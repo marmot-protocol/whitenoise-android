@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -73,6 +74,7 @@ import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
@@ -82,11 +84,8 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.group.SoleAdminDeletePicker
-import dev.ipf.whitenoise.android.ui.group.SoleAdminDeletePrompt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,9 +106,7 @@ internal fun ChatsScreen(
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    // #1131: sole-admin-with-others Delete routes here instead of blocking —
-    // transfer admin (auto for one candidate, picker for 3+) then leave + wipe.
-    var soleAdminDelete by remember { mutableStateOf<SoleAdminDeletePrompt?>(null) }
+    val mutedConversations by appState.chatMutePreferences.mutedConversations.collectAsState()
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
     // + nav icons) for a TextField that filters in real time on title +
@@ -284,6 +281,13 @@ internal fun ChatsScreen(
         remember(selectedVisibleItems) {
             chatListBulkArchiveAction(selectedVisibleItems.map { it.group.archived })
         }
+    val singleSelectedItem = selectedVisibleItems.singleOrNull()
+    val singleSelectionMuted =
+        singleSelectedItem?.let { item ->
+            appState.activeAccountRef?.let { accountRef ->
+                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
+            }
+        } ?: false
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
     // scroll-to-top on tap. Wrapped in key(showArchived) so switching the
@@ -372,6 +376,9 @@ internal fun ChatsScreen(
                     archiveAction = bulkArchiveAction,
                     actionsEnabled = selectedChatIds.isNotEmpty(),
                     allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
+                    showMarkRead = singleSelectedItem?.hasUnread == true,
+                    showMuteToggle = singleSelectedItem != null,
+                    muted = singleSelectionMuted,
                     onClose = ::clearSelection,
                     onArchive = {
                         val selected = selectedVisibleItems
@@ -399,40 +406,18 @@ internal fun ChatsScreen(
                         }
                     },
                     onDelete = {
-                        if (selectedChatIds.isEmpty()) return@ChatListSelectionBar
-                        appState.launchMutation {
-                            val selected = selectedVisibleItems
-                            val blockedSoleAdminIds = mutableListOf<String>()
-                            val deletable = mutableListOf<ChatListItem>()
-                            selected.forEach { item ->
-                                if (controller.soleAdminTransferCandidates(item.group.groupIdHex) != null) {
-                                    blockedSoleAdminIds += item.id
-                                } else {
-                                    deletable += item
-                                }
-                            }
-                            if (blockedSoleAdminIds.size == 1 && deletable.isEmpty()) {
-                                val item = selected.first { it.id == blockedSoleAdminIds.single() }
-                                val candidates = controller.soleAdminTransferCandidates(item.group.groupIdHex)
-                                if (candidates != null) {
-                                    clearSelection()
-                                    soleAdminDelete = SoleAdminDeletePrompt(item, candidates)
-                                    return@launchMutation
-                                }
-                            }
-                            if (blockedSoleAdminIds.isNotEmpty()) {
-                                appState.present(
-                                    context.resources.getQuantityString(
-                                        R.plurals.toast_chat_list_bulk_delete_blocked_sole_admin,
-                                        blockedSoleAdminIds.size,
-                                        blockedSoleAdminIds.size,
-                                    ),
-                                )
-                            }
-                            if (deletable.isNotEmpty()) {
-                                pendingBulkDelete = deletable
-                            }
-                        }
+                        pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                    },
+                    onMarkRead = {
+                        val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        appState.launchMutation { controller.markAllRead(item) }
+                    },
+                    onMuteToggle = {
+                        val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        appState.setConversationMuted(
+                            item.group.groupIdHex,
+                            !singleSelectionMuted,
+                        )
                     },
                     onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
                     onDeselectAll = { selectedChatIds.clear() },
@@ -642,14 +627,7 @@ internal fun ChatsScreen(
                 appState.launchMutation {
                     var succeeded = 0
                     items.forEach { item ->
-                        val alreadyLeft = item.removedFromGroup(appState.activeAccount?.accountIdHex)
-                        if (
-                            controller.deleteGroupFromChatList(
-                                item.group.groupIdHex,
-                                leaveFirstHint = !alreadyLeft,
-                                notify = false,
-                            )
-                        ) {
+                        if (controller.deleteGroupLocalFromChatList(item.group.groupIdHex, notify = false)) {
                             succeeded++
                         }
                     }
@@ -666,42 +644,6 @@ internal fun ChatsScreen(
             },
             onDismiss = { pendingBulkDelete = null },
         )
-    }
-
-    soleAdminDelete?.let { prompt ->
-        val groupId = prompt.item.group.groupIdHex
-        if (prompt.candidates.size == 1) {
-            val newAdmin = prompt.candidates.first()
-            ConfirmDialog(
-                title = stringResource(R.string.delete_group_dialog_title),
-                message =
-                    stringResource(
-                        R.string.confirm_sole_admin_transfer_then_leave_message,
-                        appState.displayName(newAdmin.memberIdHex),
-                    ),
-                confirmLabel = stringResource(R.string.delete_group_confirm),
-                destructive = true,
-                onConfirm = {
-                    soleAdminDelete = null
-                    appState.launchMutation {
-                        controller.transferAdminThenDeleteFromChatList(groupId, newAdmin)
-                    }
-                },
-                onDismiss = { soleAdminDelete = null },
-            )
-        } else {
-            SoleAdminDeletePicker(
-                candidates = prompt.candidates,
-                appState = appState,
-                onPick = { member ->
-                    soleAdminDelete = null
-                    appState.launchMutation {
-                        controller.transferAdminThenDeleteFromChatList(groupId, member)
-                    }
-                },
-                onDismiss = { soleAdminDelete = null },
-            )
-        }
     }
 }
 

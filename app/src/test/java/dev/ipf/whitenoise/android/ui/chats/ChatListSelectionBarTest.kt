@@ -37,9 +37,14 @@ class ChatListSelectionBarTest {
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
                     allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
                     onClose = { closes++ },
                     onArchive = { archives++ },
                     onDelete = { deletes++ },
+                    onMarkRead = {},
+                    onMuteToggle = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = {},
                 )
@@ -70,9 +75,14 @@ class ChatListSelectionBarTest {
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
                     allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onMarkRead = {},
+                    onMuteToggle = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
                 )
@@ -99,9 +109,14 @@ class ChatListSelectionBarTest {
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
                     allVisibleSelected = true,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onMarkRead = {},
+                    onMuteToggle = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
                 )
@@ -126,9 +141,14 @@ class ChatListSelectionBarTest {
                     archiveAction = ChatListBulkArchiveAction.Unarchive,
                     actionsEnabled = false,
                     allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onMarkRead = {},
+                    onMuteToggle = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -137,5 +157,100 @@ class ChatListSelectionBarTest {
 
         composeRule.onNodeWithContentDescription(string(R.string.unarchive)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun singleSelectionOverflowRoutesMarkReadAndMute() {
+        var markRead = 0
+        var muteToggle = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 1,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = true,
+                    showMuteToggle = true,
+                    muted = false,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onMarkRead = { markRead++ },
+                    onMuteToggle = { muteToggle++ },
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mute)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mark_read)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mute)).performClick()
+
+        assertEquals(1, markRead)
+        assertEquals(1, muteToggle)
+    }
+
+    @Test
+    fun multiSelectionOverflowHidesSingleChatActions() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 2,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onMarkRead = {},
+                    onMuteToggle = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mark_read)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mute)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
+    }
+
+    @Test
+    fun singleSelectionShowsUnmuteWhenMuted() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 1,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = true,
+                    muted = true,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onMarkRead = {},
+                    onMuteToggle = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_unmute)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mute)).assertDoesNotExist()
     }
 }

@@ -70,10 +70,6 @@
         <item quantity="one">%1$d Chat von diesem Gerät gelöscht</item>
         <item quantity="other">%1$d Chats von diesem Gerät gelöscht</item>
     </plurals>
-    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
-        <item quantity="one">%1$d ausgewählter Chat erfordert vor dem Löschen eine Admin-Übertragung — einzeln löschen</item>
-        <item quantity="other">%1$d ausgewählte Chats erfordern vor dem Löschen eine Admin-Übertragung — einzeln löschen</item>
-    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d Chat</item>
         <item quantity="other">%1$d Chats</item>

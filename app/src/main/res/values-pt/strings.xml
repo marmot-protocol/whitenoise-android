@@ -70,10 +70,6 @@
         <item quantity="one">%1$d chat excluído deste dispositivo</item>
         <item quantity="other">%1$d chats excluídos deste dispositivo</item>
     </plurals>
-    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
-        <item quantity="one">%1$d chat selecionado precisa de transferência de admin antes de excluir — exclua individualmente</item>
-        <item quantity="other">%1$d chats selecionados precisam de transferência de admin antes de excluir — exclua individualmente</item>
-    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d conversa</item>
         <item quantity="other">%1$d conversas</item>

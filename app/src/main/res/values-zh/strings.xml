@@ -66,9 +66,6 @@
     <plurals name="toast_chat_list_chats_deleted">
         <item quantity="other">已从此设备删除 %1$d 个聊天</item>
     </plurals>
-    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
-        <item quantity="other">%1$d 个所选聊天需要先转移管理员才能删除 — 请单独删除</item>
-    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="other">%1$d 个聊天</item>
     </plurals>

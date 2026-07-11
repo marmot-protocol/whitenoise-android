@@ -4,7 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -30,9 +32,14 @@ internal fun ChatListSelectionBar(
     archiveAction: ChatListBulkArchiveAction,
     actionsEnabled: Boolean,
     allVisibleSelected: Boolean,
+    showMarkRead: Boolean,
+    showMuteToggle: Boolean,
+    muted: Boolean,
     onClose: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    onMarkRead: () -> Unit,
+    onMuteToggle: () -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
 ) {
@@ -70,6 +77,36 @@ internal fun ChatListSelectionBar(
                 shape = MenuDefaults.shape,
                 border = amoledSurfaceBorderStroke(),
             ) {
+                if (showMarkRead) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_row_action_mark_read)) },
+                        leadingIcon = { Icon(Icons.Default.MarkChatRead, contentDescription = null) },
+                        onClick = {
+                            overflowOpen = false
+                            onMarkRead()
+                        },
+                    )
+                }
+                if (showMuteToggle) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (muted) {
+                                        R.string.chat_row_action_unmute
+                                    } else {
+                                        R.string.chat_row_action_mute
+                                    },
+                                ),
+                            )
+                        },
+                        leadingIcon = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                        onClick = {
+                            overflowOpen = false
+                            onMuteToggle()
+                        },
+                    )
+                }
                 if (allVisibleSelected) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.chat_list_deselect_all)) },

@@ -63,8 +63,8 @@ internal fun Modifier.chatListSelectionRowClickable(onClick: () -> Unit): Modifi
 /**
  * Chat list row with long-press selection entry (#1169). Long-press enters
  * multi-select mode; while active, tap toggles selection and long-press is a
- * no-op. Archive and delete run from the selection bar; mark-read/mute/delete
- * for a single chat remain in the in-conversation menu.
+ * no-op. Archive and delete run from the selection bar; mark-read and mute for
+ * a single selected chat are in the selection bar overflow.
  */
 @Composable
 internal fun ChatListRow(
