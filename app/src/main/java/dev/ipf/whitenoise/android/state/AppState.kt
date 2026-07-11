@@ -3210,17 +3210,36 @@ class WhiteNoiseAppState(
         }
         runCatching {
             withGroupCommitLock(accountRef, groupIdHex) {
-                marmotIo { secureDeleteExpired(accountRef, groupIdHex) }
+                val mediaBeforePrune =
+                    runCatching { marmotIo { listMedia(accountRef, groupIdHex, null) } }
+                        .onFailure {
+                            rethrowIfCancellation(it)
+                            appStateDebug(it) {
+                                "sweep media snapshot failed group=${groupIdHex.take(8)}: ${it.readableMessage()}"
+                            }
+                        }.getOrDefault(emptyList())
+                val result = marmotIo { secureDeleteExpired(accountRef, groupIdHex) }
+                result to mediaBeforePrune
             }
-        }.onSuccess { result ->
+        }.onSuccess { (result, mediaBeforePrune) ->
+            val expiredCiphertextSha256 = result.mediaCiphertextSha256.toSet()
             // Match the foreground sweep: when the engine actually pruned
             // rows, clear the conversation's tray card so it can't keep
             // pointing at a now-vanished message, and wipe the pruned
-            // attachments' decrypted bytes from the on-disk cache.
+            // attachments' decrypted bytes from every Android-owned cache tier.
             if (result.prunedMessages > 0uL) {
                 dismissConversationNotifications(accountRef, groupIdHex)
             }
-            evictExpiredDiskMediaCaches(result.mediaCiphertextSha256.toSet())
+            evictExpiredMediaCaches(
+                expiredCiphertextSha256 = expiredCiphertextSha256,
+                cacheKeys =
+                    mediaCacheKeysForCiphertextTags(
+                        account = accountRef,
+                        groupIdHex = groupIdHex,
+                        mediaRecords = mediaBeforePrune,
+                        ciphertextTags = expiredCiphertextSha256,
+                    ),
+            )
         }.onFailure {
             rethrowIfCancellation(it)
             appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
@@ -3337,19 +3356,24 @@ class WhiteNoiseAppState(
         return false
     }
 
-    /**
-     * Evict the on-disk (L2) decrypted-media entries stamped with any of
-     * [expiredCiphertextSha256]. This is the load-state-independent media wipe
-     * (#334): the closed-conversation path has no loaded `mediaReferences`
-     * map, so it can't resolve in-memory cache keys — but disk entries carry
-     * their ciphertext tag, so they're evicted directly. The session-scoped
-     * L1/thumbnail caches only hold media for conversations opened this
-     * session, where the foreground sweep already covers eviction.
-     */
-    private suspend fun evictExpiredDiskMediaCaches(expiredCiphertextSha256: Set<String>) {
-        if (expiredCiphertextSha256.isEmpty()) return
+    private suspend fun evictExpiredMediaCaches(
+        expiredCiphertextSha256: Set<String>,
+        cacheKeys: Set<String>,
+    ) {
+        if (expiredCiphertextSha256.isEmpty() && cacheKeys.isEmpty()) return
+        // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap. Keep
+        // the in-memory L1 removals main-confined even though disk eviction is IO.
+        removeMediaMemoryCacheKeys(
+            cacheKeys = cacheKeys,
+            dispatcher = Dispatchers.Main.immediate,
+            removePlaintext = { key -> mediaPlaintextCache.remove(key) },
+            removeThumbnail = { key -> mediaThumbnailCache.remove(key) },
+        )
         withContext(Dispatchers.IO) {
-            diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+            cacheKeys.forEach { diskMediaCache.remove(it) }
+            if (expiredCiphertextSha256.isNotEmpty()) {
+                diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+            }
         }
     }
 
