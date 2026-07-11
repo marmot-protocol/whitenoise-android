@@ -596,6 +596,19 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">已選取</string>
+    <string name="select">選取</string>
+    <string name="batch_delete_own">要為所有人刪除您的 %1$d 則訊息嗎？</string>
+    <plurals name="batch_delete_others">
+        <item quantity="other">要在本機隱藏 %1$d 則訊息嗎？</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="other">要為所有人刪除您的 %1$d 則訊息，並在本機隱藏另外 %2$d 則嗎？</item>
+    </plurals>
+    <string name="batch_delete_complete">已移除所選訊息</string>
+    <string name="batch_delete_partial">已移除部分所選訊息；另一些操作失敗</string>
+    <string name="batch_delete_failed">無法移除所選訊息</string>
+    <string name="toast_forwarded_batch_partial">已轉寄部分所選訊息；另一些轉寄失敗</string>
+    <string name="toast_forward_batch_failed">無法轉寄所選訊息</string>
     <plurals name="unread_messages_count">
         <item quantity="other">%1$d 則未讀訊息</item>
     </plurals>

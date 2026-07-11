@@ -597,6 +597,21 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Seçili</string>
+    <string name="select">Seç</string>
+    <string name="batch_delete_own">Mesajlarınızın %1$d tanesini herkes için silmek istiyor musunuz?</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">%1$d mesaj yerel olarak gizlensin mi?</item>
+        <item quantity="other">%1$d mesaj yerel olarak gizlensin mi?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">Mesajlarınızın %1$d tanesini herkes için silip diğer %2$d mesajı yerel olarak gizlemek istiyor musunuz?</item>
+        <item quantity="other">Mesajlarınızın %1$d tanesini herkes için silip diğer %2$d mesajı yerel olarak gizlemek istiyor musunuz?</item>
+    </plurals>
+    <string name="batch_delete_complete">Seçili mesajlar kaldırıldı</string>
+    <string name="batch_delete_partial">Seçili mesajların bazıları kaldırıldı; bazılarında işlem başarısız oldu</string>
+    <string name="batch_delete_failed">Seçili mesajlar kaldırılamadı</string>
+    <string name="toast_forwarded_batch_partial">Seçili mesajların bazıları iletildi; bazıları iletilemedi</string>
+    <string name="toast_forward_batch_failed">Seçili mesajlar iletilemedi</string>
     <plurals name="unread_messages_count">
         <item quantity="one">%1$d okunmamış mesaj</item>
         <item quantity="other">%1$d okunmamış mesaj</item>

@@ -1574,6 +1574,53 @@ class WhiteNoiseAppState(
         }
     }
 
+    /**
+     * Forward multiple text messages to each target chat in their original
+     * timeline order. One target's batch holds the group commit lock for the
+     * complete sequence so another mutation cannot interleave between messages.
+     */
+    fun forwardTexts(
+        targetGroupIds: List<String>,
+        texts: List<String>,
+    ) {
+        val bodies = MessageProjector.validatedForwardTextBodies(texts)
+        val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
+        if (bodies.isEmpty() || targets.isEmpty()) return
+        val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
+        launchMutation {
+            var completeTargets = 0
+            var successfulSends = 0
+            for (groupIdHex in targets) {
+                var targetComplete = true
+                try {
+                    withGroupCommitLock(account, groupIdHex) {
+                        for (body in bodies) {
+                            try {
+                                marmotIo { sendText(account, groupIdHex, body) }
+                                successfulSends += 1
+                            } catch (throwable: Throwable) {
+                                if (throwable is CancellationException) throw throwable
+                                targetComplete = false
+                            }
+                        }
+                    }
+                } catch (throwable: Throwable) {
+                    if (throwable is CancellationException) throw throwable
+                    targetComplete = false
+                }
+                if (targetComplete) completeTargets += 1
+            }
+            when {
+                completeTargets == targets.size ->
+                    presentText(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(completeTargets)))
+                successfulSends == 0 ->
+                    present(R.string.toast_forward_batch_failed, copyable = true)
+                else ->
+                    present(R.string.toast_forwarded_batch_partial, copyable = true)
+            }
+        }
+    }
+
     fun profileAddableGroups(accountIdHex: String): List<ChatListItem> =
         chatsController?.profileAddableGroups(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 

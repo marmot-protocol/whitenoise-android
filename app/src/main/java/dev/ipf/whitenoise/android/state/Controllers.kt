@@ -3099,6 +3099,12 @@ class ConversationController(
     val reactions: Map<String, List<ReactionTally>> get() = reactionsState
     var deletedMessageIds by mutableStateOf<Set<String>>(emptySet())
         private set
+
+    // One-shot invalidation mailbox for UI snapshots held outside the bounded
+    // timeline. ConversationScreen acknowledges each batch after reconciliation,
+    // so removed IDs do not become a second long-lived message index.
+    var pendingTimelineRemovedMessageIds by mutableStateOf<Set<String>>(emptySet())
+        private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
 
     /** Per-target edit history for kind-1009 events, recomputed on every
@@ -4680,8 +4686,11 @@ class ConversationController(
         }
     }
 
-    suspend fun deleteMessage(message: AppMessageRecordFfi) {
-        val account = conversationAccountRef ?: return
+    suspend fun deleteMessage(
+        message: AppMessageRecordFfi,
+        presentFailure: Boolean = true,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
         if (
             !canDeleteMessageForEveryone(
                 actionsEnabled = canSendMessages,
@@ -4691,18 +4700,26 @@ class ConversationController(
                 deleted = message.messageIdHex in deletedMessageIds,
             )
         ) {
-            return
+            return false
         }
         val target = message.messageIdHex
         deletedMessageIds = deletedMessageIds + target
-        try {
+        return try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
                 appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
             }
+            true
         } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
-            appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+            throwable.rethrowIfCancellation()
+            if (presentFailure) {
+                appState.present(
+                    R.string.toast_couldnt_delete_message,
+                    AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
+                    copyable = true,
+                )
+            }
+            false
         }
     }
 
@@ -4710,6 +4727,10 @@ class ConversationController(
         val target = messageIdHex.takeIf { it.isNotBlank() } ?: return
         appState.hideMessageForMe(conversationAccountRef, group.groupIdHex, target)
         publishTimelineFromIndexes()
+    }
+
+    fun acknowledgeTimelineRemovals(messageIds: Set<String>) {
+        pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - messageIds
     }
 
     /**
@@ -6175,6 +6196,7 @@ class ConversationController(
                     }
                 }
                 is TimelineMessageChangeFfi.Remove -> {
+                    pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds + change.messageIdHex
                     val removed = timelineRecords[change.messageIdHex]
                     removed
                         ?.let(TimelineProjector::toAppMessageRecord)
@@ -6355,6 +6377,7 @@ class ConversationController(
         reconcileOptimistic: Boolean = false,
         allowDelayedProjection: Boolean = false,
     ): AppMessageRecordFfi {
+        pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
         // Defensive guard against the Rust core re-emitting an identical
         // record (own-publish + own-relay-echo both fire
         // `timeline_changes_for_event` for the same kind-9). Without this,
@@ -6504,11 +6527,15 @@ class ConversationController(
     // loaded, [protectedTimelineMessageIds] is excluded from the trim.
     private fun trimLiveTimelineWindow(maxItems: Int) {
         val protectedIds = if (hasLoadedOlderPages) protectedTimelineMessageIds else emptySet()
-        timelineMessageIdsExceedingLiveCap(
-            items = timelineItemsById.values,
-            protectedIds = protectedIds,
-            maxLiveItems = maxItems,
-        ).forEach(::removeProjectedRecord)
+        val evictedIds =
+            timelineMessageIdsExceedingLiveCap(
+                items = timelineItemsById.values,
+                protectedIds = protectedIds,
+                maxLiveItems = maxItems,
+            )
+        if (evictedIds.isNotEmpty()) {
+            evictedIds.forEach(::removeProjectedRecord)
+        }
         pruneReadAnchorsToWindow()
     }
 

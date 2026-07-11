@@ -15,17 +15,41 @@ import java.io.File
  */
 class AppStateSendLockCoverageTest {
     @Test
-    fun forwardTextLocksEachTargetSend() {
-        val body = appStateFunctionBody("forwardText")
+    fun forwardTextsLocksEachTargetsOrderedMessageBatch() {
+        val body = appStateFunctionBody("forwardTexts")
 
         assertTrue(
-            "forwardText must serialize each forwarded send through the per-group commit lock",
+            "forwardTexts must serialize each target's ordered message batch through the per-group commit lock",
             Regex(
                 """for\s*\(\s*groupIdHex\s+in\s+targets\s*\).*""" +
                     """withGroupCommitLock\s*\(\s*account\s*,\s*groupIdHex\s*\).*""" +
-                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*groupIdHex\s*,\s*trimmed\s*\)\s*\}""",
+                    """for\s*\(\s*body\s+in\s+bodies\s*\).*""" +
+                    """marmotIo\s*\{\s*sendText\s*\(\s*account\s*,\s*groupIdHex\s*,\s*body\s*\)\s*\}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
+        )
+        assertTrue(
+            "forwardTexts must validate bodies without trimming user-authored text",
+            "MessageProjector.validatedForwardTextBodies(texts)" in body &&
+                "String::trim" !in body,
+        )
+        assertTrue(
+            "forwardTexts must continue after an individual send failure and report partial batches accurately",
+            "successfulSends += 1" in body &&
+                "targetComplete = false" in body &&
+                "R.string.toast_forwarded_batch_partial" in body,
+        )
+    }
+
+    @Test
+    fun singleMessageForwardKeepsSingleMessageResultCopy() {
+        val body = appStateFunctionBody("forwardText")
+
+        assertTrue(
+            "forwardText must keep its single-message target breakdown instead of using batch result copy",
+            "R.string.toast_forwarded_partial" in body &&
+                "R.string.toast_forward_failed" in body &&
+                "toast_forwarded_batch_partial" !in body,
         )
     }
 
@@ -102,7 +126,7 @@ class AppStateSendLockCoverageTest {
     fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
         val body = controllerFunctionBody("deleteMessage")
         val authorizationGate = body.indexOf("!canDeleteMessageForEveryone(")
-        val earlyReturn = body.indexOf("return", startIndex = authorizationGate)
+        val earlyReturn = body.indexOf("return false", startIndex = authorizationGate)
         val optimisticMutation = body.indexOf("deletedMessageIds = deletedMessageIds + target")
         val ffiDelete = body.indexOf("appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }")
 
@@ -113,6 +137,40 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "unauthorized deletes must return before reaching the FFI delete call",
             ffiDelete > earlyReturn,
+        )
+    }
+
+    @Test
+    fun deleteMessageReturnsCommitResultAndBatchUsesIt() {
+        val controllers = controllersSource().readText()
+        val body = controllerFunctionBody("deleteMessage")
+        val conversation = conversationScreenSource().readText()
+
+        assertTrue(
+            "deleteMessage must expose a Boolean commit result",
+            Regex("""suspend\s+fun\s+deleteMessage\s*\([^)]*\)\s*:\s*Boolean""").containsMatchIn(controllers),
+        )
+        assertTrue(
+            "deleteMessage guards must report that no commit occurred",
+            "conversationAccountRef ?: return false" in body &&
+                "!canDeleteMessageForEveryone(" in body &&
+                "return false" in body,
+        )
+        assertTrue(
+            "deleteMessage must report true after the locked commit and false after rollback",
+            body.indexOf("appState.withGroupCommitLock") < body.indexOf("true") &&
+                body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.lastIndexOf("false"),
+        )
+        assertTrue(
+            "deleteMessage must roll back optimistic deletion before propagating cancellation",
+            body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.indexOf("throwable.rethrowIfCancellation()"),
+        )
+        assertTrue(
+            "batch deletion must aggregate commit results without emitting one snackbar per failure",
+            "controller.deleteMessage(record, presentFailure = false)" in conversation &&
+                "R.string.batch_delete_partial" in conversation &&
+                "if (presentFailure)" in body &&
+                "record.messageIdHex !in controller.deletedMessageIds" !in conversation,
         )
     }
 
