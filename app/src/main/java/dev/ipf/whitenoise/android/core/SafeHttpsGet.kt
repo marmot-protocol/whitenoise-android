@@ -105,6 +105,7 @@ object SafeHttpsGet {
                 openPinnedConnection(
                     parsed = parsed,
                     addresses = resolved,
+                    requestDeadlineNanos = requestDeadlineNanos,
                     connectTimeoutMillis = connectTimeoutMillis,
                     readTimeoutMillis = readTimeoutMillis,
                     requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
@@ -172,11 +173,13 @@ object SafeHttpsGet {
     private fun openPinnedConnection(
         parsed: URL,
         addresses: Array<InetAddress>,
+        requestDeadlineNanos: Long,
         connectTimeoutMillis: Int,
         readTimeoutMillis: Int,
         requestHeaders: Map<String, String>,
     ): HttpURLConnection? {
         for (address in addresses) {
+            if (deadlineExceeded(requestDeadlineNanos)) return null
             val connection =
                 pinnedConnection(parsed, address, connectTimeoutMillis, readTimeoutMillis, requestHeaders)
                     ?: continue
