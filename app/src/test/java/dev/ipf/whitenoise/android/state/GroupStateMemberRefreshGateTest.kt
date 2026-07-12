@@ -58,6 +58,19 @@ class GroupStateMemberRefreshGateTest {
     }
 
     @Test
+    fun selfRemovalTransitionIsDetectedImmediately() {
+        val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
+        val removed = previous.copy(selfMembership = SelfMembershipFfi.REMOVED)
+        val left = previous.copy(selfMembership = SelfMembershipFfi.LEFT)
+        val unchangedRemoved = previous.copy(selfMembership = SelfMembershipFfi.REMOVED)
+
+        assertTrue(groupStateUpdateRemovesSelf(previous, removed))
+        assertTrue(groupStateUpdateRemovesSelf(previous, left))
+        assertFalse(groupStateUpdateRemovesSelf(removed, unchangedRemoved))
+        assertFalse(groupStateUpdateRemovesSelf(previous, previous.copy(name = "Renamed")))
+    }
+
+    @Test
     fun groupIdentityChangesTriggerForcedEvictionProbe() {
         val previous = group(groupIdHex = "group-a")
         val updated = previous.copy(groupIdHex = "group-b")
