@@ -159,6 +159,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactSharePreviewDialog
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationSharePreviewDialog
+import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedLocation
 import dev.ipf.whitenoise.android.ui.conversation.share.fetchCurrentLocation
@@ -752,14 +753,14 @@ internal fun ConversationScreen(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) launchCameraCapture() }
 
-    // Contact share (attachment sheet): PickContact returns a URI with a
-    // temporary read grant scoped to the one chosen contact, so no
-    // READ_CONTACTS permission is requested and only that contact's
-    // name/phone/email are read — never the address book.
+    // Contact share (attachment sheet): the phone-row picker returns a data
+    // URI whose temporary read grant covers the chosen entry's name + number
+    // directly, so no READ_CONTACTS permission is requested and nothing
+    // beyond that one picked row is read — never the address book.
     var pendingContactShare by remember(chat.id) { mutableStateOf<SharedContact?>(null) }
     var pendingLocationShare by remember(chat.id) { mutableStateOf<SharedLocation?>(null) }
     val contactPickerLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { contactUri ->
+        rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
             if (contactUri == null) return@rememberLauncherForActivityResult
             scope.launch {
                 val contact =
@@ -2554,7 +2555,7 @@ internal fun ConversationScreen(
                                             )
                                         }
                                     },
-                                    onShareContact = { contactPickerLauncher.launch(null) },
+                                    onShareContact = { contactPickerLauncher.launch(Unit) },
                                     onPasteImageUris = { uris ->
                                         // Receive-content URI grants are scoped to the
                                         // paste callback. Copy the bytes into app-owned

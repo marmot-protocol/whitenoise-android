@@ -1,14 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
+import android.app.Activity
 import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+
+private const val TAG = "WNContactShare"
 
 /**
  * The only fields extracted from a picked contact — never the address book.
@@ -27,64 +34,87 @@ internal data class SharedContact(
 internal fun formatContactShareText(contact: SharedContact): String = listOfNotNull(contact.name, contact.phone, contact.email).joinToString("\n")
 
 /**
- * Reads name plus primary phone/email for one picked contact through the
- * picker's temporary URI grant — no READ_CONTACTS permission involved, and
- * only the granted contact's entity rows are touched.
+ * Picks one phone entry from the system contact picker. Unlike a whole-contact
+ * pick, the returned data row itself carries name + number, so the picker's
+ * temporary URI grant is enough to read them — the whole-contact flow needs a
+ * second query on an entity sub-URI the grant does not cover on stock Android,
+ * which is what broke the first on-device attempt.
  */
+internal class PickContactPhoneRow : ActivityResultContract<Unit, Uri?>() {
+    override fun createIntent(
+        context: Context,
+        input: Unit,
+    ): Intent = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+
+    override fun parseResult(
+        resultCode: Int,
+        intent: Intent?,
+    ): Uri? = intent?.data?.takeIf { resultCode == Activity.RESULT_OK }
+}
+
+/** Reads name + number from the granted phone data row; email is best-effort. */
 internal fun readSharedContact(
     resolver: ContentResolver,
-    contactUri: Uri,
-): SharedContact? =
+    phoneRowUri: Uri,
+): SharedContact? {
+    var name: String? = null
+    var phone: String? = null
+    var contactId: Long? = null
     runCatching {
-        var name: String? = null
         resolver
             .query(
-                contactUri,
-                arrayOf(ContactsContract.Contacts.DISPLAY_NAME),
+                phoneRowUri,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                ),
                 null,
                 null,
                 null,
             )?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     name = cursor.getString(0)?.takeIf { it.isNotBlank() }
+                    phone = cursor.getString(1)?.takeIf { it.isNotBlank() }
+                    contactId = if (cursor.isNull(2)) null else cursor.getLong(2)
                 }
             }
-        var phone: String? = null
-        var phoneIsPrimary = false
+    }.onFailure { Log.w(TAG, "picked phone row query failed", it) }
+    val email = contactId?.let { readPrimaryEmail(resolver, it) }
+    return SharedContact(name = name, phone = phone, email = email).takeUnless { it.isEmpty }
+}
+
+// The email table sits outside the picker's URI grant, so on stock Android
+// this raises SecurityException without READ_CONTACTS — expected, and it just
+// means the share goes out without an email line.
+private fun readPrimaryEmail(
+    resolver: ContentResolver,
+    contactId: Long,
+): String? =
+    runCatching {
         var email: String? = null
         var emailIsPrimary = false
-        val entityUri = Uri.withAppendedPath(contactUri, ContactsContract.Contacts.Entity.CONTENT_DIRECTORY)
         resolver
             .query(
-                entityUri,
+                ContactsContract.CommonDataKinds.Email.CONTENT_URI,
                 arrayOf(
-                    ContactsContract.Contacts.Entity.MIMETYPE,
-                    ContactsContract.Contacts.Entity.DATA1,
-                    ContactsContract.Contacts.Entity.IS_SUPER_PRIMARY,
+                    ContactsContract.CommonDataKinds.Email.ADDRESS,
+                    ContactsContract.CommonDataKinds.Email.IS_SUPER_PRIMARY,
                 ),
-                null,
-                null,
+                "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ?",
+                arrayOf(contactId.toString()),
                 null,
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
-                    val mime = cursor.getString(0) ?: continue
-                    val value = cursor.getString(1)?.takeIf { it.isNotBlank() } ?: continue
-                    val primary = cursor.getInt(2) != 0
-                    when (mime) {
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE ->
-                            if (phone == null || (primary && !phoneIsPrimary)) {
-                                phone = value
-                                phoneIsPrimary = primary
-                            }
-                        ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE ->
-                            if (email == null || (primary && !emailIsPrimary)) {
-                                email = value
-                                emailIsPrimary = primary
-                            }
+                    val value = cursor.getString(0)?.takeIf { it.isNotBlank() } ?: continue
+                    val primary = cursor.getInt(1) != 0
+                    if (email == null || (primary && !emailIsPrimary)) {
+                        email = value
+                        emailIsPrimary = primary
                     }
                 }
             }
-        SharedContact(name = name, phone = phone, email = email)
+        email
     }.getOrNull()
 
 @Composable
