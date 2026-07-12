@@ -396,46 +396,56 @@ internal fun ConversationScreen(
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
     val selectableMessages =
-        renderedTimeline
-            .mapNotNull { item ->
-                val record = item.record
-                val messageId = record.messageIdHex
-                if (
-                    !isBatchSelectableMessage(
-                        messageId = messageId,
-                        userVisibleMessage = MessageProjector.isChatKind(record.kind),
-                        committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
-                        projectedDeleted = item.projected?.deleted == true,
-                        deletedMessageIds = controller.deletedMessageIds,
-                    )
-                ) {
-                    return@mapNotNull null
-                }
-                val invalidated = item.projected?.invalidationStatus != null
-                val editedText =
-                    controller.editsByTarget[messageId]
-                        ?.latestText
-                        ?.takeIf { record.kind == 9uL }
-                BatchMessageSelection(
-                    action =
-                        BatchMessageActionItem(
+        remember(
+            renderedTimeline,
+            controller.deletedMessageIds,
+            controller.editsByTarget,
+            appState.activeAccount?.accountIdHex,
+            appState.profileRevisionForCompose,
+        ) {
+            renderedTimeline
+                .mapNotNull { item ->
+                    val record = item.record
+                    val messageId = record.messageIdHex
+                    if (
+                        !isBatchSelectableMessage(
                             messageId = messageId,
-                            senderId = record.sender,
-                            senderDisplayName = appState.displayName(record.sender),
-                            copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
-                            forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
-                            mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
-                        ),
-                    record = record,
-                    timelineOrder = item.timelineOrder,
-                )
-            }.associateBy { it.action.messageId }
+                            userVisibleMessage = MessageProjector.isChatKind(record.kind),
+                            committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
+                            projectedDeleted = item.projected?.deleted == true,
+                            deletedMessageIds = controller.deletedMessageIds,
+                        )
+                    ) {
+                        return@mapNotNull null
+                    }
+                    val invalidated = item.projected?.invalidationStatus != null
+                    val editedText =
+                        controller.editsByTarget[messageId]
+                            ?.latestText
+                            ?.takeIf { record.kind == 9uL }
+                    BatchMessageSelection(
+                        action =
+                            BatchMessageActionItem(
+                                messageId = messageId,
+                                senderId = record.sender,
+                                senderDisplayName = appState.displayName(record.sender),
+                                copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
+                                forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
+                                mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
+                            ),
+                        record = record,
+                        timelineOrder = item.timelineOrder,
+                    )
+                }.associateBy { it.action.messageId }
+        }
     val invalidVisibleMessageIds =
-        renderedTimeline
-            .asSequence()
-            .map { it.record.messageIdHex }
-            .filter { it.isNotBlank() && it !in selectableMessages }
-            .toSet()
+        remember(renderedTimeline, selectableMessages) {
+            renderedTimeline
+                .asSequence()
+                .map { it.record.messageIdHex }
+                .filter { it.isNotBlank() && it !in selectableMessages }
+                .toSet()
+        }
     LaunchedEffect(
         selectableMessages,
         invalidVisibleMessageIds,

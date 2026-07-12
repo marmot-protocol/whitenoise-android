@@ -51,10 +51,13 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.flow.filter
+import java.util.Locale
 
 /** Chat-list filter state. `Archived` swaps the source list to archived chats
  *  rather than predicate-filtering the active one. */
 internal enum class ChatListFilter { All, Unread, Groups, Archived }
+
+internal fun localeInvariantFold(value: String): String = value.lowercase(Locale.ROOT)
 
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
@@ -76,23 +79,23 @@ internal fun applyChatListSearchAndFilter(
         }
     val needle = rawQuery.trim()
     if (needle.isEmpty()) return byFilter
-    val ciNeedle = needle.lowercase()
+    val ciNeedle = localeInvariantFold(needle)
     return byFilter.filter { item ->
         // Match against the SAME title the user sees in the row, not the
         // raw group.name. For DMs and other unnamed chats, group.name is
         // blank and the visible title is projected from the other
         // member's profile — without this projection the search misses
         // direct messages by their displayed name.
-        val title = chatListItemDisplayTitle(item, appState, titleCopy).lowercase()
+        val title = localeInvariantFold(chatListItemDisplayTitle(item, appState, titleCopy))
         if (title.contains(ciNeedle)) return@filter true
-        val preview = item.projectedPreviewText().lowercase()
+        val preview = localeInvariantFold(item.projectedPreviewText())
         if (preview.contains(ciNeedle)) return@filter true
         // Group description matches (issue #388): descriptions hold the
         // context users put there to find a group later ("research workgroup",
         // "family planning"), so they should surface the row even when the
         // title and preview don't mention the needle. Same lowercase +
         // substring containment as title/preview.
-        val description = item.group.description.lowercase()
+        val description = localeInvariantFold(item.group.description)
         if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
         // Message-body matches (issue #290): the async per-chat search
         // (ChatsController.searchMessageBodies) found the needle inside this

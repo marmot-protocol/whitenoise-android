@@ -139,7 +139,7 @@ class NotificationReplyWorker(
                 }
                 if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
             } finally {
-                presenter.cancel(action.notificationTag, action.notificationId)
+                presenter.dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)
             }
         }
     }

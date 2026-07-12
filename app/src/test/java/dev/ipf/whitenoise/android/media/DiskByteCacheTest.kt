@@ -148,6 +148,29 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun failedReplacementRestoresTheLiveEntrysTag() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing DiskByteCache.kt source file")
+        val body = source.kotlinFunctionBody("put")
+        val tagCommit = body.indexOf("!tagTmp.renameTo(tagFile)")
+        val binCommit = body.indexOf("!tmp.renameTo(file)")
+
+        assertTrue("the tag commit must remain serialized with the data commit", tagCommit in 0 until binCommit)
+        assertTrue(
+            "a failed data replacement must restore the previous indexed tag",
+            body.indexOf("checkNotNull(tagFile).writeText(previousTag)", binCommit) > binCommit,
+        )
+        assertTrue(
+            "an un-restorable tag must fail closed by removing the stale index entry",
+            body.indexOf("index.remove(hashed)", binCommit) > binCommit,
+        )
+    }
+
+    @Test
     fun get_refreshesFileLastModifiedForReadRecency() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("a", ByteArray(40))

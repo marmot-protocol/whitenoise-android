@@ -172,8 +172,14 @@ object MessageProjector {
         // reactionById's insertion order (sorted by recordedAt above) keeps the
         // per-emoji order stable for the emoji tiebreaker in the final sort.
         val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
+        val displayEmojiByNormalized = linkedMapOf<String, String>()
         for (reaction in reactionById.values) {
-            sendersByEmoji.getOrPut(reaction.emoji) { linkedSetOf() }.add(reaction.sender)
+            val emoji = normalizeReactionEmoji(reaction.emoji)
+            val displayEmoji = displayEmojiByNormalized[emoji]
+            if (displayEmoji == null || '\uFE0F' in reaction.emoji && '\uFE0F' !in displayEmoji) {
+                displayEmojiByNormalized[emoji] = reaction.emoji
+            }
+            sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.add(reaction.sender)
         }
 
         return sendersByEmoji
@@ -182,7 +188,7 @@ object MessageProjector {
                     null
                 } else {
                     ReactionTally(
-                        emoji = emoji,
+                        emoji = displayEmojiByNormalized.getValue(emoji),
                         count = senders.size,
                         // Case-insensitive: see TimelineProjector.reactionTallies.
                         mine = myAccountId != null && senders.contains(myAccountId.lowercase()),
@@ -194,6 +200,11 @@ object MessageProjector {
                     .thenBy { it.emoji },
             )
     }
+
+    internal fun normalizeReactionEmoji(emoji: String): String =
+        emoji
+            .filterNot { it == '\uFE0E' || it == '\uFE0F' }
+            .ifBlank { emoji }
 
     fun isMine(
         message: AppMessageRecordFfi,

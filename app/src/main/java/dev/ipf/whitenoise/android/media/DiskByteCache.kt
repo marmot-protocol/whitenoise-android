@@ -243,9 +243,24 @@ class DiskByteCache(
             }
             if (!tmp.renameTo(file)) {
                 runCatching { tmp.delete() }
-                // Couldn't place the `.bin`; drop the tag we just wrote so no orphan
-                // sidecar points at a nonexistent entry.
-                tagFile?.let { runCatching { it.delete() } }
+                // The tag rename landed first. For a same-key replacement the
+                // old bytes and index entry are still live, so restore their tag
+                // instead of deleting the sidecar that expiry eviction needs.
+                val restoredExistingTag =
+                    existing?.tag?.let { previousTag ->
+                        runCatching {
+                            checkNotNull(tagFile).writeText(previousTag)
+                            true
+                        }.getOrDefault(false)
+                    } ?: runCatching { tagFile?.delete() != false }.getOrDefault(false)
+                if (!restoredExistingTag && existing != null) {
+                    // If metadata restoration itself fails, fail closed: do not
+                    // leave indexed plaintext that cannot be evicted by its tag.
+                    runCatching { file.delete() }
+                    runCatching { tagFile?.delete() }
+                    index.remove(hashed)
+                    residentBytes -= existing.size
+                }
                 return
             }
             if (existing != null) {

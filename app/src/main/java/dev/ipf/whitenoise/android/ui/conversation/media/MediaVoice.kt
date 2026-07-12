@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -82,22 +83,17 @@ internal fun MediaVoiceBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
 
-    val cachedFileOnEntry =
-        remember(pillKey, reference.mediaType) {
-            cachedVoiceAttachmentFile(
-                context = context,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-            )
-        }
+    var localFile by
+        rememberCachedVoiceAttachmentFileState(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     val cachedPlaintextOnEntry =
         remember(pillKey, reference.mediaType) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
-    var localFile by remember(pillKey, reference.mediaType) {
-        mutableStateOf(cachedFileOnEntry)
-    }
     var totalDurationMs by remember(pillKey) { mutableStateOf(0) }
     var loading by remember(pillKey) { mutableStateOf(false) }
     var failed by remember(pillKey) { mutableStateOf(false) }
@@ -114,7 +110,7 @@ internal fun MediaVoiceBubble(
                 mine = mine,
                 audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
                 hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = cachedFileOnEntry != null,
+                hasCachedFile = localFile != null,
             ),
         )
     }
@@ -479,6 +475,32 @@ internal fun cachedVoiceAttachmentFile(
         attachmentIndex = attachmentIndex,
         reference = reference,
     ).takeIf { it.isFile && it.length() > 0L }
+
+@Composable
+private fun rememberCachedVoiceAttachmentFileState(
+    context: Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): MutableState<java.io.File?> {
+    val cachedFile =
+        remember(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+            mutableStateOf<java.io.File?>(null)
+        }
+    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+        val file =
+            withContext(Dispatchers.IO) {
+                cachedVoiceAttachmentFile(
+                    context = context,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                )
+            }
+        if (cachedFile.value == null) cachedFile.value = file
+    }
+    return cachedFile
+}
 
 internal fun shouldStartVoiceAttachmentDownload(
     mine: Boolean,

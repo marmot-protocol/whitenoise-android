@@ -102,7 +102,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
                 ) {
-                    LocalNotificationPresenter(appContext).cancel(action.notificationTag, action.notificationId)
+                    LocalNotificationPresenter(appContext)
+                        .dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)
                 }
             }
         }
