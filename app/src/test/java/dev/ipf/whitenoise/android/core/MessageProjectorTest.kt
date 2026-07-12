@@ -43,6 +43,20 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun reactionTalliesCoalesceEmojiPresentationSelectors() {
+        val records =
+            listOf(
+                reaction("r1", sender = "alice", target = "m1", emoji = "❤", at = 1u),
+                reaction("r2", sender = "bob", target = "m1", emoji = "❤️", at = 2u),
+            )
+
+        assertEquals(
+            listOf(ReactionTally(emoji = "❤️", count = 2, mine = true)),
+            MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "bob"),
+        )
+    }
+
+    @Test
     fun reactionTalliesMatchSendersCaseInsensitively() {
         val records =
             listOf(

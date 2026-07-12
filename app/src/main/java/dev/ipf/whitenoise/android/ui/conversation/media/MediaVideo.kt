@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,22 +91,17 @@ internal fun MediaVideoGridTile(
 ) {
     val context = LocalContext.current
     val epoch = reference.sourceEpoch
-    val cachedFileOnEntry =
-        remember(messageIdHex, attachmentIndex, reference.mediaType) {
-            cachedVideoAttachmentFile(
-                context = context,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-            )
-        }
+    var localFile by
+        rememberCachedVideoAttachmentFileState(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     val cachedPlaintextOnEntry =
         remember(messageIdHex, attachmentIndex) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
-    var localFile by remember(messageIdHex, attachmentIndex, epoch, reference.mediaType) {
-        mutableStateOf(cachedFileOnEntry)
-    }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -122,7 +118,7 @@ internal fun MediaVideoGridTile(
                 mine = mine,
                 videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
                 hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = cachedFileOnEntry != null,
+                hasCachedFile = localFile != null,
             ),
         )
     }
@@ -310,22 +306,17 @@ internal fun MediaVideoBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
     val epoch = reference.sourceEpoch
-    val cachedFileOnEntry =
-        remember(pillKey, reference.mediaType) {
-            cachedVideoAttachmentFile(
-                context = context,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-            )
-        }
+    var localFile by
+        rememberCachedVideoAttachmentFileState(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     val cachedPlaintextOnEntry =
         remember(pillKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
-    var localFile by remember(pillKey, epoch, reference.mediaType) {
-        mutableStateOf(cachedFileOnEntry)
-    }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -351,7 +342,7 @@ internal fun MediaVideoBubble(
                 mine = mine,
                 videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
                 hasCachedAttachment = cachedPlaintextOnEntry,
-                hasCachedFile = cachedFileOnEntry != null,
+                hasCachedFile = localFile != null,
             ),
         )
     }
@@ -679,6 +670,32 @@ internal fun cachedVideoAttachmentFile(
         reference = reference,
     ).takeIf { it.isFile && it.length() > 0L }
 
+@Composable
+private fun rememberCachedVideoAttachmentFileState(
+    context: Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): MutableState<java.io.File?> {
+    val cachedFile =
+        remember(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+            mutableStateOf<java.io.File?>(null)
+        }
+    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch, reference.mediaType) {
+        val file =
+            withContext(Dispatchers.IO) {
+                cachedVideoAttachmentFile(
+                    context = context,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = attachmentIndex,
+                    reference = reference,
+                )
+            }
+        if (cachedFile.value == null) cachedFile.value = file
+    }
+    return cachedFile
+}
+
 @VisibleForTesting
 internal fun shouldStartVideoAttachmentDownload(
     mine: Boolean,
@@ -795,23 +812,13 @@ internal fun VideoViewerPage(
     mine: Boolean,
 ) {
     val context = LocalContext.current
-    val cachedFileOnEntry =
-        remember(messageIdHex, attachmentIndex, reference.mediaType) {
-            cachedVideoAttachmentFile(
-                context = context,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-            )
-        }
-    var localFile by remember(
-        messageIdHex,
-        attachmentIndex,
-        reference.sourceEpoch,
-        reference.mediaType,
-    ) {
-        mutableStateOf(cachedFileOnEntry)
-    }
+    var localFile by
+        rememberCachedVideoAttachmentFileState(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch) {
         if (localFile != null) return@LaunchedEffect
         // Receive-side: skip epoch=0 (FFI download would error). Own
