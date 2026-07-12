@@ -77,6 +77,8 @@ internal fun ComposerAttachmentSheetPane(
     alpha: Float,
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
+    onShareLocation: (() -> Unit)?,
+    onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -146,15 +148,15 @@ internal fun ComposerAttachmentSheetPane(
                     AttachmentActionTile(
                         icon = Icons.Default.LocationOn,
                         label = stringResource(R.string.attach_location),
-                        available = false,
-                        onClick = onComingSoon,
+                        available = onShareLocation != null,
+                        onClick = onShareLocation ?: onComingSoon,
                         modifier = Modifier.weight(1f),
                     )
                     AttachmentActionTile(
                         icon = Icons.Default.Person,
                         label = stringResource(R.string.attach_contact),
-                        available = false,
-                        onClick = onComingSoon,
+                        available = onShareContact != null,
+                        onClick = onShareContact ?: onComingSoon,
                         modifier = Modifier.weight(1f),
                     )
                 }

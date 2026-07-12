@@ -667,6 +667,13 @@
     <string name="attach_contact">聯絡人</string>
     <string name="attach_options">新增附件</string>
     <string name="media_preview_position_badge">傳送順序 %1$d</string>
+    <string name="share_contact_title">分享聯絡人</string>
+    <string name="share_location_title">分享位置</string>
+    <string name="contact_read_failed">無法讀取聯絡人</string>
+    <string name="location_locating">正在取得位置…</string>
+    <string name="location_unavailable">無法取得目前位置</string>
+    <string name="location_permission_denied">位置權限遭拒</string>
+    <string name="location_accuracy_format">精確度 ±%1$d 公尺</string>
     <string name="media_no_app_to_open">未安裝可開啟此檔案的應用程式</string>
     <string name="media_couldnt_open">無法開啟檔案</string>
     <string name="media_open">開啟</string>

@@ -676,6 +676,13 @@
     <string name="attach_contact">Kişi</string>
     <string name="attach_options">Ek ekle</string>
     <string name="media_preview_position_badge">Gönderim sırası %1$d</string>
+    <string name="share_contact_title">Kişiyi paylaş</string>
+    <string name="share_location_title">Konumu paylaş</string>
+    <string name="contact_read_failed">Kişi okunamadı</string>
+    <string name="location_locating">Konumunuz alınıyor…</string>
+    <string name="location_unavailable">Mevcut konum alınamadı</string>
+    <string name="location_permission_denied">Konum izni reddedildi</string>
+    <string name="location_accuracy_format">Doğruluk ±%1$d m</string>
     <string name="media_no_app_to_open">Bu dosyayı açacak uygulama yok</string>
     <string name="media_couldnt_open">Dosya açılamadı</string>
     <string name="media_open">Aç</string>

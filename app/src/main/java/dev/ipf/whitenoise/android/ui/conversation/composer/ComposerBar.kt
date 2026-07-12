@@ -200,6 +200,8 @@ internal fun ComposerBar(
     onPickFromGallery: (() -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
+    onShareLocation: (() -> Unit)? = null,
+    onShareContact: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
     editingMessageId: String? = null,
@@ -819,6 +821,20 @@ internal fun ComposerBar(
                                 {
                                     attachmentSheetState.dismiss()
                                     pick()
+                                }
+                            },
+                        onShareLocation =
+                            onShareLocation?.let { share ->
+                                {
+                                    attachmentSheetState.dismiss()
+                                    share()
+                                }
+                            },
+                        onShareContact =
+                            onShareContact?.let { share ->
+                                {
+                                    attachmentSheetState.dismiss()
+                                    share()
                                 }
                             },
                         onComingSoon = { appState?.present(R.string.coming_soon) },

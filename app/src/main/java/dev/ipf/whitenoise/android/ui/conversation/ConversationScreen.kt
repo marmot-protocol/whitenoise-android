@@ -157,6 +157,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.ContactSharePreviewDialog
+import dev.ipf.whitenoise.android.ui.conversation.share.LocationSharePreviewDialog
+import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
+import dev.ipf.whitenoise.android.ui.conversation.share.SharedLocation
+import dev.ipf.whitenoise.android.ui.conversation.share.fetchCurrentLocation
+import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
+import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
@@ -742,6 +751,59 @@ internal fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) launchCameraCapture() }
+
+    // Contact share (attachment sheet): PickContact returns a URI with a
+    // temporary read grant scoped to the one chosen contact, so no
+    // READ_CONTACTS permission is requested and only that contact's
+    // name/phone/email are read — never the address book.
+    var pendingContactShare by remember(chat.id) { mutableStateOf<SharedContact?>(null) }
+    var pendingLocationShare by remember(chat.id) { mutableStateOf<SharedLocation?>(null) }
+    val contactPickerLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { contactUri ->
+            if (contactUri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val contact =
+                    withContext(Dispatchers.IO) {
+                        readSharedContact(context.contentResolver, contactUri)
+                    }
+                if (contact == null || contact.isEmpty) {
+                    appState.present(R.string.contact_read_failed)
+                } else {
+                    pendingContactShare = contact
+                }
+            }
+        }
+
+    fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    // One-shot fix; the payload lives only in pendingLocationShare until the
+    // user confirms or cancels the preview.
+    fun requestLocationFix() {
+        appState.present(R.string.location_locating)
+        scope.launch {
+            val location =
+                fetchCurrentLocation(
+                    context,
+                    hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
+                )
+            if (location == null) {
+                appState.present(R.string.location_unavailable)
+            } else {
+                pendingLocationShare = location
+            }
+        }
+    }
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { grants ->
+            if (locationGrantAllowsSharing(grants)) {
+                requestLocationFix()
+            } else {
+                appState.present(R.string.location_permission_denied)
+            }
+        }
 
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
@@ -2475,6 +2537,24 @@ internal fun ConversationScreen(
                                         // without restricting by MIME. Bytes upload as-is.
                                         documentPickerLauncher.launch(arrayOf("*/*"))
                                     },
+                                    onShareLocation = {
+                                        // Permission is requested here, on the tap, never
+                                        // earlier. Fine and coarse together so the user's
+                                        // approximate-only choice still works.
+                                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                        ) {
+                                            requestLocationFix()
+                                        } else {
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                                ),
+                                            )
+                                        }
+                                    },
+                                    onShareContact = { contactPickerLauncher.launch(null) },
                                     onPasteImageUris = { uris ->
                                         // Receive-content URI grants are scoped to the
                                         // paste callback. Copy the bytes into app-owned
@@ -2942,6 +3022,36 @@ internal fun ConversationScreen(
                 showDetails = true
             },
             onDismiss = { showTransferAdminFirst = false },
+        )
+    }
+
+    pendingContactShare?.let { contact ->
+        ContactSharePreviewDialog(
+            contact = contact,
+            onDismiss = { pendingContactShare = null },
+            onSend = {
+                pendingContactShare = null
+                appState.launchMutation {
+                    controller.send(formatContactShareText(contact)) {
+                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                    }
+                }
+            },
+        )
+    }
+
+    pendingLocationShare?.let { location ->
+        LocationSharePreviewDialog(
+            location = location,
+            onDismiss = { pendingLocationShare = null },
+            onSend = {
+                pendingLocationShare = null
+                appState.launchMutation {
+                    controller.send(formatLocationShareText(location)) {
+                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                    }
+                }
+            },
         )
     }
 

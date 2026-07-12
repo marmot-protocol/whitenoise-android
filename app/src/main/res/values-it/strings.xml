@@ -676,6 +676,13 @@
     <string name="attach_contact">Contatto</string>
     <string name="attach_options">Aggiungi allegato</string>
     <string name="media_preview_position_badge">Posizione di invio %1$d</string>
+    <string name="share_contact_title">Condividi contatto</string>
+    <string name="share_location_title">Condividi posizione</string>
+    <string name="contact_read_failed">Impossibile leggere il contatto</string>
+    <string name="location_locating">Recupero della posizione…</string>
+    <string name="location_unavailable">Impossibile ottenere la posizione attuale</string>
+    <string name="location_permission_denied">Autorizzazione alla posizione negata</string>
+    <string name="location_accuracy_format">Precisione ±%1$d m</string>
     <string name="media_no_app_to_open">Nessuna app installata per aprire questo file</string>
     <string name="media_couldnt_open">Impossibile aprire il file</string>
     <string name="media_open">Apri</string>

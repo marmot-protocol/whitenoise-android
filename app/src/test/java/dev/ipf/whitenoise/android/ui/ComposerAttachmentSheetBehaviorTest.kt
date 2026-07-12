@@ -43,6 +43,8 @@ class ComposerAttachmentSheetBehaviorTest {
     private fun renderComposer(
         onPickFromGallery: () -> Unit = {},
         onPickDocument: () -> Unit = {},
+        onShareLocation: (() -> Unit)? = null,
+        onShareContact: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -54,6 +56,8 @@ class ComposerAttachmentSheetBehaviorTest {
                         onSend = { _, _ -> },
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
+                        onShareLocation = onShareLocation,
+                        onShareContact = onShareContact,
                     )
                 }
             }
@@ -101,6 +105,34 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText(string(R.string.attach_gallery)).assertDoesNotExist()
+    }
+
+    @Test
+    fun contactTileFiresCallbackAndClosesTheSheet() {
+        var contactClicks = 0
+        renderComposer(onShareContact = { contactClicks++ })
+        assertEquals(0, contactClicks)
+        openAttachmentSheet()
+        // Composing the sheet alone must not start the flow — only the tap may.
+        assertEquals(0, contactClicks)
+        composeRule.onNodeWithText(string(R.string.attach_contact)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, contactClicks)
+        composeRule.onNodeWithText(string(R.string.attach_contact)).assertDoesNotExist()
+    }
+
+    @Test
+    fun locationTileFiresCallbackOnlyAfterTap() {
+        var locationClicks = 0
+        renderComposer(onShareLocation = { locationClicks++ })
+        assertEquals(0, locationClicks)
+        openAttachmentSheet()
+        // The permission request lives inside this callback, so "no fire before
+        // tap" is exactly "no permission prompt before tap".
+        assertEquals(0, locationClicks)
+        composeRule.onNodeWithText(string(R.string.attach_location)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, locationClicks)
     }
 
     @Test
