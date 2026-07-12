@@ -119,6 +119,33 @@ class LocalNotificationDismissalTest {
         )
     }
 
+    @Test
+    fun siblingDismissalKeepsInviteCardPostedAfterBaseline() {
+        val account = "account-a"
+        val group = "group-a"
+        manager.notify(
+            "invite-target",
+            41,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, group)
+                    },
+            ),
+        )
+        // Baseline strictly before the invite's post time exercises the
+        // shouldDismissInvite + postTime survive branch (and its tapTokens skip).
+        val invitePostTime = manager.activeNotifications.single().postTime
+
+        assertTrue(
+            LocalNotificationPresenter(context)
+                .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = invitePostTime - 1),
+        )
+
+        assertEquals(1, manager.activeNotifications.size)
+    }
+
     private fun notification(extras: Bundle? = null) =
         NotificationCompat
             .Builder(context, TEST_CHANNEL)

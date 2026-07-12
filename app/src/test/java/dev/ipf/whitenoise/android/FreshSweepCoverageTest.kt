@@ -54,13 +54,15 @@ class FreshSweepCoverageTest {
         val replyWorker = source("notifications/NotificationReplyWorker.kt")
         val actionReceiver = source("notifications/NotificationActionReceiver.kt")
 
-        // Both paths cancel the replied/read card outright, then clear its
-        // reaction/mention/invite siblings only when a newer one didn't arrive
-        // during the action window (#1311).
-        assertTrue(replyWorker.contains("cancel(action.notificationTag, action.notificationId)"))
-        assertTrue(replyWorker.contains("dismissConversationSiblingCardsNotNewerThan("))
-        assertTrue(actionReceiver.contains("cancel(action.notificationTag, action.notificationId)"))
-        assertTrue(actionReceiver.contains("dismissConversationSiblingCardsNotNewerThan("))
+        // Both paths cancel the replied/read card outright BEFORE clearing its
+        // reaction/mention/invite siblings, and the sibling clear is bounded by
+        // the captured action-window cutoff so newer cards survive (#1311).
+        listOf(replyWorker, actionReceiver).forEach { text ->
+            val cancelAt = text.indexOf("cancel(action.notificationTag, action.notificationId)")
+            val siblingAt = text.indexOf("dismissConversationSiblingCardsNotNewerThan(")
+            assertTrue(cancelAt in 0 until siblingAt)
+            assertTrue(text.contains("sinceMs = dismissBaselineMs"))
+        }
     }
 
     @Test
