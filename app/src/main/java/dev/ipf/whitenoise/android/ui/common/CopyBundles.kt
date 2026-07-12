@@ -1,18 +1,24 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ConversationControllerCopy
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -124,12 +130,59 @@ private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.Relative
 }
 
 @Composable
-internal fun rememberedRelativeTime(epochSeconds: ULong): String =
-    IdentityFormatter.relativeTime(
-        epochSeconds,
-        rememberRelativeTimeCopy(),
-        LocalConfiguration.current.locales[0],
-    )
+internal fun rememberedRelativeTime(epochSeconds: ULong): String {
+    val copy = rememberRelativeTimeCopy()
+    val locale = LocalConfiguration.current.locales[0]
+    val currentTime = rememberRelativeTimeNow()
+    return remember(epochSeconds, copy, locale, currentTime) {
+        IdentityFormatter.relativeTime(
+            epochSeconds = epochSeconds,
+            copy = copy,
+            locale = locale,
+            now = currentTime,
+        )
+    }
+}
+
+@Composable
+private fun rememberRelativeTimeNow(): Instant {
+    val lifecycleOwner = LocalContext.current.lifecycleOwner()
+    var currentTime by remember { mutableStateOf(Instant.now()) }
+    var resumed by remember(lifecycleOwner) {
+        mutableStateOf(
+            lifecycleOwner == null || lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+        )
+    }
+    DisposableEffect(lifecycleOwner) {
+        if (lifecycleOwner == null) {
+            onDispose { }
+        } else {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> {
+                            currentTime = Instant.now()
+                            resumed = true
+                        }
+                        Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_DESTROY -> resumed = false
+                        else -> Unit
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+    LaunchedEffect(resumed) {
+        if (!resumed) return@LaunchedEffect
+        while (true) {
+            delay(relativeTimeRefreshDelayMillis(Instant.now()))
+            currentTime = Instant.now()
+        }
+    }
+    return currentTime
+}
+
+internal fun relativeTimeRefreshDelayMillis(now: Instant): Long = (60_000L - (now.toEpochMilli() % 60_000L)).coerceAtLeast(1L)
 
 // Clock time only (locale-aware short form, e.g. "3:28 PM" / "15:28"). The
 // transcript groups messages under day separators, so a bubble footer doesn't

@@ -1478,6 +1478,21 @@ internal fun agentStreamFailureText(
     return copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName)
 }
 
+internal suspend fun runBestEffortPostCommitSteps(
+    steps: List<Pair<String, suspend () -> Unit>>,
+    onFailure: (String, Throwable) -> Unit,
+) {
+    steps.forEach { (name, step) ->
+        try {
+            step()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            onFailure(name, throwable)
+        }
+    }
+}
+
 private data class OptimisticReactionChange(
     val targetMessageId: String,
     val emoji: String,
@@ -2324,11 +2339,15 @@ class ChatsController(
                     appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
                 } else {
                     if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                        val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
-                        demotedBeforeLeave = true
-                        appState.applyLocalGroupUpdate(demoteResult.details.group)
+                        withContext(NonCancellable) {
+                            val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                            demotedBeforeLeave = true
+                            appState.applyLocalGroupUpdate(demoteResult.details.group)
+                            appState.marmotIo { leaveGroup(account, groupIdHex) }
+                        }
+                    } else {
+                        appState.marmotIo { leaveGroup(account, groupIdHex) }
                     }
-                    appState.marmotIo { leaveGroup(account, groupIdHex) }
                 }
             }
             // Invalidate both snapshot sources that seed the next
@@ -5417,12 +5436,16 @@ class ConversationController(
                         appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                            val demoteResult =
-                                appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
-                            demotedBeforeLeave = true
-                            applyMutationDetails(account, demoteResult.details)
+                            withContext(NonCancellable) {
+                                val demoteResult =
+                                    appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                                demotedBeforeLeave = true
+                                applyMutationDetails(account, demoteResult.details)
+                                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                            }
+                        } else {
+                            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                         }
-                        appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                     }
                 }
                 // Authoritative local self-leave: record it before the
@@ -5474,28 +5497,47 @@ class ConversationController(
     suspend fun acceptInvite(notify: Boolean = true): Boolean =
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatching {
-                group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
-                appState.applyLocalGroupUpdate(group)
-                appState.dismissConversationNotifications(account, group.groupIdHex)
-                // Accepting an invite (re-)joins the group, so clear any stale
-                // local self-left latch before refreshMembers() so applyGroupDetails
-                // is allowed to add self back to the roster (issue #787).
-                selfMembership.clearSelfLeft()
-                refreshMembers()
-                refreshCurrentTimeline(account).forEach { streamId ->
-                    if (activeStreamIds.add(streamId)) {
-                        inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+            val acceptedGroup =
+                runCatching { appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) } }
+                    .getOrElse {
+                        it.rethrowIfCancellation()
+                        appState.present(
+                            R.string.toast_couldnt_accept_invite,
+                            AppText.Plain(it.message ?: it.javaClass.simpleName),
+                            copyable = true,
+                        )
+                        return@withMutationLockResult false
                     }
-                }
-                initializeReadState(account)
-                if (notify) appState.present(R.string.toast_invite_accepted)
-                true
-            }.getOrElse {
-                it.rethrowIfCancellation()
-                appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
-                false
-            }
+            group = acceptedGroup
+            appState.applyLocalGroupUpdate(group)
+            appState.dismissConversationNotifications(account, group.groupIdHex)
+            // Accepting an invite (re-)joins the group, so clear any stale
+            // local self-left latch before refreshMembers() so applyGroupDetails
+            // is allowed to add self back to the roster (issue #787).
+            selfMembership.clearSelfLeft()
+            runBestEffortPostCommitSteps(
+                steps =
+                    listOf(
+                        "members" to { refreshMembers() },
+                        "timeline" to {
+                            refreshCurrentTimeline(account).forEach { streamId ->
+                                if (activeStreamIds.add(streamId)) {
+                                    inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+                                }
+                            }
+                        },
+                        "read-state" to { initializeReadState(account) },
+                    ),
+                onFailure = { step, throwable ->
+                    Log.w(
+                        "DMConversation",
+                        "post-accept $step refresh failed for ${group.groupIdHex.take(8)}",
+                        throwable,
+                    )
+                },
+            )
+            if (notify) appState.present(R.string.toast_invite_accepted)
+            true
         }
 
     suspend fun declineInvite(): Boolean =
@@ -5617,17 +5659,17 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             if (refs.isEmpty()) return@withMutationLockResult false
-            val adminTargets =
-                if (addAsAdmin) {
-                    refs.map { ref ->
-                        appState.marmotIo { accountIdHex(ref) }
-                            ?: throw IllegalArgumentException("Invalid member reference")
-                    }
-                } else {
-                    emptyList()
-                }
             var inviteSent = false
             try {
+                val adminTargets =
+                    if (addAsAdmin) {
+                        refs.map { ref ->
+                            appState.marmotIo { accountIdHex(ref) }
+                                ?: throw IllegalArgumentException("Invalid member reference")
+                        }
+                    } else {
+                        emptyList()
+                    }
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val inviteResult =
                         appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
