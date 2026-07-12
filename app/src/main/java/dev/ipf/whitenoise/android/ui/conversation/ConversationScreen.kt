@@ -157,12 +157,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
-import dev.ipf.whitenoise.android.ui.conversation.share.ContactSharePreviewDialog
-import dev.ipf.whitenoise.android.ui.conversation.share.LocationSharePreviewDialog
+import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
+import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
-import dev.ipf.whitenoise.android.ui.conversation.share.SharedLocation
-import dev.ipf.whitenoise.android.ui.conversation.share.fetchCurrentLocation
+import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
+import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
@@ -758,7 +759,9 @@ internal fun ConversationScreen(
     // directly, so no READ_CONTACTS permission is requested and nothing
     // beyond that one picked row is read — never the address book.
     var pendingContactShare by remember(chat.id) { mutableStateOf<SharedContact?>(null) }
-    var pendingLocationShare by remember(chat.id) { mutableStateOf<SharedLocation?>(null) }
+    // The picked point lives only here until the user sends or cancels; the
+    // keyless OSM picker is the single confirmation surface.
+    var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
             if (contactUri == null) return@rememberLauncherForActivityResult
@@ -777,34 +780,42 @@ internal fun ConversationScreen(
 
     fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    // One-shot fix; the payload lives only in pendingLocationShare until the
-    // user confirms or cancels the preview.
-    fun requestLocationFix() {
-        appState.present(R.string.location_locating)
-        scope.launch {
-            val location =
-                fetchCurrentLocation(
-                    context,
-                    hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
-                )
-            if (location == null) {
-                appState.present(R.string.location_unavailable)
-            } else {
-                pendingLocationShare = location
-            }
-        }
-    }
-
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
         ) { grants ->
             if (locationGrantAllowsSharing(grants)) {
-                requestLocationFix()
+                locationPickerOpen = true
             } else {
                 appState.present(R.string.location_permission_denied)
             }
         }
+
+    fun sendSharedContact(contact: SharedContact) {
+        appState.launchMutation {
+            val vcardBytes =
+                withContext(Dispatchers.IO) {
+                    buildVCard(contact).toByteArray(Charsets.UTF_8)
+                }
+            // The vCard rides the existing media pipeline as a text/vcard
+            // attachment (portable — any client can save it), and the caption
+            // carries the human-readable name/phone so a peer with no contact
+            // renderer still reads it, and our own bubble draws a card from it.
+            val attachment =
+                PendingAttachment(
+                    plaintextBytes = vcardBytes,
+                    mediaType = VCARD_MIME_TYPE,
+                    fileName = contactVCardFileName(contact),
+                )
+            val caption = formatContactShareText(contact).ifBlank { null }
+            val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
+            scope.launch {
+                val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                listState.animateScrollToItem(target)
+            }
+            controller.uploadQueued(seeded)
+        }
+    }
 
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
@@ -2545,7 +2556,7 @@ internal fun ConversationScreen(
                                         if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
                                             hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
                                         ) {
-                                            requestLocationFix()
+                                            locationPickerOpen = true
                                         } else {
                                             locationPermissionLauncher.launch(
                                                 arrayOf(
@@ -3027,26 +3038,22 @@ internal fun ConversationScreen(
     }
 
     pendingContactShare?.let { contact ->
-        ContactSharePreviewDialog(
+        ContactPreviewScreen(
             contact = contact,
             onDismiss = { pendingContactShare = null },
-            onSend = {
+            onSend = { selected ->
                 pendingContactShare = null
-                appState.launchMutation {
-                    controller.send(formatContactShareText(contact)) {
-                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
-                    }
-                }
+                sendSharedContact(selected)
             },
         )
     }
 
-    pendingLocationShare?.let { location ->
-        LocationSharePreviewDialog(
-            location = location,
-            onDismiss = { pendingLocationShare = null },
-            onSend = {
-                pendingLocationShare = null
+    if (locationPickerOpen) {
+        LocationPickerScreen(
+            hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
+            onDismiss = { locationPickerOpen = false },
+            onPick = { location ->
+                locationPickerOpen = false
                 appState.launchMutation {
                     controller.send(formatLocationShareText(location)) {
                         scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }

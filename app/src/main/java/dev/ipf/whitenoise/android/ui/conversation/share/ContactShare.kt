@@ -8,14 +8,11 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
-import dev.ipf.whitenoise.android.R
 
 private const val TAG = "WNContactShare"
+
+/** MIME type for the portable vCard attachment carried by a contact share. */
+internal const val VCARD_MIME_TYPE = "text/vcard"
 
 /**
  * The only fields extracted from a picked contact — never the address book.
@@ -28,17 +25,66 @@ internal data class SharedContact(
     val email: String?,
 ) {
     val isEmpty: Boolean get() = name == null && phone == null && email == null
+
+    val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: phone ?: email ?: ""
 }
 
-/** Text fallback until a structured contact message kind exists. */
+/** Human-readable body carried as the message caption (also the text fallback). */
 internal fun formatContactShareText(contact: SharedContact): String = listOfNotNull(contact.name, contact.phone, contact.email).joinToString("\n")
+
+/**
+ * Recovers a contact from a shared-contact message's caption so the bubble can
+ * draw a card without fetching the vCard blob. Heuristic by design: a line with
+ * `@` is the email, a mostly-digit / `+`-prefixed line is the phone, and the
+ * first remaining line is the name.
+ */
+internal fun parseSharedContactFromText(text: String): SharedContact? {
+    val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    if (lines.isEmpty()) return null
+    val email = lines.firstOrNull { it.contains('@') && !it.contains(' ') }
+    val phone =
+        lines.firstOrNull { line ->
+            line != email && (line.startsWith("+") || line.count { it.isDigit() } >= 6) && !line.contains('@')
+        }
+    val name = lines.firstOrNull { it != email && it != phone }
+    val contact = SharedContact(name = name, phone = phone, email = email)
+    return contact.takeUnless { it.isEmpty }
+}
+
+private fun vcardEscape(value: String): String =
+    value
+        .replace("\\", "\\\\")
+        .replace("\n", "\\n")
+        .replace(",", "\\,")
+        .replace(";", "\\;")
+
+/** Minimal RFC 6350 vCard (3.0 for the broadest importer support). */
+internal fun buildVCard(contact: SharedContact): String =
+    buildString {
+        append("BEGIN:VCARD\r\n")
+        append("VERSION:3.0\r\n")
+        append("FN:${vcardEscape(contact.displayName)}\r\n")
+        contact.phone?.let { append("TEL;TYPE=CELL:${vcardEscape(it)}\r\n") }
+        contact.email?.let { append("EMAIL:${vcardEscape(it)}\r\n") }
+        append("END:VCARD\r\n")
+    }
+
+/** A filesystem-safe `.vcf` name derived from the contact's display name. */
+internal fun contactVCardFileName(contact: SharedContact): String {
+    val base =
+        contact.displayName
+            .ifBlank { "contact" }
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .take(48)
+            .ifBlank { "contact" }
+    return "$base.vcf"
+}
 
 /**
  * Picks one phone entry from the system contact picker. Unlike a whole-contact
  * pick, the returned data row itself carries name + number, so the picker's
  * temporary URI grant is enough to read them — the whole-contact flow needs a
- * second query on an entity sub-URI the grant does not cover on stock Android,
- * which is what broke the first on-device attempt.
+ * second query on an entity sub-URI the grant does not cover on stock Android.
  */
 internal class PickContactPhoneRow : ActivityResultContract<Unit, Uri?>() {
     override fun createIntent(
@@ -116,26 +162,3 @@ private fun readPrimaryEmail(
             }
         email
     }.getOrNull()
-
-@Composable
-internal fun ContactSharePreviewDialog(
-    contact: SharedContact,
-    onDismiss: () -> Unit,
-    onSend: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.share_contact_title)) },
-        text = { Text(formatContactShareText(contact)) },
-        confirmButton = {
-            TextButton(onClick = onSend) {
-                Text(stringResource(R.string.send))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
-}

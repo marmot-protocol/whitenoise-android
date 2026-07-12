@@ -678,11 +678,12 @@
     <string name="media_preview_position_badge">Position d\'envoi %1$d</string>
     <string name="share_contact_title">Partager le contact</string>
     <string name="share_location_title">Partager la position</string>
+    <string name="location_use_current">Utiliser la position actuelle</string>
+    <string name="location_send_this">Envoyer cette position</string>
+    <string name="contact_field_phone">Téléphone</string>
+    <string name="contact_field_email">E-mail</string>
     <string name="contact_read_failed">Impossible de lire le contact</string>
-    <string name="location_locating">Récupération de votre position…</string>
-    <string name="location_unavailable">Impossible d\'obtenir la position actuelle</string>
     <string name="location_permission_denied">Autorisation de localisation refusée</string>
-    <string name="location_accuracy_format">Précision ±%1$d m</string>
     <string name="media_no_app_to_open">Aucune application installée pour ouvrir ce fichier</string>
     <string name="media_couldnt_open">Impossible d\'ouvrir le fichier</string>
     <string name="media_open">Ouvrir</string>

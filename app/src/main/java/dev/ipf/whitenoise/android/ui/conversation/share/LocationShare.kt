@@ -5,14 +5,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.location.LocationManager
 import android.os.CancellationSignal
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -32,9 +24,32 @@ internal data class SharedLocation(
 /** Always dot-decimal — a locale comma separator would break the URL. */
 internal fun formatCoordinate(value: Double): String = String.format(Locale.US, "%.6f", value)
 
-/** Text fallback until a structured location message kind exists. */
+/**
+ * Text fallback until a structured location message kind exists. The
+ * `maps?q=lat,lng` form is the precise point query every maps app resolves,
+ * so a peer on any client at least gets a tappable, accurate link — and our
+ * own clients can parse the coordinates back out with
+ * [parseSharedLocationFromText] to draw a map bubble.
+ */
 internal fun formatLocationShareText(location: SharedLocation): String =
-    "Location: https://maps.google.com/?q=${formatCoordinate(location.latitude)},${formatCoordinate(location.longitude)}"
+    "Location: https://maps.google.com/maps?q=${formatCoordinate(location.latitude)},${formatCoordinate(location.longitude)}"
+
+private val MAPS_QUERY_COORDINATE =
+    Regex("""maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
+
+/**
+ * Recovers coordinates from a shared-location message so the bubble can draw a
+ * map. Deliberately lenient — it accepts the `?q=` and `/maps?q=` forms and a
+ * `%2C`-encoded comma, so a location shared by an older build (or another
+ * client that pasted a maps link) still renders a map instead of raw text.
+ */
+internal fun parseSharedLocationFromText(text: String): SharedLocation? {
+    val match = MAPS_QUERY_COORDINATE.find(text) ?: return null
+    val lat = match.groupValues[1].toDoubleOrNull() ?: return null
+    val lng = match.groupValues[2].toDoubleOrNull() ?: return null
+    if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+    return SharedLocation(latitude = lat, longitude = lng, accuracyMeters = null)
+}
 
 internal fun locationGrantAllowsSharing(grants: Map<String, Boolean>): Boolean =
     grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
@@ -91,38 +106,4 @@ internal suspend fun fetchCurrentLocation(
             }
         }.onFailure { continuation.resume(null) }
     }
-}
-
-@Composable
-internal fun LocationSharePreviewDialog(
-    location: SharedLocation,
-    onDismiss: () -> Unit,
-    onSend: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.share_location_title)) },
-        text = {
-            Column {
-                Text("${formatCoordinate(location.latitude)}, ${formatCoordinate(location.longitude)}")
-                location.accuracyMeters?.let { accuracy ->
-                    Text(
-                        stringResource(R.string.location_accuracy_format, accuracy),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onSend) {
-                Text(stringResource(R.string.send))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
 }

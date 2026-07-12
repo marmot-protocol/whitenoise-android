@@ -40,8 +40,10 @@ work = "2.11.2"
 roborazzi = "1.68.0"
 robolectric = "4.16.1"
 kover = "0.9.8"
+osmdroid = "6.1.20"
 
 [libraries]
+osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }

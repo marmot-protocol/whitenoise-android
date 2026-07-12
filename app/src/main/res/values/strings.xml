@@ -834,11 +834,12 @@
     <string name="media_preview_position_badge">Send position %1$d</string>
     <string name="share_contact_title">Share contact</string>
     <string name="share_location_title">Share location</string>
+    <string name="location_use_current">Use current location</string>
+    <string name="location_send_this">Send this location</string>
+    <string name="contact_field_phone">Phone</string>
+    <string name="contact_field_email">Email</string>
     <string name="contact_read_failed">Couldn\'t read contact</string>
-    <string name="location_locating">Getting your location…</string>
-    <string name="location_unavailable">Couldn\'t get current location</string>
     <string name="location_permission_denied">Location permission denied</string>
-    <string name="location_accuracy_format">Accuracy ±%1$d m</string>
     <string name="media_no_app_to_open">No app installed to open this file</string>
     <string name="media_couldnt_open">Couldn\'t open file</string>
     <string name="media_open">Open</string>
