@@ -142,8 +142,8 @@ class DiskByteCacheTest {
         assertTrue(
             "same-key replacement must inspect the existing entry before renames but remove it only after the data commit succeeds",
             body.indexOf("val existing = existingSnapshot") < body.indexOf("!renameFile(tmp, file)") &&
-                body.indexOf("!renameFile(tmp, file)") < body.indexOf("index.remove(hashed)") &&
-                body.indexOf("index.remove(hashed)") < body.indexOf("index[hashed] = Entry(file, size, ciphertextTag)"),
+                body.indexOf("!renameFile(tmp, file)") < body.lastIndexOf("index.remove(hashed)") &&
+                body.lastIndexOf("index.remove(hashed)") < body.indexOf("index[hashed] = Entry(file, size, ciphertextTag)"),
         )
     }
 
@@ -172,6 +172,39 @@ class DiskByteCacheTest {
         val reopened = DiskByteCache(dir, maxBytes = 1024)
         assertTrue(reopened.get("k")!!.contentEquals(original))
         assertEquals(0, reopened.removeByCiphertextTags(setOf("new-ciphertext")))
+        assertEquals(1, reopened.removeByCiphertextTags(setOf("old-ciphertext")))
+        assertNull(reopened.get("k"))
+    }
+
+    @Test
+    fun failedUntaggedReplacementKeepsTaggedExistingEntryAndTag() {
+        // Regression: an untagged same-key replacement whose `.bin` rename fails
+        // never touches the tag file, so the still-valid tagged existing entry
+        // must survive — the fail-closed cleanup only applies to puts that
+        // attempted a tag rename (tagTmp != null).
+        var failDataCommit = false
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                maxBytes = 1024,
+                renameFile = { source, target ->
+                    if (failDataCommit && source.name.contains("-bin-") && target.name.endsWith(".bin")) {
+                        false
+                    } else {
+                        source.renameTo(target)
+                    }
+                },
+            )
+        val original = ByteArray(40) { 1 }
+        cache.put("k", original, cache.generation(), ciphertextTag = "old-ciphertext")
+
+        failDataCommit = true
+        cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = null)
+
+        assertTrue("old bytes must survive a failed untagged replacement", cache.get("k")!!.contentEquals(original))
+        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        assertTrue("old bytes must survive restart", reopened.get("k")!!.contentEquals(original))
+        // The old tag must still authorize eviction — proof the sidecar was untouched.
         assertEquals(1, reopened.removeByCiphertextTags(setOf("old-ciphertext")))
         assertNull(reopened.get("k"))
     }

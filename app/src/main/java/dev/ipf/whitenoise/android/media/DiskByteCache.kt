@@ -263,20 +263,27 @@ class DiskByteCache(
             }
             if (!renameFile(tmp, file)) {
                 runCatching { tmp.delete() }
-                // The tag rename landed first. For a same-key replacement the
-                // old bytes and index entry are still live, so restore their tag
-                // atomically instead of rewriting the live sidecar in place.
-                val restoredExistingTag =
-                    existing?.tag?.let {
-                        rollbackTagTmp != null && tagFile != null && renameFile(rollbackTagTmp, tagFile)
-                    } ?: runCatching { tagFile?.delete() != false }.getOrDefault(false)
-                if (!restoredExistingTag && existing != null) {
-                    // If metadata restoration itself fails, fail closed: do not
-                    // leave indexed plaintext that cannot be evicted by its tag.
-                    runCatching { file.delete() }
-                    runCatching { tagFile?.delete() }
-                    index.remove(hashed)
-                    residentBytes -= existing.size
+                // Only a put that actually attempted a tag rename (tagTmp != null)
+                // can have left the sidecar mismatched with the still-live old
+                // `.bin`. An untagged replacement never touches the tag file, so
+                // the existing entry — and its tag, if any — is intact; abort
+                // cleanly instead of deleting a valid entry on a transient rename.
+                if (tagTmp != null) {
+                    // The tag rename landed first. For a same-key replacement the
+                    // old bytes and index entry are still live, so restore their tag
+                    // atomically instead of rewriting the live sidecar in place.
+                    val restoredExistingTag =
+                        existing?.tag?.let {
+                            rollbackTagTmp != null && tagFile != null && renameFile(rollbackTagTmp, tagFile)
+                        } ?: runCatching { tagFile?.delete() != false }.getOrDefault(false)
+                    if (!restoredExistingTag && existing != null) {
+                        // If metadata restoration itself fails, fail closed: do not
+                        // leave indexed plaintext that cannot be evicted by its tag.
+                        runCatching { file.delete() }
+                        runCatching { tagFile?.delete() }
+                        index.remove(hashed)
+                        residentBytes -= existing.size
+                    }
                 }
                 rollbackTagTmp?.let { runCatching { it.delete() } }
                 return
