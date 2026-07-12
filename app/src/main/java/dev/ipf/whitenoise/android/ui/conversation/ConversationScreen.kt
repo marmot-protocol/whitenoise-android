@@ -89,6 +89,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -2919,12 +2920,21 @@ internal fun ConversationScreen(
             if (composerAttachmentSheet.isOpen) {
                 // Transparent scrim over the transcript only — the composer
                 // stays reachable, so the keyboard and emoji toggles can still
-                // swap the sheet away directly.
+                // swap the sheet away directly. Carries a dismiss semantics
+                // action + label so a screen reader announces (and can trigger)
+                // this otherwise-invisible touch layer.
+                val dismissLabel = stringResource(R.string.close)
                 Box(
                     Modifier
                         .matchParentSize()
                         .pointerInput(composerAttachmentSheet) {
                             detectTapGestures { composerAttachmentSheet.dismiss() }
+                        }.semantics {
+                            contentDescription = dismissLabel
+                            onClick(label = dismissLabel) {
+                                composerAttachmentSheet.dismiss()
+                                true
+                            }
                         },
                 )
             }

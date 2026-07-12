@@ -680,6 +680,7 @@
     <string name="share_location_title">Konumu paylaş</string>
     <string name="location_use_current">Mevcut konumu kullan</string>
     <string name="location_send_this">Bu konumu gönder</string>
+    <string name="location_open_in_maps">Haritalar\'da aç</string>
     <string name="contact_field_phone">Telefon</string>
     <string name="contact_field_email">E-posta</string>
     <string name="contact_read_failed">Kişi okunamadı</string>

@@ -671,6 +671,7 @@
     <string name="share_location_title">分享位置</string>
     <string name="location_use_current">使用目前位置</string>
     <string name="location_send_this">傳送此位置</string>
+    <string name="location_open_in_maps">在地圖中開啟</string>
     <string name="contact_field_phone">電話</string>
     <string name="contact_field_email">電子郵件</string>
     <string name="contact_read_failed">無法讀取聯絡人</string>

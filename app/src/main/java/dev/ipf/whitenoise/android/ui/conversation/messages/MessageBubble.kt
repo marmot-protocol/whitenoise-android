@@ -851,9 +851,10 @@ internal fun MessageBubble(
                     }
                     if (!deleted && !invalidated && fileAttachments.isNotEmpty()) {
                         fileAttachments.forEach { entry ->
-                            // The vCard behind a contact card is shown as the card,
-                            // not a raw file pill.
-                            if (sharedContact != null && entry == vcardAttachment) return@forEach
+                            // A vCard renders the contact card above; keep its file
+                            // pill too so the .vcf stays downloadable/openable until
+                            // the card gains its own save action (both app-generated
+                            // and inbound shares must remain reachable as files).
                             MediaFileBubble(
                                 messageIdHex = record.messageIdHex,
                                 attachmentIndex = entry.index,

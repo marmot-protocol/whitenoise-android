@@ -680,6 +680,7 @@
     <string name="share_location_title">Compartir ubicación</string>
     <string name="location_use_current">Usar ubicación actual</string>
     <string name="location_send_this">Enviar esta ubicación</string>
+    <string name="location_open_in_maps">Abrir en Mapas</string>
     <string name="contact_field_phone">Teléfono</string>
     <string name="contact_field_email">Correo electrónico</string>
     <string name="contact_read_failed">No se pudo leer el contacto</string>

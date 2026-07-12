@@ -700,6 +700,7 @@
     <string name="share_location_title">Поделиться геопозицией</string>
     <string name="location_use_current">Использовать текущее местоположение</string>
     <string name="location_send_this">Отправить это местоположение</string>
+    <string name="location_open_in_maps">Открыть в картах</string>
     <string name="contact_field_phone">Телефон</string>
     <string name="contact_field_email">Эл. почта</string>
     <string name="contact_read_failed">Не удалось прочитать контакт</string>

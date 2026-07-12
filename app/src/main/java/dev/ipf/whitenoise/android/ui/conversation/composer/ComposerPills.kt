@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Keyboard
@@ -93,6 +94,11 @@ internal fun ComposerPill(
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    // Gate inputs only: the sheet these open lives in ComposerBar, but the
+    // attach button must appear whenever ANY attachment action is wired, not
+    // just gallery/document.
+    hasLocationShare: Boolean = false,
+    hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
@@ -289,13 +295,16 @@ internal fun ComposerPill(
                     )
                 }
             }
-            if (onPickFromGallery != null || onPickDocument != null) {
+            if (onPickFromGallery != null || onPickDocument != null || hasLocationShare || hasContactShare) {
                 IconButton(
                     onClick = onAttachmentsToggle,
                     modifier = Modifier.size(36.dp),
                 ) {
+                    // Swap the glyph on open (X) the way the emoji toggle swaps
+                    // to a keyboard, so sighted users get a visual cue, not just
+                    // a changed content description.
                     Icon(
-                        Icons.Default.AttachFile,
+                        if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
                         contentDescription =
                             stringResource(
                                 if (attachmentSheetOpen) R.string.close else R.string.attach_options,

@@ -836,6 +836,7 @@
     <string name="share_location_title">Share location</string>
     <string name="location_use_current">Use current location</string>
     <string name="location_send_this">Send this location</string>
+    <string name="location_open_in_maps">Open in Maps</string>
     <string name="contact_field_phone">Phone</string>
     <string name="contact_field_email">Email</string>
     <string name="contact_read_failed">Couldn\'t read contact</string>

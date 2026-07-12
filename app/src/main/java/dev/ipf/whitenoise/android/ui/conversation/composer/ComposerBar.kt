@@ -696,6 +696,8 @@ internal fun ComposerBar(
                             }
                         },
                         attachmentSheetOpen = attachmentSheetState.isOpen,
+                        hasLocationShare = onShareLocation != null,
+                        hasContactShare = onShareContact != null,
                         onCaptureFromCamera = onCaptureFromCamera,
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,

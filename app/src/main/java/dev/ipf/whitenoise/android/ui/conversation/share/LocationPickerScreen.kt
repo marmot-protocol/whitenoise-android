@@ -125,6 +125,25 @@ internal fun LocationPickerScreen(
                         .size(44.dp),
             )
 
+            // Required OpenStreetMap tile attribution (the map is user-initiated,
+            // so tiles only load once the user opens this picker).
+            Surface(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .navigationBarsPadding()
+                        .padding(4.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                shape = CircleShape,
+            ) {
+                Text(
+                    "© OpenStreetMap",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+
             Row(
                 modifier =
                     Modifier
