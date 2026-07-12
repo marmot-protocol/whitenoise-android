@@ -671,6 +671,11 @@
     <string name="attach_take_photo">Scatta foto</string>
     <string name="attach_photo_library">Galleria foto</string>
     <string name="attach_document">Documento</string>
+    <string name="attach_gallery">Galleria</string>
+    <string name="attach_location">Posizione</string>
+    <string name="attach_contact">Contatto</string>
+    <string name="attach_options">Aggiungi allegato</string>
+    <string name="media_preview_position_badge">Posizione di invio %1$d</string>
     <string name="media_no_app_to_open">Nessuna app installata per aprire questo file</string>
     <string name="media_couldnt_open">Impossibile aprire il file</string>
     <string name="media_open">Apri</string>

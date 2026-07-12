@@ -298,6 +298,8 @@ class LocalizationResourceTest {
                         "disappearing_5_minutes",
                         // "Contacts" is spelled identically in French.
                         "contacts",
+                        // "Contact" is spelled identically in French.
+                        "attach_contact",
                     ),
             )
     }

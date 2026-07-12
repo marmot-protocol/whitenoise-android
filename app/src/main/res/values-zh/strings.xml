@@ -662,6 +662,11 @@
     <string name="attach_take_photo">拍照</string>
     <string name="attach_photo_library">图库</string>
     <string name="attach_document">文档</string>
+    <string name="attach_gallery">图库</string>
+    <string name="attach_location">位置</string>
+    <string name="attach_contact">联系人</string>
+    <string name="attach_options">添加附件</string>
+    <string name="media_preview_position_badge">发送顺序 %1$d</string>
     <string name="media_no_app_to_open">未安装可打开此文件的应用</string>
     <string name="media_couldnt_open">无法打开文件</string>
     <string name="media_open">打开</string>

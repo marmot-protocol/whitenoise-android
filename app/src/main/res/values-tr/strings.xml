@@ -671,6 +671,11 @@
     <string name="attach_take_photo">Fotoğraf çek</string>
     <string name="attach_photo_library">Fotoğraf galerisi</string>
     <string name="attach_document">Belge</string>
+    <string name="attach_gallery">Galeri</string>
+    <string name="attach_location">Konum</string>
+    <string name="attach_contact">Kişi</string>
+    <string name="attach_options">Ek ekle</string>
+    <string name="media_preview_position_badge">Gönderim sırası %1$d</string>
     <string name="media_no_app_to_open">Bu dosyayı açacak uygulama yok</string>
     <string name="media_couldnt_open">Dosya açılamadı</string>
     <string name="media_open">Aç</string>

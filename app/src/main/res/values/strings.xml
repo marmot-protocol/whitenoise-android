@@ -827,6 +827,11 @@
     <string name="attach_take_photo">Take photo</string>
     <string name="attach_photo_library">Photo library</string>
     <string name="attach_document">Document</string>
+    <string name="attach_gallery">Gallery</string>
+    <string name="attach_location">Location</string>
+    <string name="attach_contact">Contact</string>
+    <string name="attach_options">Add attachment</string>
+    <string name="media_preview_position_badge">Send position %1$d</string>
     <string name="media_no_app_to_open">No app installed to open this file</string>
     <string name="media_couldnt_open">Couldn\'t open file</string>
     <string name="media_open">Open</string>

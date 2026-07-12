@@ -691,6 +691,11 @@
     <string name="attach_take_photo">Сделать фото</string>
     <string name="attach_photo_library">Фотогалерея</string>
     <string name="attach_document">Документ</string>
+    <string name="attach_gallery">Галерея</string>
+    <string name="attach_location">Местоположение</string>
+    <string name="attach_contact">Контакт</string>
+    <string name="attach_options">Добавить вложение</string>
+    <string name="media_preview_position_badge">Позиция отправки %1$d</string>
     <string name="media_no_app_to_open">Нет приложения для открытия этого файла</string>
     <string name="media_couldnt_open">Не удалось открыть файл</string>
     <string name="media_open">Открыть</string>

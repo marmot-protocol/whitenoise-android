@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,6 +78,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -135,11 +137,12 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewSheet
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
@@ -2093,6 +2096,10 @@ internal fun ConversationScreen(
             initialDraft = appState.draftFor(controller.group.groupIdHex).orEmpty(),
         )
 
+    // Hoisted from ComposerBar so a tap on the transcript can dismiss the
+    // attachment sheet — the composer itself stays interactive while it's open.
+    val composerAttachmentSheet = rememberComposerAttachmentSheetState()
+
     val openDetailsDescription = stringResource(R.string.details)
     LaunchedEffect(selectedForwardBodies.isEmpty()) {
         batchForwardSheetOpen =
@@ -2432,6 +2439,7 @@ internal fun ConversationScreen(
                                     onDraftChange = { appState.setDraft(groupIdHex, it) },
                                     draftKey = groupIdHex,
                                     textState = composerTextState,
+                                    attachmentSheetState = composerAttachmentSheet,
                                     editingMessageId = controller.editingMessageId,
                                     editingInitialText = editingRecord?.let { controller.displayedText(it) },
                                     onCancelEdit = { controller.editingMessageId = null },
@@ -2816,6 +2824,18 @@ internal fun ConversationScreen(
                         }
                     }
             }
+            if (composerAttachmentSheet.isOpen) {
+                // Transparent scrim over the transcript only — the composer
+                // stays reachable, so the keyboard and emoji toggles can still
+                // swap the sheet away directly.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .pointerInput(composerAttachmentSheet) {
+                            detectTapGestures { composerAttachmentSheet.dismiss() }
+                        },
+                )
+            }
         }
     }
 
@@ -2928,9 +2948,10 @@ internal fun ConversationScreen(
     if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
         val imageUris = pendingMediaUris
         val documentUris = pendingDocumentUris
-        MediaPreviewSheet(
+        MediaPreviewScreen(
             uris = imageUris,
             documentUris = documentUris,
+            chatTitle = controller.title(groupTitleCopy),
             onDismiss = {
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()

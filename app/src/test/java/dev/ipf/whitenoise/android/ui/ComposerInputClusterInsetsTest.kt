@@ -43,6 +43,41 @@ class ComposerInputClusterInsetsTest {
     }
 
     @Test
+    fun attachmentPaneOpenClusterSkipsImePadding() {
+        assertFalse(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = false,
+                composerEmojiSearchActive = false,
+                showAttachmentPane = true,
+            ),
+        )
+    }
+
+    @Test
+    fun attachmentPaneOverridesEmojiSearchImePadding() {
+        // The attachment sheet has no in-pane text input, so it always owns
+        // the bottom region outright while visible.
+        assertFalse(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = true,
+                composerEmojiSearchActive = true,
+                showAttachmentPane = true,
+            ),
+        )
+    }
+
+    @Test
+    fun attachmentPaneHiddenKeepsImePadding() {
+        assertTrue(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = false,
+                composerEmojiSearchActive = false,
+                showAttachmentPane = false,
+            ),
+        )
+    }
+
+    @Test
     fun startingReplyReanchorsBottomInputCluster() {
         assertTrue(
             shouldReanchorBottomInputForReplyTargetChange(
