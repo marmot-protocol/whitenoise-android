@@ -45,7 +45,7 @@ class FreshSweepCoverageTest {
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
         assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
-        assertTrue(accept.contains("refresh after accepting invite failed"))
+        assertTrue(accept.contains("runBestEffortPostCommitSteps("))
         assertTrue(invite.indexOf("try {") < invite.indexOf("val adminTargets"))
     }
 

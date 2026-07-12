@@ -40,6 +40,7 @@ class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
     maxEntryBytes: Long = DEFAULT_MAX_ENTRY_BYTES,
+    private val renameFile: (File, File) -> Boolean = { source, target -> source.renameTo(target) },
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -221,6 +222,25 @@ class DiskByteCache(
             } else {
                 null
             }
+        // Capture the exact entry whose tag may need restoring. The rollback
+        // sidecar is written before entering the cache monitor, then atomically
+        // renamed back only if the data commit fails. If another same-key put
+        // wins before commit, the identity check below drops this best-effort
+        // write instead of restoring stale metadata over the winner.
+        val existingSnapshot = synchronized(this) { index[hashed] }
+        val rollbackTagTmp =
+            if (tagTmp != null) {
+                existingSnapshot?.tag?.let { previousTag ->
+                    val rollback = uniqueTmpFile(tagFileFor(file).name.removeSuffix(TAG_SUFFIX), "tag-rollback")
+                    if (runCatching { rollback.writeText(previousTag) }.isFailure) {
+                        abortPut(tmp, tagTmp, rollback)
+                        return
+                    }
+                    rollback
+                }
+            } else {
+                null
+            }
         // Stale `.tag` for THIS key: deleted unguarded because the key is live
         // again (this put re-added it), so the liveness guard would wrongly skip
         // it — but the new entry has no tag at that path, so it must go.
@@ -232,26 +252,23 @@ class DiskByteCache(
             // A concurrent clear() (sign-out / account switch) may have run while
             // we were writing — abort and drop temp artifacts rather than
             // re-persisting plaintext for a wiped session. See #154, #1033.
-            if (expectedGeneration != generation) {
-                abortPut(tmp, tagTmp)
+            if (expectedGeneration != generation || index[hashed] !== existingSnapshot) {
+                abortPut(tmp, tagTmp, rollbackTagTmp)
                 return
             }
-            val existing = index[hashed]
-            if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
-                abortPut(tmp, tagTmp)
+            val existing = existingSnapshot
+            if (tagTmp != null && tagFile != null && !renameFile(tagTmp, tagFile)) {
+                abortPut(tmp, tagTmp, rollbackTagTmp)
                 return
             }
-            if (!tmp.renameTo(file)) {
+            if (!renameFile(tmp, file)) {
                 runCatching { tmp.delete() }
                 // The tag rename landed first. For a same-key replacement the
                 // old bytes and index entry are still live, so restore their tag
-                // instead of deleting the sidecar that expiry eviction needs.
+                // atomically instead of rewriting the live sidecar in place.
                 val restoredExistingTag =
-                    existing?.tag?.let { previousTag ->
-                        runCatching {
-                            checkNotNull(tagFile).writeText(previousTag)
-                            true
-                        }.getOrDefault(false)
+                    existing?.tag?.let {
+                        rollbackTagTmp != null && tagFile != null && renameFile(rollbackTagTmp, tagFile)
                     } ?: runCatching { tagFile?.delete() != false }.getOrDefault(false)
                 if (!restoredExistingTag && existing != null) {
                     // If metadata restoration itself fails, fail closed: do not
@@ -261,6 +278,7 @@ class DiskByteCache(
                     index.remove(hashed)
                     residentBytes -= existing.size
                 }
+                rollbackTagTmp?.let { runCatching { it.delete() } }
                 return
             }
             if (existing != null) {
@@ -280,6 +298,7 @@ class DiskByteCache(
             residentBytes += size
             evicted += evictedEntryFiles()
         }
+        rollbackTagTmp?.let { runCatching { it.delete() } }
         deleteFiles(staleTagFiles)
         deleteStaleEntries(evicted)
     }
@@ -437,9 +456,11 @@ class DiskByteCache(
     private fun abortPut(
         tmp: File,
         tagTmp: File?,
+        rollbackTagTmp: File? = null,
     ) {
         runCatching { tmp.delete() }
         tagTmp?.let { runCatching { it.delete() } }
+        rollbackTagTmp?.let { runCatching { it.delete() } }
     }
 
     private fun buildHydratedIndex(): HydratedIndex {

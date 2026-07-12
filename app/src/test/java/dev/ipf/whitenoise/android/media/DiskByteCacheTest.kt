@@ -140,34 +140,40 @@ class DiskByteCacheTest {
         val body = source.kotlinFunctionBody("put")
 
         assertTrue(
-            "same-key replacement must inspect the existing entry before renames but remove it only after tmp.renameTo(file) succeeds",
-            body.indexOf("val existing = index[hashed]") < body.indexOf("!tmp.renameTo(file)") &&
-                body.indexOf("!tmp.renameTo(file)") < body.indexOf("index.remove(hashed)") &&
+            "same-key replacement must inspect the existing entry before renames but remove it only after the data commit succeeds",
+            body.indexOf("val existing = existingSnapshot") < body.indexOf("!renameFile(tmp, file)") &&
+                body.indexOf("!renameFile(tmp, file)") < body.indexOf("index.remove(hashed)") &&
                 body.indexOf("index.remove(hashed)") < body.indexOf("index[hashed] = Entry(file, size, ciphertextTag)"),
         )
     }
 
     @Test
-    fun failedReplacementRestoresTheLiveEntrysTag() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
-            ).firstOrNull { it.exists() }?.readText()
-                ?: error("Missing DiskByteCache.kt source file")
-        val body = source.kotlinFunctionBody("put")
-        val tagCommit = body.indexOf("!tagTmp.renameTo(tagFile)")
-        val binCommit = body.indexOf("!tmp.renameTo(file)")
+    fun failedReplacementKeepsOldBytesAndRestoresTheirTagAcrossRestart() {
+        var failDataCommit = false
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                maxBytes = 1024,
+                renameFile = { source, target ->
+                    if (failDataCommit && source.name.contains("-bin-") && target.name.endsWith(".bin")) {
+                        false
+                    } else {
+                        source.renameTo(target)
+                    }
+                },
+            )
+        val original = ByteArray(40) { 1 }
+        cache.put("k", original, cache.generation(), ciphertextTag = "old-ciphertext")
 
-        assertTrue("the tag commit must remain serialized with the data commit", tagCommit in 0 until binCommit)
-        assertTrue(
-            "a failed data replacement must restore the previous indexed tag",
-            body.indexOf("checkNotNull(tagFile).writeText(previousTag)", binCommit) > binCommit,
-        )
-        assertTrue(
-            "an un-restorable tag must fail closed by removing the stale index entry",
-            body.indexOf("index.remove(hashed)", binCommit) > binCommit,
-        )
+        failDataCommit = true
+        cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = "new-ciphertext")
+
+        assertTrue(cache.get("k")!!.contentEquals(original))
+        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        assertTrue(reopened.get("k")!!.contentEquals(original))
+        assertEquals(0, reopened.removeByCiphertextTags(setOf("new-ciphertext")))
+        assertEquals(1, reopened.removeByCiphertextTags(setOf("old-ciphertext")))
+        assertNull(reopened.get("k"))
     }
 
     @Test

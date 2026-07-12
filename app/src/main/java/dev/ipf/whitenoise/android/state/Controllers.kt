@@ -1478,6 +1478,21 @@ internal fun agentStreamFailureText(
     return copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName)
 }
 
+internal suspend fun runBestEffortPostCommitSteps(
+    steps: List<Pair<String, suspend () -> Unit>>,
+    onFailure: (String, Throwable) -> Unit,
+) {
+    steps.forEach { (name, step) ->
+        try {
+            step()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            onFailure(name, throwable)
+        }
+    }
+}
+
 private data class OptimisticReactionChange(
     val targetMessageId: String,
     val emoji: String,
@@ -5494,24 +5509,33 @@ class ConversationController(
                         return@withMutationLockResult false
                     }
             group = acceptedGroup
-            runCatching {
-                appState.applyLocalGroupUpdate(group)
-                appState.dismissConversationNotifications(account, group.groupIdHex)
-                // Accepting an invite (re-)joins the group, so clear any stale
-                // local self-left latch before refreshMembers() so applyGroupDetails
-                // is allowed to add self back to the roster (issue #787).
-                selfMembership.clearSelfLeft()
-                refreshMembers()
-                refreshCurrentTimeline(account).forEach { streamId ->
-                    if (activeStreamIds.add(streamId)) {
-                        inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
-                    }
-                }
-                initializeReadState(account)
-            }.onFailure {
-                it.rethrowIfCancellation()
-                Log.w("DMConversation", "refresh after accepting invite failed for ${group.groupIdHex.take(8)}", it)
-            }
+            appState.applyLocalGroupUpdate(group)
+            appState.dismissConversationNotifications(account, group.groupIdHex)
+            // Accepting an invite (re-)joins the group, so clear any stale
+            // local self-left latch before refreshMembers() so applyGroupDetails
+            // is allowed to add self back to the roster (issue #787).
+            selfMembership.clearSelfLeft()
+            runBestEffortPostCommitSteps(
+                steps =
+                    listOf(
+                        "members" to { refreshMembers() },
+                        "timeline" to {
+                            refreshCurrentTimeline(account).forEach { streamId ->
+                                if (activeStreamIds.add(streamId)) {
+                                    inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+                                }
+                            }
+                        },
+                        "read-state" to { initializeReadState(account) },
+                    ),
+                onFailure = { step, throwable ->
+                    Log.w(
+                        "DMConversation",
+                        "post-accept $step refresh failed for ${group.groupIdHex.take(8)}",
+                        throwable,
+                    )
+                },
+            )
             if (notify) appState.present(R.string.toast_invite_accepted)
             true
         }
