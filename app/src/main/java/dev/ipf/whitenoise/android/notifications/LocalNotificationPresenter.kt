@@ -100,6 +100,48 @@ class LocalNotificationPresenter(
             }
     }
 
+    // Replying / marking read from the shade engaged with the conversation as it
+    // stood when the action fired, not with cards that arrived afterwards. Clear
+    // the reaction, mention, and invite sibling cards, but keep any that were
+    // (re)posted after [sinceMs] — a reaction, mention, or invite that landed
+    // during the reply's retry+settle window is genuinely new and must survive.
+    // The replied/read message card is cancelled directly by the caller (it is
+    // deliberately re-posted mid-window to clear the direct-reply lifetime
+    // extension), so it is not matched here.
+    fun dismissConversationSiblingCardsNotNewerThan(
+        accountRef: String,
+        groupIdHex: String,
+        sinceMs: Long,
+    ): Boolean {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        val active = runCatching { manager.activeNotifications }.getOrNull()?.toList().orEmpty()
+        val compat = NotificationManagerCompat.from(context)
+        val postTimeByKey = active.associate { (it.tag to it.id) to it.postTime }
+        listOf(
+            LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
+        ).forEach { key ->
+            val postTime = postTimeByKey[key.tag to key.id] ?: return@forEach
+            if (postTime <= sinceMs) compat.cancel(key.tag, key.id)
+        }
+        active.forEach { sbn ->
+            val extras = sbn.notification.extras ?: return@forEach
+            val isInvite =
+                shouldDismissInvite(
+                    extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+                    extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+                    accountRef = accountRef,
+                    groupIdHex = groupIdHex,
+                )
+            if (isInvite && sbn.postTime <= sinceMs) {
+                compat.cancel(sbn.tag, sbn.id)
+                sbn.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+            }
+        }
+        return true
+    }
+
     @SuppressLint("MissingPermission")
     suspend fun show(
         update: NotificationUpdateFfi,

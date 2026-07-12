@@ -128,6 +128,9 @@ class NotificationReplyWorker(
         reply: String,
     ) {
         val presenter = LocalNotificationPresenter(appContext)
+        // Baseline for sparing sibling cards that arrive during the retry+settle
+        // window below: only cards already present when we start are cleared.
+        val dismissBaselineMs = System.currentTimeMillis()
         withContext(NonCancellable) {
             try {
                 var resolved = false
@@ -139,7 +142,15 @@ class NotificationReplyWorker(
                 }
                 if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
             } finally {
-                presenter.dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)
+                // The replied card was deliberately re-posted above, so cancel it
+                // outright; clear its reaction/mention/invite siblings only when a
+                // newer one didn't arrive mid-window.
+                presenter.cancel(action.notificationTag, action.notificationId)
+                presenter.dismissConversationSiblingCardsNotNewerThan(
+                    accountRef = action.target.accountRef,
+                    groupIdHex = action.target.groupIdHex,
+                    sinceMs = dismissBaselineMs,
+                )
             }
         }
     }

@@ -95,6 +95,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
             NotificationActionKind.REPLY -> return
             NotificationActionKind.MARK_READ -> {
                 appState.ensureNotificationRuntimeStarted()
+                // Baseline before the mark-read round-trip so a message, reaction,
+                // or mention arriving while it runs keeps its card.
+                val dismissBaselineMs = System.currentTimeMillis()
                 if (
                     appState.markNotificationMessageRead(
                         accountRef = action.target.accountRef,
@@ -102,8 +105,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
                 ) {
-                    LocalNotificationPresenter(appContext)
-                        .dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)
+                    val presenter = LocalNotificationPresenter(appContext)
+                    presenter.cancel(action.notificationTag, action.notificationId)
+                    presenter.dismissConversationSiblingCardsNotNewerThan(
+                        accountRef = action.target.accountRef,
+                        groupIdHex = action.target.groupIdHex,
+                        sinceMs = dismissBaselineMs,
+                    )
                 }
             }
         }

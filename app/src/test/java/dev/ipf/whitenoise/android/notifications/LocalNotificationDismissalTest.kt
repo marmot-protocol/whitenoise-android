@@ -66,6 +66,59 @@ class LocalNotificationDismissalTest {
         assertEquals(listOf(other.tag to other.id), remaining)
     }
 
+    @Test
+    fun siblingDismissalClearsSiblingsAtOrBeforeBaselineButLeavesTheMessageCard() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
+        val mention = LocalNotificationFormatter.mentionDismissalKey(account, group)
+        listOf(conversation, reaction, mention).forEach { manager.notify(it.tag, it.id, notification()) }
+        manager.notify(
+            "invite-target",
+            41,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, group)
+                    },
+            ),
+        )
+        // Baseline at/after every posted card, so each sibling counts as "already
+        // present" and is cleared. The message card is the caller's to cancel.
+        val baseline = manager.activeNotifications.maxOf { it.postTime }
+
+        assertTrue(
+            LocalNotificationPresenter(context)
+                .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = baseline),
+        )
+
+        val remaining = manager.activeNotifications.map { it.tag to it.id }
+        assertEquals(listOf(conversation.tag to conversation.id), remaining)
+    }
+
+    @Test
+    fun siblingDismissalKeepsSiblingsPostedAfterBaseline() {
+        val account = "account-a"
+        val group = "group-a"
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
+        manager.notify(reaction.tag, reaction.id, notification())
+        // Baseline strictly before the card's post time, so it counts as newer
+        // (arrived mid-window) and must survive.
+        val reactionPostTime = manager.activeNotifications.single().postTime
+
+        assertTrue(
+            LocalNotificationPresenter(context)
+                .dismissConversationSiblingCardsNotNewerThan(account, group, sinceMs = reactionPostTime - 1),
+        )
+
+        assertEquals(
+            listOf(reaction.tag to reaction.id),
+            manager.activeNotifications.map { it.tag to it.id },
+        )
+    }
+
     private fun notification(extras: Bundle? = null) =
         NotificationCompat
             .Builder(context, TEST_CHANNEL)

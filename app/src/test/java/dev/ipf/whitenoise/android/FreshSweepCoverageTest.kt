@@ -50,12 +50,17 @@ class FreshSweepCoverageTest {
     }
 
     @Test
-    fun readAndReplyActionsDismissAllConversationCards() {
+    fun readAndReplyActionsClearRepliedCardAndSpareNewerSiblings() {
         val replyWorker = source("notifications/NotificationReplyWorker.kt")
         val actionReceiver = source("notifications/NotificationActionReceiver.kt")
 
-        assertTrue(replyWorker.contains("dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)"))
-        assertTrue(actionReceiver.contains("dismissConversationMessages(action.target.accountRef, action.target.groupIdHex)"))
+        // Both paths cancel the replied/read card outright, then clear its
+        // reaction/mention/invite siblings only when a newer one didn't arrive
+        // during the action window (#1311).
+        assertTrue(replyWorker.contains("cancel(action.notificationTag, action.notificationId)"))
+        assertTrue(replyWorker.contains("dismissConversationSiblingCardsNotNewerThan("))
+        assertTrue(actionReceiver.contains("cancel(action.notificationTag, action.notificationId)"))
+        assertTrue(actionReceiver.contains("dismissConversationSiblingCardsNotNewerThan("))
     }
 
     @Test
