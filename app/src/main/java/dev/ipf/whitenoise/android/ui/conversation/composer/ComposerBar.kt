@@ -201,6 +201,7 @@ internal fun ComposerBar(
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
     onShareLocation: (() -> Unit)? = null,
+    onShareUser: (() -> Unit)? = null,
     onShareContact: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
@@ -696,9 +697,10 @@ internal fun ComposerBar(
                             }
                         },
                         attachmentSheetOpen = attachmentSheetState.isOpen,
+                        hasCameraCapture = onCaptureFromCamera != null,
                         hasLocationShare = onShareLocation != null,
+                        hasUserShare = onShareUser != null,
                         hasContactShare = onShareContact != null,
-                        onCaptureFromCamera = onCaptureFromCamera,
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
                         onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
@@ -825,8 +827,22 @@ internal fun ComposerBar(
                                     pick()
                                 }
                             },
+                        onCaptureFromCamera =
+                            onCaptureFromCamera?.let { capture ->
+                                {
+                                    attachmentSheetState.dismiss()
+                                    capture()
+                                }
+                            },
                         onShareLocation =
                             onShareLocation?.let { share ->
+                                {
+                                    attachmentSheetState.dismiss()
+                                    share()
+                                }
+                            },
+                        onShareUser =
+                            onShareUser?.let { share ->
                                 {
                                     attachmentSheetState.dismiss()
                                     share()

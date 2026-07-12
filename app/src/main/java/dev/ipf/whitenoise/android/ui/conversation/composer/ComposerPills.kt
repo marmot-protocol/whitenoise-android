@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -90,14 +89,15 @@ internal fun ComposerPill(
     onEmojiPickerToggle: () -> Unit,
     onAttachmentsToggle: () -> Unit,
     attachmentSheetOpen: Boolean,
-    onCaptureFromCamera: (() -> Unit)?,
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
+    hasCameraCapture: Boolean = false,
     hasLocationShare: Boolean = false,
+    hasUserShare: Boolean = false,
     hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
@@ -295,7 +295,13 @@ internal fun ComposerPill(
                     )
                 }
             }
-            if (onPickFromGallery != null || onPickDocument != null || hasLocationShare || hasContactShare) {
+            if (onPickFromGallery != null ||
+                onPickDocument != null ||
+                hasCameraCapture ||
+                hasLocationShare ||
+                hasUserShare ||
+                hasContactShare
+            ) {
                 IconButton(
                     onClick = onAttachmentsToggle,
                     modifier = Modifier.size(36.dp),
@@ -309,19 +315,6 @@ internal fun ComposerPill(
                             stringResource(
                                 if (attachmentSheetOpen) R.string.close else R.string.attach_options,
                             ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            if (onCaptureFromCamera != null) {
-                IconButton(
-                    onClick = onCaptureFromCamera,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Default.PhotoCamera,
-                        contentDescription = stringResource(R.string.attach_take_photo),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp),
                     )

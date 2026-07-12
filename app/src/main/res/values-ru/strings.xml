@@ -694,6 +694,9 @@
     <string name="attach_gallery">Галерея</string>
     <string name="attach_location">Местоположение</string>
     <string name="attach_contact">Контакт</string>
+    <string name="attach_user">Пользователь</string>
+    <string name="share_user_title">Поделиться пользователем</string>
+    <string name="share_user_view">Открыть профиль</string>
     <string name="attach_options">Добавить вложение</string>
     <string name="media_preview_position_badge">Позиция отправки %1$d</string>
     <string name="share_contact_title">Поделиться контактом</string>

@@ -44,6 +44,7 @@ class ComposerAttachmentSheetBehaviorTest {
         onPickFromGallery: () -> Unit = {},
         onPickDocument: () -> Unit = {},
         onShareLocation: (() -> Unit)? = null,
+        onShareUser: (() -> Unit)? = null,
         onShareContact: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
@@ -57,6 +58,7 @@ class ComposerAttachmentSheetBehaviorTest {
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
                         onShareLocation = onShareLocation,
+                        onShareUser = onShareUser,
                         onShareContact = onShareContact,
                     )
                 }
@@ -136,14 +138,30 @@ class ComposerAttachmentSheetBehaviorTest {
     }
 
     @Test
+    fun userTileFiresCallbackOnlyAfterTap() {
+        var userClicks = 0
+        renderComposer(onShareUser = { userClicks++ })
+        assertEquals(0, userClicks)
+        openAttachmentSheet()
+        assertEquals(0, userClicks)
+        composeRule.onNodeWithText(string(R.string.attach_user)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, userClicks)
+        composeRule.onNodeWithText(string(R.string.attach_user)).assertDoesNotExist()
+    }
+
+    @Test
     fun unavailableActionsAreVisiblyMarkedComingSoon() {
         renderComposer()
         openAttachmentSheet()
+        composeRule.onNodeWithText(string(R.string.attach_take_photo)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.attach_location)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.attach_user)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.attach_contact)).assertIsDisplayed()
-        // Both placeholder tiles carry the caption, so two nodes match.
+        // Camera, Location, User, and Contact are all unwired here, so four
+        // placeholder tiles carry the caption (Gallery + Document are wired).
         assertEquals(
-            2,
+            4,
             composeRule
                 .onAllNodesWithText(string(R.string.coming_soon))
                 .fetchSemanticsNodes()

@@ -674,6 +674,9 @@
     <string name="attach_gallery">Galeri</string>
     <string name="attach_location">Konum</string>
     <string name="attach_contact">Kişi</string>
+    <string name="attach_user">Kullanıcı</string>
+    <string name="share_user_title">Kullanıcıyı paylaş</string>
+    <string name="share_user_view">Profili görüntüle</string>
     <string name="attach_options">Ek ekle</string>
     <string name="media_preview_position_badge">Gönderim sırası %1$d</string>
     <string name="share_contact_title">Kişiyi paylaş</string>

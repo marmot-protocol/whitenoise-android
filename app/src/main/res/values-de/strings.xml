@@ -674,6 +674,9 @@
     <string name="attach_gallery">Galerie</string>
     <string name="attach_location">Standort</string>
     <string name="attach_contact">Kontakt</string>
+    <string name="attach_user">Benutzer</string>
+    <string name="share_user_title">Benutzer teilen</string>
+    <string name="share_user_view">Profil ansehen</string>
     <string name="attach_options">Anhang hinzufügen</string>
     <string name="media_preview_position_badge">Sendeposition %1$d</string>
     <string name="share_contact_title">Kontakt teilen</string>

@@ -5,9 +5,11 @@ import dev.ipf.whitenoise.android.ui.conversation.share.SharedLocation
 import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.selectLocationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,6 +104,39 @@ class ShareFormattingTest {
         assertEquals("Ada Lovelace", parsed?.name)
         assertEquals("+1 555 0100", parsed?.phone)
         assertEquals("ada@example.org", parsed?.email)
+    }
+
+    private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
+
+    @Test
+    fun userShareSendsNameAndNostrReference() {
+        assertEquals(
+            "Ada Lovelace\nnostr:$sampleNpub",
+            formatUserShareText("Ada Lovelace", sampleNpub),
+        )
+        // No usable name → the bare nostr reference.
+        assertEquals("nostr:$sampleNpub", formatUserShareText(null, sampleNpub))
+    }
+
+    @Test
+    fun userShareRoundTripsNameAndNpub() {
+        val parsed = parseSharedUserFromText(formatUserShareText("Ada Lovelace", sampleNpub))
+        assertEquals("Ada Lovelace", parsed?.name)
+        assertEquals(sampleNpub, parsed?.npub)
+    }
+
+    @Test
+    fun bareNpubParsesAsAUserShare() {
+        assertEquals(sampleNpub, parseSharedUserFromText(sampleNpub)?.npub)
+        assertNull(parseSharedUserFromText(sampleNpub)?.name)
+    }
+
+    @Test
+    fun proseMentioningAnNpubIsNotHijackedIntoAUserCard() {
+        // A longer message that merely contains an npub stays plain text.
+        assertNull(parseSharedUserFromText("hey check out nostr:$sampleNpub they post great stuff"))
+        assertNull(parseSharedUserFromText("line one\nline two\nnostr:$sampleNpub"))
+        assertNull(parseSharedUserFromText("no reference here at all"))
     }
 
     @Test

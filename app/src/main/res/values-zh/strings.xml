@@ -665,6 +665,9 @@
     <string name="attach_gallery">图库</string>
     <string name="attach_location">位置</string>
     <string name="attach_contact">联系人</string>
+    <string name="attach_user">用户</string>
+    <string name="share_user_title">分享用户</string>
+    <string name="share_user_view">查看资料</string>
     <string name="attach_options">添加附件</string>
     <string name="media_preview_position_badge">发送顺序 %1$d</string>
     <string name="share_contact_title">分享联系人</string>

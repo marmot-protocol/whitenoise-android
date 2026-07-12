@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -76,8 +78,10 @@ internal fun ComposerAttachmentSheetPane(
     height: Dp,
     alpha: Float,
     onPickFromGallery: (() -> Unit)?,
+    onCaptureFromCamera: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     onShareLocation: (() -> Unit)?,
+    onShareUser: (() -> Unit)?,
     onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
     onDismiss: () -> Unit,
@@ -122,6 +126,11 @@ internal fun ComposerAttachmentSheetPane(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceEvenly,
             ) {
+                // Two rows of three. Row 1 is capture/files (Gallery, Camera,
+                // Document); row 2 is place/people (Location, User, Contact).
+                // User (npub, actionable) and Contact (phone, informational) sit
+                // adjacent but read as distinct — different icons and labels —
+                // so a phone number never looks like an in-app identity.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -131,6 +140,13 @@ internal fun ComposerAttachmentSheetPane(
                         label = stringResource(R.string.attach_gallery),
                         available = onPickFromGallery != null,
                         onClick = onPickFromGallery ?: onComingSoon,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AttachmentActionTile(
+                        icon = Icons.Default.PhotoCamera,
+                        label = stringResource(R.string.attach_take_photo),
+                        available = onCaptureFromCamera != null,
+                        onClick = onCaptureFromCamera ?: onComingSoon,
                         modifier = Modifier.weight(1f),
                     )
                     AttachmentActionTile(
@@ -154,6 +170,13 @@ internal fun ComposerAttachmentSheetPane(
                     )
                     AttachmentActionTile(
                         icon = Icons.Default.Person,
+                        label = stringResource(R.string.attach_user),
+                        available = onShareUser != null,
+                        onClick = onShareUser ?: onComingSoon,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AttachmentActionTile(
+                        icon = Icons.Default.Contacts,
                         label = stringResource(R.string.attach_contact),
                         available = onShareContact != null,
                         onClick = onShareContact ?: onComingSoon,

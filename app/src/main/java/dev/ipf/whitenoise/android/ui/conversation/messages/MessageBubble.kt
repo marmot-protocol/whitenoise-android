@@ -116,10 +116,12 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -670,6 +672,14 @@ internal fun MessageBubble(
                             null
                         }
                     }
+                val sharedUser =
+                    remember(shareBodyText, deleted, invalidated, anyConfirmedMedia, record.kind) {
+                        if (!deleted && !invalidated && !anyConfirmedMedia && record.kind == 9uL) {
+                            parseSharedUserFromText(shareBodyText)
+                        } else {
+                            null
+                        }
+                    }
                 val pendingAttachmentsForRecord =
                     remember(record.messageIdHex, controller.pendingAttachmentsList(record.messageIdHex)) {
                         controller.pendingAttachmentsList(record.messageIdHex)
@@ -747,7 +757,8 @@ internal fun MessageBubble(
                                 pendingAudio.isNotEmpty() ||
                                 pendingVisualRefs.isNotEmpty() ||
                                 showPendingPlaceholder ||
-                                sharedLocation != null
+                                sharedLocation != null ||
+                                sharedUser != null
                         )
                 // The media-rendering blocks. Each child keeps its own rounded
                 // media Surface, so calling this directly in the row Column (not
@@ -791,6 +802,12 @@ internal fun MessageBubble(
                     }
                     if (sharedContact != null) {
                         ContactMessageBubble(contact = sharedContact)
+                    }
+                    if (sharedUser != null) {
+                        UserMessageBubble(
+                            user = sharedUser,
+                            onOpen = { appState.presentProfile(sharedUser.npub) },
+                        )
                     }
                     if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
                         if (visualAttachments.size == 1) {
@@ -975,9 +992,9 @@ internal fun MessageBubble(
                         // Deleted/invalidated tombstones show only the
                         // tombstone copy, never an inline image/caption.
                         deleted || invalidated -> displayedBody
-                        // The contact card / location bubble carry the body,
-                        // so the raw caption/maps-link text is suppressed.
-                        sharedContact != null || sharedLocation != null -> null
+                        // The contact card / location bubble / user card carry
+                        // the body, so the raw caption/link/npub text is hidden.
+                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
                         mediaPendingName != null && !anyConfirmedMedia -> null
                         anyConfirmedMedia ->
                             (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }

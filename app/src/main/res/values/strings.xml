@@ -830,6 +830,9 @@
     <string name="attach_gallery">Gallery</string>
     <string name="attach_location">Location</string>
     <string name="attach_contact">Contact</string>
+    <string name="attach_user">User</string>
+    <string name="share_user_title">Share user</string>
+    <string name="share_user_view">View profile</string>
     <string name="attach_options">Add attachment</string>
     <string name="media_preview_position_badge">Send position %1$d</string>
     <string name="share_contact_title">Share contact</string>

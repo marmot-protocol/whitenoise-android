@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -63,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,6 +108,7 @@ import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
@@ -123,6 +126,7 @@ import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
+import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -167,6 +171,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
 import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
@@ -763,6 +768,11 @@ internal fun ConversationScreen(
     // The picked point lives only here until the user sends or cancels; the
     // keyless OSM picker is the single confirmation surface.
     var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    // "Share user" (npub) — the identity-native counterpart to a phone contact.
+    // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
+    // the recipient can tap to open that profile.
+    var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
             if (contactUri == null) return@rememberLauncherForActivityResult
@@ -791,6 +801,18 @@ internal fun ConversationScreen(
                 appState.present(R.string.location_permission_denied)
             }
         }
+
+    fun sendSharedUser(candidate: RecipientSearch.Candidate) {
+        val body = formatUserShareText(candidate.displayName, candidate.npub)
+        appState.launchMutation {
+            controller.send(body) {
+                scope.launch {
+                    val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    listState.animateScrollToItem(target)
+                }
+            }
+        }
+    }
 
     fun sendSharedContact(contact: SharedContact) {
         appState.launchMutation {
@@ -2567,6 +2589,7 @@ internal fun ConversationScreen(
                                             )
                                         }
                                     },
+                                    onShareUser = { shareUserPickerOpen = true },
                                     onShareContact = { contactPickerLauncher.launch(Unit) },
                                     onPasteImageUris = { uris ->
                                         // Receive-content URI grants are scoped to the
@@ -3055,6 +3078,28 @@ internal fun ConversationScreen(
                 pendingContactShare = null
                 sendSharedContact(selected)
             },
+        )
+    }
+
+    if (shareUserPickerOpen) {
+        val activeHex = appState.activeAccount?.accountIdHex
+        ContactPickerScreen(
+            appState = appState,
+            title = stringResource(R.string.share_user_title),
+            selected = shareUserSelection,
+            onBack = {
+                shareUserPickerOpen = false
+                shareUserSelection.clear()
+            },
+            onConfirm = {
+                val picked = shareUserSelection.toList()
+                shareUserPickerOpen = false
+                shareUserSelection.clear()
+                picked.forEach { sendSharedUser(it) }
+            },
+            confirmIcon = Icons.AutoMirrored.Filled.Send,
+            autoSelectResolvedIdentifier = true,
+            excludeAccountIdHexes = setOfNotNull(activeHex),
         )
     }
 
