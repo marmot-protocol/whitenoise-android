@@ -47,6 +47,7 @@ class AmberSignerController(
                 parseActivityResult(
                     SignerOp.GetPublicKey,
                     outcome.resultOk,
+                    rejected = readRejectedIntentExtra(outcome.data),
                     resultExtra = outcome.data?.getStringExtra(Nip55.EXTRA_RESULT),
                     eventExtra = outcome.data?.getStringExtra(Nip55.EXTRA_EVENT),
                     packageExtra = outcome.data?.getStringExtra(Nip55.EXTRA_PACKAGE),
