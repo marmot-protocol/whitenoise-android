@@ -100,6 +100,12 @@ object AvatarImageLoader {
         return synchronized(lock) { cache.get(key) }
     }
 
+    /** Android-bitmap view of [peek], for non-Compose consumers (notification icons). */
+    fun peekBitmap(url: String?): android.graphics.Bitmap? = peek(url)?.asAndroidBitmap()
+
+    /** Android-bitmap view of [load], for non-Compose consumers (notification icons). */
+    suspend fun loadBitmap(url: String): android.graphics.Bitmap? = load(url)?.asAndroidBitmap()
+
     fun clear() {
         synchronized(lock) {
             generation++

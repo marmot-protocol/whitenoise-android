@@ -968,8 +968,11 @@
     <string name="see_all_members">Ver los %1$d miembros</string>
     <string name="chat_lock">Bloqueo del chat</string>
     <string name="collapse_long_messages">Contraer mensajes largos</string>
-    <string name="mute_notifications">Silenciar notificaciones</string>
-    <string name="mute_notifications_subtitle">Dejar de recibir notificaciones del sistema para este chat</string>
+    <string name="notify">Notificar</string>
+    <string name="notify_all_messages">Todos los mensajes</string>
+    <string name="notify_only_mentions">Solo menciones</string>
+    <string name="notify_nothing">Nada</string>
+    <string name="customize_sound_vibration">Personalizar sonido y vibración</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostrar un acceso «Leer más» para los mensajes largos en este chat</string>
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>

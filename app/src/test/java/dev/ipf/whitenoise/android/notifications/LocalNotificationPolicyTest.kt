@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.NotificationSuppression
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,8 +86,12 @@ class LocalNotificationPolicyTest {
                 activeConversationGroupIdHex = null,
                 activeConversationAccountRef = null,
                 appLockScreenVisible = false,
-                isConversationMuted = { accountRef, groupIdHex ->
-                    accountRef == "account-a" && groupIdHex == "muted-group"
+                conversationNotifyMode = { accountRef, groupIdHex ->
+                    if (accountRef == "account-a" && groupIdHex == "muted-group") {
+                        ChatNotifyMode.NONE
+                    } else {
+                        ChatNotifyMode.ALL
+                    }
                 },
             ),
         )
@@ -101,9 +106,55 @@ class LocalNotificationPolicyTest {
                 activeConversationGroupIdHex = null,
                 activeConversationAccountRef = null,
                 appLockScreenVisible = false,
-                isConversationMuted = { accountRef, groupIdHex ->
-                    accountRef == "account-a" && groupIdHex == "muted-group"
+                conversationNotifyMode = { accountRef, groupIdHex ->
+                    if (accountRef == "account-a" && groupIdHex == "muted-group") {
+                        ChatNotifyMode.NONE
+                    } else {
+                        ChatNotifyMode.ALL
+                    }
                 },
+            ),
+        )
+    }
+
+    @Test
+    fun mentionsOnlyConversationPostsMention() {
+        assertTrue(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "quiet-group", accountRef = "account-a", isMention = true),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
+            ),
+        )
+    }
+
+    @Test
+    fun mentionsOnlyConversationSuppressesNonMention() {
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "quiet-group", accountRef = "account-a", isMention = false),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
+            ),
+        )
+    }
+
+    @Test
+    fun nothingModeSuppressesMentionToo() {
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-group", accountRef = "account-a", isMention = true),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.NONE },
             ),
         )
     }
@@ -160,8 +211,9 @@ class LocalNotificationPolicyTest {
     private fun update(
         groupIdHex: String,
         accountRef: String = "account",
+        isMention: Boolean = false,
     ) = NotificationUpdateFfi(
-        isMention = false,
+        isMention = isMention,
         notificationKey = "message:$accountRef:message",
         conversationKey = "conversation:$accountRef:$groupIdHex",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,
