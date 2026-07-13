@@ -4547,7 +4547,7 @@ class WhiteNoiseAppState(
     ): NotificationSystemText? {
         val record = notificationTimelineRecord(update) ?: return null
         if (!MessageProjector.isGroupSystemKind(record.kind)) return null
-        val event = GroupSystemEvents.resolve(record.plaintext, record.groupSystem) ?: return null
+        val event = GroupSystemEvents.resolve(record) ?: return null
         val diff = GroupSystemEvents.renameDiffNames(event)
         val actorHex = GroupSystemEvents.actorHex(event, record.sender)
         val actorName =

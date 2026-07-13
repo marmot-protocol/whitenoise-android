@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import org.json.JSONObject
 
 /**
@@ -11,10 +13,9 @@ import org.json.JSONObject
 data class GroupSystemEvent(
     val systemType: String,
     val text: String,
-    // Attribution fields: only ever non-null when the event came from
-    // Marmot's structured projection ([GroupSystemEvents.fromFfi]). The JSON
-    // parse fallback leaves both null — a raw payload's actor/subject are
-    // unauthenticated peer claims (#985).
+    // Attribution fields: only ever non-null when the event came from Marmot's
+    // authenticated state-change projection. The JSON parse fallback leaves
+    // both null — a raw payload's actor/subject are peer claims (#985).
     val actor: String?,
     val subject: String?,
     val name: String?,
@@ -32,6 +33,10 @@ data class GroupSystemEvent(
     // previous and new per-group retention in seconds. 0 = off; null = absent.
     val oldRetentionSeconds: ULong? = null,
     val newRetentionSeconds: ULong? = null,
+    // True only for engine-synthesized timeline rows (`direction == "system"`
+    // and no source message). A non-null GroupSystemEventFfi alone is not proof:
+    // Marmot also schema-parses member-authored kind-1210 messages (#1318).
+    val fromAuthenticatedStateProjection: Boolean,
 )
 
 data class GroupRenameDiffNames(
@@ -161,18 +166,16 @@ object GroupSystemEvents {
      * system payload — the caller still must not fall back to chat-body
      * rendering for a kind-1210 record; use [GroupSystemCopy.fallback].
      *
-     * This fallback only runs when Marmot's structured projection rejected
-     * the payload (missing/unknown schema `v`, malformed JSON): synthesized
-     * rows always project, so anything landing here is at best a
-     * future-schema payload and at worst a member-authored spoof. The
+     * This fallback handles anything that is not an authenticated state-change
+     * projection, including member-authored kind-1210 messages even when
+     * Marmot successfully schema-parsed them into GroupSystemEventFfi. The
      * payload's `data.actor` / `data.subject` are unauthenticated claims and
      * are deliberately NOT surfaced — `actor` stays null so [actorHex]
      * attributes the row to the MLS-authenticated envelope sender, and
      * `subject` stays null so [summary] can never name (or "you"-address)
-     * whoever the payload claims was acted on. Non-attributing display
-     * fields (`name`, `old_name`, retention seconds) are still parsed,
-     * sanitized at render time as usual. Only [fromFfi]'s structured
-     * projection may carry actor/subject. See #985.
+     * whoever the payload claims was acted on. Display fields are retained only
+     * to backfill an older authenticated projection; fallback-only events render
+     * as neutral [GroupSystemCopy.fallback]. See #985 and #1318.
      */
     fun parse(plaintext: String): GroupSystemEvent? =
         runCatching {
@@ -197,10 +200,11 @@ object GroupSystemEvents {
                 // as an authoritative "turned off" (which is only secs == 0).
                 oldRetentionSeconds = data?.optLong("old_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
                 newRetentionSeconds = data?.optLong("new_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
+                fromAuthenticatedStateProjection = false,
             )
         }.getOrNull()
 
-    fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent =
+    private fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent =
         GroupSystemEvent(
             systemType = ffi.systemType,
             text = ffi.text,
@@ -211,17 +215,42 @@ object GroupSystemEvents {
             oldNameKnown = ffi.oldName != null,
             oldRetentionSeconds = ffi.oldRetentionSeconds,
             newRetentionSeconds = ffi.newRetentionSeconds,
+            fromAuthenticatedStateProjection = true,
         )
 
     /**
-     * Prefer Marmot's structured projection; fall back to parsing kind-1210
-     * JSON. The projection now carries the previous name, but if a row predates
-     * that field we still backfill `oldName` from the JSON payload's
-     * `data.old_name` (when present) so the rename row can render the diff.
+     * Resolve a timeline kind-1210 row without treating successful schema
+     * parsing as state authentication. Marmot synthesizes real MLS state rows
+     * with `direction == "system"` and no source message; ordinary sent/received
+     * app messages always have another direction and are rendered neutrally.
+     *
+     * Trusted projections now carry the previous name, but for older rows we
+     * still backfill `oldName` from their trusted synthesized JSON payload.
      */
     fun resolve(
+        record: TimelineMessageRecordFfi,
+        structured: GroupSystemEventFfi? = record.groupSystem,
+    ): GroupSystemEvent? {
+        if (record.kind != 1210uL) return null
+        if (record.direction != "system" || record.sourceMessageIdHex != null) {
+            return parse(record.plaintext)
+        }
+        return resolveAuthenticatedStateProjection(record.plaintext, structured)
+    }
+
+    /** App-record equivalent; `direction` is the engine-controlled provenance. */
+    fun resolve(
+        record: AppMessageRecordFfi,
+        structured: GroupSystemEventFfi?,
+    ): GroupSystemEvent? {
+        if (record.kind != 1210uL) return null
+        if (record.direction != "system") return parse(record.plaintext)
+        return resolveAuthenticatedStateProjection(record.plaintext, structured)
+    }
+
+    private fun resolveAuthenticatedStateProjection(
         plaintext: String,
-        structured: GroupSystemEventFfi? = null,
+        structured: GroupSystemEventFfi?,
     ): GroupSystemEvent? =
         structured?.let { ffi ->
             val structuredEvent = fromFfi(ffi)
@@ -232,6 +261,9 @@ object GroupSystemEvents {
                 structuredEvent
             }
         } ?: parse(plaintext)
+
+    /** Resolve raw kind-1210 content without authenticated state provenance. */
+    fun resolve(plaintext: String): GroupSystemEvent? = parse(plaintext)
 
     /**
      * The hex pubkey to attribute the change to: the structured projection's
@@ -249,7 +281,7 @@ object GroupSystemEvents {
 
     /** Sanitized old/new rename names when a real previous name is known. */
     fun renameDiffNames(event: GroupSystemEvent): GroupRenameDiffNames? =
-        if (event.systemType == TypeGroupRenamed) {
+        if (event.fromAuthenticatedStateProjection && event.systemType == TypeGroupRenamed) {
             ProfileSanitizer.displayName(event.name)?.let { name -> renameDiffNames(event, name) }
         } else {
             null
@@ -284,6 +316,11 @@ object GroupSystemEvents {
         retentionLabel: String? = null,
         copy: GroupSystemCopy = GroupSystemCopy.Default,
     ): String {
+        // A kind-1210 application message can be authored by any group member.
+        // Only the engine projection proves that its claimed state change was
+        // actually synthesized from authenticated MLS group state.
+        if (!event.fromAuthenticatedStateProjection) return copy.fallback
+
         val subject = subjectName ?: copy.someone
         return when (event.systemType) {
             TypeMemberAdded ->
@@ -397,9 +434,18 @@ object GroupSystemEvents {
     fun previewText(
         plaintext: String,
         copy: GroupSystemCopy = GroupSystemCopy.Default,
-        structured: GroupSystemEventFfi? = null,
     ): String {
-        val event = resolve(plaintext, structured) ?: return copy.fallback
+        val event = resolve(plaintext) ?: return copy.fallback
+        return summary(event, actorName = null, subjectName = null, copy = copy)
+    }
+
+    /** Name-free summary that preserves authenticated state projections. */
+    fun previewText(
+        record: TimelineMessageRecordFfi,
+        copy: GroupSystemCopy = GroupSystemCopy.Default,
+        structured: GroupSystemEventFfi? = record.groupSystem,
+    ): String {
+        val event = resolve(record, structured) ?: return copy.fallback
         return summary(event, actorName = null, subjectName = null, copy = copy)
     }
 }
