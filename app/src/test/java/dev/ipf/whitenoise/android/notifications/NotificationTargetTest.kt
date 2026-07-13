@@ -322,7 +322,7 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun replyWorkerInput_roundTripsActionAndDedupesSameReply() {
+    fun replyWorkerRequest_roundTripsActionAndKeepsIdenticalCompletionKeysDistinct() {
         val action =
             NotificationAction(
                 kind = NotificationActionKind.REPLY,
@@ -330,16 +330,13 @@ class NotificationTargetTest {
                 notificationTag = "acct-a|group-1",
                 notificationId = 0,
             )
-        val sameReply = NotificationReplyWorker.notificationReplyWorkName(action, " hello ")
-        val laterMessage =
-            action.copy(
-                target = action.target.copy(messageIdHex = "msg-2"),
-            )
+        val firstRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
+        val secondRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
+        val firstCompletionKey = NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id)
 
         assertEquals(action, NotificationReplyWorker.notificationReplyActionFromInput(NotificationReplyWorker.notificationReplyInputData(action, "hello")))
-        assertEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "hello"))
-        assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "different"))
-        assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(laterMessage, "hello"))
+        assertEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id))
+        assertNotEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(secondRequest.id))
     }
 
     @Test
