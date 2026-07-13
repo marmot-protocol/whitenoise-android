@@ -555,7 +555,7 @@ internal fun ConversationScreen(
             )
         }
     }
-    val unreadIncomingCount by remember {
+    val unreadIncomingCount by remember(controller, chat.id) {
         derivedStateOf {
             if (!initialTimelineAnchored) {
                 0
@@ -568,19 +568,19 @@ internal fun ConversationScreen(
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
     // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
     // mention classification, reusing the #414 per-message detection.
-    val selfAccountIdHexForMentions = appState.activeAccount?.accountIdHex
-    val unreadMentionMessageIds by remember {
+    val unreadMentionMessageIds by remember(controller, chat.id) {
         derivedStateOf {
+            val selfAccountIdHex = appState.activeAccount?.accountIdHex
             // Anchor on the UI read high-water mark. It advances immediately when
             // the user visits a mention and when the visible row settles, so a
             // recreated controller cannot briefly resurrect already-read mentions.
-            if (!initialTimelineAnchored || selfAccountIdHexForMentions.isNullOrBlank() || readAnchorMessageId == null) {
+            if (!initialTimelineAnchored || selfAccountIdHex.isNullOrBlank() || readAnchorMessageId == null) {
                 emptyList()
             } else {
                 unreadReceivedMentionIds(controller.timeline, readAnchorMessageId) { msg ->
                     documentMentionsAccount(
                         document = msg.record.contentTokens,
-                        accountIdHex = selfAccountIdHexForMentions,
+                        accountIdHex = selfAccountIdHex,
                         resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
                     )
                 }
