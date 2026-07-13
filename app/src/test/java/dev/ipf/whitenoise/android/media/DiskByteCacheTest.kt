@@ -444,6 +444,28 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun get_transientReadError_keepsIndexedEntrySubjectToByteCap() {
+        val cache = DiskByteCache(dir, maxBytes = 100)
+        cache.put("a", ByteArray(40))
+        cache.put("b", ByteArray(40))
+        val unreadable = File(dir, sha256Hex("a") + ".bin")
+        assertTrue(unreadable.setReadable(false, false))
+
+        assertNull("transient read failure is a miss", cache.get("a"))
+        assertTrue("backing path must still exist", unreadable.isFile)
+        assertTrue(cache.contains("a"))
+        assertEquals(2, cache.size())
+        assertEquals(80L, cache.residentBytes())
+
+        cache.put("c", ByteArray(40))
+        assertTrue(cache.residentBytes() <= 100)
+        assertNull(cache.get("b"))
+        assertNotNull(cache.get("c"))
+
+        unreadable.setReadable(true, false)
+    }
+
+    @Test
     fun clear_skipsForeignFilesInDir() {
         // Defensive: if a future co-tenant ever drops files in cacheDir,
         // clear() must not wipe them. Only our own `.bin` / `.tmp` files.

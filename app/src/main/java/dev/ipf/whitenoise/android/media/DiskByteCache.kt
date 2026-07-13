@@ -127,11 +127,14 @@ class DiskByteCache(
             entry.file.setLastModified(System.currentTimeMillis())
             bytes
         } catch (_: IOException) {
-            // File vanished (manual delete, OS cache reap, FS corruption).
-            // Drop the index entry and report miss; the caller will re-fetch.
+            // Distinguish a vanished backing file from a transient read failure
+            // (permission, temporary I/O). Only drop stale index state when the
+            // path is actually gone; otherwise report a miss but keep accounting
+            // so LRU eviction can still reclaim the bytes. See #1321.
+            val backingStillPresent = entry.file.isFile
             synchronized(this) {
                 // Only evict if a concurrent put() hasn't already replaced it.
-                if (index[hashed] === entry) {
+                if (!backingStillPresent && index[hashed] === entry) {
                     index.remove(hashed)
                     residentBytes -= entry.size
                 }
