@@ -459,7 +459,10 @@ private fun EmojiSearchField(
 ) {
     Surface(
         modifier = modifier.height(64.dp).padding(top = 14.dp, bottom = 6.dp),
-        color = Color(0xFF303337),
+        // Transparent so the search row blends with the picker surface in both
+        // light and AMOLED themes, instead of a hardcoded dark box that reads
+        // as black in light mode.
+        color = Color.Transparent,
         shape = RoundedCornerShape(22.dp),
     ) {
         Row(
@@ -592,7 +595,9 @@ private fun EmojiCategoryRail(
     Row(
         modifier =
             modifier
-                .background(Color(0xFF202126))
+                // Transparent so the category rail blends with the picker
+                // surface in both themes rather than a hardcoded dark bar.
+                .background(Color.Transparent)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
