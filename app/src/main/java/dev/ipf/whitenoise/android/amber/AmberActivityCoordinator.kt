@@ -44,8 +44,8 @@ object AmberActivityCoordinator {
     // [promptLock] before launching; read (without the lock) by [deliverResult]
     // on the main thread.
     // The single in-flight prompt: its rendezvous queue plus the request id we
-    // expect the result to echo back (EXTRA_ID). Set under [promptLock] before
-    // launching; read (without the lock) by [deliverResult] on the main thread.
+    // expect the relay result to carry. Set under [promptLock] before launching;
+    // read (without the lock) by [deliverResult] on the main thread.
     private val pending = AtomicReference<Pending?>(null)
 
     /** Outcome of an Intent approval, as seen by the (worker-thread) caller. */
@@ -93,10 +93,10 @@ object AmberActivityCoordinator {
         data: Intent?,
     ) {
         val active = pending.get() ?: return
-        // Correlate by request id: a late result from a prior, timed-out prompt
-        // must not satisfy the next caller. Every prompt carries a client id in
-        // the Intent and accepts only a result that echoes the same EXTRA_ID.
-        val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
+        // Correlate by relay request id: each prompt runs through
+        // [AmberSignerRelayActivity], which stamps [AmberSignerRelay.EXTRA_REQUEST_ID]
+        // even when the external signer returns RESULT_CANCELED with null data.
+        val resultId = data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID)
         if (!shouldAcceptResult(active.requestId, resultId)) {
             // A dropped result means the waiting caller will burn the full
             // approval timeout — loud enough to find in a field logcat.
@@ -106,14 +106,18 @@ object AmberActivityCoordinator {
             )
             return
         }
-        active.queue.offer(Delivery.Result(resultOk, data))
+        if (data?.getBooleanExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, false) == true) {
+            active.queue.offer(Delivery.LauncherGone)
+        } else {
+            active.queue.offer(Delivery.Result(resultOk, data))
+        }
     }
 
     /**
      * Whether a delivered result should satisfy the active request. Accepts
-     * only when the result echoes the same client-chosen `EXTRA_ID` sent with
-     * the Intent, so a prior, timed-out request's late result can never satisfy
-     * the next caller.
+     * only when the relay result echoes the same client-chosen request id sent
+     * with the prompt, so a prior, timed-out request's late result can never
+     * satisfy the next caller.
      */
     internal fun shouldAcceptResult(
         expectedId: String,
@@ -143,9 +147,9 @@ object AmberActivityCoordinator {
                         queue.offer(Delivery.LauncherGone)
                     } else {
                         try {
-                            active.launch(intent)
+                            active.launch(AmberSignerRelay.buildLaunchIntent(requestId, intent))
                         } catch (_: Exception) {
-                            // Signer package vanished / could not be launched.
+                            // The app-private relay Activity could not be launched.
                             queue.offer(Delivery.LauncherGone)
                         }
                     }
