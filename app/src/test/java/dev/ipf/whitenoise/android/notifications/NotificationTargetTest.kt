@@ -322,7 +322,7 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun replyWorkerInput_roundTripsActionAndKeepsIdenticalInvocationsDistinct() {
+    fun replyWorkerRequest_roundTripsActionAndKeepsIdenticalCompletionKeysDistinct() {
         val action =
             NotificationAction(
                 kind = NotificationActionKind.REPLY,
@@ -332,11 +332,11 @@ class NotificationTargetTest {
             )
         val firstRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
         val secondRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
-        val firstWorkName = NotificationReplyWorker.notificationReplyWorkName(firstRequest.id)
+        val firstCompletionKey = NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id)
 
         assertEquals(action, NotificationReplyWorker.notificationReplyActionFromInput(NotificationReplyWorker.notificationReplyInputData(action, "hello")))
-        assertEquals(firstWorkName, NotificationReplyWorker.notificationReplyWorkName(firstRequest.id))
-        assertNotEquals(firstWorkName, NotificationReplyWorker.notificationReplyWorkName(secondRequest.id))
+        assertEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id))
+        assertNotEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(secondRequest.id))
     }
 
     @Test

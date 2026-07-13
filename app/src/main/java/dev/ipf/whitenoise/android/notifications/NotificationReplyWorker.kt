@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -32,7 +31,7 @@ class NotificationReplyWorker(
         val completionStore = NotificationReplyCompletionStore.create(applicationContext)
         // WorkManager keeps this id stable across retries and assigns a new one
         // to every separately enqueued reply, even when the text is identical.
-        val completionKey = notificationReplyWorkName(id)
+        val completionKey = notificationReplyCompletionKey(id)
         if (!application.appState.notificationActionsAllowed) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             return Result.success()
@@ -167,7 +166,7 @@ class NotificationReplyWorker(
         private const val KEY_NOTIFICATION_TAG = "notification_tag"
         private const val KEY_NOTIFICATION_ID = "notification_id"
         private const val KEY_REPLY = "reply"
-        private const val UNIQUE_WORK_PREFIX = "notification_reply_"
+        private const val COMPLETION_KEY_PREFIX = "notification_reply_"
         private const val MAX_SEND_ATTEMPTS = 3
         private const val REPLY_BACKOFF_DELAY_SECONDS = 30L
 
@@ -177,12 +176,7 @@ class NotificationReplyWorker(
             reply: String,
         ) {
             runCatching {
-                val request = notificationReplyRequest(action, reply)
-                WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                    notificationReplyWorkName(request.id),
-                    ExistingWorkPolicy.KEEP,
-                    request,
-                )
+                WorkManager.getInstance(context.applicationContext).enqueue(notificationReplyRequest(action, reply))
             }.onFailure {
                 if (BuildConfig.DEBUG) Log.w(TAG, "failed to enqueue reply worker", it)
             }
@@ -227,6 +221,6 @@ class NotificationReplyWorker(
                 notificationId = data.getInt(KEY_NOTIFICATION_ID, Int.MIN_VALUE).takeUnless { it == Int.MIN_VALUE },
             )
 
-        internal fun notificationReplyWorkName(workRequestId: UUID): String = UNIQUE_WORK_PREFIX + workRequestId
+        internal fun notificationReplyCompletionKey(workRequestId: UUID): String = COMPLETION_KEY_PREFIX + workRequestId
     }
 }
