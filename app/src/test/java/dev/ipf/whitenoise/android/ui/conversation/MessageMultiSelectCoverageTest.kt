@@ -32,8 +32,38 @@ class MessageMultiSelectCoverageTest {
         val controllerIdentity = "chat.id, appState.activeAccountRef, appState.runtimeGeneration"
 
         assertTrue(source.contains("val selectedMessages = remember($controllerIdentity)"))
+        assertTrue(source.contains("val selectedSelections by remember($controllerIdentity)"))
         assertTrue(source.contains("var batchForwardSheetOpen by remember($controllerIdentity)"))
         assertTrue(source.contains("var showBatchDeleteConfirm by remember($controllerIdentity)"))
+    }
+
+    @Test
+    fun batchSelectionDerivationsStayRemembered() {
+        val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            source.contains(
+                "val selectedActionItems = remember(selectedSelections) { " +
+                    "selectedSelections.map(BatchMessageSelection::action) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedForwardBodies = remember(selectedActionItems) { " +
+                    "batchForwardBodies(selectedActionItems) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedDeleteBreakdown = remember(selectedActionItems) { " +
+                    "batchDeleteBreakdown(selectedActionItems) }",
+            ),
+        )
     }
 
     @Test
@@ -54,7 +84,8 @@ class MessageMultiSelectCoverageTest {
         val source = source("messages/MessageBubble.kt").replace(Regex("\\s+"), " ")
 
         assertTrue(source.contains("expanded = isActionMenuOpen && !deleted && !selectionMode"))
-        assertTrue(source.contains("val onMediaLongPress: () -> Unit = { if (!selectionMode)"))
+        assertTrue(source.contains("remember(selectionMode, onActionMenuOpenChange)"))
+        assertTrue(source.contains("if (!selectionMode) { longPressWindowY = null onActionMenuOpenChange(true)"))
         assertTrue(source.contains("if (!deleted && !selectionMode) { longPressWindowY = null onActionMenuOpenChange(true)"))
     }
 
