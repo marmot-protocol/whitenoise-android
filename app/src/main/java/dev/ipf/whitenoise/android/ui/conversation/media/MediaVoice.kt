@@ -62,12 +62,17 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+private val voiceMaterializationLock = Any()
+private val inFlightVoiceMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
 
 @Composable
 internal fun MediaVoiceBubble(
@@ -433,6 +438,13 @@ internal suspend fun materializeVoiceAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
+    val file =
+        voiceAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     cachedVoiceAttachmentFile(
         context = context,
         messageIdHex = messageIdHex,
@@ -440,13 +452,48 @@ internal suspend fun materializeVoiceAttachment(
         reference = reference,
     )?.let { return it }
 
-    val cacheFile =
-        voiceAttachmentCacheFile(
-            context = context,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-        )
+    val key = file.absolutePath
+    var owner = false
+    val shared =
+        synchronized(voiceMaterializationLock) {
+            inFlightVoiceMaterializations[key]
+                ?.takeIf { it.isActive }
+                ?: CompletableDeferred<java.io.File>()
+                    .also {
+                        inFlightVoiceMaterializations[key] = it
+                        owner = true
+                    }
+        }
+    if (!owner) return shared.await()
+
+    return try {
+        val materialized =
+            withContext(NonCancellable) {
+                materializeVoiceAttachmentOnce(file, controller, messageIdHex, attachmentIndex, reference, mine)
+            }
+        shared.complete(materialized)
+        materialized
+    } catch (throwable: Throwable) {
+        shared.completeExceptionally(throwable)
+        throw throwable
+    } finally {
+        synchronized(voiceMaterializationLock) {
+            if (inFlightVoiceMaterializations[key] === shared) {
+                inFlightVoiceMaterializations.remove(key)
+            }
+        }
+    }
+}
+
+private suspend fun materializeVoiceAttachmentOnce(
+    file: java.io.File,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): java.io.File {
+    if (file.isFile && file.length() > 0L) return file
     val retained =
         if (mine) {
             controller
@@ -459,8 +506,8 @@ internal suspend fun materializeVoiceAttachment(
     val bytes =
         retained
             ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
-    withContext(Dispatchers.IO) { cacheFile.writeBytes(bytes) }
-    return cacheFile
+    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    return file
 }
 
 internal fun cachedVoiceAttachmentFile(

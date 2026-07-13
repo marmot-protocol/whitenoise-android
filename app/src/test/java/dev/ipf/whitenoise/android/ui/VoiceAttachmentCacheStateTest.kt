@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFile
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldInvalidateVoiceAttachmentCache
@@ -102,6 +103,28 @@ class VoiceAttachmentCacheStateTest {
             ),
         )
     }
+
+    @Test
+    fun voiceMaterializationUsesSingleFlightForSameCacheFile() {
+        val source = mediaVoiceSource().readText()
+        val body = source.functionBody("materializeVoiceAttachment")
+
+        assertTrue("voice materialization should keep an in-flight map", "inFlightVoiceMaterializations" in source)
+        assertTrue("same cache file callers should await the owner", "if (!owner) return shared.await()" in body)
+        assertTrue("the owner should survive first-caller UI cancellation", "withContext(NonCancellable)" in body)
+        assertTrue("the owner should publish the materialized file to waiters", "shared.complete(materialized)" in body)
+        assertTrue(
+            "completed or failed materializations should not poison future retries",
+            "inFlightVoiceMaterializations.remove(key)" in body,
+        )
+    }
+
+    private fun mediaVoiceSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MediaVoice.kt source file")
 
     private fun mediaReference(mediaType: String): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
