@@ -720,12 +720,15 @@ internal fun MessageBubble(
                 // viewer); anchored to the bubble top like the accessibility
                 // long-click path. Hoisted so every media call site shares one
                 // definition.
-                val onMediaLongPress: () -> Unit = {
-                    if (!selectionMode) {
-                        longPressWindowY = null
-                        onActionMenuOpenChange(true)
+                val onMediaLongPress =
+                    remember(selectionMode, onActionMenuOpenChange) {
+                        {
+                            if (!selectionMode) {
+                                longPressWindowY = null
+                                onActionMenuOpenChange(true)
+                            }
+                        }
                     }
-                }
                 val mediaBlocks: @Composable ColumnScope.() -> Unit = {
                     if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
                         if (visualAttachments.size == 1) {

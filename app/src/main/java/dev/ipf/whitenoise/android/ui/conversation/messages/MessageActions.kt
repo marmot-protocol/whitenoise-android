@@ -457,6 +457,10 @@ internal fun ForwardMessageSheet(
         if (searchFocused) sheetState.expand()
     }
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    val forwardPreviewText =
+        remember(body, appState.profileRevisionForCompose) {
+            resolveMentionsInPlaintext(body) { appState.mentionDisplayName(it) }
+        }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -487,7 +491,7 @@ internal fun ForwardMessageSheet(
                 // The forwarded text stays the verbatim `body` — onForward
                 // never sees this string.
                 Text(
-                    resolveMentionsInPlaintext(body) { appState.mentionDisplayName(it) },
+                    forwardPreviewText,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
