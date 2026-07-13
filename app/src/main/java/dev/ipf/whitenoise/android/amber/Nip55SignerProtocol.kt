@@ -148,9 +148,13 @@ object Nip55 {
     /** True when [content] is small enough to embed in a foreground Intent data URI. */
     fun contentFitsIntentFallbackBudget(content: String): Boolean = content.toByteArray(Charsets.UTF_8).size <= MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES
 
-    fun buildGetPublicKeyIntent(permissionsJson: String): Intent =
+    fun buildGetPublicKeyIntent(
+        permissionsJson: String,
+        id: String,
+    ): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")).apply {
             putExtra(EXTRA_TYPE, SignerOp.GetPublicKey.intentType)
+            putExtra(EXTRA_ID, id)
             if (permissionsJson.isNotEmpty()) putExtra(EXTRA_PERMISSIONS, permissionsJson)
         }
 

@@ -44,8 +44,8 @@ object AmberActivityCoordinator {
     // [promptLock] before launching; read (without the lock) by [deliverResult]
     // on the main thread.
     // The single in-flight prompt: its rendezvous queue plus the request id we
-    // expect the result to echo back (EXTRA_ID). Set under [promptLock] before
-    // launching; read (without the lock) by [deliverResult] on the main thread.
+    // expect the relay result to carry. Set under [promptLock] before launching;
+    // read (without the lock) by [deliverResult] on the main thread.
     private val pending = AtomicReference<Pending?>(null)
 
     /** Outcome of an Intent approval, as seen by the (worker-thread) caller. */
@@ -73,7 +73,7 @@ object AmberActivityCoordinator {
 
     private data class Pending(
         val queue: ArrayBlockingQueue<Delivery>,
-        val requestId: String?,
+        val requestId: String,
     )
 
     fun attach(launcher: ActivityResultLauncher<Intent>) {
@@ -93,11 +93,10 @@ object AmberActivityCoordinator {
         data: Intent?,
     ) {
         val active = pending.get() ?: return
-        // Correlate by request id: a late result from a prior, timed-out prompt
-        // must not satisfy the next caller. An id-bearing request accepts only a
-        // result that echoes its id; get_public_key sends no id, so its result
-        // (which likewise carries none) matches on both being null.
-        val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
+        // Correlate by relay request id: each prompt runs through
+        // [AmberSignerRelayActivity], which stamps [AmberSignerRelay.EXTRA_REQUEST_ID]
+        // even when the external signer returns RESULT_CANCELED with null data.
+        val resultId = data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID)
         if (!shouldAcceptResult(active.requestId, resultId)) {
             // A dropped result means the waiting caller will burn the full
             // approval timeout — loud enough to find in a field logcat.
@@ -107,22 +106,23 @@ object AmberActivityCoordinator {
             )
             return
         }
-        active.queue.offer(Delivery.Result(resultOk, data))
+        if (data?.getBooleanExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, false) == true) {
+            active.queue.offer(Delivery.LauncherGone)
+        } else {
+            active.queue.offer(Delivery.Result(resultOk, data))
+        }
     }
 
     /**
-     * Whether a delivered result should satisfy the active request. An
-     * id-bearing request accepts only a result echoing the same `EXTRA_ID`, so
-     * a prior, timed-out request's late result can never satisfy it.
-     * get_public_key sends no id, and signers answer it with a self-generated
-     * id — so a no-id request accepts whatever arrives while it is the single
-     * pending prompt (the prompt lock serializes prompts, so there is nothing
-     * else the result could belong to).
+     * Whether a delivered result should satisfy the active request. Accepts
+     * only when the relay result echoes the same client-chosen request id sent
+     * with the prompt, so a prior, timed-out request's late result can never
+     * satisfy the next caller.
      */
     internal fun shouldAcceptResult(
-        expectedId: String?,
+        expectedId: String,
         resultId: String?,
-    ): Boolean = expectedId == null || expectedId == resultId
+    ): Boolean = expectedId == resultId
 
     /**
      * Show [intent] via the foreground launcher and block the CALLING (worker)
@@ -133,7 +133,7 @@ object AmberActivityCoordinator {
     fun awaitApproval(
         intent: Intent,
         timeoutMs: Long,
-        requestId: String?,
+        requestId: String,
     ): Outcome =
         promptLock.withLock {
             if (launcher == null) return Outcome.NoForegroundActivity
@@ -147,9 +147,9 @@ object AmberActivityCoordinator {
                         queue.offer(Delivery.LauncherGone)
                     } else {
                         try {
-                            active.launch(intent)
+                            active.launch(AmberSignerRelay.buildLaunchIntent(requestId, intent))
                         } catch (_: Exception) {
-                            // Signer package vanished / could not be launched.
+                            // The app-private relay Activity could not be launched.
                             queue.offer(Delivery.LauncherGone)
                         }
                     }
