@@ -18,8 +18,9 @@ class ChatsControllerListVisibilityTest {
 
         assertTrue(
             "hidden-to-visible must synchronously recompute before return snap compares heads",
-            Regex("""if\s*\(\s*visible\s*\)\s*recompute\(\s*\)""").containsMatchIn(body) ||
-                Regex("""visible\s*&&\s*\(\s*pendingRecompute\s*\|\|\s*recomputeScheduled\s*\)""").containsMatchIn(body),
+            Regex(
+                """if\s*\(\s*visible\s*&&\s*\(\s*pendingRecompute\s*\|\|\s*recomputeScheduled\s*\)\s*\)\s*\{\s*recompute\(\s*\)\s*}""",
+            ).containsMatchIn(body),
         )
         assertFalse(
             "return flush must not be gated solely on pendingRecompute",
