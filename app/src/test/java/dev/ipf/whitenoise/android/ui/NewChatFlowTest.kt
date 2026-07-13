@@ -168,12 +168,12 @@ class NewChatFlowTest {
     }
 
     @Test
-    fun startProfileChatTreatsPostResolutionInvalidIdentityAsMissingSetup() {
-        val invalidIdentity = MarmotKitException.InvalidIdentity("invalid Marmot KeyPackage event")
+    fun startProfileChatDistinguishesInvalidRecipientFromUnusableKeyPackage() {
+        val invalidIdentity = MarmotKitException.InvalidIdentity("bad npub")
 
-        assertTrue(startProfileChatFailureIsMissingSetup(invalidIdentity))
+        assertFalse(startProfileChatFailureIsMissingSetup(invalidIdentity))
         assertEquals(
-            AppText.Resource(R.string.error_missing_key_package),
+            AppText.Resource(R.string.error_invalid_identity_reference),
             startProfileChatFailureDetail(invalidIdentity) { "ignored" },
         )
         assertFalse(startProfileChatFailureCopyable(invalidIdentity))
@@ -181,6 +181,18 @@ class NewChatFlowTest {
             AppText.Resource(R.string.error_invalid_identity_reference),
             groupCreateFailureDetail(invalidIdentity) { "ignored" },
         )
+
+        val invalidKeyPackage = MarmotKitException.InvalidKeyPackageEvent("unsupported cipher suite")
+        assertTrue(startProfileChatFailureIsMissingSetup(invalidKeyPackage))
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            startProfileChatFailureDetail(invalidKeyPackage) { "ignored" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            groupCreateFailureDetail(invalidKeyPackage) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(invalidKeyPackage))
     }
 
     @Test
