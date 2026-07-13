@@ -64,6 +64,10 @@
                 <data android:scheme="marmot" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".amber.AmberSignerRelayActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <service
             android:name=".notifications.NotificationStreamForegroundService"
             android:exported="false"

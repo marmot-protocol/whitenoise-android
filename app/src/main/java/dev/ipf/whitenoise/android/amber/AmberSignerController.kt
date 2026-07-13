@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.amber
 import android.content.Context
 import dev.ipf.marmotkit.ExternalAccountSignerFfi
 import dev.ipf.marmotkit.MarmotKitException
+import java.util.UUID
 
 /**
  * Entry points for the Amber (NIP-55) external-signer flow, wrapping the
@@ -29,10 +30,9 @@ class AmberSignerController(
      */
     fun requestPublicKey(): String {
         if (!isSignerInstalled()) throw MarmotKitException.ExternalSignerUnavailable("")
-        val intent = Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson())
-        // get_public_key carries no request id (single, login-time), so the
-        // coordinator delivers its result without correlation.
-        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId = null)) {
+        val requestId = UUID.randomUUID().toString()
+        val intent = Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId)
+        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
             is AmberActivityCoordinator.Outcome.Completed -> parsePublicKey(outcome)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable("")
