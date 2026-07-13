@@ -72,6 +72,10 @@
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
     <string name="error_missing_key_package">Bu kişi henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
     <string name="error_missing_key_package_for">%1$s henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
+    <string name="invite_to_white_noise">White Noise\'a Davet Et</string>
+    <string name="invite_to_white_noise_description">%1$s henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
+    <string name="unknown_invite_to_white_noise_description">Bu kullanıcı henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
+    <string name="invite_message">White Noise\'da bana katıl. Telefon numarası yok. Gözetim yok. Sadece gerçek gizlilik. Buradan indir: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Bu alıcı geçerli bir Nostr genel anahtarı değil. Bir npub, profil bağlantısı veya hex genel anahtarı kullanın.</string>
     <string name="error_group_publish_failed">Grup yerel olarak oluşturuldu ancak yayınlanamadı: %1$s</string>
     <string name="error_group_create_failed_retry">Şifreli sohbet ayarlanırken bir şeyler ters gitti. Bağlantınızı kontrol edip tekrar deneyin.</string>
