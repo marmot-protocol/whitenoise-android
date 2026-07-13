@@ -23,6 +23,13 @@ class ChatMutePreferences(
     private val _notificationModes = MutableStateFlow(readNotificationModes(preferences))
     val notificationModes: StateFlow<Map<String, ChatNotifyMode>> = _notificationModes.asStateFlow()
 
+    // Back-compat projection for callers that only care about the muted/unmuted
+    // axis (chat-list badge, multi-select bulk mute) — the composite keys whose
+    // mode is NONE. Kept in sync with [_notificationModes] so those surfaces
+    // don't need to know about the tri-state model.
+    private val _mutedConversations = MutableStateFlow(mutedKeysOf(_notificationModes.value))
+    val mutedConversations: StateFlow<Set<String>> = _mutedConversations.asStateFlow()
+
     fun mode(
         accountRef: String,
         groupIdHex: String,
@@ -48,6 +55,7 @@ class ChatMutePreferences(
             }
         if (updated == _notificationModes.value) return
         _notificationModes.value = updated
+        _mutedConversations.value = mutedKeysOf(updated)
         preferences
             .edit()
             .putStringSet(
@@ -91,6 +99,8 @@ class ChatMutePreferences(
         }
 
         fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet() ?: emptySet()
+
+        fun mutedKeysOf(modes: Map<String, ChatNotifyMode>): Set<String> = modes.filterValues { it == ChatNotifyMode.NONE }.keys.toSet()
 
         fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
             buildMap {
