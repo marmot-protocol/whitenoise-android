@@ -2887,6 +2887,19 @@ class WhiteNoiseAppState(
         return chatMutePreferences.isMuted(accountRef, groupIdHex)
     }
 
+    fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
+        val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
+        return chatMutePreferences.mode(accountRef, groupIdHex)
+    }
+
+    fun setConversationNotifyMode(
+        groupIdHex: String,
+        mode: ChatNotifyMode,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.setMode(accountRef, groupIdHex, mode)
+    }
+
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,
@@ -4662,6 +4675,29 @@ class WhiteNoiseAppState(
         )
     }
 
+    // A notification renders once, so await the sender's local profile instead
+    // of relying on the UI presentation cache, which materializes
+    // asynchronously. Fall back to the payload picture when the local profile
+    // has none. Sanitize every URL before fetching it.
+    private suspend fun notificationSenderAvatarUrl(update: NotificationUpdateFfi): String? =
+        ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
+            ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
+
+    // Conversation shortcut icon: the peer for a DM, or the group's own avatar
+    // for a group chat. The sender's MessagingStyle icon is resolved separately.
+    private suspend fun notificationConversationAvatarUrl(
+        update: NotificationUpdateFfi,
+        senderAvatarUrl: String?,
+    ): String? =
+        if (update.isDm) {
+            senderAvatarUrl
+        } else {
+            runCatching { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl }
+                .getOrNull()
+                ?.let { ProfileSanitizer.imageUrl(it) }
+                ?.takeIf { it.isNotBlank() }
+        }
+
     private fun notificationGroupTitleCopy(): GroupTitleCopy =
         GroupTitleCopy(
             inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
@@ -4678,7 +4714,7 @@ class WhiteNoiseAppState(
                 activeConversationGroupIdHex = activeConversation,
                 activeConversationAccountRef = activeConversationAccountRef,
                 appLockScreenVisible = appLockScreenVisible,
-                isConversationMuted = chatMutePreferences::isMuted,
+                conversationNotifyMode = chatMutePreferences::mode,
             )
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
@@ -4720,6 +4756,7 @@ class WhiteNoiseAppState(
             // was locked earlier, keep the post redacted even if it has since
             // unlocked because the rich fields were intentionally not resolved.
             val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
+            val senderAvatarUrl = if (redactNotificationContent) null else notificationSenderAvatarUrl(update)
             localNotificationPresenter.show(
                 update,
                 if (redactNotificationContent) null else (systemText?.title ?: notificationConversationTitle(update)),
@@ -4737,6 +4774,13 @@ class WhiteNoiseAppState(
                         )
                     },
                 redactContent = redactNotificationContent,
+                conversationAvatarUrl =
+                    if (redactNotificationContent) {
+                        null
+                    } else {
+                        notificationConversationAvatarUrl(update, senderAvatarUrl)
+                    },
+                senderAvatarUrl = senderAvatarUrl,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

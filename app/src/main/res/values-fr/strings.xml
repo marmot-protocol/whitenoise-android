@@ -968,8 +968,11 @@
     <string name="see_all_members">Voir les %1$d membres</string>
     <string name="chat_lock">Verrouillage de la discussion</string>
     <string name="collapse_long_messages">Réduire les longs messages</string>
-    <string name="mute_notifications">Mettre les notifications en sourdine</string>
-    <string name="mute_notifications_subtitle">Arrêter les notifications système pour cette discussion</string>
+    <string name="notify">Notifier</string>
+    <string name="notify_all_messages">Tous les messages</string>
+    <string name="notify_only_mentions">Mentions uniquement</string>
+    <string name="notify_nothing">Rien</string>
+    <string name="customize_sound_vibration">Personnaliser le son et les vibrations</string>
     <string name="chat_muted_badge">En sourdine</string>
     <string name="collapse_long_messages_subtitle">Afficher un raccourci « Lire la suite » pour les longs messages de cette discussion</string>
     <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>

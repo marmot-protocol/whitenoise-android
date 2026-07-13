@@ -24,11 +24,17 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.security.MessageDigest
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -45,6 +51,15 @@ class LocalNotificationPresenter(
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
+
+    // Conversation channels we've already created in this process, so the hot
+    // post path skips the get-or-create Binder round-trip after the first post.
+    private val ensuredConversationChannels = ConcurrentHashMap.newKeySet<String>()
+
+    // Warms the avatar cache off the post path when a conversation's avatar is
+    // not yet cached, so a later notification (or shortcut refresh) can attach
+    // it. Never blocks notification delivery on the network.
+    private val avatarWarmScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -168,6 +183,8 @@ class LocalNotificationPresenter(
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         recipientAccountSubtext: String? = null,
         redactContent: Boolean = false,
+        conversationAvatarUrl: String? = null,
+        senderAvatarUrl: String? = null,
     ): Boolean {
         val formattedContent =
             LocalNotificationFormatter.content(
@@ -211,9 +228,28 @@ class LocalNotificationPresenter(
             } else {
                 rawNotificationContent
             }
+        // A shortcut-backed message posts on its per-conversation channel (the
+        // child of whichever parent it routed to — message OR mention), so
+        // Android treats it as a conversation and the user's per-conversation
+        // sound/vibration applies. Locked/redacted posts and non-message cards
+        // stay on the parent channel and carry no shortcut.
+        val messagingShortcutId =
+            if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                conversationShortcutId(update.accountRef, update.groupIdHex)
+            } else {
+                null
+            }
+        val channelId =
+            if (messagingShortcutId != null) {
+                withContext(Dispatchers.Default) {
+                    ensureConversationChannel(decision.channelId, messagingShortcutId)
+                } ?: decision.channelId
+            } else {
+                decision.channelId
+            }
         val builder =
             NotificationCompat
-                .Builder(context, decision.channelId)
+                .Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_whitenoise)
                 .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
                 .setCategory(decision.category)
@@ -252,16 +288,39 @@ class LocalNotificationPresenter(
                             existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
                         }
                     }
-                if (!redactContent) {
-                    conversationShortcutId(update)?.let { shortcutId ->
-                        val locusId = LocusIdCompat(shortcutId)
-                        builder
-                            .setShortcutId(shortcutId)
-                            .setLocusId(locusId)
-                            .addPerson(senderPerson(notificationContent))
+                val (conversationAvatarBitmap, senderAvatarBitmap) =
+                    if (redactContent) {
+                        null to null
+                    } else {
                         withContext(Dispatchers.Default) {
-                            publishConversationShortcut(update, notificationContent, shortcutId, locusId)
+                            coroutineScope {
+                                val conversationAvatar = async { resolveAvatarBitmap(conversationAvatarUrl) }
+                                val senderAvatar = async { resolveAvatarBitmap(senderAvatarUrl) }
+                                conversationAvatar.await() to senderAvatar.await()
+                            }
                         }
+                    }
+                warmConversationAvatar(conversationAvatarUrl, alreadyCached = conversationAvatarBitmap != null)
+                warmConversationAvatar(senderAvatarUrl, alreadyCached = senderAvatarBitmap != null)
+                val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
+                if (!redactContent && messagingShortcutId != null) {
+                    val locusId = LocusIdCompat(messagingShortcutId)
+                    builder
+                        .setShortcutId(messagingShortcutId)
+                        .setLocusId(locusId)
+                        .addPerson(sender)
+                    withContext(Dispatchers.Default) {
+                        publishConversationShortcut(
+                            update,
+                            notificationContent,
+                            messagingShortcutId,
+                            locusId,
+                            conversationAvatarUrl,
+                            conversationAvatarBitmap,
+                            senderAvatarUrl,
+                            senderAvatarBitmap,
+                            sender,
+                        )
                     }
                 }
                 builder.setStyle(
@@ -271,6 +330,7 @@ class LocalNotificationPresenter(
                         if (redactContent) null else conversationTitleOverride,
                         decision.historyCap,
                         carried,
+                        sender,
                     ),
                 )
                 if (redactContent) {
@@ -408,6 +468,7 @@ class LocalNotificationPresenter(
         conversationTitleOverride: String?,
         historyCap: Int,
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
+        sender: Person,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -424,12 +485,6 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        val sender =
-            Person
-                .Builder()
-                .setName(content.senderName)
-                .setKey(content.senderKey)
-                .build()
         style.addMessage(content.body, update.timestampMs, sender)
         return style
     }
@@ -448,16 +503,16 @@ class LocalNotificationPresenter(
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
 
-    private fun conversationShortcutId(update: NotificationUpdateFfi): String? {
-        if (update.accountRef.isBlank() || update.groupIdHex.isBlank()) return null
-        return "conversation-" + sha256Hex("${update.accountRef}\u0000${update.groupIdHex}").take(32)
-    }
-
     private fun publishConversationShortcut(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
         shortcutId: String,
         locusId: LocusIdCompat,
+        conversationAvatarUrl: String?,
+        conversationAvatarBitmap: android.graphics.Bitmap?,
+        senderAvatarUrl: String?,
+        senderAvatarBitmap: android.graphics.Bitmap?,
+        sender: Person,
     ) {
         runCatching {
             val title = content.conversationTitle ?: content.title
@@ -469,6 +524,10 @@ class LocalNotificationPresenter(
                     notificationTag = content.notificationTag,
                     senderName = content.senderName,
                     senderKey = content.senderKey,
+                    avatarUrl = conversationAvatarUrl,
+                    avatarApplied = conversationAvatarBitmap != null,
+                    senderAvatarUrl = senderAvatarUrl,
+                    senderAvatarApplied = senderAvatarBitmap != null,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
@@ -488,10 +547,10 @@ class LocalNotificationPresenter(
                     .Builder(context, shortcutId)
                     .setShortLabel(snapshot.shortLabel)
                     .setLongLabel(snapshot.longLabel)
-                    .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                    .setIcon(conversationShortcutIcon(conversationAvatarBitmap))
                     .setIntent(intent)
                     .setLocusId(locusId)
-                    .setPerson(senderPerson(content))
+                    .setPerson(sender)
                     .setLongLived(true)
                     .build()
             ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
@@ -500,6 +559,43 @@ class LocalNotificationPresenter(
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
         }
+    }
+
+    // Adaptive bitmap so the People / conversation surfaces mask the avatar to a
+    // circle; fall back to the launcher icon when the chat has no avatar or it
+    // isn't cached yet.
+    private fun conversationShortcutIcon(avatarBitmap: android.graphics.Bitmap?): IconCompat =
+        if (avatarBitmap != null) {
+            IconCompat.createWithAdaptiveBitmap(avatarBitmap)
+        } else {
+            IconCompat.createWithResource(context, R.mipmap.ic_launcher)
+        }
+
+    private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
+        if (url.isNullOrBlank()) return null
+        AvatarImageLoader.peekBitmap(url)?.let { return it }
+        // Bounded so a slow avatar host can't delay notification delivery; the
+        // underlying fetch still completes and caches, upgrading the next post.
+        return withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { AvatarImageLoader.loadBitmap(url) }
+    }
+
+    private fun warmConversationAvatar(
+        url: String?,
+        alreadyCached: Boolean,
+    ) {
+        if (alreadyCached || url.isNullOrBlank()) return
+        avatarWarmScope.launch { runCatching { AvatarImageLoader.load(url) } }
+    }
+
+    private fun ensureConversationChannel(
+        parentChannelId: String,
+        conversationShortcutId: String,
+    ): String? {
+        val conversationChannelId = ConversationNotificationChannels.conversationChannelId(parentChannelId, conversationShortcutId)
+        if (conversationChannelId in ensuredConversationChannels) return conversationChannelId
+        val created = ConversationNotificationChannels.ensureConversationChannel(context, parentChannelId, conversationShortcutId)
+        if (created != null) ensuredConversationChannels.add(created)
+        return created
     }
 
     private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {
@@ -523,19 +619,6 @@ class LocalNotificationPresenter(
             shortcutLastUsed.remove(it)
         }
     }
-
-    private fun senderPerson(content: LocalNotificationContent): Person =
-        Person
-            .Builder()
-            .setName(content.senderName)
-            .setKey(content.senderKey)
-            .build()
-
-    private fun sha256Hex(value: String): String =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString(separator = "") { "%02x".format(it) }
 
     private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
         val remoteInput =
@@ -619,8 +702,25 @@ private data class ConversationShortcutSnapshot(
     val notificationTag: String,
     val senderName: String,
     val senderKey: String,
+    val avatarUrl: String?,
+    val avatarApplied: Boolean,
+    val senderAvatarUrl: String?,
+    val senderAvatarApplied: Boolean,
 )
 
+internal fun notificationSenderPerson(
+    content: LocalNotificationContent,
+    avatarBitmap: android.graphics.Bitmap?,
+): Person =
+    Person
+        .Builder()
+        .setName(content.senderName)
+        .setKey(content.senderKey)
+        .apply {
+            avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
+        }.build()
+
+private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 
 private inline fun notificationDebug(message: () -> String) {

@@ -6,40 +6,83 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class ChatNotifyMode {
+    ALL,
+    MENTIONS_ONLY,
+    NONE,
+}
+
 /**
- * Per-account, per-conversation mute state for local notification suppression
- * (#1179). Android notification preference — not White Noise protocol data.
+ * Per-account, per-conversation notification mode (#1179, #1252).
+ * Android notification preference — not White Noise protocol data.
  */
 class ChatMutePreferences(
     context: Context,
     private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
-    private val _mutedConversations = MutableStateFlow(readMutedSet())
+    private val _notificationModes = MutableStateFlow(readNotificationModes(preferences))
+    val notificationModes: StateFlow<Map<String, ChatNotifyMode>> = _notificationModes.asStateFlow()
+
+    // Back-compat projection for callers that only care about the muted/unmuted
+    // axis (chat-list badge, multi-select bulk mute) — the composite keys whose
+    // mode is NONE. Kept in sync with [_notificationModes] so those surfaces
+    // don't need to know about the tri-state model.
+    private val _mutedConversations = MutableStateFlow(mutedKeysOf(_notificationModes.value))
     val mutedConversations: StateFlow<Set<String>> = _mutedConversations.asStateFlow()
+
+    fun mode(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatNotifyMode {
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
+        return _notificationModes.value[key] ?: ChatNotifyMode.ALL
+    }
 
     fun isMuted(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean = compositeKey(accountRef, groupIdHex) in _mutedConversations.value
+    ): Boolean = mode(accountRef, groupIdHex) == ChatNotifyMode.NONE
+
+    fun setMode(
+        accountRef: String,
+        groupIdHex: String,
+        mode: ChatNotifyMode,
+    ) {
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
+        val updated =
+            _notificationModes.value.toMutableMap().apply {
+                if (mode == ChatNotifyMode.ALL) remove(key) else put(key, mode)
+            }
+        if (updated == _notificationModes.value) return
+        _notificationModes.value = updated
+        _mutedConversations.value = mutedKeysOf(updated)
+        preferences
+            .edit()
+            .putStringSet(
+                KEY_MUTED_CONVERSATIONS,
+                updated.filterValues { it == ChatNotifyMode.NONE }.keys,
+            ).putStringSet(
+                KEY_MENTION_ONLY_CONVERSATIONS,
+                updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys,
+            ).apply()
+    }
 
     fun setMuted(
         accountRef: String,
         groupIdHex: String,
         muted: Boolean,
     ) {
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
-        val updated =
-            _mutedConversations.value.toMutableSet().apply {
-                if (muted) add(key) else remove(key)
-            }
-        if (updated == _mutedConversations.value) return
-        _mutedConversations.value = updated
-        preferences.edit().putStringSet(KEY_MUTED_CONVERSATIONS, updated.toSet()).apply()
+        setMode(
+            accountRef = accountRef,
+            groupIdHex = groupIdHex,
+            mode = if (muted) ChatNotifyMode.NONE else ChatNotifyMode.ALL,
+        )
     }
 
     internal companion object {
         private const val PREFERENCES_NAME = "whitenoise.chat_mute"
         private const val KEY_MUTED_CONVERSATIONS = "mutedConversations"
+        private const val KEY_MENTION_ONLY_CONVERSATIONS = "mentionOnlyConversations"
 
         fun compositeKey(
             accountRef: String,
@@ -56,7 +99,18 @@ class ChatMutePreferences(
         }
 
         fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet() ?: emptySet()
-    }
 
-    private fun readMutedSet(): Set<String> = Companion.readMutedSet(preferences)
+        fun mutedKeysOf(modes: Map<String, ChatNotifyMode>): Set<String> = modes.filterValues { it == ChatNotifyMode.NONE }.keys.toSet()
+
+        fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
+            buildMap {
+                preferences
+                    .getStringSet(KEY_MENTION_ONLY_CONVERSATIONS, emptySet())
+                    .orEmpty()
+                    .forEach { put(it, ChatNotifyMode.MENTIONS_ONLY) }
+                // The existing mute set remains the migration source of truth.
+                // If corrupt preferences contain a key in both sets, NONE wins.
+                readMutedSet(preferences).forEach { put(it, ChatNotifyMode.NONE) }
+            }
+    }
 }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -42,10 +43,11 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
@@ -58,6 +60,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -102,7 +105,9 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -183,6 +188,7 @@ internal fun GroupDetailsScreen(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
+    var showNotificationModePicker by remember { mutableStateOf(false) }
     // Auto-opened straight from the empty-group "Add members" CTA: render the
     // picker on the first frame (no details-screen flash) and route its Back to
     // the conversation instead of to the details body underneath.
@@ -540,10 +546,10 @@ internal fun GroupDetailsScreen(
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
-        val mutedKeys by appState.chatMutePreferences.mutedConversations.collectAsState()
-        val conversationMuted =
-            remember(appState.activeAccountRef, controller.group.groupIdHex, mutedKeys) {
-                appState.isConversationMuted(controller.group.groupIdHex)
+        val notificationModes by appState.chatMutePreferences.notificationModes.collectAsState()
+        val conversationNotifyMode =
+            remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
+                appState.conversationNotifyMode(controller.group.groupIdHex)
             }
         Column(
             Modifier
@@ -664,14 +670,28 @@ internal fun GroupDetailsScreen(
                     appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                 },
             )
-            GroupSwitchActionRow(
-                icon = Icons.Default.NotificationsOff,
-                title = stringResource(R.string.mute_notifications),
-                subtitle = stringResource(R.string.mute_notifications_subtitle),
-                checked = conversationMuted,
-                onCheckedChange = {
-                    appState.setConversationMuted(controller.group.groupIdHex, it)
-                },
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            SectionHeader(stringResource(R.string.notifications))
+            SettingsActionRow(
+                icon = Icons.Default.Notifications,
+                title = stringResource(R.string.notify),
+                value = notificationModeLabel(conversationNotifyMode),
+                onClick = { showNotificationModePicker = true },
+            )
+            SettingsActionRow(
+                icon = Icons.Default.Settings,
+                title = stringResource(R.string.customize_sound_vibration),
+                onClick =
+                    appState.activeAccountRef?.let { accountRef ->
+                        {
+                            openConversationNotificationSettings(
+                                context = context,
+                                accountRef = accountRef,
+                                groupIdHex = controller.group.groupIdHex,
+                                isDm = isDm,
+                            )
+                        }
+                    },
             )
             SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
@@ -679,6 +699,17 @@ internal fun GroupDetailsScreen(
                 enabled = false,
                 comingSoon = true,
             )
+
+            if (showNotificationModePicker) {
+                NotificationModePickerDialog(
+                    currentMode = conversationNotifyMode,
+                    onDismiss = { showNotificationModePicker = false },
+                    onSelect = { mode ->
+                        showNotificationModePicker = false
+                        appState.setConversationNotifyMode(controller.group.groupIdHex, mode)
+                    },
+                )
+            }
 
             if (showDisappearingPicker) {
                 DisappearingMessagesPickerDialog(
@@ -1356,6 +1387,50 @@ private fun GroupMutationErrorBanner(
         }
     }
 }
+
+@Composable
+private fun NotificationModePickerDialog(
+    currentMode: ChatNotifyMode,
+    onDismiss: () -> Unit,
+    onSelect: (ChatNotifyMode) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.notify)) },
+        text = {
+            Column {
+                ChatNotifyMode.entries.forEach { mode ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = mode == currentMode,
+                                    onClick = { onSelect(mode) },
+                                    role = Role.RadioButton,
+                                ).padding(vertical = Dimens.spaceSm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+                    ) {
+                        RadioButton(selected = mode == currentMode, onClick = null)
+                        Text(notificationModeLabel(mode), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun notificationModeLabel(mode: ChatNotifyMode): String =
+    stringResource(
+        when (mode) {
+            ChatNotifyMode.ALL -> R.string.notify_all_messages
+            ChatNotifyMode.MENTIONS_ONLY -> R.string.notify_only_mentions
+            ChatNotifyMode.NONE -> R.string.notify_nothing
+        },
+    )
 
 @Composable
 private fun GroupSwitchActionRow(
