@@ -1099,6 +1099,12 @@ internal fun shouldInsertSentOptimisticMessage(
     projectedMessageIds: Set<String>,
 ): Boolean = confirmedId !in projectedMessageIds
 
+/** Publish succeeded without an id and its temp bubble still awaits the engine echo (#1315). */
+internal fun textSendAwaitingEchoConfirmation(
+    summaryMessageIds: List<String>,
+    optimisticStillPresent: Boolean,
+): Boolean = summaryMessageIds.isEmpty() && optimisticStillPresent
+
 internal fun compareTimelineMessages(
     left: TimelineMessage,
     right: TimelineMessage,
@@ -4139,19 +4145,32 @@ class ConversationController(
                     )
                     publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
                 }
+            val hasConfirmedId = summary.messageIds.isNotEmpty()
+            val awaitingEcho =
+                textSendAwaitingEchoConfirmation(
+                    summary.messageIds,
+                    optimisticStillPresent = optimisticKey in optimisticMessages,
+                )
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
-            if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
-            optimisticMessages.remove(optimisticKey)
+            if ((hasConfirmedId || awaitingEcho) && confirmedId.isNotEmpty()) {
+                messageById[confirmedId] = confirmed
+            }
+            if (!awaitingEcho) {
+                optimisticMessages.remove(optimisticKey)
+                if (confirmedId != tempId) messageById.remove(tempId)
+            }
             optimisticChatListPreviewRows.remove(optimisticKey)
-            messageById.remove(tempId)
             invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
                 .forEach(::removeProjectedRecord)
-            val insertedSent = shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)
+            val insertedSent =
+                awaitingEcho ||
+                    (hasConfirmedId && shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds))
             if (insertedSent) {
-                optimisticMessages["msg:$confirmedId"] =
+                val sentKey = if (awaitingEcho) optimisticKey else "msg:$confirmedId"
+                optimisticMessages[sentKey] =
                     TimelineMessage(
-                        "msg:$confirmedId",
+                        sentKey,
                         confirmed,
                         MessageStatus.Sent,
                         timelineOrder = optimisticOrder,
@@ -4173,10 +4192,11 @@ class ConversationController(
                         "flip" to (if (insertedSent) null else "echo-reconcile"),
                     ),
             )
-            // This success path removed the pending optimistic directly, so the
-            // echo-reconcile may never fire for this temp id — drop its trace
-            // entry so the bounded map doesn't retain it.
-            forgetSendTrace(tempId)
+            // When we keep the temp bubble for echo reconciliation, leave the
+            // trace entry so `echo-reconcile` can still be logged.
+            if (!awaitingEcho) {
+                forgetSendTrace(tempId)
+            }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             if (throwable.isUseAfterEviction()) {

@@ -30,6 +30,13 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun textSendSummaryWaitsOnlyWhileTempBubbleStillExists() {
+        assertEquals(true, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = true))
+        assertEquals(false, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = false))
+        assertEquals(false, textSendAwaitingEchoConfirmation(listOf("confirmed-id"), optimisticStillPresent = true))
+    }
+
+    @Test
     fun sentOptimisticReplacementIsSkippedWhenProjectionArrivesBeforeResponse() {
         assertEquals(
             false,
