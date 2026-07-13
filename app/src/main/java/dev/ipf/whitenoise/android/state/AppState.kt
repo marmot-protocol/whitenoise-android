@@ -4675,6 +4675,18 @@ class WhiteNoiseAppState(
         )
     }
 
+    // Conversation avatar for the notification shortcut icon. A DM's avatar is
+    // the peer, carried in the message payload as the sender — free, no IO. A
+    // group's avatar isn't in the payload, so resolve it from the group record.
+    private suspend fun notificationConversationAvatarUrl(update: NotificationUpdateFfi): String? =
+        if (update.isDm) {
+            update.sender.pictureUrl?.takeIf { it.isNotBlank() }
+        } else {
+            runCatching { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+        }
+
     private fun notificationGroupTitleCopy(): GroupTitleCopy =
         GroupTitleCopy(
             inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
@@ -4750,6 +4762,7 @@ class WhiteNoiseAppState(
                         )
                     },
                 redactContent = redactNotificationContent,
+                conversationAvatarUrl = if (redactNotificationContent) null else notificationConversationAvatarUrl(update),
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

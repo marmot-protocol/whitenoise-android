@@ -105,7 +105,6 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
@@ -552,12 +551,6 @@ internal fun GroupDetailsScreen(
             remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
                 appState.conversationNotifyMode(controller.group.groupIdHex)
             }
-        val notificationChannelId =
-            when {
-                conversationNotifyMode == ChatNotifyMode.MENTIONS_ONLY -> NotificationChannelSpec.MENTIONS.id
-                isDm -> NotificationChannelSpec.DIRECT_MESSAGES.id
-                else -> NotificationChannelSpec.GROUP_MESSAGES.id
-            }
         Column(
             Modifier
                 .fillMaxSize()
@@ -695,7 +688,7 @@ internal fun GroupDetailsScreen(
                                 context = context,
                                 accountRef = accountRef,
                                 groupIdHex = controller.group.groupIdHex,
-                                channelId = notificationChannelId,
+                                isDm = isDm,
                             )
                         }
                     },

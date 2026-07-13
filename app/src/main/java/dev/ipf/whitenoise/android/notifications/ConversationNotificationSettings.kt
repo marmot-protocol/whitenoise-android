@@ -44,8 +44,21 @@ internal fun openConversationNotificationSettings(
     context: Context,
     accountRef: String,
     groupIdHex: String,
-    channelId: String,
+    isDm: Boolean,
 ) {
+    val shortcutId = conversationShortcutId(accountRef, groupIdHex)
+    val primaryParent = ConversationNotificationChannels.primaryMessageParent(isDm)
+    val channelId =
+        if (shortcutId != null) {
+            // Create the per-conversation channels up front so the deep link
+            // resolves even before any notification has posted for this
+            // conversation, then target the PRIMARY message parent's
+            // conversation channel — never a bare parent channel.
+            ConversationNotificationChannels.ensureConversationChannels(context, shortcutId, isDm)
+            ConversationNotificationChannels.conversationChannelId(primaryParent.id, shortcutId)
+        } else {
+            primaryParent.id
+        }
     val preferred =
         conversationNotificationSettingsIntent(
             context = context,

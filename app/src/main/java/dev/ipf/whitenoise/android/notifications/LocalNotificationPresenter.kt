@@ -24,9 +24,13 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -44,6 +48,15 @@ class LocalNotificationPresenter(
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
+
+    // Conversation channels we've already created in this process, so the hot
+    // post path skips the get-or-create Binder round-trip after the first post.
+    private val ensuredConversationChannels = ConcurrentHashMap.newKeySet<String>()
+
+    // Warms the avatar cache off the post path when a conversation's avatar is
+    // not yet cached, so a later notification (or shortcut refresh) can attach
+    // it. Never blocks notification delivery on the network.
+    private val avatarWarmScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -167,6 +180,7 @@ class LocalNotificationPresenter(
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         recipientAccountSubtext: String? = null,
         redactContent: Boolean = false,
+        conversationAvatarUrl: String? = null,
     ): Boolean {
         val formattedContent =
             LocalNotificationFormatter.content(
@@ -210,9 +224,28 @@ class LocalNotificationPresenter(
             } else {
                 rawNotificationContent
             }
+        // A shortcut-backed message posts on its per-conversation channel (the
+        // child of whichever parent it routed to — message OR mention), so
+        // Android treats it as a conversation and the user's per-conversation
+        // sound/vibration applies. Locked/redacted posts and non-message cards
+        // stay on the parent channel and carry no shortcut.
+        val messagingShortcutId =
+            if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                conversationShortcutId(update.accountRef, update.groupIdHex)
+            } else {
+                null
+            }
+        val channelId =
+            if (messagingShortcutId != null) {
+                withContext(Dispatchers.Default) {
+                    ensureConversationChannel(decision.channelId, messagingShortcutId)
+                } ?: decision.channelId
+            } else {
+                decision.channelId
+            }
         val builder =
             NotificationCompat
-                .Builder(context, decision.channelId)
+                .Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_whitenoise)
                 .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
                 .setCategory(decision.category)
@@ -251,16 +284,14 @@ class LocalNotificationPresenter(
                             existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
                         }
                     }
-                if (!redactContent) {
-                    conversationShortcutId(update.accountRef, update.groupIdHex)?.let { shortcutId ->
-                        val locusId = LocusIdCompat(shortcutId)
-                        builder
-                            .setShortcutId(shortcutId)
-                            .setLocusId(locusId)
-                            .addPerson(senderPerson(notificationContent))
-                        withContext(Dispatchers.Default) {
-                            publishConversationShortcut(update, notificationContent, shortcutId, locusId)
-                        }
+                if (!redactContent && messagingShortcutId != null) {
+                    val locusId = LocusIdCompat(messagingShortcutId)
+                    builder
+                        .setShortcutId(messagingShortcutId)
+                        .setLocusId(locusId)
+                        .addPerson(senderPerson(notificationContent))
+                    withContext(Dispatchers.Default) {
+                        publishConversationShortcut(update, notificationContent, messagingShortcutId, locusId, conversationAvatarUrl)
                     }
                 }
                 builder.setStyle(
@@ -452,9 +483,15 @@ class LocalNotificationPresenter(
         content: LocalNotificationContent,
         shortcutId: String,
         locusId: LocusIdCompat,
+        conversationAvatarUrl: String?,
     ) {
         runCatching {
             val title = content.conversationTitle ?: content.title
+            // In-memory read only; on a cache miss we warm it below and let a
+            // later post upgrade the icon — the shortcut is never delayed on the
+            // network. The snapshot records whether the avatar was applied so a
+            // launcher-icon publish is superseded once the avatar is cached.
+            val avatarBitmap = AvatarImageLoader.peekBitmap(conversationAvatarUrl)
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
@@ -463,12 +500,15 @@ class LocalNotificationPresenter(
                     notificationTag = content.notificationTag,
                     senderName = content.senderName,
                     senderKey = content.senderKey,
+                    avatarUrl = conversationAvatarUrl,
+                    avatarApplied = avatarBitmap != null,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
                 ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
                 return
             }
+            warmConversationAvatar(conversationAvatarUrl, alreadyCached = avatarBitmap != null)
             pruneConversationShortcutsBeforePublish(shortcutId)
             val intent =
                 Intent(context, MainActivity::class.java).apply {
@@ -482,7 +522,7 @@ class LocalNotificationPresenter(
                     .Builder(context, shortcutId)
                     .setShortLabel(snapshot.shortLabel)
                     .setLongLabel(snapshot.longLabel)
-                    .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                    .setIcon(conversationShortcutIcon(avatarBitmap))
                     .setIntent(intent)
                     .setLocusId(locusId)
                     .setPerson(senderPerson(content))
@@ -494,6 +534,35 @@ class LocalNotificationPresenter(
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
         }
+    }
+
+    // Adaptive bitmap so the People / conversation surfaces mask the avatar to a
+    // circle; fall back to the launcher icon when the chat has no avatar or it
+    // isn't cached yet.
+    private fun conversationShortcutIcon(avatarBitmap: android.graphics.Bitmap?): IconCompat =
+        if (avatarBitmap != null) {
+            IconCompat.createWithAdaptiveBitmap(avatarBitmap)
+        } else {
+            IconCompat.createWithResource(context, R.mipmap.ic_launcher)
+        }
+
+    private fun warmConversationAvatar(
+        url: String?,
+        alreadyCached: Boolean,
+    ) {
+        if (alreadyCached || url.isNullOrBlank()) return
+        avatarWarmScope.launch { runCatching { AvatarImageLoader.load(url) } }
+    }
+
+    private fun ensureConversationChannel(
+        parentChannelId: String,
+        conversationShortcutId: String,
+    ): String? {
+        val conversationChannelId = ConversationNotificationChannels.conversationChannelId(parentChannelId, conversationShortcutId)
+        if (conversationChannelId in ensuredConversationChannels) return conversationChannelId
+        val created = ConversationNotificationChannels.ensureConversationChannel(context, parentChannelId, conversationShortcutId)
+        if (created != null) ensuredConversationChannels.add(created)
+        return created
     }
 
     private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {
@@ -607,6 +676,8 @@ private data class ConversationShortcutSnapshot(
     val notificationTag: String,
     val senderName: String,
     val senderKey: String,
+    val avatarUrl: String?,
+    val avatarApplied: Boolean,
 )
 
 private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
