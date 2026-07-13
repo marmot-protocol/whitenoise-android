@@ -289,6 +289,7 @@ internal fun groupCreateFailureDetail(
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
         is MarmotKitException.MissingKeyPackage -> missingKeyPackageFailureDetail(throwable.account, displayName)
+        is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
@@ -296,14 +297,13 @@ internal fun groupCreateFailureDetail(
     }
 
 /**
- * Direct-chat entry points resolve recipient references to a canonical Nostr
- * public key before calling the engine. On that path `InvalidIdentity` can only
- * describe an unusable fetched identity/KeyPackage, not the already-validated
- * recipient input, so it belongs to the same "not on White Noise yet" state as
- * `MissingKeyPackage`. New-group input keeps the stricter mapping above.
+ * Missing or unusable KeyPackages mean the recipient is not ready for secure
+ * chat. Malformed recipient references remain `InvalidIdentity`, even after a
+ * direct-chat lookup, so this classification never relies on call-site guesses
+ * or error-detail strings.
  */
 internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean =
-    throwable is MarmotKitException.MissingKeyPackage || throwable is MarmotKitException.InvalidIdentity
+    throwable is MarmotKitException.MissingKeyPackage || throwable is MarmotKitException.InvalidKeyPackageEvent
 
 internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
     recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
@@ -313,16 +313,13 @@ internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
 internal fun startProfileChatFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
-): AppText =
-    when (throwable) {
-        is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_missing_key_package)
-        else -> groupCreateFailureDetail(throwable, displayName)
-    }
+): AppText = groupCreateFailureDetail(throwable, displayName)
 
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> false
         is MarmotKitException.MissingKeyPackage -> false
+        is MarmotKitException.InvalidKeyPackageEvent -> false
         is MarmotKitException.InvalidIdentity -> false
         is MarmotKitException.Publish -> true
         is MarmotKitException -> false

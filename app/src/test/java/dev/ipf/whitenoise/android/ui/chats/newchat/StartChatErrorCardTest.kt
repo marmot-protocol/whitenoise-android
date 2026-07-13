@@ -26,7 +26,7 @@ class StartChatErrorCardTest {
 
     @Test
     fun inviteStateKeepsKnownNameAndUsesGenericFallback() {
-        val error = MarmotKitException.MissingKeyPackage("deadbeef")
+        val error = MarmotKitException.InvalidKeyPackageEvent("unsupported cipher suite")
 
         val known =
             startChatErrorUiState(
