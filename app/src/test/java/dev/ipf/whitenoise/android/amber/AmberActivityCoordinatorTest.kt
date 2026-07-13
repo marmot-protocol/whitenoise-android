@@ -1,20 +1,31 @@
 package dev.ipf.whitenoise.android.amber
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Pins the request-id correlation that stops a late result from a prior,
  * timed-out Amber prompt from satisfying the next caller (which would hand one
  * operation's signed payload to a different operation).
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class AmberActivityCoordinatorTest {
     @Test
-    fun mismatchedRequestIdsAreDropped() {
-        // A timed out; B is now the active request. A's late result must not
-        // satisfy B.
-        assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = "req-B", resultId = "req-A"))
+    fun staleResultCannotSatisfyGetPublicKey() {
+        // A sign_event timed out; its late result must not satisfy the next
+        // get_public_key request.
+        assertFalse(
+            AmberActivityCoordinator.shouldAcceptResult(
+                expectedId = "login-req-7f3a",
+                resultId = "stale-sign-event-id",
+            ),
+        )
     }
 
     @Test
@@ -23,24 +34,14 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
-    fun getPublicKeyBothMissingIsAccepted() {
-        // get_public_key sends no id and its result echoes none: both null match.
-        assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = null))
-    }
-
-    @Test
-    fun idBearingRequestDropsResultWithoutId() {
-        // An id-bearing request whose result omits the id (a stale prompt's late
-        // result) is never delivered.
+    fun resultWithoutIdIsDropped() {
         assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = "req-A", resultId = null))
     }
 
     @Test
-    fun noIdRequestAcceptsSignerGeneratedResultId() {
-        // get_public_key sends no id, but signers answer it with a
-        // self-generated id. The prompt lock keeps a single prompt pending, so
-        // the no-id request accepts whatever id the result carries — dropping
-        // it would block the caller for the full approval timeout.
-        assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = "d0438f"))
+    fun getPublicKeyIntentCarriesClientRequestId() {
+        val requestId = "login-req-7f3a"
+        val intent = Nip55.buildGetPublicKeyIntent(Nip55.defaultPermissionsJson(), requestId)
+        assertEquals(requestId, intent.getStringExtra(Nip55.EXTRA_ID))
     }
 }

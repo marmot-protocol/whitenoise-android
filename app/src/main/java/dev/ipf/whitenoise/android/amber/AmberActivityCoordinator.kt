@@ -73,7 +73,7 @@ object AmberActivityCoordinator {
 
     private data class Pending(
         val queue: ArrayBlockingQueue<Delivery>,
-        val requestId: String?,
+        val requestId: String,
     )
 
     fun attach(launcher: ActivityResultLauncher<Intent>) {
@@ -94,9 +94,8 @@ object AmberActivityCoordinator {
     ) {
         val active = pending.get() ?: return
         // Correlate by request id: a late result from a prior, timed-out prompt
-        // must not satisfy the next caller. An id-bearing request accepts only a
-        // result that echoes its id; get_public_key sends no id, so its result
-        // (which likewise carries none) matches on both being null.
+        // must not satisfy the next caller. Every prompt carries a client id in
+        // the Intent and accepts only a result that echoes the same EXTRA_ID.
         val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
         if (!shouldAcceptResult(active.requestId, resultId)) {
             // A dropped result means the waiting caller will burn the full
@@ -111,18 +110,15 @@ object AmberActivityCoordinator {
     }
 
     /**
-     * Whether a delivered result should satisfy the active request. An
-     * id-bearing request accepts only a result echoing the same `EXTRA_ID`, so
-     * a prior, timed-out request's late result can never satisfy it.
-     * get_public_key sends no id, and signers answer it with a self-generated
-     * id — so a no-id request accepts whatever arrives while it is the single
-     * pending prompt (the prompt lock serializes prompts, so there is nothing
-     * else the result could belong to).
+     * Whether a delivered result should satisfy the active request. Accepts
+     * only when the result echoes the same client-chosen `EXTRA_ID` sent with
+     * the Intent, so a prior, timed-out request's late result can never satisfy
+     * the next caller.
      */
     internal fun shouldAcceptResult(
-        expectedId: String?,
+        expectedId: String,
         resultId: String?,
-    ): Boolean = expectedId == null || expectedId == resultId
+    ): Boolean = expectedId == resultId
 
     /**
      * Show [intent] via the foreground launcher and block the CALLING (worker)
@@ -133,7 +129,7 @@ object AmberActivityCoordinator {
     fun awaitApproval(
         intent: Intent,
         timeoutMs: Long,
-        requestId: String?,
+        requestId: String,
     ): Outcome =
         promptLock.withLock {
             if (launcher == null) return Outcome.NoForegroundActivity
