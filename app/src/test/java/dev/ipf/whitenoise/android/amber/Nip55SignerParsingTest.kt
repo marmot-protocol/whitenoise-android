@@ -19,6 +19,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.GetPublicKey,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "npub1abc",
                 eventExtra = null,
                 packageExtra = "com.example.signer",
@@ -32,6 +33,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.GetPublicKey,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "npub1abc",
                 eventExtra = null,
                 packageExtra = null,
@@ -45,6 +47,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.GetPublicKey,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "  ",
                 eventExtra = null,
                 packageExtra = "com.example.signer",
@@ -59,6 +62,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.SignEvent,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "abc", // the signature, NOT what we return
                 eventExtra = signed,
                 packageExtra = null,
@@ -73,6 +77,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.SignEvent,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "abc",
                 eventExtra = signed,
                 packageExtra = "com.example.signer",
@@ -86,6 +91,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.SignEvent,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "abc",
                 eventExtra = null,
                 packageExtra = null,
@@ -99,6 +105,7 @@ class Nip55SignerParsingTest {
             parseActivityResult(
                 SignerOp.Nip44Decrypt,
                 resultOk = true,
+                rejected = false,
                 resultExtra = "plaintext",
                 eventExtra = null,
                 packageExtra = null,
@@ -134,12 +141,43 @@ class Nip55SignerParsingTest {
                 parseActivityResult(
                     op,
                     resultOk = false,
+                    rejected = false,
                     resultExtra = "something",
                     eventExtra = "something",
                     packageExtra = "com.example.signer",
                 )
             assertEquals("op=$op", ActivityResultOutcome.Rejected, outcome)
         }
+    }
+
+    @Test
+    fun resultOkWithRejectedFlagIsRejectedForEveryOp() {
+        SignerOp.entries.forEach { op ->
+            val outcome =
+                parseActivityResult(
+                    op,
+                    resultOk = true,
+                    rejected = true,
+                    resultExtra = null,
+                    eventExtra = null,
+                    packageExtra = null,
+                )
+            assertEquals("op=$op", ActivityResultOutcome.Rejected, outcome)
+        }
+    }
+
+    @Test
+    fun resultOkWithRejectedFlagTakesPrecedenceOverValueExtras() {
+        val outcome =
+            parseActivityResult(
+                SignerOp.SignEvent,
+                resultOk = true,
+                rejected = true,
+                resultExtra = "abc",
+                eventExtra = """{"id":"deadbeef","sig":"abc"}""",
+                packageExtra = "com.example.signer",
+            )
+        assertEquals(ActivityResultOutcome.Rejected, outcome)
     }
 
     @Test
