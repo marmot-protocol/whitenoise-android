@@ -46,6 +46,8 @@ fun WhiteNoiseApp(
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundAppUpdateTap: Int = 0,
+    onAppUpdateTapHandled: (Int) -> Unit = {},
     onRequestAppUnlock: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -126,6 +128,7 @@ fun WhiteNoiseApp(
                 snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
+                    AppSelfUpdateDialog(appState = appState)
                     when (val phase = appState.phase) {
                         AppPhase.Bootstrapping -> LoadingScreen()
                         AppPhase.Onboarding -> OnboardingScreen(appState)
@@ -134,6 +137,8 @@ fun WhiteNoiseApp(
                                 appState = appState,
                                 inboundNotificationTarget = inboundNotificationTarget,
                                 onNotificationTargetHandled = onNotificationTargetHandled,
+                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                onAppUpdateTapHandled = onAppUpdateTapHandled,
                             )
                         is AppPhase.Failed ->
                             FailureScreen(

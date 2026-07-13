@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.LocaleManager
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
 import android.os.SystemClock
@@ -73,6 +76,15 @@ import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
+import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
+import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
+import dev.ipf.whitenoise.android.updates.AppUpdateConstants
+import dev.ipf.whitenoise.android.updates.AppUpdateForegroundState
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
+import dev.ipf.whitenoise.android.updates.AppUpdateNotifier
+import dev.ipf.whitenoise.android.updates.AppUpdateRepository
+import dev.ipf.whitenoise.android.updates.shouldPostAppUpdateNotification
+import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -949,6 +961,9 @@ class WhiteNoiseAppState(
     private val bootstrapMutex = Mutex()
     private val nativePushSyncMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val appUpdateRepository = AppUpdateRepository(appContext)
+    private val appUpdateNotifier = AppUpdateNotifier(appContext)
+    private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
     private val amberSigner = AmberSignerController(appContext)
@@ -1121,6 +1136,12 @@ class WhiteNoiseAppState(
     var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
         private set
 
+    var appUpdateInfo by mutableStateOf(appUpdateRepository.loadInfo())
+        private set
+
+    var appSelfUpdateState by mutableStateOf<AppSelfUpdateState>(AppSelfUpdateState.Idle)
+        private set
+
     var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
         private set
 
@@ -1256,6 +1277,8 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
+        appSelfUpdateFlow.sweepStaleApks()
+        notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         // Off-main: the ConnectivityManager registration + seed query are
         // binder IPCs and this constructor runs on the main thread. Until the
         // seed lands, the snapshot reads as offline/no-networks — the same
@@ -3275,6 +3298,7 @@ class WhiteNoiseAppState(
         // chat entirely, via onTaskRemoved(), so a foreground-service-kept
         // process cannot keep silencing that chat after the UI is gone (#821).
         suppression = if (foreground) suppression.onForeground() else suppression.onBackground()
+        AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             maybeShowAppLockForForeground()
         } else {
@@ -3286,6 +3310,9 @@ class WhiteNoiseAppState(
         }
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
         if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+        if (!foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
+        if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
+        if (foreground) refreshAppSelfUpdateInstallPermission()
     }
 
     /**
@@ -3592,6 +3619,107 @@ class WhiteNoiseAppState(
     fun refreshLocalNotificationPermission() {
         localNotificationPermissionGranted = localNotificationPresenter.canPostNotifications()
     }
+
+    suspend fun refreshAppUpdate(
+        force: Boolean = false,
+        notifyIfNewer: Boolean = false,
+    ): AppUpdateInfo {
+        if (!force && !appUpdateRepository.shouldCheck()) {
+            appUpdateInfo = appUpdateRepository.loadInfo()
+            maybeShowAppUpdateNotification(appUpdateInfo, notifyIfNewer)
+            return appUpdateInfo
+        }
+        val info =
+            runCatching { appUpdateRepository.refresh() }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "app update check failed: ${it.readableMessage()}" }
+                }.getOrElse {
+                    appUpdateRepository.loadInfo()
+                }
+        appUpdateInfo = info
+        maybeShowAppUpdateNotification(info, notifyIfNewer)
+        return info
+    }
+
+    private fun maybeShowAppUpdateNotification(
+        info: AppUpdateInfo,
+        notifyIfNewer: Boolean,
+    ) {
+        if (shouldPostAppUpdateNotification(info, notifyIfNewer, appInForeground)) {
+            appUpdateNotifier.show(info)
+        }
+    }
+
+    suspend fun refreshAppUpdateIfStale(notifyIfNewer: Boolean = false): AppUpdateInfo = refreshAppUpdate(force = false, notifyIfNewer = notifyIfNewer)
+
+    fun dismissAppUpdateBanner() {
+        appUpdateInfo = appUpdateRepository.dismissLatest()
+    }
+
+    fun showAppUpdateBannerFromNotification() {
+        appUpdateInfo = appUpdateRepository.loadInfo()
+    }
+
+    fun openZapstoreListing(context: Context = appContext) {
+        val intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateConstants.ZAPSTORE_LISTING_URL)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            present(R.string.toast_zapstore_unavailable)
+        }
+    }
+
+    fun handleAppUpdateAction(context: Context = appContext) {
+        val latest = appUpdateInfo.latestVersion
+        if (shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED) && latest != null) {
+            startAppSelfUpdate(latest)
+            return
+        }
+        openZapstoreListing(context)
+    }
+
+    fun startAppSelfUpdate(version: String? = appUpdateInfo.latestVersion) {
+        val targetVersion = version ?: return
+        appSelfUpdateFlow.start(
+            scope = notificationScope,
+            version = targetVersion,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun confirmAppSelfUpdateDownload() {
+        appSelfUpdateFlow.confirmDownload(
+            scope = notificationScope,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun cancelAppSelfUpdate() {
+        appSelfUpdateFlow.cancel(deleteVerifiedApk = true) { appSelfUpdateState = it }
+    }
+
+    fun retryAppSelfUpdate() {
+        val version = appUpdateInfo.latestVersion ?: return
+        appSelfUpdateFlow.retry(
+            scope = notificationScope,
+            version = version,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun refreshAppSelfUpdateInstallPermission() {
+        appSelfUpdateFlow.refreshInstallPermission { appSelfUpdateState = it }
+    }
+
+    fun openAppSelfUpdateInstallPermissionSettings(context: Context = appContext) {
+        appSelfUpdateFlow.openInstallPermissionSettings(context)
+    }
+
+    fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef

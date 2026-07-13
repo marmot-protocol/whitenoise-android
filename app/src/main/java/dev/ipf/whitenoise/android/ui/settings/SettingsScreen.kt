@@ -35,12 +35,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -64,6 +66,8 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,6 +146,8 @@ private fun SettingsHomeScreen(
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
     var showAddIdentity by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
@@ -214,6 +220,19 @@ private fun SettingsHomeScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        },
+                    )
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.app_updates)) {
+                    AppUpdateSettingsRow(
+                        info = appState.appUpdateInfo,
+                        onClick = {
+                            if (appState.appUpdateInfo.latestVersion == null) {
+                                scope.launch { appState.refreshAppUpdate(force = true, notifyIfNewer = false) }
+                            }
+                            appState.handleAppUpdateAction(context)
                         },
                     )
                 }
@@ -413,5 +432,31 @@ internal fun SettingsRow(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    )
+}
+
+@Composable
+private fun AppUpdateSettingsRow(
+    info: AppUpdateInfo,
+    onClick: () -> Unit,
+) {
+    val latest = info.latestVersion
+    val subtitle =
+        when {
+            latest == null -> stringResource(R.string.app_update_settings_unknown, info.installedVersion)
+            !info.isUpdateAvailable -> stringResource(R.string.app_update_settings_current, info.installedVersion)
+            info.releasesBehind != null ->
+                stringResource(
+                    R.string.app_update_settings_available_with_count,
+                    info.installedVersion,
+                    latest,
+                    info.releasesBehind,
+                )
+            else -> stringResource(R.string.app_update_settings_available, info.installedVersion, latest)
+        }
+    SettingsRow(
+        title = stringResource(R.string.app_update_settings_title),
+        subtitle = subtitle,
+        onClick = onClick,
     )
 }
