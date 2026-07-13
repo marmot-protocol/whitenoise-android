@@ -14,10 +14,21 @@ class FreshSweepCoverageTest {
         val source = source("ui/conversation/ConversationScreen.kt")
         val block = source.substring(source.indexOf("val renderedTimeline ="), source.indexOf("LaunchedEffect(", source.indexOf("val renderedTimeline =")))
 
-        assertTrue("selectable messages must be memoized", "val selectableMessages =\n        remember(" in block)
-        assertTrue("deletions must invalidate the memo", "controller.deletedMessageIds" in block)
-        assertTrue("edits must invalidate the memo", "controller.editsByTarget" in block)
-        assertTrue("profile changes must refresh sender names", "appState.profileRevisionForCompose" in block)
+        assertTrue("selectable message projections must be memoized", "val selectableMessageProjections =\n        remember(" in block)
+        val projectionsStart = block.indexOf("val selectableMessageProjections =")
+        val selectableStart = block.indexOf("val selectableMessages =", projectionsStart)
+        val projectionsBlock = block.substring(projectionsStart, selectableStart)
+        val selectableBlock = block.substring(selectableStart)
+
+        assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in projectionsBlock)
+        assertTrue("edits must invalidate projections", "controller.editsByTarget" in projectionsBlock)
+        assertTrue("copy text must be projected once per timeline change", "MessageProjector.copyableText" in projectionsBlock)
+        assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
+        assertFalse("profile changes must not rebuild text projections", "appState.profileRevisionForCompose" in projectionsBlock)
+        assertTrue("selectable messages must be memoized", "val selectableMessages =\n        remember(" in selectableBlock)
+        assertTrue("profile changes must refresh sender names", "appState.profileRevisionForCompose" in selectableBlock)
+        assertFalse("profile changes must not re-project copy text", "MessageProjector.copyableText" in selectableBlock)
+        assertFalse("profile changes must not re-project forward text", "MessageProjector.forwardableText" in selectableBlock)
         assertTrue("invalid ids must be memoized", "remember(renderedTimeline, selectableMessages)" in block)
     }
 
