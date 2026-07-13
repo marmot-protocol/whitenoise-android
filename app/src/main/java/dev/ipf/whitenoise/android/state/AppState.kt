@@ -368,10 +368,10 @@ internal fun conversationOpenDismissalTarget(
     return ConversationNotificationTarget(account, group)
 }
 
-internal fun dismissConversationNotificationsOnOpen(
+internal suspend fun dismissConversationNotificationsOnOpen(
     activeAccountRef: String?,
     groupIdHex: String?,
-    dismissConversationNotifications: (String, String) -> Unit,
+    dismissConversationNotifications: suspend (String, String) -> Unit,
 ) {
     conversationOpenDismissalTarget(activeAccountRef, groupIdHex)?.let { target ->
         dismissConversationNotifications(target.accountRef, target.groupIdHex)
@@ -3170,7 +3170,7 @@ class WhiteNoiseAppState(
         suppression = suppression.onTaskRemoved()
     }
 
-    fun setActiveConversation(groupIdHex: String?) {
+    private fun applyActiveConversationTransition(groupIdHex: String?) {
         // The chat screen always runs under the active account, so capture it
         // when opening; closing (null) clears both halves via the transition.
         suppression = suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null)
@@ -3178,6 +3178,12 @@ class WhiteNoiseAppState(
             synchronized(conversationStateLock) {
                 promoteConversationState(activeConversationAccountRef, groupIdHex)
             }
+        }
+    }
+
+    suspend fun setActiveConversation(groupIdHex: String?) {
+        applyActiveConversationTransition(groupIdHex)
+        if (groupIdHex != null) {
             // Clear the conversation's tray cards on the first open, regardless
             // of whether mark-read later advances the read watermark. The
             // mark-read-driven dismissal in the conversation controllers stays
@@ -3192,13 +3198,21 @@ class WhiteNoiseAppState(
         }
     }
 
-    fun dismissConversationNotifications(
+    fun clearActiveConversation() {
+        applyActiveConversationTransition(null)
+        appStateDebug {
+            "active conversation=<none> account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
+        }
+    }
+
+    suspend fun dismissConversationNotifications(
         accountRef: String,
         groupIdHex: String,
     ) {
         runCatching {
             localNotificationPresenter.dismissConversationMessages(accountRef, groupIdHex)
         }.onFailure {
+            rethrowIfCancellation(it)
             appStateDebug { "notification dismiss failed group=${groupIdHex.take(8)}" }
         }
     }

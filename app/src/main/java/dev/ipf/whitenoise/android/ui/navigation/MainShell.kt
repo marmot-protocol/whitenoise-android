@@ -294,7 +294,7 @@ internal fun MainShell(
         appState.setActiveConversation(selectedChat?.group?.groupIdHex)
     }
     DisposableEffect(Unit) {
-        onDispose { appState.setActiveConversation(null) }
+        onDispose { appState.clearActiveConversation() }
     }
 
     // Pop in-shell navigation back to the chat-list root when the active

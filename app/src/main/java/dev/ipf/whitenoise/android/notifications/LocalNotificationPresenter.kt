@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -25,13 +26,19 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.coroutineContext
 
 class LocalNotificationPresenter(
     private val context: Context,
+    private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
+        manager.activeNotifications
+    },
 ) {
     private val redactedPublicVersions = ConcurrentHashMap<String, Notification>()
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
@@ -54,36 +61,45 @@ class LocalNotificationPresenter(
     // group-invite card. Invites are tagged by their opaque notificationKey, not
     // the per-conversation tag, so they're found by the account + group stamped
     // into their extras at post time rather than by key.
-    fun dismissConversationMessages(
+    suspend fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val manager = NotificationManagerCompat.from(context)
-        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
-        val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-        manager.cancel(message.tag, message.id)
-        manager.cancel(reaction.tag, reaction.id)
-        manager.cancel(mention.tag, mention.id)
-        dismissInvitesForGroup(accountRef, groupIdHex)
-        notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
-        return true
+        return withContext(Dispatchers.Default) {
+            val manager = NotificationManagerCompat.from(context)
+            val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+            val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+            val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
+            manager.cancel(message.tag, message.id)
+            manager.cancel(reaction.tag, reaction.id)
+            manager.cancel(mention.tag, mention.id)
+            dismissInvitesForGroup(accountRef, groupIdHex)
+            notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
+            true
+        }
     }
 
     // Invite cards carry no per-conversation tag, so match them by the account +
     // group stamped into their extras and cancel each by its own (tag, id). Both
     // must match: the same group can exist in more than one local account, so the
     // group id alone would clear another account's invite for that group.
-    fun dismissInvitesForGroup(
+    private suspend fun dismissInvitesForGroup(
         accountRef: String,
         groupIdHex: String,
     ) {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        runCatching { manager.activeNotifications }
-            .getOrNull()
-            ?.filter {
+        val active =
+            try {
+                activeNotificationsProvider(manager)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                return
+            }
+        val inviteNotifications =
+            active.filter {
                 val extras = it.notification.extras ?: return@filter false
                 shouldDismissInvite(
                     extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
@@ -91,13 +107,13 @@ class LocalNotificationPresenter(
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
                 )
-            }?.let { inviteNotifications ->
-                val compat = NotificationManagerCompat.from(context)
-                inviteNotifications.forEach {
-                    compat.cancel(it.tag, it.id)
-                    it.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
-                }
             }
+        val compat = NotificationManagerCompat.from(context)
+        inviteNotifications.forEach {
+            coroutineContext.ensureActive()
+            compat.cancel(it.tag, it.id)
+            it.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+        }
     }
 
     // Replying / marking read from the shade engaged with the conversation as it
