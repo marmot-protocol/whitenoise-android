@@ -672,6 +672,7 @@
     <string name="attach_photo_library">Galleria foto</string>
     <string name="attach_document">Documento</string>
     <string name="attach_gallery">Galleria</string>
+    <string name="recent_media_enable">Mostra foto recenti</string>
     <string name="attach_location">Posizione</string>
     <string name="attach_contact">Contatto</string>
     <string name="attach_user">Utente</string>

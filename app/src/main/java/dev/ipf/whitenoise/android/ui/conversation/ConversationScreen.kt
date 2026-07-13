@@ -2554,6 +2554,14 @@ internal fun ConversationScreen(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                                         )
                                     },
+                                    onPickRecentMedia = { uri ->
+                                        // A tap on the recent-media strip stages that item
+                                        // into the same shelf as the picker, so the preview
+                                        // sheet opens with it queued (multi-select + send
+                                        // live in the preview).
+                                        pendingMediaUris =
+                                            (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                                    },
                                     onCaptureFromCamera = {
                                         val granted =
                                             ContextCompat.checkSelfPermission(

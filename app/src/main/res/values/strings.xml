@@ -828,6 +828,7 @@
     <string name="attach_photo_library">Photo library</string>
     <string name="attach_document">Document</string>
     <string name="attach_gallery">Gallery</string>
+    <string name="recent_media_enable">Show recent photos</string>
     <string name="attach_location">Location</string>
     <string name="attach_contact">Contact</string>
     <string name="attach_user">User</string>

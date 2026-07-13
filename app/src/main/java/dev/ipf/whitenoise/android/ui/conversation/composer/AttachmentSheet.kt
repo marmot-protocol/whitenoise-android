@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.media.RecentMediaStrip
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -65,6 +66,7 @@ internal fun rememberComposerAttachmentSheetState(): ComposerAttachmentSheetStat
 @Composable
 internal fun ComposerAttachmentSheetPane(
     alpha: Float,
+    onPickRecentMedia: ((android.net.Uri) -> Unit)?,
     onPickFromGallery: (() -> Unit)?,
     onCaptureFromCamera: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
@@ -93,9 +95,15 @@ internal fun ComposerAttachmentSheetPane(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(Dimens.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+                    .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
         ) {
+            // Recent-media strip fills the space the pane reserves; it owns its
+            // own opt-in permission and stays absent until the gallery action is
+            // wired (same availability as the Gallery tile).
+            if (onPickRecentMedia != null) {
+                RecentMediaStrip(onPick = onPickRecentMedia)
+            }
             // Two rows of three. Row 1 is capture/files (Gallery, Camera,
             // Document); row 2 is place/people (Location, User, Contact).
             // User (npub, actionable) and Contact (phone, informational) sit
@@ -165,23 +173,20 @@ private fun AttachmentActionTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Neutral circular chip using the theme's default content color (no accent
+    // fill). Compact sizing (24dp icon in a ~48dp circle) with tight spacing.
     Column(
         modifier =
             modifier
                 .clip(RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onClick)
-                .padding(vertical = Dimens.spaceSm),
+                .padding(vertical = Dimens.spaceXs),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
     ) {
         Surface(
             shape = CircleShape,
-            color =
-                if (available) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                },
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = amoledSurfaceBorderStroke(),
         ) {
             Icon(
@@ -189,31 +194,31 @@ private fun AttachmentActionTile(
                 contentDescription = null,
                 tint =
                     if (available) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
+                        MaterialTheme.colorScheme.onSurface
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     },
                 modifier =
                     Modifier
-                        .padding(Dimens.spaceLg)
-                        .size(28.dp),
+                        .padding(Dimens.spaceMd)
+                        .size(24.dp),
             )
         }
         Text(
             label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color =
                 if (available) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 },
         )
         if (!available) {
             Text(
                 stringResource(R.string.coming_soon),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
         }
     }

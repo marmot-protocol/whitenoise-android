@@ -198,6 +198,7 @@ internal fun ComposerBar(
     draftKey: Any? = null,
     onAfterSend: () -> Unit = {},
     onPickFromGallery: (() -> Unit)? = null,
+    onPickRecentMedia: ((Uri) -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
     onShareLocation: (() -> Unit)? = null,
@@ -812,6 +813,13 @@ internal fun ComposerBar(
                 if (showAttachmentPane) {
                     ComposerAttachmentSheetPane(
                         alpha = attachmentPaneAlpha,
+                        onPickRecentMedia =
+                            onPickRecentMedia?.let { pick ->
+                                { uri ->
+                                    attachmentSheetState.dismiss()
+                                    pick(uri)
+                                }
+                            },
                         onPickFromGallery =
                             onPickFromGallery?.let { pick ->
                                 {

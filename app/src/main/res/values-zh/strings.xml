@@ -663,6 +663,7 @@
     <string name="attach_photo_library">图库</string>
     <string name="attach_document">文档</string>
     <string name="attach_gallery">图库</string>
+    <string name="recent_media_enable">显示最近的照片</string>
     <string name="attach_location">位置</string>
     <string name="attach_contact">联系人</string>
     <string name="attach_user">用户</string>

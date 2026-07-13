@@ -672,6 +672,7 @@
     <string name="attach_photo_library">Fotoğraf galerisi</string>
     <string name="attach_document">Belge</string>
     <string name="attach_gallery">Galeri</string>
+    <string name="recent_media_enable">Son fotoğrafları göster</string>
     <string name="attach_location">Konum</string>
     <string name="attach_contact">Kişi</string>
     <string name="attach_user">Kullanıcı</string>
