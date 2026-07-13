@@ -10,7 +10,7 @@ class NotificationReplyWorkerCoverageTest {
     fun workerShortCircuitsCompletedOrAlreadyCommittedReplies() {
         val body = notificationReplyWorkerSource().readText().functionBody("doWork")
 
-        assertTrue("worker should use a durable completion key", "val completionKey = notificationReplyWorkName(action, reply)" in body)
+        assertTrue("worker should use its stable request id as the durable completion key", "val completionKey = notificationReplyCompletionKey(id)" in body)
         assertTrue("worker should skip re-sending a completed reply", "completionStore.isCompleted(completionKey)" in body)
         assertTrue(
             "worker should only probe committed timeline replies after an earlier persisted send attempt",

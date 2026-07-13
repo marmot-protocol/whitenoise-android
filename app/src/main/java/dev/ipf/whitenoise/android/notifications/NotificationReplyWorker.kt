@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -17,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.security.MessageDigest
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class NotificationReplyWorker(
@@ -30,7 +29,9 @@ class NotificationReplyWorker(
         val reply = inputData.getString(KEY_REPLY)?.trim().orEmpty()
         if (reply.isBlank()) return Result.success()
         val completionStore = NotificationReplyCompletionStore.create(applicationContext)
-        val completionKey = notificationReplyWorkName(action, reply)
+        // WorkManager keeps this id stable across retries and assigns a new one
+        // to every separately enqueued reply, even when the text is identical.
+        val completionKey = notificationReplyCompletionKey(id)
         if (!application.appState.notificationActionsAllowed) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             return Result.success()
@@ -165,7 +166,7 @@ class NotificationReplyWorker(
         private const val KEY_NOTIFICATION_TAG = "notification_tag"
         private const val KEY_NOTIFICATION_ID = "notification_id"
         private const val KEY_REPLY = "reply"
-        private const val UNIQUE_WORK_PREFIX = "notification_reply_"
+        private const val COMPLETION_KEY_PREFIX = "notification_reply_"
         private const val MAX_SEND_ATTEMPTS = 3
         private const val REPLY_BACKOFF_DELAY_SECONDS = 30L
 
@@ -175,11 +176,7 @@ class NotificationReplyWorker(
             reply: String,
         ) {
             runCatching {
-                WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                    notificationReplyWorkName(action, reply),
-                    ExistingWorkPolicy.KEEP,
-                    notificationReplyRequest(action, reply),
-                )
+                WorkManager.getInstance(context.applicationContext).enqueue(notificationReplyRequest(action, reply))
             }.onFailure {
                 if (BuildConfig.DEBUG) Log.w(TAG, "failed to enqueue reply worker", it)
             }
@@ -224,26 +221,6 @@ class NotificationReplyWorker(
                 notificationId = data.getInt(KEY_NOTIFICATION_ID, Int.MIN_VALUE).takeUnless { it == Int.MIN_VALUE },
             )
 
-        internal fun notificationReplyWorkName(
-            action: NotificationAction,
-            reply: String,
-        ): String =
-            UNIQUE_WORK_PREFIX +
-                sha256Hex(
-                    listOf(
-                        action.target.accountRef,
-                        action.target.groupIdHex,
-                        action.target.messageIdHex.orEmpty(),
-                        action.target.kind.name,
-                        action.notificationTag,
-                        reply.trim(),
-                    ).joinToString(separator = "\u0000"),
-                ).take(32)
-
-        private fun sha256Hex(value: String): String =
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest(value.toByteArray(Charsets.UTF_8))
-                .joinToString(separator = "") { "%02x".format(it) }
+        internal fun notificationReplyCompletionKey(workRequestId: UUID): String = COMPLETION_KEY_PREFIX + workRequestId
     }
 }
