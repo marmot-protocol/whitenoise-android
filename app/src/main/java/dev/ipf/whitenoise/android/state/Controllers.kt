@@ -5514,7 +5514,7 @@ class ConversationController(
             }
         }
 
-    fun dismissConversationNotifications() {
+    suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return
         appState.dismissConversationNotifications(account, group.groupIdHex)
     }
