@@ -4,7 +4,14 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVideoAttachmentFile
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeVideoAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVideoAttachmentDownload
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,6 +26,10 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VideoAttachmentCacheStateTest {
+    private companion object {
+        private const val TEST_HANG_GUARD_MS = 30_000L
+    }
+
     @Test
     fun cachedVideoFileIsFoundOnEntry() {
         val context = RuntimeEnvironment.getApplication()
@@ -99,6 +110,74 @@ class VideoAttachmentCacheStateTest {
             "completed or failed materializations should not poison future retries",
             "inFlightVideoMaterializations.remove(key)" in body,
         )
+    }
+
+    @Test
+    fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
+        runBlocking {
+            withTimeout(TEST_HANG_GUARD_MS) {
+                val context = RuntimeEnvironment.getApplication()
+                val messageId = "video-single-flight-waiter-${System.nanoTime()}"
+                val attachmentIndex = 1
+                val reference = mediaReference(mediaType = "video/mp4")
+                val cacheFile =
+                    File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-$attachmentIndex.mp4")
+                cacheFile.delete()
+
+                val fullBytes = ByteArray(128) { (it + 1).toByte() }
+                val partialBytes = fullBytes.copyOfRange(0, 16)
+                val downloadEntered = CompletableDeferred<Unit>()
+                val releaseDownload = CompletableDeferred<Unit>()
+
+                val owner =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        materializeVideoAttachment(
+                            context = context,
+                            messageIdHex = messageId,
+                            attachmentIndex = attachmentIndex,
+                            reference = reference,
+                            resolveBytes = {
+                                downloadEntered.complete(Unit)
+                                releaseDownload.await()
+                                fullBytes
+                            },
+                        )
+                    }
+                try {
+                    downloadEntered.await()
+
+                    cacheFile.writeBytes(partialBytes)
+                    assertEquals(partialBytes.size.toLong(), cacheFile.length())
+                    assertEquals(cacheFile, cachedVideoAttachmentFile(context, messageId, attachmentIndex, reference))
+
+                    val waiter =
+                        async(start = CoroutineStart.UNDISPATCHED) {
+                            materializeVideoAttachment(
+                                context = context,
+                                messageIdHex = messageId,
+                                attachmentIndex = attachmentIndex,
+                                reference = reference,
+                                resolveBytes = { error("waiter must join the owner's flight") },
+                            )
+                        }
+
+                    assertFalse(
+                        "same-path waiter must not return a partial cache file while materialization is in flight",
+                        waiter.isCompleted,
+                    )
+
+                    releaseDownload.complete(Unit)
+                    val ownerFile = owner.await()
+                    val waiterFile = waiter.await()
+                    assertArrayEquals(fullBytes, ownerFile.readBytes())
+                    assertArrayEquals(fullBytes, waiterFile.readBytes())
+                    assertEquals(fullBytes.size.toLong(), waiterFile.length())
+                } finally {
+                    releaseDownload.complete(Unit)
+                    cacheFile.delete()
+                }
+            }
+        }
     }
 
     @Test
