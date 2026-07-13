@@ -578,13 +578,13 @@ internal fun MediaVideoBubble(
 
 /** Decrypted video on disk under cacheDir/video_attachments; reuses the
  *  age-based janitor that already sweeps shared_media / voice_attachments. */
-private suspend fun materializeVideoAttachment(
+@VisibleForTesting
+internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
-    controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
+    resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
     val file =
         videoAttachmentCacheFile(
@@ -593,12 +593,6 @@ private suspend fun materializeVideoAttachment(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
-    cachedVideoAttachmentFile(
-        context = context,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-    )?.let { return it }
 
     val key = file.absolutePath
     var owner = false
@@ -617,7 +611,7 @@ private suspend fun materializeVideoAttachment(
     return try {
         val materialized =
             withContext(NonCancellable) {
-                materializeVideoAttachmentOnce(file, controller, messageIdHex, attachmentIndex, reference, mine)
+                materializeVideoAttachmentOnce(file, resolveBytes)
             }
         shared.complete(materialized)
         materialized
@@ -633,25 +627,39 @@ private suspend fun materializeVideoAttachment(
     }
 }
 
-private suspend fun materializeVideoAttachmentOnce(
-    file: java.io.File,
+private suspend fun materializeVideoAttachment(
+    context: android.content.Context,
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+): java.io.File =
+    materializeVideoAttachment(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        resolveBytes = {
+            val retained =
+                if (mine) {
+                    controller
+                        .pendingAttachmentsList(messageIdHex)
+                        .getOrNull(attachmentIndex)
+                        ?.plaintextBytes
+                } else {
+                    null
+                }
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+        },
+    )
+
+private suspend fun materializeVideoAttachmentOnce(
+    file: java.io.File,
+    resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
     if (file.isFile && file.length() > 0L) return file
-    val retained =
-        if (mine) {
-            controller
-                .pendingAttachmentsList(messageIdHex)
-                .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-        } else {
-            null
-        }
-    val bytes = retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+    val bytes = resolveBytes()
     withContext(Dispatchers.IO) { file.writeBytes(bytes) }
     return file
 }
