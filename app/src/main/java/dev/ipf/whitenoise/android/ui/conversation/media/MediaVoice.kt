@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,12 +63,17 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+private val voiceMaterializationLock = Any()
+private val inFlightVoiceMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
 
 @Composable
 internal fun MediaVoiceBubble(
@@ -432,35 +438,83 @@ internal suspend fun materializeVoiceAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
-): java.io.File {
-    cachedVoiceAttachmentFile(
+): java.io.File =
+    materializeVoiceAttachment(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = reference,
-    )?.let { return it }
+        resolveBytes = {
+            val retained =
+                if (mine) {
+                    controller
+                        .pendingAttachmentsList(messageIdHex)
+                        .getOrNull(attachmentIndex)
+                        ?.plaintextBytes
+                } else {
+                    null
+                }
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+        },
+    )
 
-    val cacheFile =
+@VisibleForTesting
+internal suspend fun materializeVoiceAttachment(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    resolveBytes: suspend () -> ByteArray,
+): java.io.File {
+    val file =
         voiceAttachmentCacheFile(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
-    val retained =
-        if (mine) {
-            controller
-                .pendingAttachmentsList(messageIdHex)
-                .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-        } else {
-            null
+
+    val key = file.absolutePath
+    var owner = false
+    val shared =
+        synchronized(voiceMaterializationLock) {
+            inFlightVoiceMaterializations[key]
+                ?.takeIf { it.isActive }
+                ?: CompletableDeferred<java.io.File>()
+                    .also {
+                        inFlightVoiceMaterializations[key] = it
+                        owner = true
+                    }
         }
-    val bytes =
-        retained
-            ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
-    withContext(Dispatchers.IO) { cacheFile.writeBytes(bytes) }
-    return cacheFile
+    if (!owner) return shared.await()
+
+    return try {
+        val materialized =
+            withContext(NonCancellable) {
+                materializeVoiceAttachmentOnce(file, resolveBytes)
+            }
+        shared.complete(materialized)
+        materialized
+    } catch (throwable: Throwable) {
+        shared.completeExceptionally(throwable)
+        throw throwable
+    } finally {
+        synchronized(voiceMaterializationLock) {
+            if (inFlightVoiceMaterializations[key] === shared) {
+                inFlightVoiceMaterializations.remove(key)
+            }
+        }
+    }
+}
+
+private suspend fun materializeVoiceAttachmentOnce(
+    file: java.io.File,
+    resolveBytes: suspend () -> ByteArray,
+): java.io.File {
+    if (file.isFile && file.length() > 0L) return file
+    val bytes = resolveBytes()
+    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    return file
 }
 
 internal fun cachedVoiceAttachmentFile(
