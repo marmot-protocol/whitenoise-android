@@ -30,6 +30,100 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun textSendSummaryWaitsOnlyWhileTempBubbleStillExists() {
+        assertEquals(true, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = true))
+        assertEquals(false, textSendAwaitingEchoConfirmation(emptyList(), optimisticStillPresent = false))
+        assertEquals(false, textSendAwaitingEchoConfirmation(listOf("confirmed-id"), optimisticStillPresent = true))
+    }
+
+    @Test
+    fun retryEmptySummaryRetainsTempKeyedSentBubbleAndMessageById() {
+        val tempId = "temp-retry"
+        val key = "msg:$tempId"
+        val record = message(tempId, plaintext = "retry me")
+        val optimisticMessages = linkedMapOf(key to timelineMessage(tempId, MessageStatus.Pending, plaintext = "retry me"))
+        val messageById = linkedMapOf(tempId to record)
+
+        val reconciliation =
+            reconcileSuccessfulTextSend(
+                summaryMessageIds = emptyList(),
+                optimisticKey = key,
+                tempId = tempId,
+                optimisticRecord = record,
+                optimisticMessages = optimisticMessages,
+                messageById = messageById,
+                projectedMessageIds = emptySet(),
+                timelineOrder = 7uL,
+            )
+
+        assertEquals(true, reconciliation.awaitingEcho)
+        assertEquals(tempId, reconciliation.confirmedId)
+        val sent = optimisticMessages[key]
+        assertEquals(MessageStatus.Sent, sent?.status)
+        assertEquals(tempId, sent?.record?.messageIdHex)
+        assertEquals(7uL, sent?.timelineOrder)
+        assertEquals(record.copy(messageIdHex = tempId), messageById[tempId])
+        assertEquals(1, optimisticMessages.size)
+        assertEquals(key, optimisticMessages.keys.single())
+    }
+
+    @Test
+    fun retryEmptySummaryAfterEchoReconcileDoesNotRecreateTempState() {
+        val tempId = "temp-echoed"
+        val key = "msg:$tempId"
+        val record = message(tempId, plaintext = "already echoed")
+        val optimisticMessages = linkedMapOf<String, TimelineMessage>()
+        val messageById = linkedMapOf<String, AppMessageRecordFfi>()
+
+        val reconciliation =
+            reconcileSuccessfulTextSend(
+                summaryMessageIds = emptyList(),
+                optimisticKey = key,
+                tempId = tempId,
+                optimisticRecord = record,
+                optimisticMessages = optimisticMessages,
+                messageById = messageById,
+                projectedMessageIds = setOf("engine-id"),
+                timelineOrder = 3uL,
+            )
+
+        assertEquals(false, reconciliation.awaitingEcho)
+        assertEquals(false, reconciliation.insertedSent)
+        assertEquals(emptyMap<String, TimelineMessage>(), optimisticMessages)
+        assertEquals(emptyMap<String, AppMessageRecordFfi>(), messageById)
+    }
+
+    @Test
+    fun retryConfirmedIdTransitionsToSentWithoutStaleTempRecords() {
+        val tempId = "temp-confirmed"
+        val key = "msg:$tempId"
+        val record = message(tempId, plaintext = "confirmed retry")
+        val optimisticMessages = linkedMapOf(key to timelineMessage(tempId, MessageStatus.Pending, plaintext = "confirmed retry"))
+        val messageById = linkedMapOf(tempId to record)
+
+        val reconciliation =
+            reconcileSuccessfulTextSend(
+                summaryMessageIds = listOf("confirmed-id"),
+                optimisticKey = key,
+                tempId = tempId,
+                optimisticRecord = record,
+                optimisticMessages = optimisticMessages,
+                messageById = messageById,
+                projectedMessageIds = emptySet(),
+                timelineOrder = 11uL,
+            )
+
+        assertEquals("confirmed-id", reconciliation.confirmedId)
+        assertEquals(false, reconciliation.awaitingEcho)
+        assertNull(optimisticMessages[key])
+        assertNull(messageById[tempId])
+        val sent = optimisticMessages["msg:confirmed-id"]
+        assertEquals(MessageStatus.Sent, sent?.status)
+        assertEquals("confirmed-id", sent?.record?.messageIdHex)
+        assertEquals(record.copy(messageIdHex = "confirmed-id"), messageById["confirmed-id"])
+    }
+
+    @Test
     fun sentOptimisticReplacementIsSkippedWhenProjectionArrivesBeforeResponse() {
         assertEquals(
             false,
