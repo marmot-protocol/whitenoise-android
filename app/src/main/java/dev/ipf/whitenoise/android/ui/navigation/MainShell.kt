@@ -86,6 +86,11 @@ internal fun MainShell(
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
     val conversationScrollSnapshots = remember { mutableStateMapOf<String, ConversationScrollSnapshot>() }
+    // Visible active-list head retained while a conversation opened from
+    // ChatsScreen is foregrounded. Published back to the list only after
+    // setChatListVisible(true) flushes pending recompute (issue #1313).
+    var chatListHeadAtConversationOpen by remember { mutableStateOf<String?>(null) }
+    var pendingConversationReturnHeadId by remember { mutableStateOf<String?>(null) }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -114,7 +119,15 @@ internal fun MainShell(
     // path. The subscription keeps draining updates into the controller's maps
     // throughout; one recompute flushes on return.
     LaunchedEffect(chatsController, selectedChat == null) {
-        chatsController.setChatListVisible(selectedChat == null)
+        val listVisible = selectedChat == null
+        chatsController.setChatListVisible(listVisible)
+        if (listVisible) {
+            val headAtOpen = chatListHeadAtConversationOpen
+            if (headAtOpen != null) {
+                pendingConversationReturnHeadId = headAtOpen
+                chatListHeadAtConversationOpen = null
+            }
+        }
     }
 
     // Notification tap routing: switch to the target account if needed, wait
@@ -320,6 +333,8 @@ internal fun MainShell(
             selectedChatFocusMessageId = null
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
+            chatListHeadAtConversationOpen = null
+            pendingConversationReturnHeadId = null
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
@@ -409,11 +424,13 @@ internal fun MainShell(
             ChatsScreen(
                 appState = appState,
                 controller = chatsController,
+                conversationReturnHeadId = pendingConversationReturnHeadId,
+                onConversationReturnHeadHandled = { pendingConversationReturnHeadId = null },
                 onOpenSettings = {
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
-                onOpenGroup = { item, focusMessageId, justCreated ->
+                onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
                     selectedChatFocusMessageId = focusMessageId
                     selectedChatFocusHighlight = true
                     selectedChatOpenedFromNotification = false
@@ -422,6 +439,7 @@ internal fun MainShell(
                     // creation and existing-DM opens pass false. Reuse that DM-only
                     // invariant for the open-time subtitle hint (#998).
                     selectedChatOpenedAsDmHint = justCreated
+                    chatListHeadAtConversationOpen = visibleHeadId
                     selectedChat = item
                 },
             )
