@@ -25,8 +25,10 @@ class PlaybackCacheInvalidationTest {
     }
 
     @Test
-    fun decodingFailedErrorInvalidatesAttachmentCache() {
-        assertTrue(
+    fun decodingFailedErrorDoesNotInvalidateAttachmentCache() {
+        // A decode failure is often a device/codec bug on a valid file, so the
+        // cache must be preserved rather than deleted and re-downloaded.
+        assertFalse(
             playbackErrorInvalidatesAttachmentCache(
                 PlaybackException(
                     "decode",
