@@ -811,7 +811,6 @@ internal fun ComposerBar(
                 }
                 if (showAttachmentPane) {
                     ComposerAttachmentSheetPane(
-                        height = attachmentPaneHeight,
                         alpha = attachmentPaneAlpha,
                         onPickFromGallery =
                             onPickFromGallery?.let { pick ->
@@ -856,7 +855,6 @@ internal fun ComposerBar(
                                 }
                             },
                         onComingSoon = { appState?.present(R.string.coming_soon) },
-                        onDismiss = { attachmentSheetState.dismiss() },
                     )
                 }
             }
