@@ -1,5 +1,5 @@
 source=marmot-protocol/mdk
 mdk-sha=b9ac1146a5379506ab67cb6b90c9158b6f3ebb6e
-mdk-short-sha=b9ac114
+mdk-short-sha=b9ac1146
 mdk-branch=pip/mdk-1266-v2
 features=otlp-export
