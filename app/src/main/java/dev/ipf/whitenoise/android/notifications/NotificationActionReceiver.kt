@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -24,8 +25,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
             return
         }
         val pending = goAsync()
-        // Mark-read is a small best-effort action, but it still touches FFI/Binder
-        // work; keep it off the main thread and below the broadcast deadline.
+        // Keep receiver orchestration and presenter Binder work off the main
+        // thread; handleAction hops to main only for AppState mutations.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope.launch {
             try {
@@ -94,17 +95,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
         when (action.kind) {
             NotificationActionKind.REPLY -> return
             NotificationActionKind.MARK_READ -> {
-                appState.ensureNotificationRuntimeStarted()
                 // Baseline before the mark-read round-trip so a message, reaction,
                 // or mention arriving while it runs keeps its card.
                 val dismissBaselineMs = System.currentTimeMillis()
-                if (
-                    appState.markNotificationMessageRead(
-                        accountRef = action.target.accountRef,
-                        groupIdHex = action.target.groupIdHex,
-                        messageIdHex = action.target.messageIdHex.orEmpty(),
-                    )
-                ) {
+                val markedRead =
+                    withContext(Dispatchers.Main.immediate) {
+                        appState.ensureNotificationRuntimeStarted()
+                        appState.markNotificationMessageRead(
+                            accountRef = action.target.accountRef,
+                            groupIdHex = action.target.groupIdHex,
+                            messageIdHex = action.target.messageIdHex.orEmpty(),
+                        )
+                    }
+                if (markedRead) {
                     val presenter = LocalNotificationPresenter(appContext)
                     presenter.cancel(action.notificationTag, action.notificationId)
                     presenter.dismissConversationSiblingCardsNotNewerThan(
