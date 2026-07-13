@@ -117,6 +117,7 @@ class AmberExternalSigner(
                 parseActivityResult(
                     op,
                     resultOk,
+                    rejected = readRejectedIntentExtra(data),
                     resultExtra = data?.getStringExtra(Nip55.EXTRA_RESULT),
                     eventExtra = data?.getStringExtra(Nip55.EXTRA_EVENT),
                     packageExtra = data?.getStringExtra(Nip55.EXTRA_PACKAGE),

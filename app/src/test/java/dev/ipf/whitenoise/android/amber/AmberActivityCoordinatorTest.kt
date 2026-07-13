@@ -251,4 +251,116 @@ class AmberActivityCoordinatorTest {
         assertFalse(outcome.resultOk)
         assertEquals(currentRequestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
     }
+
+    @Test
+    fun nip55RejectionCompletesPromptly() {
+        val requestId = "current-sign-event"
+        val packageName = "com.example.signer"
+        val eventJson = """{"kind":1,"content":"hello"}"""
+
+        val outcomeRef = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val done = CountDownLatch(1)
+        val worker =
+            Thread {
+                outcomeRef.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildSignEventIntent(packageName, eventJson, requestId, currentUser = "abc"),
+                        timeoutMs = 5_000,
+                        requestId = requestId,
+                    ),
+                )
+                done.countDown()
+            }
+        worker.start()
+
+        awaitRelayLaunch()
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                AmberSignerRelay.buildResultIntent(
+                    requestId,
+                    signerData = Intent().apply { putExtra(Nip55.EXTRA_REJECTED, true) },
+                ),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        val outcome = outcomeRef.get()
+        assertTrue(outcome is AmberActivityCoordinator.Outcome.Completed)
+        outcome as AmberActivityCoordinator.Outcome.Completed
+        assertTrue(outcome.resultOk)
+        assertTrue(readRejectedIntentExtra(outcome.data))
+        assertEquals(requestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+    }
+
+    @Test
+    fun staleNip55RejectionAfterTimeoutDoesNotSatisfyNextRequest() {
+        val staleRequestId = "stale-sign-event"
+        val currentRequestId = "current-sign-event"
+        val packageName = "com.example.signer"
+        val eventJson = """{"kind":1,"content":"hello"}"""
+
+        val firstOutcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val firstDone = CountDownLatch(1)
+        val firstWorker =
+            Thread {
+                firstOutcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildSignEventIntent(packageName, eventJson, staleRequestId, currentUser = "abc"),
+                        timeoutMs = 100,
+                        requestId = staleRequestId,
+                    ),
+                )
+                firstDone.countDown()
+            }
+        firstWorker.start()
+        awaitRelayLaunch()
+
+        assertTrue(firstDone.await(2, TimeUnit.SECONDS))
+        assertEquals(AmberActivityCoordinator.Outcome.TimedOut, firstOutcome.get())
+
+        launched.set(null)
+        val secondOutcome = AtomicReference<AmberActivityCoordinator.Outcome>()
+        val secondDone = CountDownLatch(1)
+        val secondWorker =
+            Thread {
+                secondOutcome.set(
+                    AmberActivityCoordinator.awaitApproval(
+                        Nip55.buildSignEventIntent(packageName, eventJson, currentRequestId, currentUser = "abc"),
+                        timeoutMs = 5_000,
+                        requestId = currentRequestId,
+                    ),
+                )
+                secondDone.countDown()
+            }
+        secondWorker.start()
+        awaitRelayLaunch()
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                AmberSignerRelay.buildResultIntent(
+                    staleRequestId,
+                    signerData = Intent().apply { putExtra(Nip55.EXTRA_REJECTED, true) },
+                ),
+        )
+
+        assertFalse(secondDone.await(200, TimeUnit.MILLISECONDS))
+
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                AmberSignerRelay.buildResultIntent(
+                    currentRequestId,
+                    signerData = Intent().apply { putExtra(Nip55.EXTRA_REJECTED, true) },
+                ),
+        )
+
+        assertTrue(secondDone.await(2, TimeUnit.SECONDS))
+
+        val outcome = secondOutcome.get()
+        assertTrue(outcome is AmberActivityCoordinator.Outcome.Completed)
+        outcome as AmberActivityCoordinator.Outcome.Completed
+        assertTrue(outcome.resultOk)
+        assertEquals(currentRequestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+    }
 }

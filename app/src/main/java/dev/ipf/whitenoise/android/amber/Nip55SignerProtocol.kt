@@ -89,6 +89,7 @@ object Nip55 {
     const val EXTRA_PACKAGE = "package"
 
     const val COLUMN_REJECTED = "rejected"
+    const val EXTRA_REJECTED = COLUMN_REJECTED
     const val COLUMN_RESULT = "result"
     const val COLUMN_EVENT = "event"
 
@@ -266,17 +267,19 @@ fun parseContentRow(
  * Pure interpretation of a signer `onActivityResult`. `get_public_key` reads the
  * npub/hex from `result` (plus the chosen `package`); `sign_event` reads the
  * SIGNED event JSON from `event`; encrypt/decrypt reads `result`. A non-OK
- * result is a [ActivityResultOutcome.Rejected]; an OK result with the expected
- * extra missing is [ActivityResultOutcome.Malformed].
+ * result or an OK result with `rejected=true` is [ActivityResultOutcome.Rejected];
+ * an OK result with the expected extra missing is [ActivityResultOutcome.Malformed].
  */
 fun parseActivityResult(
     op: SignerOp,
     resultOk: Boolean,
+    rejected: Boolean,
     resultExtra: String?,
     eventExtra: String?,
     packageExtra: String?,
 ): ActivityResultOutcome {
     if (!resultOk) return ActivityResultOutcome.Rejected
+    if (rejected) return ActivityResultOutcome.Rejected
     return when (op) {
         SignerOp.GetPublicKey -> {
             val pubkey =
@@ -298,6 +301,8 @@ fun parseActivityResult(
         }
     }
 }
+
+internal fun readRejectedIntentExtra(data: Intent?): Boolean = data?.getBooleanExtra(Nip55.EXTRA_REJECTED, false) == true
 
 internal fun signedEventPubkey(eventJson: String): String? =
     runCatching {
