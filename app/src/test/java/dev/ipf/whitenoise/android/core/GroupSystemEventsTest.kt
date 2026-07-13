@@ -1,6 +1,11 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,6 +17,17 @@ class GroupSystemEventsTest {
     private val avatarChangedJson =
         """{"v":1,"system_type":"group_avatar_changed","text":"Group avatar changed",""" +
             """"data":{"actor":"$actorHex"}}"""
+    private val avatarChangedStructured =
+        GroupSystemEventFfi(
+            systemType = "group_avatar_changed",
+            text = "Group avatar changed",
+            actorAccountIdHex = actorHex,
+            subjectAccountIdHex = null,
+            name = null,
+            oldName = null,
+            oldRetentionSeconds = null,
+            newRetentionSeconds = null,
+        )
 
     @Test
     fun parsesAvatarChangedPayload() {
@@ -28,6 +44,7 @@ class GroupSystemEventsTest {
                 actor = null,
                 subject = null,
                 name = null,
+                fromAuthenticatedStateProjection = false,
             ),
             event,
         )
@@ -51,18 +68,18 @@ class GroupSystemEventsTest {
         assertNull(event.subject)
         // Attribution falls back to the authenticated sender…
         assertEquals("d946d2", GroupSystemEvents.actorHex(event, "d946d2"))
-        // …and the subject renders as the anonymous form, never a name the
-        // payload picked. subjectIsSelf can't trigger either (subject == null).
+        // No payload-only event renders an authoritative state change,
+        // even with the authenticated sender available for attribution.
         assertEquals(
-            "Mallory made Someone an admin",
+            GroupSystemCopy.Default.fallback,
             GroupSystemEvents.summary(event, actorName = "Mallory", subjectName = null),
         )
     }
 
     @Test
     fun structuredProjectionStillCarriesAttribution() {
-        // fromFfi is the only attribution source: Marmot's projection is the
-        // vetted schema-v1 parse, so its actor/subject flow through intact.
+        // Only engine-synthesized timeline rows may promote Marmot's parsed
+        // fields to authenticated state attribution.
         val structured =
             GroupSystemEventFfi(
                 systemType = "member_added",
@@ -75,10 +92,115 @@ class GroupSystemEventsTest {
                 newRetentionSeconds = null,
             )
 
-        val event = GroupSystemEvents.resolve("""{"v":1,"system_type":"member_added"}""", structured)!!
+        val event =
+            GroupSystemEvents.resolve(
+                timelineRecord(
+                    plaintext = """{"v":1,"system_type":"member_added"}""",
+                    groupSystem = structured,
+                ),
+            )!!
 
         assertEquals(actorHex, event.actor)
         assertEquals("b2".repeat(32), event.subject)
+    }
+
+    @Test
+    fun sourcedTimelineProjectionsCannotClaimAuthenticatedState() {
+        val untrustedRecords =
+            listOf(
+                timelineRecord(
+                    plaintext = avatarChangedJson,
+                    direction = "received",
+                    sourceMessageIdHex = "transport-message",
+                    groupSystem = avatarChangedStructured,
+                ),
+                timelineRecord(
+                    plaintext = avatarChangedJson,
+                    direction = "system",
+                    sourceMessageIdHex = "transport-message",
+                    groupSystem = avatarChangedStructured,
+                ),
+            )
+
+        untrustedRecords.forEach { record ->
+            val event = GroupSystemEvents.resolve(record)!!
+
+            assertEquals(GroupSystemCopy.Default.fallback, GroupSystemEvents.summary(event, "Mallory", null))
+            assertNull(event.actor)
+        }
+    }
+
+    @Test
+    fun appRecordDirectionControlsProjectionTrust() {
+        listOf("received", "sent").forEach { direction ->
+            val memberAuthored =
+                GroupSystemEvents.resolve(
+                    appRecord(plaintext = avatarChangedJson, direction = direction),
+                    avatarChangedStructured,
+                )!!
+
+            assertEquals(GroupSystemCopy.Default.fallback, GroupSystemEvents.summary(memberAuthored, "Mallory", null))
+            assertNull(memberAuthored.actor)
+        }
+
+        val synthesized =
+            GroupSystemEvents.resolve(
+                appRecord(plaintext = avatarChangedJson, direction = "system"),
+                avatarChangedStructured,
+            )!!
+
+        assertEquals(actorHex, synthesized.actor)
+        assertEquals("alice changed the group avatar", GroupSystemEvents.summary(synthesized, "alice", null))
+    }
+
+    @Test
+    fun jsonFallbackStateChangesResolveToNeutralRows() {
+        val spoofedStateChanges =
+            listOf(
+                """{"system_type":"group_renamed","data":{"name":"Attacker name","old_name":"Real name"}}""",
+                """{"system_type":"group_avatar_changed","data":{}}""",
+                """{"system_type":"disappearing_timer_changed","data":{"new_retention_seconds":0}}""",
+            )
+
+        spoofedStateChanges.forEach { plaintext ->
+            val event = GroupSystemEvents.resolve(plaintext)!!
+
+            assertEquals(
+                GroupSystemCopy.Default.fallback,
+                GroupSystemEvents.summary(
+                    event = event,
+                    actorName = "Mallory",
+                    subjectName = null,
+                    retentionLabel = "7 days",
+                ),
+            )
+            assertEquals(GroupSystemCopy.Default.fallback, GroupSystemEvents.previewText(plaintext))
+        }
+
+        assertNull(GroupSystemEvents.renameDiffNames(GroupSystemEvents.resolve(spoofedStateChanges.first())!!))
+    }
+
+    @Test
+    fun structuredDisappearingTimerChangeStillRenders() {
+        val structured =
+            GroupSystemEventFfi(
+                systemType = "disappearing_timer_changed",
+                text = "Disappearing messages are off",
+                actorAccountIdHex = actorHex,
+                subjectAccountIdHex = null,
+                name = null,
+                oldName = null,
+                oldRetentionSeconds = 86_400uL,
+                newRetentionSeconds = 0uL,
+            )
+        val json =
+            """{"v":1,"system_type":"disappearing_timer_changed",""" +
+                """"data":{"old_retention_seconds":86400,"new_retention_seconds":0}}"""
+
+        assertEquals(
+            "Disappearing messages are off",
+            GroupSystemEvents.previewText(timelineRecord(plaintext = json, groupSystem = structured)),
+        )
     }
 
     @Test
@@ -90,7 +212,10 @@ class GroupSystemEventsTest {
 
     @Test
     fun summaryPrefersStructuredFieldsOverEmbeddedText() {
-        val event = GroupSystemEvents.parse(avatarChangedJson)!!
+        val event =
+            GroupSystemEvents.resolve(
+                timelineRecord(plaintext = avatarChangedJson, groupSystem = avatarChangedStructured),
+            )!!
 
         assertEquals(
             "alice changed the group avatar",
@@ -107,6 +232,7 @@ class GroupSystemEventsTest {
                 actor = null,
                 subject = "ab12cd",
                 name = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -124,6 +250,7 @@ class GroupSystemEventsTest {
                 actor = "d9",
                 subject = null,
                 name = "Ops crew",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -144,6 +271,7 @@ class GroupSystemEventsTest {
                 actor = null,
                 subject = null,
                 name = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -174,6 +302,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Protocol",
                 oldName = "Marmot Lab",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -194,6 +323,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Protocol",
                 oldName = "Marmot Lab",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -212,6 +342,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Protocol",
                 oldName = "Marmot Lab",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -232,6 +363,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Protocol",
                 oldName = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -252,6 +384,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Lab",
                 oldName = "   ",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -273,6 +406,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "Marmot Lab",
                 oldName = "Marmot   Lab",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -294,6 +428,7 @@ class GroupSystemEventsTest {
                 subject = null,
                 name = "New\u200bName\u2066",
                 oldName = "\u202EOld\u200dName",
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -308,9 +443,21 @@ class GroupSystemEventsTest {
             """{"v":1,"system_type":"group_renamed",""" +
                 """"data":{"name":"Marmot Protocol","old_name":"Marmot Lab"}}"""
 
+        val structured =
+            GroupSystemEventFfi(
+                systemType = "group_renamed",
+                text = "Group renamed",
+                actorAccountIdHex = "alice",
+                subjectAccountIdHex = null,
+                name = "Marmot Protocol",
+                oldName = null,
+                oldRetentionSeconds = null,
+                newRetentionSeconds = null,
+            )
+
         assertEquals(
             "The group was renamed from “Marmot Lab” to “Marmot Protocol”",
-            GroupSystemEvents.previewText(json),
+            GroupSystemEvents.previewText(timelineRecord(plaintext = json, groupSystem = structured)),
         )
     }
 
@@ -334,7 +481,7 @@ class GroupSystemEventsTest {
             """{"v":1,"system_type":"group_renamed",""" +
                 """"data":{"name":"Marmot Protocol","old_name":"Marmot Lab"}}"""
 
-        val event = GroupSystemEvents.resolve(json, structured)!!
+        val event = GroupSystemEvents.resolve(timelineRecord(plaintext = json, groupSystem = structured))!!
 
         assertEquals("Marmot Protocol", event.name)
         assertEquals("Marmot Lab", event.oldName)
@@ -349,6 +496,7 @@ class GroupSystemEventsTest {
                 actor = null,
                 subject = null,
                 name = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -366,6 +514,7 @@ class GroupSystemEventsTest {
                 actor = null,
                 subject = "ab12cd",
                 name = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         // Signer fills in for a missing data.actor; an explicit actor wins;
@@ -377,7 +526,10 @@ class GroupSystemEventsTest {
 
     @Test
     fun selfActorRendersTheYouForms() {
-        val event = GroupSystemEvents.parse(avatarChangedJson)!!
+        val event =
+            GroupSystemEvents.resolve(
+                timelineRecord(plaintext = avatarChangedJson, groupSystem = avatarChangedStructured),
+            )!!
 
         assertEquals(
             "You changed the group avatar",
@@ -394,6 +546,7 @@ class GroupSystemEventsTest {
                 actor = "ef34",
                 subject = "ab12cd",
                 name = null,
+                fromAuthenticatedStateProjection = true,
             )
 
         assertEquals(
@@ -415,7 +568,57 @@ class GroupSystemEventsTest {
 
     @Test
     fun previewTextIsNameFreePassiveForm() {
-        assertEquals("The group avatar changed", GroupSystemEvents.previewText(avatarChangedJson))
+        assertEquals(
+            "The group avatar changed",
+            GroupSystemEvents.previewText(
+                timelineRecord(plaintext = avatarChangedJson, groupSystem = avatarChangedStructured),
+            ),
+        )
         assertEquals("Group updated", GroupSystemEvents.previewText("not json"))
     }
+
+    private fun appRecord(
+        plaintext: String,
+        direction: String,
+    ) = AppMessageRecordFfi(
+        messageIdHex = "message",
+        direction = direction,
+        groupIdHex = "group",
+        sender = actorHex,
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = 1210uL,
+        tags = emptyList(),
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+    )
+
+    private fun timelineRecord(
+        plaintext: String,
+        direction: String = "system",
+        sourceMessageIdHex: String? = null,
+        groupSystem: GroupSystemEventFfi? = null,
+    ) = TimelineMessageRecordFfi(
+        messageIdHex = "message",
+        sourceMessageIdHex = sourceMessageIdHex,
+        direction = direction,
+        groupIdHex = "group",
+        sender = actorHex,
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = 1210uL,
+        tags = emptyList<MessageTagFfi>(),
+        timelineAt = 1uL,
+        receivedAt = 1uL,
+        replyToMessageIdHex = null,
+        replyPreview = null,
+        mediaJson = null,
+        media = emptyList(),
+        agentTextStreamJson = null,
+        groupSystem = groupSystem,
+        reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+        deleted = false,
+        deletedByMessageIdHex = null,
+        invalidationStatus = null,
+    )
 }
