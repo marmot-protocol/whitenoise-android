@@ -181,7 +181,7 @@ class Nip55SignerParsingTest {
     }
 
     @Test
-    fun contentRowRejectedFallsBackToIntent() {
+    fun contentRowRejectedIsTerminal() {
         val outcome =
             parseContentRow(
                 SignerOp.Nip44Encrypt,
@@ -189,7 +189,7 @@ class Nip55SignerParsingTest {
                 resultColumn = "ignored-because-rejected",
                 eventColumn = null,
             )
-        assertEquals(ContentRowOutcome.Unavailable, outcome)
+        assertEquals(ContentRowOutcome.Rejected, outcome)
     }
 
     @Test
