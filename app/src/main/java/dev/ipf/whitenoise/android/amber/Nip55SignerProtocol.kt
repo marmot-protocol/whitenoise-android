@@ -35,11 +35,12 @@ sealed interface ContentRowOutcome {
         val value: String,
     ) : ContentRowOutcome
 
+    /** The signer remembered a prior rejection; NIP-55 forbids prompting again. */
+    data object Rejected : ContentRowOutcome
+
     /**
-     * The signer can't answer in the background (no cursor, a `rejected` flag,
-     * or a missing value column). Mirrors the reference plugin: the caller must
-     * fall back to the foreground Intent prompt rather than treating this as a
-     * terminal rejection — a not-yet-"remembered" operation reports `rejected`.
+     * The signer can't answer in the background (no cursor or a missing value
+     * column), so the caller may fall back to the foreground Intent prompt.
      */
     data object Unavailable : ContentRowOutcome
 }
@@ -192,9 +193,9 @@ object Nip55 {
 
     /**
      * Query the signer's ContentResolver interface. Returns [ContentRowOutcome.Value]
-     * only when the signer answered in the background; any other case (no
-     * provider, exception, `rejected`, missing column) is [ContentRowOutcome.Unavailable]
-     * so the caller falls back to the Intent prompt.
+     * when the signer answered in the background, [ContentRowOutcome.Rejected]
+     * for a remembered rejection, or [ContentRowOutcome.Unavailable] when the
+     * caller may fall back to the Intent prompt.
      *
      * `args` follow the NIP-55 convention: sign_event is `[eventJson, "", currentUser]`;
      * encrypt/decrypt is `[content, counterparty, currentUser]`.
@@ -244,8 +245,8 @@ object Nip55 {
 /**
  * Pure interpretation of a ContentResolver row. `sign_event` yields the SIGNED
  * event JSON from the `event` column; everything else yields the `result`
- * column. A `rejected` flag or an absent/blank value means "can't answer in the
- * background" — the caller falls back to the Intent prompt.
+ * column. A `rejected` flag is terminal; an absent/blank value means "can't
+ * answer in the background" and lets the caller fall back to the Intent prompt.
  */
 fun parseContentRow(
     op: SignerOp,
@@ -253,7 +254,7 @@ fun parseContentRow(
     resultColumn: String?,
     eventColumn: String?,
 ): ContentRowOutcome {
-    if (rejected) return ContentRowOutcome.Unavailable
+    if (rejected) return ContentRowOutcome.Rejected
     val value =
         when (op) {
             SignerOp.SignEvent -> eventColumn

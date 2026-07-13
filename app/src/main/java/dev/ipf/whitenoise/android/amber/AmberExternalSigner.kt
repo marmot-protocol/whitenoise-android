@@ -83,6 +83,7 @@ class AmberExternalSigner(
             }
         when (val row = Nip55.queryViaContentResolver(appContext, op, packageName, args)) {
             is ContentRowOutcome.Value -> return validateSignerValue(op, row.value)
+            ContentRowOutcome.Rejected -> throw MarmotKitException.ExternalSignerRejected()
             ContentRowOutcome.Unavailable -> Unit // fall through to the Intent prompt
         }
 
