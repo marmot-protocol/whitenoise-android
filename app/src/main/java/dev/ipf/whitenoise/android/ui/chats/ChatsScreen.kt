@@ -43,10 +43,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +57,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +74,7 @@ import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
@@ -79,11 +84,8 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.group.SoleAdminDeletePicker
-import dev.ipf.whitenoise.android.ui.group.SoleAdminDeletePrompt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,10 +103,10 @@ internal fun ChatsScreen(
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
-    var pendingDelete by remember { mutableStateOf<ChatListItem?>(null) }
-    // #1131: sole-admin-with-others Delete routes here instead of blocking —
-    // transfer admin (auto for one candidate, picker for 3+) then leave + wipe.
-    var soleAdminDelete by remember { mutableStateOf<SoleAdminDeletePrompt?>(null) }
+    var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    val selectedChatIds = remember { mutableStateSetOf<String>() }
+    val selectionMode = selectedChatIds.isNotEmpty()
+    val mutedConversations by appState.chatMutePreferences.mutedConversations.collectAsState()
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
     // + nav icons) for a TextField that filters in real time on title +
@@ -130,6 +132,11 @@ internal fun ChatsScreen(
     val showArchived = filter == ChatListFilter.Archived
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    fun clearSelection() {
+        selectedChatIds.clear()
+    }
 
     // Lift the app-level toast host (it flows through WhiteNoiseSnackbarHost,
     // which reads LocalSnackbarBottomInset) above the quick-action FAB so a
@@ -156,9 +163,12 @@ internal fun ChatsScreen(
     // Back from chat-list search unwinds the search state — close the field and
     // restore the normal top bar (which drops focus and the IME) — instead of
     // exiting the app, matching the Settings/Diagnostics back behavior (#121,
-    // #149). See #320.
-    BackHandler(enabled = searchOpen) {
-        searchOpen = false
+    // #149). See #320. Selection mode takes priority (#1169).
+    BackHandler(enabled = chatListBackHandlerEnabled(selectionMode, searchOpen)) {
+        when {
+            selectionMode -> clearSelection()
+            searchOpen -> searchOpen = false
+        }
     }
 
     // System voice-input integration for the dictation button. The recognizer
@@ -257,6 +267,27 @@ internal fun ChatsScreen(
                 bodyMatchGroupIds = bodyMatches.keys,
             )
         }
+    val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
+    LaunchedEffect(visibleChatIds, selectionMode) {
+        if (selectionMode) {
+            selectedChatIds.retainAll(reconcileChatListSelection(selectedChatIds, visibleChatIds))
+        }
+    }
+    val selectedVisibleItems =
+        remember(visibleItems, selectedChatIds.size) {
+            visibleItems.filter { it.id in selectedChatIds }
+        }
+    val bulkArchiveAction =
+        remember(selectedVisibleItems) {
+            chatListBulkArchiveAction(selectedVisibleItems.map { it.group.archived })
+        }
+    val singleSelectedItem = selectedVisibleItems.singleOrNull()
+    val singleSelectionMuted =
+        singleSelectedItem?.let { item ->
+            appState.activeAccountRef?.let { accountRef ->
+                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
+            }
+        } ?: false
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
     // scroll-to-top on tap. Wrapped in key(showArchived) so switching the
@@ -339,39 +370,97 @@ internal fun ChatsScreen(
 
     Scaffold(
         topBar = {
-            ChatListTopBar(
-                appState = appState,
-                searchOpen = searchOpen,
-                searchQuery = searchQuery,
-                searchFocusRequester = searchFocusRequester,
-                onSearchQueryChange = { searchQuery = it },
-                onSearchOpen = { searchOpen = true },
-                onSearchClose = { searchOpen = false },
-                onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
-                onMic = {
-                    val intent =
-                        android.content
-                            .Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                            .putExtra(
-                                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                            )
-                    // ActivityNotFoundException fires on devices without
-                    // any RecognizerIntent handler (rare on consumer
-                    // hardware; possible on AOSP forks or kiosk-mode
-                    // devices). Surface that as a toast instead of
-                    // swallowing — otherwise the mic tap is silent.
-                    try {
-                        voiceSearchLauncher.launch(intent)
-                    } catch (_: android.content.ActivityNotFoundException) {
-                        appState.present(R.string.chat_list_voice_unavailable)
-                    }
-                },
-                onOpenSettings = onOpenSettings,
-            )
+            if (selectionMode) {
+                ChatListSelectionBar(
+                    count = selectedChatIds.size,
+                    archiveAction = bulkArchiveAction,
+                    actionsEnabled = selectedChatIds.isNotEmpty(),
+                    allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
+                    showMarkRead =
+                        singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                    showMuteToggle = singleSelectedItem != null,
+                    muted = singleSelectionMuted,
+                    onClose = ::clearSelection,
+                    onArchive = {
+                        val selected = selectedVisibleItems
+                        if (selected.isEmpty()) return@ChatListSelectionBar
+                        val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
+                        clearSelection()
+                        appState.launchMutation {
+                            var succeeded = 0
+                            selected.forEach { item ->
+                                if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) {
+                                    succeeded++
+                                }
+                            }
+                            if (succeeded > 0) {
+                                val pluralRes =
+                                    if (archive) {
+                                        R.plurals.toast_chat_list_chats_archived
+                                    } else {
+                                        R.plurals.toast_chat_list_chats_restored
+                                    }
+                                appState.present(
+                                    context.resources.getQuantityString(pluralRes, succeeded, succeeded),
+                                )
+                            }
+                        }
+                    },
+                    onDelete = {
+                        pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                    },
+                    onMarkRead = {
+                        val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        clearSelection()
+                        appState.launchMutation { controller.markAllRead(item) }
+                    },
+                    onMuteToggle = {
+                        val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        val nextMuted = !singleSelectionMuted
+                        clearSelection()
+                        appState.setConversationMuted(
+                            item.group.groupIdHex,
+                            nextMuted,
+                        )
+                    },
+                    onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
+                    onDeselectAll = { selectedChatIds.clear() },
+                )
+            } else {
+                ChatListTopBar(
+                    appState = appState,
+                    searchOpen = searchOpen,
+                    searchQuery = searchQuery,
+                    searchFocusRequester = searchFocusRequester,
+                    onSearchQueryChange = { searchQuery = it },
+                    onSearchOpen = { searchOpen = true },
+                    onSearchClose = { searchOpen = false },
+                    onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
+                    onMic = {
+                        val intent =
+                            android.content
+                                .Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(
+                                    android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                                )
+                        // ActivityNotFoundException fires on devices without
+                        // any RecognizerIntent handler (rare on consumer
+                        // hardware; possible on AOSP forks or kiosk-mode
+                        // devices). Surface that as a toast instead of
+                        // swallowing — otherwise the mic tap is silent.
+                        try {
+                            voiceSearchLauncher.launch(intent)
+                        } catch (_: android.content.ActivityNotFoundException) {
+                            appState.present(R.string.chat_list_voice_unavailable)
+                        }
+                    },
+                    onOpenSettings = onOpenSettings,
+                )
+            }
         },
         floatingActionButton = {
-            if (!searchOpen) {
+            if (!searchOpen && !selectionMode) {
                 FloatingActionButton(onClick = { showNewChatFlow = true }) {
                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.new_message))
                 }
@@ -458,39 +547,26 @@ internal fun ChatsScreen(
                                             description = item.group.description,
                                         )
                                     }
-                                ChatRowWithMenu(
+                                ChatListRow(
                                     item = item,
                                     appState = appState,
+                                    isMuted =
+                                        appState.activeAccountRef?.let { accountRef ->
+                                            ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
+                                                mutedConversations
+                                        } ?: false,
+                                    selectionMode = selectionMode,
+                                    selected = item.id in selectedChatIds,
                                     bodyMatch = bodyMatch,
                                     onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex, false) },
-                                    onMenuArchiveToggle = {
-                                        // Durable process-lifetime scope, not the
-                                        // composable's: archiving drops the row out of
-                                        // the active list, and a cancelled mutation would
-                                        // skip the post-await confirmation toast.
-                                        appState.launchMutation {
-                                            controller.setArchived(item.group.groupIdHex, !item.group.archived)
-                                        }
+                                    onEnterSelection = {
+                                        selectedChatIds.clear()
+                                        selectedChatIds.addAll(enterChatListSelection(item.id))
                                     },
-                                    onMarkRead = {
-                                        appState.launchMutation { controller.markAllRead(item) }
-                                    },
-                                    onMuteToggle = {
-                                        appState.setConversationMuted(
-                                            item.group.groupIdHex,
-                                            !appState.isConversationMuted(item.group.groupIdHex),
-                                        )
-                                    },
-                                    onDelete = {
-                                        // Sole admin with others still present? Route to the
-                                        // transfer-then-leave flow (#1131) instead of the plain
-                                        // confirm, which would block deep in the controller.
-                                        appState.launchMutation {
-                                            when (val candidates = controller.soleAdminTransferCandidates(item.group.groupIdHex)) {
-                                                null -> pendingDelete = item
-                                                else -> soleAdminDelete = SoleAdminDeletePrompt(item, candidates)
-                                            }
-                                        }
+                                    onToggleSelection = {
+                                        val updated = toggleChatListSelection(selectedChatIds, item.id)
+                                        selectedChatIds.clear()
+                                        selectedChatIds.addAll(updated)
                                     },
                                 )
                             }
@@ -509,7 +585,7 @@ internal fun ChatsScreen(
                 // implicit receiver here) — the bottom-end alignment is carried
                 // by the Modifier in the BoxScope, not a scoped AnimatedVisibility.
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = jumpToTopVisible,
+                    visible = jumpToTopVisible && !selectionMode,
                     enter = fadeIn() + slideInHorizontally { it / 2 },
                     exit = fadeOut() + slideOutHorizontally { it / 2 },
                     modifier =
@@ -547,58 +623,36 @@ internal fun ChatsScreen(
         }
     }
 
-    pendingDelete?.let { item ->
-        val alreadyLeft = item.removedFromGroup(appState.activeAccount?.accountIdHex)
+    pendingBulkDelete?.let { items ->
+        val count = items.size
         ConfirmDialog(
-            title = stringResource(R.string.delete_group_dialog_title),
-            message = stringResource(R.string.delete_group_dialog_message),
+            title = stringResource(R.string.delete_group_confirm),
+            message = pluralStringResource(R.plurals.chat_list_bulk_delete_confirm, count, count),
             confirmLabel = stringResource(R.string.delete_group_confirm),
             destructive = true,
             onConfirm = {
-                val groupId = item.group.groupIdHex
-                pendingDelete = null
+                pendingBulkDelete = null
+                clearSelection()
                 appState.launchMutation {
-                    controller.deleteGroupFromChatList(groupId, leaveFirstHint = !alreadyLeft)
+                    var succeeded = 0
+                    items.forEach { item ->
+                        if (controller.deleteGroupLocalFromChatList(item.group.groupIdHex, notify = false)) {
+                            succeeded++
+                        }
+                    }
+                    if (succeeded > 0) {
+                        appState.present(
+                            context.resources.getQuantityString(
+                                R.plurals.toast_chat_list_chats_deleted,
+                                succeeded,
+                                succeeded,
+                            ),
+                        )
+                    }
                 }
             },
-            onDismiss = { pendingDelete = null },
+            onDismiss = { pendingBulkDelete = null },
         )
-    }
-
-    soleAdminDelete?.let { prompt ->
-        val groupId = prompt.item.group.groupIdHex
-        if (prompt.candidates.size == 1) {
-            val newAdmin = prompt.candidates.first()
-            ConfirmDialog(
-                title = stringResource(R.string.delete_group_dialog_title),
-                message =
-                    stringResource(
-                        R.string.confirm_sole_admin_transfer_then_leave_message,
-                        appState.displayName(newAdmin.memberIdHex),
-                    ),
-                confirmLabel = stringResource(R.string.delete_group_confirm),
-                destructive = true,
-                onConfirm = {
-                    soleAdminDelete = null
-                    appState.launchMutation {
-                        controller.transferAdminThenDeleteFromChatList(groupId, newAdmin)
-                    }
-                },
-                onDismiss = { soleAdminDelete = null },
-            )
-        } else {
-            SoleAdminDeletePicker(
-                candidates = prompt.candidates,
-                appState = appState,
-                onPick = { member ->
-                    soleAdminDelete = null
-                    appState.launchMutation {
-                        controller.transferAdminThenDeleteFromChatList(groupId, member)
-                    }
-                },
-                onDismiss = { soleAdminDelete = null },
-            )
-        }
     }
 }
 

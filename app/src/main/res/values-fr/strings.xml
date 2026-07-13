@@ -52,6 +52,28 @@
     <string name="toast_chat_deleted_local">Discussion supprimée de cet appareil</string>
     <string name="toast_couldnt_delete_chat">Impossible de supprimer la discussion</string>
     <string name="chat_row_action_leave">Quitter le groupe</string>
+    <string name="chat_list_select_all">Tout sélectionner</string>
+    <string name="chat_list_deselect_all">Tout désélectionner</string>
+    <plurals name="chat_list_selected_count">
+        <item quantity="one">%1$d discussion sélectionnée</item>
+        <item quantity="other">%1$d discussions sélectionnées</item>
+    </plurals>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Supprimer %1$d discussion de cet appareil ?</item>
+        <item quantity="other">Supprimer %1$d discussions de cet appareil ?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d discussion archivée</item>
+        <item quantity="other">%1$d discussions archivées</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d discussion restaurée</item>
+        <item quantity="other">%1$d discussions restaurées</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d discussion supprimée de cet appareil</item>
+        <item quantity="other">%1$d discussions supprimées de cet appareil</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d discussion</item>
         <item quantity="other">%1$d discussions</item>

@@ -52,6 +52,28 @@
     <string name="toast_chat_deleted_local">Chat von diesem Gerät gelöscht</string>
     <string name="toast_couldnt_delete_chat">Chat konnte nicht gelöscht werden</string>
     <string name="chat_row_action_leave">Gruppe verlassen</string>
+    <string name="chat_list_select_all">Alle auswählen</string>
+    <string name="chat_list_deselect_all">Auswahl aufheben</string>
+    <plurals name="chat_list_selected_count">
+        <item quantity="one">%1$d Chat ausgewählt</item>
+        <item quantity="other">%1$d Chats ausgewählt</item>
+    </plurals>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">%1$d Chat von diesem Gerät löschen?</item>
+        <item quantity="other">%1$d Chats von diesem Gerät löschen?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d Chat archiviert</item>
+        <item quantity="other">%1$d Chats archiviert</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d Chat wiederhergestellt</item>
+        <item quantity="other">%1$d Chats wiederhergestellt</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d Chat von diesem Gerät gelöscht</item>
+        <item quantity="other">%1$d Chats von diesem Gerät gelöscht</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d Chat</item>
         <item quantity="other">%1$d Chats</item>
