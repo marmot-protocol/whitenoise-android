@@ -395,13 +395,12 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
-    val selectableMessages =
+    val selectableMessageProjections =
         remember(
             renderedTimeline,
             controller.deletedMessageIds,
             controller.editsByTarget,
             appState.activeAccount?.accountIdHex,
-            appState.profileRevisionForCompose,
         ) {
             renderedTimeline
                 .mapNotNull { item ->
@@ -428,7 +427,7 @@ internal fun ConversationScreen(
                             BatchMessageActionItem(
                                 messageId = messageId,
                                 senderId = record.sender,
-                                senderDisplayName = appState.displayName(record.sender),
+                                senderDisplayName = record.sender,
                                 copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
                                 forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
                                 mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
@@ -437,6 +436,17 @@ internal fun ConversationScreen(
                         timelineOrder = item.timelineOrder,
                     )
                 }.associateBy { it.action.messageId }
+        }
+    val selectableMessages =
+        remember(selectableMessageProjections, appState.profileRevisionForCompose) {
+            selectableMessageProjections.mapValues { (_, selection) ->
+                selection.copy(
+                    action =
+                        selection.action.copy(
+                            senderDisplayName = appState.displayName(selection.action.senderId),
+                        ),
+                )
+            }
         }
     val invalidVisibleMessageIds =
         remember(renderedTimeline, selectableMessages) {
