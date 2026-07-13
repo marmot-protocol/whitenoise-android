@@ -2388,6 +2388,31 @@ class ChatsController(
     }
 
     /**
+     * Local-only chat-list wipe: hide the row optimistically, run client cleanup
+     * + [deleteGroupLocal], and never touch MLS membership. Used by bulk Delete
+     * local (#1169) so still-member groups stay joined.
+     */
+    suspend fun deleteGroupLocalFromChatList(
+        groupIdHex: String,
+        notify: Boolean = true,
+    ): Boolean {
+        val account = accountRef ?: return false
+        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        removeChatRow(groupIdHex)
+        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+        wipe.exceptionOrNull()?.let {
+            if (it is CancellationException) throw it
+            removedRow?.let { row -> foldChatRow(row) }
+            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+            return false
+        }
+        if (notify) {
+            appState.present(R.string.toast_chat_deleted_local)
+        }
+        return true
+    }
+
+    /**
      * When [leaveFirst] (the user is still a member), leave the group first and
      * abort the wipe if the leave fails; a left group wipes directly. The wipe is
      * local-only and never touches MLS state, so the row can reappear from a later

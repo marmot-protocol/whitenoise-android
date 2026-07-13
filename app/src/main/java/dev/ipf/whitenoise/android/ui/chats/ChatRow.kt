@@ -1,45 +1,38 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.Badge
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -54,7 +47,6 @@ import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
@@ -62,127 +54,50 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+
+@OptIn(ExperimentalFoundationApi::class)
+internal fun Modifier.chatListSelectionRowClickable(onClick: () -> Unit): Modifier = combinedClickable(onClick = onClick, onLongClick = {})
 
 /**
- * Chat row with a long-press action menu (Archive / Unarchive,
- * Mark-as-read).
- *
- * Archiving is reached only through this menu and the in-conversation
- * menu — there is no swipe-to-archive gesture on the chat list. The
- * gesture was removed because it kept firing accidentally during
- * vertical scrolls and successive hardening passes never made it
- * reliably intentional. [onMenuArchiveToggle] runs the archive toggle,
- * whose controller call shows the plain confirmation toast.
+ * Chat list row with long-press selection entry (#1169). Long-press enters
+ * multi-select mode; while active, tap toggles selection and long-press is a
+ * no-op. Archive and delete run from the selection bar; mark-read and mute for
+ * a single selected chat are in the selection bar overflow.
  */
 @Composable
-internal fun ChatRowWithMenu(
+internal fun ChatListRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
+    isMuted: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     onOpen: () -> Unit,
-    onMenuArchiveToggle: () -> Unit,
-    onMarkRead: () -> Unit,
-    onMuteToggle: () -> Unit,
-    onDelete: () -> Unit,
+    onEnterSelection: () -> Unit,
+    onToggleSelection: () -> Unit,
     // Non-null when this row matched the chat-list search on a message body
     // (issue #290); drives the highlighted snippet line under the row.
     bodyMatch: MessageBodyMatch? = null,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-    val mutedKeys by appState.chatMutePreferences.mutedConversations.collectAsState()
-    val accountRef = appState.activeAccountRef
-    val isMuted =
-        remember(accountRef, item.group.groupIdHex, mutedKeys) {
-            accountRef != null &&
-                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedKeys
-        }
-    Box {
-        ChatRow(
-            item = item,
-            appState = appState,
-            onClick = onOpen,
-            onLongClick = { menuOpen = true },
-            bodyMatch = bodyMatch,
-            isMuted = isMuted,
-        )
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-            shape = MenuDefaults.shape,
-            border = amoledSurfaceBorderStroke(),
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (item.group.archived) {
-                                R.string.chat_row_action_unarchive
-                            } else {
-                                R.string.chat_row_action_archive
-                            },
-                        ),
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        if (item.group.archived) Icons.Default.Unarchive else Icons.Default.Archive,
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    menuOpen = false
-                    onMenuArchiveToggle()
-                },
-            )
-            if (item.hasUnread) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.chat_row_action_mark_read)) },
-                    leadingIcon = { Icon(Icons.Default.MarkChatRead, contentDescription = null) },
-                    onClick = {
-                        menuOpen = false
-                        onMarkRead()
-                    },
-                )
-            }
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (isMuted) {
-                                R.string.chat_row_action_unmute
-                            } else {
-                                R.string.chat_row_action_mute
-                            },
-                        ),
-                    )
-                },
-                leadingIcon = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    onMuteToggle()
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.chat_row_action_delete_group),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                },
-                onClick = {
-                    menuOpen = false
-                    onDelete()
-                },
-            )
-        }
-    }
+    ChatRow(
+        item = item,
+        appState = appState,
+        selectionMode = selectionMode,
+        selected = selected,
+        onClick =
+            if (selectionMode) {
+                onToggleSelection
+            } else {
+                onOpen
+            },
+        onLongClick =
+            if (selectionMode) {
+                null
+            } else {
+                onEnterSelection
+            },
+        bodyMatch = bodyMatch,
+        isMuted = isMuted,
+    )
 }
 
 /**
@@ -210,6 +125,8 @@ internal fun ChatRow(
     appState: WhiteNoiseAppState,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
     isMuted: Boolean = false,
     // Message-body search hit for this row (issue #290): when present, a
     // second supporting line shows the matched message with the needle
@@ -247,138 +164,171 @@ internal fun ChatRow(
         avatarAccount
             ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
     val rowModifier =
-        if (onLongClick != null) {
-            Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
-        } else {
-            Modifier.clickable(onClick = onClick)
+        when {
+            selectionMode ->
+                Modifier
+                    .fillMaxWidth()
+                    .semantics { this.selected = selected }
+                    .chatListSelectionRowClickable(onClick = onClick)
+            onLongClick != null ->
+                Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            else -> Modifier.clickable(onClick = onClick)
         }
-    ListItem(
-        modifier = rowModifier,
-        leadingContent = {
-            Box(
-                modifier =
-                    if (openableDmAvatarAccount != null) {
-                        Modifier
-                            .clip(CircleShape)
-                            .clickable(role = Role.Button) {
-                                appState.presentProfile(appState.npub(openableDmAvatarAccount))
-                            }
-                    } else {
-                        Modifier
-                    },
-            ) {
-                Avatar(
-                    title = title,
-                    seed = avatarAccount ?: item.group.groupIdHex,
-                    size = 44.dp,
-                    // A group's own avatar URL wins over the member-derived avatar.
-                    pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-                )
-                if (isMuted) {
-                    Icon(
-                        imageVector = Icons.Default.NotificationsOff,
-                        contentDescription = stringResource(R.string.chat_muted_badge),
-                        modifier =
+    Box(modifier = rowModifier) {
+        ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            leadingContent = {
+                Box(
+                    modifier =
+                        if (!selectionMode && openableDmAvatarAccount != null) {
                             Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(18.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(2.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                .clickable(role = Role.Button) {
+                                    appState.presentProfile(appState.npub(openableDmAvatarAccount))
+                                }
+                        } else {
+                            Modifier
+                        },
+                ) {
+                    Avatar(
+                        title = title,
+                        seed = avatarAccount ?: item.group.groupIdHex,
+                        size = 44.dp,
+                        // A group's own avatar URL wins over the member-derived avatar.
+                        pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
                     )
+                    if (isMuted) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsOff,
+                            contentDescription = stringResource(R.string.chat_muted_badge),
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .padding(2.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
-        },
-        headlineContent = {
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        supportingContent = {
-            val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
-            // Tokens only ever describe the last message's body, so they're
-            // ignored whenever the line shows something else (invite copy,
-            // draft). When the controller hasn't parsed yet (or the parse
-            // produced nothing), fall back to today's plaintext line. No
-            // parsing happens here — composition stays parse-free.
-            val markdownPreview =
-                item.previewTokens
-                    ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
-            val preview =
-                if (markdownPreview != null) {
-                    rememberMarkdownPreviewText(
-                        markdownPreview,
-                        mentionDisplayName =
-                            remember(appState) {
-                                { bech32: String -> appState.mentionDisplayName(bech32) }
+            },
+            headlineContent = {
+                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            supportingContent = {
+                val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
+                // Tokens only ever describe the last message's body, so they're
+                // ignored whenever the line shows something else (invite copy,
+                // draft). When the controller hasn't parsed yet (or the parse
+                // produced nothing), fall back to today's plaintext line. No
+                // parsing happens here — composition stays parse-free.
+                val markdownPreview =
+                    item.previewTokens
+                        ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
+                val preview =
+                    if (markdownPreview != null) {
+                        rememberMarkdownPreviewText(
+                            markdownPreview,
+                            mentionDisplayName =
+                                remember(appState) {
+                                    { bech32: String -> appState.mentionDisplayName(bech32) }
+                                },
+                        )
+                    } else {
+                        AnnotatedString(
+                            when {
+                                item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                                draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                                else ->
+                                    item.projectedPreviewText(
+                                        copy = messageTextCopy,
+                                        empty = stringResource(R.string.no_messages_yet),
+                                    )
                             },
+                        )
+                    }
+                // A body-content hit makes the matched message itself the subtitle:
+                // the highlighted snippet replaces the last-message preview (its
+                // timestamp already rides `timestampAt` above), so the line the user
+                // reads is the one that actually matched. Title/preview-only hits
+                // (bodyMatch null) keep the normal last-message preview.
+                if (bodyMatch != null) {
+                    val highlightStyle =
+                        SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    val snippetText =
+                        remember(bodyMatch.snippet, highlightStyle) {
+                            highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                        }
+                    Text(
+                        text = snippetText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    AnnotatedString(
-                        when {
-                            item.group.pendingConfirmation -> stringResource(R.string.invitation)
-                            draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
-                            else ->
-                                item.projectedPreviewText(
-                                    copy = messageTextCopy,
-                                    empty = stringResource(R.string.no_messages_yet),
-                                )
-                        },
+                    Text(
+                        text = preview,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
                     )
                 }
-            // A body-content hit makes the matched message itself the subtitle:
-            // the highlighted snippet replaces the last-message preview (its
-            // timestamp already rides `timestampAt` above), so the line the user
-            // reads is the one that actually matched. Title/preview-only hits
-            // (bodyMatch null) keep the normal last-message preview.
-            if (bodyMatch != null) {
-                val highlightStyle =
-                    SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
+            },
+            trailingContent = {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        rememberedRelativeTime(timestampAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color =
+                            if (rowHasUnread) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                     )
-                val snippetText =
-                    remember(bodyMatch.snippet, highlightStyle) {
-                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                    if (item.group.pendingConfirmation) {
+                        Badge { Text(stringResource(R.string.invited)) }
+                    } else if (rowHasUnread) {
+                        // Surface the highest-signal unread: an @ badge beside the
+                        // count when one of the unread messages mentions you (#611).
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (item.unreadMention) MentionBadge()
+                            UnreadCountBadge(rowUnreadCount)
+                        }
                     }
-                Text(
-                    text = snippetText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Text(
-                    text = preview,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                )
-            }
-        },
-        trailingContent = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    rememberedRelativeTime(timestampAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color =
-                        if (rowHasUnread) {
-                            MaterialTheme.colorScheme.primary
+                }
+            },
+        )
+        if (selectionMode) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            Color.Transparent
                         },
-                )
-                if (item.group.pendingConfirmation) {
-                    Badge { Text(stringResource(R.string.invited)) }
-                } else if (rowHasUnread) {
-                    // Surface the highest-signal unread: an @ badge beside the
-                    // count when one of the unread messages mentions you (#611).
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (item.unreadMention) MentionBadge()
-                        UnreadCountBadge(rowUnreadCount)
-                    }
+                    ),
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = stringResource(R.string.selected),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp)
+                                .size(24.dp),
+                    )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
