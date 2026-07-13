@@ -44,6 +44,17 @@ class ForwardMessageSheetCoverageTest {
     }
 
     @Test
+    fun forwardPreviewResolutionIsRememberedAcrossSearchEdits() {
+        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet").replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "mention resolution should rerun for body/profile changes, not every search-field recomposition",
+            "remember(body, appState.profileRevisionForCompose) { resolveMentionsInPlaintext(body)" in body,
+        )
+        assertTrue("Text( forwardPreviewText," in body)
+    }
+
+    @Test
     fun forwardButtonRemainsOutsideScrollableTargetList() {
         val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
         val listIndex = body.indexOf("LazyColumn(")

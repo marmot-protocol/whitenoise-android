@@ -484,8 +484,17 @@ internal fun ConversationScreen(
         }
     }
     val selectionMode = selectedMessages.isNotEmpty()
-    val selectedSelections = orderedBatchSelections(selectedMessages.values)
-    val selectedActionItems = selectedSelections.map(BatchMessageSelection::action)
+    val selectedSelections by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            derivedStateOf { orderedBatchSelections(selectedMessages.values) }
+        }
+    val selectedActionItems =
+        remember(selectedSelections) {
+            selectedSelections.map(BatchMessageSelection::action)
+        }
+    val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }
+    val selectedForwardBodies = remember(selectedActionItems) { batchForwardBodies(selectedActionItems) }
+    val selectedDeleteBreakdown = remember(selectedActionItems) { batchDeleteBreakdown(selectedActionItems) }
     val renderedSize = renderedTimeline.size
     val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
     val nearBottom =
@@ -2080,9 +2089,6 @@ internal fun ConversationScreen(
         )
 
     val openDetailsDescription = stringResource(R.string.details)
-    val selectedCopyText = batchCopyText(selectedActionItems)
-    val selectedForwardBodies = batchForwardBodies(selectedActionItems)
-    val selectedDeleteBreakdown = batchDeleteBreakdown(selectedActionItems)
     LaunchedEffect(selectedForwardBodies.isEmpty()) {
         batchForwardSheetOpen =
             batchForwardSheetOpenForBodies(
