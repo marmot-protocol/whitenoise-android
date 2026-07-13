@@ -7,6 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.lang.ref.WeakReference
 
 class DraftStoreTest {
     private fun store() = DraftStore(InMemoryDraftPersistence())
@@ -59,6 +60,55 @@ class DraftStoreTest {
         }
 
         assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun settingEvictedObservedEmptyDraftUpdatesOriginalState() {
+        val s = store()
+        val observedReads = HashSet<Any>()
+        val observedSnapshot = Snapshot.takeSnapshot { observedReads.add(it) }
+        try {
+            observedSnapshot.enter { assertNull(s.get("a", "observed")) }
+        } finally {
+            observedSnapshot.dispose()
+        }
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 1) { index ->
+            s.get("a", "missing-$index")
+        }
+
+        val setChanges = HashSet<Any>()
+        val setHandle = Snapshot.registerApplyObserver { changed, _ -> setChanges.addAll(changed) }
+        try {
+            Snapshot.withMutableSnapshot { s.set("a", "observed", "typed") }
+        } finally {
+            setHandle.dispose()
+        }
+
+        assertTrue(
+            "setting an evicted draft must update the state its reader still observes",
+            observedReads.intersect(setChanges).isNotEmpty(),
+        )
+        assertEquals("typed", s.get("a", "observed"))
+    }
+
+    @Test
+    fun collectedEvictedStateMetadataIsDrainedOnNextRead() {
+        val s = store()
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 1) { index ->
+            s.get("a", "missing-$index")
+        }
+
+        val evictedReferences = s.evictedDraftStateReferencesForTest()
+        assertTrue(evictedReferences.isNotEmpty())
+        evictedReferences.forEach { reference ->
+            reference.clear()
+            reference.enqueue()
+        }
+
+        s.get("a", "missing-${DraftStore.MAX_IN_MEMORY_DRAFT_STATES}")
+
+        assertEquals(0, s.evictedDraftStateReferencesForTest().size)
     }
 
     @Test
@@ -306,6 +356,13 @@ class DraftStoreTest {
         @Suppress("UNCHECKED_CAST")
         val drafts = draftsField.get(this) as Map<String, MutableState<String?>>
         return drafts.size
+    }
+
+    private fun DraftStore.evictedDraftStateReferencesForTest(): List<WeakReference<*>> {
+        val referencesField =
+            DraftStore::class.java.getDeclaredField("evictedEmptyDraftStates").apply { isAccessible = true }
+        val references = referencesField.get(this) as Map<*, *>
+        return references.values.map { it as WeakReference<*> }
     }
 
     private class ReplacingOnFirstReadState(
