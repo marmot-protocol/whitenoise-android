@@ -33,6 +33,23 @@ class FreshSweepCoverageTest {
     }
 
     @Test
+    fun conversationUnreadDerivationsRebindToTheVisibleController() {
+        val source =
+            source("ui/conversation/ConversationScreen.kt")
+                .section("val unreadIncomingCount by", "// Reading the raw IME inset")
+                .replace(Regex("\\s+"), " ")
+
+        assertTrue(source.contains("val unreadIncomingCount by remember(controller, chat.id)"))
+        assertTrue(
+            source.contains(
+                "val unreadMentionMessageIds by remember(controller, chat.id) { derivedStateOf { " +
+                    "val selfAccountIdHex = appState.activeAccount?.accountIdHex",
+            ),
+        )
+        assertFalse(source.contains("selfAccountIdHexForMentions"))
+    }
+
+    @Test
     fun mediaCacheFileProbesRunOffTheComposeThread() {
         val video = source("ui/conversation/media/MediaVideo.kt")
         val voice = source("ui/conversation/media/MediaVoice.kt")
