@@ -38,6 +38,35 @@ class MessageMultiSelectCoverageTest {
     }
 
     @Test
+    fun batchSelectionDerivationsStayRemembered() {
+        val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            source.contains(
+                "val selectedActionItems = remember(selectedSelections) { " +
+                    "selectedSelections.map(BatchMessageSelection::action) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedForwardBodies = remember(selectedActionItems) { " +
+                    "batchForwardBodies(selectedActionItems) }",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "val selectedDeleteBreakdown = remember(selectedActionItems) { " +
+                    "batchDeleteBreakdown(selectedActionItems) }",
+            ),
+        )
+    }
+
+    @Test
     fun bubbleSelectionOverlayInterceptsRowTaps() {
         val source = source("messages/MessageBubble.kt")
 
