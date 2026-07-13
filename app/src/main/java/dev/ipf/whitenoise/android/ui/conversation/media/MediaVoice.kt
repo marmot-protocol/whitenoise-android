@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -437,6 +438,33 @@ internal suspend fun materializeVoiceAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
+): java.io.File =
+    materializeVoiceAttachment(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        resolveBytes = {
+            val retained =
+                if (mine) {
+                    controller
+                        .pendingAttachmentsList(messageIdHex)
+                        .getOrNull(attachmentIndex)
+                        ?.plaintextBytes
+                } else {
+                    null
+                }
+            retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+        },
+    )
+
+@VisibleForTesting
+internal suspend fun materializeVoiceAttachment(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
     val file =
         voiceAttachmentCacheFile(
@@ -445,12 +473,6 @@ internal suspend fun materializeVoiceAttachment(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
-    cachedVoiceAttachmentFile(
-        context = context,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-    )?.let { return it }
 
     val key = file.absolutePath
     var owner = false
@@ -469,7 +491,7 @@ internal suspend fun materializeVoiceAttachment(
     return try {
         val materialized =
             withContext(NonCancellable) {
-                materializeVoiceAttachmentOnce(file, controller, messageIdHex, attachmentIndex, reference, mine)
+                materializeVoiceAttachmentOnce(file, resolveBytes)
             }
         shared.complete(materialized)
         materialized
@@ -487,25 +509,10 @@ internal suspend fun materializeVoiceAttachment(
 
 private suspend fun materializeVoiceAttachmentOnce(
     file: java.io.File,
-    controller: ConversationController,
-    messageIdHex: String,
-    attachmentIndex: Int,
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
+    resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
     if (file.isFile && file.length() > 0L) return file
-    val retained =
-        if (mine) {
-            controller
-                .pendingAttachmentsList(messageIdHex)
-                .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-        } else {
-            null
-        }
-    val bytes =
-        retained
-            ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+    val bytes = resolveBytes()
     withContext(Dispatchers.IO) { file.writeBytes(bytes) }
     return file
 }
