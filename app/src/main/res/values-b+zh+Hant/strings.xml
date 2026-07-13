@@ -71,6 +71,10 @@
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_missing_key_package">此人尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
     <string name="error_missing_key_package_for">%1$s 尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
+    <string name="invite_to_white_noise">邀請加入 White Noise</string>
+    <string name="invite_to_white_noise_description">%1$s 尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>
+    <string name="unknown_invite_to_white_noise_description">此使用者尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>
+    <string name="invite_message">來 White Noise 加入我吧。無需手機號碼，沒有監控，真正保有隱私。點這裡下載：https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_publish_failed">該群組已在本地創建，但發布失敗：%1$s</string>
     <string name="error_group_create_failed_retry">設定加密聊天時發生問題。請檢查連線，然後再試一次。</string>

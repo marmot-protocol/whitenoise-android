@@ -72,6 +72,10 @@
     <string name="error_valid_recipient_reference">Entrez un npub valide, un lien de profil ou une clé publique hex.</string>
     <string name="error_missing_key_package">Cette personne n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
     <string name="error_missing_key_package_for">%1$s n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
+    <string name="invite_to_white_noise">Inviter sur White Noise</string>
+    <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
+    <string name="unknown_invite_to_white_noise_description">Cet utilisateur n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>
+    <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_publish_failed">Le groupe a été créé localement, mais la publication a échoué : %1$s</string>
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>

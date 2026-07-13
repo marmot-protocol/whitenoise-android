@@ -11,8 +11,11 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
+import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
+import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
+import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.canSubmitNewChatSheet
@@ -165,11 +168,36 @@ class NewChatFlowTest {
     }
 
     @Test
-    fun startProfileChatFailureDistinguishesInvalidAndTechnicalFailures() {
+    fun startProfileChatTreatsPostResolutionInvalidIdentityAsMissingSetup() {
+        val invalidIdentity = MarmotKitException.InvalidIdentity("invalid Marmot KeyPackage event")
+
+        assertTrue(startProfileChatFailureIsMissingSetup(invalidIdentity))
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            startProfileChatFailureDetail(invalidIdentity) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(invalidIdentity))
         assertEquals(
             AppText.Resource(R.string.error_invalid_identity_reference),
-            startProfileChatFailureDetail(MarmotKitException.InvalidIdentity("bad npub")) { "ignored" },
+            groupCreateFailureDetail(invalidIdentity) { "ignored" },
         )
+    }
+
+    @Test
+    fun startProfileChatInviteCopyUsesKnownNameOrGenericFallback() {
+        assertEquals(
+            AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),
+            startProfileChatInviteDetail("Alice"),
+        )
+        assertEquals(
+            AppText.Resource(R.string.unknown_invite_to_white_noise_description),
+            startProfileChatInviteDetail("  "),
+        )
+        assertTrue(startProfileChatFailureIsMissingSetup(MarmotKitException.MissingKeyPackage("deadbeef")))
+    }
+
+    @Test
+    fun startProfileChatFailureDistinguishesTechnicalFailures() {
         val publishFailure = MarmotKitException.Publish("relay unreachable")
         assertEquals(
             AppText.Resource(R.string.error_group_publish_failed, listOf("relay unreachable")),

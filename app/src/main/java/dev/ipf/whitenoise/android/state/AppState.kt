@@ -270,30 +270,54 @@ internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): Profil
 
 private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
+private fun missingKeyPackageFailureDetail(
+    account: String,
+    displayName: (String) -> String,
+): AppText {
+    val normalizedAccount = account.trim()
+    return if (normalizedAccount.isEmpty()) {
+        AppText.Resource(R.string.error_missing_key_package)
+    } else {
+        AppText.Resource(R.string.error_missing_key_package_for, listOf(displayName(normalizedAccount)))
+    }
+}
+
 internal fun groupCreateFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
 ): AppText =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
-        is MarmotKitException.MissingKeyPackage -> {
-            val account = throwable.account.trim()
-            if (account.isEmpty()) {
-                AppText.Resource(R.string.error_missing_key_package)
-            } else {
-                AppText.Resource(R.string.error_missing_key_package_for, listOf(displayName(account)))
-            }
-        }
+        is MarmotKitException.MissingKeyPackage -> missingKeyPackageFailureDetail(throwable.account, displayName)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
         is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
         else -> AppText.Plain(throwable.readableMessage())
     }
 
+/**
+ * Direct-chat entry points resolve recipient references to a canonical Nostr
+ * public key before calling the engine. On that path `InvalidIdentity` can only
+ * describe an unusable fetched identity/KeyPackage, not the already-validated
+ * recipient input, so it belongs to the same "not on White Noise yet" state as
+ * `MissingKeyPackage`. New-group input keeps the stricter mapping above.
+ */
+internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean =
+    throwable is MarmotKitException.MissingKeyPackage || throwable is MarmotKitException.InvalidIdentity
+
+internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
+    recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
+        AppText.Resource(R.string.invite_to_white_noise_description, listOf(it))
+    } ?: AppText.Resource(R.string.unknown_invite_to_white_noise_description)
+
 internal fun startProfileChatFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
-): AppText = groupCreateFailureDetail(throwable, displayName)
+): AppText =
+    when (throwable) {
+        is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_missing_key_package)
+        else -> groupCreateFailureDetail(throwable, displayName)
+    }
 
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {

@@ -62,6 +62,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
+import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
+import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -69,14 +71,50 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
-private data class StartChatErrorUiState(
+internal data class StartChatErrorUiState(
     val npub: String,
     val progressHex: String,
     val detail: AppText,
     val copyable: Boolean,
+    val recipientName: String? = null,
+    val invitation: Boolean = false,
     val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
     val retryGroupIdHex: String? = null,
 )
+
+internal fun startChatErrorUiState(
+    npub: String,
+    progressHex: String,
+    error: Throwable,
+    recipientName: String?,
+    displayName: (String) -> String,
+): StartChatErrorUiState {
+    val invitation = startProfileChatFailureIsMissingSetup(error)
+    return StartChatErrorUiState(
+        npub = npub,
+        progressHex = progressHex,
+        detail =
+            if (invitation) {
+                startProfileChatInviteDetail(recipientName)
+            } else {
+                startProfileChatFailureDetail(error, displayName)
+            },
+        copyable = startProfileChatFailureCopyable(error),
+        recipientName = recipientName,
+        invitation = invitation,
+        title =
+            if (invitation) {
+                AppText.Resource(R.string.invite_to_white_noise)
+            } else {
+                AppText.Resource(R.string.toast_couldnt_start_chat)
+            },
+    )
+}
+
+internal fun inviteShareIntent(message: String): Intent =
+    Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_TEXT, message)
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
@@ -157,6 +195,8 @@ private fun NewMessageScreen(
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val showMyQrLabel = stringResource(R.string.show_my_qr_code)
+    val inviteTitle = stringResource(R.string.invite_to_white_noise)
+    val inviteMessage = stringResource(R.string.invite_message)
 
     // Back must stay installed (a disabled handler lets the event fall through
     // to the Activity) but no-op while a tapped person's chat is being created;
@@ -187,6 +227,7 @@ private fun NewMessageScreen(
     fun openOrCreateChat(
         npub: String,
         hexForProgress: String,
+        recipientName: String? = null,
         retryGroupIdHex: String? = null,
     ) {
         if (creatingHex != null) return
@@ -220,11 +261,12 @@ private fun NewMessageScreen(
                 }.onFailure { error ->
                     rethrowIfCancellation(error)
                     startChatError =
-                        StartChatErrorUiState(
+                        startChatErrorUiState(
                             npub = npub,
                             progressHex = hexForProgress,
-                            detail = startProfileChatFailureDetail(error, appState::displayName),
-                            copyable = startProfileChatFailureCopyable(error),
+                            error = error,
+                            recipientName = recipientName,
+                            displayName = appState::displayName,
                         )
                 }
             } finally {
@@ -294,7 +336,17 @@ private fun NewMessageScreen(
                     item {
                         StartChatErrorCard(
                             error = error,
-                            onRetry = { openOrCreateChat(error.npub, error.progressHex, error.retryGroupIdHex) },
+                            onRetry = {
+                                openOrCreateChat(
+                                    npub = error.npub,
+                                    hexForProgress = error.progressHex,
+                                    recipientName = error.recipientName,
+                                    retryGroupIdHex = error.retryGroupIdHex,
+                                )
+                            },
+                            onInvite = {
+                                context.startActivity(Intent.createChooser(inviteShareIntent(inviteMessage), inviteTitle))
+                            },
                             onCopy = { detail ->
                                 clipboard.setText(AnnotatedString(detail))
                                 appState.present(R.string.copied)
@@ -316,7 +368,16 @@ private fun NewMessageScreen(
                             avatarSeed = resolvedHex,
                             avatarUrl = appState.avatarUrl(resolvedHex),
                             enabled = creatingHex == null,
-                            onClick = { openOrCreateChat(appState.npub(resolvedHex), resolvedHex) },
+                            onClick = {
+                                openOrCreateChat(
+                                    npub = appState.npub(resolvedHex),
+                                    hexForProgress = resolvedHex,
+                                    recipientName =
+                                        appState
+                                            .displayName(resolvedHex)
+                                            .takeIf { resolution.state == RecipientPreviewState.Loaded },
+                                )
+                            },
                             onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
                             trailing =
                                 if (creatingHex == resolvedHex) {
@@ -353,7 +414,13 @@ private fun NewMessageScreen(
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl = appState.avatarUrl(candidate.accountIdHex),
                             enabled = creatingHex == null,
-                            onClick = { openOrCreateChat(candidate.npub, candidate.accountIdHex) },
+                            onClick = {
+                                openOrCreateChat(
+                                    npub = candidate.npub,
+                                    hexForProgress = candidate.accountIdHex,
+                                    recipientName = appState.displayName(candidate.accountIdHex),
+                                )
+                            },
                             onLongClick = { appState.presentProfile(candidate.npub) },
                             trailing =
                                 if (creatingHex == candidate.accountIdHex) {
@@ -484,9 +551,10 @@ private fun AppText.resolveForCompose(): String =
     }
 
 @Composable
-private fun StartChatErrorCard(
+internal fun StartChatErrorCard(
     error: StartChatErrorUiState,
     onRetry: () -> Unit,
+    onInvite: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
     val title = error.title.resolveForCompose()
@@ -500,7 +568,12 @@ private fun StartChatErrorCard(
         Text(
             title,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.error,
+            color =
+                if (error.invitation) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
         )
         Text(
             detail,
@@ -508,6 +581,13 @@ private fun StartChatErrorCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
+            if (error.invitation) {
+                Button(onClick = onInvite) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.share))
+                }
+            }
             TextButton(onClick = onRetry) {
                 Text(stringResource(R.string.retry))
             }
