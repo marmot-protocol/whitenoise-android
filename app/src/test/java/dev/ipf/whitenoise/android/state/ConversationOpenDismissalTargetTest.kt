@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -25,8 +26,10 @@ class ConversationOpenDismissalTargetTest {
     fun openingConversationDismissesTheComputedTarget() {
         val dismissed = mutableListOf<ConversationNotificationTarget>()
 
-        dismissConversationNotificationsOnOpen("acct-a", "group-1") { accountRef, groupIdHex ->
-            dismissed += ConversationNotificationTarget(accountRef, groupIdHex)
+        runBlocking {
+            dismissConversationNotificationsOnOpen("acct-a", "group-1") { accountRef, groupIdHex ->
+                dismissed += ConversationNotificationTarget(accountRef, groupIdHex)
+            }
         }
 
         assertEquals(listOf(ConversationNotificationTarget("acct-a", "group-1")), dismissed)
@@ -36,8 +39,10 @@ class ConversationOpenDismissalTargetTest {
     fun openingConversationWithNoTargetDoesNotDismissAnything() {
         val dismissed = mutableListOf<ConversationNotificationTarget>()
 
-        dismissConversationNotificationsOnOpen("acct-a", "   ") { accountRef, groupIdHex ->
-            dismissed += ConversationNotificationTarget(accountRef, groupIdHex)
+        runBlocking {
+            dismissConversationNotificationsOnOpen("acct-a", "   ") { accountRef, groupIdHex ->
+                dismissed += ConversationNotificationTarget(accountRef, groupIdHex)
+            }
         }
 
         assertEquals(emptyList<ConversationNotificationTarget>(), dismissed)

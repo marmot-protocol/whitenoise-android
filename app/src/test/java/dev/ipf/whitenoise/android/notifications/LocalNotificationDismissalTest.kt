@@ -4,16 +4,26 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -33,6 +43,73 @@ class LocalNotificationDismissalTest {
     fun tearDown() {
         manager.cancelAll()
         manager.deleteNotificationChannel(TEST_CHANNEL)
+    }
+
+    @Test
+    fun dismissConversationMessagesReadsActiveNotificationsOffMainThread() {
+        val account = "account-a"
+        val group = "group-a"
+        manager.notify(
+            "invite-target",
+            41,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, group)
+                    },
+            ),
+        )
+
+        val readThread = AtomicReference<Thread>()
+        val providerInvoked = AtomicBoolean(false)
+        val mainLooperCallbackRan = AtomicBoolean(false)
+        val presenter =
+            LocalNotificationPresenter(context) { notificationManager ->
+                providerInvoked.set(true)
+                readThread.set(Thread.currentThread())
+                notificationManager.activeNotifications
+            }
+        val failure = AtomicReference<Throwable>()
+        Handler(Looper.getMainLooper()).post {
+            mainLooperCallbackRan.set(true)
+            runCatching {
+                assertTrue(runBlocking { presenter.dismissConversationMessages(account, group) })
+                assertNotNull(readThread.get())
+                assertNotEquals(Looper.getMainLooper().thread, readThread.get())
+            }.onFailure(failure::set)
+        }
+        shadowOf(Looper.getMainLooper()).idle()
+        failure.get()?.let { throw it }
+        assertTrue(mainLooperCallbackRan.get())
+        assertTrue(providerInvoked.get())
+    }
+
+    @Test
+    fun dismissConversationMessagesRethrowsCancellationFromActiveNotificationsRead() {
+        val account = "account-a"
+        val group = "group-a"
+        manager.notify(
+            "invite-target",
+            41,
+            notification(
+                extras =
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, account)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, group)
+                    },
+            ),
+        )
+        val presenter =
+            LocalNotificationPresenter(context) { _ ->
+                throw CancellationException("cancelled during activeNotifications read")
+            }
+
+        assertThrows(CancellationException::class.java) {
+            runBlocking { presenter.dismissConversationMessages(account, group) }
+        }
+
+        assertEquals(1, manager.activeNotifications.size)
     }
 
     @Test
@@ -60,7 +137,7 @@ class LocalNotificationDismissalTest {
         val other = LocalNotificationFormatter.conversationDismissalKey("account-b", "group-b")
         manager.notify(other.tag, other.id, notification())
 
-        assertTrue(LocalNotificationPresenter(context).dismissConversationMessages(account, group))
+        assertTrue(runBlocking { LocalNotificationPresenter(context).dismissConversationMessages(account, group) })
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertEquals(listOf(other.tag to other.id), remaining)
