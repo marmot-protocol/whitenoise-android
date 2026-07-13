@@ -117,12 +117,17 @@ internal object AttachmentCachePublication {
     ) {
         val stripe = stripeFor(attachmentKey)
         var evictionError: Throwable? = null
-        var finalDeleteError: IOException? = null
+        var deleteError: IOException? = null
         withContext(Dispatchers.IO) {
             synchronized(this@AttachmentCachePublication) {
                 stripe.invalidatingCount++
                 try {
                     bumpStripeGenerationAndDelete(stripe, finalFile)
+                } catch (e: IOException) {
+                    // A failed first delete must not skip plaintext eviction —
+                    // record it and continue. invalidatingCount stays raised and
+                    // is balanced by the finally below.
+                    deleteError = e
                 } catch (t: Throwable) {
                     stripe.invalidatingCount--
                     throw t
@@ -137,14 +142,14 @@ internal object AttachmentCachePublication {
                     try {
                         bumpStripeGenerationAndDelete(stripe, finalFile)
                     } catch (e: IOException) {
-                        finalDeleteError = e
+                        if (deleteError == null) deleteError = e
                     } finally {
                         stripe.invalidatingCount--
                     }
                 }
             }
         }
-        finalDeleteError?.let { throw it }
+        deleteError?.let { throw it }
         evictionError?.let { throw it }
     }
 
@@ -167,7 +172,9 @@ internal object AttachmentCachePublication {
         finalFile: File,
     ) {
         stripe.generation++
-        val deleted = !finalFile.exists() || finalFile.delete()
+        // delete() first, then treat an already-gone file as success — avoids the
+        // exists()/delete() race where a concurrent removal makes delete() fail.
+        val deleted = finalFile.delete() || !finalFile.exists()
         if (!deleted) {
             throw IOException("failed to delete corrupt attachment cache ${finalFile.absolutePath}")
         }

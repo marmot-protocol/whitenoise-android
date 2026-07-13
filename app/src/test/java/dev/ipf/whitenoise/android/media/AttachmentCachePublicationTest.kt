@@ -233,7 +233,7 @@ class AttachmentCachePublicationTest {
     }
 
     @Test
-    fun failedInitialDelete_doesNotLeaveStripePermanentlyInvalidating() {
+    fun failedInitialDelete_stillEvictsPlaintextAndDoesNotBrickStripe() {
         dir = Files.createTempDirectory("attachment-cache-delete-failure").toFile()
         val blocked = File(dir, "blocked.mp4").apply { mkdirs() }
         File(blocked, "child").writeBytes(byteArrayOf(1))
@@ -252,7 +252,8 @@ class AttachmentCachePublicationTest {
             }
 
         assertTrue(failure.isFailure)
-        assertFalse(evictCalled)
+        // A failed first delete must not skip plaintext eviction.
+        assertTrue(evictCalled)
         assertNotNull(
             "a failed initial delete must not brick every future publish on the stripe",
             AttachmentCachePublication.capturePermit(attachmentKey),
