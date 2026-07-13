@@ -212,7 +212,7 @@ object Nip55 {
                 if (cursor.moveToFirst()) {
                     parseContentRow(
                         op,
-                        rejected = readRejectedFlag(cursor),
+                        rejected = cursor.getColumnIndex(COLUMN_REJECTED) >= 0,
                         resultColumn = cursor.stringColumnOrNull(COLUMN_RESULT),
                         eventColumn = cursor.stringColumnOrNull(COLUMN_EVENT),
                     )
@@ -225,16 +225,6 @@ object Nip55 {
             // so fall back to the Intent prompt.
             ContentRowOutcome.Unavailable
         }
-
-    private fun readRejectedFlag(cursor: Cursor): Boolean {
-        val index = cursor.getColumnIndex(COLUMN_REJECTED)
-        if (index < 0) return false
-        return if (cursor.getType(index) == Cursor.FIELD_TYPE_INTEGER) {
-            cursor.getInt(index) != 0
-        } else {
-            cursor.getString(index)?.toBoolean() == true
-        }
-    }
 
     private fun Cursor.stringColumnOrNull(name: String): String? {
         val index = getColumnIndex(name)

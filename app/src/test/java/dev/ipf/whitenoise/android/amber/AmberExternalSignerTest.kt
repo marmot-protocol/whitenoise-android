@@ -51,7 +51,7 @@ class AmberExternalSignerTest {
     }
 
     @Test
-    fun rememberedContentResolverRejectionDoesNotLaunchForegroundSigner() {
+    fun rememberedContentResolverRejectionWithNullValueDoesNotLaunchForegroundSigner() {
         val thrown = AtomicReference<Throwable>()
         val done = CountDownLatch(1)
         val signer =
@@ -109,7 +109,7 @@ class AmberExternalSignerTest {
             sortOrder: String?,
         ): Cursor =
             MatrixCursor(arrayOf(Nip55.COLUMN_REJECTED, Nip55.COLUMN_RESULT)).apply {
-                addRow(arrayOf<Any>(1, "ignored-because-rejected"))
+                addRow(arrayOf<Any?>(null, "ignored-because-rejected"))
             }
 
         override fun getType(uri: Uri): String? = null
