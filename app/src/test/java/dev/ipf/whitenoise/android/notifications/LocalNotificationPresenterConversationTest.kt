@@ -3,11 +3,14 @@ package dev.ipf.whitenoise.android.notifications
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
+import android.graphics.Bitmap
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -65,6 +68,15 @@ class LocalNotificationPresenterConversationTest {
             notification.channelId,
         )
         assertEquals(shortcutId, notification.shortcutId)
+    }
+
+    @Test
+    fun senderPersonUsesTheResolvedAvatarBitmap() {
+        val content = LocalNotificationFormatter.content(update(isMention = false), context)!!
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+
+        assertNotNull(notificationSenderPerson(content, bitmap).icon)
+        assertNull(notificationSenderPerson(content, null).icon)
     }
 
     private fun update(isMention: Boolean) =

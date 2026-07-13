@@ -4675,15 +4675,26 @@ class WhiteNoiseAppState(
         )
     }
 
-    // Conversation avatar for the notification shortcut icon. A DM's avatar is
-    // the peer, carried in the message payload as the sender — free, no IO. A
-    // group's avatar isn't in the payload, so resolve it from the group record.
-    private suspend fun notificationConversationAvatarUrl(update: NotificationUpdateFfi): String? =
+    // A notification renders once, so await the sender's local profile instead
+    // of relying on the UI presentation cache, which materializes
+    // asynchronously. Fall back to the payload picture when the local profile
+    // has none. Sanitize every URL before fetching it.
+    private suspend fun notificationSenderAvatarUrl(update: NotificationUpdateFfi): String? =
+        ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
+            ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
+
+    // Conversation shortcut icon: the peer for a DM, or the group's own avatar
+    // for a group chat. The sender's MessagingStyle icon is resolved separately.
+    private suspend fun notificationConversationAvatarUrl(
+        update: NotificationUpdateFfi,
+        senderAvatarUrl: String?,
+    ): String? =
         if (update.isDm) {
-            update.sender.pictureUrl?.takeIf { it.isNotBlank() }
+            senderAvatarUrl
         } else {
             runCatching { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl }
                 .getOrNull()
+                ?.let { ProfileSanitizer.imageUrl(it) }
                 ?.takeIf { it.isNotBlank() }
         }
 
@@ -4745,6 +4756,7 @@ class WhiteNoiseAppState(
             // was locked earlier, keep the post redacted even if it has since
             // unlocked because the rich fields were intentionally not resolved.
             val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
+            val senderAvatarUrl = if (redactNotificationContent) null else notificationSenderAvatarUrl(update)
             localNotificationPresenter.show(
                 update,
                 if (redactNotificationContent) null else (systemText?.title ?: notificationConversationTitle(update)),
@@ -4762,7 +4774,13 @@ class WhiteNoiseAppState(
                         )
                     },
                 redactContent = redactNotificationContent,
-                conversationAvatarUrl = if (redactNotificationContent) null else notificationConversationAvatarUrl(update),
+                conversationAvatarUrl =
+                    if (redactNotificationContent) {
+                        null
+                    } else {
+                        notificationConversationAvatarUrl(update, senderAvatarUrl)
+                    },
+                senderAvatarUrl = senderAvatarUrl,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

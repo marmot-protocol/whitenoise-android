@@ -29,9 +29,12 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -181,6 +184,7 @@ class LocalNotificationPresenter(
         recipientAccountSubtext: String? = null,
         redactContent: Boolean = false,
         conversationAvatarUrl: String? = null,
+        senderAvatarUrl: String? = null,
     ): Boolean {
         val formattedContent =
             LocalNotificationFormatter.content(
@@ -284,14 +288,39 @@ class LocalNotificationPresenter(
                             existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
                         }
                     }
+                val (conversationAvatarBitmap, senderAvatarBitmap) =
+                    if (redactContent) {
+                        null to null
+                    } else {
+                        withContext(Dispatchers.Default) {
+                            coroutineScope {
+                                val conversationAvatar = async { resolveAvatarBitmap(conversationAvatarUrl) }
+                                val senderAvatar = async { resolveAvatarBitmap(senderAvatarUrl) }
+                                conversationAvatar.await() to senderAvatar.await()
+                            }
+                        }
+                    }
+                warmConversationAvatar(conversationAvatarUrl, alreadyCached = conversationAvatarBitmap != null)
+                warmConversationAvatar(senderAvatarUrl, alreadyCached = senderAvatarBitmap != null)
+                val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
                 if (!redactContent && messagingShortcutId != null) {
                     val locusId = LocusIdCompat(messagingShortcutId)
                     builder
                         .setShortcutId(messagingShortcutId)
                         .setLocusId(locusId)
-                        .addPerson(senderPerson(notificationContent))
+                        .addPerson(sender)
                     withContext(Dispatchers.Default) {
-                        publishConversationShortcut(update, notificationContent, messagingShortcutId, locusId, conversationAvatarUrl)
+                        publishConversationShortcut(
+                            update,
+                            notificationContent,
+                            messagingShortcutId,
+                            locusId,
+                            conversationAvatarUrl,
+                            conversationAvatarBitmap,
+                            senderAvatarUrl,
+                            senderAvatarBitmap,
+                            sender,
+                        )
                     }
                 }
                 builder.setStyle(
@@ -301,6 +330,7 @@ class LocalNotificationPresenter(
                         if (redactContent) null else conversationTitleOverride,
                         decision.historyCap,
                         carried,
+                        sender,
                     ),
                 )
                 if (redactContent) {
@@ -438,6 +468,7 @@ class LocalNotificationPresenter(
         conversationTitleOverride: String?,
         historyCap: Int,
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
+        sender: Person,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -454,12 +485,6 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        val sender =
-            Person
-                .Builder()
-                .setName(content.senderName)
-                .setKey(content.senderKey)
-                .build()
         style.addMessage(content.body, update.timestampMs, sender)
         return style
     }
@@ -484,14 +509,13 @@ class LocalNotificationPresenter(
         shortcutId: String,
         locusId: LocusIdCompat,
         conversationAvatarUrl: String?,
+        conversationAvatarBitmap: android.graphics.Bitmap?,
+        senderAvatarUrl: String?,
+        senderAvatarBitmap: android.graphics.Bitmap?,
+        sender: Person,
     ) {
         runCatching {
             val title = content.conversationTitle ?: content.title
-            // In-memory read only; on a cache miss we warm it below and let a
-            // later post upgrade the icon — the shortcut is never delayed on the
-            // network. The snapshot records whether the avatar was applied so a
-            // launcher-icon publish is superseded once the avatar is cached.
-            val avatarBitmap = AvatarImageLoader.peekBitmap(conversationAvatarUrl)
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
@@ -501,14 +525,15 @@ class LocalNotificationPresenter(
                     senderName = content.senderName,
                     senderKey = content.senderKey,
                     avatarUrl = conversationAvatarUrl,
-                    avatarApplied = avatarBitmap != null,
+                    avatarApplied = conversationAvatarBitmap != null,
+                    senderAvatarUrl = senderAvatarUrl,
+                    senderAvatarApplied = senderAvatarBitmap != null,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
                 ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
                 return
             }
-            warmConversationAvatar(conversationAvatarUrl, alreadyCached = avatarBitmap != null)
             pruneConversationShortcutsBeforePublish(shortcutId)
             val intent =
                 Intent(context, MainActivity::class.java).apply {
@@ -522,10 +547,10 @@ class LocalNotificationPresenter(
                     .Builder(context, shortcutId)
                     .setShortLabel(snapshot.shortLabel)
                     .setLongLabel(snapshot.longLabel)
-                    .setIcon(conversationShortcutIcon(avatarBitmap))
+                    .setIcon(conversationShortcutIcon(conversationAvatarBitmap))
                     .setIntent(intent)
                     .setLocusId(locusId)
-                    .setPerson(senderPerson(content))
+                    .setPerson(sender)
                     .setLongLived(true)
                     .build()
             ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
@@ -545,6 +570,14 @@ class LocalNotificationPresenter(
         } else {
             IconCompat.createWithResource(context, R.mipmap.ic_launcher)
         }
+
+    private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
+        if (url.isNullOrBlank()) return null
+        AvatarImageLoader.peekBitmap(url)?.let { return it }
+        // Bounded so a slow avatar host can't delay notification delivery; the
+        // underlying fetch still completes and caches, upgrading the next post.
+        return withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { AvatarImageLoader.loadBitmap(url) }
+    }
 
     private fun warmConversationAvatar(
         url: String?,
@@ -586,13 +619,6 @@ class LocalNotificationPresenter(
             shortcutLastUsed.remove(it)
         }
     }
-
-    private fun senderPerson(content: LocalNotificationContent): Person =
-        Person
-            .Builder()
-            .setName(content.senderName)
-            .setKey(content.senderKey)
-            .build()
 
     private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
         val remoteInput =
@@ -678,8 +704,23 @@ private data class ConversationShortcutSnapshot(
     val senderKey: String,
     val avatarUrl: String?,
     val avatarApplied: Boolean,
+    val senderAvatarUrl: String?,
+    val senderAvatarApplied: Boolean,
 )
 
+internal fun notificationSenderPerson(
+    content: LocalNotificationContent,
+    avatarBitmap: android.graphics.Bitmap?,
+): Person =
+    Person
+        .Builder()
+        .setName(content.senderName)
+        .setKey(content.senderKey)
+        .apply {
+            avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
+        }.build()
+
+private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 
 private inline fun notificationDebug(message: () -> String) {
