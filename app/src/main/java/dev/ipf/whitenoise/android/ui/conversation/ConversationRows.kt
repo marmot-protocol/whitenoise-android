@@ -171,8 +171,8 @@ internal fun GroupSystemRow(
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
-        remember(record.plaintext, groupSystem) {
-            GroupSystemEvents.resolve(record.plaintext, groupSystem)
+        remember(record.plaintext, record.direction, groupSystem) {
+            GroupSystemEvents.resolve(record, groupSystem)
         }
     // Localized new-window label for the disappearing-timer "set to …" rows; null
     // when the event isn't a timer-on change (off/other rows need no duration).

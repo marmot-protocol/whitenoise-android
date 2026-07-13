@@ -95,7 +95,7 @@ class TimelineProjectorTest {
     }
 
     @Test
-    fun replyPreviewSuppressesRawGroupSystemJson() {
+    fun replyPreviewNeutralizesUnstructuredGroupSystemJson() {
         val actorHex = "a1".repeat(32)
         val groupSystemJson =
             """{"v":1,"system_type":"group_avatar_changed","text":"Group avatar changed",""" +
@@ -110,7 +110,7 @@ class TimelineProjectorTest {
             )
 
         assertEquals(
-            TimelineReplyDisplay(sender = "alice", body = "The group avatar changed"),
+            TimelineReplyDisplay(sender = "alice", body = "Group updated"),
             TimelineProjector.replyPreview(record),
         )
     }
