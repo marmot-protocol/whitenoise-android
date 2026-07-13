@@ -77,6 +77,20 @@ class FreshSweepCoverageTest {
     }
 
     @Test
+    fun notificationMarkReadConfinesAppStateMutationsToMainThread() {
+        val source = source("notifications/NotificationActionReceiver.kt")
+        val markReadBranch = source.section("NotificationActionKind.MARK_READ -> {", "val presenter")
+        val mainConfinedMutations =
+            Regex(
+                """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
+                    """appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
+                    """appState\.markNotificationMessageRead\(""",
+            )
+
+        assertTrue(mainConfinedMutations.containsMatchIn(markReadBranch))
+    }
+
+    @Test
     fun relativeTimeRefreshesOnResumeAndMinuteBoundaries() {
         val source = source("ui/common/CopyBundles.kt")
 
