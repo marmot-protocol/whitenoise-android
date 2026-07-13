@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.IOException
+import java.lang.ref.ReferenceQueue
+import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
 
 /**
@@ -25,6 +27,12 @@ internal interface DraftPersistence {
     )
 }
 
+private class EvictedDraftStateReference(
+    val key: String,
+    state: MutableState<String?>,
+    queue: ReferenceQueue<MutableState<String?>>,
+) : WeakReference<MutableState<String?>>(state, queue)
+
 /**
  * Holds unsent draft text per `(accountIdHex, groupIdHex)`. Reads return the
  * in-memory cache; writes update the cache and the backing persistence layer.
@@ -40,6 +48,8 @@ class DraftStore internal constructor(
 ) {
     private val lock = Any()
     private val drafts = LinkedHashMap<String, MutableState<String?>>(16, 0.75f, true)
+    private val collectedEvictedDraftStates = ReferenceQueue<MutableState<String?>>()
+    private val evictedEmptyDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
 
     init {
         persistence.read().forEach { (k, value) -> drafts[k] = mutableStateOf(value) }
@@ -47,13 +57,30 @@ class DraftStore internal constructor(
 
     // Per-key state so reads/writes are observed independently. Creating an
     // empty state on a miss is what lets a composable that read a not-yet-set
-    // draft recompose once it is set.
+    // draft recompose once it is set. Evicted empty states remain weakly
+    // reachable so an active observer keeps the same state identity on a later
+    // write, while unobserved states remain eligible for garbage collection.
     private fun stateFor(k: String): MutableState<String?> =
         synchronized(lock) {
-            drafts
-                .getOrPut(k) { mutableStateOf(null) }
-                .also { pruneEmptyDraftStatesLocked() }
+            stateForLocked(k).also { pruneEmptyDraftStatesLocked(retainedState = it) }
         }
+
+    private fun stateForLocked(k: String): MutableState<String?> {
+        drainCollectedEvictedDraftStatesLocked()
+        drafts[k]?.let { return it }
+        val state = evictedEmptyDraftStates.remove(k)?.get() ?: mutableStateOf<String?>(null)
+        drafts[k] = state
+        return state
+    }
+
+    private fun drainCollectedEvictedDraftStatesLocked() {
+        while (true) {
+            val reference = collectedEvictedDraftStates.poll() as? EvictedDraftStateReference ?: return
+            if (evictedEmptyDraftStates[reference.key] === reference) {
+                evictedEmptyDraftStates.remove(reference.key)
+            }
+        }
+    }
 
     fun get(
         accountIdHex: String,
@@ -83,11 +110,12 @@ class DraftStore internal constructor(
                 return@synchronized
             }
 
-            val state = drafts.getOrPut(k) { mutableStateOf(null) }
+            val state = stateForLocked(k)
             if (state.value != text) {
                 state.value = text
                 persistence.write(k, text)
             }
+            pruneEmptyDraftStatesLocked(retainedState = state)
         }
     }
 
@@ -110,12 +138,17 @@ class DraftStore internal constructor(
         }
     }
 
-    private fun pruneEmptyDraftStatesLocked() {
+    private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
+        drainCollectedEvictedDraftStatesLocked()
         if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
         val iterator = drafts.entries.iterator()
         while (drafts.size > MAX_IN_MEMORY_DRAFT_STATES && iterator.hasNext()) {
             val entry = iterator.next()
-            if (entry.value.value == null) iterator.remove()
+            if (entry.value !== retainedState && entry.value.value == null) {
+                iterator.remove()
+                evictedEmptyDraftStates[entry.key] =
+                    EvictedDraftStateReference(entry.key, entry.value, collectedEvictedDraftStates)
+            }
         }
     }
 
