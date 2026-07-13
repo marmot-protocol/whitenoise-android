@@ -107,6 +107,12 @@ internal fun ChatsScreen(
     // item 0 without yanking an active on-list reader (issue #1313).
     conversationReturnHeadId: String? = null,
     onConversationReturnHeadHandled: () -> Unit = {},
+    // Chat-list profile opens must capture the same visible filtered head used
+    // by direct conversation opens so profile-sheet Message/shared-group routes
+    // can arm the return snap (#1313).
+    onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
+        appState.presentProfile(npub)
+    },
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
@@ -283,6 +289,11 @@ internal fun ChatsScreen(
     ) {
         val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
+    }
+
+    fun presentProfileFromVisibleList(npub: String) {
+        val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+        onPresentProfile(npub, visibleHeadId)
     }
     LaunchedEffect(visibleChatIds, selectionMode) {
         if (selectionMode) {
@@ -533,7 +544,7 @@ internal fun ChatsScreen(
                 },
                 onOpenProfile = { npub ->
                     searchOpen = false
-                    appState.presentProfile(npub)
+                    presentProfileFromVisibleList(npub)
                 },
             )
             Box(Modifier.fillMaxSize()) {
@@ -593,6 +604,7 @@ internal fun ChatsScreen(
                                     selected = item.id in selectedChatIds,
                                     bodyMatch = bodyMatch,
                                     onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                                    onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
                                     onEnterSelection = {
                                         selectedChatIds.clear()
                                         selectedChatIds.addAll(enterChatListSelection(item.id))
@@ -759,6 +771,7 @@ private fun ChatListIdentifierResult(
                     item = existing,
                     appState = appState,
                     onClick = { onOpenChat(existing) },
+                    onOpenProfile = onOpenProfile,
                 )
             } else {
                 ListItem(

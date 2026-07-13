@@ -2629,7 +2629,12 @@ class ChatsController(
         if (isCleared) return
         if (visible == chatListVisible) return
         chatListVisible = visible
-        if (visible && pendingRecompute) recompute()
+        // Flush any folded backing updates synchronously on return so the shell's
+        // one-shot head snapshot compares against the current projection, not a
+        // stale list left over while scheduleRecompute's debounce was pending (#1313).
+        if (visible && (pendingRecompute || recomputeScheduled)) {
+            recompute()
+        }
     }
 
     private var recomputeScheduled = false

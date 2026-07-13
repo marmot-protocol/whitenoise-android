@@ -72,6 +72,7 @@ internal fun ChatListRow(
     selectionMode: Boolean,
     selected: Boolean,
     onOpen: () -> Unit,
+    onOpenProfile: (String) -> Unit,
     onEnterSelection: () -> Unit,
     onToggleSelection: () -> Unit,
     // Non-null when this row matched the chat-list search on a message body
@@ -95,6 +96,7 @@ internal fun ChatListRow(
             } else {
                 onEnterSelection
             },
+        onOpenProfile = onOpenProfile,
         bodyMatch = bodyMatch,
         isMuted = isMuted,
     )
@@ -124,6 +126,7 @@ internal fun ChatRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
     onClick: () -> Unit,
+    onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -184,7 +187,7 @@ internal fun ChatRow(
                             Modifier
                                 .clip(CircleShape)
                                 .clickable(role = Role.Button) {
-                                    appState.presentProfile(appState.npub(openableDmAvatarAccount))
+                                    onOpenProfile(appState.npub(openableDmAvatarAccount))
                                 }
                         } else {
                             Modifier
