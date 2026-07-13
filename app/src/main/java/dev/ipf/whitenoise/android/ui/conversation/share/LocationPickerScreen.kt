@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
 import android.content.Context
+import android.view.MotionEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,9 +44,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
@@ -78,8 +85,10 @@ internal fun LocationPickerScreen(
             ),
     ) {
         val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
         val scope = rememberCoroutineScope()
         var locating by remember { mutableStateOf(true) }
+        var selectedCenter by remember { mutableStateOf<SharedLocation?>(null) }
         val mapView =
             remember {
                 configureOsmdroid(context)
@@ -91,9 +100,47 @@ internal fun LocationPickerScreen(
                     controller.setCenter(FALLBACK_CENTER)
                 }
             }
-        DisposableEffect(mapView) {
-            mapView.onResume()
-            onDispose { mapView.onDetach() }
+        DisposableEffect(mapView, lifecycleOwner) {
+            var userHasInteracted = false
+            val mapListener =
+                object : MapListener {
+                    override fun onScroll(event: ScrollEvent?): Boolean {
+                        if (userHasInteracted) {
+                            val center = mapView.mapCenter
+                            selectedCenter = SharedLocation(center.latitude, center.longitude, null)
+                        }
+                        return false
+                    }
+
+                    override fun onZoom(event: ZoomEvent?): Boolean = false
+                }
+            mapView.addMapListener(mapListener)
+            mapView.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> userHasInteracted = true
+                    else -> Unit
+                }
+                false
+            }
+            val lifecycleObserver =
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                        Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                        else -> Unit
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                mapView.onResume()
+            }
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+                mapView.setOnTouchListener(null)
+                mapView.removeMapListener(mapListener)
+                mapView.onPause()
+                mapView.onDetach()
+            }
         }
 
         fun centerOnCurrent() {
@@ -101,6 +148,7 @@ internal fun LocationPickerScreen(
             scope.launch {
                 val current = fetchCurrentLocation(context, hasFineGrant)
                 if (current != null) {
+                    selectedCenter = current
                     mapView.controller.animateTo(GeoPoint(current.latitude, current.longitude))
                     mapView.controller.setZoom(PICKER_ZOOM)
                 }
@@ -124,25 +172,6 @@ internal fun LocationPickerScreen(
                         .padding(bottom = 36.dp)
                         .size(44.dp),
             )
-
-            // Required OpenStreetMap tile attribution (the map is user-initiated,
-            // so tiles only load once the user opens this picker).
-            Surface(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .navigationBarsPadding()
-                        .padding(4.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                shape = CircleShape,
-            ) {
-                Text(
-                    "© OpenStreetMap",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
 
             Row(
                 modifier =
@@ -175,6 +204,20 @@ internal fun LocationPickerScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Keep the required attribution in the same bottom-control
+                // stack so the full-width send button can never cover it.
+                Surface(
+                    modifier = Modifier.align(Alignment.Start),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    shape = CircleShape,
+                ) {
+                    Text(
+                        "© OpenStreetMap contributors",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
                 FilledIconButton(onClick = { centerOnCurrent() }) {
                     if (locating) {
                         CircularProgressIndicator(
@@ -185,6 +228,14 @@ internal fun LocationPickerScreen(
                     } else {
                         Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_use_current))
                     }
+                }
+                selectedCenter?.let { location ->
+                    Text(
+                        "${formatCoordinate(location.latitude)}, ${formatCoordinate(location.longitude)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.align(Alignment.Start),
+                    )
                 }
                 Button(
                     onClick = {
@@ -197,6 +248,7 @@ internal fun LocationPickerScreen(
                             ),
                         )
                     },
+                    enabled = selectedCenter != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))

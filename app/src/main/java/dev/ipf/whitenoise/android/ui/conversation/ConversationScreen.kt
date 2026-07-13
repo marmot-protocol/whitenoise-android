@@ -1274,9 +1274,14 @@ internal fun ConversationScreen(
         imageUris: List<android.net.Uri>,
         documentUris: List<android.net.Uri>,
         caption: String,
+        onAccepted: () -> Unit = {},
+        onRejected: () -> Unit = {},
         onAfterSend: () -> Unit = {},
     ) {
-        if (imageUris.isEmpty() && documentUris.isEmpty()) return
+        if (imageUris.isEmpty() && documentUris.isEmpty()) {
+            onRejected()
+            return
+        }
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
             // Enforce the album byte cap on images first so a multi-large-photo
@@ -1323,6 +1328,7 @@ internal fun ConversationScreen(
                     val toast =
                         if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
                     appState.present(toast, copyable = !imageAlbumOverflowed)
+                    onRejected()
                     return@launchMutation
                 }
             }
@@ -1334,7 +1340,10 @@ internal fun ConversationScreen(
             } else if (docOutcome.rejected) {
                 appState.present(R.string.media_file_too_large)
             }
-            if (merged.isEmpty()) return@launchMutation
+            if (merged.isEmpty()) {
+                onRejected()
+                return@launchMutation
+            }
             // Two-phase ship: SEED every send synchronously (so all the
             // optimistic bubbles appear in the same recomposition pass and
             // the user sees the queue light up at once), THEN run the
@@ -1393,13 +1402,18 @@ internal fun ConversationScreen(
                     if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
                 controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
             }
+            if (seeded.isEmpty()) {
+                onRejected()
+                return@launchMutation
+            }
             // Pull the user down to the just-seeded bubbles before the
             // upload loop suspends — same UX as text-send. Firing after
             // queueAttachments (the optimistic seed) and before
             // uploadQueued (the FFI publish) means the scroll lands in the
             // same frame the bubble appears, instead of waiting on the
             // relay round-trip.
-            if (seeded.isNotEmpty()) onAfterSend()
+            onAccepted()
+            onAfterSend()
             // Run uploads sequentially so the kind-9 publishes go out in
             // pick order. The optimistic bubbles are already on screen.
             for (slot in seeded) {
@@ -3137,13 +3151,17 @@ internal fun ConversationScreen(
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
             },
-            onSend = { caption ->
-                pendingMediaUris = emptyList()
-                pendingDocumentUris = emptyList()
+            onSend = { caption, onResult ->
                 sendStagedAttachments(
                     imageUris,
                     documentUris,
                     caption,
+                    onAccepted = {
+                        pendingMediaUris = emptyList()
+                        pendingDocumentUris = emptyList()
+                        onResult(true)
+                    },
+                    onRejected = { onResult(false) },
                     onAfterSend = {
                         // Pull the user down to the just-seeded bubble.
                         // `bottomTimelineIndex` reads from

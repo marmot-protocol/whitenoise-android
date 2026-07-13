@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import android.app.Application
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -92,6 +93,26 @@ class SharePreviewDialogTest {
         }
         composeRule.onNodeWithContentDescription(app.getString(R.string.close)).performClick()
         assertTrue(dismissed)
+        assertNull(sent)
+    }
+
+    @Test
+    fun deselectingEveryContactMethodDisablesSend() {
+        var sent: SharedContact? = null
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ContactPreviewScreen(
+                    contact = SharedContact(name = "Ada Lovelace", phone = "+1 555 0100", email = "ada@example.org"),
+                    onDismiss = {},
+                    onSend = { sent = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText("+1 555 0100").performClick()
+        composeRule.onNodeWithText("ada@example.org").performClick()
+        composeRule
+            .onNodeWithContentDescription(app.getString(R.string.send))
+            .assertIsNotEnabled()
         assertNull(sent)
     }
 }

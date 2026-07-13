@@ -693,6 +693,7 @@
     <string name="attach_document">Документ</string>
     <string name="attach_gallery">Галерея</string>
     <string name="recent_media_enable">Показать недавние фото</string>
+    <string name="recent_media_manage">Управлять выбранными фото</string>
     <string name="attach_location">Местоположение</string>
     <string name="attach_contact">Контакт</string>
     <string name="attach_user">Пользователь</string>

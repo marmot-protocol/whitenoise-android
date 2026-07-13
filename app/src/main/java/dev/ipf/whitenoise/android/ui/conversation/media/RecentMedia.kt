@@ -28,7 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,8 +44,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -75,6 +83,22 @@ internal fun hasRecentMediaAccess(context: Context): Boolean =
     recentMediaReadPermissions().any {
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
+
+internal fun hasPartialRecentMediaAccess(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+    ) == PackageManager.PERMISSION_GRANTED &&
+        !(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_IMAGES,
+            ) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.READ_MEDIA_VIDEO,
+                ) == PackageManager.PERMISSION_GRANTED
+        )
 
 /**
  * Most-recent images and videos from the shared store, newest first. Reads only
@@ -125,11 +149,15 @@ private val ThumbPx = Size(256, 256)
 private fun rememberRecentThumbnail(uri: Uri): ImageBitmap? {
     val context = LocalContext.current
     var bitmap by remember(uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    androidx.compose.runtime.LaunchedEffect(uri) {
+    LaunchedEffect(uri) {
         bitmap =
             withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.loadThumbnail(uri, ThumbPx, null) }.getOrNull()
             }
+    }
+    DisposableEffect(bitmap) {
+        val decoded = bitmap
+        onDispose { decoded?.recycle() }
     }
     return remember(bitmap) { bitmap?.asImageBitmap() }
 }
@@ -148,15 +176,35 @@ internal fun RecentMediaStrip(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var granted by remember { mutableStateOf(hasRecentMediaAccess(context)) }
+    var partialAccess by remember { mutableStateOf(hasPartialRecentMediaAccess(context)) }
     var items by remember { mutableStateOf<List<RecentMediaItem>>(emptyList()) }
+    var refreshToken by remember { mutableIntStateOf(0) }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             granted = recentMediaGrantAllowsRead(grants) || hasRecentMediaAccess(context)
+            partialAccess =
+                grants[Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED] == true ||
+                hasPartialRecentMediaAccess(context)
+            refreshToken++
         }
 
-    androidx.compose.runtime.LaunchedEffect(granted) {
+    DisposableEffect(lifecycleOwner, context) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    granted = hasRecentMediaAccess(context)
+                    partialAccess = hasPartialRecentMediaAccess(context)
+                    refreshToken++
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(granted, refreshToken) {
         items = if (granted) queryRecentVisualMedia(context, RECENT_MEDIA_LIMIT) else emptyList()
     }
 
@@ -169,11 +217,22 @@ internal fun RecentMediaStrip(
                 items(items, key = { it.uri }) { item ->
                     RecentThumb(item = item, onClick = { onPick(item.uri) })
                 }
+                if (partialAccess) {
+                    item(key = "recent_media_manage") {
+                        TextButton(onClick = { permissionLauncher.launch(recentMediaReadPermissions()) }) {
+                            Text(stringResource(R.string.recent_media_manage))
+                        }
+                    }
+                }
             }
-        !granted ->
+        !granted || partialAccess ->
             Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { permissionLauncher.launch(recentMediaReadPermissions()) }) {
-                    Text(stringResource(R.string.recent_media_enable))
+                    Text(
+                        stringResource(
+                            if (partialAccess) R.string.recent_media_manage else R.string.recent_media_enable,
+                        ),
+                    )
                 }
             }
         else -> Unit // granted but empty gallery — render nothing
@@ -185,13 +244,16 @@ private fun RecentThumb(
     item: RecentMediaItem,
     onClick: () -> Unit,
 ) {
+    val description =
+        stringResource(if (item.isVideo) R.string.reply_media_video else R.string.reply_media_photo)
     Box(
         modifier =
             Modifier
                 .size(72.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = description },
     ) {
         val bitmap = rememberRecentThumbnail(item.uri)
         if (bitmap != null) {
@@ -214,7 +276,7 @@ private fun RecentThumb(
             ) {
                 Icon(
                     Icons.Default.PlayArrow,
-                    contentDescription = stringResource(R.string.reply_media_video),
+                    contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(16.dp),
                 )

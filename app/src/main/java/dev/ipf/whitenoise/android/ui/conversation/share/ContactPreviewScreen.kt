@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -62,7 +64,7 @@ internal fun ContactPreviewScreen(
         var includePhone by remember { mutableStateOf(contact.phone != null) }
         var includeEmail by remember { mutableStateOf(contact.email != null) }
         var sending by remember { mutableStateOf(false) }
-        val canSend = (includePhone && contact.phone != null) || (includeEmail && contact.email != null) || contact.name != null
+        val canSend = (includePhone && contact.phone != null) || (includeEmail && contact.email != null)
 
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -137,9 +139,22 @@ internal fun ContactPreviewScreen(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .navigationBarsPadding()
-                            .padding(24.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                            .padding(24.dp)
+                            .semantics {
+                                if (sending || !canSend) disabled()
+                            },
+                    containerColor =
+                        if (canSend) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                    contentColor =
+                        if (canSend) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
                 }

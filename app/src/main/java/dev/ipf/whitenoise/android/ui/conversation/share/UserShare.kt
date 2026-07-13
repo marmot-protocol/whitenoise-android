@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ProfileLink
 
 /**
  * A shared Nostr user — the actionable, identity-native counterpart to a phone
@@ -34,10 +35,6 @@ internal data class SharedUser(
     val npub: String,
     val name: String?,
 )
-
-// A single-line NIP-21 `nostr:npub1…` reference, or a bare `npub1…`. Bech32,
-// so the data part is limited to its charset.
-private val NPUB_LINE = Regex("""^(?:nostr:)?(npub1[023456789acdefghjklmnpqrstuvwxyz]{20,})$""", RegexOption.IGNORE_CASE)
 
 /** The `nostr:` reference we send; a peer on any Nostr client sees a profile link. */
 internal fun formatUserShareText(
@@ -58,8 +55,11 @@ internal fun formatUserShareText(
 internal fun parseSharedUserFromText(text: String): SharedUser? {
     val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
     if (lines.isEmpty() || lines.size > 2) return null
-    val refLine = lines.firstOrNull { NPUB_LINE.matches(it) } ?: return null
-    val npub = NPUB_LINE.find(refLine)?.groupValues?.get(1) ?: return null
+    val refLine =
+        lines.firstOrNull {
+            it.startsWith("npub1", ignoreCase = true) || it.startsWith("nostr:npub1", ignoreCase = true)
+        } ?: return null
+    val npub = ProfileLink.parse(refLine)?.npub ?: return null
     val name = lines.firstOrNull { it != refLine }
     return SharedUser(npub = npub, name = name)
 }

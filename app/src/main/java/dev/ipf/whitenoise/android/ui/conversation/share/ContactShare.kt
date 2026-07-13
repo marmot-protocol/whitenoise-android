@@ -47,8 +47,11 @@ internal fun parseSharedContactFromText(text: String): SharedContact? {
             line != email && (line.startsWith("+") || line.count { it.isDigit() } >= 6) && !line.contains('@')
         }
     val name = lines.firstOrNull { it != email && it != phone }
-    val contact = SharedContact(name = name, phone = phone, email = email)
-    return contact.takeUnless { it.isEmpty }
+    // A generic caption on an externally-authored .vcf is not enough to prove
+    // it is our contact-share fallback. Require one actionable contact field so
+    // ordinary captions remain visible beside the file attachment.
+    if (phone == null && email == null) return null
+    return SharedContact(name = name, phone = phone, email = email)
 }
 
 private fun vcardEscape(value: String): String =
@@ -58,11 +61,15 @@ private fun vcardEscape(value: String): String =
         .replace(",", "\\,")
         .replace(";", "\\;")
 
-/** Minimal RFC 6350 vCard (3.0 for the broadest importer support). */
+/** Minimal RFC 2426 vCard 3.0 for broad importer support. */
 internal fun buildVCard(contact: SharedContact): String =
     buildString {
         append("BEGIN:VCARD\r\n")
         append("VERSION:3.0\r\n")
+        // vCard 3.0 requires both N and FN. We only receive one display-name
+        // field from the privacy-scoped system picker, so keep it intact in the
+        // family-name component rather than guessing how to split it.
+        append("N:${vcardEscape(contact.displayName)};;;;\r\n")
         append("FN:${vcardEscape(contact.displayName)}\r\n")
         contact.phone?.let { append("TEL;TYPE=CELL:${vcardEscape(it)}\r\n") }
         contact.email?.let { append("EMAIL:${vcardEscape(it)}\r\n") }

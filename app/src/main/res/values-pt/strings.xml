@@ -673,6 +673,7 @@
     <string name="attach_document">Documento</string>
     <string name="attach_gallery">Galeria</string>
     <string name="recent_media_enable">Mostrar fotos recentes</string>
+    <string name="recent_media_manage">Gerir fotos selecionadas</string>
     <string name="attach_location">Localização</string>
     <string name="attach_contact">Contato</string>
     <string name="attach_user">Usuário</string>

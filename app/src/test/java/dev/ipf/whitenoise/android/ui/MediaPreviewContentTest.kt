@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -48,7 +50,7 @@ class MediaPreviewContentTest {
 
     private fun renderPreview(
         initialMedia: List<Uri>,
-        onSend: (String) -> Unit = {},
+        onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -101,11 +103,31 @@ class MediaPreviewContentTest {
     @Test
     fun sendCarriesTheTypedCaption() {
         var sentCaption: String? = null
-        renderPreview(listOf(uri(1)), onSend = { sentCaption = it })
+        renderPreview(
+            listOf(uri(1)),
+            onSend = { caption, onResult ->
+                sentCaption = caption
+                onResult(true)
+            },
+        )
         composeRule.onNodeWithText(string(R.string.add_caption)).performTextInput("hello")
         composeRule.onNodeWithContentDescription(string(R.string.send)).performClick()
         composeRule.waitForIdle()
         assertEquals("hello", sentCaption)
+    }
+
+    @Test
+    fun rejectedSendReEnablesThePreview() {
+        var onResult: ((Boolean) -> Unit)? = null
+        renderPreview(
+            listOf(uri(1)),
+            onSend = { _, result -> onResult = result },
+        )
+        val send = composeRule.onNodeWithContentDescription(string(R.string.send))
+        send.performClick()
+        send.assertIsNotEnabled()
+        composeRule.runOnIdle { onResult?.invoke(false) }
+        send.assertIsEnabled()
     }
 
     @Test

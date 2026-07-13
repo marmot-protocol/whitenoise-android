@@ -35,16 +35,20 @@ internal fun formatLocationShareText(location: SharedLocation): String =
     "Location: https://maps.google.com/maps?q=${formatCoordinate(location.latitude)},${formatCoordinate(location.longitude)}"
 
 private val MAPS_QUERY_COORDINATE =
-    Regex("""maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
+    Regex(
+        """\s*(?:Location:\s*)?https://maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)\s*""",
+        RegexOption.IGNORE_CASE,
+    )
 
 /**
  * Recovers coordinates from a shared-location message so the bubble can draw a
  * map. Deliberately lenient — it accepts the `?q=` and `/maps?q=` forms and a
  * `%2C`-encoded comma, so a location shared by an older build (or another
- * client that pasted a maps link) still renders a map instead of raw text.
+ * client that pasted only a maps link) still renders a map instead of raw
+ * text. The whole body must match; prose around a maps URL stays visible.
  */
 internal fun parseSharedLocationFromText(text: String): SharedLocation? {
-    val match = MAPS_QUERY_COORDINATE.find(text) ?: return null
+    val match = MAPS_QUERY_COORDINATE.matchEntire(text) ?: return null
     val lat = match.groupValues[1].toDoubleOrNull() ?: return null
     val lng = match.groupValues[2].toDoubleOrNull() ?: return null
     if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null

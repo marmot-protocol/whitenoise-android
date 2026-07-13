@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -59,6 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,60 +71,111 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-/** Decode a downscaled preview bitmap for a local content Uri, off-thread. */
+private const val PREVIEW_STRIP_MAX_EDGE_PX = 256
+
+private data class LocalPreviewMetadata(
+    val isVideo: Boolean,
+    val displayName: String?,
+)
+
+/** Resolve provider-backed MIME types and names once, off the composition thread. */
 @Composable
-private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
+private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android.net.Uri, LocalPreviewMetadata> {
     val context = LocalContext.current
-    var bitmap by remember(uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(uri) {
-        bitmap =
-            withContext(Dispatchers.Default) {
-                val mime = safeGetType(context.contentResolver, uri)
-                if (mime.startsWith("video/", ignoreCase = true)) {
-                    // Video URI: extract the first frame as the staging thumbnail
-                    // instead of trying to decode the bytes as JPEG (which spins
-                    // forever on a video and leaves the sheet stuck). Scaled to
-                    // the staging tile size — full-res posters from a 4K clip
-                    // would be a ~33 MB ARGB bitmap per tile.
-                    runCatching {
-                        val mmr = android.media.MediaMetadataRetriever()
-                        try {
-                            mmr.setDataSource(context, uri)
-                            val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                            mmr
-                                .getScaledFrameAtTime(
-                                    0L,
-                                    android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                    edge,
-                                    edge,
-                                )
-                        } finally {
-                            runCatching { mmr.release() }
-                        }
-                    }.getOrNull()
-                } else {
-                    // Decode the picked image straight to a sampled bitmap,
-                    // preserving its native format and alpha. Earlier this
-                    // round-tripped through MediaPipeline.readDownscaledJpeg
-                    // (recompress to JPEG) and then re-decoded those bytes at
-                    // full resolution — that flattened transparent PNGs onto
-                    // white and, on large lossless sources (e.g. PNG
-                    // screenshots), the recompress or the un-sampled re-decode
-                    // could silently OOM/fail, leaving the staging tile stuck
-                    // on a spinner that never resolved (#387). Mirrors the
-                    // in-bubble thumbnail path (decodeSampledBitmap).
-                    runCatching {
-                        MediaPipeline
-                            .decodeSampledFromUri(
-                                context.contentResolver,
-                                uri,
-                                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+    val metadata by
+        produceState<Map<android.net.Uri, LocalPreviewMetadata>>(
+            initialValue = emptyMap(),
+            key1 = items,
+        ) {
+            value =
+                withContext(Dispatchers.IO) {
+                    items.associate { item ->
+                        val mime = safeGetType(context.contentResolver, item.uri)
+                        item.uri to
+                            LocalPreviewMetadata(
+                                isVideo = mime.startsWith("video/", ignoreCase = true),
+                                displayName =
+                                    if (item is StagedPreviewItem.Document) {
+                                        queryDisplayName(context.contentResolver, item.uri)
+                                    } else {
+                                        null
+                                    },
                             )
-                    }.getOrNull()
+                    }
                 }
+        }
+    return metadata
+}
+
+/** Decode a size-appropriate preview bitmap for a local content Uri, off-thread. */
+@Composable
+private fun rememberLocalPreviewBitmap(
+    uri: android.net.Uri,
+    isVideo: Boolean,
+    maxEdgePx: Int,
+): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri, isVideo, maxEdgePx) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(uri, isVideo, maxEdgePx) {
+        var decoded: android.graphics.Bitmap? = null
+        try {
+            withContext(Dispatchers.IO) {
+                decoded =
+                    if (isVideo) {
+                        // Video URI: extract the first frame as the staging thumbnail
+                        // instead of trying to decode the bytes as JPEG (which spins
+                        // forever on a video and leaves the sheet stuck). Scaled to
+                        // the staging tile size — full-res posters from a 4K clip
+                        // would be a ~33 MB ARGB bitmap per tile.
+                        runCatching {
+                            val mmr = android.media.MediaMetadataRetriever()
+                            try {
+                                mmr.setDataSource(context, uri)
+                                mmr
+                                    .getScaledFrameAtTime(
+                                        0L,
+                                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                        maxEdgePx,
+                                        maxEdgePx,
+                                    )
+                            } finally {
+                                runCatching { mmr.release() }
+                            }
+                        }.getOrNull()
+                    } else {
+                        // Decode the picked image straight to a sampled bitmap,
+                        // preserving its native format and alpha. Earlier this
+                        // round-tripped through MediaPipeline.readDownscaledJpeg
+                        // (recompress to JPEG) and then re-decoded those bytes at
+                        // full resolution — that flattened transparent PNGs onto
+                        // white and, on large lossless sources (e.g. PNG
+                        // screenshots), the recompress or the un-sampled re-decode
+                        // could silently OOM/fail, leaving the staging tile stuck
+                        // on a spinner that never resolved (#387). Mirrors the
+                        // in-bubble thumbnail path (decodeSampledBitmap).
+                        runCatching {
+                            MediaPipeline
+                                .decodeSampledFromUri(
+                                    context.contentResolver,
+                                    uri,
+                                    maxEdgePx,
+                                )
+                        }.getOrNull()
+                    }
             }
+            currentCoroutineContext().ensureActive()
+            bitmap = decoded
+            decoded = null
+        } finally {
+            // A key change can cancel this effect after decoding but before
+            // publication. Recycle that orphan immediately instead of waiting
+            // for a large native buffer to reach the GC.
+            decoded?.recycle()
+        }
     }
     // Recycle the decoded buffer on key change and dispose instead of leaving
     // it to the GC, mirroring rememberSampledBitmap. Capture the instance so a
@@ -132,14 +185,6 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
         onDispose { decoded?.recycle() }
     }
     return remember(bitmap) { bitmap?.asImageBitmap() }
-}
-
-@Composable
-private fun rememberIsVideoUri(uri: android.net.Uri): Boolean {
-    val context = LocalContext.current
-    return remember(uri) {
-        safeGetType(context.contentResolver, uri).startsWith("video/", ignoreCase = true)
-    }
 }
 
 /** One staged attachment in the preview, in send order — media first, then documents. */
@@ -183,7 +228,7 @@ internal fun MediaPreviewScreen(
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onDismiss: () -> Unit,
-    onSend: (caption: String) -> Unit,
+    onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveAt: (Int) -> Unit,
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
@@ -217,7 +262,7 @@ internal fun MediaPreviewContent(
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onClose: () -> Unit,
-    onSend: (caption: String) -> Unit,
+    onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveMediaAt: (Int) -> Unit,
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
@@ -229,6 +274,7 @@ internal fun MediaPreviewContent(
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
+    val previewMetadata = rememberPreviewMetadata(items)
     LaunchedEffect(items.size) {
         currentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
@@ -289,8 +335,8 @@ internal fun MediaPreviewContent(
             contentAlignment = Alignment.Center,
         ) {
             when (val item = items.getOrNull(currentIndex)) {
-                is StagedPreviewItem.Media -> HeroMediaPreview(item.uri)
-                is StagedPreviewItem.Document -> HeroDocumentPreview(item.uri)
+                is StagedPreviewItem.Media -> HeroMediaPreview(item.uri, previewMetadata[item.uri])
+                is StagedPreviewItem.Document -> HeroDocumentPreview(item.uri, previewMetadata[item.uri])
                 null -> Unit
             }
         }
@@ -315,6 +361,7 @@ internal fun MediaPreviewContent(
                 ) { index, item ->
                     PreviewStripThumb(
                         item = item,
+                        metadata = previewMetadata[item.uri],
                         position = index + 1,
                         selected = index == currentIndex,
                         enabled = !sending,
@@ -346,9 +393,15 @@ internal fun MediaPreviewContent(
                     onClick = {
                         if (!sending && items.isNotEmpty()) {
                             sending = true
-                            onSend(caption)
+                            onSend(caption) { accepted ->
+                                if (!accepted) sending = false
+                            }
                         }
                     },
+                    modifier =
+                        Modifier.semantics {
+                            if (sending || items.isEmpty()) disabled()
+                        },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
@@ -376,10 +429,15 @@ private fun previewCaptionFieldColors() =
     )
 
 @Composable
-private fun HeroMediaPreview(uri: android.net.Uri) {
-    val isVideo = rememberIsVideoUri(uri)
+private fun HeroMediaPreview(
+    uri: android.net.Uri,
+    metadata: LocalPreviewMetadata?,
+) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val bitmap = rememberLocalPreviewBitmap(uri)
+        val bitmap =
+            metadata?.let {
+                rememberLocalPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+            }
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
@@ -394,7 +452,7 @@ private fun HeroMediaPreview(uri: android.net.Uri) {
                 color = Color.White,
             )
         }
-        if (isVideo) {
+        if (metadata?.isVideo == true) {
             Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f)) {
                 Icon(
                     Icons.Default.PlayArrow,
@@ -411,10 +469,11 @@ private fun HeroMediaPreview(uri: android.net.Uri) {
 }
 
 @Composable
-private fun HeroDocumentPreview(uri: android.net.Uri) {
-    val context = LocalContext.current
-    val displayName =
-        remember(uri) { queryDisplayName(context.contentResolver, uri) ?: "file" }
+private fun HeroDocumentPreview(
+    uri: android.net.Uri,
+    metadata: LocalPreviewMetadata?,
+) {
+    val displayName = metadata?.displayName ?: uri.lastPathSegment ?: stringResource(R.string.reply_media_document)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -440,6 +499,7 @@ private fun HeroDocumentPreview(uri: android.net.Uri) {
 @Composable
 private fun PreviewStripThumb(
     item: StagedPreviewItem,
+    metadata: LocalPreviewMetadata?,
     position: Int,
     selected: Boolean,
     enabled: Boolean,
@@ -462,7 +522,10 @@ private fun PreviewStripThumb(
     ) {
         when (item) {
             is StagedPreviewItem.Media -> {
-                val bitmap = rememberLocalPreviewBitmap(item.uri)
+                val bitmap =
+                    metadata?.let {
+                        rememberLocalPreviewBitmap(item.uri, it.isVideo, PREVIEW_STRIP_MAX_EDGE_PX)
+                    }
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap,
@@ -485,12 +548,12 @@ private fun PreviewStripThumb(
                         )
                     }
                 }
-                if (rememberIsVideoUri(item.uri)) {
+                if (metadata?.isVideo == true) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f)) {
                             Icon(
                                 Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.reply_media_video),
+                                contentDescription = null,
                                 tint = Color.White,
                                 modifier =
                                     Modifier

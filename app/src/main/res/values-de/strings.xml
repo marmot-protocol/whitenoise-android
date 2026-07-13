@@ -672,7 +672,8 @@
     <string name="attach_photo_library">Fotomediathek</string>
     <string name="attach_document">Dokument</string>
     <string name="attach_gallery">Galerie</string>
-    <string name="recent_media_enable">Neue Fotos anzeigen</string>
+    <string name="recent_media_enable">Zuletzt hinzugefügte Fotos anzeigen</string>
+    <string name="recent_media_manage">Ausgewählte Fotos verwalten</string>
     <string name="attach_location">Standort</string>
     <string name="attach_contact">Kontakt</string>
     <string name="attach_user">Benutzer</string>

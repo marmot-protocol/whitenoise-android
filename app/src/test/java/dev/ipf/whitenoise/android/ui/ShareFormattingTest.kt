@@ -95,6 +95,7 @@ class ShareFormattingTest {
         )
         assertNull(parseSharedLocationFromText("just a normal message, no coordinates"))
         assertNull(parseSharedLocationFromText("https://maps.google.com/maps?q=999,999"))
+        assertNull(parseSharedLocationFromText("Meet me here: https://maps.google.com/maps?q=11.871263,8.534887"))
     }
 
     @Test
@@ -104,6 +105,7 @@ class ShareFormattingTest {
         assertEquals("Ada Lovelace", parsed?.name)
         assertEquals("+1 555 0100", parsed?.phone)
         assertEquals("ada@example.org", parsed?.email)
+        assertNull(parseSharedContactFromText("See the attached details"))
     }
 
     private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
@@ -137,12 +139,14 @@ class ShareFormattingTest {
         assertNull(parseSharedUserFromText("hey check out nostr:$sampleNpub they post great stuff"))
         assertNull(parseSharedUserFromText("line one\nline two\nnostr:$sampleNpub"))
         assertNull(parseSharedUserFromText("no reference here at all"))
+        assertNull(parseSharedUserFromText("nostr:npub1notavalidprofile"))
     }
 
     @Test
     fun vcardCarriesNameAndFieldsForPortability() {
         val vcard = buildVCard(SharedContact(name = "Ada Lovelace", phone = "+15550100", email = "ada@example.org"))
         assertTrue(vcard.startsWith("BEGIN:VCARD"))
+        assertTrue(vcard.contains("N:Ada Lovelace;;;;"))
         assertTrue(vcard.contains("FN:Ada Lovelace"))
         assertTrue(vcard.contains("TEL;TYPE=CELL:+15550100"))
         assertTrue(vcard.contains("EMAIL:ada@example.org"))
