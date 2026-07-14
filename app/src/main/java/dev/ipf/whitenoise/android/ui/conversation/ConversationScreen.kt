@@ -620,6 +620,8 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    val imeOpenReanchorNearBottom =
+        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, nearBottom)
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
@@ -1832,8 +1834,10 @@ internal fun ConversationScreen(
     // each tick, so a single snap at frame 0 leaves the bubble below the
     // final viewport. The repeat loop re-snaps every frame for ~24 frames,
     // chasing the shrinking viewport to its settled bottom. Gated on
-    // nearBottom so reading history isn't interrupted. imeIsOpen is derived
-    // once above (boolean edge of WindowInsets.ime) to avoid recomposing the
+    // the last closed-IME near-bottom value (not live nearBottom) so a transient
+    // canScrollForward=false during IME viewport resize cannot yank a history
+    // reader to the newest row (#1375). imeIsOpen is derived once above
+    // (boolean edge of WindowInsets.ime) to avoid recomposing the
     // body on every keyboard-animation frame. Keyed on initialTimelineAnchored
     // too so that when you open a chat with the keyboard already up (no
     // imeIsOpen edge), the chase still fires the moment the first-open anchor
@@ -1842,7 +1846,7 @@ internal fun ConversationScreen(
     LaunchedEffect(imeIsOpen, chat.id, initialTimelineAnchored) {
         if (!imeIsOpen) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
-        if (!initialTimelineAnchored || !nearBottom || suppressForCustomInputSwap) return@LaunchedEffect
+        if (!initialTimelineAnchored || !imeOpenReanchorNearBottom || suppressForCustomInputSwap) return@LaunchedEffect
         repeat(24) {
             withFrameNanos { }
             val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
