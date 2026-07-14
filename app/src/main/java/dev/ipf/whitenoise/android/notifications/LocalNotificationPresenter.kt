@@ -345,6 +345,13 @@ class LocalNotificationPresenter(
                         sender,
                     ),
                 )
+                update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
+                    builder.addExtras(
+                        Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
+                        },
+                    )
+                }
                 if (redactContent) {
                     builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                 }
@@ -427,6 +434,26 @@ class LocalNotificationPresenter(
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
+    internal fun conversationCardMessageIdHex(
+        notificationTag: String,
+        notificationId: Int,
+    ): String? = conversationCardMessageIdHex(activeConversationCard(notificationTag, notificationId))
+
+    internal fun cancelRepliedConversationCardIfSameGeneration(
+        notificationTag: String,
+        notificationId: Int,
+        repliedMessageIdHex: String?,
+    ) {
+        if (
+            shouldCancelRepliedConversationCard(
+                repliedMessageIdHex,
+                conversationCardMessageIdHex(notificationTag, notificationId),
+            )
+        ) {
+            cancel(notificationTag, notificationId)
+        }
+    }
+
     /**
      * Re-post the (tag, id) notification carrying a RemoteInput history entry —
      * the documented "reply handled" signal that clears the system's
@@ -501,18 +528,25 @@ class LocalNotificationPresenter(
         return style
     }
 
+    private fun activeConversationCard(
+        tag: String,
+        id: Int,
+    ): Notification? =
+        runCatching {
+            context
+                .getSystemService(NotificationManager::class.java)
+                ?.activeNotifications
+                ?.firstOrNull { it.tag == tag && it.id == id }
+                ?.notification
+        }.getOrNull()
+
     private fun existingMessagingStyle(
         tag: String,
         id: Int,
     ): NotificationCompat.MessagingStyle? {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return null
-        val existing =
-            runCatching { manager.activeNotifications }
-                .getOrNull()
-                ?.firstOrNull { it.tag == tag && it.id == id }
-                ?: return null
-        if (existing.notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
-        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
+        val existing = activeConversationCard(tag, id) ?: return null
+        if (existing.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
+        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing)
     }
 
     private fun publishConversationShortcut(

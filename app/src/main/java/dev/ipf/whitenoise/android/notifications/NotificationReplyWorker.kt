@@ -143,12 +143,15 @@ class NotificationReplyWorker(
                 }
                 if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
             } finally {
-                // The replied card was deliberately re-posted above, so cancel it
-                // outright; clear its reaction/mention/invite siblings only when a
-                // newer one didn't arrive mid-window.
-                presenter.dismissActionNotificationAndOlderSiblings(
+                // The replied card was deliberately re-posted above to clear the
+                // direct-reply lifetime extension. Cancel it only when its stamped
+                // latest-message id still matches the replied action target.
+                presenter.cancelRepliedConversationCardIfSameGeneration(
                     notificationTag = action.notificationTag,
                     notificationId = action.notificationId,
+                    repliedMessageIdHex = action.target.messageIdHex,
+                )
+                presenter.dismissConversationSiblingCardsNotNewerThan(
                     accountRef = action.target.accountRef,
                     groupIdHex = action.target.groupIdHex,
                     sinceMs = dismissBaselineMs,

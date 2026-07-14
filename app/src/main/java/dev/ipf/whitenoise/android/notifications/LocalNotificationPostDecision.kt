@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.Notification
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -90,6 +91,23 @@ internal fun shouldDismissInvite(
 ): Boolean {
     if (accountRef.isBlank() || groupIdHex.isBlank()) return false
     return extraAccountRef == accountRef && extraGroupIdHex == groupIdHex
+}
+
+internal fun conversationCardMessageIdHex(notification: Notification?): String? =
+    notification
+        ?.extras
+        ?.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX)
+        ?.takeIf { it.isNotBlank() }
+
+// Cancel the replied card only when its stamped latest-message id still matches
+// the replied action target. Fail closed to data loss when either id is absent.
+internal fun shouldCancelRepliedConversationCard(
+    repliedMessageIdHex: String?,
+    liveCardMessageIdHex: String?,
+): Boolean {
+    val replied = repliedMessageIdHex?.takeIf { it.isNotBlank() } ?: return false
+    val live = liveCardMessageIdHex?.takeIf { it.isNotBlank() } ?: return false
+    return replied == live
 }
 
 private fun categoryFor(trigger: NotificationTriggerFfi): String =
