@@ -4,9 +4,13 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -29,14 +33,27 @@ class LocalNotificationPresenterConversationTest {
     private val manager: NotificationManager
         get() = context.getSystemService(NotificationManager::class.java)
 
+    private var publishedShortcut: ShortcutInfoCompat? = null
+    private lateinit var presenter: LocalNotificationPresenter
+
     @Before
     fun setUp() {
+        manager.cancelAll()
+        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        publishedShortcut = null
+        presenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut ->
+                    publishedShortcut = shortcut
+                    ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+                },
+            )
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     @Test
     fun groupMessagePostsOnTheGroupConversationChannelWithTheConversationShortcut() {
-        val presenter = LocalNotificationPresenter(context)
         presenter.ensureChannels()
 
         val posted =
@@ -52,11 +69,15 @@ class LocalNotificationPresenterConversationTest {
             notification.channelId,
         )
         assertEquals(shortcutId, notification.shortcutId)
+        val shortcut = checkNotNull(publishedShortcut)
+        assertEquals(shortcutId, shortcut.id)
+        assertNotNull(shortcut.icon)
+        assertEquals(IconCompat.TYPE_RESOURCE, shortcut.icon!!.type)
+        assertEquals(R.mipmap.ic_launcher, shortcut.icon!!.resId)
     }
 
     @Test
     fun mentionPostsOnTheMentionConversationChannelForTheSameConversation() {
-        val presenter = LocalNotificationPresenter(context)
         presenter.ensureChannels()
 
         runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi") }

@@ -79,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -140,6 +141,16 @@ internal fun messageBubbleBorder(
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         mine && isAmoledSurfaceTheme() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         else -> amoledSurfaceBorderStroke()
+    }
+
+@Composable
+internal fun rememberMessageMediaReferences(
+    tags: List<MessageTagFfi>,
+    messageIdHex: String,
+    perMessageMediaReferences: List<MediaAttachmentReferenceFfi>?,
+): List<MediaAttachmentReferenceFfi> =
+    remember(tags, messageIdHex, perMessageMediaReferences) {
+        perMessageMediaReferences ?: MediaReferenceParser.parseAllImetaTags(tags)
     }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -574,9 +585,11 @@ internal fun MessageBubble(
                 // bridge records that haven't been projected yet.
                 val perMessageMediaReferences = controller.mediaReferences[record.messageIdHex]
                 val mediaReferences =
-                    remember(record.tags, record.messageIdHex, perMessageMediaReferences) {
-                        perMessageMediaReferences ?: MediaReferenceParser.parseAllImetaTags(record.tags)
-                    }
+                    rememberMessageMediaReferences(
+                        tags = record.tags,
+                        messageIdHex = record.messageIdHex,
+                        perMessageMediaReferences = perMessageMediaReferences,
+                    )
                 // Split media into image refs (rendered as a bubble or
                 // 2-col grid) and file refs (a list of pills). Mixed
                 // albums render both: images on top, file pills below.
