@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
@@ -920,7 +921,11 @@ internal fun ConversationScreen(
                                     )
                                 }.getOrNull() ?: return@launch
                             dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                .play("${nextMsg.record.messageIdHex}#$idx", file, ownerKey = ownerKey)
+                                .play(
+                                    voicePlaybackKey(nextMsg.record.messageIdHex, idx, ref.sourceEpoch),
+                                    file,
+                                    ownerKey = ownerKey,
+                                )
                         }
                     }
                 }

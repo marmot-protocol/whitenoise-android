@@ -21,6 +21,7 @@ internal object AttachmentCachePublication {
     private val tmpCounter = AtomicLong()
     private val stripes = Array(STRIPE_COUNT) { Stripe() }
     private var wipeGeneration = 0
+    private var wipesInProgress = 0
 
     @VisibleForTesting
     @Volatile
@@ -39,6 +40,13 @@ internal object AttachmentCachePublication {
     @Synchronized
     fun onWipeStarted() {
         wipeGeneration++
+        wipesInProgress++
+    }
+
+    @Synchronized
+    fun onWipeFinished() {
+        check(wipesInProgress > 0) { "attachment cache wipe finished without a matching start" }
+        wipesInProgress--
     }
 
     fun attachmentKey(
@@ -53,6 +61,7 @@ internal object AttachmentCachePublication {
      */
     fun capturePermit(attachmentKey: String): Permit? {
         synchronized(this) {
+            if (wipesInProgress > 0) return null
             val stripe = stripeFor(attachmentKey)
             if (stripe.invalidatingCount > 0) return null
             return Permit(wipeGeneration, stripe.generation)

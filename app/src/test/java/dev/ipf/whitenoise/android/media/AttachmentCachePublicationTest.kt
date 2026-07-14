@@ -104,8 +104,12 @@ class AttachmentCachePublicationTest {
                     finalFile = finalFile,
                     loadBytes = {
                         AttachmentCachePublication.onWipeStarted()
-                        voiceDir.deleteRecursively()
-                        payload
+                        try {
+                            voiceDir.deleteRecursively()
+                            payload
+                        } finally {
+                            AttachmentCachePublication.onWipeFinished()
+                        }
                     },
                 )
             }
@@ -150,21 +154,59 @@ class AttachmentCachePublicationTest {
                 }
             runBlocking { writerReachedCommit.await() }
             AttachmentCachePublication.onWipeStarted()
-            voiceDir.deleteRecursively()
-            releaseWriter.complete(Unit)
+            try {
+                voiceDir.deleteRecursively()
+                releaseWriter.complete(Unit)
 
-            assertFalse(
-                "a writer scheduled before wipe must not publish afterward",
-                published.get(),
-            )
-            assertFalse(
-                "wipe must not be undone by mkdirs from a stale writer",
-                voiceDir.exists(),
-            )
-            assertFalse(finalFile.exists())
+                assertFalse(
+                    "a writer scheduled before wipe must not publish afterward",
+                    published.get(),
+                )
+                assertFalse(
+                    "wipe must not be undone by mkdirs from a stale writer",
+                    voiceDir.exists(),
+                )
+                assertFalse(finalFile.exists())
+            } finally {
+                AttachmentCachePublication.onWipeFinished()
+            }
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    @Test
+    fun publishStartedDuringWipe_isRejectedUntilWipeFinishes() {
+        dir = Files.createTempDirectory("attachment-cache-active-wipe").toFile()
+        val finalFile = File(File(dir, "voice_attachments"), "msg-active-wipe.m4a")
+        val attachmentKey = AttachmentCachePublication.attachmentKey("msg-active-wipe", 0, 1uL)
+        var loadCalled = false
+
+        AttachmentCachePublication.onWipeStarted()
+        try {
+            val published =
+                runBlocking {
+                    AttachmentCachePublication.publishAfterLoad(
+                        attachmentKey = attachmentKey,
+                        finalFile = finalFile,
+                        loadBytes = {
+                            loadCalled = true
+                            byteArrayOf(1, 2, 3)
+                        },
+                    )
+                }
+
+            assertFalse("a writer starting during wipe must not receive a permit", published)
+            assertFalse("a rejected writer must not load plaintext", loadCalled)
+            assertFalse(finalFile.exists())
+        } finally {
+            AttachmentCachePublication.onWipeFinished()
+        }
+
+        assertNotNull(
+            "publication should resume after the wipe finishes",
+            AttachmentCachePublication.capturePermit(attachmentKey),
+        )
     }
 
     @Test

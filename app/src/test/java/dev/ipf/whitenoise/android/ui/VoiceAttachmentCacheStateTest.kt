@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFil
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldInvalidateVoiceAttachmentCache
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVoiceAttachmentDownload
+import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -128,6 +129,21 @@ class VoiceAttachmentCacheStateTest {
 
         assertEquals(epochOneFile, cachedVoiceAttachmentFile(context, messageId, 1, epochOne))
         assertNull(cachedVoiceAttachmentFile(context, messageId, 1, epochTwo))
+    }
+
+    @Test
+    fun sourceEpochIsPartOfVoicePlaybackIdentity() {
+        val messageId = "voice-playback-epoch-identity"
+
+        val epochOneKey = voicePlaybackKey(messageId, 1, 1uL)
+        val epochTwoKey = voicePlaybackKey(messageId, 1, 2uL)
+
+        assertEquals("$messageId#1#1", epochOneKey)
+        assertEquals("$messageId#1#2", epochTwoKey)
+        assertFalse(
+            "a stale playback callback must not match a newer attachment revision",
+            epochOneKey == epochTwoKey,
+        )
     }
 
     @Test

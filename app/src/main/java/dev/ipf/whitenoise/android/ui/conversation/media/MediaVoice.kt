@@ -76,6 +76,12 @@ import java.util.Locale
 private val voiceMaterializationLock = Any()
 private val inFlightVoiceMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
 
+internal fun voicePlaybackKey(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    sourceEpoch: ULong,
+): String = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, sourceEpoch)
+
 @Composable
 internal fun MediaVoiceBubble(
     messageIdHex: String,
@@ -88,8 +94,8 @@ internal fun MediaVoiceBubble(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pillKey = "$messageIdHex#$attachmentIndex"
     val epoch = reference.sourceEpoch
+    val pillKey = voicePlaybackKey(messageIdHex, attachmentIndex, epoch)
 
     var localFile by
         rememberCachedVoiceAttachmentFileState(
