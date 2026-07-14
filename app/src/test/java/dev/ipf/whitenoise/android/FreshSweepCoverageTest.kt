@@ -78,6 +78,25 @@ class FreshSweepCoverageTest {
     }
 
     @Test
+    fun notificationReplyEncryptionLeavesReceiverMainThreadAndReportsFailure() {
+        val receiver = source("notifications/NotificationActionReceiver.kt")
+        val onReceive = receiver.section("override fun onReceive(", "private suspend fun enqueueReplyAction")
+        val enqueueReply = receiver.section("private suspend fun enqueueReplyAction", "private suspend fun handleAction")
+
+        assertTrue("reply handling must be protected by goAsync", "val pending = goAsync()" in onReceive)
+        assertFalse(
+            "reply handling must not return before goAsync",
+            "if (action.kind == NotificationActionKind.REPLY)" in onReceive,
+        )
+        assertTrue("keystore work must run on the IO dispatcher", "withContext(Dispatchers.IO)" in enqueueReply)
+        assertTrue("enqueue failures must be visible to the user", "R.string.toast_send_failed" in enqueueReply)
+        val worker = source("notifications/NotificationReplyWorker.kt")
+        val workerEnqueue = worker.section("suspend fun enqueue(", "internal fun shouldRetryAfterFailure")
+        assertTrue("WorkManager enqueue must be awaited without blocking the receiver thread", ".await()" in workerEnqueue)
+        assertFalse("receiver timeout must remain cancellation-aware", ".get()" in workerEnqueue)
+    }
+
+    @Test
     fun notificationMarkReadConfinesAppStateMutationsToMainThread() {
         val source = source("notifications/NotificationActionReceiver.kt")
         val markReadBranch = source.section("NotificationActionKind.MARK_READ -> {", "val presenter")
