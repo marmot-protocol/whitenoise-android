@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.crypto.BadPaddingException
@@ -67,7 +68,18 @@ class NotificationReplyWorker(
         // WorkManager keeps this id stable across retries and assigns a new one
         // to every separately enqueued reply, even when the text is identical.
         val completionKey = notificationReplyCompletionKey(id)
+        if (completionStore.isCompleted(completionKey)) {
+            return completedReplyResult(application, action, reply)
+        }
+        when (completionStore.abandonedOutcome(completionKey)) {
+            NotificationReplyAbandonedOutcome.Success -> return Result.success()
+            NotificationReplyAbandonedOutcome.Failure -> return Result.failure()
+            null -> Unit
+        }
         if (!application.appState.notificationActionsAllowed) {
+            val persisted =
+                completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)
+            if (!persisted) return Result.retry()
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             return Result.success()
         }
@@ -76,73 +88,71 @@ class NotificationReplyWorker(
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
             }
-            // New requests persist the latest timeline cursor while holding the
-            // group send lock. Legacy started markers have no valid cursor, so
-            // they take the normal send path rather than risking a false match.
-            val recoveryBoundary = completionStore.startedRecoveryBoundary(completionKey)
-            if (
-                completionStore.isCompleted(completionKey) ||
-                (recoveryBoundary != null && alreadyCommitted(application, action, reply, recoveryBoundary))
-            ) {
-                completionStore.markCompleted(completionKey)
-                markReadAfterReply(application, action)
-                dismissSentReplyNotification(applicationContext, action, reply)
-                notificationReplyActionHandled(sent = true)
-                return Result.success()
-            }
-            val sent =
+            val sendOutcome =
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.sendNotificationReply(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         afterMessageIdHex = action.target.messageIdHex.orEmpty(),
                         text = reply,
-                        persistRecoveryBoundary = { boundary ->
-                            withContext(Dispatchers.IO) {
-                                completionStore.markStarted(completionKey, boundary)
-                            }
-                        },
+                        completionStore = completionStore,
+                        completionKey = completionKey,
+                        recoveryScope = notificationReplyRecoveryScope(action.target.accountRef, action.target.groupIdHex),
                     )
                 }
-            if (sent) {
+            if (sendOutcome != NotificationReplySendOutcome.Failed) {
                 completionStore.markCompleted(completionKey)
-                markReadAfterReply(application, action)
-                dismissSentReplyNotification(applicationContext, action, reply)
-                notificationReplyActionHandled(sent = true)
-                Result.success()
+                completedReplyResult(application, action, reply)
             } else {
                 notificationReplyActionHandled(sent = false)
                 if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
-                replyFailureResult(action, containsLegacyPlaintext)
+                replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey)
             }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            replyFailureResult(action, containsLegacyPlaintext)
+            replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey)
         }
     }
 
-    private suspend fun alreadyCommitted(
+    private suspend fun completedReplyResult(
         application: WhiteNoiseApplication,
         action: NotificationAction,
         reply: String,
-        recoveryBoundary: NotificationReplyRecoveryBoundary,
-    ): Boolean =
-        withContext(Dispatchers.Main.immediate) {
-            application.appState.notificationReplyAlreadyCommitted(
-                accountRef = action.target.accountRef,
-                groupIdHex = action.target.groupIdHex,
-                recoveryBoundary = recoveryBoundary,
-                text = reply,
-            )
+    ): Result {
+        try {
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.ensureNotificationRuntimeStarted()
+            }
+            markReadAfterReply(application, action)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            Log.w(TAG, "reply sent but mark-read cleanup failed", throwable)
         }
+        try {
+            dismissSentReplyNotification(applicationContext, action, reply)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            Log.w(TAG, "reply sent but notification cleanup failed", throwable)
+        }
+        notificationReplyActionHandled(sent = true)
+        return Result.success()
+    }
 
     private fun replyFailureResult(
         action: NotificationAction,
         containsLegacyPlaintext: Boolean,
+        completionStore: NotificationReplyCompletionStore,
+        completionKey: String,
     ): Result {
         if (shouldRetryAfterFailure(runAttemptCount, containsLegacyPlaintext)) return Result.retry()
+        // Only persist the abandon marker once we're actually giving up; if it
+        // can't be recorded, retry so recovery state isn't lost.
+        val persisted = completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Failure)
+        if (!persisted) return Result.retry()
         val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
         Log.w(TAG, "reply failed ($reason) group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")
         return Result.failure()
@@ -319,5 +329,21 @@ class NotificationReplyWorker(
             )
 
         internal fun notificationReplyCompletionKey(workRequestId: UUID): String = COMPLETION_KEY_PREFIX + workRequestId
+
+        internal fun notificationReplyRecoveryScope(
+            accountRef: String,
+            groupIdHex: String,
+        ): String {
+            val digest = MessageDigest.getInstance("SHA-256").digest("$accountRef\u0000$groupIdHex".toByteArray())
+            return buildString(digest.size * 2) {
+                digest.forEach { byte ->
+                    val value = byte.toInt() and 0xff
+                    append(HEX_DIGITS[value ushr 4])
+                    append(HEX_DIGITS[value and 0x0f])
+                }
+            }
+        }
+
+        private const val HEX_DIGITS = "0123456789abcdef"
     }
 }
