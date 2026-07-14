@@ -383,6 +383,23 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun encryptedReplyEquality_usesByteContent() {
+        val encryptedReply =
+            EncryptedNotificationReply(
+                initializationVector = byteArrayOf(1, 2, 3),
+                ciphertext = byteArrayOf(4, 5, 6),
+            )
+        val sameBytes =
+            EncryptedNotificationReply(
+                initializationVector = encryptedReply.initializationVector.copyOf(),
+                ciphertext = encryptedReply.ciphertext.copyOf(),
+            )
+
+        assertEquals(encryptedReply, sameBytes)
+        assertEquals(encryptedReply.hashCode(), sameBytes.hashCode())
+    }
+
+    @Test
     fun replyCipher_rejectsCiphertextFromAnotherWorkRequestOrRoute() {
         val action =
             NotificationAction(

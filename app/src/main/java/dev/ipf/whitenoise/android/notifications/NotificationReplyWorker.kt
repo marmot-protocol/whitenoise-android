@@ -8,6 +8,7 @@ import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.await
 import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -50,7 +51,7 @@ class NotificationReplyWorker(
                 is NotificationReplyInput.Encrypted ->
                     try {
                         NotificationReplyCipher
-                            .create(applicationContext)
+                            .create()
                             .decrypt(replyInput.reply, id, action)
                             .trim()
                     } catch (cancel: CancellationException) {
@@ -214,22 +215,26 @@ class NotificationReplyWorker(
         private const val MAX_SEND_ATTEMPTS = 3
         private const val REPLY_BACKOFF_DELAY_SECONDS = 30L
 
-        fun enqueue(
+        suspend fun enqueue(
             context: Context,
             action: NotificationAction,
             reply: String,
-        ) {
-            runCatching {
+        ): Boolean =
+            try {
                 val appContext = context.applicationContext
                 val requestId = UUID.randomUUID()
-                val encryptedReply = NotificationReplyCipher.create(appContext).encrypt(reply, requestId, action)
+                val encryptedReply = NotificationReplyCipher.create().encrypt(reply, requestId, action)
                 WorkManager
                     .getInstance(appContext)
                     .enqueue(notificationReplyRequest(action, requestId, encryptedReply))
-            }.onFailure {
-                Log.w(TAG, "failed to encrypt or enqueue notification reply", it)
+                    .await()
+                true
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Throwable) {
+                Log.w(TAG, "failed to encrypt or enqueue notification reply", failure)
+                false
             }
-        }
 
         internal fun shouldRetryAfterFailure(
             runAttemptCount: Int,

@@ -1,19 +1,27 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.content.Context
-import androidx.security.crypto.MasterKey
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 internal data class EncryptedNotificationReply(
     val initializationVector: ByteArray,
     val ciphertext: ByteArray,
-)
+) {
+    override fun equals(other: Any?): Boolean =
+        other is EncryptedNotificationReply &&
+            initializationVector.contentEquals(other.initializationVector) &&
+            ciphertext.contentEquals(other.ciphertext)
+
+    override fun hashCode(): Int = 31 * initializationVector.contentHashCode() + ciphertext.contentHashCode()
+}
 
 /**
  * Seals notification replies before they enter WorkManager's plaintext database.
@@ -64,22 +72,35 @@ internal class NotificationReplyCipher(
         private const val KEY_ALIAS = "whitenoise_notification_reply_aes_gcm_v1"
         private val KEY_LOCK = Any()
 
-        @Suppress("DEPRECATION")
-        fun create(context: Context): NotificationReplyCipher =
-            synchronized(KEY_LOCK) {
-                MasterKey
-                    .Builder(context.applicationContext, KEY_ALIAS)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                val keyStore =
-                    KeyStore.getInstance(ANDROID_KEY_STORE).apply {
-                        load(null)
-                    }
-                val secretKey =
-                    keyStore.getKey(KEY_ALIAS, null) as? SecretKey
-                        ?: error("Missing notification reply encryption key")
-                NotificationReplyCipher(secretKey)
+        @Volatile
+        private var cachedCipher: NotificationReplyCipher? = null
+
+        fun create(): NotificationReplyCipher =
+            cachedCipher ?: synchronized(KEY_LOCK) {
+                cachedCipher ?: NotificationReplyCipher(getOrCreateSecretKey()).also { cachedCipher = it }
             }
+
+        private fun getOrCreateSecretKey(): SecretKey {
+            val keyStore =
+                KeyStore.getInstance(ANDROID_KEY_STORE).apply {
+                    load(null)
+                }
+            (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+            check(!keyStore.containsAlias(KEY_ALIAS)) { "Missing notification reply encryption key" }
+
+            val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE)
+            keyGenerator.init(
+                KeyGenParameterSpec
+                    .Builder(
+                        KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                    ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(KEY_SIZE_BITS)
+                    .build(),
+            )
+            return keyGenerator.generateKey()
+        }
 
         private fun associatedData(
             requestId: UUID,
@@ -114,5 +135,6 @@ internal class NotificationReplyCipher(
         }
 
         private const val ANDROID_KEY_STORE = "AndroidKeyStore"
+        private const val KEY_SIZE_BITS = 256
     }
 }
