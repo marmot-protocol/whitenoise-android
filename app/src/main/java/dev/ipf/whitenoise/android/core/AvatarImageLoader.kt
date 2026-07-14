@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import java.util.LinkedHashMap
 
 object AvatarImageLoader {
@@ -23,8 +24,13 @@ object AvatarImageLoader {
     private const val CACHE_SIZE_BYTES = 16 * 1024 * 1024
     private const val FAILURE_TTL_MS = 60_000L
     private const val FAILURE_CACHE_MAX_ENTRIES = 512
+    private const val FETCH_CONCURRENCY = 4
+    private const val NOTIFICATION_FETCH_CONCURRENCY = 2
+    private const val REGULAR_FETCH_CONCURRENCY = FETCH_CONCURRENCY - NOTIFICATION_FETCH_CONCURRENCY
+    private const val PREWARM_MAX_QUEUED = 64
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
     private val lock = Any()
     private val cache =
         object : LruCache<String, ImageBitmap>(CACHE_SIZE_BYTES) {
@@ -33,7 +39,8 @@ object AvatarImageLoader {
                 value: ImageBitmap,
             ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
         }
-    private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
+    private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
+    private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
 
     // Bumped by clear(); fetches launched under an older generation discard
@@ -41,51 +48,137 @@ object AvatarImageLoader {
     // in-flight request that was already on the network.
     private var generation = 0L
 
-    suspend fun load(url: String): ImageBitmap? {
+    suspend fun load(url: String): ImageBitmap? =
+        load(
+            url = url,
+            expectedGeneration = null,
+            fetchLane = AvatarFetchLane.REGULAR,
+        )
+
+    /**
+     * Queue an avatar fetch without delaying the caller. Chat/profile projection
+     * uses this ahead of notification delivery so the first shortcut/person icon
+     * can take the synchronous cache path. Work is URL-deduplicated, bounded to a
+     * small network fan-out, and generation-guarded so account teardown cannot be
+     * followed by an old queued warm repopulating the cache.
+     */
+    fun preWarm(url: String?) {
+        val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        val scheduledGeneration =
+            synchronized(lock) {
+                val nowMillis = System.currentTimeMillis()
+                if (cache.get(key) != null ||
+                    isFailureFresh(key, nowMillis) ||
+                    inFlight.containsKey(key) ||
+                    preWarmQueuedGeneration.containsKey(key) ||
+                    preWarmQueuedGeneration.size >= PREWARM_MAX_QUEUED
+                ) {
+                    return
+                }
+                generation.also { preWarmQueuedGeneration[key] = it }
+            }
+        scope.launch {
+            try {
+                // Admit speculative work before it is registered in `inFlight`.
+                // A demand for a URL behind this queue can therefore start its
+                // own fetch through the reserved lane instead of joining a
+                // deferred that has not acquired network capacity yet.
+                fetchGate.withPreWarmAdmission {
+                    load(
+                        url = key,
+                        expectedGeneration = scheduledGeneration,
+                        fetchLane = AvatarFetchLane.PREWARM_ADMITTED,
+                        waitForDetachedFetch = true,
+                    )
+                }
+            } finally {
+                synchronized(lock) {
+                    if (preWarmQueuedGeneration[key] == scheduledGeneration) {
+                        preWarmQueuedGeneration.remove(key)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun load(
+        url: String,
+        expectedGeneration: Long?,
+        fetchLane: AvatarFetchLane,
+        waitForDetachedFetch: Boolean = false,
+    ): ImageBitmap? {
         cached(url)?.let { return it }
         val request =
             synchronized(lock) {
+                if (expectedGeneration != null && expectedGeneration != generation) {
+                    return@synchronized CompletedAvatarRequest(null)
+                }
                 cache.get(url)?.let { return@synchronized CompletedAvatarRequest(it) }
                 if (isFailureFresh(url, System.currentTimeMillis())) {
                     return@synchronized CompletedAvatarRequest(null)
                 }
-                inFlight[url]?.let { return@synchronized PendingAvatarRequest(it) }
-                val deferred = CompletableDeferred<ImageBitmap?>()
-                inFlight[url] = deferred
-                val launchedGeneration = generation
-                scope.launch {
-                    val image = runCatching { fetch(url) }.getOrNull()
-                    synchronized(lock) {
-                        if (launchedGeneration != generation) {
-                            // clear() ran while we were in flight; drop the result.
-                            inFlight.remove(url, deferred)
-                            deferred.complete(null)
-                            return@launch
-                        }
-                        if (image != null) {
-                            cache.put(url, image)
-                            failureExpiresAt.remove(url)
-                        } else {
-                            val nowMillis = System.currentTimeMillis()
-                            failureExpiresAt.recordFailure(
-                                url = url,
-                                expiresAtMillis = nowMillis + FAILURE_TTL_MS,
-                                nowMillis = nowMillis,
-                            )
-                        }
-                        inFlight.remove(url)
-                        // Complete INSIDE the lock so any concurrent `load(url)`
-                        // that enters the synchronized block sees a consistent
-                        // (cache hit OR fresh failure-fresh state OR pending
-                        // entry) — never the gap of "removed from inFlight + not
-                        // yet completed" that would let a second fetch slip in
-                        // for the same URL.
-                        deferred.complete(image)
+                inFlight[url]?.let {
+                    // A prewarm admission is only for starting new regular-lane work.
+                    // Do not hold it while an existing demand fetch finishes.
+                    return@synchronized if (fetchLane == AvatarFetchLane.PREWARM_ADMITTED) {
+                        CompletedAvatarRequest(null)
+                    } else {
+                        PendingAvatarRequest(it)
                     }
                 }
-                PendingAvatarRequest(deferred)
+                val inFlightRequest = AvatarInFlightRequest()
+                val deferred = inFlightRequest.result
+                inFlight[url] = inFlightRequest
+                val launchedGeneration = generation
+                scope.launch {
+                    try {
+                        // Gate the detached fetch itself, not the caller awaiting
+                        // its result. clear() completes result waiters immediately
+                        // but cannot end a blocking socket read; the fetch permit
+                        // remains held until the socket returns.
+                        val image =
+                            runCatching {
+                                fetchGate.withPermit(fetchLane) {
+                                    if (synchronized(lock) { launchedGeneration != generation }) null else fetch(url)
+                                }
+                            }.getOrNull()
+                        synchronized(lock) {
+                            if (launchedGeneration != generation) {
+                                // clear() ran while we were in flight; drop the result.
+                                inFlight.remove(url, inFlightRequest)
+                                deferred.complete(null)
+                                return@launch
+                            }
+                            if (image != null) {
+                                cache.put(url, image)
+                                failureExpiresAt.remove(url)
+                            } else {
+                                val nowMillis = System.currentTimeMillis()
+                                failureExpiresAt.recordFailure(
+                                    url = url,
+                                    expiresAtMillis = nowMillis + FAILURE_TTL_MS,
+                                    nowMillis = nowMillis,
+                                )
+                            }
+                            inFlight.remove(url, inFlightRequest)
+                            // Complete INSIDE the lock so any concurrent `load(url)`
+                            // that enters the synchronized block sees a consistent
+                            // (cache hit OR fresh failure-fresh state OR pending
+                            // entry) — never the gap of "removed from inFlight + not
+                            // yet completed" that would let a second fetch slip in
+                            // for the same URL.
+                            deferred.complete(image)
+                        }
+                    } finally {
+                        // Separate from `result`: clear() deliberately wakes UI
+                        // waiters early, while speculative admission must remain
+                        // occupied until the detached socket has actually stopped.
+                        inFlightRequest.fetchCompleted.complete(Unit)
+                    }
+                }
+                PendingAvatarRequest(inFlightRequest)
             }
-        return request.await()
+        return request.await(waitForDetachedFetch)
     }
 
     /**
@@ -103,15 +196,21 @@ object AvatarImageLoader {
     /** Android-bitmap view of [peek], for non-Compose consumers (notification icons). */
     fun peekBitmap(url: String?): android.graphics.Bitmap? = peek(url)?.asAndroidBitmap()
 
-    /** Android-bitmap view of [load], for non-Compose consumers (notification icons). */
-    suspend fun loadBitmap(url: String): android.graphics.Bitmap? = load(url)?.asAndroidBitmap()
+    /** Android-bitmap view of [load], using capacity reserved for notification icons. */
+    suspend fun loadBitmap(url: String): android.graphics.Bitmap? =
+        load(
+            url = url,
+            expectedGeneration = null,
+            fetchLane = AvatarFetchLane.NOTIFICATION,
+        )?.asAndroidBitmap()
 
     fun clear() {
         synchronized(lock) {
             generation++
             cache.evictAll()
             failureExpiresAt.clear()
-            inFlight.values.forEach { it.complete(null) }
+            preWarmQueuedGeneration.clear()
+            inFlight.values.forEach { it.result.complete(null) }
             inFlight.clear()
         }
     }
@@ -148,6 +247,53 @@ object AvatarImageLoader {
             }
         val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
         return scaleAvatarBitmapToMaxDimension(decoded, MAX_AVATAR_DIMENSION)
+    }
+}
+
+internal enum class AvatarFetchLane {
+    REGULAR,
+    NOTIFICATION,
+    PREWARM_ADMITTED,
+}
+
+/**
+ * Keeps notification image loads off the regular avatar queue. The two lane
+ * counts add up to the loader's single hard network bound, while two notification
+ * permits let a group shortcut and sender icon resolve in parallel.
+ */
+internal class AvatarFetchGate(
+    regularPermits: Int,
+    notificationPermits: Int,
+) {
+    init {
+        require(regularPermits > 0) { "regularPermits must be positive" }
+        require(notificationPermits > 0) { "notificationPermits must be positive" }
+    }
+
+    private val regular = Semaphore(regularPermits)
+    private val notification = Semaphore(notificationPermits)
+
+    suspend fun <T> withPermit(
+        lane: AvatarFetchLane,
+        block: suspend () -> T,
+    ): T =
+        when (lane) {
+            AvatarFetchLane.REGULAR -> regular.withPermit(block)
+            AvatarFetchLane.NOTIFICATION -> notification.withPermit(block)
+            AvatarFetchLane.PREWARM_ADMITTED -> block()
+        }
+
+    suspend fun <T> withPreWarmAdmission(block: suspend () -> T): T = regular.withPermit(block)
+
+    suspend fun <T> withNotificationPermit(block: suspend () -> T): T = notification.withPermit(block)
+
+    private suspend fun <T> Semaphore.withPermit(block: suspend () -> T): T {
+        acquire()
+        return try {
+            block()
+        } finally {
+            release()
+        }
     }
 }
 
@@ -251,17 +397,26 @@ internal fun avatarDecodeSampleSize(
 }
 
 private sealed interface AvatarRequest {
-    suspend fun await(): ImageBitmap?
+    suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap?
 }
 
 private class CompletedAvatarRequest(
     private val image: ImageBitmap?,
 ) : AvatarRequest {
-    override suspend fun await(): ImageBitmap? = image
+    override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? = image
+}
+
+private class AvatarInFlightRequest {
+    val result = CompletableDeferred<ImageBitmap?>()
+    val fetchCompleted = CompletableDeferred<Unit>()
 }
 
 private class PendingAvatarRequest(
-    private val deferred: CompletableDeferred<ImageBitmap?>,
+    private val request: AvatarInFlightRequest,
 ) : AvatarRequest {
-    override suspend fun await(): ImageBitmap? = deferred.await()
+    override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? {
+        val image = request.result.await()
+        if (waitForDetachedFetch) request.fetchCompleted.await()
+        return image
+    }
 }

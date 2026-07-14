@@ -40,6 +40,7 @@ import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
@@ -2678,6 +2679,17 @@ class ChatsController(
         row.lastMessage?.sender?.let(appState::requestProfile)
     }
 
+    private fun preWarmNotificationAvatars(item: ChatListItem) {
+        val conversationAvatar =
+            ProfileSanitizer.imageUrl(item.group.avatarUrl)
+                ?: ProfileSanitizer.imageUrl(item.projection?.avatarUrl)
+        AvatarImageLoader.preWarm(conversationAvatar)
+        GroupProjector
+            .avatarAccount(item.group, item.otherMemberAccount, item.memberCount)
+            ?.let(appState::preWarmProfileAvatar)
+        item.latest?.sender?.let(appState::preWarmProfileAvatar)
+    }
+
     /**
      * Called by the shell when a conversation is foregrounded (`false`) or the
      * chat list is back on screen (`true`). The subscription stays alive either
@@ -2790,6 +2802,11 @@ class ChatsController(
         val all = sortChatListItems(projected)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
+        // Limit speculative network work to the recent visible conversations the
+        // user is likely to receive from next. The app-state notification stream
+        // independently warms each ingested sender/conversation on cold UI-less
+        // process starts.
+        items.take(NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS).forEach(::preWarmNotificationAvatars)
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
         // For any group we don't yet have members cached for, fan out a
         // one-shot members fetch so unnamed titles and the profile sheet's
@@ -3072,6 +3089,7 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
+private const val NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS = 24
 
 // Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
 // of per-chat `timelineMessages` FFI queries running at once so a large chat
