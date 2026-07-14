@@ -1,20 +1,41 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class IdentityCreationFlowTest {
     @Test
-    fun fastIdentityCreationPlanLimitsBlockingCreateToFirstRelay() {
-        val relays = listOf("wss://relay.us.whitenoise.chat", "wss://relay.eu.whitenoise.chat")
+    fun creationKeepsTheFullRelaySetOnTheEngineCall() {
+        val body = appStateSource().readText().functionBody("createIdentity")
 
-        val plan = fastIdentityCreationRelayPlan(relays)
+        assertTrue(
+            body.contains("createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)"),
+        )
+        assertFalse(body.contains("take(1)"))
+    }
 
-        assertEquals(listOf("wss://relay.us.whitenoise.chat"), plan.createDefaultRelays)
-        assertEquals(listOf("wss://relay.us.whitenoise.chat"), plan.createBootstrapRelays)
-        assertEquals(relays, plan.publishDefaultRelays)
-        assertEquals(relays, plan.publishBootstrapRelays)
+    @Test
+    fun readyStatePrecedesPostCreateWarmup() {
+        val body = appStateSource().readText().functionBody("createIdentity")
+        val ready = body.indexOf("phase = AppPhase.Ready")
+        val warmup = body.indexOf("launchIdentityPostCreateWarmup(summary)")
+
+        assertTrue("identity must become ready before best-effort warm-up starts", ready >= 0 && warmup > ready)
+    }
+
+    @Test
+    fun postCreateWarmupIsBestEffortAndAccountScoped() {
+        val body = appStateSource().readText().functionBody("launchIdentityPostCreateWarmup")
+
+        assertTrue(body.contains("runBestEffortPostCommitSteps("))
+        assertTrue(body.contains("activeAccountRef == summary.label"))
+        assertTrue(body.contains("refreshAccounts()"))
+        assertTrue(body.contains("syncNativePushRegistrationIfEnabled()"))
     }
 
     @Test
@@ -50,14 +71,6 @@ class IdentityCreationFlowTest {
         )
     }
 
-    @Test
-    fun bootstrapRetryDelayBacksOffWithCap() {
-        assertEquals(1_000L, identityBootstrapRetryDelayMillis(0, initialDelayMillis = 1_000L, maxDelayMillis = 5_000L))
-        assertEquals(2_000L, identityBootstrapRetryDelayMillis(1, initialDelayMillis = 1_000L, maxDelayMillis = 5_000L))
-        assertEquals(4_000L, identityBootstrapRetryDelayMillis(2, initialDelayMillis = 1_000L, maxDelayMillis = 5_000L))
-        assertEquals(5_000L, identityBootstrapRetryDelayMillis(3, initialDelayMillis = 1_000L, maxDelayMillis = 5_000L))
-    }
-
     private fun account(
         label: String,
         accountIdHex: String,
@@ -70,4 +83,11 @@ class IdentityCreationFlowTest {
         signedOut = false,
         running = running,
     )
+
+    private fun appStateSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppState.kt source file")
 }
