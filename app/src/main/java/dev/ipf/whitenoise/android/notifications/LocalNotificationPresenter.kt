@@ -276,6 +276,7 @@ class LocalNotificationPresenter(
         // Name the recipient identity in the header when multi-account (#836).
         if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
+        var messagingPost: MessagingPostContext? = null
         when (val style = decision.style) {
             // Reactions get their own self-contained card (own tag/id on the
             // reactions channel, see LocalNotificationFormatter) so they're muted
@@ -290,16 +291,6 @@ class LocalNotificationPresenter(
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
             NotificationStyleChoice.Messaging -> {
-                // Resolve the carried-forward history off-main: activeNotifications
-                // is a Binder round-trip and extractMessagingStyle re-serializes it.
-                val carried =
-                    if (redactContent) {
-                        null
-                    } else {
-                        withContext(Dispatchers.Default) {
-                            existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
-                        }
-                    }
                 val (conversationAvatarBitmap, senderAvatarBitmap) =
                     if (redactContent) {
                         null to null
@@ -335,16 +326,13 @@ class LocalNotificationPresenter(
                         )
                     }
                 }
-                builder.setStyle(
-                    messagingStyle(
-                        update,
-                        notificationContent,
-                        if (redactContent) null else conversationTitleOverride,
-                        decision.historyCap,
-                        carried,
-                        sender,
-                    ),
-                )
+                update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
+                    builder.addExtras(
+                        Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
+                        },
+                    )
+                }
                 if (redactContent) {
                     builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                 }
@@ -360,6 +348,11 @@ class LocalNotificationPresenter(
                             }
                         }
                 }
+                messagingPost =
+                    MessagingPostContext(
+                        sender = sender,
+                        conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
+                    )
             }
 
             is NotificationStyleChoice.InviteWithExtras -> {
@@ -380,12 +373,58 @@ class LocalNotificationPresenter(
         }
 
         val notificationManager = NotificationManagerCompat.from(context)
-        val notification = builder.build()
         withContext(Dispatchers.Default) {
-            if (decision.replaceExistingBeforePost) {
-                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+            val messaging = messagingPost
+            if (messaging != null) {
+                ConversationCardPostSynchronizer.withLock(
+                    notificationContent.notificationTag,
+                    notificationContent.notificationId,
+                    ConversationCardOp.SHOW_NOTIFY,
+                ) {
+                    val carried =
+                        if (redactContent) {
+                            null
+                        } else {
+                            existingMessagingStyle(
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                            )?.messages
+                        }
+                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                        ConversationCardOp.SHOW_NOTIFY,
+                        ConversationCardBarrier.AFTER_READ,
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
+                    )
+                    builder.setStyle(
+                        messagingStyle(
+                            update,
+                            notificationContent,
+                            messaging.conversationTitleOverride,
+                            decision.historyCap,
+                            carried,
+                            messaging.sender,
+                        ),
+                    )
+                    val notification = builder.build()
+                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                        ConversationCardOp.SHOW_NOTIFY,
+                        ConversationCardBarrier.BEFORE_WRITE,
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
+                    )
+                    if (decision.replaceExistingBeforePost) {
+                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                    }
+                    notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
+                }
+            } else {
+                val notification = builder.build()
+                if (decision.replaceExistingBeforePost) {
+                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                }
+                notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
             }
-            notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
         }
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
@@ -427,6 +466,35 @@ class LocalNotificationPresenter(
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
+    internal fun conversationCardMessageIdHex(
+        notificationTag: String,
+        notificationId: Int,
+    ): String? = conversationCardMessageIdHex(activeConversationCard(notificationTag, notificationId))
+
+    internal fun cancelRepliedConversationCardIfSameGeneration(
+        notificationTag: String,
+        notificationId: Int,
+        repliedMessageIdHex: String?,
+    ) {
+        ConversationCardPostSynchronizer.withLock(
+            notificationTag,
+            notificationId,
+            ConversationCardOp.CANCEL_IF_SAME_GENERATION,
+        ) {
+            val liveCardMessageIdHex = conversationCardMessageIdHex(notificationTag, notificationId)
+            ConversationCardPostSynchronizer.awaitTestBarrier(
+                ConversationCardOp.CANCEL_IF_SAME_GENERATION,
+                ConversationCardBarrier.AFTER_READ,
+                notificationTag,
+                notificationId,
+            )
+            if (shouldCancelRepliedConversationCard(repliedMessageIdHex, liveCardMessageIdHex)) {
+                NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
+                notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
+            }
+        }
+    }
+
     /**
      * Re-post the (tag, id) notification carrying a RemoteInput history entry —
      * the documented "reply handled" signal that clears the system's
@@ -448,27 +516,38 @@ class LocalNotificationPresenter(
         notificationTag: String,
         notificationId: Int,
         replyText: String,
-    ): Boolean {
-        val active =
+    ): Boolean =
+        ConversationCardPostSynchronizer.withLock(
+            notificationTag,
+            notificationId,
+            ConversationCardOp.MARK_REPLY_HANDLED,
+        ) {
+            val active =
+                runCatching {
+                    context
+                        .getSystemService(NotificationManager::class.java)
+                        ?.activeNotifications
+                        ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+                }.getOrNull() ?: return@withLock false
+            ConversationCardPostSynchronizer.awaitTestBarrier(
+                ConversationCardOp.MARK_REPLY_HANDLED,
+                ConversationCardBarrier.AFTER_READ,
+                notificationTag,
+                notificationId,
+            )
             runCatching {
-                context
-                    .getSystemService(NotificationManager::class.java)
-                    ?.activeNotifications
-                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
-            }.getOrNull() ?: return false
-        return runCatching {
-            val resolved =
-                NotificationCompat
-                    .Builder(context, active.notification)
-                    .setRemoteInputHistory(arrayOf(replyText))
-                    .setSilent(true)
-                    .setOnlyAlertOnce(true)
-                    .build()
-            NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
-            notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
-            true
-        }.getOrDefault(false)
-    }
+                val resolved =
+                    NotificationCompat
+                        .Builder(context, active.notification)
+                        .setRemoteInputHistory(arrayOf(replyText))
+                        .setSilent(true)
+                        .setOnlyAlertOnce(true)
+                        .build()
+                NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+                notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
+                true
+            }.getOrDefault(false)
+        }
 
     // Accumulate every message from a conversation into one card. Android keys a
     // notification by (tag, id); reusing the per-conversation tag updates the
@@ -501,18 +580,25 @@ class LocalNotificationPresenter(
         return style
     }
 
+    private fun activeConversationCard(
+        tag: String,
+        id: Int,
+    ): Notification? =
+        runCatching {
+            context
+                .getSystemService(NotificationManager::class.java)
+                ?.activeNotifications
+                ?.firstOrNull { it.tag == tag && it.id == id }
+                ?.notification
+        }.getOrNull()
+
     private fun existingMessagingStyle(
         tag: String,
         id: Int,
     ): NotificationCompat.MessagingStyle? {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return null
-        val existing =
-            runCatching { manager.activeNotifications }
-                .getOrNull()
-                ?.firstOrNull { it.tag == tag && it.id == id }
-                ?: return null
-        if (existing.notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
-        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
+        val existing = activeConversationCard(tag, id) ?: return null
+        if (existing.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
+        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing)
     }
 
     private fun publishConversationShortcut(
@@ -706,6 +792,11 @@ class LocalNotificationPresenter(
         )
     }
 }
+
+private data class MessagingPostContext(
+    val sender: Person,
+    val conversationTitleOverride: String?,
+)
 
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
