@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
+import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
 import dev.ipf.whitenoise.android.ui.profile.AddAccountSheetContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -30,6 +31,7 @@ class AddAccountSheetContentTest {
         amberSignerAvailable: Boolean,
         identity: String = "",
         inFlightAction: OnboardingAction = OnboardingAction.Idle,
+        importErrorRes: Int? = null,
         onCreate: () -> Unit = {},
         onLoginWithAmber: () -> Unit = {},
         onImport: () -> Unit = {},
@@ -40,7 +42,7 @@ class AddAccountSheetContentTest {
                     amberSignerAvailable = amberSignerAvailable,
                     inFlightAction = inFlightAction,
                     identity = identity,
-                    importErrorRes = null,
+                    importErrorRes = importErrorRes,
                     onCreate = onCreate,
                     onLoginWithAmber = onLoginWithAmber,
                     onIdentityChange = {},
@@ -100,5 +102,14 @@ class AddAccountSheetContentTest {
         setContent(amberSignerAvailable = true, inFlightAction = OnboardingAction.Creating)
         composeRule.onNodeWithText(string(R.string.onboarding_login_with_amber)).assertIsNotEnabled()
         composeRule.onNodeWithText(string(R.string.import_existing_identity)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun publicKeyImportFailureShowsDedicatedError() {
+        val npub = "npub1" + "a".repeat(58)
+        val errorRes = importIdentityErrorRes(npub)
+        setContent(amberSignerAvailable = false, identity = npub, importErrorRes = errorRes)
+        composeRule.onNodeWithText(string(R.string.import_existing_identity)).performClick()
+        composeRule.onNodeWithText(string(R.string.sign_in_error_public_key)).assertExists()
     }
 }
