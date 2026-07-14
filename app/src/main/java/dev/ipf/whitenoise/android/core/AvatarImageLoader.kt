@@ -117,7 +117,15 @@ object AvatarImageLoader {
                 if (isFailureFresh(url, System.currentTimeMillis())) {
                     return@synchronized CompletedAvatarRequest(null)
                 }
-                inFlight[url]?.let { return@synchronized PendingAvatarRequest(it) }
+                inFlight[url]?.let {
+                    // A prewarm admission is only for starting new regular-lane work.
+                    // Do not hold it while an existing demand fetch finishes.
+                    return@synchronized if (fetchLane == AvatarFetchLane.PREWARM_ADMITTED) {
+                        CompletedAvatarRequest(null)
+                    } else {
+                        PendingAvatarRequest(it)
+                    }
+                }
                 val inFlightRequest = AvatarInFlightRequest()
                 val deferred = inFlightRequest.result
                 inFlight[url] = inFlightRequest

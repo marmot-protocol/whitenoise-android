@@ -37,7 +37,7 @@ class AvatarImageLoaderTest {
             val notifications =
                 List(2) {
                     async(Dispatchers.Default) {
-                        gate.withNotificationPermit {
+                        gate.withPermit(AvatarFetchLane.NOTIFICATION) {
                             if (notificationStarts.incrementAndGet() == 2) {
                                 bothNotificationsStarted.complete(Unit)
                             }

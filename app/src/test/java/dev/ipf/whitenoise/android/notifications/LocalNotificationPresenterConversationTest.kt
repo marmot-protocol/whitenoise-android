@@ -4,8 +4,10 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -129,6 +131,18 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(32, bitmap.width)
         assertEquals(32, bitmap.height)
         assertEquals(IconCompat.TYPE_BITMAP, icon.type)
+    }
+
+    @Test
+    fun monogramBackgroundMaintainsReadableContrastWithWhiteInitials() {
+        val brightestHueSeed = "gk" // Java hash 3300 -> hue 60 (yellow).
+
+        assertTrue(
+            ColorUtils.calculateContrast(
+                Color.WHITE,
+                notificationMonogramBackgroundColor(brightestHueSeed),
+            ) >= 4.5,
+        )
     }
 
     private fun update(isMention: Boolean) =

@@ -830,7 +830,7 @@ internal fun notificationMonogramBitmap(
 
 internal fun notificationMonogramBackgroundColor(seed: String): Int {
     val hue = Math.floorMod(seed.hashCode(), 360).toFloat()
-    return Color.HSVToColor(floatArrayOf(hue, 0.58f, 0.62f))
+    return Color.HSVToColor(floatArrayOf(hue, 0.58f, 0.45f))
 }
 
 internal fun notificationAvatarInitials(title: String): String {
