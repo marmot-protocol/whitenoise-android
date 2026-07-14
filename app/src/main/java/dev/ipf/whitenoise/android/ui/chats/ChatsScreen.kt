@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -86,6 +87,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,7 +101,18 @@ internal fun ChatsScreen(
     // scrolls to that message on open. justCreated is true only when the chat
     // was just created by the New Chat / Create Group flow (issue #321), which
     // opens it with the composer focused + keyboard up.
-    onOpenGroup: (ChatListItem, String?, Boolean) -> Unit,
+    onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHeadId: String?) -> Unit,
+    // Head row id captured when the shell opened a conversation from this list.
+    // Compared once on re-entry so a background reorder while away can snap to
+    // item 0 without yanking an active on-list reader (issue #1313).
+    conversationReturnHeadId: String? = null,
+    onConversationReturnHeadHandled: () -> Unit = {},
+    // Chat-list profile opens must capture the same visible filtered head used
+    // by direct conversation opens so profile-sheet Message/shared-group routes
+    // can arm the return snap (#1313).
+    onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
+        appState.presentProfile(npub)
+    },
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
@@ -268,6 +281,20 @@ internal fun ChatsScreen(
             )
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
+
+    fun openGroupFromVisibleList(
+        item: ChatListItem,
+        focusMessageId: String?,
+        justCreated: Boolean,
+    ) {
+        val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+        onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
+    }
+
+    fun presentProfileFromVisibleList(npub: String) {
+        val visibleHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+        onPresentProfile(npub, visibleHeadId)
+    }
     LaunchedEffect(visibleChatIds, selectionMode) {
         if (selectionMode) {
             selectedChatIds.retainAll(reconcileChatListSelection(selectedChatIds, visibleChatIds))
@@ -312,39 +339,57 @@ internal fun ChatsScreen(
         }
     }
     // Snap the list flush to the top when a different chat reorders into
-    // position 0 *and the head row is sitting clipped* (issue #541). A send
-    // bumps the messaged conversation to the head via the live subscription;
-    // with keyed `items`, LazyColumn pins the previously-anchored row at its
-    // old pixel offset, so the new head lands one row down / clipped instead of
-    // flush. We snap to offset 0 so the freshest chat is fully visible.
+    // position 0 (issue #541 / #1313). A send bumps the messaged conversation
+    // to the head via the live subscription; with keyed `items`, LazyColumn pins
+    // the previously-anchored row at its old pixel offset, so the new head lands
+    // one row down / clipped instead of flush. We snap to offset 0 so the
+    // freshest chat is fully visible.
     //
-    // The snap is deliberately constrained to the clipped-head case so a plain
-    // background/incoming reorder can't yank an idle reader to the top (issue
-    // #541 review). It fires only when ALL hold:
-    //   - active (non-archived) list,
-    //   - the head row's identity actually changed (a different chat reordered
-    //     in; the first established head is seeded without snapping),
-    //   - the user is not mid-scroll (`isScrollInProgress`),
-    //   - the viewport is anchored at item 0 (`firstVisibleItemIndex == 0`) —
-    //     i.e. the user was at/near the top, the send/back-return case — and
-    //   - that item-0 anchor is clipped (`firstVisibleItemScrollOffset > 0`),
-    //     the symptom we're correcting.
-    // A reader scrolled deeper has `firstVisibleItemIndex > 0`, so an unrelated
-    // reorder to data-index-0 leaves their position untouched.
+    // Two paths, both via [ChatListHeadSnap]:
+    //   - Return from a conversation: if the head changed while the list was
+    //     off-screen, snap regardless of the restored scroll index (#1313).
+    //   - Active on-list reader: only the clipped-head case at item 0 so a
+    //     background reorder cannot yank someone scrolled deeper (#541 review).
     // Keyed on `showArchived` so the tracked head resets alongside
     // `chatListState` on a view swap.
     val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
     var lastActiveHeadId by remember(showArchived) { mutableStateOf(activeHeadId) }
+    LaunchedEffect(conversationReturnHeadId, activeHeadId, showArchived) {
+        val headAtConversationOpen = conversationReturnHeadId ?: return@LaunchedEffect
+        snapshotFlow {
+            canDecideConversationReturnHeadSnap(
+                headIdAtConversationOpen = headAtConversationOpen,
+                currentHeadId = activeHeadId,
+                isScrollInProgress = chatListState.isScrollInProgress,
+                isActiveList = !showArchived,
+            )
+        }.first { it }
+        if (
+            shouldSnapChatListOnConversationReturn(
+                headIdAtConversationOpen = headAtConversationOpen,
+                currentHeadId = activeHeadId,
+                isActiveList = !showArchived,
+            )
+        ) {
+            chatListState.scrollToItem(0)
+        }
+        onConversationReturnHeadHandled()
+    }
     LaunchedEffect(activeHeadId) {
         val previous = lastActiveHeadId
         lastActiveHeadId = activeHeadId
-        if (activeHeadId == null || previous == null || activeHeadId == previous) return@LaunchedEffect
-        if (chatListState.isScrollInProgress) return@LaunchedEffect
-        // Only correct the clipped head at the top of the list; leave a reader
-        // scrolled further down (firstVisibleItemIndex > 0) where they are.
-        if (chatListState.firstVisibleItemIndex != 0) return@LaunchedEffect
-        if (chatListState.firstVisibleItemScrollOffset == 0) return@LaunchedEffect
-        chatListState.scrollToItem(0)
+        if (
+            shouldSnapChatListForClippedHeadReorder(
+                previousHeadId = previous,
+                currentHeadId = activeHeadId,
+                firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = chatListState.firstVisibleItemScrollOffset,
+                isScrollInProgress = chatListState.isScrollInProgress,
+                isActiveList = !showArchived,
+            )
+        ) {
+            chatListState.scrollToItem(0)
+        }
     }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
@@ -361,7 +406,7 @@ internal fun ChatsScreen(
             appState = appState,
             onOpenConversation = { item, justCreated ->
                 showNewChatFlow = false
-                onOpenGroup(item, null, justCreated)
+                openGroupFromVisibleList(item, null, justCreated)
             },
             onClose = { showNewChatFlow = false },
         )
@@ -495,11 +540,11 @@ internal fun ChatsScreen(
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
                     searchOpen = false
-                    onOpenGroup(chat, null, false)
+                    openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
                     searchOpen = false
-                    appState.presentProfile(npub)
+                    presentProfileFromVisibleList(npub)
                 },
             )
             Box(Modifier.fillMaxSize()) {
@@ -558,7 +603,8 @@ internal fun ChatsScreen(
                                     selectionMode = selectionMode,
                                     selected = item.id in selectedChatIds,
                                     bodyMatch = bodyMatch,
-                                    onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex, false) },
+                                    onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                                    onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
                                     onEnterSelection = {
                                         selectedChatIds.clear()
                                         selectedChatIds.addAll(enterChatListSelection(item.id))
@@ -725,6 +771,7 @@ private fun ChatListIdentifierResult(
                     item = existing,
                     appState = appState,
                     onClick = { onOpenChat(existing) },
+                    onOpenProfile = onOpenProfile,
                 )
             } else {
                 ListItem(
