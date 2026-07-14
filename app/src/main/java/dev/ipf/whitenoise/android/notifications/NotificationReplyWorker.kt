@@ -78,7 +78,9 @@ class NotificationReplyWorker(
         }
         if (!application.appState.notificationActionsAllowed) {
             val persisted =
-                completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)
+                withContext(Dispatchers.IO) {
+                    completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)
+                }
             if (!persisted) return Result.retry()
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             return Result.success()
@@ -101,7 +103,9 @@ class NotificationReplyWorker(
                     )
                 }
             if (sendOutcome != NotificationReplySendOutcome.Failed) {
-                completionStore.markCompleted(completionKey)
+                withContext(Dispatchers.IO) {
+                    completionStore.markCompleted(completionKey)
+                }
                 completedReplyResult(application, action, reply)
             } else {
                 notificationReplyActionHandled(sent = false)
@@ -142,16 +146,19 @@ class NotificationReplyWorker(
         return Result.success()
     }
 
-    private fun replyFailureResult(
+    private suspend fun replyFailureResult(
         action: NotificationAction,
         containsLegacyPlaintext: Boolean,
         completionStore: NotificationReplyCompletionStore,
         completionKey: String,
     ): Result {
         if (shouldRetryAfterFailure(runAttemptCount, containsLegacyPlaintext)) return Result.retry()
-        // Only persist the abandon marker once we're actually giving up; if it
-        // can't be recorded, retry so recovery state isn't lost.
-        val persisted = completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Failure)
+        // Only persist the abandon marker once we're actually giving up (off the
+        // worker thread); if it can't be recorded, retry so recovery state isn't lost.
+        val persisted =
+            withContext(Dispatchers.IO) {
+                completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Failure)
+            }
         if (!persisted) return Result.retry()
         val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
         Log.w(TAG, "reply failed ($reason) group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")

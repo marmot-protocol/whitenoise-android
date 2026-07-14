@@ -3691,7 +3691,7 @@ class WhiteNoiseAppState(
             }
         }.onFailure {
             rethrowIfCancellation(it)
-            Log.w("DMAppState", "notification reply failed for group=${group.take(8)}", it)
+            appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
         }.getOrDefault(NotificationReplySendOutcome.Failed)
     }
 
@@ -3748,7 +3748,7 @@ class WhiteNoiseAppState(
             }
         }.onFailure {
             rethrowIfCancellation(it)
-            Log.w("DMAppState", "notification reply dedupe probe failed for group=${group.take(8)}", it)
+            appStateDebug(it) { "notification reply dedupe probe failed for group=${group.take(8)}: ${it.readableMessage()}" }
         }.getOrDefault(NotificationReplyCommitProbe.Indeterminate)
     }
 

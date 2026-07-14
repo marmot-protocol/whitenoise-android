@@ -213,9 +213,11 @@ internal class NotificationReplyCompletionStore(
                 .map { it.removePrefix(RECOVERY_SEQUENCE_KEY_PREFIX) }
                 .filterNot(::hasStarted)
                 .toList()
-        terminalKeys.forEach { key ->
-            if (!recoveryStateIsRequiredFence(key)) removeRecoveryState(key).commit()
-        }
+        val prunableKeys = terminalKeys.filterNot(::recoveryStateIsRequiredFence)
+        if (prunableKeys.isEmpty()) return
+        val editor = preferences.edit()
+        prunableKeys.forEach { key -> removeRecoveryState(editor, key) }
+        editor.commit()
     }
 
     private fun recoveryStateIsRequiredFence(key: String): Boolean {
