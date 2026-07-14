@@ -389,10 +389,29 @@ class LocalNotificationPresenter(
         val notificationManager = NotificationManagerCompat.from(context)
         val notification = builder.build()
         withContext(Dispatchers.Default) {
-            if (decision.replaceExistingBeforePost) {
-                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+            if (decision.style == NotificationStyleChoice.Messaging) {
+                ConversationCardPostSynchronizer.withLock(
+                    notificationContent.notificationTag,
+                    notificationContent.notificationId,
+                    ConversationCardOp.SHOW_NOTIFY,
+                ) {
+                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                        ConversationCardOp.SHOW_NOTIFY,
+                        ConversationCardBarrier.BEFORE_WRITE,
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
+                    )
+                    if (decision.replaceExistingBeforePost) {
+                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                    }
+                    notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
+                }
+            } else {
+                if (decision.replaceExistingBeforePost) {
+                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                }
+                notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
             }
-            notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
         }
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
@@ -444,13 +463,22 @@ class LocalNotificationPresenter(
         notificationId: Int,
         repliedMessageIdHex: String?,
     ) {
-        if (
-            shouldCancelRepliedConversationCard(
-                repliedMessageIdHex,
-                conversationCardMessageIdHex(notificationTag, notificationId),
-            )
+        ConversationCardPostSynchronizer.withLock(
+            notificationTag,
+            notificationId,
+            ConversationCardOp.CANCEL_IF_SAME_GENERATION,
         ) {
-            cancel(notificationTag, notificationId)
+            val liveCardMessageIdHex = conversationCardMessageIdHex(notificationTag, notificationId)
+            ConversationCardPostSynchronizer.awaitTestBarrier(
+                ConversationCardOp.CANCEL_IF_SAME_GENERATION,
+                ConversationCardBarrier.AFTER_READ,
+                notificationTag,
+                notificationId,
+            )
+            if (shouldCancelRepliedConversationCard(repliedMessageIdHex, liveCardMessageIdHex)) {
+                NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
+                notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
+            }
         }
     }
 
@@ -475,27 +503,38 @@ class LocalNotificationPresenter(
         notificationTag: String,
         notificationId: Int,
         replyText: String,
-    ): Boolean {
-        val active =
+    ): Boolean =
+        ConversationCardPostSynchronizer.withLock(
+            notificationTag,
+            notificationId,
+            ConversationCardOp.MARK_REPLY_HANDLED,
+        ) {
+            val active =
+                runCatching {
+                    context
+                        .getSystemService(NotificationManager::class.java)
+                        ?.activeNotifications
+                        ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+                }.getOrNull() ?: return@withLock false
+            ConversationCardPostSynchronizer.awaitTestBarrier(
+                ConversationCardOp.MARK_REPLY_HANDLED,
+                ConversationCardBarrier.AFTER_READ,
+                notificationTag,
+                notificationId,
+            )
             runCatching {
-                context
-                    .getSystemService(NotificationManager::class.java)
-                    ?.activeNotifications
-                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
-            }.getOrNull() ?: return false
-        return runCatching {
-            val resolved =
-                NotificationCompat
-                    .Builder(context, active.notification)
-                    .setRemoteInputHistory(arrayOf(replyText))
-                    .setSilent(true)
-                    .setOnlyAlertOnce(true)
-                    .build()
-            NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
-            notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
-            true
-        }.getOrDefault(false)
-    }
+                val resolved =
+                    NotificationCompat
+                        .Builder(context, active.notification)
+                        .setRemoteInputHistory(arrayOf(replyText))
+                        .setSilent(true)
+                        .setOnlyAlertOnce(true)
+                        .build()
+                NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+                notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
+                true
+            }.getOrDefault(false)
+        }
 
     // Accumulate every message from a conversation into one card. Android keys a
     // notification by (tag, id); reusing the per-conversation tag updates the
