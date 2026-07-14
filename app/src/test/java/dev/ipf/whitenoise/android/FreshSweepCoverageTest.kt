@@ -78,22 +78,6 @@ class FreshSweepCoverageTest {
     }
 
     @Test
-    fun readAndReplyActionsClearRepliedCardAndSpareNewerSiblings() {
-        val replyWorker = source("notifications/NotificationReplyWorker.kt")
-        val actionReceiver = source("notifications/NotificationActionReceiver.kt")
-
-        // Both paths cancel the replied/read card outright BEFORE clearing its
-        // reaction/mention/invite siblings, and the sibling clear is bounded by
-        // the captured action-window cutoff so newer cards survive (#1311).
-        listOf(replyWorker, actionReceiver).forEach { text ->
-            val cancelAt = text.indexOf("cancel(action.notificationTag, action.notificationId)")
-            val siblingAt = text.indexOf("dismissConversationSiblingCardsNotNewerThan(")
-            assertTrue(cancelAt in 0 until siblingAt)
-            assertTrue(text.contains("sinceMs = dismissBaselineMs"))
-        }
-    }
-
-    @Test
     fun notificationMarkReadConfinesAppStateMutationsToMainThread() {
         val source = source("notifications/NotificationActionReceiver.kt")
         val markReadBranch = source.section("NotificationActionKind.MARK_READ -> {", "val presenter")

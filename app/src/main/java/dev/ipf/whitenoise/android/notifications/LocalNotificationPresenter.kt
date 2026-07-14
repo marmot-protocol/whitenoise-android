@@ -42,6 +42,9 @@ import kotlin.coroutines.coroutineContext
 
 class LocalNotificationPresenter(
     private val context: Context,
+    private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
+        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+    },
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -131,14 +134,23 @@ class LocalNotificationPresenter(
         }
     }
 
-    // Replying / marking read from the shade engaged with the conversation as it
-    // stood when the action fired, not with cards that arrived afterwards. Clear
-    // the reaction, mention, and invite sibling cards, but keep any that were
+    // Replying / marking read owns the acted-on card, so cancel it before taking
+    // the sibling snapshot. Both action paths share this operation so their
+    // ordering and newer-sibling preservation cannot drift apart.
+    fun dismissActionNotificationAndOlderSiblings(
+        notificationTag: String,
+        notificationId: Int,
+        accountRef: String,
+        groupIdHex: String,
+        sinceMs: Long,
+    ): Boolean {
+        cancel(notificationTag, notificationId)
+        return dismissConversationSiblingCardsNotNewerThan(accountRef, groupIdHex, sinceMs)
+    }
+
+    // Clear reaction, mention, and invite sibling cards, but keep any that were
     // (re)posted after [sinceMs] — a reaction, mention, or invite that landed
-    // during the reply's retry+settle window is genuinely new and must survive.
-    // The replied/read message card is cancelled directly by the caller (it is
-    // deliberately re-posted mid-window to clear the direct-reply lifetime
-    // extension), so it is not matched here.
+    // during the action window is genuinely new and must survive.
     fun dismissConversationSiblingCardsNotNewerThan(
         accountRef: String,
         groupIdHex: String,
@@ -146,7 +158,7 @@ class LocalNotificationPresenter(
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        val active = runCatching { manager.activeNotifications }.getOrNull()?.toList().orEmpty()
+        val active = runCatching { activeNotificationsProvider(manager) }.getOrNull()?.toList().orEmpty()
         val compat = NotificationManagerCompat.from(context)
         val postTimeByKey = active.associate { (it.tag to it.id) to it.postTime }
         listOf(
@@ -553,7 +565,7 @@ class LocalNotificationPresenter(
                     .setPerson(sender)
                     .setLongLived(true)
                     .build()
-            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+            shortcutPublisher(shortcut)
             shortcutSnapshots[shortcutId] = snapshot
             ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
         }.onFailure {
