@@ -11,6 +11,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Requested at runtime only when the user taps Location in the composer
+         attachment sheet, for a single current-location share. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Requested at runtime only when the user opts into the recent-media strip
+         in the attachment sheet; the Gallery tile itself stays permission-free
+         via the system photo picker. VISUAL_USER_SELECTED supports Android's
+         partial ("Select photos") grant. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

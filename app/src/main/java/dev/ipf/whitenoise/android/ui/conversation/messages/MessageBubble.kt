@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -61,6 +63,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -111,6 +114,14 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
+import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -632,6 +643,43 @@ internal fun MessageBubble(
                         audioAttachments.isNotEmpty() ||
                         videoAttachments.isNotEmpty() ||
                         fileAttachments.isNotEmpty()
+                // Share-message recognition (app-side rich rendering). A contact
+                // ships as a text/vcard attachment with a name/phone caption, so
+                // its card draws from the caption without fetching the blob; a
+                // location ships as a plain maps-link text with no attachment.
+                // Both stay readable on any other client (a .vcf file / a link).
+                val vcardAttachment =
+                    remember(fileAttachments) {
+                        fileAttachments.firstOrNull { (_, ref) ->
+                            ref.mediaType.equals(VCARD_MIME_TYPE, ignoreCase = true) ||
+                                ref.fileName.endsWith(".vcf", ignoreCase = true)
+                        }
+                    }
+                val shareBodyText = editState?.latestText ?: record.plaintext
+                val sharedContact =
+                    remember(vcardAttachment, shareBodyText, deleted, invalidated) {
+                        if (vcardAttachment != null && !deleted && !invalidated) {
+                            parseSharedContactFromText(shareBodyText)
+                        } else {
+                            null
+                        }
+                    }
+                val sharedLocation =
+                    remember(shareBodyText, deleted, invalidated, anyConfirmedMedia, record.kind) {
+                        if (!deleted && !invalidated && !anyConfirmedMedia && record.kind == 9uL) {
+                            parseSharedLocationFromText(shareBodyText)
+                        } else {
+                            null
+                        }
+                    }
+                val sharedUser =
+                    remember(shareBodyText, deleted, invalidated, anyConfirmedMedia, record.kind) {
+                        if (!deleted && !invalidated && !anyConfirmedMedia && record.kind == 9uL) {
+                            parseSharedUserFromText(shareBodyText)
+                        } else {
+                            null
+                        }
+                    }
                 val pendingAttachmentsForRecord =
                     remember(record.messageIdHex, controller.pendingAttachmentsList(record.messageIdHex)) {
                         controller.pendingAttachmentsList(record.messageIdHex)
@@ -708,7 +756,9 @@ internal fun MessageBubble(
                             anyConfirmedMedia ||
                                 pendingAudio.isNotEmpty() ||
                                 pendingVisualRefs.isNotEmpty() ||
-                                showPendingPlaceholder
+                                showPendingPlaceholder ||
+                                sharedLocation != null ||
+                                sharedUser != null
                         )
                 // The media-rendering blocks. Each child keeps its own rounded
                 // media Surface, so calling this directly in the row Column (not
@@ -730,6 +780,35 @@ internal fun MessageBubble(
                         }
                     }
                 val mediaBlocks: @Composable ColumnScope.() -> Unit = {
+                    if (sharedLocation != null) {
+                        val shareContext = LocalContext.current
+                        LocationMessageBubble(
+                            location = sharedLocation,
+                            onOpen = {
+                                runCatching {
+                                    shareContext.startActivity(
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse(
+                                                "https://maps.google.com/maps?q=" +
+                                                    "${formatCoordinate(sharedLocation.latitude)}," +
+                                                    formatCoordinate(sharedLocation.longitude),
+                                            ),
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }
+                            },
+                        )
+                    }
+                    if (sharedContact != null) {
+                        ContactMessageBubble(contact = sharedContact)
+                    }
+                    if (sharedUser != null) {
+                        UserMessageBubble(
+                            user = sharedUser,
+                            onOpen = { appState.presentProfile(sharedUser.npub) },
+                        )
+                    }
                     if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
                         if (visualAttachments.size == 1) {
                             val entry = visualAttachments.first()
@@ -789,6 +868,10 @@ internal fun MessageBubble(
                     }
                     if (!deleted && !invalidated && fileAttachments.isNotEmpty()) {
                         fileAttachments.forEach { entry ->
+                            // A vCard renders the contact card above; keep its file
+                            // pill too so the .vcf stays downloadable/openable until
+                            // the card gains its own save action (both app-generated
+                            // and inbound shares must remain reachable as files).
                             MediaFileBubble(
                                 messageIdHex = record.messageIdHex,
                                 attachmentIndex = entry.index,
@@ -909,6 +992,9 @@ internal fun MessageBubble(
                         // Deleted/invalidated tombstones show only the
                         // tombstone copy, never an inline image/caption.
                         deleted || invalidated -> displayedBody
+                        // The contact card / location bubble / user card carry
+                        // the body, so the raw caption/link/npub text is hidden.
+                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
                         mediaPendingName != null && !anyConfirmedMedia -> null
                         anyConfirmedMedia ->
                             (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }

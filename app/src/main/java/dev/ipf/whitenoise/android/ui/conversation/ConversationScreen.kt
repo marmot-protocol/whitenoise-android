@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -62,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +80,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -87,6 +91,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,6 +108,7 @@ import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
@@ -120,6 +126,7 @@ import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
+import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -135,11 +142,12 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewSheet
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
@@ -154,6 +162,18 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
+import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
+import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
+import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
+import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
+import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
+import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
+import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
@@ -172,6 +192,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
@@ -599,6 +620,7 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField; `composerFocused` mirrors the live focus
@@ -739,6 +761,86 @@ internal fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) launchCameraCapture() }
+
+    // Contact share (attachment sheet): the phone-row picker returns a data
+    // URI whose temporary read grant covers the chosen entry's name + number
+    // directly, so no READ_CONTACTS permission is requested and nothing
+    // beyond that one picked row is read — never the address book.
+    var pendingContactShare by remember(chat.id) { mutableStateOf<SharedContact?>(null) }
+    // The picked point lives only here until the user sends or cancels; the
+    // keyless OSM picker is the single confirmation surface.
+    var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    // "Share user" (npub) — the identity-native counterpart to a phone contact.
+    // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
+    // the recipient can tap to open that profile.
+    var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
+    val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
+    val contactPickerLauncher =
+        rememberLauncherForActivityResult(PickContactPhoneRow()) { contactUri ->
+            if (contactUri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val contact =
+                    withContext(Dispatchers.IO) {
+                        readSharedContact(context.contentResolver, contactUri)
+                    }
+                if (contact == null || contact.isEmpty) {
+                    appState.present(R.string.contact_read_failed)
+                } else {
+                    pendingContactShare = contact
+                }
+            }
+        }
+
+    fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { grants ->
+            if (locationGrantAllowsSharing(grants)) {
+                locationPickerOpen = true
+            } else {
+                appState.present(R.string.location_permission_denied)
+            }
+        }
+
+    fun sendSharedUser(candidate: RecipientSearch.Candidate) {
+        val body = formatUserShareText(candidate.displayName, candidate.npub)
+        appState.launchMutation {
+            controller.send(body) {
+                scope.launch {
+                    val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    listState.animateScrollToItem(target)
+                }
+            }
+        }
+    }
+
+    fun sendSharedContact(contact: SharedContact) {
+        appState.launchMutation {
+            val vcardBytes =
+                withContext(Dispatchers.IO) {
+                    buildVCard(contact).toByteArray(Charsets.UTF_8)
+                }
+            // The vCard rides the existing media pipeline as a text/vcard
+            // attachment (portable — any client can save it), and the caption
+            // carries the human-readable name/phone so a peer with no contact
+            // renderer still reads it, and our own bubble draws a card from it.
+            val attachment =
+                PendingAttachment(
+                    plaintextBytes = vcardBytes,
+                    mediaType = VCARD_MIME_TYPE,
+                    fileName = contactVCardFileName(contact),
+                )
+            val caption = formatContactShareText(contact).ifBlank { null }
+            val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
+            scope.launch {
+                val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                listState.animateScrollToItem(target)
+            }
+            controller.uploadQueued(seeded)
+        }
+    }
 
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
@@ -1174,9 +1276,14 @@ internal fun ConversationScreen(
         imageUris: List<android.net.Uri>,
         documentUris: List<android.net.Uri>,
         caption: String,
+        onAccepted: () -> Unit = {},
+        onRejected: () -> Unit = {},
         onAfterSend: () -> Unit = {},
     ) {
-        if (imageUris.isEmpty() && documentUris.isEmpty()) return
+        if (imageUris.isEmpty() && documentUris.isEmpty()) {
+            onRejected()
+            return
+        }
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
             // Enforce the album byte cap on images first so a multi-large-photo
@@ -1223,6 +1330,7 @@ internal fun ConversationScreen(
                     val toast =
                         if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
                     appState.present(toast, copyable = !imageAlbumOverflowed)
+                    onRejected()
                     return@launchMutation
                 }
             }
@@ -1234,7 +1342,10 @@ internal fun ConversationScreen(
             } else if (docOutcome.rejected) {
                 appState.present(R.string.media_file_too_large)
             }
-            if (merged.isEmpty()) return@launchMutation
+            if (merged.isEmpty()) {
+                onRejected()
+                return@launchMutation
+            }
             // Two-phase ship: SEED every send synchronously (so all the
             // optimistic bubbles appear in the same recomposition pass and
             // the user sees the queue light up at once), THEN run the
@@ -1293,13 +1404,18 @@ internal fun ConversationScreen(
                     if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
                 controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
             }
+            if (seeded.isEmpty()) {
+                onRejected()
+                return@launchMutation
+            }
             // Pull the user down to the just-seeded bubbles before the
             // upload loop suspends — same UX as text-send. Firing after
             // queueAttachments (the optimistic seed) and before
             // uploadQueued (the FFI publish) means the scroll lands in the
             // same frame the bubble appears, instead of waiting on the
             // relay round-trip.
-            if (seeded.isNotEmpty()) onAfterSend()
+            onAccepted()
+            onAfterSend()
             // Run uploads sequentially so the kind-9 publishes go out in
             // pick order. The optimistic bubbles are already on screen.
             for (slot in seeded) {
@@ -1724,7 +1840,9 @@ internal fun ConversationScreen(
     // settles — otherwise the anchor lands against the pre-IME viewport and the
     // newest message sits a few rows above the bottom until the keyboard closes.
     LaunchedEffect(imeIsOpen, chat.id, initialTimelineAnchored) {
-        if (!imeIsOpen || !initialTimelineAnchored || !nearBottom) return@LaunchedEffect
+        if (!imeIsOpen) return@LaunchedEffect
+        val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
+        if (!initialTimelineAnchored || !nearBottom || suppressForCustomInputSwap) return@LaunchedEffect
         repeat(24) {
             withFrameNanos { }
             val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
@@ -2093,6 +2211,10 @@ internal fun ConversationScreen(
             initialDraft = appState.draftFor(controller.group.groupIdHex).orEmpty(),
         )
 
+    // Hoisted from ComposerBar so a tap on the transcript can dismiss the
+    // attachment sheet — the composer itself stays interactive while it's open.
+    val composerAttachmentSheet = rememberComposerAttachmentSheetState()
+
     val openDetailsDescription = stringResource(R.string.details)
     LaunchedEffect(selectedForwardBodies.isEmpty()) {
         batchForwardSheetOpen =
@@ -2432,6 +2554,7 @@ internal fun ConversationScreen(
                                     onDraftChange = { appState.setDraft(groupIdHex, it) },
                                     draftKey = groupIdHex,
                                     textState = composerTextState,
+                                    attachmentSheetState = composerAttachmentSheet,
                                     editingMessageId = controller.editingMessageId,
                                     editingInitialText = editingRecord?.let { controller.displayedText(it) },
                                     onCancelEdit = { controller.editingMessageId = null },
@@ -2448,6 +2571,14 @@ internal fun ConversationScreen(
                                         imagePickerLauncher.launch(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                                         )
+                                    },
+                                    onPickRecentMedia = { uri ->
+                                        // A tap on the recent-media strip stages that item
+                                        // into the same shelf as the picker, so the preview
+                                        // sheet opens with it queued (multi-select + send
+                                        // live in the preview).
+                                        pendingMediaUris =
+                                            (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
                                     },
                                     onCaptureFromCamera = {
                                         val granted =
@@ -2467,6 +2598,25 @@ internal fun ConversationScreen(
                                         // without restricting by MIME. Bytes upload as-is.
                                         documentPickerLauncher.launch(arrayOf("*/*"))
                                     },
+                                    onShareLocation = {
+                                        // Permission is requested here, on the tap, never
+                                        // earlier. Fine and coarse together so the user's
+                                        // approximate-only choice still works.
+                                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                        ) {
+                                            locationPickerOpen = true
+                                        } else {
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                                ),
+                                            )
+                                        }
+                                    },
+                                    onShareUser = { shareUserPickerOpen = true },
+                                    onShareContact = { contactPickerLauncher.launch(Unit) },
                                     onPasteImageUris = { uris ->
                                         // Receive-content URI grants are scoped to the
                                         // paste callback. Copy the bytes into app-owned
@@ -2500,6 +2650,12 @@ internal fun ConversationScreen(
                                     composerFocus = composerFocus,
                                     onComposerFocusChanged = { composerFocused = it },
                                     onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
+                                    onKeyboardRestoreFromCustomInput = {
+                                        suppressNextImeOpenReanchor.set(true)
+                                    },
+                                    onKeyboardRestoreFromCustomInputFailed = {
+                                        suppressNextImeOpenReanchor.set(false)
+                                    },
                                 )
                             }
                         }
@@ -2816,6 +2972,27 @@ internal fun ConversationScreen(
                         }
                     }
             }
+            if (composerAttachmentSheet.isOpen) {
+                // Transparent scrim over the transcript only — the composer
+                // stays reachable, so the keyboard and emoji toggles can still
+                // swap the sheet away directly. Carries a dismiss semantics
+                // action + label so a screen reader announces (and can trigger)
+                // this otherwise-invisible touch layer.
+                val dismissLabel = stringResource(R.string.close)
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .pointerInput(composerAttachmentSheet) {
+                            detectTapGestures { composerAttachmentSheet.dismiss() }
+                        }.semantics {
+                            contentDescription = dismissLabel
+                            onClick(label = dismissLabel) {
+                                composerAttachmentSheet.dismiss()
+                                true
+                            }
+                        },
+                )
+            }
         }
     }
 
@@ -2925,23 +3102,76 @@ internal fun ConversationScreen(
         )
     }
 
+    pendingContactShare?.let { contact ->
+        ContactPreviewScreen(
+            contact = contact,
+            onDismiss = { pendingContactShare = null },
+            onSend = { selected ->
+                pendingContactShare = null
+                sendSharedContact(selected)
+            },
+        )
+    }
+
+    if (shareUserPickerOpen) {
+        val activeHex = appState.activeAccount?.accountIdHex
+        ContactPickerScreen(
+            appState = appState,
+            title = stringResource(R.string.share_user_title),
+            selected = shareUserSelection,
+            onBack = {
+                shareUserPickerOpen = false
+                shareUserSelection.clear()
+            },
+            onConfirm = {
+                val picked = shareUserSelection.toList()
+                shareUserPickerOpen = false
+                shareUserSelection.clear()
+                picked.forEach { sendSharedUser(it) }
+            },
+            confirmIcon = Icons.AutoMirrored.Filled.Send,
+            autoSelectResolvedIdentifier = true,
+            excludeAccountIdHexes = setOfNotNull(activeHex),
+        )
+    }
+
+    if (locationPickerOpen) {
+        LocationPickerScreen(
+            hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
+            onDismiss = { locationPickerOpen = false },
+            onPick = { location ->
+                locationPickerOpen = false
+                appState.launchMutation {
+                    controller.send(formatLocationShareText(location)) {
+                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                    }
+                }
+            },
+        )
+    }
+
     if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
         val imageUris = pendingMediaUris
         val documentUris = pendingDocumentUris
-        MediaPreviewSheet(
+        MediaPreviewScreen(
             uris = imageUris,
             documentUris = documentUris,
+            chatTitle = controller.title(groupTitleCopy),
             onDismiss = {
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
             },
-            onSend = { caption ->
-                pendingMediaUris = emptyList()
-                pendingDocumentUris = emptyList()
+            onSend = { caption, onResult ->
                 sendStagedAttachments(
                     imageUris,
                     documentUris,
                     caption,
+                    onAccepted = {
+                        pendingMediaUris = emptyList()
+                        pendingDocumentUris = emptyList()
+                        onResult(true)
+                    },
+                    onRejected = { onResult(false) },
                     onAfterSend = {
                         // Pull the user down to the just-seeded bubble.
                         // `bottomTimelineIndex` reads from
