@@ -1211,7 +1211,10 @@ internal fun MessageBubble(
                             // quote + short reply still keeps a narrow bubble
                             // because the widest child is then small (#208 preserved).
                             fillWidth = true,
-                            mentionDisplayName = { appState.mentionDisplayName(it) },
+                            mentionDisplayName =
+                                remember(appState, appState.profileRevisionForCompose) {
+                                    { bech32: String -> appState.mentionDisplayName(bech32) }
+                                },
                         )
                     }
                 }
