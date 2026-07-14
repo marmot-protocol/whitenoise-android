@@ -5077,11 +5077,13 @@ class ConversationController(
 
     // Resolve-time SSRF guard before the native Blossom fetch. The imeta gate
     // only validates the literal host, so an attacker's public-looking locator
-    // name can still resolve to loopback / RFC-1918. The native fetch re-resolves,
-    // so this blocks the common static case (not an active mid-connection
-    // rebind), matching the avatar/profile fetchers. MediaReferenceParser also
-    // rewrites fetchable locators from the parsed authority before native sees
-    // them, so Kotlin and native do not disagree about the raw locator host.
+    // name can still resolve to loopback / RFC-1918. This Kotlin preflight is
+    // defense in depth; the bundled native Blossom client independently
+    // re-resolves, rejects every non-public address, pins the vetted addresses
+    // for the actual socket, and repeats that validation on each redirect hop.
+    // MediaReferenceParser also rewrites fetchable locators from the parsed
+    // authority before native sees them, so Kotlin and native do not disagree
+    // about the raw locator host.
     private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi): MediaAttachmentReferenceFfi {
         val safeReference =
             withContext(Dispatchers.IO) {
