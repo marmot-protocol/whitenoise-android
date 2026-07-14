@@ -4,7 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.RemoteInput
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,10 +22,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         val action = NotificationActions.parse(intent) ?: return
-        if (action.kind == NotificationActionKind.REPLY) {
-            enqueueReplyAction(context.applicationContext, action, intent)
-            return
-        }
         val pending = goAsync()
         // Keep receiver orchestration and presenter Binder work off the main
         // thread; handleAction hops to main only for AppState mutations.
@@ -32,7 +30,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
             try {
                 val completed =
                     withTimeoutOrNull(GO_ASYNC_BUDGET_MS) {
-                        handleAction(context.applicationContext, action)
+                        when (action.kind) {
+                            NotificationActionKind.REPLY -> enqueueReplyAction(context.applicationContext, action, intent)
+                            NotificationActionKind.MARK_READ -> handleAction(context.applicationContext, action)
+                        }
                         true
                     }
                 if (completed == null) {
@@ -55,13 +56,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun enqueueReplyAction(
+    private suspend fun enqueueReplyAction(
         appContext: Context,
         action: NotificationAction,
         intent: Intent,
     ) {
         val application = appContext as? WhiteNoiseApplication ?: return
-        if (!application.appState.notificationActionsAllowed) {
+        val notificationActionsAllowed =
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.notificationActionsAllowed
+            }
+        if (!notificationActionsAllowed) {
             Log.w(
                 "DMNotifyAction",
                 "notification reply blocked by app lock group=${action.target.groupIdHex.take(8)}",
@@ -76,7 +81,15 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 ?.trim()
                 .orEmpty()
         if (reply.isBlank()) return
-        NotificationReplyWorker.enqueue(appContext, action, reply)
+        val enqueued =
+            withContext(Dispatchers.IO) {
+                NotificationReplyWorker.enqueue(appContext, action, reply)
+            }
+        if (!enqueued) {
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(appContext, R.string.toast_send_failed, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private suspend fun handleAction(
