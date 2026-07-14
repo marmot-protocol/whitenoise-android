@@ -47,7 +47,8 @@ internal enum class NotificationReplyCommitProbe {
 internal enum class NotificationReplySendOutcome {
     Sent,
     AlreadyCommitted,
-    Failed,
+    RetryableFailure,
+    NonRetryableFailure,
 }
 
 internal fun NotificationReplyTimelineRecord.cursor(): NotificationReplyRecoveryBoundary =

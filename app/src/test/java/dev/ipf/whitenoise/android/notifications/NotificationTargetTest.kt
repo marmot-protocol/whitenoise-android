@@ -547,6 +547,28 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun replyWorkerRetriesOnlyRetryableSendFailures() {
+        assertTrue(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.NonRetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 2,
+            ),
+        )
+    }
+
+    @Test
     fun replyWorkerRequest_usesExplicitExponentialBackoff() {
         val action =
             NotificationAction(
