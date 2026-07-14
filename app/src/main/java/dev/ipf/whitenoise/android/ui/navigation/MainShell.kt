@@ -86,6 +86,10 @@ internal fun MainShell(
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
     val conversationScrollSnapshots = remember { mutableStateMapOf<String, ConversationScrollSnapshot>() }
+    // Visible active-list head provenance while a conversation opened from
+    // ChatsScreen is foregrounded. Published back to the list only after
+    // setChatListVisible(true) flushes pending recompute (issue #1313).
+    var chatListReturnHeadSnap by remember { mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed) }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -114,7 +118,11 @@ internal fun MainShell(
     // path. The subscription keeps draining updates into the controller's maps
     // throughout; one recompute flushes on return.
     LaunchedEffect(chatsController, selectedChat == null) {
-        chatsController.setChatListVisible(selectedChat == null)
+        val listVisible = selectedChat == null
+        chatsController.setChatListVisible(listVisible)
+        if (listVisible) {
+            chatListReturnHeadSnap = onChatListBecameVisible(chatListReturnHeadSnap)
+        }
     }
 
     // Notification tap routing: switch to the target account if needed, wait
@@ -162,6 +170,7 @@ internal fun MainShell(
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
+            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
             selectedChat = null
             // Notification routing never opens a just-created conversation, so
             // clear any leftover open-time state from a prior New Chat / Create
@@ -182,6 +191,7 @@ internal fun MainShell(
                 // anchors to a stale unread count / old messages. Clearing it
                 // here makes tapping from inside a chat take the same clean path
                 // as tapping after returning to the chat list.
+                chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                 selectedChat = null
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
@@ -225,6 +235,7 @@ internal fun MainShell(
                         // target conversation (issue #321 guard).
                         selectedChatJustCreated = false
                         selectedChatOpenedAsDmHint = false
+                        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                         selectedChat = it
                     }
                 routingNotification = false
@@ -267,6 +278,7 @@ internal fun MainShell(
             (chatsController.items + chatsController.archivedItems)
                 .firstOrNull { it.group.groupIdHex == savedGroupId }
                 ?.let {
+                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                     selectedChatFocusMessageId = null
                     selectedChatOpenedFromNotification = false
                     selectedChatOpenedAsDmHint = false
@@ -320,6 +332,7 @@ internal fun MainShell(
             selectedChatFocusMessageId = null
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
+            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
@@ -331,6 +344,7 @@ internal fun MainShell(
     // threaded through ConversationScreen, by the in-conversation sheet (#635) so
     // both surfaces behave identically.
     val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
+        chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
         selectedChatFocusMessageId = null
         selectedChatOpenedFromNotification = false
         selectedChatJustCreated = justCreated
@@ -353,7 +367,10 @@ internal fun MainShell(
                 appState = appState,
                 npub = npub,
                 onOpenGroup = openGroupFromProfile,
-                onDismiss = { appState.clearPresentedProfile() },
+                onDismiss = {
+                    chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
+                    appState.clearPresentedProfile()
+                },
                 securePolicy =
                     when {
                         section != MainSection.Chats -> SecureFlagPolicy.Inherit
@@ -409,11 +426,16 @@ internal fun MainShell(
             ChatsScreen(
                 appState = appState,
                 controller = chatsController,
+                conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
+                onConversationReturnHeadHandled = {
+                    chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                },
                 onOpenSettings = {
+                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
-                onOpenGroup = { item, focusMessageId, justCreated ->
+                onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
                     selectedChatFocusMessageId = focusMessageId
                     selectedChatFocusHighlight = true
                     selectedChatOpenedFromNotification = false
@@ -422,7 +444,12 @@ internal fun MainShell(
                     // creation and existing-DM opens pass false. Reuse that DM-only
                     // invariant for the open-time subtitle hint (#998).
                     selectedChatOpenedAsDmHint = justCreated
+                    chatListReturnHeadSnap = openGroupFromChatList(chatListReturnHeadSnap, visibleHeadId)
                     selectedChat = item
+                },
+                onPresentProfile = { npub, visibleHeadId ->
+                    chatListReturnHeadSnap = presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                    appState.presentProfile(npub)
                 },
             )
         }
