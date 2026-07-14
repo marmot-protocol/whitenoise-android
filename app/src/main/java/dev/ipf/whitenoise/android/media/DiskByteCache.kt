@@ -5,6 +5,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
 import java.security.ProviderException
@@ -12,7 +14,6 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
-import javax.crypto.CipherOutputStream
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
@@ -32,17 +33,14 @@ internal fun interface DiskByteCacheKeyProvider {
  *                                   → FFI download → store in both, return
  *
  * Files live under [cacheDir] — typically `context.cacheDir/decrypted-media/`
- * which Android does not back up to cloud by default. Each entry is encrypted
- * with AES-256-GCM under an Android Keystore-backed key before it reaches disk.
- * Its filename is `sha256(key).enc`; the original key is not recoverable from
- * disk (no stable account/group/messageId leak via `ls`).
+ * which Android does not back up to cloud by default. Each entry is a single
+ * versioned AES-256-GCM envelope under `sha256(key).enc`; the original key is
+ * not recoverable from disk (no stable account/group/messageId leak via `ls`).
  *
- * An entry may carry an optional `.tag` sidecar holding the attachment's
- * ciphertext SHA-256. It exists so the disappearing-message sweep can evict an
- * expired attachment by ciphertext hash even when its message isn't currently
- * loaded (the in-memory hash→key map only covers loaded rows). The tag is the
- * ciphertext hash — not the cache key — so the "key not recoverable from disk"
- * guarantee is preserved.
+ * The envelope optionally embeds the attachment's ciphertext SHA-256 so the
+ * disappearing-message sweep can evict an expired attachment by hash even when
+ * its message isn't currently loaded (the in-memory hash→key map only covers
+ * loaded rows). The hash is non-secret metadata bound into the GCM AAD.
  *
  * Index state is synchronized on `this`, but expensive read/write/hydration
  * disk I/O is kept outside that monitor so main-thread probes don't block on
@@ -59,6 +57,15 @@ internal class DiskByteCache(
     private val keyProvider: DiskByteCacheKeyProvider,
     maxEntryBytes: Long = DEFAULT_MAX_ENTRY_BYTES,
     private val renameFile: (File, File) -> Boolean = { source, target -> source.renameTo(target) },
+    private val syncCacheDirectory: (File) -> Unit = { directory ->
+        FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { channel ->
+            channel.force(true)
+        }
+    },
+    private val afterTempFileCreated: () -> Unit = {},
+    private val afterEncryptedWrite: () -> Unit = {},
+    private val afterPutEpochCaptured: () -> Unit = {},
+    private val beforeStaleFilesDeleted: () -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -71,6 +78,10 @@ internal class DiskByteCache(
     // and is rejected if a wipe intervened, so decrypted plaintext from a
     // signed-out session can't be re-persisted after sign-out. See #154.
     private var generation = 0
+
+    // Bumped at the start of every non-empty removeByCiphertextTags sweep so an
+    // in-flight put cannot publish after expiry metadata was invalidated.
+    private var expirySweepEpoch = 0
     private val entryByteLimit = minOf(maxBytes, maxEntryBytes).coerceAtLeast(1L)
 
     // No directory I/O in the constructor. AppState calls prepare() on
@@ -167,13 +178,11 @@ internal class DiskByteCache(
                     residentBytes -= entry.size
                 }
             }
-            // Deliberately do NOT unlink the `.tag` here: a concurrent put()
-            // could recreate this key's `.enc`+`.tag` between the lock release
-            // and the delete, and removing the fresh tag would strand the entry
-            // past expiry. If the `.enc` truly vanished, the orphaned
-            // `.tag` is swept on the next rehydrate.
             null
-        } catch (_: GeneralSecurityException) {
+        } catch (error: GeneralSecurityException) {
+            if (error.isAuthenticationFailure()) {
+                evictPoisonedEntry(hashed, entry, generationAtLookup)
+            }
             // Keystore/provider faults are cache misses. Never fall back to
             // writing or returning plaintext when encryption is unavailable.
             null
@@ -197,158 +206,89 @@ internal class DiskByteCache(
         // Reject a write whose session was wiped while it sat queued: clear()
         // bumps `generation` under this same lock, so a put scheduled before
         // the wipe skips here and no plaintext lands after sign-out. See #154.
-        synchronized(this) {
-            if (expectedGeneration != generation) return
-        }
+        val sweepEpochAtEntry =
+            synchronized(this) {
+                if (expectedGeneration != generation) return
+                expirySweepEpoch
+            }
+        afterPutEpochCaptured()
         // Hydrate before writing `.tmp` files so rehydrate's orphan sweep
-        // doesn't delete in-flight temps on first access. Hydration itself may
-        // scan the directory and read `.tag` files, so keep it off `this` to
-        // avoid blocking main-thread contains() probes during scroll.
+        // doesn't delete in-flight temps on first access.
         ensureHydrated()
-        synchronized(this) {
-            if (expectedGeneration != generation) return
-        }
-        cacheDir.mkdirs()
         val hashed = fileNameFor(key)
         val file = File(cacheDir, hashed)
-        // Unique `.tmp` names so concurrent puts for the same key (possible while
-        // this thread is outside the monitor) don't clobber each other.
-        val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "enc")
-        // Atomic write: write to a sibling `.tmp` file then rename onto the
-        // final path. A power loss or kill mid-encryption would otherwise leave
-        // a truncated `.enc`; a subsequent authenticated read would report a
-        // miss instead of usable bytes. Done outside the monitor so a main-thread
-        // `contains()` isn't blocked behind multi-MB writes. See #1033.
+        val putContext =
+            synchronized(this) {
+                if (expectedGeneration != generation) return
+                cacheDir.mkdirs()
+                val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "enc")
+                val output =
+                    try {
+                        FileOutputStream(tmp)
+                    } catch (_: IOException) {
+                        return
+                    }
+                PutContext(
+                    tmp = tmp,
+                    output = output,
+                    existingSnapshot = index[hashed],
+                    sweepEpochAtStart = sweepEpochAtEntry,
+                )
+            }
+        afterTempFileCreated()
+        // Atomic write: encrypt into a sibling `.tmp` envelope, then rename onto
+        // the final path in one commit step so data and expiry metadata cannot
+        // diverge across process death. See #1373.
         try {
-            writeEncrypted(tmp, hashed, bytes)
+            putContext.output.use { output ->
+                writeEncrypted(output, hashed, bytes, ciphertextTag)
+            }
         } catch (_: GeneralSecurityException) {
-            runCatching { tmp.delete() }
+            abortPut(putContext.tmp)
             return
         } catch (_: ProviderException) {
-            runCatching { tmp.delete() }
+            abortPut(putContext.tmp)
             return
         } catch (_: IOException) {
-            runCatching { tmp.delete() }
+            abortPut(putContext.tmp)
             // Disk full / permission error. L1 still holds the bytes; this
             // entry just won't survive restart. Silent fail is acceptable.
             return
         }
-        // When a ciphertext tag is required (disappearing-message media), it is
-        // the only thing that lets the expiry sweep wipe this entry by hash after
-        // a restart, so the write FAILS CLOSED on it: persist the `.tag`
-        // (atomically, temp + rename) BEFORE the `.enc` is renamed into place.
-        // This lets an ordinary data-rename failure restore the prior sidecar;
-        // making the two-file publication crash-atomic is tracked in #1373.
-        // If the tag can't be persisted, drop the `.enc`.
-        // The expensive tag write happens outside the monitor; the final tag
-        // rename is part of the short commit phase so concurrent puts for the
-        // same key cannot publish a mismatched `.enc`/`.tag` pair.
-        val tagFile = if (ciphertextTag != null) tagFileFor(file) else null
-        val tagTmp =
-            if (ciphertextTag != null && tagFile != null) {
-                val tmpTag =
-                    uniqueTmpFile(
-                        tagFile.name.removeSuffix(TAG_SUFFIX),
-                        "tag",
-                    )
-                val tagWritten =
-                    runCatching {
-                        tmpTag.writeText(ciphertextTag)
-                    }.isSuccess
-                if (!tagWritten) {
-                    runCatching { tmpTag.delete() }
-                    runCatching { tmp.delete() }
-                    return
-                }
-                tmpTag
-            } else {
-                null
-            }
-        // Capture the exact entry whose tag may need restoring. The rollback
-        // sidecar is written before entering the cache monitor, then atomically
-        // renamed back only if the data commit fails. If another same-key put
-        // wins before commit, the identity check below drops this best-effort
-        // write instead of restoring stale metadata over the winner.
-        val existingSnapshot = synchronized(this) { index[hashed] }
-        val rollbackTagTmp =
-            if (tagTmp != null) {
-                existingSnapshot?.tag?.let { previousTag ->
-                    val rollback = uniqueTmpFile(tagFileFor(file).name.removeSuffix(TAG_SUFFIX), "tag-rollback")
-                    if (runCatching { rollback.writeText(previousTag) }.isFailure) {
-                        abortPut(tmp, tagTmp, rollback)
-                        return
-                    }
-                    rollback
-                }
-            } else {
-                null
-            }
-        // Stale `.tag` for THIS key: deleted unguarded because the key is live
-        // again (this put re-added it), so the liveness guard would wrongly skip
-        // it — but the new entry has no tag at that path, so it must go.
-        val staleTagFiles = mutableListOf<File>()
-        // Evicted OTHER keys: routed through the liveness guard so a concurrent
-        // same-key re-put's fresh file isn't unlinked by this deferred delete.
+        afterEncryptedWrite()
         val evicted = mutableListOf<Pair<String, List<File>>>()
         synchronized(this) {
-            // A concurrent clear() (sign-out / account switch) may have run while
-            // we were writing — abort and drop temp artifacts rather than
-            // re-persisting plaintext for a wiped session. See #154, #1033.
-            if (expectedGeneration != generation || index[hashed] !== existingSnapshot) {
-                abortPut(tmp, tagTmp, rollbackTagTmp)
+            // A concurrent clear() (sign-out / account switch) or expiry sweep may
+            // have run while we were writing — abort and drop temp artifacts
+            // rather than re-persisting plaintext for a wiped session. See #154,
+            // #1033.
+            if (
+                expectedGeneration != generation ||
+                index[hashed] !== putContext.existingSnapshot ||
+                expirySweepEpoch != putContext.sweepEpochAtStart
+            ) {
+                abortPut(putContext.tmp)
                 return
             }
-            val existing = existingSnapshot
-            if (tagTmp != null && tagFile != null && !renameFile(tagTmp, tagFile)) {
-                abortPut(tmp, tagTmp, rollbackTagTmp)
+            if (!renameFile(putContext.tmp, file)) {
+                runCatching { putContext.tmp.delete() }
                 return
             }
-            if (!renameFile(tmp, file)) {
-                runCatching { tmp.delete() }
-                // Only a put that actually attempted a tag rename (tagTmp != null)
-                // can have left the sidecar mismatched with the still-live old
-                // `.enc`. An untagged replacement never touches the tag file, so
-                // the existing entry — and its tag, if any — is intact; abort
-                // cleanly instead of deleting a valid entry on a transient rename.
-                if (tagTmp != null) {
-                    // The tag rename landed first. For a same-key replacement the
-                    // old bytes and index entry are still live, so restore their tag
-                    // atomically instead of rewriting the live sidecar in place.
-                    val restoredExistingTag =
-                        existing?.tag?.let {
-                            rollbackTagTmp != null && tagFile != null && renameFile(rollbackTagTmp, tagFile)
-                        } ?: runCatching { tagFile?.delete() != false }.getOrDefault(false)
-                    if (!restoredExistingTag && existing != null) {
-                        // If metadata restoration itself fails, fail closed: do not
-                        // leave an indexed entry that cannot be evicted by its tag.
-                        runCatching { file.delete() }
-                        runCatching { tagFile?.delete() }
-                        index.remove(hashed)
-                        residentBytes -= existing.size
-                    }
-                }
-                rollbackTagTmp?.let { runCatching { it.delete() } }
-                return
-            }
+            // The rename has already atomically published one complete envelope.
+            // A directory-sync failure means durability is uncertain, but deleting
+            // the new file here would turn a complete old-or-new result into a
+            // guaranteed cache miss and still require another directory sync.
+            runCatching { syncCacheDirectory(cacheDir) }
+            val existing = putContext.existingSnapshot
             if (existing != null) {
                 index.remove(hashed)
                 residentBytes -= existing.size
-                // Do NOT delete existing.file: a same-key replace shares the
-                // destination path (deterministic hashed name), which
-                // `tmp.renameTo(file)` above overwrote in place. Scheduling it
-                // for the deferred delete removed the freshly-written bytes
-                // (regression from moving deletes off the monitor). Clean up
-                // only a STALE tag, and only when this put writes no new tag to
-                // that same path — a new tag would have overwritten it above.
-                if (ciphertextTag == null) staleTagFiles += tagFileFor(file)
             }
             val size = file.length().toInt()
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
             evicted += evictedEntryFiles()
         }
-        rollbackTagTmp?.let { runCatching { it.delete() } }
-        deleteFiles(staleTagFiles)
         deleteStaleEntries(evicted)
     }
 
@@ -376,14 +316,14 @@ internal class DiskByteCache(
             synchronized(this) {
                 val entry = index.remove(hashed) ?: return
                 residentBytes -= entry.size
-                listOf(hashed to listOf(entry.file, tagFileFor(entry.file)))
+                listOf(hashed to filesFor(entry))
             }
         deleteStaleEntries(stale)
     }
 
     /**
      * Evict every entry whose ciphertext tag is in [ciphertextTags] — deleting
-     * its backing file, sidecar, and index row. Unlike [remove], this matches
+     * its backing file and index row. Unlike [remove], this matches
      * by the persisted ciphertext hash rather than the cache key, so the
      * disappearing-message sweep can wipe expired attachments from disk even
      * when their message isn't currently loaded (and thus has no entry in the
@@ -395,6 +335,7 @@ internal class DiskByteCache(
         val stale = mutableListOf<Pair<String, List<File>>>()
         val removed =
             synchronized(this) {
+                expirySweepEpoch++
                 var removed = 0
                 val iterator = index.entries.iterator()
                 while (iterator.hasNext()) {
@@ -412,29 +353,24 @@ internal class DiskByteCache(
         return removed
     }
 
-    private fun deleteFiles(files: List<File>) {
-        files.forEach { runCatching { it.delete() } }
-    }
-
     /**
-     * Delete each removed entry's files outside the monitor (keeping bulk
-     * unlinks off the lock, per #1069), but skip any key a concurrent put() has
-     * re-created — its path now holds fresh bytes, and unlinking those would
-     * drop the just-written entry. One lock acquisition snapshots which keys are
-     * live again; the unlinks then run unlocked.
+     * Delete each removed entry only while its key remains absent. The liveness
+     * check and unlink share the monitor with put's rename, so a same-key re-put
+     * cannot publish between them and have its fresh envelope unlinked.
      */
     private fun deleteStaleEntries(stale: List<Pair<String, List<File>>>) {
         if (stale.isEmpty()) return
-        val recreated =
-            synchronized(this) {
-                stale.mapNotNullTo(HashSet()) { (hashed, _) -> hashed.takeIf(index::containsKey) }
-            }
         stale.forEach { (hashed, files) ->
-            if (hashed !in recreated) files.forEach { runCatching { it.delete() } }
+            synchronized(this) {
+                if (!index.containsKey(hashed)) {
+                    beforeStaleFilesDeleted()
+                    files.forEach { runCatching { it.delete() } }
+                }
+            }
         }
     }
 
-    private fun filesFor(entry: Entry): List<File> = listOf(entry.file, tagFileFor(entry.file))
+    private fun filesFor(entry: Entry): List<File> = listOf(entry.file, legacyTagFileFor(entry.file, SUFFIX))
 
     /** LRU-evict down to [maxBytes], returning each evicted entry keyed by its
      *  hashed name so the caller's deferred delete can skip a concurrent re-put
@@ -466,7 +402,7 @@ internal class DiskByteCache(
         // is unaffected, since that's in get(), not here.
         index.values.forEach { entry ->
             runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
+            runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
         }
         index.clear()
         residentBytes = 0L
@@ -507,14 +443,8 @@ internal class DiskByteCache(
             "$baseName-$kind-${TMP_COUNTER.incrementAndGet()}-${System.nanoTime()}$TMP_SUFFIX",
         )
 
-    private fun abortPut(
-        tmp: File,
-        tagTmp: File?,
-        rollbackTagTmp: File? = null,
-    ) {
+    private fun abortPut(tmp: File) {
         runCatching { tmp.delete() }
-        tagTmp?.let { runCatching { it.delete() } }
-        rollbackTagTmp?.let { runCatching { it.delete() } }
     }
 
     private fun wipeLegacyPlaintext(): Boolean {
@@ -534,7 +464,7 @@ internal class DiskByteCache(
                 continue
             }
             val encryptedPeer = File(file.parentFile, file.name.removeSuffix(LEGACY_SUFFIX) + SUFFIX)
-            if (!encryptedPeer.isFile) runCatching { tagFileForLegacy(file).delete() }
+            if (!encryptedPeer.isFile) runCatching { legacyTagFileFor(file, LEGACY_SUFFIX).delete() }
         }
         return complete
     }
@@ -558,20 +488,19 @@ internal class DiskByteCache(
                 .sortedBy { it.lastModified() }
         for (file in files) {
             val size = file.length()
-            val plaintextSize = size - ENCRYPTION_OVERHEAD_BYTES
+            val envelope =
+                readAuthenticatedEnvelopeHeader(file) ?: run {
+                    runCatching { file.delete() }
+                    runCatching { legacyTagFileFor(file, SUFFIX).delete() }
+                    continue
+                }
+            val plaintextSize = size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES
             if (plaintextSize <= 0 || size > Int.MAX_VALUE || plaintextSize > entryByteLimit) {
                 runCatching { file.delete() }
-                runCatching { tagFileFor(file).delete() }
+                runCatching { legacyTagFileFor(file, SUFFIX).delete() }
                 continue
             }
-            // Recover the persisted ciphertext tag so hash-based eviction works
-            // for entries cached in a previous session.
-            val tag =
-                tagFileFor(file)
-                    .takeIf { it.exists() }
-                    ?.let { runCatching { it.readText() }.getOrNull() }
-                    ?.takeIf { it.isNotBlank() }
-            hydratedIndex[file.name] = Entry(file, size.toInt(), tag)
+            hydratedIndex[file.name] = Entry(file, size.toInt(), envelope.ciphertextTag)
             hydratedBytes += size
         }
         // Hot-trim if total resident exceeds cap (e.g., cap was reduced
@@ -580,44 +509,163 @@ internal class DiskByteCache(
         while (iterator.hasNext() && hydratedBytes > maxBytes) {
             val (_, entry) = iterator.next()
             runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
+            runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
             hydratedBytes -= entry.size
             iterator.remove()
         }
-        // Drop any orphaned `.tag` sidecar whose `.enc` is gone, so they don't
-        // accumulate after entries are evicted out-of-band.
+        // The envelope is authoritative now; every legacy `.tag` is stale.
         allFiles
             .filter { it.name.endsWith(TAG_SUFFIX) }
-            .forEach { tagFile ->
-                val encryptedName = tagFile.name.removeSuffix(TAG_SUFFIX) + SUFFIX
-                if (!hydratedIndex.containsKey(encryptedName)) runCatching { tagFile.delete() }
-            }
+            .forEach { tagFile -> runCatching { tagFile.delete() } }
         return HydratedIndex(hydratedIndex, hydratedBytes)
     }
 
-    // Sibling sidecar that stores an entry's ciphertext tag: `<sha256>.tag`
-    // next to `<sha256>.enc`.
-    private fun tagFileFor(encryptedFile: File): File = File(encryptedFile.parentFile, encryptedFile.name.removeSuffix(SUFFIX) + TAG_SUFFIX)
+    // Legacy sibling sidecar from the pre-#1373 two-file layout.
+    private fun legacyTagFileFor(
+        dataFile: File,
+        dataSuffix: String,
+    ): File = File(dataFile.parentFile, dataFile.name.removeSuffix(dataSuffix) + TAG_SUFFIX)
 
-    private fun tagFileForLegacy(plaintextFile: File): File = File(plaintextFile.parentFile, plaintextFile.name.removeSuffix(LEGACY_SUFFIX) + TAG_SUFFIX)
+    private data class EnvelopeHeader(
+        val ciphertextTag: String?,
+        val bytes: ByteArray,
+    ) {
+        val headerBytes: Int
+            get() = bytes.size
+    }
+
+    private fun envelopeHeaderBytes(ciphertextTag: String?): ByteArray {
+        val tagBytes = ciphertextTag?.toByteArray(Charsets.UTF_8) ?: byteArrayOf()
+        require(tagBytes.size <= MAX_TAG_BYTES) { "ciphertext tag exceeds $MAX_TAG_BYTES bytes" }
+        val header = ByteArray(FIXED_ENVELOPE_HEADER_BYTES + tagBytes.size)
+        System.arraycopy(ENVELOPE_MAGIC, 0, header, 0, ENVELOPE_MAGIC.size)
+        header[ENVELOPE_MAGIC.size] = ENVELOPE_VERSION
+        header[ENVELOPE_MAGIC.size + 1] = tagBytes.size.toByte()
+        if (tagBytes.isNotEmpty()) {
+            System.arraycopy(tagBytes, 0, header, FIXED_ENVELOPE_HEADER_BYTES, tagBytes.size)
+        }
+        return header
+    }
+
+    private fun readAuthenticatedEnvelopeHeader(file: File): EnvelopeHeader? {
+        if (file.length() < MIN_ENVELOPE_BYTES) return null
+        return try {
+            FileInputStream(file).use { input ->
+                readAndAuthenticateMetadata(input, file.name).envelope
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: GeneralSecurityException) {
+            null
+        } catch (_: ProviderException) {
+            null
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun readEnvelopeHeader(input: InputStream): EnvelopeHeader {
+        val fixedHeader = input.readExactly(FIXED_ENVELOPE_HEADER_BYTES)
+        if (!fixedHeader.copyOfRange(0, ENVELOPE_MAGIC.size).contentEquals(ENVELOPE_MAGIC)) {
+            throw IOException("invalid cache envelope magic")
+        }
+        if (fixedHeader[ENVELOPE_MAGIC.size] != ENVELOPE_VERSION) {
+            throw IOException("unsupported cache envelope version")
+        }
+        val tagLength = fixedHeader[ENVELOPE_MAGIC.size + 1].toInt() and 0xFF
+        val tagBytes = if (tagLength == 0) byteArrayOf() else input.readExactly(tagLength)
+        val header = fixedHeader + tagBytes
+        return EnvelopeHeader(
+            ciphertextTag = tagBytes.toString(Charsets.UTF_8).takeIf { it.isNotBlank() },
+            bytes = header,
+        )
+    }
+
+    @Throws(GeneralSecurityException::class, IOException::class)
+    private fun readAndAuthenticateMetadata(
+        input: InputStream,
+        fileName: String,
+    ): AuthenticatedMetadata {
+        val envelope = readEnvelopeHeader(input)
+        val metadataIv = input.readExactly(IV_BYTES)
+        val metadataAuthTag = input.readExactly(GCM_TAG_BYTES)
+        verifyMetadataAuth(metadataIv, metadataAuthTag, buildMetadataAad(fileName, envelope.bytes))
+        return AuthenticatedMetadata(envelope, metadataIv, metadataAuthTag)
+    }
+
+    @Throws(GeneralSecurityException::class, IOException::class)
+    private fun verifyMetadataAuth(
+        metadataIv: ByteArray,
+        metadataAuthTag: ByteArray,
+        metadataAad: ByteArray,
+    ) {
+        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, metadataIv))
+        cipher.updateAAD(metadataAad)
+        cipher.doFinal(metadataAuthTag)
+    }
+
+    private fun buildMetadataAad(
+        fileName: String,
+        header: ByteArray,
+    ): ByteArray = METADATA_AAD_DOMAIN + fileName.toByteArray(Charsets.UTF_8) + header
+
+    private fun buildPayloadAad(
+        fileName: String,
+        header: ByteArray,
+        metadataIv: ByteArray,
+        metadataAuthTag: ByteArray,
+    ): ByteArray =
+        PAYLOAD_AAD_DOMAIN +
+            fileName.toByteArray(Charsets.UTF_8) +
+            header +
+            metadataIv +
+            metadataAuthTag
 
     @Throws(GeneralSecurityException::class, IOException::class)
     private fun writeEncrypted(
-        file: File,
+        output: FileOutputStream,
         fileName: String,
         plaintext: ByteArray,
+        ciphertextTag: String?,
     ) {
-        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
-        val iv = cipher.iv
-        if (iv.size != IV_BYTES) {
-            throw GeneralSecurityException("AES-GCM provider returned a ${iv.size}-byte IV")
+        val header = envelopeHeaderBytes(ciphertextTag)
+        val metadataAad = buildMetadataAad(fileName, header)
+        val metadataCipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+        metadataCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        val metadataIv = metadataCipher.iv
+        if (metadataIv.size != IV_BYTES) {
+            throw GeneralSecurityException("AES-GCM provider returned a ${metadataIv.size}-byte metadata IV")
         }
-        cipher.updateAAD(fileName.toByteArray(Charsets.UTF_8))
-        FileOutputStream(file).use { output ->
-            output.write(iv)
-            CipherOutputStream(output, cipher).use { encrypted -> encrypted.write(plaintext) }
+        metadataCipher.updateAAD(metadataAad)
+        val metadataAuthTag = metadataCipher.doFinal()
+        if (metadataAuthTag.size != GCM_TAG_BYTES) {
+            throw GeneralSecurityException("AES-GCM provider returned a ${metadataAuthTag.size}-byte metadata tag")
         }
+
+        val payloadAad = buildPayloadAad(fileName, header, metadataIv, metadataAuthTag)
+        val payloadCipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+        payloadCipher.init(Cipher.ENCRYPT_MODE, keyProvider.getOrCreate())
+        val payloadIv = payloadCipher.iv
+        if (payloadIv.size != IV_BYTES) {
+            throw GeneralSecurityException("AES-GCM provider returned a ${payloadIv.size}-byte payload IV")
+        }
+        payloadCipher.updateAAD(payloadAad)
+        output.write(header)
+        output.write(metadataIv)
+        output.write(metadataAuthTag)
+        output.write(payloadIv)
+        var offset = 0
+        while (offset < plaintext.size) {
+            val chunkBytes = minOf(ENCRYPTION_CHUNK_BYTES, plaintext.size - offset)
+            val encrypted = payloadCipher.update(plaintext, offset, chunkBytes)
+            if (encrypted != null && encrypted.isNotEmpty()) output.write(encrypted)
+            offset += chunkBytes
+        }
+        output.write(payloadCipher.doFinal())
+        // Make the complete envelope durable before the single publication
+        // rename. If the rename itself is lost in a power failure, recovery
+        // sees the old envelope; if it lands, the new envelope is complete.
+        output.fd.sync()
     }
 
     @Throws(GeneralSecurityException::class, IOException::class)
@@ -626,10 +674,18 @@ internal class DiskByteCache(
         fileName: String,
     ): ByteArray =
         FileInputStream(file).use { input ->
-            val iv = input.readExactly(IV_BYTES)
+            val authenticated = readAndAuthenticateMetadata(input, fileName)
+            val payloadIv = input.readExactly(IV_BYTES)
+            val payloadAad =
+                buildPayloadAad(
+                    fileName,
+                    authenticated.envelope.bytes,
+                    authenticated.metadataIv,
+                    authenticated.metadataAuthTag,
+                )
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, iv))
-            cipher.updateAAD(fileName.toByteArray(Charsets.UTF_8))
+            cipher.init(Cipher.DECRYPT_MODE, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, payloadIv))
+            cipher.updateAAD(payloadAad)
             CipherInputStream(input, cipher).use { encrypted -> encrypted.readBytes() }
         }
 
@@ -645,7 +701,9 @@ internal class DiskByteCache(
         return bytes
     }
 
-    private fun IOException.isAuthenticationFailure(): Boolean = generateSequence<Throwable>(this) { it.cause }.any { it is AEADBadTagException }
+    private fun Throwable.isAuthenticationFailure(): Boolean = generateSequence<Throwable>(this) { it.cause }.any { it is AEADBadTagException }
+
+    private fun IOException.isAuthenticationFailure(): Boolean = (this as Throwable).isAuthenticationFailure()
 
     private fun evictPoisonedEntry(
         fileName: String,
@@ -655,7 +713,7 @@ internal class DiskByteCache(
         synchronized(this) {
             if (generation != generationAtLookup || index[fileName] !== entry) return
             if (entry.file.exists() && !entry.file.delete()) return
-            runCatching { tagFileFor(entry.file).delete() }
+            runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
             index.remove(fileName)
             residentBytes -= entry.size
         }
@@ -673,6 +731,19 @@ internal class DiskByteCache(
         return sb.toString()
     }
 
+    private data class AuthenticatedMetadata(
+        val envelope: EnvelopeHeader,
+        val metadataIv: ByteArray,
+        val metadataAuthTag: ByteArray,
+    )
+
+    private data class PutContext(
+        val tmp: File,
+        val output: FileOutputStream,
+        val existingSnapshot: Entry?,
+        val sweepEpochAtStart: Int,
+    )
+
     private data class Entry(
         val file: File,
         val size: Int,
@@ -689,11 +760,22 @@ internal class DiskByteCache(
         const val LEGACY_SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
         const val TAG_SUFFIX = ".tag"
+        const val ENVELOPE_VERSION: Byte = 2
+        const val MAX_TAG_BYTES = 255
         const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
         const val IV_BYTES = 12
-        const val TAG_BITS = 128
-        const val ENCRYPTION_OVERHEAD_BYTES = IV_BYTES + TAG_BITS / Byte.SIZE_BITS
+        const val GCM_TAG_BYTES = 16
+        const val TAG_BITS = GCM_TAG_BYTES * Byte.SIZE_BITS
+        const val METADATA_AUTH_BYTES = IV_BYTES + GCM_TAG_BYTES
+        const val PAYLOAD_CRYPTO_OVERHEAD_BYTES = IV_BYTES + GCM_TAG_BYTES
+        const val ENVELOPE_CRYPTO_OVERHEAD_BYTES = METADATA_AUTH_BYTES + PAYLOAD_CRYPTO_OVERHEAD_BYTES
+        const val FIXED_ENVELOPE_HEADER_BYTES = 6
+        const val MIN_ENVELOPE_BYTES = FIXED_ENVELOPE_HEADER_BYTES + ENVELOPE_CRYPTO_OVERHEAD_BYTES + 1L
+        const val ENCRYPTION_CHUNK_BYTES = 8 * 1024
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
+        val ENVELOPE_MAGIC = byteArrayOf('W'.code.toByte(), 'N'.code.toByte(), 'D'.code.toByte(), 'C'.code.toByte())
+        val METADATA_AAD_DOMAIN = "WN-DC-META".toByteArray(Charsets.UTF_8)
+        val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)
         val TMP_COUNTER = AtomicLong()
         val HEX =
             charArrayOf(
