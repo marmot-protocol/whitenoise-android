@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import androidx.work.BackoffPolicy
+import androidx.work.ListenableWorker
 import androidx.work.workDataOf
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -562,6 +563,45 @@ class NotificationTargetTest {
         )
         assertFalse(
             NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun replyWorkerMapsSendOutcomesToWorkResults() {
+        assertEquals(
+            ListenableWorker.Result.success(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.Sent,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.success(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.AlreadyCommitted,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.NonRetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.retry(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
                 NotificationReplySendOutcome.RetryableFailure,
                 operationFailureAttempt = 2,
             ),

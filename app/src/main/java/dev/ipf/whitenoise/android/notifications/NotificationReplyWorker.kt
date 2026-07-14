@@ -375,6 +375,17 @@ class NotificationReplyWorker(
             outcome == NotificationReplySendOutcome.RetryableFailure &&
                 shouldRetryAfterFailure(operationFailureAttempt, containsLegacyPlaintext)
 
+        internal fun resultAfterSendOutcome(
+            outcome: NotificationReplySendOutcome,
+            operationFailureAttempt: Int,
+        ): Result =
+            when {
+                outcome == NotificationReplySendOutcome.Sent ||
+                    outcome == NotificationReplySendOutcome.AlreadyCommitted -> Result.success()
+                shouldRetryAfterSendOutcome(outcome, operationFailureAttempt) -> Result.retry()
+                else -> Result.failure()
+            }
+
         internal fun shouldRetryAfterCryptoFailure(
             failure: Throwable,
             operationFailureAttempt: Int,
