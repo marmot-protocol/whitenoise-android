@@ -109,8 +109,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 if (markedRead) {
                     val presenter = LocalNotificationPresenter(appContext)
-                    presenter.cancel(action.notificationTag, action.notificationId)
-                    presenter.dismissConversationSiblingCardsNotNewerThan(
+                    presenter.dismissActionNotificationAndOlderSiblings(
+                        notificationTag = action.notificationTag,
+                        notificationId = action.notificationId,
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         sinceMs = dismissBaselineMs,

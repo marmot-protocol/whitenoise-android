@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -141,6 +142,40 @@ class LocalNotificationDismissalTest {
 
         val remaining = manager.activeNotifications.map { it.tag to it.id }
         assertEquals(listOf(other.tag to other.id), remaining)
+    }
+
+    @Test
+    fun actionDismissalCancelsTheReadOrRepliedCardBeforeInspectingSiblings() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
+        listOf(conversation, reaction).forEach { manager.notify(it.tag, it.id, notification()) }
+        val baseline = manager.activeNotifications.maxOf { it.postTime }
+        val providerInvoked = AtomicBoolean(false)
+        val presenter =
+            LocalNotificationPresenter(context) { notificationManager ->
+                providerInvoked.set(true)
+                assertFalse(
+                    notificationManager.activeNotifications.any {
+                        it.tag == conversation.tag && it.id == conversation.id
+                    },
+                )
+                notificationManager.activeNotifications
+            }
+
+        assertTrue(
+            presenter.dismissActionNotificationAndOlderSiblings(
+                notificationTag = conversation.tag,
+                notificationId = conversation.id,
+                accountRef = account,
+                groupIdHex = group,
+                sinceMs = baseline,
+            ),
+        )
+
+        assertTrue(providerInvoked.get())
+        assertTrue(manager.activeNotifications.isEmpty())
     }
 
     @Test

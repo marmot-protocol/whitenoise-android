@@ -162,6 +162,39 @@ internal fun conversationTranscriptShareIntent(
     }
 }
 
+@Composable
+internal fun GroupDetailsLocalDeleteControl(
+    readOnlyInvite: Boolean,
+    isSelfMember: Boolean,
+    membersVerified: Boolean,
+    enabled: Boolean,
+    inProgress: Boolean,
+    onDeleteConfirmed: () -> Unit,
+) {
+    if (readOnlyInvite || isSelfMember || !membersVerified) return
+    var confirmOpen by remember { mutableStateOf(false) }
+    DangerActionRow(
+        icon = Icons.Default.Delete,
+        title = stringResource(R.string.chat_row_action_delete_group),
+        enabled = enabled,
+        inProgress = inProgress,
+        onClick = { confirmOpen = true },
+    )
+    if (confirmOpen) {
+        ConfirmDialog(
+            title = stringResource(R.string.delete_group_dialog_title),
+            message = stringResource(R.string.delete_group_dialog_message),
+            confirmLabel = stringResource(R.string.delete_group_confirm),
+            onConfirm = {
+                confirmOpen = false
+                onDeleteConfirmed()
+            },
+            onDismiss = { confirmOpen = false },
+            destructive = true,
+        )
+    }
+}
+
 // Members shown in Group Details before the "See all" expander.
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 6
 
@@ -1057,15 +1090,21 @@ internal fun GroupDetailsScreen(
                     inProgress = activeMutation?.action == GroupMutationAction.Leave,
                     onClick = { requestLeave(controller.title(groupTitleCopy)) },
                 )
-            } else if (!readOnlyInvite && controller.membersVerified) {
-                DangerActionRow(
-                    icon = Icons.Default.Delete,
-                    title = stringResource(R.string.chat_row_action_delete_group),
-                    enabled = !mutationsBlocked,
-                    inProgress = activeMutation?.action == GroupMutationAction.Delete,
-                    onClick = { pendingConfirm = DetailsConfirm.Delete },
-                )
             }
+            GroupDetailsLocalDeleteControl(
+                readOnlyInvite = readOnlyInvite,
+                isSelfMember = controller.isSelfMember,
+                membersVerified = controller.membersVerified,
+                enabled = !mutationsBlocked,
+                inProgress = activeMutation?.action == GroupMutationAction.Delete,
+                onDeleteConfirmed = {
+                    runGroupMutation(
+                        action = GroupMutationAction.Delete,
+                        mutation = { controller.deleteGroupLocal() },
+                        onSuccess = onLeft,
+                    )
+                },
+            )
         }
     }
     if (showTransferAdmin) {
@@ -1212,22 +1251,6 @@ internal fun GroupDetailsScreen(
                             onSuccess = {
                                 onLeft()
                             },
-                        )
-                    },
-                    onDismiss = { pendingConfirm = null },
-                    destructive = true,
-                )
-            DetailsConfirm.Delete ->
-                ConfirmDialog(
-                    title = stringResource(R.string.delete_group_dialog_title),
-                    message = stringResource(R.string.delete_group_dialog_message),
-                    confirmLabel = stringResource(R.string.delete_group_confirm),
-                    onConfirm = {
-                        pendingConfirm = null
-                        runGroupMutation(
-                            action = GroupMutationAction.Delete,
-                            mutation = { controller.deleteGroupLocal() },
-                            onSuccess = { onLeft() },
                         )
                     },
                     onDismiss = { pendingConfirm = null },
@@ -1547,8 +1570,6 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
-
-    data object Delete : DetailsConfirm()
 }
 
 @Composable
