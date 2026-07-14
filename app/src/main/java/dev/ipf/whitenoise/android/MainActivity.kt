@@ -129,6 +129,9 @@ class MainActivity : FragmentActivity() {
     private fun consumeIntent(intent: Intent?) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
             inboundAppUpdateTap += 1
+            // One-shot, like the notification tap below: clear the stored intent so
+            // activity recreation cannot replay the same update tap.
+            setIntent(Intent(this, MainActivity::class.java))
             return
         }
         val parsedTarget =

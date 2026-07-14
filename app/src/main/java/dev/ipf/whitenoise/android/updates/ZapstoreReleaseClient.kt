@@ -68,6 +68,9 @@ class ZapstoreReleaseClient(
                     fun finish(result: Result<List<NostrEvent>>) {
                         if (!completed.compareAndSet(false, true)) return
                         runCatching { socket.close(1000, "done") }
+                        // A timeout can cancel the continuation before onFailure
+                        // fires from socket.cancel(); don't resume it after that.
+                        if (!continuation.isActive) return
                         result
                             .onSuccess { continuation.resume(it) }
                             .onFailure { continuation.resumeWithException(it) }

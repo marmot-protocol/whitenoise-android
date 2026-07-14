@@ -1277,7 +1277,8 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
-        appSelfUpdateFlow.sweepStaleApks()
+        // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
+        mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
         notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         // Off-main: the ConnectivityManager registration + seed query are
         // binder IPCs and this constructor runs on the main thread. Until the

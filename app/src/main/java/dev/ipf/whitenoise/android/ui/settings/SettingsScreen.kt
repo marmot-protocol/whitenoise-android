@@ -229,10 +229,14 @@ private fun SettingsHomeScreen(
                     AppUpdateSettingsRow(
                         info = appState.appUpdateInfo,
                         onClick = {
-                            if (appState.appUpdateInfo.latestVersion == null) {
-                                scope.launch { appState.refreshAppUpdate(force = true, notifyIfNewer = false) }
+                            // Await the check before acting, so a first tap in the
+                            // unknown state still routes on the fresh result.
+                            scope.launch {
+                                if (appState.appUpdateInfo.latestVersion == null) {
+                                    appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+                                }
+                                appState.handleAppUpdateAction(context)
                             }
-                            appState.handleAppUpdateAction(context)
                         },
                     )
                 }
