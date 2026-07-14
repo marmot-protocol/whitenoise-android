@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.LocaleList
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
@@ -153,6 +154,18 @@ internal data class SignOutOutcome(
     val nextActiveRef: String?,
     val phase: AppPhase,
 )
+
+internal fun accountSummariesWithCreatedIdentity(
+    current: List<AccountSummaryFfi>,
+    created: AccountSummaryFfi,
+): List<AccountSummaryFfi> {
+    val existingIndex =
+        current.indexOfFirst {
+            it.label == created.label || it.accountIdHex.equals(created.accountIdHex, ignoreCase = true)
+        }
+    if (existingIndex < 0) return current + created
+    return current.toMutableList().also { it[existingIndex] = created }
+}
 
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
@@ -1958,17 +1971,55 @@ class WhiteNoiseAppState(
     }
 
     suspend fun createIdentity() {
+        val startedAt = SystemClock.elapsedRealtime()
         try {
             val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
-            refreshAccounts()
-            setActiveAccount(summary.label)
-            refreshLocalNotificationSettings()
+            activateCreatedIdentity(summary)
             phase = AppPhase.Ready
             present(R.string.toast_identity_created)
-            warmProfile(summary.accountIdHex)
+            appStateDebug { "identity engine setup returned in ${SystemClock.elapsedRealtime() - startedAt}ms" }
+            launchIdentityPostCreateWarmup(summary)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()), copyable = true)
+        }
+    }
+
+    private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
+        if (summary.label != activeAccountRef) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
+        }
+        accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        activeAccountRef = summary.label
+        preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
+        localNotificationSettings = null
+        reloadMediaAutoDownloadMatrix()
+    }
+
+    private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) {
+        mutationsScope.launch {
+            runBestEffortPostCommitSteps(
+                steps =
+                    listOf(
+                        "refresh-accounts" to { refreshAccounts() },
+                        "configure-privacy-runtime" to {
+                            if (activeAccountRef == summary.label) configurePrivacyRuntime()
+                        },
+                        "refresh-notification-settings" to {
+                            if (activeAccountRef == summary.label) refreshLocalNotificationSettings()
+                        },
+                        "warm-profile" to {
+                            if (activeAccountRef == summary.label) warmProfile(summary.accountIdHex)
+                        },
+                        "sync-push-registration" to {
+                            if (activeAccountRef == summary.label) syncNativePushRegistrationIfEnabled()
+                        },
+                    ),
+                onFailure = { step, error ->
+                    appStateDebug(error) { "post-create $step failed: ${error.readableMessage()}" }
+                },
+            )
         }
     }
 
