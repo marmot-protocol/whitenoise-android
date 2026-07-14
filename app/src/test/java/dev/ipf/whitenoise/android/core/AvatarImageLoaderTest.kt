@@ -1,9 +1,59 @@
 package dev.ipf.whitenoise.android.core
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 class AvatarImageLoaderTest {
+    @Test
+    fun notificationAvatarsUseDedicatedLanesWhenPreWarmsAreSaturated() {
+        runBlocking {
+            val gate = AvatarFetchGate(regularPermits = 2, notificationPermits = 2)
+            val releasePreWarms = CompletableDeferred<Unit>()
+            val activePreWarms = AtomicInteger(0)
+            val twoPreWarmsStarted = CompletableDeferred<Unit>()
+
+            val preWarms =
+                List(2) {
+                    async(Dispatchers.Default) {
+                        gate.withPreWarmAdmission {
+                            if (activePreWarms.incrementAndGet() == 2) {
+                                twoPreWarmsStarted.complete(Unit)
+                            }
+                            releasePreWarms.await()
+                        }
+                    }
+                }
+            withTimeout(5_000L) { twoPreWarmsStarted.await() }
+
+            val notificationStarts = AtomicInteger(0)
+            val bothNotificationsStarted = CompletableDeferred<Unit>()
+            val notifications =
+                List(2) {
+                    async(Dispatchers.Default) {
+                        gate.withNotificationPermit {
+                            if (notificationStarts.incrementAndGet() == 2) {
+                                bothNotificationsStarted.complete(Unit)
+                            }
+                        }
+                    }
+                }
+
+            withTimeout(5_000L) { bothNotificationsStarted.await() }
+            assertEquals(2, activePreWarms.get())
+
+            releasePreWarms.complete(Unit)
+            preWarms.awaitAll()
+            notifications.awaitAll()
+        }
+    }
+
     @Test
     fun avatarDecodeSampleSizeLeavesSmallImagesAlone() {
         assertEquals(1, avatarDecodeSampleSize(width = 128, height = 256, maxDimension = 512))

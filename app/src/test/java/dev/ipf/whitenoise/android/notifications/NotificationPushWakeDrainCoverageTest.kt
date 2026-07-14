@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
+import dev.ipf.whitenoise.android.state.postAfterNotificationAvatarPreWarm
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,6 +59,22 @@ class NotificationPushWakeDrainCoverageTest {
                 "notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())" in appState,
         )
     }
+
+    @Test
+    fun coldPushWakePreWarmsAvatarsBeforePostingTheFirstNotification() =
+        runBlocking {
+            val calls = mutableListOf<String>()
+
+            postAfterNotificationAvatarPreWarm(
+                preWarm = {
+                    calls += "pre-warm"
+                    "resolved-avatar-urls"
+                },
+                post = { resolved -> calls += "post:$resolved" },
+            )
+
+            assertEquals(listOf("pre-warm", "post:resolved-avatar-urls"), calls)
+        }
 
     @Test
     fun rejectedForegroundServicePushWakeStopsBeforeRecordingOffMain() {

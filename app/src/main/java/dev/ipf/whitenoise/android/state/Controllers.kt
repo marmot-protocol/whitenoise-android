@@ -1816,9 +1816,6 @@ class ChatsController(
                                         is ChatListSubscriptionUpdateFfi.Row -> {
                                             val row = update.row
                                             requestChatRowProfiles(row)
-                                            if (shouldPreWarmNotificationAvatars(update.trigger)) {
-                                                preWarmNotificationAvatars(row)
-                                            }
                                             chatsDebug {
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
@@ -2693,11 +2690,6 @@ class ChatsController(
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
 
-    private fun preWarmNotificationAvatars(row: ChatListRowFfi) {
-        AvatarImageLoader.preWarm(ProfileSanitizer.imageUrl(row.avatarUrl))
-        row.lastMessage?.sender?.let(appState::preWarmProfileAvatar)
-    }
-
     /**
      * Called by the shell when a conversation is foregrounded (`false`) or the
      * chat list is back on screen (`true`). The subscription stays alive either
@@ -2811,9 +2803,9 @@ class ChatsController(
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         // Limit speculative network work to the recent visible conversations the
-        // user is likely to receive from next. Live row/group updates below warm
-        // their exact sender/conversation immediately, including while the list
-        // is hidden behind an open chat.
+        // user is likely to receive from next. The app-state notification stream
+        // independently warms each ingested sender/conversation on cold UI-less
+        // process starts.
         items.take(NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS).forEach(::preWarmNotificationAvatars)
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
         // For any group we don't yet have members cached for, fan out a
@@ -3093,9 +3085,6 @@ private val ConversationTimelinePageLimit = 50u
 // long-open, busy conversation while leaving ample scroll headroom before
 // loadOlder() must re-fetch.
 private const val LIVE_TIMELINE_WINDOW_CAP = 200
-
-internal fun shouldPreWarmNotificationAvatars(trigger: ChatListUpdateTriggerFfi): Boolean =
-    trigger == ChatListUpdateTriggerFfi.NEW_GROUP || trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE
 
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
