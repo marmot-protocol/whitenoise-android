@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
@@ -3605,35 +3606,66 @@ class WhiteNoiseAppState(
             }
     }
 
-    suspend fun sendNotificationReply(
+    internal suspend fun sendNotificationReply(
         accountRef: String,
         groupIdHex: String,
+        afterMessageIdHex: String,
         text: String,
+        persistRecoveryBoundary: suspend (NotificationReplyRecoveryBoundary) -> Boolean,
     ): Boolean {
         val account = accountRef.takeIf { it.isNotBlank() } ?: return false
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
+        val targetMessage = afterMessageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
         val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
         return runCatching {
             withGroupCommitLock(account, group) {
+                // Capture the head under the same lock as sendText. A retry can
+                // then ignore every identical sent row from an earlier request.
+                val latest =
+                    marmotIo {
+                        timelineMessages(
+                            account,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = group,
+                                search = null,
+                                before = null,
+                                beforeMessageId = null,
+                                after = null,
+                                afterMessageId = null,
+                                limit = 1u,
+                            ),
+                        ).messages.lastOrNull()
+                    }
+                val recoveryBoundary =
+                    latest?.let {
+                        NotificationReplyRecoveryBoundary(
+                            timelineAt = it.timelineAt,
+                            messageIdHex = it.messageIdHex,
+                        )
+                    }
+                        // A valid zero-time cursor still makes an empty/pruned
+                        // timeline retryable without admitting older sent rows.
+                        ?: NotificationReplyRecoveryBoundary(timelineAt = 0uL, messageIdHex = targetMessage)
+                if (!persistRecoveryBoundary(recoveryBoundary)) return@withGroupCommitLock false
                 marmotIo { sendText(account, group, body) }
+                true
             }
-            true
         }.onFailure {
             rethrowIfCancellation(it)
             Log.w("DMAppState", "notification reply failed for group=${group.take(8)}", it)
         }.getOrDefault(false)
     }
 
-    suspend fun notificationReplyAlreadyCommitted(
+    internal suspend fun notificationReplyAlreadyCommitted(
         accountRef: String,
         groupIdHex: String,
-        afterMessageIdHex: String,
+        recoveryBoundary: NotificationReplyRecoveryBoundary,
         text: String,
     ): Boolean {
         val account = accountRef.takeIf { it.isNotBlank() } ?: return false
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
         val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
-        val afterMessage = afterMessageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+        if (!ConversationController.HEX_MESSAGE_ID.matches(recoveryBoundary.messageIdHex)) return false
         return runCatching {
             val records =
                 marmotIo {
@@ -3644,8 +3676,8 @@ class WhiteNoiseAppState(
                             search = null,
                             before = null,
                             beforeMessageId = null,
-                            after = null,
-                            afterMessageId = afterMessage,
+                            after = recoveryBoundary.timelineAt,
+                            afterMessageId = recoveryBoundary.messageIdHex,
                             limit = 50u,
                         ),
                     ).messages

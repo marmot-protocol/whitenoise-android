@@ -76,9 +76,13 @@ class NotificationReplyWorker(
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
             }
+            // New requests persist the latest timeline cursor while holding the
+            // group send lock. Legacy started markers have no valid cursor, so
+            // they take the normal send path rather than risking a false match.
+            val recoveryBoundary = completionStore.startedRecoveryBoundary(completionKey)
             if (
                 completionStore.isCompleted(completionKey) ||
-                (completionStore.hasStarted(completionKey) && alreadyCommitted(application, action, reply))
+                (recoveryBoundary != null && alreadyCommitted(application, action, reply, recoveryBoundary))
             ) {
                 completionStore.markCompleted(completionKey)
                 markReadAfterReply(application, action)
@@ -86,13 +90,18 @@ class NotificationReplyWorker(
                 notificationReplyActionHandled(sent = true)
                 return Result.success()
             }
-            completionStore.markStarted(completionKey)
             val sent =
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.sendNotificationReply(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
+                        afterMessageIdHex = action.target.messageIdHex.orEmpty(),
                         text = reply,
+                        persistRecoveryBoundary = { boundary ->
+                            withContext(Dispatchers.IO) {
+                                completionStore.markStarted(completionKey, boundary)
+                            }
+                        },
                     )
                 }
             if (sent) {
@@ -118,12 +127,13 @@ class NotificationReplyWorker(
         application: WhiteNoiseApplication,
         action: NotificationAction,
         reply: String,
+        recoveryBoundary: NotificationReplyRecoveryBoundary,
     ): Boolean =
         withContext(Dispatchers.Main.immediate) {
             application.appState.notificationReplyAlreadyCommitted(
                 accountRef = action.target.accountRef,
                 groupIdHex = action.target.groupIdHex,
-                afterMessageIdHex = action.target.messageIdHex.orEmpty(),
+                recoveryBoundary = recoveryBoundary,
                 text = reply,
             )
         }

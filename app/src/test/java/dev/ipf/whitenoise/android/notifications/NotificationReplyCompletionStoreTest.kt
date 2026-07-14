@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,13 +15,56 @@ class NotificationReplyCompletionStoreTest {
         assertFalse(store.isCompleted("reply-a"))
         assertFalse(store.hasStarted("reply-a"))
 
-        store.markStarted("reply-a")
+        store.markStarted("reply-a", boundary(timelineAt = 10uL, messageIdHex = "message-before-reply-a"))
         assertTrue(store.hasStarted("reply-a"))
+        assertEquals(
+            boundary(timelineAt = 10uL, messageIdHex = "message-before-reply-a"),
+            store.startedRecoveryBoundary("reply-a"),
+        )
         store.markCompleted("reply-a")
 
         assertTrue(store.isCompleted("reply-a"))
         assertFalse(store.hasStarted("reply-a"))
+        assertNull(store.startedRecoveryBoundary("reply-a"))
         assertFalse(store.isCompleted("reply-b"))
+    }
+
+    @Test
+    fun distinctRequestsPersistIndependentRecoveryBoundaries() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+
+        store.markStarted("request-a", boundary(timelineAt = 10uL, messageIdHex = "message-before-a"))
+        store.markStarted("request-b", boundary(timelineAt = 20uL, messageIdHex = "message-before-b"))
+
+        assertEquals(
+            boundary(timelineAt = 10uL, messageIdHex = "message-before-a"),
+            store.startedRecoveryBoundary("request-a"),
+        )
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "message-before-b"),
+            store.startedRecoveryBoundary("request-b"),
+        )
+
+        store.markCompleted("request-a")
+
+        assertNull(store.startedRecoveryBoundary("request-a"))
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "message-before-b"),
+            store.startedRecoveryBoundary("request-b"),
+        )
+    }
+
+    @Test
+    fun legacyStartedMarkerDoesNotInventARecoveryBoundary() {
+        val prefs = FakeSharedPreferences()
+        prefs
+            .edit()
+            .putLong(NotificationReplyCompletionStore.startedStorageKey("legacy"), 1_000L)
+            .commit()
+        val store = NotificationReplyCompletionStore(prefs, nowMillis = { 1_000L })
+
+        assertTrue(store.hasStarted("legacy"))
+        assertNull(store.startedRecoveryBoundary("legacy"))
     }
 
     @Test
@@ -28,15 +73,21 @@ class NotificationReplyCompletionStoreTest {
         val prefs = FakeSharedPreferences()
         val store = NotificationReplyCompletionStore(prefs, nowMillis = { now })
 
-        store.markStarted("stale")
+        store.markStarted("stale", boundary(timelineAt = 10uL, messageIdHex = "stale-boundary"))
         store.markCompleted("old")
         now += 8L * 24L * 60L * 60L * 1000L
         store.markCompleted("new")
 
         assertFalse(store.hasStarted("stale"))
+        assertNull(store.startedRecoveryBoundary("stale"))
         assertFalse(store.isCompleted("old"))
         assertTrue(store.isCompleted("new"))
     }
+
+    private fun boundary(
+        timelineAt: ULong,
+        messageIdHex: String,
+    ): NotificationReplyRecoveryBoundary = NotificationReplyRecoveryBoundary(timelineAt, messageIdHex)
 
     private class FakeSharedPreferences : SharedPreferences {
         private val values = linkedMapOf<String, Any?>()
@@ -118,7 +169,10 @@ class NotificationReplyCompletionStoreTest {
             override fun putString(
                 key: String?,
                 value: String?,
-            ): SharedPreferences.Editor = this
+            ): SharedPreferences.Editor {
+                if (key != null) updates[key] = value
+                return this
+            }
 
             override fun putStringSet(
                 key: String?,
