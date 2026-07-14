@@ -192,6 +192,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
@@ -619,6 +620,7 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField; `composerFocused` mirrors the live focus
@@ -1838,7 +1840,9 @@ internal fun ConversationScreen(
     // settles — otherwise the anchor lands against the pre-IME viewport and the
     // newest message sits a few rows above the bottom until the keyboard closes.
     LaunchedEffect(imeIsOpen, chat.id, initialTimelineAnchored) {
-        if (!imeIsOpen || !initialTimelineAnchored || !nearBottom) return@LaunchedEffect
+        if (!imeIsOpen) return@LaunchedEffect
+        val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
+        if (!initialTimelineAnchored || !nearBottom || suppressForCustomInputSwap) return@LaunchedEffect
         repeat(24) {
             withFrameNanos { }
             val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
@@ -2646,6 +2650,12 @@ internal fun ConversationScreen(
                                     composerFocus = composerFocus,
                                     onComposerFocusChanged = { composerFocused = it },
                                     onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
+                                    onKeyboardRestoreFromCustomInput = {
+                                        suppressNextImeOpenReanchor.set(true)
+                                    },
+                                    onKeyboardRestoreFromCustomInputFailed = {
+                                        suppressNextImeOpenReanchor.set(false)
+                                    },
                                 )
                             }
                         }

@@ -41,8 +41,9 @@ class ComposerAttachmentSheetBehaviorTest {
     private fun string(resId: Int): String = app.getString(resId)
 
     private fun renderComposer(
-        onPickFromGallery: () -> Unit = {},
-        onPickDocument: () -> Unit = {},
+        onPickFromGallery: (() -> Unit)? = {},
+        onCaptureFromCamera: (() -> Unit)? = null,
+        onPickDocument: (() -> Unit)? = {},
         onShareLocation: (() -> Unit)? = null,
         onShareUser: (() -> Unit)? = null,
         onShareContact: (() -> Unit)? = null,
@@ -56,6 +57,7 @@ class ComposerAttachmentSheetBehaviorTest {
                         onCancelReply = {},
                         onSend = { _, _ -> },
                         onPickFromGallery = onPickFromGallery,
+                        onCaptureFromCamera = onCaptureFromCamera,
                         onPickDocument = onPickDocument,
                         onShareLocation = onShareLocation,
                         onShareUser = onShareUser,
@@ -98,6 +100,25 @@ class ComposerAttachmentSheetBehaviorTest {
         composeRule.onNodeWithText(string(R.string.attach_document)).performClick()
         composeRule.waitForIdle()
         assertEquals(1, documentClicks)
+    }
+
+    @Test
+    fun cameraOnlyComposerUsesTheSingleAttachmentTrigger() {
+        var cameraClicks = 0
+        renderComposer(
+            onPickFromGallery = null,
+            onCaptureFromCamera = { cameraClicks++ },
+            onPickDocument = null,
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.attach_options)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.attach_take_photo)).assertDoesNotExist()
+        openAttachmentSheet()
+        composeRule.onNodeWithText(string(R.string.attach_take_photo)).performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, cameraClicks)
+        composeRule.onNodeWithText(string(R.string.attach_take_photo)).assertDoesNotExist()
     }
 
     @Test

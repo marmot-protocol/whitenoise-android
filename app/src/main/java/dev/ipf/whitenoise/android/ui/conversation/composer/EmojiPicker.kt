@@ -222,12 +222,10 @@ internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
     rememberedImeHeight: Dp,
-): Dp =
-    when {
-        currentImeHeight > 0.dp -> currentImeHeight
-        rememberedImeHeight > 0.dp -> rememberedImeHeight
-        else -> ComposerEmojiPickerFallbackHeight
-    }
+): Dp {
+    val knownHeight = if (currentImeHeight > 0.dp) currentImeHeight else rememberedImeHeight
+    return if (knownHeight > 0.dp) knownHeight else ComposerEmojiPickerFallbackHeight
+}
 
 internal fun composerEmojiPaneHeight(
     lockedPaneHeight: Dp,
@@ -251,6 +249,8 @@ internal fun updatedComposerRememberedImeHeight(
         previousRememberedImeHeight
     }
 
+private val ComposerImeSwapTolerance = 8.dp
+
 internal fun shouldSwapComposerEmojiPaneToIme(
     keyboardRestorePending: Boolean,
     currentImeHeight: Dp,
@@ -258,7 +258,7 @@ internal fun shouldSwapComposerEmojiPaneToIme(
 ): Boolean =
     keyboardRestorePending &&
         currentImeHeight > 0.dp &&
-        currentImeHeight.value >= targetImeHeight.value * 0.85f
+        currentImeHeight >= targetImeHeight - ComposerImeSwapTolerance
 
 @Composable
 private fun EmojiPickerContent(

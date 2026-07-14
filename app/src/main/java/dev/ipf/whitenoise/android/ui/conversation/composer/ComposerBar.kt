@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -102,6 +103,26 @@ internal fun composerBottomClusterModifier(
         withNav
     }
 }
+
+/**
+ * While the attachment pane replaces an animating IME, reserve at least the
+ * IME's live height. The pane then follows the system inset down in one smooth
+ * handoff and naturally stops shrinking when its own content becomes taller.
+ */
+internal fun composerAttachmentPaneMinimumHeight(
+    showAttachmentPane: Boolean,
+    currentImeHeight: androidx.compose.ui.unit.Dp,
+): androidx.compose.ui.unit.Dp = if (showAttachmentPane) currentImeHeight else 0.dp
+
+/**
+ * A focus request emits its own focus callback. Ignore that callback while a
+ * pane-to-IME handoff is already running so it cannot start a second keyboard
+ * request and a second transcript re-anchor.
+ */
+internal fun shouldStartComposerKeyboardRestore(
+    paneOpen: Boolean,
+    keyboardRestorePending: Boolean,
+): Boolean = paneOpen && !keyboardRestorePending
 
 /**
  * Starting a reply grows the bottom input cluster by inserting the preview card.
@@ -231,6 +252,8 @@ internal fun ComposerBar(
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onBottomInputChanged: () -> Unit = {},
+    onKeyboardRestoreFromCustomInput: () -> Unit = {},
+    onKeyboardRestoreFromCustomInputFailed: () -> Unit = {},
     // #1206: shared so the long-message reader's composer and the main composer
     // don't keep divergent text/edit state. Defaults to a private per-instance
     // state, preserving standalone behavior for any other caller.
@@ -288,6 +311,7 @@ internal fun ComposerBar(
     // editing — the edit effect above already owns focus then.
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
     val navigationInsets = WindowInsets.navigationBars
@@ -297,9 +321,9 @@ internal fun ComposerBar(
                 .coerceAtLeast(0)
                 .toDp()
         }
-    var rememberedImePaneHeight by remember { mutableStateOf(0.dp) }
-    var lockedComposerEmojiPaneHeight by remember { mutableStateOf(0.dp) }
-    var lockedComposerAttachmentPaneHeight by remember { mutableStateOf(0.dp) }
+    var rememberedImePaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
+    var lockedComposerEmojiPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
+    var lockedComposerAttachmentPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
     LaunchedEffect(currentImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
         rememberedImePaneHeight =
             updatedComposerRememberedImeHeight(
@@ -320,12 +344,10 @@ internal fun ComposerBar(
         } else {
             emojiPaneBaseHeight
         }
-    val emojiPaneAlpha by animateFloatAsState(
-        targetValue = if (composerEmojiPickerOpen) 1f else 0f,
-        animationSpec = tween(durationMillis = 120),
-        label = "composerEmojiPaneAlpha",
-    )
-    val showEmojiPane = composerEmojiPickerOpen || emojiPaneAlpha > 0.01f
+    // Keep exactly one opaque owner of the bottom region during the IME swap.
+    // Fading this pane while the IME animates underneath exposes both surfaces
+    // for several frames and looks like a duplicated, blinking composer.
+    val showEmojiPane = composerEmojiPickerOpen
     val latestImePaneHeight by rememberUpdatedState(currentImePaneHeight)
     LaunchedEffect(showEmojiPane) {
         if (!showEmojiPane) {
@@ -347,6 +369,11 @@ internal fun ComposerBar(
         label = "composerAttachmentPaneAlpha",
     )
     val showAttachmentPane = attachmentSheetState.isOpen || attachmentPaneAlpha > 0.01f
+    val attachmentPaneMinimumHeight =
+        composerAttachmentPaneMinimumHeight(
+            showAttachmentPane = showAttachmentPane,
+            currentImeHeight = currentImePaneHeight,
+        )
     LaunchedEffect(showAttachmentPane) {
         if (!showAttachmentPane) lockedComposerAttachmentPaneHeight = 0.dp
     }
@@ -357,7 +384,7 @@ internal fun ComposerBar(
     }
 
     fun restoreKeyboardFromEmojiPane() {
-        if (!composerEmojiPickerOpen) return
+        if (!shouldStartComposerKeyboardRestore(composerEmojiPickerOpen, composerKeyboardRestorePending)) return
         if (lockedComposerEmojiPaneHeight == 0.dp) {
             lockedComposerEmojiPaneHeight =
                 composerEmojiPaneTargetHeight(
@@ -367,7 +394,7 @@ internal fun ComposerBar(
         }
         composerEmojiSearchActive = false
         composerKeyboardRestorePending = true
-        onBottomInputChanged()
+        onKeyboardRestoreFromCustomInput()
         runCatching { composerFocus.requestFocus() }
         keyboardController?.show()
     }
@@ -390,9 +417,18 @@ internal fun ComposerBar(
     LaunchedEffect(composerKeyboardRestorePending) {
         if (composerKeyboardRestorePending) {
             delay(600L)
-            if (composerKeyboardRestorePending && latestImePaneHeight == 0.dp) {
+            if (composerKeyboardRestorePending) {
                 composerKeyboardRestorePending = false
-                focusManager.clearFocus(force = true)
+                if (latestImePaneHeight > 0.dp) {
+                    // Some IMEs settle a few pixels below the reserved pane
+                    // height. Never leave the custom pane covering a keyboard
+                    // that is already visible just because the insets differ.
+                    composerEmojiPickerOpen = false
+                    attachmentSheetState.dismiss()
+                } else {
+                    onKeyboardRestoreFromCustomInputFailed()
+                    focusManager.clearFocus(force = true)
+                }
             }
         }
     }
@@ -487,7 +523,6 @@ internal fun ComposerBar(
                 rememberedImeHeight = rememberedImePaneHeight,
             )
         composerEmojiPickerOpen = true
-        onBottomInputChanged()
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
@@ -512,7 +547,7 @@ internal fun ComposerBar(
     }
 
     fun restoreKeyboardFromAttachmentSheet() {
-        if (!attachmentSheetState.isOpen) return
+        if (!shouldStartComposerKeyboardRestore(attachmentSheetState.isOpen, composerKeyboardRestorePending)) return
         if (lockedComposerAttachmentPaneHeight == 0.dp) {
             lockedComposerAttachmentPaneHeight =
                 composerEmojiPaneTargetHeight(
@@ -798,7 +833,7 @@ internal fun ComposerBar(
                 if (showEmojiPane) {
                     ComposerEmojiPickerPane(
                         height = emojiPaneHeight,
-                        alpha = emojiPaneAlpha,
+                        alpha = 1f,
                         onEmojiPicked = { emoji ->
                             val updated = insertComposerEmoji(textFieldValue, emoji)
                             applyComposerFieldValue(updated)
@@ -813,6 +848,7 @@ internal fun ComposerBar(
                 if (showAttachmentPane) {
                     ComposerAttachmentSheetPane(
                         alpha = attachmentPaneAlpha,
+                        minimumHeight = attachmentPaneMinimumHeight,
                         onPickRecentMedia =
                             onPickRecentMedia?.let { pick ->
                                 { uri ->

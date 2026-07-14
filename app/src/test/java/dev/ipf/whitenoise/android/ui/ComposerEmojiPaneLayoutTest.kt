@@ -4,9 +4,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerSearchExtraHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheetMaxHeightFraction
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerAttachmentPaneMinimumHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerSheetVisibleContentFraction
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldStartComposerKeyboardRestore
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldSwapComposerEmojiPaneToIme
 import dev.ipf.whitenoise.android.ui.conversation.composer.updatedComposerRememberedImeHeight
 import org.junit.Assert.assertEquals
@@ -21,12 +23,69 @@ import org.junit.Test
  */
 class ComposerEmojiPaneLayoutTest {
     @Test
+    fun keyboardRestoreStartsOnlyOnceForAnOpenPane() {
+        assertTrue(
+            shouldStartComposerKeyboardRestore(
+                paneOpen = true,
+                keyboardRestorePending = false,
+            ),
+        )
+        assertFalse(
+            shouldStartComposerKeyboardRestore(
+                paneOpen = true,
+                keyboardRestorePending = true,
+            ),
+        )
+        assertFalse(
+            shouldStartComposerKeyboardRestore(
+                paneOpen = false,
+                keyboardRestorePending = false,
+            ),
+        )
+    }
+
+    @Test
+    fun attachmentPaneTracksTheAnimatedImeHeightDuringTheHandoff() {
+        listOf(900.dp, 700.dp, 400.dp, 0.dp).forEach { animatedImeHeight ->
+            assertEquals(
+                animatedImeHeight,
+                composerAttachmentPaneMinimumHeight(
+                    showAttachmentPane = true,
+                    currentImeHeight = animatedImeHeight,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun hiddenAttachmentPaneDoesNotReserveImeHeight() {
+        assertEquals(
+            0.dp,
+            composerAttachmentPaneMinimumHeight(
+                showAttachmentPane = false,
+                currentImeHeight = 900.dp,
+            ),
+        )
+    }
+
+    @Test
     fun targetHeightUsesTheCurrentImeHeightAtSwapStart() {
         assertEquals(
             312.dp,
             composerEmojiPaneTargetHeight(
                 currentImeHeight = 312.dp,
                 rememberedImeHeight = 0.dp,
+            ),
+        )
+    }
+
+    @Test
+    fun targetHeightUsesTheCurrentKeyboardInsteadOfAStaleTallerHeight() {
+        assertEquals(
+            120.dp,
+            composerEmojiPaneTargetHeight(
+                currentImeHeight = 120.dp,
+                rememberedImeHeight = 300.dp,
             ),
         )
     }
@@ -97,7 +156,19 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun restoreWaitsForTheStableTargetHeightInsteadOfTheFirstNonZeroImeInset() {
+    fun rememberedImeHeightTracksTheLatestKeyboardHeight() {
+        assertEquals(
+            120.dp,
+            updatedComposerRememberedImeHeight(
+                previousRememberedImeHeight = 300.dp,
+                currentImeHeight = 120.dp,
+                freezeUpdates = false,
+            ),
+        )
+    }
+
+    @Test
+    fun restoreWaitsUntilTheImeIsWithinTheLockedPaneTolerance() {
         val targetHeight = 300.dp
 
         assertFalse(
@@ -110,14 +181,14 @@ class ComposerEmojiPaneLayoutTest {
         assertFalse(
             shouldSwapComposerEmojiPaneToIme(
                 keyboardRestorePending = true,
-                currentImeHeight = 254.dp,
+                currentImeHeight = 291.dp,
                 targetImeHeight = targetHeight,
             ),
         )
         assertTrue(
             shouldSwapComposerEmojiPaneToIme(
                 keyboardRestorePending = true,
-                currentImeHeight = 255.dp,
+                currentImeHeight = 292.dp,
                 targetImeHeight = targetHeight,
             ),
         )

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -66,6 +67,7 @@ internal fun rememberComposerAttachmentSheetState(): ComposerAttachmentSheetStat
 @Composable
 internal fun ComposerAttachmentSheetPane(
     alpha: Float,
+    minimumHeight: androidx.compose.ui.unit.Dp,
     onPickRecentMedia: ((android.net.Uri) -> Unit)?,
     onPickFromGallery: (() -> Unit)?,
     onCaptureFromCamera: (() -> Unit)?,
@@ -80,6 +82,7 @@ internal fun ComposerAttachmentSheetPane(
         modifier =
             modifier
                 .fillMaxWidth()
+                .heightIn(min = minimumHeight)
                 .clipToBounds()
                 .alpha(alpha),
         color = MaterialTheme.colorScheme.surface,
@@ -90,7 +93,10 @@ internal fun ComposerAttachmentSheetPane(
         // drag handle — so it reads as the same composer surface, not a floating
         // modal. Height wraps the two tile rows rather than matching the
         // keyboard, so the sheet is only as tall as it needs to be (no dead
-        // space below). A recent-media strip can add a row here later.
+        // space below). During an IME-to-pane handoff, [minimumHeight] follows
+        // the shrinking keyboard inset so the composer moves only once, in
+        // lockstep with the system animation, before settling at this natural
+        // content height.
         Column(
             modifier =
                 Modifier
