@@ -25,13 +25,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -77,7 +74,6 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.first
 
@@ -91,13 +87,18 @@ internal fun ComposerPill(
     emojiPickerOpen: Boolean,
     onValueChange: (TextFieldValue) -> Unit,
     onEmojiPickerToggle: () -> Unit,
-    onAttachMenuToggle: () -> Unit,
-    attachMenuOpen: Boolean,
-    onAttachMenuDismiss: () -> Unit,
-    onCaptureFromCamera: (() -> Unit)?,
+    onAttachmentsToggle: () -> Unit,
+    attachmentSheetOpen: Boolean,
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    // Gate inputs only: the sheet these open lives in ComposerBar, but the
+    // attach button must appear whenever ANY attachment action is wired, not
+    // just gallery/document.
+    hasCameraCapture: Boolean = false,
+    hasLocationShare: Boolean = false,
+    hasUserShare: Boolean = false,
+    hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
@@ -294,54 +295,26 @@ internal fun ComposerPill(
                     )
                 }
             }
-            if (onPickFromGallery != null || onPickDocument != null) {
-                Box {
-                    IconButton(
-                        onClick = onAttachMenuToggle,
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.AttachFile,
-                            contentDescription = stringResource(R.string.attach_image),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    KeyboardPreservingDropdownMenu(
-                        expanded = attachMenuOpen,
-                        onDismissRequest = onAttachMenuDismiss,
-                    ) {
-                        if (onPickFromGallery != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.attach_photo_library)) },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                onClick = {
-                                    onAttachMenuDismiss()
-                                    onPickFromGallery()
-                                },
-                            )
-                        }
-                        if (onPickDocument != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.attach_document)) },
-                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                onClick = {
-                                    onAttachMenuDismiss()
-                                    onPickDocument()
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-            if (onCaptureFromCamera != null) {
+            if (onPickFromGallery != null ||
+                onPickDocument != null ||
+                hasCameraCapture ||
+                hasLocationShare ||
+                hasUserShare ||
+                hasContactShare
+            ) {
                 IconButton(
-                    onClick = onCaptureFromCamera,
+                    onClick = onAttachmentsToggle,
                     modifier = Modifier.size(36.dp),
                 ) {
+                    // Swap the glyph on open (X) the way the emoji toggle swaps
+                    // to a keyboard, so sighted users get a visual cue, not just
+                    // a changed content description.
                     Icon(
-                        Icons.Default.PhotoCamera,
-                        contentDescription = stringResource(R.string.attach_take_photo),
+                        if (attachmentSheetOpen) Icons.Default.Close else Icons.Default.AttachFile,
+                        contentDescription =
+                            stringResource(
+                                if (attachmentSheetOpen) R.string.close else R.string.attach_options,
+                            ),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp),
                     )
