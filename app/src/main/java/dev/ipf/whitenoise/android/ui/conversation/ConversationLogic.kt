@@ -137,13 +137,15 @@ internal fun isNearBottom(
     timelineSize: Int,
     hasOlderHeader: Boolean,
 ): Boolean {
-    if (!listState.canScrollForward) return true
     val olderHeaderCount = if (hasOlderHeader) 1 else 0
     val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
     // Check the LAST visible item, not the first — keeps "near bottom"
     // truthful when the viewport shrinks (e.g. keyboard open) and fewer
     // items fit, which pushes firstVisibleItemIndex earlier even though
-    // the bottom is still on-screen.
+    // the bottom is still on-screen. Do not short-circuit on
+    // canScrollForward: during IME resize the lazy list can transiently
+    // report no forward scroll range while the last visible row is still
+    // history (issue #1375).
     val lastVisible =
         listState.layoutInfo.visibleItemsInfo
             .lastOrNull()

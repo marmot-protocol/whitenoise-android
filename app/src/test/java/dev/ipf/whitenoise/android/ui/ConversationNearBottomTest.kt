@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
@@ -74,6 +75,53 @@ class ConversationNearBottomTest {
             assertFalse(
                 "Jump FAB should show when scrolled up after timeline hydration",
                 nearBottomHolder[0]!!,
+            )
+        }
+    }
+
+    /**
+     * IME-open chase gates on near-bottom (issue #1375). While the keyboard
+     * shrinks the viewport, LazyListState can transiently report
+     * canScrollForward=false even though the last visible row is still history.
+     * isNearBottom must not treat that as "at bottom".
+     */
+    @Test
+    fun isNearBottomFalseWhenCannotScrollForwardButViewingHistory() {
+        val listState = LazyListState()
+        val loadedTimelineCount = 22
+        val fullTimelineSize = 50
+
+        composeRule.setContent {
+            LazyColumn(
+                modifier = Modifier.height(220.dp),
+                state = listState,
+            ) {
+                item { Spacer(Modifier.height(1.dp)) }
+                item { Spacer(Modifier.height(1.dp)) }
+                items((0 until loadedTimelineCount).toList()) {
+                    Box(Modifier.fillMaxWidth().height(50.dp))
+                }
+                item { Spacer(Modifier.height(1.dp)) }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread {
+            runBlocking {
+                listState.scrollToItem(20)
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            assertFalse(
+                "Scrolled-up reader must not be treated as near bottom when the " +
+                    "lazy list end is visible but newer messages exist off-screen",
+                isNearBottom(
+                    listState = listState,
+                    timelineSize = fullTimelineSize,
+                    hasOlderHeader = true,
+                ),
             )
         }
     }
