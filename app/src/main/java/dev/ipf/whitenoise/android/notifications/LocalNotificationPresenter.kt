@@ -8,6 +8,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -26,15 +31,13 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -58,11 +61,6 @@ class LocalNotificationPresenter(
     // Conversation channels we've already created in this process, so the hot
     // post path skips the get-or-create Binder round-trip after the first post.
     private val ensuredConversationChannels = ConcurrentHashMap.newKeySet<String>()
-
-    // Warms the avatar cache off the post path when a conversation's avatar is
-    // not yet cached, so a later notification (or shortcut refresh) can attach
-    // it. Never blocks notification delivery on the network.
-    private val avatarWarmScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -303,8 +301,6 @@ class LocalNotificationPresenter(
                             }
                         }
                     }
-                warmConversationAvatar(conversationAvatarUrl, alreadyCached = conversationAvatarBitmap != null)
-                warmConversationAvatar(senderAvatarUrl, alreadyCached = senderAvatarBitmap != null)
                 val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
                 if (!redactContent && messagingShortcutId != null) {
                     val locusId = LocusIdCompat(messagingShortcutId)
@@ -645,8 +641,13 @@ class LocalNotificationPresenter(
                     .Builder(context, shortcutId)
                     .setShortLabel(snapshot.shortLabel)
                     .setLongLabel(snapshot.longLabel)
-                    .setIcon(conversationShortcutIcon(conversationAvatarBitmap))
-                    .setIntent(intent)
+                    .setIcon(
+                        notificationConversationIcon(
+                            title = snapshot.longLabel,
+                            seed = snapshot.shortcutId,
+                            avatarBitmap = conversationAvatarBitmap,
+                        ),
+                    ).setIntent(intent)
                     .setLocusId(locusId)
                     .setPerson(sender)
                     .setLongLived(true)
@@ -659,30 +660,13 @@ class LocalNotificationPresenter(
         }
     }
 
-    // Adaptive bitmap so the People / conversation surfaces mask the avatar to a
-    // circle; fall back to the launcher icon when the chat has no avatar or it
-    // isn't cached yet.
-    private fun conversationShortcutIcon(avatarBitmap: android.graphics.Bitmap?): IconCompat =
-        if (avatarBitmap != null) {
-            IconCompat.createWithAdaptiveBitmap(avatarBitmap)
-        } else {
-            IconCompat.createWithResource(context, R.mipmap.ic_launcher)
-        }
-
     private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
         if (url.isNullOrBlank()) return null
         AvatarImageLoader.peekBitmap(url)?.let { return it }
-        // Bounded so a slow avatar host can't delay notification delivery; the
-        // underlying fetch still completes and caches, upgrading the next post.
+        // Bounded so a slow avatar host can't delay notification delivery. The
+        // loader owns its fetch scope, so the request continues to fill the cache
+        // after this await times out.
         return withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { AvatarImageLoader.loadBitmap(url) }
-    }
-
-    private fun warmConversationAvatar(
-        url: String?,
-        alreadyCached: Boolean,
-    ) {
-        if (alreadyCached || url.isNullOrBlank()) return
-        avatarWarmScope.launch { runCatching { AvatarImageLoader.load(url) } }
     }
 
     private fun ensureConversationChannel(
@@ -811,9 +795,74 @@ private data class ConversationShortcutSnapshot(
     val senderAvatarApplied: Boolean,
 )
 
+/**
+ * Normal bitmaps avoid IconCompat's adaptive-icon safe-zone crop, which can cut
+ * into already-tight headshots. Android's conversation surfaces still apply
+ * their own circular presentation. Missing avatars get a stable per-conversation
+ * monogram instead of every shortcut sharing the launcher icon.
+ */
+internal fun notificationConversationIcon(
+    title: String,
+    seed: String,
+    avatarBitmap: Bitmap?,
+): IconCompat = IconCompat.createWithBitmap(avatarBitmap ?: notificationMonogramBitmap(title, seed))
+
+internal fun notificationMonogramBitmap(
+    title: String,
+    seed: String,
+    sizePx: Int = NOTIFICATION_MONOGRAM_SIZE_PX,
+): Bitmap {
+    require(sizePx > 0) { "sizePx must be positive" }
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    canvas.drawColor(notificationMonogramBackgroundColor(seed))
+    val paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = sizePx * 0.44f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+    val baseline = sizePx / 2f - (paint.ascent() + paint.descent()) / 2f
+    canvas.drawText(notificationAvatarInitials(title), sizePx / 2f, baseline, paint)
+    return bitmap
+}
+
+internal fun notificationMonogramBackgroundColor(seed: String): Int {
+    val hue = Math.floorMod(seed.hashCode(), 360).toFloat()
+    return Color.HSVToColor(floatArrayOf(hue, 0.58f, 0.45f))
+}
+
+internal fun notificationAvatarInitials(title: String): String {
+    val words = title.trim().split(Regex("[\\s\\p{Z}]+")).filter(String::isNotBlank)
+    val initials =
+        buildString {
+            words.take(if (words.size > 1) 2 else 1).forEach { word ->
+                word.firstMonogramCodePoint()?.let(::appendCodePoint)
+            }
+        }.uppercase(Locale.ROOT)
+    return initials.ifBlank { "?" }
+}
+
+private fun String.firstMonogramCodePoint(): Int? {
+    var offset = 0
+    while (offset < length) {
+        val codePoint = codePointAt(offset)
+        offset += Character.charCount(codePoint)
+        val type = Character.getType(codePoint)
+        if (!Character.isWhitespace(codePoint) &&
+            !Character.isISOControl(codePoint) &&
+            type != Character.FORMAT.toInt()
+        ) {
+            return codePoint
+        }
+    }
+    return null
+}
+
 internal fun notificationSenderPerson(
     content: LocalNotificationContent,
-    avatarBitmap: android.graphics.Bitmap?,
+    avatarBitmap: Bitmap?,
 ): Person =
     Person
         .Builder()
@@ -823,6 +872,7 @@ internal fun notificationSenderPerson(
             avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
         }.build()
 
+private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 

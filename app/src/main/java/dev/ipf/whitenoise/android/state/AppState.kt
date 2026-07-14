@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
@@ -608,6 +609,51 @@ private data class ProfilePresentation(
     }
 }
 
+internal data class NotificationAvatarPreWarmTarget(
+    val senderAccountIdHex: String?,
+    val senderAvatarUrl: String?,
+    val resolveGroupAvatar: Boolean,
+    val preWarmRemoteImages: Boolean,
+)
+
+internal fun shouldPreWarmNotificationAvatars(
+    update: NotificationUpdateFfi,
+    shouldPost: Boolean,
+    canPost: Boolean,
+): Boolean =
+    shouldPost &&
+        canPost &&
+        !update.isFromSelf &&
+        update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+        !LocalNotificationFormatter.isReaction(update)
+
+internal fun notificationAvatarPreWarmTarget(
+    update: NotificationUpdateFfi,
+    appLockScreenVisible: Boolean,
+): NotificationAvatarPreWarmTarget =
+    NotificationAvatarPreWarmTarget(
+        senderAccountIdHex =
+            update.sender.accountIdHex
+                .trim()
+                .takeIf { it.isNotEmpty() },
+        senderAvatarUrl = ProfileSanitizer.imageUrl(update.sender.pictureUrl),
+        resolveGroupAvatar = !update.isDm,
+        preWarmRemoteImages = !appLockScreenVisible,
+    )
+
+private data class PreWarmedNotificationAvatars(
+    val senderAvatarUrl: String?,
+    val groupAvatarUrl: String?,
+)
+
+/** Keeps cold-wake avatar work ahead of the first notification post. */
+internal suspend fun <T> postAfterNotificationAvatarPreWarm(
+    preWarm: suspend () -> T,
+    post: suspend (T) -> Unit,
+) {
+    post(preWarm())
+}
+
 enum class RelayListKind {
     Nip65,
     Inbox,
@@ -1108,6 +1154,11 @@ class WhiteNoiseAppState(
     // Materialized profile metadata, populated off-main by [refreshProfile].
     // Read accessors serve from here so composition never crosses the FFI.
     private val userProfiles = BoundedEntryCache<String, UserProfileMetadataFfi>(MAX_USER_PROFILE_CACHE_ENTRIES)
+
+    // Profile ids whose avatar image was requested by a recent/live conversation
+    // projection. Kept separate from general profile materialization so opening a
+    // large roster does not trigger unsolicited image-host traffic.
+    private val pendingAvatarPreWarmAccountIds = linkedSetOf<String>()
 
     // Ids with an in-flight local materialization, so a cache miss launches at
     // most one local read per id. Distinct from the relay-refresh cooldown gate.
@@ -2416,6 +2467,7 @@ class WhiteNoiseAppState(
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
             userProfiles.clear()
+            pendingAvatarPreWarmAccountIds.clear()
             materializingProfiles.clear()
         }
         synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
@@ -4143,6 +4195,42 @@ class WhiteNoiseAppState(
         return avatar
     }
 
+    /**
+     * Start local profile materialization and image decoding without waiting for
+     * either. Chat/message projections call this before notification delivery;
+     * [applyProfilePresentation] queues the image as soon as local storage (or a
+     * relay refresh) yields a sanitized URL.
+     */
+    internal fun preWarmProfileAvatar(accountIdHex: String) {
+        val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val cachedAvatar =
+            synchronized(profilePresentationLock) {
+                val avatar = profilePresentations[id]?.avatarUrl
+                if (avatar != null) {
+                    pendingAvatarPreWarmAccountIds.remove(id)
+                } else {
+                    // Reinsert to keep the set in recent-conversation order; a
+                    // live sender must not sit behind old avatarless profiles.
+                    pendingAvatarPreWarmAccountIds.remove(id)
+                    if (pendingAvatarPreWarmAccountIds.size >= MAX_PENDING_AVATAR_PREWARMS) {
+                        val oldest = pendingAvatarPreWarmAccountIds.iterator()
+                        if (oldest.hasNext()) {
+                            oldest.next()
+                            oldest.remove()
+                        }
+                    }
+                    pendingAvatarPreWarmAccountIds.add(id)
+                }
+                avatar
+            }
+        AvatarImageLoader.preWarm(cachedAvatar)
+        // Starts an ungated local materialization on a miss and observes its
+        // revision; applyProfilePresentation consumes the pending warm above once
+        // the URL lands. The relay refresh remains independently cooldown-gated.
+        profilePresentation(id)
+        requestProfile(id)
+    }
+
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // This is called from render/timeline projection paths, so do not synchronously
@@ -4747,19 +4835,83 @@ class WhiteNoiseAppState(
         ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
             ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
 
+    private fun shouldPostNotification(update: NotificationUpdateFfi): Boolean =
+        LocalNotificationPolicy.shouldPost(
+            update = update,
+            appInForeground = appInForeground,
+            activeConversationGroupIdHex = activeConversationGroupIdHex,
+            activeConversationAccountRef = activeConversationAccountRef,
+            appLockScreenVisible = appLockScreenVisible,
+            conversationNotifyMode = chatMutePreferences::mode,
+        )
+
+    /**
+     * Starts sender and conversation image work as soon as the app-state
+     * notification subscription receives an ingested update. This path exists in
+     * a cold FCM process with no UI-owned [ChatsController], and it waits only for
+     * local projections — remote image work remains detached and bounded.
+     * Returns already-resolved URLs so the eventual post does not repeat FFI
+     * reads. Every remote-image launch re-checks the app lock after the preceding
+     * suspending local lookup.
+     */
+    private suspend fun preWarmNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
+        val eligible =
+            shouldPreWarmNotificationAvatars(
+                update = update,
+                shouldPost = shouldPostNotification(update),
+                canPost = localNotificationPresenter.canPostNotifications(),
+            )
+        if (!eligible) return PreWarmedNotificationAvatars(senderAvatarUrl = null, groupAvatarUrl = null)
+
+        val target = notificationAvatarPreWarmTarget(update, appLockScreenVisible)
+        preWarmNotificationAvatarIfUnlocked(target.senderAvatarUrl)
+        val senderAvatarUrl =
+            if (target.preWarmRemoteImages && target.senderAccountIdHex != null) {
+                bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
+            } else {
+                null
+            }
+        preWarmNotificationAvatarIfUnlocked(senderAvatarUrl)
+
+        val groupAvatarUrl =
+            if (target.resolveGroupAvatar) {
+                bestEffortNotificationAvatarLookup {
+                    marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
+                }?.let { ProfileSanitizer.imageUrl(it) }
+            } else {
+                null
+            }
+        preWarmNotificationAvatarIfUnlocked(groupAvatarUrl)
+        return PreWarmedNotificationAvatars(senderAvatarUrl, groupAvatarUrl)
+    }
+
+    private fun preWarmNotificationAvatarIfUnlocked(url: String?) {
+        if (!appLockScreenVisible) AvatarImageLoader.preWarm(url)
+    }
+
+    private suspend fun bestEffortNotificationAvatarLookup(block: suspend () -> String?): String? =
+        try {
+            block()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            null
+        }
+
     // Conversation shortcut icon: the peer for a DM, or the group's own avatar
     // for a group chat. The sender's MessagingStyle icon is resolved separately.
     private suspend fun notificationConversationAvatarUrl(
         update: NotificationUpdateFfi,
         senderAvatarUrl: String?,
+        preWarmedGroupAvatarUrl: String?,
     ): String? =
         if (update.isDm) {
             senderAvatarUrl
         } else {
-            runCatching { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl }
-                .getOrNull()
-                ?.let { ProfileSanitizer.imageUrl(it) }
-                ?.takeIf { it.isNotBlank() }
+            preWarmedGroupAvatarUrl
+                ?: bestEffortNotificationAvatarLookup {
+                    marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group.avatarUrl
+                }?.let { ProfileSanitizer.imageUrl(it) }
         }
 
     private fun notificationGroupTitleCopy(): GroupTitleCopy =
@@ -4769,17 +4921,12 @@ class WhiteNoiseAppState(
             unknownTitle = appContext.getString(R.string.unknown),
         )
 
-    private suspend fun postNotificationUpdate(update: NotificationUpdateFfi) {
+    private suspend fun postNotificationUpdate(
+        update: NotificationUpdateFfi,
+        preWarmedAvatars: PreWarmedNotificationAvatars,
+    ) {
         val activeConversation = activeConversationGroupIdHex
-        val shouldPost =
-            LocalNotificationPolicy.shouldPost(
-                update = update,
-                appInForeground = appInForeground,
-                activeConversationGroupIdHex = activeConversation,
-                activeConversationAccountRef = activeConversationAccountRef,
-                appLockScreenVisible = appLockScreenVisible,
-                conversationNotifyMode = chatMutePreferences::mode,
-            )
+        val shouldPost = shouldPostNotification(update)
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
                 "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
@@ -4815,15 +4962,32 @@ class WhiteNoiseAppState(
                 } else {
                     ReplyMediaKind.None
                 }
-            // A lock can arrive while the suspend enrichment above is running.
-            // Re-check before posting; if we skipped enrichment because the app
-            // was locked earlier, keep the post redacted even if it has since
-            // unlocked because the rich fields were intentionally not resolved.
+            val senderAvatarUrl =
+                if (skipEnrichmentForLock || appLockScreenVisible) {
+                    null
+                } else {
+                    preWarmedAvatars.senderAvatarUrl
+                        ?: bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
+                }
+            val conversationTitle =
+                if (skipEnrichmentForLock || appLockScreenVisible) {
+                    null
+                } else {
+                    systemText?.title ?: notificationConversationTitle(update)
+                }
+            val conversationAvatarUrl =
+                if (skipEnrichmentForLock || appLockScreenVisible) {
+                    null
+                } else {
+                    notificationConversationAvatarUrl(update, senderAvatarUrl, preWarmedAvatars.groupAvatarUrl)
+                }
+            // A lock can arrive during any suspending enrichment above. Re-check
+            // after all app-state lookups; if enrichment was skipped while locked,
+            // keep the post redacted even if the app has since unlocked.
             val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
-            val senderAvatarUrl = if (redactNotificationContent) null else notificationSenderAvatarUrl(update)
             localNotificationPresenter.show(
                 update,
-                if (redactNotificationContent) null else (systemText?.title ?: notificationConversationTitle(update)),
+                if (redactNotificationContent) null else conversationTitle,
                 if (redactNotificationContent) null else senderNameOverride,
                 if (redactNotificationContent) null else previewTextOverride,
                 if (redactNotificationContent) null else reactedToPreviewOverride,
@@ -4838,13 +5002,8 @@ class WhiteNoiseAppState(
                         )
                     },
                 redactContent = redactNotificationContent,
-                conversationAvatarUrl =
-                    if (redactNotificationContent) {
-                        null
-                    } else {
-                        notificationConversationAvatarUrl(update, senderAvatarUrl)
-                    },
-                senderAvatarUrl = senderAvatarUrl,
+                conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
+                senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the
@@ -4875,7 +5034,10 @@ class WhiteNoiseAppState(
                             while (isActive) {
                                 val update = marmotIo { subscription.next() } ?: break
                                 backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                                postNotificationUpdate(update)
+                                postAfterNotificationAvatarPreWarm(
+                                    preWarm = { preWarmNotificationAvatars(update) },
+                                    post = { avatars -> postNotificationUpdate(update, avatars) },
+                                )
                             }
                         } finally {
                             runCatching {
@@ -5009,10 +5171,16 @@ class WhiteNoiseAppState(
         accountIdHex: String,
         presentation: ProfilePresentation,
     ) {
-        val changed =
+        val (changed, shouldPreWarm) =
             synchronized(profilePresentationLock) {
-                profilePresentations.put(accountIdHex, presentation) != presentation
+                val changed = profilePresentations.put(accountIdHex, presentation) != presentation
+                val shouldPreWarm =
+                    presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)
+                changed to shouldPreWarm
             }
+        if (shouldPreWarm) {
+            AvatarImageLoader.preWarm(presentation.avatarUrl)
+        }
         if (changed) {
             profileRevision += 1
         }
@@ -5022,6 +5190,7 @@ class WhiteNoiseAppState(
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
             userProfiles.clear()
+            pendingAvatarPreWarmAccountIds.clear()
             materializingProfiles.clear()
         }
         profileRevision += 1
@@ -5078,6 +5247,7 @@ class WhiteNoiseAppState(
         private const val ACCOUNT_UNREAD_MEMBER_FANOUT = 4
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
+        private const val MAX_PENDING_AVATAR_PREWARMS = 64
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
