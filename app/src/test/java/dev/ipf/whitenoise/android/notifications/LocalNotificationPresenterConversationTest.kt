@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -102,6 +103,32 @@ class LocalNotificationPresenterConversationTest {
 
         assertNotNull(notificationSenderPerson(content, bitmap).icon)
         assertNull(notificationSenderPerson(content, null).icon)
+    }
+
+    @Test
+    fun conversationShortcutUsesPlainBitmapWithoutAdaptiveSafeZoneCrop() {
+        val bitmap = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+
+        val icon = notificationConversationIcon(title = "Alice", seed = "conversation-a", avatarBitmap = bitmap)
+
+        assertEquals(IconCompat.TYPE_BITMAP, icon.type)
+    }
+
+    @Test
+    fun avatarlessConversationGetsDeterministicDistinctMonogramBitmap() {
+        assertEquals("AB", notificationAvatarInitials(" Alice   Baker "))
+        assertEquals("AB", notificationAvatarInitials("Alice\u00a0Baker"))
+        assertEquals("A", notificationAvatarInitials("Alice"))
+        assertEquals("?", notificationAvatarInitials(" \u202e "))
+        assertEquals(notificationMonogramBackgroundColor("conversation-a"), notificationMonogramBackgroundColor("conversation-a"))
+        assertNotEquals(notificationMonogramBackgroundColor("conversation-a"), notificationMonogramBackgroundColor("conversation-b"))
+
+        val bitmap = notificationMonogramBitmap(title = "Alice Baker", seed = "conversation-a", sizePx = 32)
+        val icon = notificationConversationIcon(title = "Alice Baker", seed = "conversation-a", avatarBitmap = null)
+
+        assertEquals(32, bitmap.width)
+        assertEquals(32, bitmap.height)
+        assertEquals(IconCompat.TYPE_BITMAP, icon.type)
     }
 
     private fun update(isMention: Boolean) =

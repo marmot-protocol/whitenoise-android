@@ -10,6 +10,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.LinkedHashMap
 
 object AvatarImageLoader {
@@ -23,8 +25,11 @@ object AvatarImageLoader {
     private const val CACHE_SIZE_BYTES = 16 * 1024 * 1024
     private const val FAILURE_TTL_MS = 60_000L
     private const val FAILURE_CACHE_MAX_ENTRIES = 512
+    private const val FETCH_CONCURRENCY = 4
+    private const val PREWARM_MAX_QUEUED = 64
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val fetchGate = Semaphore(FETCH_CONCURRENCY)
     private val lock = Any()
     private val cache =
         object : LruCache<String, ImageBitmap>(CACHE_SIZE_BYTES) {
@@ -34,6 +39,7 @@ object AvatarImageLoader {
             ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
         }
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
+    private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
 
     // Bumped by clear(); fetches launched under an older generation discard
@@ -41,10 +47,53 @@ object AvatarImageLoader {
     // in-flight request that was already on the network.
     private var generation = 0L
 
-    suspend fun load(url: String): ImageBitmap? {
+    suspend fun load(url: String): ImageBitmap? = load(url, expectedGeneration = null)
+
+    /**
+     * Queue an avatar fetch without delaying the caller. Chat/profile projection
+     * uses this ahead of notification delivery so the first shortcut/person icon
+     * can take the synchronous cache path. Work is URL-deduplicated, bounded to a
+     * small network fan-out, and generation-guarded so account teardown cannot be
+     * followed by an old queued warm repopulating the cache.
+     */
+    fun preWarm(url: String?) {
+        val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        val scheduledGeneration =
+            synchronized(lock) {
+                val nowMillis = System.currentTimeMillis()
+                if (cache.get(key) != null ||
+                    isFailureFresh(key, nowMillis) ||
+                    inFlight.containsKey(key) ||
+                    preWarmQueuedGeneration.containsKey(key) ||
+                    preWarmQueuedGeneration.size >= PREWARM_MAX_QUEUED
+                ) {
+                    return
+                }
+                generation.also { preWarmQueuedGeneration[key] = it }
+            }
+        scope.launch {
+            try {
+                load(key, expectedGeneration = scheduledGeneration)
+            } finally {
+                synchronized(lock) {
+                    if (preWarmQueuedGeneration[key] == scheduledGeneration) {
+                        preWarmQueuedGeneration.remove(key)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun load(
+        url: String,
+        expectedGeneration: Long?,
+    ): ImageBitmap? {
         cached(url)?.let { return it }
         val request =
             synchronized(lock) {
+                if (expectedGeneration != null && expectedGeneration != generation) {
+                    return@synchronized CompletedAvatarRequest(null)
+                }
                 cache.get(url)?.let { return@synchronized CompletedAvatarRequest(it) }
                 if (isFailureFresh(url, System.currentTimeMillis())) {
                     return@synchronized CompletedAvatarRequest(null)
@@ -54,7 +103,17 @@ object AvatarImageLoader {
                 inFlight[url] = deferred
                 val launchedGeneration = generation
                 scope.launch {
-                    val image = runCatching { fetch(url) }.getOrNull()
+                    // Gate the detached fetch itself, not the caller awaiting its
+                    // deferred result. clear() completes waiters immediately but
+                    // cannot end a blocking socket read; keeping the permit until
+                    // fetch returns preserves the global concurrency bound across
+                    // account-generation changes.
+                    val image =
+                        runCatching {
+                            fetchGate.withPermit {
+                                if (synchronized(lock) { launchedGeneration != generation }) null else fetch(url)
+                            }
+                        }.getOrNull()
                     synchronized(lock) {
                         if (launchedGeneration != generation) {
                             // clear() ran while we were in flight; drop the result.
@@ -111,6 +170,7 @@ object AvatarImageLoader {
             generation++
             cache.evictAll()
             failureExpiresAt.clear()
+            preWarmQueuedGeneration.clear()
             inFlight.values.forEach { it.complete(null) }
             inFlight.clear()
         }

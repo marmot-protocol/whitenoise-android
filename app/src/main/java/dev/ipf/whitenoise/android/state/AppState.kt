@@ -1109,6 +1109,11 @@ class WhiteNoiseAppState(
     // Read accessors serve from here so composition never crosses the FFI.
     private val userProfiles = BoundedEntryCache<String, UserProfileMetadataFfi>(MAX_USER_PROFILE_CACHE_ENTRIES)
 
+    // Profile ids whose avatar image was requested by a recent/live conversation
+    // projection. Kept separate from general profile materialization so opening a
+    // large roster does not trigger unsolicited image-host traffic.
+    private val pendingAvatarPreWarmAccountIds = linkedSetOf<String>()
+
     // Ids with an in-flight local materialization, so a cache miss launches at
     // most one local read per id. Distinct from the relay-refresh cooldown gate.
     private val materializingProfiles = mutableSetOf<String>()
@@ -2416,6 +2421,7 @@ class WhiteNoiseAppState(
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
             userProfiles.clear()
+            pendingAvatarPreWarmAccountIds.clear()
             materializingProfiles.clear()
         }
         synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
@@ -4143,6 +4149,42 @@ class WhiteNoiseAppState(
         return avatar
     }
 
+    /**
+     * Start local profile materialization and image decoding without waiting for
+     * either. Chat/message projections call this before notification delivery;
+     * [applyProfilePresentation] queues the image as soon as local storage (or a
+     * relay refresh) yields a sanitized URL.
+     */
+    internal fun preWarmProfileAvatar(accountIdHex: String) {
+        val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val cachedAvatar =
+            synchronized(profilePresentationLock) {
+                val avatar = profilePresentations[id]?.avatarUrl
+                if (avatar != null) {
+                    pendingAvatarPreWarmAccountIds.remove(id)
+                } else {
+                    // Reinsert to keep the set in recent-conversation order; a
+                    // live sender must not sit behind old avatarless profiles.
+                    pendingAvatarPreWarmAccountIds.remove(id)
+                    if (pendingAvatarPreWarmAccountIds.size >= MAX_PENDING_AVATAR_PREWARMS) {
+                        val oldest = pendingAvatarPreWarmAccountIds.iterator()
+                        if (oldest.hasNext()) {
+                            oldest.next()
+                            oldest.remove()
+                        }
+                    }
+                    pendingAvatarPreWarmAccountIds.add(id)
+                }
+                avatar
+            }
+        AvatarImageLoader.preWarm(cachedAvatar)
+        // Starts an ungated local materialization on a miss and observes its
+        // revision; applyProfilePresentation consumes the pending warm above once
+        // the URL lands. The relay refresh remains independently cooldown-gated.
+        profilePresentation(id)
+        requestProfile(id)
+    }
+
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // This is called from render/timeline projection paths, so do not synchronously
@@ -5009,10 +5051,16 @@ class WhiteNoiseAppState(
         accountIdHex: String,
         presentation: ProfilePresentation,
     ) {
-        val changed =
+        val (changed, shouldPreWarm) =
             synchronized(profilePresentationLock) {
-                profilePresentations.put(accountIdHex, presentation) != presentation
+                val changed = profilePresentations.put(accountIdHex, presentation) != presentation
+                val shouldPreWarm =
+                    presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)
+                changed to shouldPreWarm
             }
+        if (shouldPreWarm) {
+            AvatarImageLoader.preWarm(presentation.avatarUrl)
+        }
         if (changed) {
             profileRevision += 1
         }
@@ -5022,6 +5070,7 @@ class WhiteNoiseAppState(
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
             userProfiles.clear()
+            pendingAvatarPreWarmAccountIds.clear()
             materializingProfiles.clear()
         }
         profileRevision += 1
@@ -5078,6 +5127,7 @@ class WhiteNoiseAppState(
         private const val ACCOUNT_UNREAD_MEMBER_FANOUT = 4
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
+        private const val MAX_PENDING_AVATAR_PREWARMS = 64
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
