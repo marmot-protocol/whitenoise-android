@@ -18,6 +18,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import javax.crypto.BadPaddingException
+import javax.crypto.IllegalBlockSizeException
+
+internal sealed interface NotificationReplyInput {
+    data class Encrypted(
+        val reply: EncryptedNotificationReply,
+    ) : NotificationReplyInput
+
+    data class LegacyPlaintext(
+        val reply: String,
+    ) : NotificationReplyInput
+
+    data object Malformed : NotificationReplyInput
+}
 
 class NotificationReplyWorker(
     appContext: Context,
@@ -25,8 +39,28 @@ class NotificationReplyWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val application = applicationContext as? WhiteNoiseApplication ?: return Result.success()
-        val action = notificationReplyActionFromInput(inputData) ?: return Result.success()
-        val reply = inputData.getString(KEY_REPLY)?.trim().orEmpty()
+        val action = notificationReplyActionFromInput(inputData) ?: return Result.failure()
+        val replyInput = notificationReplyFromInput(inputData)
+        // Legacy rows already exist in WorkManager's database after an upgrade.
+        // Process them once, but never schedule their plaintext input for backoff.
+        val containsLegacyPlaintext = replyInput is NotificationReplyInput.LegacyPlaintext
+        val reply =
+            when (replyInput) {
+                is NotificationReplyInput.LegacyPlaintext -> replyInput.reply.trim()
+                is NotificationReplyInput.Encrypted ->
+                    try {
+                        NotificationReplyCipher
+                            .create(applicationContext)
+                            .decrypt(replyInput.reply, id, action)
+                            .trim()
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        Log.w(TAG, "failed to decrypt notification reply", failure)
+                        return cryptoFailureResult(failure)
+                    }
+                NotificationReplyInput.Malformed -> return Result.failure()
+            }
         if (reply.isBlank()) return Result.success()
         val completionStore = NotificationReplyCompletionStore.create(applicationContext)
         // WorkManager keeps this id stable across retries and assigns a new one
@@ -69,13 +103,13 @@ class NotificationReplyWorker(
             } else {
                 notificationReplyActionHandled(sent = false)
                 if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
-                replyFailureResult(action)
+                replyFailureResult(action, containsLegacyPlaintext)
             }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            replyFailureResult(action)
+            replyFailureResult(action, containsLegacyPlaintext)
         }
     }
 
@@ -93,11 +127,18 @@ class NotificationReplyWorker(
             )
         }
 
-    private fun replyFailureResult(action: NotificationAction): Result {
-        if (shouldRetryAfterFailure(runAttemptCount)) return Result.retry()
-        Log.w(TAG, "reply retry limit reached group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")
+    private fun replyFailureResult(
+        action: NotificationAction,
+        containsLegacyPlaintext: Boolean,
+    ): Result {
+        if (shouldRetryAfterFailure(runAttemptCount, containsLegacyPlaintext)) return Result.retry()
+        val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
+        Log.w(TAG, "reply failed ($reason) group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")
         return Result.failure()
     }
+
+    private fun cryptoFailureResult(failure: Throwable): Result =
+        if (shouldRetryAfterCryptoFailure(failure, runAttemptCount)) Result.retry() else Result.failure()
 
     private suspend fun markReadAfterReply(
         application: WhiteNoiseApplication,
@@ -166,7 +207,9 @@ class NotificationReplyWorker(
         private const val KEY_TARGET_KIND = "target_kind"
         private const val KEY_NOTIFICATION_TAG = "notification_tag"
         private const val KEY_NOTIFICATION_ID = "notification_id"
-        private const val KEY_REPLY = "reply"
+        private const val KEY_LEGACY_REPLY = "reply"
+        private const val KEY_REPLY_IV = "reply_iv"
+        private const val KEY_REPLY_CIPHERTEXT = "reply_ciphertext"
         private const val COMPLETION_KEY_PREFIX = "notification_reply_"
         private const val MAX_SEND_ATTEMPTS = 3
         private const val REPLY_BACKOFF_DELAY_SECONDS = 30L
@@ -177,19 +220,40 @@ class NotificationReplyWorker(
             reply: String,
         ) {
             runCatching {
-                WorkManager.getInstance(context.applicationContext).enqueue(notificationReplyRequest(action, reply))
+                val appContext = context.applicationContext
+                val requestId = UUID.randomUUID()
+                val encryptedReply = NotificationReplyCipher.create(appContext).encrypt(reply, requestId, action)
+                WorkManager
+                    .getInstance(appContext)
+                    .enqueue(notificationReplyRequest(action, requestId, encryptedReply))
             }.onFailure {
-                if (BuildConfig.DEBUG) Log.w(TAG, "failed to enqueue reply worker", it)
+                Log.w(TAG, "failed to encrypt or enqueue notification reply", it)
             }
         }
 
-        internal fun shouldRetryAfterFailure(runAttemptCount: Int): Boolean = runAttemptCount < MAX_SEND_ATTEMPTS - 1
+        internal fun shouldRetryAfterFailure(
+            runAttemptCount: Int,
+            containsLegacyPlaintext: Boolean = false,
+        ): Boolean = !containsLegacyPlaintext && runAttemptCount < MAX_SEND_ATTEMPTS - 1
+
+        internal fun shouldRetryAfterCryptoFailure(
+            failure: Throwable,
+            runAttemptCount: Int,
+        ): Boolean {
+            val isTerminal =
+                generateSequence(failure) { current -> current.cause?.takeUnless { it === current } }.any {
+                    it is IllegalArgumentException || it is BadPaddingException || it is IllegalBlockSizeException
+                }
+            return !isTerminal && shouldRetryAfterFailure(runAttemptCount)
+        }
 
         internal fun notificationReplyRequest(
             action: NotificationAction,
-            reply: String,
+            requestId: UUID,
+            encryptedReply: EncryptedNotificationReply,
         ) = OneTimeWorkRequestBuilder<NotificationReplyWorker>()
-            .setInputData(notificationReplyInputData(action, reply))
+            .setId(requestId)
+            .setInputData(notificationReplyInputData(action, encryptedReply))
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
                 REPLY_BACKOFF_DELAY_SECONDS,
@@ -198,7 +262,7 @@ class NotificationReplyWorker(
 
         internal fun notificationReplyInputData(
             action: NotificationAction,
-            reply: String,
+            encryptedReply: EncryptedNotificationReply,
         ): Data =
             workDataOf(
                 KEY_ACTION to NotificationActions.ACTION_REPLY,
@@ -208,8 +272,22 @@ class NotificationReplyWorker(
                 KEY_TARGET_KIND to action.target.kind.name,
                 KEY_NOTIFICATION_TAG to action.notificationTag,
                 KEY_NOTIFICATION_ID to action.notificationId,
-                KEY_REPLY to reply,
+                KEY_REPLY_IV to encryptedReply.initializationVector,
+                KEY_REPLY_CIPHERTEXT to encryptedReply.ciphertext,
             )
+
+        internal fun notificationReplyFromInput(data: Data): NotificationReplyInput {
+            val initializationVector = data.getByteArray(KEY_REPLY_IV)
+            val ciphertext = data.getByteArray(KEY_REPLY_CIPHERTEXT)
+            val legacyReply = data.getString(KEY_LEGACY_REPLY)
+            return when {
+                initializationVector != null && ciphertext != null && legacyReply == null ->
+                    NotificationReplyInput.Encrypted(EncryptedNotificationReply(initializationVector, ciphertext))
+                initializationVector == null && ciphertext == null && legacyReply != null ->
+                    NotificationReplyInput.LegacyPlaintext(legacyReply)
+                else -> NotificationReplyInput.Malformed
+            }
+        }
 
         internal fun notificationReplyActionFromInput(data: Data): NotificationAction? =
             NotificationActions.parseRawFields(

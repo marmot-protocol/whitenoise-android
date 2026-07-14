@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import androidx.work.BackoffPolicy
+import androidx.work.workDataOf
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -8,8 +9,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.GeneralSecurityException
+import java.security.KeyStoreException
+import java.util.UUID
+import javax.crypto.AEADBadTagException
+import javax.crypto.spec.SecretKeySpec
 
 class NotificationTargetTest {
     // ---- routeInboundIntent -------------------------------------------------
@@ -330,13 +338,157 @@ class NotificationTargetTest {
                 notificationTag = "acct-a|group-1",
                 notificationId = 0,
             )
-        val firstRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
-        val secondRequest = NotificationReplyWorker.notificationReplyRequest(action, "hello")
+        val firstRequestId = UUID.randomUUID()
+        val secondRequestId = UUID.randomUUID()
+        val firstEncryptedReply = testReplyCipher().encrypt("hello", firstRequestId, action)
+        val secondEncryptedReply = testReplyCipher().encrypt("hello", secondRequestId, action)
+        val firstRequest = NotificationReplyWorker.notificationReplyRequest(action, firstRequestId, firstEncryptedReply)
+        val secondRequest = NotificationReplyWorker.notificationReplyRequest(action, secondRequestId, secondEncryptedReply)
         val firstCompletionKey = NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id)
 
-        assertEquals(action, NotificationReplyWorker.notificationReplyActionFromInput(NotificationReplyWorker.notificationReplyInputData(action, "hello")))
+        assertEquals(
+            action,
+            NotificationReplyWorker.notificationReplyActionFromInput(
+                NotificationReplyWorker.notificationReplyInputData(action, firstEncryptedReply),
+            ),
+        )
+        assertEquals(firstRequestId, firstRequest.id)
         assertEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(firstRequest.id))
         assertNotEquals(firstCompletionKey, NotificationReplyWorker.notificationReplyCompletionKey(secondRequest.id))
+    }
+
+    @Test
+    fun replyWorkerInput_doesNotPersistPlaintext() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.REPLY,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            )
+        val reply = "shade reply plaintext sentinel"
+        val requestId = UUID.randomUUID()
+        val encryptedReply = testReplyCipher().encrypt(reply, requestId, action)
+
+        val request = NotificationReplyWorker.notificationReplyRequest(action, requestId, encryptedReply)
+        val input = request.workSpec.input
+        val restoredEncryptedReply =
+            (NotificationReplyWorker.notificationReplyFromInput(input) as NotificationReplyInput.Encrypted).reply
+
+        assertEquals(requestId, request.id)
+        assertFalse(input.keyValueMap.containsKey("reply"))
+        assertFalse(input.keyValueMap.values.any { it == reply })
+        assertFalse(input.toByteArray().toString(Charsets.ISO_8859_1).contains(reply))
+        assertEquals(reply, testReplyCipher().decrypt(restoredEncryptedReply, requestId, action))
+    }
+
+    @Test
+    fun replyCipher_rejectsCiphertextFromAnotherWorkRequestOrRoute() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.REPLY,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 7,
+            )
+        val requestId = UUID.randomUUID()
+        val encryptedReply = testReplyCipher().encrypt("hello", requestId, action)
+
+        assertThrows(GeneralSecurityException::class.java) {
+            testReplyCipher().decrypt(encryptedReply, UUID.randomUUID(), action)
+        }
+        val tamperedInitializationVector =
+            encryptedReply.initializationVector.copyOf().also { bytes ->
+                bytes[0] = (bytes[0].toInt() xor 1).toByte()
+            }
+        assertThrows(GeneralSecurityException::class.java) {
+            testReplyCipher().decrypt(
+                encryptedReply.copy(initializationVector = tamperedInitializationVector),
+                requestId,
+                action,
+            )
+        }
+        val tamperedCiphertext =
+            encryptedReply.ciphertext.copyOf().also { bytes ->
+                bytes[0] = (bytes[0].toInt() xor 1).toByte()
+            }
+        assertThrows(GeneralSecurityException::class.java) {
+            testReplyCipher().decrypt(encryptedReply.copy(ciphertext = tamperedCiphertext), requestId, action)
+        }
+        val tamperedActions =
+            listOf(
+                action.copy(kind = NotificationActionKind.MARK_READ),
+                action.copy(target = action.target.copy(accountRef = "acct-b")),
+                action.copy(target = action.target.copy(groupIdHex = "group-2")),
+                action.copy(target = action.target.copy(messageIdHex = "msg-2")),
+                action.copy(target = action.target.copy(kind = NotificationTargetKind.INVITE)),
+                action.copy(notificationTag = "acct-a|group-2"),
+                action.copy(notificationId = 8),
+            )
+        tamperedActions.forEach { tamperedAction ->
+            assertThrows(GeneralSecurityException::class.java) {
+                testReplyCipher().decrypt(encryptedReply, requestId, tamperedAction)
+            }
+        }
+    }
+
+    @Test
+    fun replyWorkerInput_supportsLegacyPlaintextWithoutRetryingIt() {
+        val reply = "already queued legacy reply"
+        val legacyInput =
+            workDataOf(
+                "action" to NotificationActions.ACTION_REPLY,
+                "account_ref" to "acct-a",
+                "group_id_hex" to "group-1",
+                "message_id_hex" to "msg-1",
+                "target_kind" to NotificationTargetKind.MESSAGE.name,
+                "notification_tag" to "acct-a|group-1",
+                "notification_id" to 0,
+                "reply" to reply,
+            )
+
+        assertEquals(
+            NotificationReplyInput.LegacyPlaintext(reply),
+            NotificationReplyWorker.notificationReplyFromInput(legacyInput),
+        )
+        assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(0, containsLegacyPlaintext = true))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(1, containsLegacyPlaintext = true))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(2, containsLegacyPlaintext = true))
+    }
+
+    @Test
+    fun replyWorkerCryptoFailureRetries_onlyPotentiallyTransientFailures() {
+        val transientFailure = KeyStoreException("temporarily unavailable")
+
+        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 0))
+        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 1))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 2))
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterCryptoFailure(
+                AEADBadTagException("metadata or ciphertext was tampered"),
+                runAttemptCount = 0,
+            ),
+        )
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterCryptoFailure(
+                IllegalArgumentException("malformed encrypted input"),
+                runAttemptCount = 0,
+            ),
+        )
+        assertSame(
+            NotificationReplyInput.Malformed,
+            NotificationReplyWorker.notificationReplyFromInput(workDataOf("reply_iv" to ByteArray(12))),
+        )
+        assertSame(
+            NotificationReplyInput.Malformed,
+            NotificationReplyWorker.notificationReplyFromInput(
+                workDataOf(
+                    "reply" to "downgrade attempt",
+                    "reply_iv" to ByteArray(12),
+                    "reply_ciphertext" to ByteArray(16),
+                ),
+            ),
+        )
     }
 
     @Test
@@ -357,11 +509,15 @@ class NotificationTargetTest {
                 notificationId = 0,
             )
 
-        val request = NotificationReplyWorker.notificationReplyRequest(action, "hello")
+        val requestId = UUID.randomUUID()
+        val encryptedReply = testReplyCipher().encrypt("hello", requestId, action)
+        val request = NotificationReplyWorker.notificationReplyRequest(action, requestId, encryptedReply)
 
         assertEquals(BackoffPolicy.EXPONENTIAL, request.workSpec.backoffPolicy)
         assertEquals(30_000L, request.workSpec.backoffDelayDuration)
     }
+
+    private fun testReplyCipher(): NotificationReplyCipher = NotificationReplyCipher(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
 
