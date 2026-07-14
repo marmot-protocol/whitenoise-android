@@ -22,6 +22,12 @@ internal fun interface DiskByteCacheKeyProvider {
     fun getOrCreate(): SecretKey
 }
 
+/** Captures wipe and expiry-sweep state for a deferred cache publication. */
+internal data class DiskByteCachePublicationToken(
+    val generation: Int,
+    val expirySweepEpoch: Int,
+)
+
 /**
  * On-disk byte cache, bounded by total size. Persists across process
  * restarts so re-opening a chat doesn't re-download every visible image.
@@ -66,9 +72,17 @@ internal class DiskByteCache(
     private val afterEncryptedWrite: () -> Unit = {},
     private val afterPutEpochCaptured: () -> Unit = {},
     private val beforeStaleFilesDeleted: () -> Unit = {},
+    private val beforeOrphanTmpSweep: () -> Unit = {},
+    private val afterOrphanTmpSweep: () -> Unit = {},
+    private val beforeHydrationDestructiveDelete: () -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
+
+    // Hydration-time transient auth failures leave valid envelopes on disk but
+    // outside the index until restart. Tracked here so expiry sweeps and exact-key
+    // removal can still delete them without trusting unauthenticated tags.
+    private val unresolvedEnvelopes = mutableSetOf<String>()
     private var residentBytes: Long = 0L
     private var hydrated = false
     private var legacyPlaintextWiped = false
@@ -101,11 +115,13 @@ internal class DiskByteCache(
                     if (legacyCleanupComplete) legacyPlaintextWiped = true
                     if (hydrated) null else generation
                 } ?: return
-            val snapshot = buildHydratedIndex()
+            val snapshot = buildHydratedIndex(generationAtStart)
             synchronized(this) install@{
                 if (hydrated || generation != generationAtStart) return@install
                 index.clear()
                 index.putAll(snapshot.index)
+                unresolvedEnvelopes.clear()
+                unresolvedEnvelopes.addAll(snapshot.unresolvedEnvelopes)
                 residentBytes = snapshot.residentBytes
                 hydrated = true
             }
@@ -191,35 +207,27 @@ internal class DiskByteCache(
         }
     }
 
-    /** Wipe generation to capture when scheduling a deferred [put]. */
     @Synchronized
-    fun generation(): Int = generation
+    fun capturePublicationToken(): DiskByteCachePublicationToken = DiskByteCachePublicationToken(generation, expirySweepEpoch)
 
     fun put(
         key: String,
         bytes: ByteArray,
-        expectedGeneration: Int,
+        token: DiskByteCachePublicationToken,
         ciphertextTag: String? = null,
     ) {
         if (bytes.isEmpty()) return
         if (bytes.size.toLong() > entryByteLimit) return
-        // Reject a write whose session was wiped while it sat queued: clear()
-        // bumps `generation` under this same lock, so a put scheduled before
-        // the wipe skips here and no plaintext lands after sign-out. See #154.
-        val sweepEpochAtEntry =
-            synchronized(this) {
-                if (expectedGeneration != generation) return
-                expirySweepEpoch
-            }
+        synchronized(this) {
+            if (token.generation != generation || token.expirySweepEpoch != expirySweepEpoch) return
+        }
         afterPutEpochCaptured()
-        // Hydrate before writing `.tmp` files so rehydrate's orphan sweep
-        // doesn't delete in-flight temps on first access.
         ensureHydrated()
         val hashed = fileNameFor(key)
         val file = File(cacheDir, hashed)
         val putContext =
             synchronized(this) {
-                if (expectedGeneration != generation) return
+                if (token.generation != generation || token.expirySweepEpoch != expirySweepEpoch) return
                 cacheDir.mkdirs()
                 val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "enc")
                 val output =
@@ -232,7 +240,7 @@ internal class DiskByteCache(
                     tmp = tmp,
                     output = output,
                     existingSnapshot = index[hashed],
-                    sweepEpochAtStart = sweepEpochAtEntry,
+                    unresolvedAtStart = unresolvedEnvelopes.contains(hashed),
                 )
             }
         afterTempFileCreated()
@@ -263,9 +271,10 @@ internal class DiskByteCache(
             // rather than re-persisting plaintext for a wiped session. See #154,
             // #1033.
             if (
-                expectedGeneration != generation ||
+                token.generation != generation ||
+                token.expirySweepEpoch != expirySweepEpoch ||
                 index[hashed] !== putContext.existingSnapshot ||
-                expirySweepEpoch != putContext.sweepEpochAtStart
+                unresolvedEnvelopes.contains(hashed) != putContext.unresolvedAtStart
             ) {
                 abortPut(putContext.tmp)
                 return
@@ -284,6 +293,7 @@ internal class DiskByteCache(
                 index.remove(hashed)
                 residentBytes -= existing.size
             }
+            unresolvedEnvelopes.remove(hashed)
             val size = file.length().toInt()
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
@@ -292,15 +302,11 @@ internal class DiskByteCache(
         deleteStaleEntries(evicted)
     }
 
-    /** Immediate write at the current generation. Deferred/background writes
-     *  that must honor a sign-out wipe should capture [generation] at schedule
-     *  time and use the three-arg overload instead. */
     fun put(
         key: String,
         bytes: ByteArray,
     ) {
-        val currentGeneration = synchronized(this) { generation }
-        put(key, bytes, currentGeneration)
+        put(key, bytes, capturePublicationToken())
     }
 
     /**
@@ -314,9 +320,15 @@ internal class DiskByteCache(
         val hashed = fileNameFor(key)
         val stale =
             synchronized(this) {
-                val entry = index.remove(hashed) ?: return
-                residentBytes -= entry.size
-                listOf(hashed to filesFor(entry))
+                val entry = index.remove(hashed)
+                if (entry != null) {
+                    residentBytes -= entry.size
+                    listOf(hashed to filesFor(entry))
+                } else if (unresolvedEnvelopes.remove(hashed)) {
+                    listOf(hashed to filesForUnresolved(hashed))
+                } else {
+                    return
+                }
             }
         deleteStaleEntries(stale)
     }
@@ -347,6 +359,16 @@ internal class DiskByteCache(
                         removed++
                     }
                 }
+                // Fail closed: an unresolved envelope's tag is unauthenticated, so
+                // any non-empty sweep must delete all of them rather than risk leaving
+                // an expired attachment readable after provider recovery.
+                val unresolvedIterator = unresolvedEnvelopes.iterator()
+                while (unresolvedIterator.hasNext()) {
+                    val hashed = unresolvedIterator.next()
+                    unresolvedIterator.remove()
+                    stale += hashed to filesForUnresolved(hashed)
+                    removed++
+                }
                 removed
             }
         deleteStaleEntries(stale)
@@ -361,9 +383,14 @@ internal class DiskByteCache(
     private fun deleteStaleEntries(stale: List<Pair<String, List<File>>>) {
         if (stale.isEmpty()) return
         stale.forEach { (hashed, files) ->
+            val absentAtProbe =
+                synchronized(this) {
+                    !index.containsKey(hashed)
+                }
+            if (!absentAtProbe) return@forEach
+            beforeStaleFilesDeleted()
             synchronized(this) {
                 if (!index.containsKey(hashed)) {
-                    beforeStaleFilesDeleted()
                     files.forEach { runCatching { it.delete() } }
                 }
             }
@@ -371,6 +398,11 @@ internal class DiskByteCache(
     }
 
     private fun filesFor(entry: Entry): List<File> = listOf(entry.file, legacyTagFileFor(entry.file, SUFFIX))
+
+    private fun filesForUnresolved(hashed: String): List<File> {
+        val file = File(cacheDir, hashed)
+        return listOf(file, legacyTagFileFor(file, SUFFIX))
+    }
 
     /** LRU-evict down to [maxBytes], returning each evicted entry keyed by its
      *  hashed name so the caller's deferred delete can skip a concurrent re-put
@@ -405,6 +437,7 @@ internal class DiskByteCache(
             runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
         }
         index.clear()
+        unresolvedEnvelopes.clear()
         residentBytes = 0L
         hydrated = true
         // Sweep directly instead of calling ensureHydrated(): sign-out can run
@@ -469,55 +502,94 @@ internal class DiskByteCache(
         return complete
     }
 
-    private fun buildHydratedIndex(): HydratedIndex {
-        val hydratedIndex = LinkedHashMap<String, Entry>(8, 0.75f, true)
-        var hydratedBytes = 0L
-        val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return HydratedIndex(hydratedIndex, hydratedBytes)
-        // Sweep stranded `.tmp` files from a prior crash so the byte cap
-        // matches what's actually on disk.
-        for (file in allFiles) {
-            if (file.name.endsWith(TMP_SUFFIX)) {
+    private fun deleteHydrationArtifactsIfGenerationMatches(
+        generationAtStart: Int,
+        files: List<File>,
+        pauseBeforeDelete: () -> Unit = {},
+    ) {
+        pauseBeforeDelete()
+        synchronized(this) {
+            if (generation != generationAtStart) return
+            files.forEach { file ->
                 runCatching { file.delete() }.onFailure {
-                    android.util.Log.w("DiskByteCache", "failed to delete orphan ${file.name}", it)
+                    android.util.Log.w("DiskByteCache", "failed to delete hydration artifact ${file.name}", it)
                 }
             }
         }
+    }
+
+    private fun buildHydratedIndex(generationAtStart: Int): HydratedIndex {
+        val hydratedIndex = LinkedHashMap<String, Entry>(8, 0.75f, true)
+        val unresolvedDuringHydration = mutableSetOf<String>()
+        var hydratedBytes = 0L
+        val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)
+        beforeOrphanTmpSweep()
+        cacheDir
+            .listFiles()
+            ?.asSequence()
+            ?.filter { it.isFile && it.name.endsWith(TMP_SUFFIX) }
+            ?.forEach { file ->
+                deleteHydrationArtifactsIfGenerationMatches(generationAtStart, listOf(file))
+            }
+        afterOrphanTmpSweep()
         val files =
             allFiles
                 .filter { it.name.endsWith(SUFFIX) }
                 .sortedBy { it.lastModified() }
         for (file in files) {
             val size = file.length()
-            val envelope =
-                readAuthenticatedEnvelopeHeader(file) ?: run {
-                    runCatching { file.delete() }
-                    runCatching { legacyTagFileFor(file, SUFFIX).delete() }
-                    continue
+            val envelopeRead = readAuthenticatedEnvelopeHeader(file)
+            when (envelopeRead.outcome) {
+                EnvelopeHeaderOutcome.VALID -> {
+                    val envelope = envelopeRead.header ?: continue
+                    val plaintextSize = size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES
+                    if (plaintextSize <= 0 || size > Int.MAX_VALUE || plaintextSize > entryByteLimit) {
+                        deleteHydrationArtifactsIfGenerationMatches(
+                            generationAtStart,
+                            listOf(file, legacyTagFileFor(file, SUFFIX)),
+                            beforeHydrationDestructiveDelete,
+                        )
+                        continue
+                    }
+                    hydratedIndex[file.name] = Entry(file, size.toInt(), envelope.ciphertextTag)
+                    hydratedBytes += size
                 }
-            val plaintextSize = size - envelope.headerBytes - ENVELOPE_CRYPTO_OVERHEAD_BYTES
-            if (plaintextSize <= 0 || size > Int.MAX_VALUE || plaintextSize > entryByteLimit) {
-                runCatching { file.delete() }
-                runCatching { legacyTagFileFor(file, SUFFIX).delete() }
-                continue
+                EnvelopeHeaderOutcome.CORRUPT -> {
+                    deleteHydrationArtifactsIfGenerationMatches(
+                        generationAtStart,
+                        listOf(file, legacyTagFileFor(file, SUFFIX)),
+                        beforeHydrationDestructiveDelete,
+                    )
+                }
+                EnvelopeHeaderOutcome.TRANSIENT_FAILURE -> {
+                    unresolvedDuringHydration.add(file.name)
+                }
             }
-            hydratedIndex[file.name] = Entry(file, size.toInt(), envelope.ciphertextTag)
-            hydratedBytes += size
         }
         // Hot-trim if total resident exceeds cap (e.g., cap was reduced
         // since the previous run; or disk filled out-of-band).
         val iterator = hydratedIndex.entries.iterator()
         while (iterator.hasNext() && hydratedBytes > maxBytes) {
             val (_, entry) = iterator.next()
-            runCatching { entry.file.delete() }
-            runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
+            deleteHydrationArtifactsIfGenerationMatches(
+                generationAtStart,
+                listOf(entry.file, legacyTagFileFor(entry.file, SUFFIX)),
+                beforeHydrationDestructiveDelete,
+            )
             hydratedBytes -= entry.size
             iterator.remove()
         }
         // The envelope is authoritative now; every legacy `.tag` is stale.
         allFiles
             .filter { it.name.endsWith(TAG_SUFFIX) }
-            .forEach { tagFile -> runCatching { tagFile.delete() } }
-        return HydratedIndex(hydratedIndex, hydratedBytes)
+            .forEach { tagFile ->
+                deleteHydrationArtifactsIfGenerationMatches(
+                    generationAtStart,
+                    listOf(tagFile),
+                    beforeHydrationDestructiveDelete,
+                )
+            }
+        return HydratedIndex(hydratedIndex, hydratedBytes, unresolvedDuringHydration)
     }
 
     // Legacy sibling sidecar from the pre-#1373 two-file layout.
@@ -547,18 +619,48 @@ internal class DiskByteCache(
         return header
     }
 
-    private fun readAuthenticatedEnvelopeHeader(file: File): EnvelopeHeader? {
-        if (file.length() < MIN_ENVELOPE_BYTES) return null
+    private enum class EnvelopeHeaderOutcome {
+        VALID,
+        CORRUPT,
+        TRANSIENT_FAILURE,
+    }
+
+    private data class EnvelopeHeaderRead(
+        val header: EnvelopeHeader?,
+        val outcome: EnvelopeHeaderOutcome,
+    )
+
+    private fun readAuthenticatedEnvelopeHeader(file: File): EnvelopeHeaderRead {
+        if (file.length() < MIN_ENVELOPE_BYTES) {
+            return EnvelopeHeaderRead(null, EnvelopeHeaderOutcome.CORRUPT)
+        }
         return try {
             FileInputStream(file).use { input ->
-                readAndAuthenticateMetadata(input, file.name).envelope
+                EnvelopeHeaderRead(
+                    readAndAuthenticateMetadata(input, file.name).envelope,
+                    EnvelopeHeaderOutcome.VALID,
+                )
             }
-        } catch (_: IOException) {
-            null
-        } catch (_: GeneralSecurityException) {
-            null
+        } catch (error: IOException) {
+            EnvelopeHeaderRead(
+                null,
+                if (error.isAuthenticationFailure() || error.isMalformedEnvelope()) {
+                    EnvelopeHeaderOutcome.CORRUPT
+                } else {
+                    EnvelopeHeaderOutcome.TRANSIENT_FAILURE
+                },
+            )
+        } catch (error: GeneralSecurityException) {
+            EnvelopeHeaderRead(
+                null,
+                if (error.isAuthenticationFailure()) {
+                    EnvelopeHeaderOutcome.CORRUPT
+                } else {
+                    EnvelopeHeaderOutcome.TRANSIENT_FAILURE
+                },
+            )
         } catch (_: ProviderException) {
-            null
+            EnvelopeHeaderRead(null, EnvelopeHeaderOutcome.TRANSIENT_FAILURE)
         }
     }
 
@@ -705,6 +807,11 @@ internal class DiskByteCache(
 
     private fun IOException.isAuthenticationFailure(): Boolean = (this as Throwable).isAuthenticationFailure()
 
+    private fun IOException.isMalformedEnvelope(): Boolean =
+        message == "invalid cache envelope magic" ||
+            message == "unsupported cache envelope version" ||
+            message == "truncated encrypted cache entry"
+
     private fun evictPoisonedEntry(
         fileName: String,
         entry: Entry,
@@ -741,7 +848,7 @@ internal class DiskByteCache(
         val tmp: File,
         val output: FileOutputStream,
         val existingSnapshot: Entry?,
-        val sweepEpochAtStart: Int,
+        val unresolvedAtStart: Boolean,
     )
 
     private data class Entry(
@@ -753,6 +860,7 @@ internal class DiskByteCache(
     private data class HydratedIndex(
         val index: LinkedHashMap<String, Entry>,
         val residentBytes: Long,
+        val unresolvedEnvelopes: Set<String>,
     )
 
     private companion object {

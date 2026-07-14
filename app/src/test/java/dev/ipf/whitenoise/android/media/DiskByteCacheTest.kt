@@ -17,6 +17,7 @@ import java.nio.file.StandardOpenOption
 import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 
 class DiskByteCacheTest {
@@ -91,7 +92,7 @@ class DiskByteCacheTest {
     @Test
     fun hydrationSweepsLegacySidecar_evenWhenEnvelopeExists() {
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-            .put("k", ByteArray(32) { 1 }, 0, "old-ciphertext")
+            .put("k", ByteArray(32) { 1 }, DiskByteCachePublicationToken(0, 0), "old-ciphertext")
         val legacySidecar = File(dir, sha256Hex("k") + ".tag").also { it.writeText("stale-ciphertext") }
 
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).size()
@@ -205,9 +206,9 @@ class DiskByteCacheTest {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         // Capture the generation a deferred write would have grabbed at
         // schedule time, then sign-out wipes the cache before it lands.
-        val scheduledGeneration = cache.generation()
+        val scheduledToken = cache.capturePublicationToken()
         cache.clear()
-        cache.put("k", ByteArray(40) { 7 }, scheduledGeneration)
+        cache.put("k", ByteArray(40) { 7 }, scheduledToken)
         assertNull("a write from a wiped session must not re-persist", cache.get("k"))
         assertEquals(0L, cache.residentBytes())
     }
@@ -217,7 +218,7 @@ class DiskByteCacheTest {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.clear()
         // A write scheduled after the wipe (current generation) is honored.
-        cache.put("k", ByteArray(40) { 7 }, cache.generation())
+        cache.put("k", ByteArray(40) { 7 }, cache.capturePublicationToken())
         assertNotNull(cache.get("k"))
         assertEquals(102L, cache.residentBytes())
     }
@@ -242,7 +243,7 @@ class DiskByteCacheTest {
     @Test
     fun tamperedEnvelopeTag_rejectedDuringHydration_beforeExpirySweepTrustsIt() {
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-            .put("k", ByteArray(40) { 1 }, 0, "real-tag")
+            .put("k", ByteArray(40) { 1 }, DiskByteCachePublicationToken(0, 0), "real-tag")
         val enc = File(dir, sha256Hex("k") + ".enc")
         val bytes = enc.readBytes()
         val tagLen = bytes[5].toInt() and 0xFF
@@ -276,11 +277,11 @@ class DiskByteCacheTest {
                 afterEncryptedWrite = { throw SimulatedCrash() },
             )
         val payload = ByteArray(40) { 9 }
-        val scheduledGeneration = cache.generation()
+        val scheduledToken = cache.capturePublicationToken()
         val putThread =
             Thread {
                 try {
-                    cache.put("k", payload, scheduledGeneration)
+                    cache.put("k", payload, scheduledToken)
                 } catch (_: SimulatedCrash) {
                     crashObserved = true
                 }
@@ -307,7 +308,7 @@ class DiskByteCacheTest {
     @Test
     fun inFlightPut_rejectedWhenExpirySweepDuringWrite() {
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-            .put("k", ByteArray(40) { 1 }, 0, "old-tag")
+            .put("k", ByteArray(40) { 1 }, DiskByteCachePublicationToken(0, 0), "old-tag")
         val writeFinished = CountDownLatch(1)
         val releaseCommit = CountDownLatch(1)
         val cache =
@@ -322,7 +323,7 @@ class DiskByteCacheTest {
             )
         val putThread =
             Thread {
-                cache.put("k", ByteArray(40) { 2 }, cache.generation(), "new-tag")
+                cache.put("k", ByteArray(40) { 2 }, cache.capturePublicationToken(), "new-tag")
             }
         putThread.start()
         assertTrue("replacement write must finish before commit", writeFinished.await(5, TimeUnit.SECONDS))
@@ -352,7 +353,7 @@ class DiskByteCacheTest {
         cache.prepare()
         val putThread =
             Thread {
-                cache.put("k", ByteArray(40) { 2 }, cache.generation(), "expired-tag")
+                cache.put("k", ByteArray(40) { 2 }, cache.capturePublicationToken(), "expired-tag")
             }
 
         putThread.start()
@@ -363,6 +364,283 @@ class DiskByteCacheTest {
 
         assertNull("a sweep must invalidate a put already in flight at entry", cache.get("k"))
         assertFalse(dir.listFiles()?.any { it.isFile && it.name.endsWith(".enc") } ?: false)
+    }
+
+    @Test
+    fun put_rejectedWhenExpirySweepRunsDuringSimulatedFetch() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        cache.put("k", ByteArray(40) { 1 }, cache.capturePublicationToken(), "sweep-tag")
+        val tokenBeforeFetch = cache.capturePublicationToken()
+        val fetchPaused = CountDownLatch(1)
+        val releaseFetch = CountDownLatch(1)
+        val putThread =
+            Thread {
+                fetchPaused.countDown()
+                releaseFetch.await(5, TimeUnit.SECONDS)
+                cache.put("k", ByteArray(40) { 2 }, tokenBeforeFetch, "sweep-tag")
+            }
+        putThread.start()
+        assertTrue("simulated fetch must start before the sweep", fetchPaused.await(5, TimeUnit.SECONDS))
+        assertEquals(1, cache.removeByCiphertextTags(setOf("sweep-tag")))
+        releaseFetch.countDown()
+        putThread.join(5_000)
+
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertNull("a deferred put must not publish after an expiry sweep during fetch", reopened.get("k"))
+        assertEquals(0, reopened.removeByCiphertextTags(setOf("sweep-tag")))
+    }
+
+    @Test
+    fun staleHydration_doesNotDeleteCurrentGenerationEnvelopeAfterClear() {
+        File(dir, sha256Hex("k") + ".enc").writeBytes(ByteArray(64).also { bytes -> bytes[0] = 1 })
+        val destructiveDeletePaused = CountDownLatch(1)
+        val releaseDestructiveDelete = CountDownLatch(1)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 1024,
+                beforeHydrationDestructiveDelete = {
+                    destructiveDeletePaused.countDown()
+                    releaseDestructiveDelete.await(5, TimeUnit.SECONDS)
+                },
+            )
+        val hydrationThread =
+            Thread {
+                cache.size()
+            }
+        hydrationThread.start()
+        assertTrue(
+            "hydration must reach destructive envelope cleanup",
+            destructiveDeletePaused.await(5, TimeUnit.SECONDS),
+        )
+        cache.clear()
+        val payload = ByteArray(40) { 9 }
+        cache.put("k", payload, cache.capturePublicationToken())
+        releaseDestructiveDelete.countDown()
+        hydrationThread.join(5_000)
+
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertTrue(
+            "current-generation put must survive stale hydration cleanup",
+            reopened.get("k")!!.contentEquals(payload),
+        )
+    }
+
+    @Test
+    fun staleHydration_doesNotDeleteCurrentGenerationTempAfterClear() {
+        val orphanSweepPaused = CountDownLatch(1)
+        val releaseOrphanSweep = CountDownLatch(1)
+        val orphanSweepComplete = CountDownLatch(1)
+        val encryptedWriteFinished = CountDownLatch(1)
+        val releasePutCommit = CountDownLatch(1)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 1024,
+                beforeOrphanTmpSweep = {
+                    orphanSweepPaused.countDown()
+                    releaseOrphanSweep.await(5, TimeUnit.SECONDS)
+                },
+                afterOrphanTmpSweep = { orphanSweepComplete.countDown() },
+                afterEncryptedWrite = {
+                    encryptedWriteFinished.countDown()
+                    releasePutCommit.await(5, TimeUnit.SECONDS)
+                },
+            )
+        val hydrationThread =
+            Thread {
+                cache.put("seed", ByteArray(40) { 1 })
+            }
+        hydrationThread.start()
+        assertTrue("hydration must reach orphan tmp sweep", orphanSweepPaused.await(5, TimeUnit.SECONDS))
+        cache.clear()
+        val payload = ByteArray(40) { 9 }
+        val putThread =
+            Thread {
+                cache.put("k", payload, cache.capturePublicationToken())
+            }
+        putThread.start()
+        assertTrue("current-generation put must finish encrypting its temp", encryptedWriteFinished.await(5, TimeUnit.SECONDS))
+        releaseOrphanSweep.countDown()
+        assertTrue("stale hydration must finish its tmp sweep before put commits", orphanSweepComplete.await(5, TimeUnit.SECONDS))
+        releasePutCommit.countDown()
+        hydrationThread.join(5_000)
+        putThread.join(5_000)
+
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertTrue("current-generation put must survive stale hydration cleanup", reopened.get("k")!!.contentEquals(payload))
+    }
+
+    @Test
+    fun hydration_preservesEntryOnTransientEnvelopeReadFailure() {
+        val payload = ByteArray(40) { 3 }
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("k", payload)
+        val enc = File(dir, sha256Hex("k") + ".enc")
+        val remainingFailures = AtomicInteger(1)
+        val flakyProvider =
+            DiskByteCacheKeyProvider {
+                if (remainingFailures.getAndDecrement() > 0) {
+                    throw ProviderException("transient keystore fault")
+                }
+                keyProvider.getOrCreate()
+            }
+        val flaky = DiskByteCache(dir, keyProvider = flakyProvider, maxBytes = 1024)
+        assertEquals("transient read failure must not index the entry", 0, flaky.size())
+        assertTrue("transient read failure must not delete a valid envelope", enc.isFile)
+
+        val recovered = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertTrue(recovered.get("k")!!.contentEquals(payload))
+    }
+
+    @Test
+    fun expirySweep_failClosedDeletesUnresolvedEnvelopeBeforeProviderRecovers() {
+        val key = "acct|grp|expired-msg|0"
+        val payload = ByteArray(40) { 5 }
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+            .put(key, payload, DiskByteCachePublicationToken(0, 0), "expired-hash")
+        val enc = File(dir, sha256Hex(key) + ".enc")
+        val remainingFailures = AtomicInteger(1)
+        val flakyProvider =
+            DiskByteCacheKeyProvider {
+                if (remainingFailures.getAndDecrement() > 0) {
+                    throw ProviderException("transient keystore fault")
+                }
+                keyProvider.getOrCreate()
+            }
+        val flaky = DiskByteCache(dir, keyProvider = flakyProvider, maxBytes = 1024)
+        assertEquals("transient hydration must not index the entry", 0, flaky.size())
+        assertTrue("transient hydration must preserve the valid envelope", enc.isFile)
+
+        assertTrue(
+            "any non-empty expiry sweep must fail closed and delete unresolved envelopes",
+            flaky.removeByCiphertextTags(setOf("different-hash")) >= 1,
+        )
+        assertFalse("unresolved envelope must be deleted during the sweep", enc.exists())
+
+        val recovered = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertNull("expired attachment must not reappear after provider recovery", recovered.get(key))
+        assertEquals(0, recovered.size())
+    }
+
+    @Test
+    fun inFlightReplacement_rejectedWhenExactKeyRemoveDuringUnresolvedWrite() {
+        val key = "k"
+        val original = ByteArray(40) { 6 }
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put(key, original)
+        val enc = File(dir, sha256Hex(key) + ".enc")
+        val remainingFailures = AtomicInteger(1)
+        val flakyProvider =
+            DiskByteCacheKeyProvider {
+                if (remainingFailures.getAndDecrement() > 0) {
+                    throw ProviderException("transient keystore fault")
+                }
+                keyProvider.getOrCreate()
+            }
+        val writeFinished = CountDownLatch(1)
+        val releaseCommit = CountDownLatch(1)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = flakyProvider,
+                maxBytes = 1024,
+                afterEncryptedWrite = {
+                    writeFinished.countDown()
+                    releaseCommit.await(5, TimeUnit.SECONDS)
+                },
+            )
+        assertEquals("transient hydration must leave the envelope unresolved", 0, cache.size())
+        assertTrue(enc.isFile)
+
+        val replacement = ByteArray(40) { 9 }
+        val putThread =
+            Thread {
+                cache.put(key, replacement, cache.capturePublicationToken())
+            }
+        putThread.start()
+        assertTrue("replacement write must finish before commit", writeFinished.await(5, TimeUnit.SECONDS))
+        cache.remove(key)
+        releaseCommit.countDown()
+        putThread.join(5_000)
+
+        assertNull("an in-flight replacement must not publish after exact-key remove", cache.get(key))
+        assertFalse("exact-key remove must delete the unresolved envelope", enc.exists())
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertNull("removed unresolved envelope must not reappear after restart", reopened.get(key))
+        assertEquals(0, reopened.size())
+    }
+
+    @Test
+    fun remove_deletesUnresolvedEnvelopeAtExactHashedPath() {
+        val payload = ByteArray(40) { 6 }
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("k", payload)
+        val enc = File(dir, sha256Hex("k") + ".enc")
+        val remainingFailures = AtomicInteger(1)
+        val flakyProvider =
+            DiskByteCacheKeyProvider {
+                if (remainingFailures.getAndDecrement() > 0) {
+                    throw ProviderException("transient keystore fault")
+                }
+                keyProvider.getOrCreate()
+            }
+        val flaky = DiskByteCache(dir, keyProvider = flakyProvider, maxBytes = 1024)
+        assertEquals(0, flaky.size())
+        assertTrue(enc.isFile)
+
+        flaky.remove("k")
+
+        assertFalse("exact-key remove must delete an unresolved envelope", enc.exists())
+        val recovered = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertNull(recovered.get("k"))
+        assertEquals(0, recovered.size())
+    }
+
+    @Test
+    fun concurrentSameKeyPuts_publishReadableEnvelopeAfterRestart() {
+        val tempFilesCreated = CountDownLatch(2)
+        val releaseEncryption = CountDownLatch(1)
+        val cache =
+            DiskByteCache(
+                cacheDir = dir,
+                keyProvider = keyProvider,
+                maxBytes = 10_000,
+                afterTempFileCreated = {
+                    tempFilesCreated.countDown()
+                    releaseEncryption.await(5, TimeUnit.SECONDS)
+                },
+            )
+        val payloadA = ByteArray(40) { 1 }
+        val payloadB = ByteArray(40) { 2 }
+        val done = CountDownLatch(2)
+        Thread {
+            cache.put("k", payloadA)
+            done.countDown()
+        }.start()
+        Thread {
+            cache.put("k", payloadB)
+            done.countDown()
+        }.start()
+        assertTrue(
+            "both puts must create distinct temp files before either encrypts",
+            tempFilesCreated.await(5, TimeUnit.SECONDS),
+        )
+        releaseEncryption.countDown()
+        assertTrue("both concurrent puts must finish", done.await(5, TimeUnit.SECONDS))
+
+        val finalBytes = cache.get("k")
+        assertNotNull(finalBytes)
+        assertTrue(
+            "concurrent same-key puts must leave one complete payload",
+            finalBytes!!.contentEquals(payloadA) || finalBytes.contentEquals(payloadB),
+        )
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 10_000)
+        val afterRestart = reopened.get("k")
+        assertNotNull(afterRestart)
+        assertTrue(
+            "the winning concurrent put must survive restart",
+            afterRestart!!.contentEquals(payloadA) || afterRestart.contentEquals(payloadB),
+        )
     }
 
     @Test
@@ -381,10 +659,10 @@ class DiskByteCacheTest {
                 },
                 beforeStaleFilesDeleted = {
                     staleDeleteStarted.countDown()
-                    reputPublished.await(500, TimeUnit.MILLISECONDS)
+                    reputPublished.await(5, TimeUnit.SECONDS)
                 },
             )
-        cache.put("k", ByteArray(40) { 1 }, cache.generation(), "old-tag")
+        cache.put("k", ByteArray(40) { 1 }, cache.capturePublicationToken(), "old-tag")
         observeReput = true
 
         val removeThread = Thread { cache.removeByCiphertextTags(setOf("old-tag")) }
@@ -392,8 +670,12 @@ class DiskByteCacheTest {
         assertTrue("expiry delete must reach its deferred unlink", staleDeleteStarted.await(5, TimeUnit.SECONDS))
 
         val updated = ByteArray(40) { 2 }
-        val putThread = Thread { cache.put("k", updated, cache.generation(), "new-tag") }
+        val putThread = Thread { cache.put("k", updated, cache.capturePublicationToken(), "new-tag") }
         putThread.start()
+        assertTrue(
+            "the concurrent re-put must publish before stale delete unlinks it",
+            reputPublished.await(5, TimeUnit.SECONDS),
+        )
         removeThread.join(5_000)
         putThread.join(5_000)
 
@@ -473,7 +755,7 @@ class DiskByteCacheTest {
         // Expiry metadata must come only from the envelope, never a legacy sidecar.
         val original = ByteArray(40) { 1 }
         val writer = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-        writer.put("k", original, writer.generation(), ciphertextTag = "old-ciphertext")
+        writer.put("k", original, writer.capturePublicationToken(), ciphertextTag = "old-ciphertext")
         File(dir, sha256Hex("k") + ".tag").writeText("new-ciphertext")
 
         val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
@@ -513,11 +795,11 @@ class DiskByteCacheTest {
                 },
             )
         val original = ByteArray(40) { 1 }
-        cache.put("k", original, cache.generation(), ciphertextTag = "old-ciphertext")
+        cache.put("k", original, cache.capturePublicationToken(), ciphertextTag = "old-ciphertext")
 
         crashBeforeDataRename = true
         try {
-            cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = "new-ciphertext")
+            cache.put("k", ByteArray(40) { 2 }, cache.capturePublicationToken(), ciphertextTag = "new-ciphertext")
             error("expected simulated crash before data publication")
         } catch (_: SimulatedCrash) {
             // Abrupt termination before the sole data rename lands.
@@ -552,12 +834,12 @@ class DiskByteCacheTest {
                     renamed
                 },
             )
-        cache.put("k", ByteArray(40) { 1 }, cache.generation(), ciphertextTag = "old-ciphertext")
+        cache.put("k", ByteArray(40) { 1 }, cache.capturePublicationToken(), ciphertextTag = "old-ciphertext")
         val updated = ByteArray(40) { 2 }
 
         crashAfterDataRename = true
         try {
-            cache.put("k", updated, cache.generation(), ciphertextTag = "new-ciphertext")
+            cache.put("k", updated, cache.capturePublicationToken(), ciphertextTag = "new-ciphertext")
             error("expected simulated crash after data publication")
         } catch (_: SimulatedCrash) {
             // Index may be inconsistent in-memory; restart is the proof.
@@ -586,10 +868,10 @@ class DiskByteCacheTest {
                 },
             )
         val original = ByteArray(40) { 1 }
-        cache.put("k", original, cache.generation(), ciphertextTag = "old-ciphertext")
+        cache.put("k", original, cache.capturePublicationToken(), ciphertextTag = "old-ciphertext")
 
         failDataCommit = true
-        cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = "new-ciphertext")
+        cache.put("k", ByteArray(40) { 2 }, cache.capturePublicationToken(), ciphertextTag = "new-ciphertext")
 
         assertTrue(cache.get("k")!!.contentEquals(original))
         val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
@@ -620,10 +902,10 @@ class DiskByteCacheTest {
                 },
             )
         val original = ByteArray(40) { 1 }
-        cache.put("k", original, cache.generation(), ciphertextTag = "old-ciphertext")
+        cache.put("k", original, cache.capturePublicationToken(), ciphertextTag = "old-ciphertext")
 
         failDataCommit = true
-        cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = null)
+        cache.put("k", ByteArray(40) { 2 }, cache.capturePublicationToken(), ciphertextTag = null)
 
         assertTrue("old bytes must survive a failed untagged replacement", cache.get("k")!!.contentEquals(original))
         val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
@@ -765,7 +1047,7 @@ class DiskByteCacheTest {
                 "put",
                 String::class.java,
                 ByteArray::class.java,
-                Int::class.javaPrimitiveType!!,
+                DiskByteCachePublicationToken::class.java,
                 String::class.java,
             )
         val immediatePut =
@@ -797,7 +1079,7 @@ class DiskByteCacheTest {
         val putThread =
             Thread {
                 try {
-                    cache.put("new", ByteArray(40) { 4 }, cache.generation())
+                    cache.put("new", ByteArray(40) { 4 }, cache.capturePublicationToken())
                 } finally {
                     putFinished.countDown()
                 }
@@ -935,8 +1217,8 @@ class DiskByteCacheTest {
     @Test
     fun removeByCiphertextTags_evictsTaggedEntriesOnly() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-        cache.put("acct|grp|msg-1|0", ByteArray(30), cache.generation(), "hash-a")
-        cache.put("acct|grp|msg-2|0", ByteArray(30), cache.generation(), "hash-b")
+        cache.put("acct|grp|msg-1|0", ByteArray(30), cache.capturePublicationToken(), "hash-a")
+        cache.put("acct|grp|msg-2|0", ByteArray(30), cache.capturePublicationToken(), "hash-b")
         cache.put("acct|grp|msg-3|0", ByteArray(30)) // untagged
         val removed = cache.removeByCiphertextTags(setOf("hash-a"))
         assertEquals(1, removed)
@@ -954,7 +1236,7 @@ class DiskByteCacheTest {
         // evicting purely by hash from a fresh instance over the same dir.
         // generation 0 is the initial generation of a fresh instance.
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-            .put("acct|grp|old-msg|0", ByteArray(40) { 5 }, 0, "expired-hash")
+            .put("acct|grp|old-msg|0", ByteArray(40) { 5 }, DiskByteCachePublicationToken(0, 0), "expired-hash")
         val rehydrated = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertNotNull("entry should survive the restart", rehydrated.get("acct|grp|old-msg|0"))
         val removed = rehydrated.removeByCiphertextTags(setOf("expired-hash"))
@@ -986,7 +1268,7 @@ class DiskByteCacheTest {
                 },
             )
         failCommit = true
-        cache.put(key, ByteArray(40) { 1 }, cache.generation(), "the-hash")
+        cache.put(key, ByteArray(40) { 1 }, cache.capturePublicationToken(), "the-hash")
         assertNull("a tagged write whose commit failed must not be readable", cache.get(key))
         assertEquals(0, cache.size())
         assertEquals(0L, cache.residentBytes())
@@ -999,7 +1281,7 @@ class DiskByteCacheTest {
     @Test
     fun removeByCiphertextTags_emptySet_isNoOp() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
-        cache.put("k", ByteArray(30), cache.generation(), "h")
+        cache.put("k", ByteArray(30), cache.capturePublicationToken(), "h")
         assertEquals(0, cache.removeByCiphertextTags(emptySet()))
         assertNotNull(cache.get("k"))
     }

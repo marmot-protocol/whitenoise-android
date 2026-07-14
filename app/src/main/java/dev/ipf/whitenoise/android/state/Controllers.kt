@@ -4639,14 +4639,14 @@ class ConversationController(
                             appState.mediaThumbnailCache.put(confirmedKey, decoded)
                         }
                         val bytesToPersist = attachment.plaintextBytes
-                        val cacheGeneration = appState.diskMediaCache.generation()
+                        val publicationToken = appState.diskMediaCache.capturePublicationToken()
                         // Tag with the uploaded blob's ciphertext hash so the
                         // expiry sweep can wipe this self-sent entry from disk by
                         // hash even after a restart / when its row isn't loaded.
                         val ciphertextTag = references.getOrNull(index)?.ciphertextSha256
                         appState.launchMutation {
                             withContext(Dispatchers.IO) {
-                                appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                                appState.diskMediaCache.put(confirmedKey, bytesToPersist, publicationToken, ciphertextTag)
                             }
                         }
                     }
@@ -5125,9 +5125,9 @@ class ConversationController(
         val groupIdHex = group.groupIdHex
         val deferred =
             appState.memoizedDownload(cacheKey) {
-                // Capture before the fetch so a sign-out wipe mid-download
-                // rejects the L2 persist below. See #154.
-                val cacheGeneration = appState.diskMediaCache.generation()
+                // Capture before the fetch so a sign-out wipe or expiry sweep
+                // mid-download rejects the L2 persist below. See #154, #1373.
+                val publicationToken = appState.diskMediaCache.capturePublicationToken()
                 val result =
                     runCatching {
                         val safeReference = assertMediaLocatorsResolveSafe(reference)
@@ -5166,7 +5166,7 @@ class ConversationController(
                     // attachment's ciphertext hash so the expiry sweep can wipe
                     // it from disk later even if its message isn't loaded then.
                     withContext(Dispatchers.IO) {
-                        appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration, reference.ciphertextSha256)
+                        appState.diskMediaCache.put(cacheKey, plaintext, publicationToken, reference.ciphertextSha256)
                     }
                 }
                 result.plaintext
@@ -5234,13 +5234,13 @@ class ConversationController(
                 }
             }
             val bytesToPersist = attachment.plaintextBytes
-            val cacheGeneration = appState.diskMediaCache.generation()
+            val publicationToken = appState.diskMediaCache.capturePublicationToken()
             // Tag with the uploaded blob's ciphertext hash (captured at upload)
             // so hash-based expiry eviction reaches this entry across sessions.
             val ciphertextTag = retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256
             appState.launchMutation {
                 withContext(Dispatchers.IO) {
-                    appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                    appState.diskMediaCache.put(cacheKey, bytesToPersist, publicationToken, ciphertextTag)
                 }
             }
         }
