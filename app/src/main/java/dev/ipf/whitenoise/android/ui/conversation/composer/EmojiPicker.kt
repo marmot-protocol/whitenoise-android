@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.provider.Settings
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -221,21 +220,28 @@ internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
+    targetImeHeight: Dp,
     rememberedImeHeight: Dp,
 ): Dp {
-    val knownHeight = if (currentImeHeight > 0.dp) currentImeHeight else rememberedImeHeight
+    val knownHeight =
+        when {
+            targetImeHeight > 0.dp -> targetImeHeight
+            rememberedImeHeight > 0.dp -> rememberedImeHeight
+            else -> currentImeHeight
+        }
     return if (knownHeight > 0.dp) knownHeight else ComposerEmojiPickerFallbackHeight
 }
 
 internal fun composerEmojiPaneHeight(
     lockedPaneHeight: Dp,
     currentImeHeight: Dp,
+    targetImeHeight: Dp,
     rememberedImeHeight: Dp,
 ): Dp =
     if (lockedPaneHeight > 0.dp) {
         lockedPaneHeight
     } else {
-        composerEmojiPaneTargetHeight(currentImeHeight, rememberedImeHeight)
+        composerEmojiPaneTargetHeight(currentImeHeight, targetImeHeight, rememberedImeHeight)
     }
 
 internal fun updatedComposerRememberedImeHeight(
@@ -249,16 +255,77 @@ internal fun updatedComposerRememberedImeHeight(
         previousRememberedImeHeight
     }
 
-private val ComposerImeSwapTolerance = 8.dp
+/**
+ * Whether the IME has finished animating and is resting at a visible height.
+ * Handing the bottom region to imePadding before this point moves the
+ * composer twice: measured on-device, the keyboard's show animation can aim
+ * at a transient overshoot target (its with-toolbar height) that it abandons
+ * one frame after arriving, snapping back to the plain height. A swap made
+ * mid-animation rides that overshoot up and back — a visible bounce in a
+ * perfectly gentle transition. A stale full-height inset right after a hide
+ * request (target 0) is rejected by the same check.
+ */
+internal fun composerImeHasSettled(
+    currentImeHeight: Dp,
+    imeTargetHeight: Dp,
+): Boolean = imeTargetHeight > 0.dp && currentImeHeight == imeTargetHeight
 
+/**
+ * Whether a pending attachment-pane restore can hand the bottom region back
+ * to imePadding. The attachment pane's minimum height already rides the live
+ * inset, so it needs no pane-height matching — only a settled keyboard.
+ */
 internal fun shouldSwapComposerEmojiPaneToIme(
     keyboardRestorePending: Boolean,
     currentImeHeight: Dp,
-    targetImeHeight: Dp,
+    imeTargetHeight: Dp,
 ): Boolean =
     keyboardRestorePending &&
-        currentImeHeight > 0.dp &&
-        currentImeHeight >= targetImeHeight - ComposerImeSwapTolerance
+        composerImeHasSettled(currentImeHeight = currentImeHeight, imeTargetHeight = imeTargetHeight)
+
+internal enum class ComposerPaneRestoreStep {
+    /** Keep the pane exactly where it is; the IME is not resting yet. */
+    HOLD,
+
+    /** The keyboard settled at a different height; glide the pane to it. */
+    MATCH_PANE_TO_KEYBOARD,
+
+    /** Pane and settled keyboard occupy identical space; release the pane. */
+    SWAP_TO_KEYBOARD,
+}
+
+/**
+ * One step of the emoji-pane-to-keyboard handoff. The pane is released only
+ * when the keyboard has settled AND the rendered pane occupies exactly the
+ * keyboard's space — if the keyboard settles at a different height than the
+ * pane reserved (a toolbar row appeared or disappeared, or the pane opened at
+ * its fallback height before any keyboard was measured), the pane first
+ * animates to the settled height so the swap is always seamless instead of a
+ * one-frame jump.
+ */
+internal fun composerEmojiPaneRestoreStep(
+    keyboardRestorePending: Boolean,
+    currentImeHeight: Dp,
+    imeTargetHeight: Dp,
+    lockedPaneHeight: Dp,
+    renderedPaneHeight: Dp,
+): ComposerPaneRestoreStep =
+    when {
+        !keyboardRestorePending || !composerImeHasSettled(currentImeHeight, imeTargetHeight) ->
+            ComposerPaneRestoreStep.HOLD
+        lockedPaneHeight != imeTargetHeight -> ComposerPaneRestoreStep.MATCH_PANE_TO_KEYBOARD
+        renderedPaneHeight != imeTargetHeight -> ComposerPaneRestoreStep.HOLD
+        else -> ComposerPaneRestoreStep.SWAP_TO_KEYBOARD
+    }
+
+/**
+ * When the restore window times out the pane is always released — the user
+ * asked for the keyboard, so staying on (or returning to) the picker would
+ * override that intent. Focus is cleared only when no IME arrived at all; if
+ * a keyboard is up at a different height than the pane reserved, it keeps
+ * focus and imePadding simply takes over at the keyboard's real height.
+ */
+internal fun composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight: Dp): Boolean = currentImeHeight == 0.dp
 
 @Composable
 private fun EmojiPickerContent(
@@ -593,122 +660,111 @@ private fun EmojiCategoryRail(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier =
-            modifier
-                // Transparent so the category rail blends with the picker
-                // surface in both themes rather than a hardcoded dark bar.
-                .background(Color.Transparent)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        // No fill and no vertical padding of its own: the rail reads as part
+        // of the picker surface, not a separate bar. Each entry is an equal
+        // weighted slot so search stays leading and backspace stays trailing.
+        modifier = modifier.padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onCustomizeReactions != null) {
             EmojiRailIconButton(
                 onClick = onCustomizeReactions,
                 selected = false,
-                modifier = Modifier.weight(1f).height(42.dp),
-            ) {
-                Icon(
-                    Icons.Default.Settings,
-                    contentDescription = stringResource(R.string.customize_reactions),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+                icon = Icons.Default.Settings,
+                contentDescription = stringResource(R.string.customize_reactions),
+                modifier = Modifier.weight(1f),
+            )
         }
         if (showSearch) {
             EmojiRailIconButton(
                 onClick = onSearch,
                 selected = searchSelected,
-                modifier = Modifier.weight(1f).height(42.dp),
-            ) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = stringResource(R.string.emoji_search_hint),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+                icon = Icons.Default.Search,
+                contentDescription = stringResource(R.string.emoji_search_hint),
+                modifier = Modifier.weight(1f),
+            )
         }
         if (showRecents) {
-            EmojiCategoryTab(
+            EmojiRailIconButton(
+                onClick = onRecents,
+                selected = recentsSelected,
                 icon = Icons.Default.History,
                 contentDescription = stringResource(R.string.emoji_category_recent),
-                selected = recentsSelected,
-                modifier = Modifier.weight(1f).height(42.dp),
-                onClick = onRecents,
+                modifier = Modifier.weight(1f),
             )
         }
         for (group in 0 until EmojiData.GroupCount) {
-            EmojiCategoryTab(
+            EmojiRailIconButton(
+                onClick = { onGroup(group) },
+                selected = selectedGroup == group,
                 icon = emojiGroupIcon(group),
                 contentDescription = stringResource(emojiGroupTitleRes(group)),
-                selected = selectedGroup == group,
-                modifier = Modifier.weight(1f).height(42.dp),
-                onClick = { onGroup(group) },
+                modifier = Modifier.weight(1f),
             )
         }
         if (onBackspace != null) {
             EmojiRailIconButton(
                 onClick = onBackspace,
                 selected = false,
-                modifier = Modifier.weight(1f).height(42.dp),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Backspace,
-                    contentDescription = stringResource(R.string.emoji_backspace),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+                icon = Icons.AutoMirrored.Filled.Backspace,
+                contentDescription = stringResource(R.string.emoji_backspace),
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
+// Compact circular chip the selected-category highlight paints; small enough
+// to fit the narrowest weighted slot when all twelve rail entries are shown.
+internal val EmojiRailHighlightSize = 34.dp
+
+internal val EmojiRailIconSize = 22.dp
+
+/**
+ * The selected fill is an onSurface overlay rather than a container role or a
+ * fixed color: surface-container tokens are all pure black in the AMOLED
+ * scheme (so a chip painted with them would vanish), and a hardcoded fill only
+ * reads correctly in one theme. A translucent onSurface wash adapts to light,
+ * dark, and AMOLED alike.
+ */
 @Composable
 private fun EmojiRailIconButton(
     onClick: () -> Unit,
     selected: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = modifier.padding(horizontal = 1.dp).clip(CircleShape).clickable(onClick = onClick),
-        shape = CircleShape,
-        color =
-            if (selected) {
-                Color(0xFF424652)
-            } else {
-                Color.Transparent
-            },
-        contentColor =
-            if (selected) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f)
-            },
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun EmojiCategoryTab(
     icon: ImageVector,
     contentDescription: String,
-    selected: Boolean,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
 ) {
-    EmojiRailIconButton(
-        onClick = onClick,
-        selected = selected,
-        modifier = modifier,
-    ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(24.dp),
-        )
+    // The chip is a fixed-size circle centered in the weighted slot, so the
+    // highlight never stretches into a slot-wide pill. The clickable Surface
+    // keeps Material's minimum interactive size, so the touch target stays
+    // larger than the visual circle.
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color =
+                if (selected) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                } else {
+                    Color.Transparent
+                },
+            contentColor =
+                if (selected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                },
+            modifier = Modifier.size(EmojiRailHighlightSize),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(EmojiRailIconSize),
+                )
+            }
+        }
     }
 }
 

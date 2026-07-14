@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -9,12 +12,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -39,10 +44,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -60,6 +67,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
@@ -73,6 +81,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 
 /**
@@ -201,12 +210,20 @@ internal class ComposerTextState(
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 }
 
+// Last measured keyboard pane height per orientation, shared across composer
+// instances for the life of the process. The keyboard's height belongs to the
+// device and IME, not to a conversation, so a freshly entered chat can reserve
+// the real keyboard space on its first emoji-pane open instead of guessing
+// with the fallback height.
+private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
+
 @Composable
 internal fun rememberComposerTextState(
     draftKey: Any?,
     initialDraft: String,
 ): ComposerTextState = remember(draftKey) { ComposerTextState(TextFieldValue(initialDraft)) }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
@@ -263,6 +280,7 @@ internal fun ComposerBar(
     attachmentSheetState: ComposerAttachmentSheetState = rememberComposerAttachmentSheetState(),
 ) {
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
+    var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -314,6 +332,7 @@ internal fun ComposerBar(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
+    val imeTargetInsets = WindowInsets.imeAnimationTarget
     val navigationInsets = WindowInsets.navigationBars
     val currentImePaneHeight =
         with(density) {
@@ -321,21 +340,38 @@ internal fun ComposerBar(
                 .coerceAtLeast(0)
                 .toDp()
         }
-    var rememberedImePaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
+    val targetImePaneHeight =
+        with(density) {
+            (imeTargetInsets.getBottom(this) - navigationInsets.getBottom(this))
+                .coerceAtLeast(0)
+                .toDp()
+        }
+    // Seeded from the process-wide memory: the keyboard's height is a property
+    // of the device and IME, not of any one conversation, so the first
+    // emoji-pane open in a freshly entered chat reserves the keyboard's real
+    // space instead of the fallback guess (which made the later pane-to-
+    // keyboard handoff grow the bottom region and cover the newest bubble).
+    var rememberedImePaneHeight by remember(configuration.orientation) {
+        mutableStateOf(composerImePaneHeightMemory[configuration.orientation] ?: 0.dp)
+    }
     var lockedComposerEmojiPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
     var lockedComposerAttachmentPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
-    LaunchedEffect(currentImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
+    LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
         rememberedImePaneHeight =
             updatedComposerRememberedImeHeight(
                 previousRememberedImeHeight = rememberedImePaneHeight,
-                currentImeHeight = currentImePaneHeight,
+                currentImeHeight = targetImePaneHeight,
                 freezeUpdates = composerEmojiPickerOpen || attachmentSheetState.isOpen,
             )
+        if (rememberedImePaneHeight > 0.dp) {
+            composerImePaneHeightMemory[configuration.orientation] = rememberedImePaneHeight
+        }
     }
     val emojiPaneBaseHeight =
         composerEmojiPaneHeight(
             lockedPaneHeight = lockedComposerEmojiPaneHeight,
             currentImeHeight = currentImePaneHeight,
+            targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
     val emojiPaneHeight =
@@ -355,12 +391,35 @@ internal fun ComposerBar(
             composerEmojiSearchActive = false
         }
     }
+    // The pane's rendered height is seeded from the live bottom inset on the
+    // open edge, then animates to the locked target. Opening over a fully
+    // shown keyboard seeds start == target, so nothing moves — the pane takes
+    // the keyboard's exact space. Opening mid-IME-animation (a rapid tap
+    // before the keyboard finished showing or hiding) continues the motion
+    // the user is already watching instead of snapping the composer to the
+    // pane's final height in one frame.
+    val latestEmojiPaneHeight by rememberUpdatedState(emojiPaneHeight)
+    val emojiPaneHeightAnim =
+        remember(showEmojiPane) {
+            Animatable(if (showEmojiPane) currentImePaneHeight else 0.dp, Dp.VectorConverter)
+        }
+    LaunchedEffect(emojiPaneHeightAnim, showEmojiPane) {
+        // Only the open pane follows its target; the placeholder instance
+        // created on close would otherwise animate invisibly for nothing.
+        if (!showEmojiPane) return@LaunchedEffect
+        snapshotFlow { latestEmojiPaneHeight }.collectLatest { target ->
+            if (emojiPaneHeightAnim.value != target) {
+                emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+            }
+        }
+    }
     // Attachment sheet: shares the emoji pane's IME-height model so opening
     // either surface swaps seamlessly with the keyboard and with each other.
     val attachmentPaneHeight =
         composerEmojiPaneHeight(
             lockedPaneHeight = lockedComposerAttachmentPaneHeight,
             currentImeHeight = currentImePaneHeight,
+            targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
     val attachmentPaneAlpha by animateFloatAsState(
@@ -389,45 +448,93 @@ internal fun ComposerBar(
             lockedComposerEmojiPaneHeight =
                 composerEmojiPaneTargetHeight(
                     currentImeHeight = currentImePaneHeight,
+                    targetImeHeight = targetImePaneHeight,
                     rememberedImeHeight = rememberedImePaneHeight,
                 )
         }
         composerEmojiSearchActive = false
+        composerEmojiPickerRequested = false
         composerKeyboardRestorePending = true
         onKeyboardRestoreFromCustomInput()
+        // Focus and IME are requested synchronously. A request parked in an
+        // effect is cancelled by the very recomposition a rapid reverse-tap
+        // triggers, which left the pane waiting on a keyboard that was never
+        // actually asked to show.
         runCatching { composerFocus.requestFocus() }
         keyboardController?.show()
     }
 
-    LaunchedEffect(composerKeyboardRestorePending, currentImePaneHeight, emojiPaneHeight, attachmentPaneHeight) {
-        val targetPaneHeight = if (attachmentSheetState.isOpen) attachmentPaneHeight else emojiPaneHeight
-        if (
-            shouldSwapComposerEmojiPaneToIme(
+    fun releasePaneToKeyboard() {
+        composerKeyboardRestorePending = false
+        composerEmojiPickerOpen = false
+        attachmentSheetState.dismiss()
+    }
+
+    LaunchedEffect(composerKeyboardRestorePending, currentImePaneHeight, targetImePaneHeight, emojiPaneHeightAnim.value) {
+        if (attachmentSheetState.isOpen) {
+            if (
+                shouldSwapComposerEmojiPaneToIme(
+                    keyboardRestorePending = composerKeyboardRestorePending,
+                    currentImeHeight = currentImePaneHeight,
+                    imeTargetHeight = targetImePaneHeight,
+                )
+            ) {
+                releasePaneToKeyboard()
+            }
+            return@LaunchedEffect
+        }
+        when (
+            composerEmojiPaneRestoreStep(
                 keyboardRestorePending = composerKeyboardRestorePending,
                 currentImeHeight = currentImePaneHeight,
-                targetImeHeight = targetPaneHeight,
+                imeTargetHeight = targetImePaneHeight,
+                lockedPaneHeight = lockedComposerEmojiPaneHeight,
+                renderedPaneHeight = emojiPaneHeightAnim.value,
             )
         ) {
-            composerKeyboardRestorePending = false
-            composerEmojiPickerOpen = false
-            attachmentSheetState.dismiss()
+            ComposerPaneRestoreStep.HOLD -> Unit
+            // The keyboard settled at a height the pane did not reserve (a
+            // toolbar row toggled, or the pane opened at its fallback before
+            // any keyboard was measured). Glide the pane there first; the
+            // animation frames re-run this effect until the rendered pane
+            // occupies exactly the keyboard's space, and only then swap.
+            ComposerPaneRestoreStep.MATCH_PANE_TO_KEYBOARD -> {
+                lockedComposerEmojiPaneHeight = targetImePaneHeight
+                // The bottom region is about to change height, so the
+                // bounds-identical-swap assumption behind the suppressed
+                // ime-open re-anchor no longer holds: chase the newest bubble
+                // through the glide so it is not left covered.
+                onBottomInputChanged()
+            }
+            ComposerPaneRestoreStep.SWAP_TO_KEYBOARD -> releasePaneToKeyboard()
         }
     }
 
     LaunchedEffect(composerKeyboardRestorePending) {
         if (composerKeyboardRestorePending) {
-            delay(600L)
+            // Must outlast a full IME show (~400ms) plus the pane's
+            // match-to-keyboard glide (250ms); at 600ms the timeout preempted
+            // the glide when the pane opened at its fallback height and the
+            // handoff ended with a visible step instead of a seamless swap.
+            delay(900L)
             if (composerKeyboardRestorePending) {
+                // The IME never reached the reserved pane. Always release the
+                // pane — the user explicitly asked for the keyboard, so
+                // re-anchoring to the picker would override that intent (and
+                // can force-hide a keyboard that did come up, just at a
+                // different height than the pane reserved).
                 composerKeyboardRestorePending = false
-                if (latestImePaneHeight > 0.dp) {
-                    // Some IMEs settle a few pixels below the reserved pane
-                    // height. Never leave the custom pane covering a keyboard
-                    // that is already visible just because the insets differ.
-                    composerEmojiPickerOpen = false
-                    attachmentSheetState.dismiss()
-                } else {
+                composerEmojiPickerRequested = false
+                composerEmojiPickerOpen = false
+                attachmentSheetState.dismiss()
+                if (composerKeyboardRestoreTimeoutClearsFocus(latestImePaneHeight)) {
                     onKeyboardRestoreFromCustomInputFailed()
                     focusManager.clearFocus(force = true)
+                } else {
+                    // Released under a keyboard resting at some other height:
+                    // the bottom region changed, so re-anchor the newest
+                    // bubble the suppressed ime-open chase would have caught.
+                    onBottomInputChanged()
                 }
             }
         }
@@ -435,6 +542,7 @@ internal fun ComposerBar(
 
     BackHandler(enabled = composerEmojiPickerOpen || attachmentSheetState.isOpen) {
         composerKeyboardRestorePending = false
+        composerEmojiPickerRequested = false
         composerEmojiPickerOpen = false
         attachmentSheetState.dismiss()
     }
@@ -515,14 +623,27 @@ internal fun ComposerBar(
 
     fun openComposerEmojiPane() {
         attachmentSheetState.dismiss()
-        composerKeyboardRestorePending = false
+        if (composerKeyboardRestorePending) {
+            // Reversing an in-flight restore abandons it; the failed callback
+            // lets the conversation screen drop the reanchor suppression it
+            // armed for a keyboard that is no longer coming.
+            composerKeyboardRestorePending = false
+            onKeyboardRestoreFromCustomInputFailed()
+        }
         composerEmojiSearchActive = false
-        lockedComposerEmojiPaneHeight =
-            composerEmojiPaneTargetHeight(
-                currentImeHeight = currentImePaneHeight,
-                rememberedImeHeight = rememberedImePaneHeight,
-            )
+        if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
+            lockedComposerEmojiPaneHeight =
+                composerEmojiPaneTargetHeight(
+                    currentImeHeight = currentImePaneHeight,
+                    targetImeHeight = targetImePaneHeight,
+                    rememberedImeHeight = rememberedImePaneHeight,
+                )
+        }
+        composerEmojiPickerRequested = true
         composerEmojiPickerOpen = true
+        // Hidden synchronously for the same reason the restore path shows
+        // synchronously: a deferred hide can land after a newer request and
+        // flip the bottom region against the user's latest choice.
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
     }
@@ -534,10 +655,12 @@ internal fun ComposerBar(
 
     fun openComposerAttachmentSheet() {
         composerKeyboardRestorePending = false
+        composerEmojiPickerRequested = false
         composerEmojiPickerOpen = false
         lockedComposerAttachmentPaneHeight =
             composerEmojiPaneTargetHeight(
                 currentImeHeight = currentImePaneHeight,
+                targetImeHeight = targetImePaneHeight,
                 rememberedImeHeight = rememberedImePaneHeight,
             )
         attachmentSheetState.open()
@@ -552,6 +675,7 @@ internal fun ComposerBar(
             lockedComposerAttachmentPaneHeight =
                 composerEmojiPaneTargetHeight(
                     currentImeHeight = currentImePaneHeight,
+                    targetImeHeight = targetImePaneHeight,
                     rememberedImeHeight = rememberedImePaneHeight,
                 )
         }
@@ -635,6 +759,7 @@ internal fun ComposerBar(
                         if (editingMessageId == null) onDraftChange(updated.text)
                         runCatching { composerFocus.requestFocus() }
                         composerEmojiPickerOpen = false
+                        composerEmojiPickerRequested = false
                         attachmentSheetState.dismiss()
                     },
                 )
@@ -651,8 +776,11 @@ internal fun ComposerBar(
                     ComposerPill(
                         textFieldValue = textFieldValue,
                         composerFocus = composerFocus,
-                        emojiPickerOpen = composerEmojiPickerOpen,
+                        emojiPickerOpen = composerEmojiPickerRequested,
                         onComposerFocusChanged = { focused ->
+                            // A tap on the text field while a pane is open asks
+                            // for the keyboard; the restore functions' pending
+                            // guard drops the echo of their own focus request.
                             if (focused && composerEmojiPickerOpen) restoreKeyboardFromEmojiPane()
                             if (focused && attachmentSheetState.isOpen) restoreKeyboardFromAttachmentSheet()
                             onComposerFocusChanged(focused)
@@ -719,7 +847,7 @@ internal fun ComposerBar(
                             }
                         },
                         onEmojiPickerToggle = {
-                            if (composerEmojiPickerOpen) {
+                            if (composerEmojiPickerRequested) {
                                 showKeyboardFromEmojiPane()
                             } else {
                                 openComposerEmojiPane()
@@ -832,7 +960,7 @@ internal fun ComposerBar(
             Box(Modifier.fillMaxWidth()) {
                 if (showEmojiPane) {
                     ComposerEmojiPickerPane(
-                        height = emojiPaneHeight,
+                        height = emojiPaneHeightAnim.value,
                         alpha = 1f,
                         onEmojiPicked = { emoji ->
                             val updated = insertComposerEmoji(textFieldValue, emoji)
