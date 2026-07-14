@@ -59,7 +59,9 @@ import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
@@ -883,13 +885,14 @@ class WhiteNoiseAppState(
      *   miss   → FFI download, store in both
      *
      * Lives in `cacheDir/decrypted-media/` — Android's not-backed-up cache
-     * surface. Sign-out wipes it alongside L1 so account A's plaintext
-     * doesn't linger on disk after switching to account B.
+     * surface, encrypted with a Keystore-backed AES-GCM key. Sign-out wipes it
+     * alongside L1 so account A's decrypted media doesn't linger after switch.
      */
     internal val diskMediaCache =
-        dev.ipf.whitenoise.android.media.DiskByteCache(
+        DiskByteCache(
             cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
+            keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
         )
 
     @Volatile
@@ -1207,6 +1210,9 @@ class WhiteNoiseAppState(
         // seed lands, the snapshot reads as offline/no-networks — the same
         // conservative answer the auto-download gate gives for "unknown".
         mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
+        // Wipe pre-encryption cache entries promptly after upgrade without doing
+        // directory I/O in this main-thread constructor.
+        mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
     }
 
     val activeAccount: AccountSummaryFfi?

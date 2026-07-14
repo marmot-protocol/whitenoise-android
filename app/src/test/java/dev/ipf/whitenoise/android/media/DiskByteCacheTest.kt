@@ -11,11 +11,17 @@ import org.junit.Test
 import java.io.File
 import java.lang.reflect.Modifier
 import java.nio.file.Files
+import java.security.ProviderException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import javax.crypto.spec.SecretKeySpec
 
 class DiskByteCacheTest {
     private lateinit var dir: File
+    private val keyProvider =
+        DiskByteCacheKeyProvider {
+            SecretKeySpec(ByteArray(32) { index -> (index + 1).toByte() }, "AES")
+        }
 
     @Before
     fun setUp() {
@@ -29,7 +35,7 @@ class DiskByteCacheTest {
 
     @Test
     fun emptyCache_getReturnsNull() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertNull(cache.get("absent"))
         assertEquals(0, cache.size())
         assertEquals(0L, cache.residentBytes())
@@ -37,40 +43,128 @@ class DiskByteCacheTest {
 
     @Test
     fun putThenGet_roundTripsThroughDisk() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         val payload = ByteArray(40) { it.toByte() }
         cache.put("k", payload)
         val out = cache.get("k")
         assertNotNull(out)
         assertTrue(out!!.contentEquals(payload))
-        assertEquals(40L, cache.residentBytes())
+        assertEquals(68L, cache.residentBytes())
+    }
+
+    @Test
+    fun put_persistsCiphertextInsteadOfPlaintext() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        val payload = "private attachment bytes".toByteArray()
+
+        cache.put("k", payload)
+
+        val stored = dir.listFiles()!!.single { it.name.endsWith(".enc") }.readBytes()
+        assertFalse("decrypted media must not be persisted verbatim", stored.contentEquals(payload))
+        assertEquals("AES-GCM stores a 12-byte IV and 16-byte tag", payload.size + 28, stored.size)
+    }
+
+    @Test
+    fun repeatedWritesUseFreshRandomIvs() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        val payload = ByteArray(32) { 7 }
+        cache.put("k", payload)
+        val file = File(dir, sha256Hex("k") + ".enc")
+        val first = file.readBytes()
+
+        cache.put("k", payload)
+        val second = file.readBytes()
+
+        assertFalse("same plaintext must not reuse an AES-GCM IV", first.copyOf(12).contentEquals(second.copyOf(12)))
+        assertTrue(cache.get("k")!!.contentEquals(payload))
+    }
+
+    @Test
+    fun encryptedEntries_areBoundToTheirHashedCacheKey() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        val first = ByteArray(32) { 1 }
+        cache.put("first", first)
+        cache.put("second", ByteArray(32) { 2 })
+        val firstFile = File(dir, sha256Hex("first") + ".enc")
+        val secondFile = File(dir, sha256Hex("second") + ".enc")
+
+        secondFile.writeBytes(firstFile.readBytes())
+
+        assertNull("moving ciphertext to another cache key must fail authentication", cache.get("second"))
+        assertFalse("the poisoned entry must be removed from the index", cache.contains("second"))
+        assertFalse("the poisoned ciphertext must be deleted", secondFile.exists())
+        assertEquals(1, cache.size())
+    }
+
+    @Test
+    fun legacyPlaintextEntries_areWipedInsteadOfMigrated() {
+        val key = "legacy"
+        val legacy = File(dir, sha256Hex(key) + ".bin").also { it.writeText("decrypted media") }
+        val legacyTag = File(dir, sha256Hex(key) + ".tag").also { it.writeText("ciphertext-hash") }
+        val foreign = File(dir, "keep-me.txt").also { it.writeText("foreign") }
+
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+
+        assertEquals(0, cache.size())
+        assertNull(cache.get(key))
+        assertFalse("upgrade must delete legacy plaintext", legacy.exists())
+        assertFalse("legacy metadata must not be orphaned", legacyTag.exists())
+        assertTrue("foreign cache-directory files are not ours to wipe", foreign.isFile)
+    }
+
+    @Test
+    fun prepareWipesLegacyPlaintextBeforeFirstCacheAccess() {
+        val legacy = File(dir, sha256Hex("legacy") + ".bin").also { it.writeText("decrypted media") }
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        assertTrue(legacy.isFile)
+
+        cache.prepare()
+
+        assertFalse("background startup preparation must delete legacy plaintext", legacy.exists())
+    }
+
+    @Test
+    fun unavailableKeyFailsClosedWithoutPersistingPlaintext() {
+        val existingPayload = "already encrypted".toByteArray()
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("existing", existingPayload)
+        val unavailableKey =
+            DiskByteCacheKeyProvider {
+                throw ProviderException("keystore unavailable")
+            }
+        val cache = DiskByteCache(dir, keyProvider = unavailableKey, maxBytes = 1024)
+
+        assertNull("provider failure on read must be a cache miss", cache.get("existing"))
+        cache.put("new", "private attachment bytes".toByteArray())
+
+        assertFalse(File(dir, sha256Hex("new") + ".enc").exists())
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
     }
 
     @Test
     fun oversizedEntry_isNotPersistedOrReadBack() {
-        val cache = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 64)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024, maxEntryBytes = 64)
         cache.put("too-large", ByteArray(65))
 
         assertNull(cache.get("too-large"))
         assertEquals(0, cache.size())
         assertEquals(0L, cache.residentBytes())
-        assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".enc") } ?: true)
     }
 
     @Test
     fun rehydrateDropsOversizedEntryBeforeReadBytes() {
-        val writer = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 128)
+        val writer = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024, maxEntryBytes = 128)
         writer.put("large", ByteArray(120) { 1 })
 
-        val tighter = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 64)
+        val tighter = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024, maxEntryBytes = 64)
         assertNull(tighter.get("large"))
         assertEquals(0L, tighter.residentBytes())
-        assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".enc") } ?: true)
     }
 
     @Test
     fun put_withStaleGeneration_isRejectedAfterClear() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         // Capture the generation a deferred write would have grabbed at
         // schedule time, then sign-out wipes the cache before it lands.
         val scheduledGeneration = cache.generation()
@@ -82,17 +176,17 @@ class DiskByteCacheTest {
 
     @Test
     fun put_withCurrentGeneration_succeedsAfterClear() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.clear()
         // A write scheduled after the wipe (current generation) is honored.
         cache.put("k", ByteArray(40) { 7 }, cache.generation())
         assertNotNull(cache.get("k"))
-        assertEquals(40L, cache.residentBytes())
+        assertEquals(68L, cache.residentBytes())
     }
 
     @Test
     fun emptyPut_ignored() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(0))
         assertNull(cache.get("k"))
         assertEquals(0L, cache.residentBytes())
@@ -100,11 +194,11 @@ class DiskByteCacheTest {
 
     @Test
     fun replacingKey_updatesByteAccounting() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(40))
         cache.put("k", ByteArray(70))
         assertEquals(1, cache.size())
-        assertEquals(70L, cache.residentBytes())
+        assertEquals(98L, cache.residentBytes())
     }
 
     @Test
@@ -112,7 +206,7 @@ class DiskByteCacheTest {
         // Regression: the replace path scheduled the previous entry's file for
         // deletion after the monitor, but same-key entries share the destination
         // path, so the deferred delete removed the freshly-renamed bytes.
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(40) { 1 })
         val updated = ByteArray(70) { 2 }
         cache.put("k", updated)
@@ -120,10 +214,10 @@ class DiskByteCacheTest {
         val out = cache.get("k")
         assertNotNull("replaced value must still be readable", out)
         assertTrue(out!!.contentEquals(updated))
-        assertTrue("a `.bin` must remain on disk after replace", dir.listFiles()?.any { it.name.endsWith(".bin") } ?: false)
+        assertTrue("a `.enc` must remain on disk after replace", dir.listFiles()?.any { it.name.endsWith(".enc") } ?: false)
 
         // Survives a restart: a fresh cache over the same dir rehydrates it.
-        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         val afterRestart = reopened.get("k")
         assertNotNull("replaced value must survive restart", afterRestart)
         assertTrue(afterRestart!!.contentEquals(updated))
@@ -153,9 +247,10 @@ class DiskByteCacheTest {
         val cache =
             DiskByteCache(
                 cacheDir = dir,
+                keyProvider = keyProvider,
                 maxBytes = 1024,
                 renameFile = { source, target ->
-                    if (failDataCommit && source.name.contains("-bin-") && target.name.endsWith(".bin")) {
+                    if (failDataCommit && source.name.contains("-enc-") && target.name.endsWith(".enc")) {
                         false
                     } else {
                         source.renameTo(target)
@@ -169,7 +264,7 @@ class DiskByteCacheTest {
         cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = "new-ciphertext")
 
         assertTrue(cache.get("k")!!.contentEquals(original))
-        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertTrue(reopened.get("k")!!.contentEquals(original))
         assertEquals(0, reopened.removeByCiphertextTags(setOf("new-ciphertext")))
         assertEquals(1, reopened.removeByCiphertextTags(setOf("old-ciphertext")))
@@ -178,7 +273,7 @@ class DiskByteCacheTest {
 
     @Test
     fun failedUntaggedReplacementKeepsTaggedExistingEntryAndTag() {
-        // Regression: an untagged same-key replacement whose `.bin` rename fails
+        // Regression: an untagged same-key replacement whose `.enc` rename fails
         // never touches the tag file, so the still-valid tagged existing entry
         // must survive — the fail-closed cleanup only applies to puts that
         // attempted a tag rename (tagTmp != null).
@@ -186,9 +281,10 @@ class DiskByteCacheTest {
         val cache =
             DiskByteCache(
                 cacheDir = dir,
+                keyProvider = keyProvider,
                 maxBytes = 1024,
                 renameFile = { source, target ->
-                    if (failDataCommit && source.name.contains("-bin-") && target.name.endsWith(".bin")) {
+                    if (failDataCommit && source.name.contains("-enc-") && target.name.endsWith(".enc")) {
                         false
                     } else {
                         source.renameTo(target)
@@ -202,7 +298,7 @@ class DiskByteCacheTest {
         cache.put("k", ByteArray(40) { 2 }, cache.generation(), ciphertextTag = null)
 
         assertTrue("old bytes must survive a failed untagged replacement", cache.get("k")!!.contentEquals(original))
-        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertTrue("old bytes must survive restart", reopened.get("k")!!.contentEquals(original))
         // The old tag must still authorize eviction — proof the sidecar was untouched.
         assertEquals(1, reopened.removeByCiphertextTags(setOf("old-ciphertext")))
@@ -211,7 +307,7 @@ class DiskByteCacheTest {
 
     @Test
     fun get_refreshesFileLastModifiedForReadRecency() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("a", ByteArray(40))
         val file = dir.listFiles { f -> f.isFile }!!.single()
         file.setLastModified(1_000L)
@@ -223,20 +319,20 @@ class DiskByteCacheTest {
 
     @Test
     fun pastCap_evictsLRU() {
-        // 100-byte cap; three 40-byte entries push over → oldest evicted.
-        val cache = DiskByteCache(dir, maxBytes = 100)
+        // 150-byte cap; three 40-byte entries push over → oldest evicted.
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 150)
         cache.put("a", ByteArray(40))
         cache.put("b", ByteArray(40))
         cache.put("c", ByteArray(40)) // 120 → evict a
         assertNull(cache.get("a"))
         assertNotNull(cache.get("b"))
         assertNotNull(cache.get("c"))
-        assertTrue(cache.residentBytes() <= 100)
+        assertTrue(cache.residentBytes() <= 150)
     }
 
     @Test
     fun get_promotesToMRU_protectsFromEviction() {
-        val cache = DiskByteCache(dir, maxBytes = 100)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 150)
         cache.put("a", ByteArray(40))
         cache.put("b", ByteArray(40))
         cache.get("a") // bump a to MRU
@@ -248,7 +344,7 @@ class DiskByteCacheTest {
 
     @Test
     fun clear_deletesAllFiles() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("a", ByteArray(30))
         cache.put("b", ByteArray(30))
         cache.clear()
@@ -261,8 +357,8 @@ class DiskByteCacheTest {
 
     @Test
     fun clearBeforeHydrationSweepsOwnedFilesWithoutIndexScan() {
-        DiskByteCache(dir, maxBytes = 1024).put("a", ByteArray(30))
-        val fresh = DiskByteCache(dir, maxBytes = 1024)
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("a", ByteArray(30))
+        val fresh = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
 
         fresh.clear()
 
@@ -274,14 +370,14 @@ class DiskByteCacheTest {
     @Test
     fun reinit_rehydratesIndexFromDisk() {
         // The whole point of L2: process restart rehydrates the cache.
-        DiskByteCache(dir, maxBytes = 1024).run {
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).run {
             put("a", ByteArray(40) { 1 })
             put("b", ByteArray(50) { 2 })
         }
         // Simulate process restart by constructing a new instance.
-        val rehydrated = DiskByteCache(dir, maxBytes = 1024)
+        val rehydrated = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertEquals(2, rehydrated.size())
-        assertEquals(90L, rehydrated.residentBytes())
+        assertEquals(146L, rehydrated.residentBytes())
         val a = rehydrated.get("a")
         assertNotNull(a)
         assertTrue(a!!.all { it == 1.toByte() })
@@ -298,8 +394,8 @@ class DiskByteCacheTest {
         // first instance only rehydrates on first access it scans the dir now
         // and sees the entry; eager constructor rehydration would have missed
         // it (the dir was empty at construction time).
-        val cache = DiskByteCache(dir, maxBytes = 1024)
-        DiskByteCache(dir, maxBytes = 1024).put("late", ByteArray(40) { 9 })
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("late", ByteArray(40) { 9 })
 
         val out = cache.get("late")
         assertNotNull(out)
@@ -313,9 +409,9 @@ class DiskByteCacheTest {
         // leaves hydration to the first real get/put on Dispatchers.IO. Proof:
         // an entry persisted by a previous "session" is invisible to a fresh
         // instance's contains() until something hydrates the index.
-        DiskByteCache(dir, maxBytes = 1024).put("persisted", ByteArray(40) { 7 })
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("persisted", ByteArray(40) { 7 })
 
-        val cold = DiskByteCache(dir, maxBytes = 1024)
+        val cold = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertFalse(cold.contains("persisted"))
 
         // First real read hydrates; the probe now sees the on-disk entry.
@@ -325,7 +421,7 @@ class DiskByteCacheTest {
 
     @Test
     fun contains_afterHydration_reflectsIndexWithoutSeedingIt() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("present", ByteArray(40) { 1 })
 
         assertTrue(cache.contains("present"))
@@ -363,12 +459,12 @@ class DiskByteCacheTest {
 
     @Test
     fun put_coldHydrationDoesNotBlockContainsMonitor() {
-        DiskByteCache(dir, maxBytes = 1024).put("persisted", ByteArray(40) { 3 })
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("persisted", ByteArray(40) { 3 })
 
         val hydrationEntered = CountDownLatch(1)
         val releaseHydration = CountDownLatch(1)
         val blockingDir = BlockingListFilesDir(dir, hydrationEntered, releaseHydration)
-        val cache = DiskByteCache(blockingDir, maxBytes = 1024)
+        val cache = DiskByteCache(blockingDir, keyProvider = keyProvider, maxBytes = 1024)
         val putFinished = CountDownLatch(1)
         val putThread =
             Thread {
@@ -421,20 +517,20 @@ class DiskByteCacheTest {
 
     @Test
     fun reinit_evictsToFitReducedCap() {
-        DiskByteCache(dir, maxBytes = 1024).run {
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).run {
             put("a", ByteArray(40))
             put("b", ByteArray(40))
             put("c", ByteArray(40))
         }
         // Restart with tighter cap — should trim down on init.
-        val tighter = DiskByteCache(dir, maxBytes = 50)
+        val tighter = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 50)
         assertTrue(tighter.residentBytes() <= 50)
         assertTrue(tighter.size() <= 1)
     }
 
     @Test
     fun missingFileOnDisk_evictsIndexEntryReturnsNull() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(40))
         // Tamper: delete the file out from under the cache.
         dir.listFiles()?.forEach { it.delete() }
@@ -445,20 +541,20 @@ class DiskByteCacheTest {
 
     @Test
     fun get_transientReadError_keepsIndexedEntrySubjectToByteCap() {
-        val cache = DiskByteCache(dir, maxBytes = 100)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 150)
         cache.put("a", ByteArray(40))
         cache.put("b", ByteArray(40))
-        val unreadable = File(dir, sha256Hex("a") + ".bin")
+        val unreadable = File(dir, sha256Hex("a") + ".enc")
         assertTrue(unreadable.setReadable(false, false))
 
         assertNull("transient read failure is a miss", cache.get("a"))
         assertTrue("backing path must still exist", unreadable.isFile)
         assertTrue(cache.contains("a"))
         assertEquals(2, cache.size())
-        assertEquals(80L, cache.residentBytes())
+        assertEquals(136L, cache.residentBytes())
 
         cache.put("c", ByteArray(40))
-        assertTrue(cache.residentBytes() <= 100)
+        assertTrue(cache.residentBytes() <= 150)
         assertNull(cache.get("b"))
         assertNotNull(cache.get("c"))
 
@@ -468,8 +564,8 @@ class DiskByteCacheTest {
     @Test
     fun clear_skipsForeignFilesInDir() {
         // Defensive: if a future co-tenant ever drops files in cacheDir,
-        // clear() must not wipe them. Only our own `.bin` / `.tmp` files.
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        // clear() must not wipe them. Only our own `.enc` / `.tmp` files.
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("a", ByteArray(30))
         val foreign = File(dir, "not-mine.txt").also { it.writeText("hello") }
         cache.clear()
@@ -485,7 +581,7 @@ class DiskByteCacheTest {
     fun put_writesAtomically_noPartialFile() {
         // Sanity check that the .tmp → rename dance leaves no `.tmp` files
         // behind on successful writes.
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(40))
         val tmpFiles = dir.listFiles()?.filter { it.name.endsWith(".tmp") }.orEmpty()
         assertTrue("no .tmp file should linger after successful put", tmpFiles.isEmpty())
@@ -493,7 +589,7 @@ class DiskByteCacheTest {
 
     @Test
     fun tempFileNamesUseAProcessCounterForSameKeyWrites() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         val method =
             DiskByteCache::class.java
                 .getDeclaredMethod("uniqueTmpFile", String::class.java, String::class.java)
@@ -510,7 +606,7 @@ class DiskByteCacheTest {
 
     @Test
     fun removeByCiphertextTags_evictsTaggedEntriesOnly() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("acct|grp|msg-1|0", ByteArray(30), cache.generation(), "hash-a")
         cache.put("acct|grp|msg-2|0", ByteArray(30), cache.generation(), "hash-b")
         cache.put("acct|grp|msg-3|0", ByteArray(30)) // untagged
@@ -519,7 +615,7 @@ class DiskByteCacheTest {
         assertNull(cache.get("acct|grp|msg-1|0"))
         assertNotNull(cache.get("acct|grp|msg-2|0"))
         assertNotNull(cache.get("acct|grp|msg-3|0"))
-        assertEquals(60L, cache.residentBytes())
+        assertEquals(116L, cache.residentBytes())
     }
 
     @Test
@@ -529,9 +625,9 @@ class DiskByteCacheTest {
         // the hash to its cache key. Proven by tagging, dropping the instance, and
         // evicting purely by hash from a fresh instance over the same dir.
         // generation 0 is the initial generation of a fresh instance.
-        DiskByteCache(dir, maxBytes = 1024)
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
             .put("acct|grp|old-msg|0", ByteArray(40) { 5 }, 0, "expired-hash")
-        val rehydrated = DiskByteCache(dir, maxBytes = 1024)
+        val rehydrated = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertNotNull("entry should survive the restart", rehydrated.get("acct|grp|old-msg|0"))
         val removed = rehydrated.removeByCiphertextTags(setOf("expired-hash"))
         assertEquals("the persisted tag must drive eviction across sessions", 1, removed)
@@ -544,28 +640,28 @@ class DiskByteCacheTest {
     @Test
     fun taggedPut_failsClosed_whenTagCannotBePersisted() {
         // The ciphertext tag authorizes hash-based expiry deletion, so a tagged
-        // write must fail closed: if the tag can't land, no decrypted .bin may
-        // survive untagged. Force the failure by occupying the tag's final path
+        // write must fail closed: if the tag can't land, no encrypted cache entry
+        // may survive without its expiry metadata. Force the failure by occupying
         // with a non-empty directory (renameTo onto it fails).
         val key = "acct|grp|msg|0"
         File(dir, sha256Hex(key) + ".tag").apply {
             mkdirs()
             File(this, "occupied").writeText("x")
         }
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put(key, ByteArray(40) { 1 }, cache.generation(), "the-hash")
         assertNull("a tagged write whose tag failed must not be readable", cache.get(key))
         assertEquals(0, cache.size())
         assertEquals(0L, cache.residentBytes())
         assertTrue(
-            "no decrypted .bin may linger when its required tag could not be written",
-            dir.listFiles()?.none { it.isFile && it.name.endsWith(".bin") } ?: true,
+            "no encrypted cache entry may linger when its required tag could not be written",
+            dir.listFiles()?.none { it.isFile && it.name.endsWith(".enc") } ?: true,
         )
     }
 
     @Test
     fun removeByCiphertextTags_emptySet_isNoOp() {
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("k", ByteArray(30), cache.generation(), "h")
         assertEquals(0, cache.removeByCiphertextTags(emptySet()))
         assertNotNull(cache.get("k"))
@@ -576,11 +672,11 @@ class DiskByteCacheTest {
         // Defense against hash collision oversight — two keys must map to
         // two distinct files. (sha256 makes real collisions improbable; this
         // pins that we're hashing the key, not the file content.)
-        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         cache.put("alice|group|msg-1", ByteArray(20))
         cache.put("bob|group|msg-1", ByteArray(30))
         assertEquals(2, cache.size())
-        assertEquals(50L, cache.residentBytes())
+        assertEquals(106L, cache.residentBytes())
     }
 
     private fun sha256Hex(value: String): String {
