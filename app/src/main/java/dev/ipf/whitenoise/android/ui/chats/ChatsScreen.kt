@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -38,7 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -63,6 +64,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -638,31 +640,48 @@ internal fun ChatsScreen(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .navigationBarsPadding()
-                            // end = 24dp (not 16) so this 40dp small FAB's centre
+                            // end = 23dp (not 16) so this 42dp control's centre
                             // lines up with the 56dp quick-action FAB above it,
                             // which the Scaffold insets 16dp from the edge:
-                            // 24 + 40/2 == 16 + 56/2 (#451).
-                            .padding(end = 24.dp, bottom = FAB_SNACKBAR_INSET),
+                            // 23 + 42/2 == 16 + 56/2 (#451).
+                            .padding(end = 23.dp, bottom = FAB_SNACKBAR_INSET),
                 ) {
-                    SmallFloatingActionButton(
-                        onClick = {
-                            scope.launch {
-                                // For a very deep scroll, animating every row to
-                                // the top is a multi-second crawl. Snap to a
-                                // near-top index first, then animate the final
-                                // viewport so the motion stays short and smooth
-                                // regardless of how far down the user was.
-                                if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
-                                    chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
-                                }
-                                chatListState.animateScrollToItem(0)
-                            }
-                        },
+                    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(42.dp)
+                                .semantics { contentDescription = scrollToTopLabel }
+                                .clickable {
+                                    scope.launch {
+                                        // For a very deep scroll, animating every row to
+                                        // the top is a multi-second crawl. Snap to a
+                                        // near-top index first, then animate the final
+                                        // viewport so the motion stays short and smooth
+                                        // regardless of how far down the user was.
+                                        if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
+                                            chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
+                                        }
+                                        chatListState.animateScrollToItem(0)
+                                    }
+                                },
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Default.ArrowUpward,
-                            contentDescription = stringResource(R.string.scroll_to_top),
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.ArrowUpward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
