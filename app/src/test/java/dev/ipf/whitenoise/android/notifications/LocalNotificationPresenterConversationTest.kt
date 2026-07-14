@@ -12,7 +12,6 @@ import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -75,8 +74,7 @@ class LocalNotificationPresenterConversationTest {
         val shortcut = checkNotNull(publishedShortcut)
         assertEquals(shortcutId, shortcut.id)
         assertNotNull(shortcut.icon)
-        assertEquals(IconCompat.TYPE_RESOURCE, shortcut.icon!!.type)
-        assertEquals(R.mipmap.ic_launcher, shortcut.icon!!.resId)
+        assertEquals(IconCompat.TYPE_BITMAP, shortcut.icon!!.type)
         assertEquals(
             "message",
             notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
