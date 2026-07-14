@@ -652,7 +652,7 @@ internal fun ChatsScreen(
                             Modifier
                                 .size(42.dp)
                                 .semantics { contentDescription = scrollToTopLabel }
-                                .clickable {
+                                .clickable(role = Role.Button) {
                                     scope.launch {
                                         // For a very deep scroll, animating every row to
                                         // the top is a multi-second crawl. Snap to a
