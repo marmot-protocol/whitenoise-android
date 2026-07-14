@@ -276,6 +276,7 @@ class LocalNotificationPresenter(
         // Name the recipient identity in the header when multi-account (#836).
         if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
+        var messagingPost: MessagingPostContext? = null
         when (val style = decision.style) {
             // Reactions get their own self-contained card (own tag/id on the
             // reactions channel, see LocalNotificationFormatter) so they're muted
@@ -290,16 +291,6 @@ class LocalNotificationPresenter(
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
             NotificationStyleChoice.Messaging -> {
-                // Resolve the carried-forward history off-main: activeNotifications
-                // is a Binder round-trip and extractMessagingStyle re-serializes it.
-                val carried =
-                    if (redactContent) {
-                        null
-                    } else {
-                        withContext(Dispatchers.Default) {
-                            existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
-                        }
-                    }
                 val (conversationAvatarBitmap, senderAvatarBitmap) =
                     if (redactContent) {
                         null to null
@@ -335,16 +326,6 @@ class LocalNotificationPresenter(
                         )
                     }
                 }
-                builder.setStyle(
-                    messagingStyle(
-                        update,
-                        notificationContent,
-                        if (redactContent) null else conversationTitleOverride,
-                        decision.historyCap,
-                        carried,
-                        sender,
-                    ),
-                )
                 update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
                     builder.addExtras(
                         Bundle().apply {
@@ -367,6 +348,11 @@ class LocalNotificationPresenter(
                             }
                         }
                 }
+                messagingPost =
+                    MessagingPostContext(
+                        sender = sender,
+                        conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
+                    )
             }
 
             is NotificationStyleChoice.InviteWithExtras -> {
@@ -387,14 +373,40 @@ class LocalNotificationPresenter(
         }
 
         val notificationManager = NotificationManagerCompat.from(context)
-        val notification = builder.build()
         withContext(Dispatchers.Default) {
-            if (decision.style == NotificationStyleChoice.Messaging) {
+            val messaging = messagingPost
+            if (messaging != null) {
                 ConversationCardPostSynchronizer.withLock(
                     notificationContent.notificationTag,
                     notificationContent.notificationId,
                     ConversationCardOp.SHOW_NOTIFY,
                 ) {
+                    val carried =
+                        if (redactContent) {
+                            null
+                        } else {
+                            existingMessagingStyle(
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                            )?.messages
+                        }
+                    ConversationCardPostSynchronizer.awaitTestBarrier(
+                        ConversationCardOp.SHOW_NOTIFY,
+                        ConversationCardBarrier.AFTER_READ,
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
+                    )
+                    builder.setStyle(
+                        messagingStyle(
+                            update,
+                            notificationContent,
+                            messaging.conversationTitleOverride,
+                            decision.historyCap,
+                            carried,
+                            messaging.sender,
+                        ),
+                    )
+                    val notification = builder.build()
                     ConversationCardPostSynchronizer.awaitTestBarrier(
                         ConversationCardOp.SHOW_NOTIFY,
                         ConversationCardBarrier.BEFORE_WRITE,
@@ -407,6 +419,7 @@ class LocalNotificationPresenter(
                     notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
                 }
             } else {
+                val notification = builder.build()
                 if (decision.replaceExistingBeforePost) {
                     notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
                 }
@@ -779,6 +792,11 @@ class LocalNotificationPresenter(
         )
     }
 }
+
+private data class MessagingPostContext(
+    val sender: Person,
+    val conversationTitleOverride: String?,
+)
 
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,

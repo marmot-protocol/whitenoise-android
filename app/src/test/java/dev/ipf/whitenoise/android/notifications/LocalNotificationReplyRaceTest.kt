@@ -23,6 +23,7 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
@@ -131,15 +132,108 @@ class LocalNotificationReplyRaceTest {
 
         replyPresenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
 
-        assertEquals(
-            listOf(conversation.tag to conversation.id),
-            manager.activeNotifications.map { it.tag to it.id },
+        assertActiveConversationCard(
+            conversation = conversation,
+            expectedMessageIdHex = "msg-b",
+            exactMessageTexts = listOf("hello", "new during window"),
         )
-        assertEquals(
-            "msg-b",
-            manager.activeNotifications.single().notification.extras.getString(
-                LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
-            ),
+    }
+
+    @Test
+    fun concurrentShowCannotDropCarriedHistoryReadOutsideLock() {
+        val conversation = conversationKey()
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        val presenterB = LocalNotificationPresenter(context)
+        val presenterC = LocalNotificationPresenter(context)
+        val showBReadCarried = CountDownLatch(1)
+        val showCAwaitingLock = CountDownLatch(1)
+        val allowShowBContinue = CountDownLatch(1)
+        val showBFinished = CountDownLatch(1)
+        val showCFinished = CountDownLatch(1)
+        val showBFailure = AtomicReference<Throwable>()
+        val showCFailure = AtomicReference<Throwable>()
+        val showBHoldingAfterRead = AtomicBoolean(false)
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.AFTER_READ &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        showBHoldingAfterRead.set(true)
+                        showBReadCarried.countDown()
+                        check(allowShowBContinue.await(5, TimeUnit.SECONDS))
+                        showBHoldingAfterRead.set(false)
+                    }
+                }
+
+                override fun onAwaitingLock(
+                    op: ConversationCardOp,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id &&
+                        showBHoldingAfterRead.get()
+                    ) {
+                        showCAwaitingLock.countDown()
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                runBlocking {
+                    assertTrue(
+                        presenterB.show(
+                            messageUpdate("msg-b", previewText = "message-b", timestampMs = 2_000L),
+                        ),
+                    )
+                }
+            } catch (throwable: Throwable) {
+                showBFailure.set(throwable)
+            } finally {
+                showBFinished.countDown()
+            }
+        }.start()
+        assertTrue(showBReadCarried.await(5, TimeUnit.SECONDS))
+
+        Thread {
+            try {
+                runBlocking {
+                    assertTrue(
+                        presenterC.show(
+                            messageUpdate("msg-c", previewText = "message-c", timestampMs = 3_000L),
+                        ),
+                    )
+                }
+            } catch (throwable: Throwable) {
+                showCFailure.set(throwable)
+            } finally {
+                showCFinished.countDown()
+            }
+        }.start()
+        assertTrue(showCAwaitingLock.await(5, TimeUnit.SECONDS))
+
+        allowShowBContinue.countDown()
+        assertTrue(showBFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(showCFinished.await(5, TimeUnit.SECONDS))
+        showBFailure.get()?.let { throw it }
+        showCFailure.get()?.let { throw it }
+
+        assertActiveConversationCard(
+            conversation = conversation,
+            expectedMessageIdHex = "msg-c",
+            exactMessageTexts = listOf("hello", "message-b", "message-c"),
         )
     }
 
@@ -226,16 +320,42 @@ class LocalNotificationReplyRaceTest {
         cancelFailure.get()?.let { throw it }
         showFailure.get()?.let { throw it }
 
+        assertActiveConversationCard(
+            conversation = conversation,
+            expectedMessageIdHex = "msg-b",
+            requiredMessageTexts = listOf("new during window"),
+        )
+    }
+
+    private fun assertActiveConversationCard(
+        conversation: NotificationDismissalKey,
+        expectedMessageIdHex: String,
+        exactMessageTexts: List<String>? = null,
+        requiredMessageTexts: List<String> = emptyList(),
+    ) {
         assertEquals(
             listOf(conversation.tag to conversation.id),
             manager.activeNotifications.map { it.tag to it.id },
         )
+        val active = manager.activeNotifications.single().notification
         assertEquals(
-            "msg-b",
-            manager.activeNotifications.single().notification.extras.getString(
-                LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
-            ),
+            expectedMessageIdHex,
+            active.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
         )
+        val messageTexts = messagingMessageTexts(active)
+        if (exactMessageTexts != null) {
+            assertEquals(exactMessageTexts, messageTexts)
+        }
+        requiredMessageTexts.forEach { required ->
+            assertTrue("$required missing from $messageTexts", messageTexts.contains(required))
+        }
+    }
+
+    private fun messagingMessageTexts(notification: android.app.Notification): List<String> {
+        val style =
+            NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+                ?: error("expected MessagingStyle")
+        return style.messages.map { it.text?.toString().orEmpty() }
     }
 
     private fun conversationKey() = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
