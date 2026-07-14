@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -116,9 +118,6 @@ internal fun conversationJumpToNewestTargetListIndex(
     return bottomTimelineIndex
 }
 
-/** Within this many items of the trailing edge counts as "at bottom". */
-private const val ConversationNearBottomItemSlack = 3
-
 internal data class ImageAttachmentReadOutcome(
     val attachment: PendingAttachment?,
     val overflowed: Boolean = false,
@@ -137,15 +136,13 @@ internal fun isNearBottom(
     timelineSize: Int,
     hasOlderHeader: Boolean,
 ): Boolean {
+    if (!listState.canScrollForward) return true
     val olderHeaderCount = if (hasOlderHeader) 1 else 0
     val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
     // Check the LAST visible item, not the first — keeps "near bottom"
     // truthful when the viewport shrinks (e.g. keyboard open) and fewer
     // items fit, which pushes firstVisibleItemIndex earlier even though
-    // the bottom is still on-screen. Do not short-circuit on
-    // canScrollForward: during IME resize the lazy list can transiently
-    // report no forward scroll range while the last visible row is still
-    // history (issue #1375).
+    // the bottom is still on-screen.
     val lastVisible =
         listState.layoutInfo.visibleItemsInfo
             .lastOrNull()
@@ -170,4 +167,25 @@ internal fun rememberConversationNearBottom(
         }
     }
     return nearBottom
+}
+
+/**
+ * Near-bottom gate for IME-open bottom chase. Until this conversation has
+ * observed the IME closed, follows live [nearBottom] so a chat opened with the
+ * keyboard already up can still chase once initial anchoring settles. After the
+ * first closed-IME snapshot, holds that value while the IME is open so a
+ * transient `canScrollForward=false` during viewport resize cannot treat a
+ * history reader as "at bottom" (#1375).
+ */
+@Composable
+internal fun rememberImeOpenReanchorNearBottom(
+    chatId: String,
+    imeIsOpen: Boolean,
+    nearBottom: Boolean,
+): Boolean {
+    var nearBottomWhenImeClosed by remember(chatId) { mutableStateOf<Boolean?>(null) }
+    SideEffect {
+        if (!imeIsOpen) nearBottomWhenImeClosed = nearBottom
+    }
+    return if (imeIsOpen) nearBottomWhenImeClosed ?: nearBottom else nearBottom
 }
