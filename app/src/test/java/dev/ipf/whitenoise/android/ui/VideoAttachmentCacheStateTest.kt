@@ -118,7 +118,7 @@ class VideoAttachmentCacheStateTest {
     }
 
     @Test
-    fun invalidateVideoAttachmentCacheAfterPlaybackFailure_failsClosedWhenDeleteFails() {
+    fun invalidateVideoAttachmentCacheAfterPlaybackFailure_stillEvictsAndFailsWhenDeleteFails() {
         val context = RuntimeEnvironment.getApplication()
         val messageId = "video-invalidate-delete-fail"
         val reference = mediaReference(mediaType = "video/mp4")
@@ -142,7 +142,8 @@ class VideoAttachmentCacheStateTest {
 
         assertTrue(failed.isFailure)
         assertTrue(failed.exceptionOrNull() is IOException)
-        assertFalse(evictCalled)
+        // A failed delete still evicts plaintext (and still surfaces the failure).
+        assertTrue(evictCalled)
         assertTrue(blocked.exists())
     }
 
