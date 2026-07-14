@@ -162,15 +162,6 @@ internal fun conversationTranscriptShareIntent(
     }
 }
 
-internal suspend fun deleteGroupLocallyAndDismissDetails(
-    deleteGroupLocal: suspend () -> Boolean,
-    onDeleted: () -> Unit,
-): Boolean {
-    val deleted = deleteGroupLocal()
-    if (deleted) onDeleted()
-    return deleted
-}
-
 @Composable
 internal fun GroupDetailsLocalDeleteControl(
     readOnlyInvite: Boolean,
@@ -1109,12 +1100,8 @@ internal fun GroupDetailsScreen(
                 onDeleteConfirmed = {
                     runGroupMutation(
                         action = GroupMutationAction.Delete,
-                        mutation = {
-                            deleteGroupLocallyAndDismissDetails(
-                                deleteGroupLocal = { controller.deleteGroupLocal() },
-                                onDeleted = onLeft,
-                            )
-                        },
+                        mutation = { controller.deleteGroupLocal() },
+                        onSuccess = onLeft,
                     )
                 },
             )

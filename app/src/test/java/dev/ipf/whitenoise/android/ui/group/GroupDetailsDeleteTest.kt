@@ -8,9 +8,6 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -82,37 +79,4 @@ class GroupDetailsDeleteTest {
         composeRule.onNodeWithText(confirmLabel).performClick()
         composeRule.runOnIdle { assertTrue(confirmed) }
     }
-
-    @Test
-    fun successfulLocalDeleteRunsCleanupBeforeDismissingDetails() =
-        runBlocking {
-            val calls = mutableListOf<String>()
-
-            val deleted =
-                deleteGroupLocallyAndDismissDetails(
-                    deleteGroupLocal = {
-                        calls += "delete"
-                        true
-                    },
-                    onDeleted = { calls += "dismiss" },
-                )
-
-            assertTrue(deleted)
-            assertEquals(listOf("delete", "dismiss"), calls)
-        }
-
-    @Test
-    fun failedLocalDeleteKeepsDetailsOpen() =
-        runBlocking {
-            var dismissed = false
-
-            val deleted =
-                deleteGroupLocallyAndDismissDetails(
-                    deleteGroupLocal = { false },
-                    onDeleted = { dismissed = true },
-                )
-
-            assertFalse(deleted)
-            assertFalse(dismissed)
-        }
 }
