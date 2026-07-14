@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
@@ -2306,29 +2307,34 @@ class WhiteNoiseAppState(
      */
     private suspend fun wipeDecryptedMediaFromDisk() {
         withContext(Dispatchers.IO) {
-            // Each target holds decrypted plaintext, so wipe them independently
-            // and best-effort: a failure in one (IO error, locked file) must not
-            // skip the others, and a swallowed failure should still be visible.
-            runCatching { diskMediaCache.clear() }
-                .onFailure {
-                    rethrowIfCancellation(it)
-                    appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
-                }
-            runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }
-                .onFailure {
-                    rethrowIfCancellation(it)
-                    appStateDebug { "voice attachment wipe failed: ${it.readableMessage()}" }
-                }
-            runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VIDEO).deleteRecursively() }
-                .onFailure {
-                    rethrowIfCancellation(it)
-                    appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
-                }
-            runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
-                .onFailure {
-                    rethrowIfCancellation(it)
-                    appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
-                }
+            AttachmentCachePublication.onWipeStarted()
+            try {
+                // Each target holds decrypted plaintext, so wipe them independently
+                // and best-effort: a failure in one (IO error, locked file) must not
+                // skip the others, and a swallowed failure should still be visible.
+                runCatching { diskMediaCache.clear() }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
+                    }
+                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "voice attachment wipe failed: ${it.readableMessage()}" }
+                    }
+                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VIDEO).deleteRecursively() }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
+                    }
+                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
+                    }
+            } finally {
+                AttachmentCachePublication.onWipeFinished()
+            }
         }
     }
 

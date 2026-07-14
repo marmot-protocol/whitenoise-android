@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -75,6 +76,12 @@ import java.util.Locale
 private val voiceMaterializationLock = Any()
 private val inFlightVoiceMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
 
+internal fun voicePlaybackKey(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    sourceEpoch: ULong,
+): String = AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, sourceEpoch)
+
 @Composable
 internal fun MediaVoiceBubble(
     messageIdHex: String,
@@ -87,7 +94,8 @@ internal fun MediaVoiceBubble(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pillKey = "$messageIdHex#$attachmentIndex"
+    val epoch = reference.sourceEpoch
+    val pillKey = voicePlaybackKey(messageIdHex, attachmentIndex, epoch)
 
     var localFile by
         rememberCachedVoiceAttachmentFileState(
@@ -97,12 +105,12 @@ internal fun MediaVoiceBubble(
             reference = reference,
         )
     val cachedPlaintextOnEntry =
-        remember(pillKey, reference.mediaType) {
+        remember(pillKey, epoch, reference.mediaType) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
-    var totalDurationMs by remember(pillKey) { mutableStateOf(0) }
-    var loading by remember(pillKey) { mutableStateOf(false) }
-    var failed by remember(pillKey) { mutableStateOf(false) }
+    var totalDurationMs by remember(pillKey, epoch) { mutableStateOf(0) }
+    var loading by remember(pillKey, epoch) { mutableStateOf(false) }
+    var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Auto-download gate (#407): own clips always materialize (bytes are
     // cached from the send), incoming honor the Audio matrix row unless the
     // attachment is already local. A cached voice file or controller plaintext
@@ -110,7 +118,7 @@ internal fun MediaVoiceBubble(
     // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
     // re-gates an un-fetched clip. A tap on the bubble flips this to true so
     // manual fetch/playback is always available even when auto-download is off.
-    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
+    var startDownload by remember(pillKey, epoch, appState.mediaAutoDownloadMatrix) {
         mutableStateOf(
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
@@ -150,8 +158,8 @@ internal fun MediaVoiceBubble(
                 0.3f + (byte / 255f) * 0.7f
             }
         }
-    var realWaveform by remember(pillKey) { mutableStateOf<FloatArray?>(null) }
-    LaunchedEffect(localFile, pillKey) {
+    var realWaveform by remember(pillKey, epoch) { mutableStateOf<FloatArray?>(null) }
+    LaunchedEffect(localFile, pillKey, epoch) {
         val file = localFile ?: return@LaunchedEffect
         if (realWaveform != null) return@LaunchedEffect
         realWaveform =
@@ -179,7 +187,7 @@ internal fun MediaVoiceBubble(
         startDownload = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio)
     }
 
-    LaunchedEffect(pillKey, reference.mediaType) {
+    LaunchedEffect(pillKey, epoch, reference.mediaType) {
         VoicePlaybackController.failures.collect { failure ->
             if (failure.key == pillKey && failure.invalidatesCache) {
                 clearBadVoiceCache("playback error")
@@ -187,7 +195,7 @@ internal fun MediaVoiceBubble(
         }
     }
 
-    LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
+    LaunchedEffect(pillKey, epoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
         // Honor the auto-download gate: when Audio is off for the active
         // connection the clip waits behind a Download affordance until the
@@ -224,7 +232,7 @@ internal fun MediaVoiceBubble(
 
     // Surface a cached duration as soon as the file is materialized so the
     // bubble shows "0:12" instead of "0:00" before the user taps Play.
-    LaunchedEffect(pillKey, localFile) {
+    LaunchedEffect(pillKey, epoch, localFile) {
         val file = localFile ?: return@LaunchedEffect
         if (totalDurationMs == 0) {
             val probed =
@@ -473,6 +481,12 @@ internal suspend fun materializeVoiceAttachment(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
+    val attachmentKey =
+        AttachmentCachePublication.attachmentKey(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            sourceEpoch = reference.sourceEpoch,
+        )
 
     val key = file.absolutePath
     var owner = false
@@ -491,7 +505,7 @@ internal suspend fun materializeVoiceAttachment(
     return try {
         val materialized =
             withContext(NonCancellable) {
-                materializeVoiceAttachmentOnce(file, resolveBytes)
+                materializeVoiceAttachmentOnce(attachmentKey, file, resolveBytes)
             }
         shared.complete(materialized)
         materialized
@@ -508,12 +522,20 @@ internal suspend fun materializeVoiceAttachment(
 }
 
 private suspend fun materializeVoiceAttachmentOnce(
+    attachmentKey: String,
     file: java.io.File,
     resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
     if (file.isFile && file.length() > 0L) return file
-    val bytes = resolveBytes()
-    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    val published =
+        AttachmentCachePublication.publishAfterLoad(
+            attachmentKey = attachmentKey,
+            finalFile = file,
+            loadBytes = resolveBytes,
+        )
+    if (!published) {
+        throw java.io.IOException("attachment cache publication aborted for ${file.name}")
+    }
     return file
 }
 
@@ -574,15 +596,26 @@ internal suspend fun clearVoiceAttachmentCacheAfterPlaybackFailure(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ) {
-    withContext(Dispatchers.IO) {
+    val attachmentKey =
+        AttachmentCachePublication.attachmentKey(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            sourceEpoch = reference.sourceEpoch,
+        )
+    val cacheFile =
         voiceAttachmentCacheFile(
             context = context,
             messageIdHex = messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-        ).delete()
+        )
+    withContext(NonCancellable) {
+        AttachmentCachePublication.invalidateAttachmentCache(
+            attachmentKey = attachmentKey,
+            finalFile = cacheFile,
+            evictPlaintext = { controller.evictCachedAttachment(messageIdHex, attachmentIndex) },
+        )
     }
-    controller.evictCachedAttachment(messageIdHex, attachmentIndex)
 }
 
 private fun voiceAttachmentCacheFile(
@@ -591,8 +624,11 @@ private fun voiceAttachmentCacheFile(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): java.io.File {
-    val cacheDir = java.io.File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }
-    return java.io.File(cacheDir, "$messageIdHex-$attachmentIndex.${voiceAttachmentExtension(reference)}")
+    val cacheDir = java.io.File(context.cacheDir, MediaCacheDirs.VOICE)
+    return java.io.File(
+        cacheDir,
+        "$messageIdHex-$attachmentIndex-${reference.sourceEpoch}.${voiceAttachmentExtension(reference)}",
+    )
 }
 
 private fun voiceAttachmentExtension(reference: MediaAttachmentReferenceFfi): String =

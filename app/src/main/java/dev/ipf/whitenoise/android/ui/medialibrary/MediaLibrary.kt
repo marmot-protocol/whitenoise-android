@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.saveVideoToGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.shortMediaTypeLabel
+import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -688,7 +689,12 @@ private fun VoiceLibraryRow(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pillKey = "${row.messageIdHex}#${row.attachmentIndex}"
+    val pillKey =
+        voicePlaybackKey(
+            row.messageIdHex,
+            row.attachmentIndex,
+            row.reference.sourceEpoch,
+        )
     var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
     var loading by remember(pillKey) { mutableStateOf(false) }
 
