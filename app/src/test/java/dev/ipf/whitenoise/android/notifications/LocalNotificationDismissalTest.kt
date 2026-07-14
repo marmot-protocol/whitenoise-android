@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -256,6 +257,105 @@ class LocalNotificationDismissalTest {
         )
 
         assertEquals(1, manager.activeNotifications.size)
+    }
+
+    @Test
+    fun replyDismissClearsMessageCardWhenSameGeneration() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        val presenter = LocalNotificationPresenter(context)
+
+        assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
+        presenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
+
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun replyDismissPreservesMessageCardWhenNewerGenerationArrivesDuringWindow() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        val presenter = LocalNotificationPresenter(context)
+
+        assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
+        manager.notify(
+            conversation.tag,
+            conversation.id,
+            messagingNotification(
+                "msg-b",
+                "hello" to 1_000L,
+                "new during window" to 2_000L,
+            ),
+        )
+        presenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
+
+        assertEquals(
+            listOf(conversation.tag to conversation.id),
+            manager.activeNotifications.map { it.tag to it.id },
+        )
+        assertEquals(
+            "msg-b",
+            manager.activeNotifications.single().notification.extras.getString(
+                LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
+            ),
+        )
+    }
+
+    @Test
+    fun replyHandledRepostPreservesGenerationMarker() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        val presenter = LocalNotificationPresenter(context)
+
+        assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
+
+        assertEquals(
+            "msg-a",
+            presenter.conversationCardMessageIdHex(conversation.tag, conversation.id),
+        )
+    }
+
+    @Test
+    fun replyDismissFailsClosedWhenGenerationMarkerMissing() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, messagingNotification(null, "hello" to 1_000L))
+        val presenter = LocalNotificationPresenter(context)
+
+        assertTrue(presenter.markDirectReplyHandled(conversation.tag, conversation.id, "reply"))
+        presenter.cancelRepliedConversationCardIfSameGeneration(conversation.tag, conversation.id, "msg-a")
+
+        assertEquals(1, manager.activeNotifications.size)
+    }
+
+    private fun messagingNotification(
+        messageIdHex: String?,
+        vararg lines: Pair<String, Long>,
+    ): android.app.Notification {
+        val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
+        lines.forEach { (text, timestampMs) ->
+            style.addMessage(text, timestampMs, Person.Builder().setName("Alice").build())
+        }
+        return NotificationCompat
+            .Builder(context, TEST_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setStyle(style)
+            .apply {
+                messageIdHex?.let {
+                    addExtras(
+                        Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, it)
+                        },
+                    )
+                }
+            }.build()
     }
 
     private fun notification(extras: Bundle? = null) =

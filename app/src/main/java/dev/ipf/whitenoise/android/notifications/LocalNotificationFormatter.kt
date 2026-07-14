@@ -52,6 +52,11 @@ object LocalNotificationFormatter {
     const val EXTRA_DISMISS_ACCOUNT_REF = "dev.ipf.whitenoise.android.notify.dismiss_account_ref"
     const val EXTRA_DISMISS_GROUP_ID = "dev.ipf.whitenoise.android.notify.dismiss_group_id"
 
+    // Latest message id stamped onto the accumulating conversation card at post
+    // time. Reply cleanup compares this to the replied action's target message
+    // id so a card updated by a newer message survives.
+    const val EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX = "dev.ipf.whitenoise.android.notify.conversation_card_message_id_hex"
+
     fun conversationDismissalKey(
         accountRef: String,
         groupIdHex: String,

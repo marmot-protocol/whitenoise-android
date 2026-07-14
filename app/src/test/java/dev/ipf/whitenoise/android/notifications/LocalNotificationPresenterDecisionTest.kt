@@ -218,6 +218,16 @@ class LocalNotificationPresenterDecisionTest {
         )
     }
 
+    @Test
+    fun shouldCancelRepliedConversationCardMatchesGenerationAndFailsClosed() {
+        assertTrue(shouldCancelRepliedConversationCard("msg-a", "msg-a"))
+        assertFalse(shouldCancelRepliedConversationCard("msg-a", "msg-b"))
+        assertFalse(shouldCancelRepliedConversationCard("msg-a", null))
+        assertFalse(shouldCancelRepliedConversationCard(null, "msg-a"))
+        assertFalse(shouldCancelRepliedConversationCard("", "msg-a"))
+        assertFalse(shouldCancelRepliedConversationCard("msg-a", ""))
+    }
+
     private fun decision(update: NotificationUpdateFfi): NotificationPostDecision? =
         decideNotificationPost(
             update = update,

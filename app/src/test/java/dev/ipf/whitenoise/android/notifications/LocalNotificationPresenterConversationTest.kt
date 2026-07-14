@@ -74,6 +74,10 @@ class LocalNotificationPresenterConversationTest {
         assertNotNull(shortcut.icon)
         assertEquals(IconCompat.TYPE_RESOURCE, shortcut.icon!!.type)
         assertEquals(R.mipmap.ic_launcher, shortcut.icon!!.resId)
+        assertEquals(
+            "message",
+            notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
+        )
     }
 
     @Test
