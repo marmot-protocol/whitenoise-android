@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -363,6 +364,7 @@ internal fun MessageActionMenu(
                                 label = stringResource(R.string.delete_for_me),
                                 icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = onDeleteForMe,
+                                isDestructive = true,
                             )
                         }
                         if (canDeleteForEveryone) {
@@ -370,6 +372,7 @@ internal fun MessageActionMenu(
                                 label = stringResource(R.string.delete_for_everyone),
                                 icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = onDeleteForEveryone,
+                                isDestructive = true,
                             )
                         }
                     }
@@ -614,16 +617,26 @@ private fun EmojiActionButton(
 }
 
 @Composable
-private fun MessageActionButton(
+internal fun MessageActionButton(
     label: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isDestructive: Boolean = false,
 ) {
     TextButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        colors =
+            ButtonDefaults.textButtonColors(
+                contentColor =
+                    if (isDestructive) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
