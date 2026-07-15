@@ -396,10 +396,10 @@ private fun mergeMarkReadReadWatermark(
 }
 
 /**
- * Reconcile a chat-list row returned from [markTimelineMessageRead] with the
- * in-memory row the subscription may have updated while the FFI call was
- * suspended. Returns null when the mark-read projection is strictly older than
- * what is already folded (a superseded concurrent mark-read).
+ * Reconcile an incoming chat-list row (mark-read return or subscription
+ * update) with the in-memory row. Returns null when the incoming projection
+ * is strictly older than what is already folded (a superseded concurrent
+ * mark-read or stale subscription unread).
  */
 internal fun mergeMarkReadChatListRow(
     current: ChatListRowFfi,
@@ -1256,6 +1256,50 @@ internal fun countUnreadIncoming(
     return timeline.drop(anchorIdx + 1).count {
         it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
     }
+}
+
+/** Privacy-safe snapshot when entry projection unread would mis-anchor the timeline. */
+internal data class UnreadCountDivergenceReport(
+    val projectionUnread: Int,
+    val timelineUnread: Int,
+    val loadedReceivedCount: Int,
+)
+
+/**
+ * Detect an inflated entry unread count that fits the loaded received window and
+ * would drive [firstUnreadReceivedIndex] toward the top. Returns null when the
+ * counts agree, the timeline is empty, projection unread is not above timeline
+ * unread, or projection unread exceeds the loaded window (falls back to bottom).
+ */
+internal fun unreadCountDivergenceReport(
+    projectionUnread: Int,
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): UnreadCountDivergenceReport? {
+    if (timeline.isEmpty()) return null
+    val timelineUnread = countUnreadIncoming(timeline, readAnchorMessageId)
+    if (projectionUnread <= timelineUnread) return null
+    val loadedReceived =
+        timeline.count { row ->
+            row.record.direction == "received" && !isDerivedStateKind(row.record.kind)
+        }
+    if (projectionUnread > loadedReceived) return null
+    return UnreadCountDivergenceReport(
+        projectionUnread = projectionUnread,
+        timelineUnread = timelineUnread,
+        loadedReceivedCount = loadedReceived,
+    )
+}
+
+internal fun logUnreadCountDivergence(
+    tag: String,
+    report: UnreadCountDivergenceReport,
+) {
+    Log.w(
+        tag,
+        "unread divergence projection=${report.projectionUnread} timeline=${report.timelineUnread} " +
+            "loadedReceived=${report.loadedReceivedCount} source=inflated_entry_projection",
+    )
 }
 
 // Derived-state event kinds: rows that arrive as `received` from the
@@ -2151,7 +2195,34 @@ class ChatsController(
         )
 
     private fun foldChatRow(row: ChatListRowFfi) {
-        chatRowsByGroup[chatRowKey(row.groupIdHex)] = row
+        val key = chatRowKey(row.groupIdHex)
+        val current = chatRowsByGroup[key]
+        val folded =
+            when {
+                current == null -> row
+                else -> mergeMarkReadChatListRow(current, row)
+            }
+        if (folded == null) {
+            if (current != null && row.unreadCount > current.unreadCount) {
+                logStaleChatListUnreadRejected(
+                    keptUnread = current.unreadCount,
+                    rejectedUnread = row.unreadCount,
+                )
+            }
+            return
+        }
+        if (
+            current != null &&
+            row.unreadCount > current.unreadCount &&
+            folded.unreadCount == current.unreadCount
+        ) {
+            logStaleChatListUnreadRejected(
+                keptUnread = current.unreadCount,
+                rejectedUnread = row.unreadCount,
+            )
+        }
+        if (folded == current) return
+        chatRowsByGroup[key] = folded
         scheduleRecompute()
     }
 
@@ -3037,6 +3108,16 @@ private fun AppGroupRecordFfi.debugSummary(): String =
 private fun ChatListRowFfi.debugSummary(): String =
     "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation unread=$unreadCount " +
         "last=${lastMessage?.messageIdHex?.take(8)} title=${title.ifBlank { "<blank>" }}"
+
+private fun logStaleChatListUnreadRejected(
+    keptUnread: ULong,
+    rejectedUnread: ULong,
+) {
+    Log.w(
+        "DMChats",
+        "stale chat-list unread rejected kept=$keptUnread rejected=$rejectedUnread source=client_stale_fold",
+    )
+}
 
 private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
     when (this) {
