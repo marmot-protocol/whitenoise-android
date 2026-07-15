@@ -97,6 +97,34 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun deletedConversationChannelIsRecreatedWithoutAProcessRestart() {
+        presenter.ensureChannels()
+        runBlocking { presenter.show(update(isMention = false), previewTextOverride = "first") }
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        val channelId =
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+            )
+        assertNotNull(manager.getNotificationChannel(channelId))
+
+        manager.deleteNotificationChannel(channelId)
+        assertNull(manager.getNotificationChannel(channelId))
+        manager.cancelAll()
+
+        val reposted = runBlocking { presenter.show(update(isMention = false), previewTextOverride = "second") }
+
+        assertTrue(reposted)
+        assertNotNull(manager.getNotificationChannel(channelId))
+        assertEquals(
+            channelId,
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
     fun senderPersonUsesTheResolvedAvatarBitmap() {
         val content = LocalNotificationFormatter.content(update(isMention = false), context)!!
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)

@@ -161,8 +161,12 @@ object MentionComposer {
         active: ActiveQuery,
         candidate: Candidate,
     ): Insertion {
-        val replaceEnd = active.start + 1 + active.query.length
-        val before = text.substring(0, active.start)
+        val start = active.start.coerceIn(0, text.length)
+        val replaceEnd =
+            (active.start.toLong() + 1L + active.query.length)
+                .coerceIn(start.toLong(), text.length.toLong())
+                .toInt()
+        val before = text.substring(0, start)
         val after = text.substring(replaceEnd)
         val needsSpace = after.firstOrNull()?.isWhitespace() != true
         val chip = "@${candidate.npub}"

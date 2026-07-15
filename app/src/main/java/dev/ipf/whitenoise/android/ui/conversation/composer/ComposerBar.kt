@@ -196,6 +196,58 @@ internal fun insertComposerEmoji(
     return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
 }
 
+/** Deletes the selected range, or the code point before a clamped caret. */
+internal fun deleteComposerSelectionOrPreviousCodePoint(value: TextFieldValue): TextFieldValue? {
+    val text = value.text
+    val selectionStart = value.selection.start.coerceIn(0, text.length)
+    val selectionEnd = value.selection.end.coerceIn(0, text.length)
+    val rangeStart = minOf(selectionStart, selectionEnd)
+    val rangeEnd = maxOf(selectionStart, selectionEnd)
+    val deleteStart =
+        if (rangeStart != rangeEnd) {
+            rangeStart
+        } else {
+            if (rangeStart == 0) return null
+            text.offsetByCodePoints(rangeStart, -1)
+        }
+    val updatedText = text.removeRange(deleteStart, rangeEnd)
+    return value.copy(text = updatedText, selection = TextRange(deleteStart), composition = null)
+}
+
+internal fun repairComposerMentionEdit(
+    oldValue: TextFieldValue,
+    proposedValue: TextFieldValue,
+    clampMentionSelection: Boolean,
+): TextFieldValue {
+    val repaired =
+        MentionComposer.wholeChipBackspace(
+            oldText = oldValue.text,
+            oldCaret = oldValue.selection.start,
+            newText = proposedValue.text,
+            newCaret = proposedValue.selection.start,
+        )
+            ?: MentionComposer.repairChipDeletion(
+                oldText = oldValue.text,
+                newText = proposedValue.text,
+            )
+    val edited =
+        repaired?.let { TextFieldValue(text = it.text, selection = TextRange(it.selection)) }
+            ?: proposedValue
+    if (!clampMentionSelection) return edited
+
+    val clamped =
+        MentionComposer.clampSelectionOutOfChips(
+            edited.text,
+            edited.selection.start,
+            edited.selection.end,
+        )
+    return if (clamped.start != edited.selection.start || clamped.end != edited.selection.end) {
+        edited.copy(selection = TextRange(clamped.start, clamped.end))
+    } else {
+        edited
+    }
+}
+
 /**
  * Hoisted composer text state (#1206). Sharing one instance across the main
  * composer and the long-message reader's composer keeps their in-progress text
@@ -603,22 +655,9 @@ internal fun ComposerBar(
     }
 
     fun deleteFromComposer() {
-        val selection = textFieldValue.selection
-        val textValue = textFieldValue.text
-        val deleteStart =
-            when {
-                selection.start != selection.end -> minOf(selection.start, selection.end)
-                selection.start <= 0 -> return
-                else -> textValue.offsetByCodePoints(selection.start, -1)
-            }
-        val deleteEnd =
-            if (selection.start != selection.end) {
-                maxOf(selection.start, selection.end)
-            } else {
-                selection.start
-            }
-        val updatedText = textValue.removeRange(deleteStart, deleteEnd)
-        applyComposerFieldValue(TextFieldValue(updatedText, selection = TextRange(deleteStart)))
+        val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
+        val updatedValue = repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled)
+        applyComposerFieldValue(updatedValue)
     }
 
     fun openComposerEmojiPane() {
@@ -803,46 +842,7 @@ internal fun ComposerBar(
                                 // detects any deletion that partially overlaps a
                                 // chip and widens it to remove the whole chip, so a
                                 // partial-chip state can never reach the renderer.
-                                val whole =
-                                    MentionComposer.wholeChipBackspace(
-                                        oldText = textFieldValue.text,
-                                        oldCaret = textFieldValue.selection.start,
-                                        newText = value.text,
-                                        newCaret = value.selection.start,
-                                    )
-                                        ?: MentionComposer.repairChipDeletion(
-                                            oldText = textFieldValue.text,
-                                            newText = value.text,
-                                        )
-                                val edited =
-                                    if (whole != null) {
-                                        TextFieldValue(text = whole.text, selection = TextRange(whole.selection))
-                                    } else {
-                                        value
-                                    }
-                                // #414: keep the caret/selection out of the interior
-                                // of any `@npub1…` chip so a tap, drag, or arrow key
-                                // can't land inside the token (which would let a
-                                // stray edit corrupt it or reopen the picker
-                                // mid-token). Only in groups, where chips exist.
-                                val applied =
-                                    if (mentionPickerEnabled) {
-                                        val clamped =
-                                            MentionComposer.clampSelectionOutOfChips(
-                                                edited.text,
-                                                edited.selection.start,
-                                                edited.selection.end,
-                                            )
-                                        if (clamped.start != edited.selection.start ||
-                                            clamped.end != edited.selection.end
-                                        ) {
-                                            edited.copy(selection = TextRange(clamped.start, clamped.end))
-                                        } else {
-                                            edited
-                                        }
-                                    } else {
-                                        edited
-                                    }
+                                val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
                                 applyComposerFieldValue(applied)
                             }
                         },

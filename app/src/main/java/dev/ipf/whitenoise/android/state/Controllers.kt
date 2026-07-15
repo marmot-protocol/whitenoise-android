@@ -7470,6 +7470,8 @@ class ConversationController(
                     -> Unit
                 }
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (throwable: Throwable) {
             updateStreamPreview(
                 streamId,
