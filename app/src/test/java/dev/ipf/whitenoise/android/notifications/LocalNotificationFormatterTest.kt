@@ -530,6 +530,29 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun unnamedReceiverFallsBackToItsShortNpub() {
+        val receiverAccountIdHex = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        val receiverShortNpub = "npub140x77...ystddknj"
+        val content =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    receiver = user(accountIdHex = receiverAccountIdHex, displayName = null),
+                ),
+                shortNpub = { accountIdHex ->
+                    when (accountIdHex) {
+                        SAMPLE_ACCOUNT_ID_HEX -> SAMPLE_SHORT_NPUB
+                        receiverAccountIdHex -> receiverShortNpub
+                        else -> error("Unexpected unnamed test user: $accountIdHex")
+                    }
+                },
+            )
+
+        assertEquals(receiverShortNpub, content?.selfName)
+        assertEquals(receiverAccountIdHex, content?.selfKey)
+    }
+
+    @Test
     fun inviteBodyUsesSenderNameOverride() {
         val content =
             content(
@@ -551,6 +574,10 @@ class LocalNotificationFormatterTest {
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+        shortNpub: (String) -> String = { accountIdHex ->
+            check(accountIdHex == SAMPLE_ACCOUNT_ID_HEX) { "Unexpected unnamed test user: $accountIdHex" }
+            SAMPLE_SHORT_NPUB
+        },
     ): LocalNotificationContent? =
         LocalNotificationFormatter.content(
             update = update,
@@ -558,10 +585,7 @@ class LocalNotificationFormatterTest {
             previewTextOverride = previewTextOverride,
             reactedToPreviewOverride = reactedToPreviewOverride,
             mediaKind = mediaKind,
-            shortNpub = { accountIdHex ->
-                check(accountIdHex == SAMPLE_ACCOUNT_ID_HEX) { "Unexpected unnamed test user: $accountIdHex" }
-                SAMPLE_SHORT_NPUB
-            },
+            shortNpub = shortNpub,
         )
 
     private fun update(
@@ -571,6 +595,7 @@ class LocalNotificationFormatterTest {
         groupIdHex: String = "group",
         previewText: String? = "Hello",
         sender: NotificationUserFfi = user(),
+        receiver: NotificationUserFfi = user(accountIdHex = "account", displayName = "Me"),
         isDm: Boolean = false,
         isFromSelf: Boolean = false,
         isMention: Boolean = false,
@@ -588,7 +613,7 @@ class LocalNotificationFormatterTest {
         isDm = isDm,
         messageIdHex = "message",
         sender = sender,
-        receiver = user(accountIdHex = "account", displayName = "Me"),
+        receiver = receiver,
         previewText = previewText,
         timestampMs = 1234,
         isFromSelf = isFromSelf,
