@@ -525,20 +525,23 @@ androidComponents {
     }
 }
 
+// Task names carry the distribution flavor between the environment and the build
+// type (e.g. packageStagingZapstoreRelease…), so match on the environment alone.
+// This runs only on release package tasks, so the build type is already implied.
 fun releaseSigningConfiguredForPackageTask(taskName: String): Boolean =
     when {
-        taskName.contains("ProductionRelease") -> hasProductionReleaseSigning
-        taskName.contains("StagingRelease") -> hasStagingReleaseSigning
+        taskName.contains("Production") -> hasProductionReleaseSigning
+        taskName.contains("Staging") -> hasStagingReleaseSigning
         else -> false
     }
 
 fun releaseSigningHintForPackageTask(taskName: String): String =
     when {
-        taskName.contains("ProductionRelease") ->
+        taskName.contains("Production") ->
             "WHITENOISE_PRODUCTION_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD " +
                 "(or WHITENOISE_KEYSTORE_* fallback)"
 
-        taskName.contains("StagingRelease") ->
+        taskName.contains("Staging") ->
             "WHITENOISE_STAGING_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD"
 
         else -> "release signing credentials"
