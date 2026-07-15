@@ -28,6 +28,10 @@ class KeyboardSafePopupCoverageTest {
 
         assertTrue("shared popup properties must disable focus stealing", "focusable = false" in body)
         assertTrue(
+            "full-window popups must not claim the system Back-gesture edges",
+            "excludeFromSystemGesture = false" in body,
+        )
+        assertTrue(
             "outside taps must be owned by the scrim, not Popup's built-in dismiss",
             "dismissOnClickOutside = false" in body,
         )

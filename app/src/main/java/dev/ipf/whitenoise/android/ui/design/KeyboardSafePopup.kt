@@ -53,6 +53,9 @@ private val keyboardSafePopupProperties =
         // keep Popup's own outside-tap detection off so a single outside tap is
         // handled exactly once and consumed.
         dismissOnClickOutside = false,
+        // Both popup windows can touch system-gesture edges. Let Android retain
+        // those edges so gesture/predictive Back reaches the host BackHandler.
+        excludeFromSystemGesture = false,
     )
 
 /**
