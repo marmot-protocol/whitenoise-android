@@ -163,6 +163,7 @@ android {
     }
 
     flavorDimensions += "environment"
+    flavorDimensions += "distribution"
 
     signingConfigs {
         if (hasProductionReleaseSigning) {
@@ -394,6 +395,18 @@ android {
                 environmentRuntimeConfigProperty("staging", "PUSH_RELAY_HINT").asBuildConfigString(),
             )
         }
+
+        // Distribution channel, orthogonal to environment — zapstore enables the
+        // verified direct-APK self-updater (installer source set + Zapstore
+        // manifest permissions), play omits it and routes updates to the listing.
+        create("zapstore") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
+        }
     }
 
     // PR preview builds reuse the staging flavor's blueprint launcher icon so
@@ -615,7 +628,10 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp)
+    testImplementation(libs.okhttp.mockwebserver)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.
     testImplementation(libs.org.json)
     // Roborazzi Compose screenshot tests run on the JVM via Robolectric, so the

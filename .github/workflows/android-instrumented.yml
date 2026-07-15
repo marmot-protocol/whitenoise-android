@@ -1,7 +1,8 @@
 name: Android Instrumented Tests
 
-# Runs app/src/androidTest on an emulator (connectedDevDebugAndroidTest).
-# These tests are slow and need a booted emulator + KVM, so they live in their own
+# Runs app/src/androidTest on an emulator (connectedDevZapstoreDebugAndroidTest).
+# Zapstore debug exercises the direct-distribution manifest/config (self-update
+# permissions). These tests are slow and need a booted emulator + KVM, so they live in their own
 # workflow off the fast unit/ktlint path (see android-ci.yml). It runs on
 # pushes to master ONLY — never on pull requests — so a slow emulator boot can
 # never gate a PR merge.
@@ -60,7 +61,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew :app:connectedDevDebugAndroidTest --no-daemon --stacktrace
+          script: ./gradlew :app:connectedDevZapstoreDebugAndroidTest --no-daemon --stacktrace
 
       - name: Upload instrumented test reports
         if: always()

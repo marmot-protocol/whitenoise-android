@@ -29,13 +29,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -65,6 +70,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -87,6 +93,8 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -515,6 +523,13 @@ internal fun ChatsScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (appState.appUpdateInfo.shouldShowBanner) {
+                AppUpdateBanner(
+                    info = appState.appUpdateInfo,
+                    onUpdateNow = { appState.handleAppUpdateAction(context) },
+                    onDismiss = { appState.dismissAppUpdateBanner() },
+                )
+            }
             // Filter chips visible whenever there's content to filter — both
             // in the active and archived lists. They're sticky above the
             // list rather than sticky inside the LazyColumn so they survive
@@ -871,3 +886,55 @@ private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 // queries (issue #290). Sits inside the existing 250–300 ms chat-list input
 // debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
+
+@Composable
+private fun AppUpdateBanner(
+    info: AppUpdateInfo,
+    onUpdateNow: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val latest = info.latestVersion ?: return
+    val description = stringResource(R.string.app_update_available_description, latest)
+    val releasesBehind = info.releasesBehind
+    ElevatedCard(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+        ) {
+            Icon(Icons.Default.Download, contentDescription = null)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(if (info.isFarBehind) R.string.app_update_persistent_title else R.string.app_update_available_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(description, style = MaterialTheme.typography.bodyMedium)
+                if (releasesBehind != null && releasesBehind > 0) {
+                    Text(
+                        pluralStringResource(R.plurals.app_update_releases_behind, releasesBehind, releasesBehind),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(onClick = onUpdateNow) {
+                    Text(stringResource(R.string.app_update_now))
+                }
+            }
+            if (!info.isFarBehind) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                }
+            }
+        }
+    }
+}

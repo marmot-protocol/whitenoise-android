@@ -28,13 +28,22 @@ just keystore-fingerprint         # print SHA-256 of production release keystore
 just keystore-fingerprint staging # print SHA-256 of staging release keystore
 ```
 
-Direct Gradle equivalents:
+Direct Gradle equivalents (Zapstore debug is the default local dev flavor):
 
 ```bash
-./gradlew :app:testDevDebugUnitTest
-./gradlew :app:assembleDevDebug
-./gradlew :app:installDevDebug
+./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest
+./gradlew :app:assembleDevZapstoreDebug
+./gradlew :app:installDevZapstoreDebug
 ```
+
+The app also has a `distribution` flavor dimension, orthogonal to the
+environment above: **`zapstore`** enables verified direct-APK self-updates (the
+Zapstore manifest permissions and the installer implementation in the `zapstore`
+source set); **`play`** omits that installer machinery entirely and shows no
+in-app update UI at all — the distributing store (e.g. Google Play) owns
+updates, and Play policy forbids sending users off-store to update. Every build combines one
+environment with one distribution and a build type — e.g.
+`assembleDevZapstoreDebug`, `assembleProductionPlayRelease`.
 
 The supported build matrix is intentionally small:
 
@@ -50,11 +59,12 @@ Every pull request to `master` (and every push to `master`) runs the
 `.github/workflows/android-ci.yml` validation workflow. It fails the build on
 Kotlin compile errors, unit-test failures, Compose screenshot regressions
 (Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations, or
-Android lint regressions. The workflow uses the dev debug variant only
-and requires no signing secrets or `google-services.json`.
+Android lint regressions. The workflow runs both the `zapstore` and `play` dev
+debug variants and requires no signing secrets or `google-services.json`.
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
-separate emulator workflow for `:app:connectedDevDebugAndroidTest`. It is
+separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`
+(Zapstore debug, exercising direct-distribution config). It is
 master-only, not a pull-request gate, because emulator boot is slower and more
 flake-prone than the fast JVM checks. It uploads Android test reports when
 available and retains them for seven days.
@@ -81,11 +91,11 @@ secrets:
 Run the same fast checks locally before pushing:
 
 ```bash
-./gradlew :app:compileDevDebugKotlin   # Kotlin compile
-./gradlew :app:testDevDebugUnitTest    # unit tests          (also: just test)
-./gradlew :app:verifyRoborazziDevDebug # screenshot tests    (compares baselines)
+./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin
+./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest  # also: just test
+./gradlew :app:verifyRoborazziDevZapstoreDebug :app:verifyRoborazziDevPlayDebug  # screenshot tests
 ./gradlew :app:ktlintCheck             # style/format check  (also: just lint)
-./gradlew :app:lintDevDebug            # Android lint
+./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug   # Android lint
 ```
 
 Use `just format` (`./gradlew :app:ktlintFormat`) to auto-fix ktlint findings
@@ -115,19 +125,20 @@ covers two surfaces:
 - `OnboardingContentScreenshotTest` — the onboarding entry screen, light theme.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs `:app:verifyRoborazziDevDebug`; on a mismatch the build fails and the
+runs `:app:verifyRoborazziDevZapstoreDebug` and `:app:verifyRoborazziDevPlayDebug`; on a mismatch the build fails and the
 diff/compare images are uploaded as workflow artifacts (`android-ci-reports`).
 
 **Re-baseline after an intentional UI change.** When you deliberately change a
 covered composable, regenerate the baselines and commit the updated PNGs:
 
 ```bash
-./gradlew :app:recordRoborazziDevDebug   # rewrite baselines under app/src/test/snapshots/
+./gradlew :app:recordRoborazziDevZapstoreDebug   # rewrite baselines under app/src/test/snapshots/
+# or :app:recordRoborazziDevPlayDebug
 git add app/src/test/snapshots/        # review the image diff, then commit
 ```
 
 Always eyeball the regenerated PNGs before committing — that review is the point
-of the check. If `verifyRoborazziDevDebug` fails on a change you did *not* intend,
+of the check. If `verifyRoborazziDevZapstoreDebug` or `verifyRoborazziDevPlayDebug` fails on a change you did *not* intend,
 that is a caught regression: fix the UI, don't re-record.
 
 ## Release Builds
@@ -242,7 +253,7 @@ For local device checks, prefer:
 just install-debug
 ```
 
-Avoid `connectedDevDebugAndroidTest` on Jeff's Pixel unless he asks for it, because it can uninstall the app and wipe local state.
+Avoid `connectedDevZapstoreDebugAndroidTest` on Jeff's Pixel unless he asks for it, because it can uninstall the app and wipe local state.
 
 ## Performance Guidance
 

@@ -32,14 +32,16 @@ STAGING_APK_DIR := "app/build/outputs/apk/staging/release"
 _default:
     @just --list
 
-# Build dev debug APK (per-ABI splits + universal).
+# Build dev Zapstore debug APK (per-ABI splits + universal). Zapstore is the
+# default local dev flavor — the direct-distribution channel with verified
+# self-updates enabled.
 debug:
-    ./gradlew :app:assembleDevDebug
-    @ls -lh app/build/outputs/apk/dev/debug/*.apk
+    ./gradlew :app:assembleDevZapstoreDebug
+    @ls -lh app/build/outputs/apk/devZapstore/debug/*.apk
 
-# Install the dev debug APK on the connected device.
+# Install the dev Zapstore debug APK on the connected device.
 install-debug:
-    ./gradlew :app:installDevDebug
+    ./gradlew :app:installDevZapstoreDebug
 
 # Launch the installed dev variant. Uses the activity FQN because
 # Dev/staging application IDs include flavor suffixes, so `pkg/.MainActivity`
@@ -55,9 +57,9 @@ run-debug: install-debug launch-debug
 uninstall-debug:
     adb uninstall {{ DEV_PKG }}
 
-# Run unit tests.
+# Run unit tests for both distribution flavors.
 test:
-    ./gradlew :app:testDevDebugUnitTest
+    ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest
 
 # Lint Kotlin sources with ktlint (read-only; fails on violations). Also runs
 

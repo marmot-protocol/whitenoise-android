@@ -81,11 +81,13 @@ jobs:
           cache-read-only: true
 
       # The dev flavor already declares `splits.abi { include("arm64-v8a", ...) }`
-      # so `assembleDevDebug` produces one APK per ABI plus a universal APK; no
-      # `-Pandroid.injected.build.abi` flag is needed. Selecting the arm64-v8a
-      # split happens in the locate step below.
-      - name: Assemble dev debug APK
-        run: ./gradlew :app:assembleDevDebug --no-daemon --stacktrace
+      # so `assembleDevZapstoreDebug` produces one APK per ABI plus a universal
+      # APK; no `-Pandroid.injected.build.abi` flag is needed. Selecting the
+      # arm64-v8a split happens in the locate step below. Zapstore is the default
+      # dev distribution; previews are sideloaded, so the self-update-capable
+      # flavor is the right one to hand testers.
+      - name: Assemble dev zapstore debug APK
+        run: ./gradlew :app:assembleDevZapstoreDebug --no-daemon --stacktrace
 
       - name: Locate built APK
         id: locate

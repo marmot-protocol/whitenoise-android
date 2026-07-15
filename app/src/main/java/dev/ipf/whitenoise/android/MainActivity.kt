@@ -36,10 +36,12 @@ import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
+    private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
     private var recentsPreferenceSecureFlagRetained = false
@@ -108,6 +110,10 @@ class MainActivity : FragmentActivity() {
                     onNotificationTargetHandled = { handled ->
                         if (inboundNotificationTarget == handled) inboundNotificationTarget = null
                     },
+                    inboundAppUpdateTap = inboundAppUpdateTap,
+                    onAppUpdateTapHandled = { handled ->
+                        if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
+                    },
                     onRequestAppUnlock = ::requestAppUnlock,
                 )
             }
@@ -121,6 +127,13 @@ class MainActivity : FragmentActivity() {
      * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
+        if (AppUpdateNavigation.isUpdateTap(intent)) {
+            inboundAppUpdateTap += 1
+            // One-shot, like the notification tap below: clear the stored intent so
+            // activity recreation cannot replay the same update tap.
+            setIntent(Intent(this, MainActivity::class.java))
+            return
+        }
         val parsedTarget =
             NotificationNavigation.parse(intent) { notificationKey, tapToken ->
                 notificationTapTokens.isValid(notificationKey, tapToken)
