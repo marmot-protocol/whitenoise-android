@@ -68,9 +68,19 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
+import dev.ipf.whitenoise.android.notifications.NotificationReplyCompletionStore
+import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryBoundary
+import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryLookup
+import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryState
+import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
+import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
+import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
+import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import kotlinx.coroutines.CancellationException
@@ -107,6 +117,7 @@ import java.net.URI
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
+import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -881,6 +892,8 @@ internal fun isLocalContactAccount(
     accounts: List<AccountSummaryFfi>,
     accountIdHex: String,
 ): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
+
+private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 class WhiteNoiseAppState(
     context: Context,
@@ -3605,59 +3618,138 @@ class WhiteNoiseAppState(
             }
     }
 
-    suspend fun sendNotificationReply(
-        accountRef: String,
-        groupIdHex: String,
-        text: String,
-    ): Boolean {
-        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
-        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
-        val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
-        return runCatching {
-            withGroupCommitLock(account, group) {
-                marmotIo { sendText(account, group, body) }
-            }
-            true
-        }.onFailure {
-            rethrowIfCancellation(it)
-            Log.w("DMAppState", "notification reply failed for group=${group.take(8)}", it)
-        }.getOrDefault(false)
-    }
-
-    suspend fun notificationReplyAlreadyCommitted(
+    internal suspend fun sendNotificationReply(
         accountRef: String,
         groupIdHex: String,
         afterMessageIdHex: String,
         text: String,
-    ): Boolean {
-        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
-        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
-        val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
-        val afterMessage = afterMessageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+        completionStore: NotificationReplyCompletionStore,
+        completionKey: String,
+        recoveryScope: String,
+    ): NotificationReplySendOutcome {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.Failed
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.Failed
+        if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) return NotificationReplySendOutcome.Failed
+        val body = text.trim().takeIf { it.isNotEmpty() } ?: return NotificationReplySendOutcome.Failed
         return runCatching {
-            val records =
-                marmotIo {
-                    timelineMessages(
-                        account,
-                        TimelineMessageQueryFfi(
-                            groupIdHex = group,
-                            search = null,
-                            before = null,
-                            beforeMessageId = null,
-                            after = null,
-                            afterMessageId = afterMessage,
-                            limit = 50u,
-                        ),
-                    ).messages
+            withGroupCommitLock(account, group) {
+                val recoveryLookup =
+                    withContext(Dispatchers.IO) {
+                        completionStore.recoveryLookup(completionKey)
+                    }
+                val recoverySnapshot =
+                    when (recoveryLookup) {
+                        NotificationReplyRecoveryLookup.NotStarted -> null
+                        NotificationReplyRecoveryLookup.Indeterminate ->
+                            return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                        is NotificationReplyRecoveryLookup.Ready -> recoveryLookup.snapshot
+                    }
+                if (recoverySnapshot != null) {
+                    when (
+                        notificationReplyCommitState(
+                            account = account,
+                            group = group,
+                            recoveryState = recoverySnapshot.recoveryState,
+                            nextAttemptBoundary = recoverySnapshot.nextAttemptBoundary,
+                            text = body,
+                        )
+                    ) {
+                        NotificationReplyCommitProbe.Committed ->
+                            return@withGroupCommitLock NotificationReplySendOutcome.AlreadyCommitted
+                        NotificationReplyCommitProbe.Indeterminate ->
+                            return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                        NotificationReplyCommitProbe.NotCommitted -> Unit
+                    }
                 }
-            records.any { record ->
-                record.direction.equals("sent", ignoreCase = true) &&
-                    record.plaintext.trim() == body
+
+                // A synthetic max-id cursor excludes every row in this wall-clock
+                // second. Wait for the next second before asking MDK to build the
+                // event so its random event id cannot sort below the lower bound.
+                val recoveryBoundary = notificationReplyRecoveryBoundary(System.currentTimeMillis())
+                val persistedBoundary =
+                    withContext(Dispatchers.IO) {
+                        completionStore.markStarted(completionKey, recoveryScope, recoveryBoundary)
+                    }
+                if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                while (!notificationReplySendWindowReady(persistedBoundary, System.currentTimeMillis())) {
+                    currentCoroutineContext().ensureActive()
+                    delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
+                }
+
+                val summary = marmotIo { sendText(account, group, body) }
+                val committedMessageId =
+                    summary.messageIds
+                        .firstOrNull()
+                        ?.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) }
+                        ?: return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                val committed =
+                    withContext(Dispatchers.IO) {
+                        completionStore.markCommittedMessage(completionKey, committedMessageId)
+                    }
+                if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                NotificationReplySendOutcome.Sent
             }
         }.onFailure {
             rethrowIfCancellation(it)
-            Log.w("DMAppState", "notification reply dedupe probe failed for group=${group.take(8)}", it)
-        }.getOrDefault(false)
+            appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
+        }.getOrDefault(NotificationReplySendOutcome.Failed)
+    }
+
+    private suspend fun notificationReplyCommitState(
+        account: String,
+        group: String,
+        recoveryState: NotificationReplyRecoveryState,
+        nextAttemptBoundary: NotificationReplyRecoveryBoundary?,
+        text: String,
+    ): NotificationReplyCommitProbe {
+        if (!ConversationController.HEX_MESSAGE_ID.matches(recoveryState.boundary.messageIdHex)) {
+            return NotificationReplyCommitProbe.Indeterminate
+        }
+        if (
+            nextAttemptBoundary != null &&
+            !ConversationController.HEX_MESSAGE_ID.matches(nextAttemptBoundary.messageIdHex)
+        ) {
+            return NotificationReplyCommitProbe.Indeterminate
+        }
+        return runCatching {
+            probeNotificationReplyCommit(
+                recoveryState = recoveryState,
+                nextAttemptBoundary = nextAttemptBoundary,
+                text = text,
+            ) { after, limit ->
+                val page =
+                    marmotIo {
+                        timelineMessages(
+                            account,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = group,
+                                search = null,
+                                before = null,
+                                beforeMessageId = null,
+                                after = after.timelineAt,
+                                afterMessageId = after.messageIdHex,
+                                limit = limit,
+                            ),
+                        )
+                    }
+                NotificationReplyTimelinePage(
+                    records =
+                        page.messages.map { record ->
+                            NotificationReplyTimelineRecord(
+                                timelineAt = record.timelineAt,
+                                messageIdHex = record.messageIdHex,
+                                sourceMessageIdHex = record.sourceMessageIdHex,
+                                direction = record.direction,
+                                plaintext = record.plaintext,
+                            )
+                        },
+                    hasMoreAfter = page.hasMoreAfter,
+                )
+            }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            appStateDebug(it) { "notification reply dedupe probe failed for group=${group.take(8)}: ${it.readableMessage()}" }
+        }.getOrDefault(NotificationReplyCommitProbe.Indeterminate)
     }
 
     suspend fun markNotificationMessageRead(

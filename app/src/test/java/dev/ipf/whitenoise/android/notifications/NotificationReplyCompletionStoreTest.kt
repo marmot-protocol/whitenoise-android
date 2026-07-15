@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,29 +15,217 @@ class NotificationReplyCompletionStoreTest {
         assertFalse(store.isCompleted("reply-a"))
         assertFalse(store.hasStarted("reply-a"))
 
-        store.markStarted("reply-a")
+        store.markStarted(
+            "reply-a",
+            scope = "group-a",
+            recoveryBoundary = boundary(timelineAt = 10uL, messageIdHex = "message-before-reply-a"),
+        )
         assertTrue(store.hasStarted("reply-a"))
+        assertEquals(
+            boundary(timelineAt = 10uL, messageIdHex = "message-before-reply-a"),
+            store.startedRecoveryState("reply-a")?.boundary,
+        )
+        assertTrue(store.markCommittedMessage("reply-a", "c".repeat(64)))
+        assertEquals("c".repeat(64), store.startedRecoveryState("reply-a")?.committedMessageIdHex)
         store.markCompleted("reply-a")
 
         assertTrue(store.isCompleted("reply-a"))
         assertFalse(store.hasStarted("reply-a"))
+        assertNull(store.startedRecoveryState("reply-a"))
         assertFalse(store.isCompleted("reply-b"))
     }
 
     @Test
-    fun markStartedAndCompletedPruneExpiredMarkers() {
+    fun attemptBoundariesAreStrictlyOrderedWithinScope() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+        val proposed = NotificationReplyRecoveryBoundary(10uL, "f".repeat(64))
+
+        assertEquals(proposed, store.markStarted("first", "group", proposed))
+        assertEquals(
+            NotificationReplyRecoveryBoundary(11uL, "f".repeat(64)),
+            store.markStarted("second", "group", proposed),
+        )
+    }
+
+    @Test
+    fun mixedCaseBoundaryAndCommitIdsPersistAsLowercase() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+
+        val persisted = store.markStarted("reply", "group", NotificationReplyRecoveryBoundary(10uL, "A".repeat(64)))
+        assertEquals("a".repeat(64), persisted?.messageIdHex)
+        assertEquals("a".repeat(64), store.startedRecoveryState("reply")?.boundary?.messageIdHex)
+
+        assertTrue(store.markCommittedMessage("reply", "B".repeat(64)))
+        assertEquals("b".repeat(64), store.startedRecoveryState("reply")?.committedMessageIdHex)
+    }
+
+    @Test
+    fun legacyTypeMismatchesAreTreatedAsAbsentWithoutCrashing() {
+        // getLong mismatch: a String persisted where a timestamp is expected.
+        val longMismatch = FakeSharedPreferences()
+        longMismatch
+            .edit()
+            .putString(NotificationReplyCompletionStore.startedStorageKey("legacy"), "not-a-long")
+            .commit()
+        val longStore = NotificationReplyCompletionStore(longMismatch, nowMillis = { 1_000L })
+        assertFalse(longStore.hasStarted("legacy"))
+
+        // getString mismatch: a Long persisted where a message id is expected.
+        val stringMismatch = FakeSharedPreferences()
+        val stringStore = NotificationReplyCompletionStore(stringMismatch, nowMillis = { 1_000L })
+        stringStore.markStarted("reply", "group", boundary(10uL, "before"))
+        stringMismatch
+            .edit()
+            .putLong(NotificationReplyCompletionStore.recoveryMessageIdStorageKey("reply"), 1L)
+            .commit()
+        assertNull(stringStore.startedRecoveryState("reply"))
+        assertEquals(NotificationReplyRecoveryLookup.Indeterminate, stringStore.recoveryLookup("reply"))
+    }
+
+    @Test
+    fun distinctRequestsPersistIndependentRecoveryBoundaries() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+
+        store.markStarted("request-a", "group", boundary(timelineAt = 10uL, messageIdHex = "message-before-a"))
+        store.markStarted("request-b", "group", boundary(timelineAt = 20uL, messageIdHex = "message-before-b"))
+
+        assertEquals(
+            boundary(timelineAt = 10uL, messageIdHex = "message-before-a"),
+            store.startedRecoveryState("request-a")?.boundary,
+        )
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "message-before-b"),
+            store.startedRecoveryState("request-b")?.boundary,
+        )
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "message-before-b"),
+            store.recoverySnapshot("request-a")?.nextAttemptBoundary,
+        )
+
+        store.markCompleted("request-a")
+
+        assertNull(store.startedRecoveryState("request-a"))
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "message-before-b"),
+            store.startedRecoveryState("request-b")?.boundary,
+        )
+    }
+
+    @Test
+    fun completedLaterRequestStillFencesEarlierRecovery() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+        store.markStarted("request-b", "group", boundary(timelineAt = 10uL, messageIdHex = "before-b"))
+        store.markStarted("request-c", "group", boundary(timelineAt = 20uL, messageIdHex = "before-c"))
+        store.markCompleted("request-c")
+
+        assertEquals(
+            boundary(timelineAt = 20uL, messageIdHex = "before-c"),
+            store.recoverySnapshot("request-b")?.nextAttemptBoundary,
+        )
+    }
+
+    @Test
+    fun legacyStartedMarkerDoesNotInventARecoveryBoundary() {
+        val prefs = FakeSharedPreferences()
+        prefs
+            .edit()
+            .putLong(NotificationReplyCompletionStore.startedStorageKey("legacy"), 1_000L)
+            .commit()
+        val store = NotificationReplyCompletionStore(prefs, nowMillis = { 1_000L })
+
+        assertTrue(store.hasStarted("legacy"))
+        assertNull(store.startedRecoveryState("legacy"))
+        assertEquals(NotificationReplyRecoveryLookup.Indeterminate, store.recoveryLookup("legacy"))
+        assertEquals(NotificationReplyRecoveryLookup.NotStarted, store.recoveryLookup("fresh"))
+    }
+
+    @Test
+    fun malformedActiveAttemptRetainsTerminalRecoveryFences() {
+        val prefs = FakeSharedPreferences()
+        prefs
+            .edit()
+            .putLong(NotificationReplyCompletionStore.startedStorageKey("legacy"), 1_000L)
+            .commit()
+        val store = NotificationReplyCompletionStore(prefs, nowMillis = { 1_000L })
+        store.markStarted("later", "group", boundary(20uL, "before-later"))
+
+        store.markCompleted("later")
+
+        assertTrue(prefs.contains(NotificationReplyCompletionStore.recoverySequenceStorageKey("later")))
+    }
+
+    @Test
+    fun activeAndTerminalMarkersSurviveLaterCleanup() {
         var now = 10L
         val prefs = FakeSharedPreferences()
         val store = NotificationReplyCompletionStore(prefs, nowMillis = { now })
 
-        store.markStarted("stale")
+        store.markStarted("pending", "group", boundary(timelineAt = 10uL, messageIdHex = "pending-boundary"))
         store.markCompleted("old")
         now += 8L * 24L * 60L * 60L * 1000L
         store.markCompleted("new")
 
-        assertFalse(store.hasStarted("stale"))
-        assertFalse(store.isCompleted("old"))
+        assertTrue(store.hasStarted("pending"))
+        assertEquals(
+            boundary(timelineAt = 10uL, messageIdHex = "pending-boundary"),
+            store.recoverySnapshot("pending")?.recoveryState?.boundary,
+        )
+        assertTrue(store.isCompleted("old"))
         assertTrue(store.isCompleted("new"))
+    }
+
+    @Test
+    fun completedFenceSurvivesWhileEarlierAttemptIsActive() {
+        var now = 10L
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { now })
+        store.markStarted("earlier", "group", boundary(10uL, "before-earlier"))
+        store.markStarted("later", "group", boundary(20uL, "before-later"))
+        store.markCompleted("later")
+
+        now += 8L * 24L * 60L * 60L * 1000L
+        store.markCompleted("unrelated")
+
+        assertTrue(store.isCompleted("later"))
+        assertEquals(boundary(20uL, "before-later"), store.recoverySnapshot("earlier")?.nextAttemptBoundary)
+    }
+
+    @Test
+    fun abandonedLaterAttemptStillFencesEarlierRecovery() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+        store.markStarted("earlier", "group", boundary(10uL, "before-earlier"))
+        store.markStarted("later", "group", boundary(20uL, "before-later"))
+
+        store.markAbandoned("later", NotificationReplyAbandonedOutcome.Failure)
+
+        assertFalse(store.hasStarted("later"))
+        assertNull(store.recoverySnapshot("later"))
+        assertEquals(NotificationReplyAbandonedOutcome.Failure, store.abandonedOutcome("later"))
+        assertEquals(boundary(20uL, "before-later"), store.recoverySnapshot("earlier")?.nextAttemptBoundary)
+    }
+
+    @Test
+    fun abandonedAttemptDropsItsRecoveryState() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+        store.markStarted("abandoned", "group", boundary(10uL, "before"))
+
+        store.markAbandoned("abandoned", NotificationReplyAbandonedOutcome.Success)
+
+        assertFalse(store.hasStarted("abandoned"))
+        assertNull(store.recoverySnapshot("abandoned"))
+        assertEquals(NotificationReplyAbandonedOutcome.Success, store.abandonedOutcome("abandoned"))
+    }
+
+    private fun boundary(
+        timelineAt: ULong,
+        messageIdHex: String,
+    ): NotificationReplyRecoveryBoundary {
+        val hex =
+            messageIdHex
+                .hashCode()
+                .toUInt()
+                .toString(16)
+                .padStart(8, '0')
+        return NotificationReplyRecoveryBoundary(timelineAt, hex.repeat(8))
     }
 
     private class FakeSharedPreferences : SharedPreferences {
@@ -46,14 +236,20 @@ class NotificationReplyCompletionStoreTest {
         override fun getLong(
             key: String?,
             defValue: Long,
-        ): Long = values[key] as? Long ?: defValue
+        ): Long {
+            val value = values[key] ?: return defValue
+            return value as? Long ?: throw ClassCastException("value for $key is not a Long")
+        }
 
         override fun edit(): SharedPreferences.Editor = FakeEditor()
 
         override fun getString(
             key: String?,
             defValue: String?,
-        ): String? = values[key] as? String ?: defValue
+        ): String? {
+            val value = values[key] ?: return defValue
+            return value as? String ?: throw ClassCastException("value for $key is not a String")
+        }
 
         override fun getStringSet(
             key: String?,
@@ -118,7 +314,10 @@ class NotificationReplyCompletionStoreTest {
             override fun putString(
                 key: String?,
                 value: String?,
-            ): SharedPreferences.Editor = this
+            ): SharedPreferences.Editor {
+                if (key != null) updates[key] = value
+                return this
+            }
 
             override fun putStringSet(
                 key: String?,
