@@ -45,6 +45,9 @@ enum class NotificationChannelSpec(
 
     /** Welcomes and group-join events. High importance so an invite heads-up. */
     INVITES("invites_v2", ChannelImportance.HIGH),
+
+    /** Zapstore app-update availability notices. Low importance: visible, no buzz. */
+    APP_UPDATES("app_updates_v1", ChannelImportance.LOW),
     ;
 
     companion object {

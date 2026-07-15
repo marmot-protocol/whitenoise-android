@@ -4,6 +4,7 @@ import android.app.Application
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.updates.AppUpdateWorker
 
 class WhiteNoiseApplication : Application() {
     val appState: WhiteNoiseAppState by lazy {
@@ -17,5 +18,6 @@ class WhiteNoiseApplication : Application() {
         // conversations (#745). KEEP-policy unique work, so this just ensures
         // the schedule exists without resetting an already-running cadence.
         DisappearingMessageSweepWorker.schedule(this)
+        AppUpdateWorker.schedule(this)
     }
 }

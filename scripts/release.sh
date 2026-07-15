@@ -130,9 +130,11 @@ else
 fi
 
 flavor_task_name() {
+  # Release APKs are the direct-distribution (Zapstore) channel, so each
+  # environment flavor combines with the zapstore distribution flavor.
   case "$1" in
-    production) printf 'Production' ;;
-    staging) printf 'Staging' ;;
+    production) printf 'ProductionZapstore' ;;
+    staging) printf 'StagingZapstore' ;;
     *) return 1 ;;
   esac
 }
@@ -279,8 +281,8 @@ selected_apks=()
 
 for flavor in "${BUILD_FLAVORS[@]}"; do
   flavor_task="$(flavor_task_name "$flavor")"
-  APK_DIR="$REPO_DIR/app/build/outputs/apk/$flavor/release"
-  INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/$flavor/release"
+  APK_DIR="$REPO_DIR/app/build/outputs/apk/${flavor}Zapstore/release"
+  INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/${flavor}Zapstore/release"
   mkdir -p "$APK_DIR"
 
   if [[ -n "$TARGET_ABI" ]]; then
@@ -327,7 +329,7 @@ done
 echo ""
 echo "==> Release APKs:"
 for flavor in "${BUILD_FLAVORS[@]}"; do
-  APK_DIR="$REPO_DIR/app/build/outputs/apk/$flavor/release"
+  APK_DIR="$REPO_DIR/app/build/outputs/apk/${flavor}Zapstore/release"
   if compgen -G "$APK_DIR/*.apk" >/dev/null; then
     ls -lh "$APK_DIR"/*.apk
   fi

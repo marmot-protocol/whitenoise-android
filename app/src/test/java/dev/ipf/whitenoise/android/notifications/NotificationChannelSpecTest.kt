@@ -126,6 +126,7 @@ class NotificationChannelSpecTest {
         assertEquals("mentions", NotificationChannelSpec.MENTIONS.id)
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
+        assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 
     private fun update(

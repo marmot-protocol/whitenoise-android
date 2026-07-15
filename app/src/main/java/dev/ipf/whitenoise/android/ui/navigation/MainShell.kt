@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -40,6 +41,8 @@ internal fun MainShell(
     appState: WhiteNoiseAppState,
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundAppUpdateTap: Int = 0,
+    onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -254,6 +257,21 @@ internal fun MainShell(
                 onNotificationTargetHandled(target)
             }
         }
+    }
+
+    // A tapped app-update notification lands here: drop any open conversation /
+    // deep settings nav, return to the chat list, and surface the update banner.
+    LaunchedEffect(inboundAppUpdateTap, appState.phase) {
+        val tap = inboundAppUpdateTap
+        if (tap == 0 || appState.phase != AppPhase.Ready) return@LaunchedEffect
+        sectionName = MainSection.Chats.name
+        settingsDetailName = null
+        selectedChat = null
+        selectedChatFocusMessageId = null
+        selectedChatJustCreated = false
+        routingNotification = false
+        appState.showAppUpdateBannerFromNotification()
+        onAppUpdateTapHandled(tap)
     }
 
     // One-shot restore after process death: once the chat list for the active
