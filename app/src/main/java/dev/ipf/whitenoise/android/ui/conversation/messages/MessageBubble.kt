@@ -135,10 +135,12 @@ import kotlin.math.roundToInt
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
+    invalidated: Boolean = false,
 ): BorderStroke? {
     val amoledAccent = amoledMessageBubbleAccentColor(mine)
     return when {
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        invalidated -> null
         amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
         else -> null
     }
@@ -1357,7 +1359,7 @@ internal fun MessageBubble(
                             Surface(
                                 color = bubbleColor,
                                 shape = RoundedCornerShape(18.dp),
-                                border = messageBubbleBorder(highlighted, mine),
+                                border = messageBubbleBorder(highlighted, mine, invalidated),
                                 tonalElevation = if (mine) 1.dp else 0.dp,
                             ) {
                                 Column(
@@ -1386,7 +1388,7 @@ internal fun MessageBubble(
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         color = bubbleColor,
                         shape = RoundedCornerShape(18.dp),
-                        border = messageBubbleBorder(highlighted, mine),
+                        border = messageBubbleBorder(highlighted, mine, invalidated),
                         tonalElevation = if (mine) 1.dp else 0.dp,
                     ) {
                         Column(

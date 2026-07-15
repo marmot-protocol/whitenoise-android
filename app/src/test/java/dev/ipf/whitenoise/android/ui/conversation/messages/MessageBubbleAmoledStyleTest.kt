@@ -64,6 +64,51 @@ class MessageBubbleAmoledStyleTest {
     }
 
     @Test
+    fun amoledInvalidatedBubbleSuppressesDirectionalAccent() {
+        var sentBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
+        var receivedBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
+        var timestamp = Color.Unspecified
+        var expectedTimestamp = Color.Unspecified
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val invalidatedSentBorder =
+                    messageBubbleBorder(
+                        highlighted = false,
+                        mine = true,
+                        invalidated = true,
+                    )
+                val invalidatedReceivedBorder =
+                    messageBubbleBorder(
+                        highlighted = false,
+                        mine = false,
+                        invalidated = true,
+                    )
+                val invalidatedTimestamp =
+                    messageBubbleTimestampColor(
+                        invalidated = true,
+                        mine = true,
+                        deleted = false,
+                    )
+                val expected = MaterialTheme.colorScheme.onErrorContainer
+
+                SideEffect {
+                    sentBorder = invalidatedSentBorder
+                    receivedBorder = invalidatedReceivedBorder
+                    timestamp = invalidatedTimestamp
+                    expectedTimestamp = expected
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertNull(sentBorder)
+            assertNull(receivedBorder)
+            assertEquals(expectedTimestamp, timestamp)
+        }
+    }
+
+    @Test
     fun standardDarkBubbleChromeKeepsExistingStyling() {
         var sentBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
         var receivedBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
