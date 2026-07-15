@@ -264,7 +264,6 @@ class LocalNotificationPresenter(
                 .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
                 .setCategory(decision.category)
                 .setPriority(decision.importance.toCompatPriority())
-                .setWhen(update.timestampMs)
                 .setShowWhen(true)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(false)
@@ -392,14 +391,16 @@ class LocalNotificationPresenter(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
                     )
+                    val presentationTimestampMs = System.currentTimeMillis()
+                    builder.setWhen(presentationTimestampMs)
                     builder.setStyle(
                         messagingStyle(
-                            update,
                             notificationContent,
                             messaging.conversationTitleOverride,
                             decision.historyCap,
                             carried,
                             messaging.sender,
+                            presentationTimestampMs,
                         ),
                     )
                     val notification = builder.build()
@@ -415,6 +416,7 @@ class LocalNotificationPresenter(
                     notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
                 }
             } else {
+                builder.setWhen(System.currentTimeMillis())
                 val notification = builder.build()
                 if (decision.replaceExistingBeforePost) {
                     notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
@@ -550,12 +552,12 @@ class LocalNotificationPresenter(
     // existing card, and MessagingStyle appends the new line to the previous
     // ones it carried — so five messages read as one entry, not five alerts.
     private fun messagingStyle(
-        update: NotificationUpdateFfi,
         content: LocalNotificationContent,
         conversationTitleOverride: String?,
         historyCap: Int,
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
+        newMessageTimestampMs: Long,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -572,7 +574,7 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        style.addMessage(content.body, update.timestampMs, sender)
+        style.addMessage(content.body, newMessageTimestampMs, sender)
         return style
     }
 

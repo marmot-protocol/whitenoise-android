@@ -1,10 +1,13 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.ColorUtils
@@ -12,6 +15,7 @@ import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -160,6 +164,84 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun freshMessageUsesPresentationTimeNotStaleFfiTimestamp() {
+        presenter.ensureChannels()
+        val staleFfiTimestampMs = 1_000L
+        val beforePostMs = System.currentTimeMillis()
+
+        val posted =
+            runBlocking {
+                presenter.show(
+                    update(isMention = false, timestampMs = staleFfiTimestampMs),
+                    previewTextOverride = "hi",
+                )
+            }
+        val afterPostMs = System.currentTimeMillis()
+
+        assertTrue(posted)
+        val notification = manager.activeNotifications.single().notification
+        assertTrue(
+            "Notification.when must not use the stale FFI timestamp",
+            notification.`when` != staleFfiTimestampMs,
+        )
+        assertTrue(
+            "Notification.when must be sampled at post time",
+            notification.`when` in beforePostMs..afterPostMs,
+        )
+        val newestMessage =
+            checkNotNull(
+                NotificationCompat.MessagingStyle
+                    .extractMessagingStyleFromNotification(notification)
+                    ?.messages
+                    ?.last(),
+            )
+        assertEquals(
+            "New MessagingStyle line must use the same presentation time as Notification.when",
+            notification.`when`,
+            newestMessage.timestamp,
+        )
+        assertEquals(
+            "New MessagingStyle line must use the same presentation time as Notification.when",
+            notification.`when`,
+            newestMessage.timestamp,
+        )
+    }
+
+    @Test
+    fun bundledHistoryPreservesCarriedMessageTimestamps() {
+        presenter.ensureChannels()
+        val conversation = LocalNotificationFormatter.conversationDismissalKey("account-a", "group-a")
+        val carriedTimestampMs = 2_000_000L
+        val staleFfiTimestampMs = 1_000L
+        manager.notify(
+            conversation.tag,
+            conversation.id,
+            carriedMessagingNotification("older line" to carriedTimestampMs),
+        )
+        val beforePostMs = System.currentTimeMillis()
+
+        val posted =
+            runBlocking {
+                presenter.show(
+                    update(isMention = false, timestampMs = staleFfiTimestampMs),
+                    previewTextOverride = "new line",
+                )
+            }
+        val afterPostMs = System.currentTimeMillis()
+
+        assertTrue(posted)
+        val notification = manager.activeNotifications.single().notification
+        val messages =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification),
+            ).messages
+        assertEquals(2, messages.size)
+        assertEquals(carriedTimestampMs, messages.first().timestamp)
+        assertTrue(messages.last().timestamp in beforePostMs..afterPostMs)
+        assertEquals(notification.`when`, messages.last().timestamp)
+    }
+
+    @Test
     fun monogramBackgroundMaintainsReadableContrastWithWhiteInitials() {
         val brightestHueSeed = "gk" // Java hash 3300 -> hue 60 (yellow).
 
@@ -171,26 +253,40 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
-    private fun update(isMention: Boolean) =
-        NotificationUpdateFfi(
-            notificationKey = "key",
-            conversationKey = "conversation",
-            trigger = NotificationTriggerFfi.NEW_MESSAGE,
-            accountRef = "account-a",
-            accountIdHex = "account-a",
-            groupIdHex = "group-a",
-            groupName = "General",
-            isDm = false,
-            isMention = isMention,
-            messageIdHex = "message",
-            sender = user(displayName = "Alice"),
-            receiver = user(accountIdHex = "self", displayName = "Me"),
-            previewText = "hi",
-            reactionEmoji = null,
-            reactedToPreview = null,
-            timestampMs = 1234,
-            isFromSelf = false,
-        )
+    private fun carriedMessagingNotification(vararg lines: Pair<String, Long>): Notification {
+        val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
+        lines.forEach { (text, timestampMs) ->
+            style.addMessage(text, timestampMs, Person.Builder().setName("Alice").build())
+        }
+        return NotificationCompat
+            .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+            .setStyle(style)
+            .build()
+    }
+
+    private fun update(
+        isMention: Boolean,
+        timestampMs: Long = 1234,
+    ) = NotificationUpdateFfi(
+        notificationKey = "key",
+        conversationKey = "conversation",
+        trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        accountRef = "account-a",
+        accountIdHex = "account-a",
+        groupIdHex = "group-a",
+        groupName = "General",
+        isDm = false,
+        isMention = isMention,
+        messageIdHex = "message",
+        sender = user(displayName = "Alice"),
+        receiver = user(accountIdHex = "self", displayName = "Me"),
+        previewText = "hi",
+        reactionEmoji = null,
+        reactedToPreview = null,
+        timestampMs = timestampMs,
+        isFromSelf = false,
+    )
 
     private fun user(
         accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
