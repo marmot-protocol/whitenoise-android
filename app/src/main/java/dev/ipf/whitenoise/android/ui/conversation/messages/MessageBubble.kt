@@ -35,6 +35,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -45,18 +47,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,6 +70,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -247,6 +254,9 @@ internal fun MessageBubble(
     composerTextState: ComposerTextState,
     highlighted: Boolean,
     selectionMode: Boolean,
+    textSelectionMode: Boolean,
+    onTextSelectionModeChange: (Boolean) -> Unit,
+    onTextSelectionBoundsChange: (Rect?) -> Unit,
     batchSelectable: Boolean,
     selected: Boolean,
     onToggleSelection: () -> Unit,
@@ -331,12 +341,11 @@ internal fun MessageBubble(
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
     val scope = rememberCoroutineScope()
-    // Window-space y of the long-press touch so the action popover can anchor
-    // near the finger on a bubble taller than the screen instead of
-    // degenerating to the visible bubble top (#326). Window space (not
-    // row-local) so the menu can offset against its own anchor regardless of
-    // where in the transcript the bubble sits.
+    // Window-space position of the long-press touch. The y component anchors
+    // the action popover; the full point seeds partial text selection (#1370).
+    var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
+    var rowBoundsLeftPx by remember { mutableStateOf(0f) }
     var rowBoundsTopPx by remember { mutableStateOf(0f) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
@@ -346,6 +355,67 @@ internal fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
+    val messageTextSelectionState = rememberSelectionState()
+    val selectableTextLayouts =
+        remember(record.messageIdHex) { mutableStateMapOf<Any, SelectableTextLayout>() }
+    var textSelectionSeeded by remember(record.messageIdHex) { mutableStateOf(false) }
+    val plainTextLayoutKey = remember(record.messageIdHex) { Any() }
+    val plainTextLayoutTracker = remember(record.messageIdHex) { SelectableTextLayoutTracker() }
+    val textSelectionClipboard =
+        rememberExitOnCopyClipboard { onTextSelectionModeChange(false) }
+    val selectableTextLayoutReporter =
+        remember(textSelectionMode, record.messageIdHex) {
+            { key: Any, layoutResult: TextLayoutResult?, coordinates: androidx.compose.ui.layout.LayoutCoordinates? ->
+                if (textSelectionMode && layoutResult != null && coordinates != null) {
+                    selectableTextLayouts[key] = SelectableTextLayout(key, layoutResult, coordinates)
+                } else {
+                    selectableTextLayouts.remove(key)
+                }
+                Unit
+            }
+        }
+    val selectableTextLayoutSnapshot = selectableTextLayouts.values.toList()
+    LaunchedEffect(textSelectionMode, selectableTextLayoutSnapshot, longPressWindowPosition) {
+        if (!textSelectionMode || textSelectionSeeded || selectableTextLayoutSnapshot.isEmpty()) return@LaunchedEffect
+        // Let every Markdown Text leaf report in this frame before calculating
+        // the global selection offset across the SelectionContainer.
+        withFrameNanos { }
+        textSelectionSeedRange(selectableTextLayouts.values, longPressWindowPosition)?.let { range ->
+            messageTextSelectionState.select(range)
+            textSelectionSeeded = true
+        }
+    }
+    LaunchedEffect(textSelectionMode) {
+        if (!textSelectionMode) {
+            selectableTextLayouts.clear()
+            textSelectionSeeded = false
+            onTextSelectionBoundsChange(null)
+        }
+    }
+
+    fun reportPlainTextLayoutIfReady() {
+        if (!textSelectionMode) return
+        val layoutResult = plainTextLayoutTracker.layoutResult ?: return
+        val coordinates = plainTextLayoutTracker.coordinates ?: return
+        selectableTextLayouts[plainTextLayoutKey] =
+            SelectableTextLayout(plainTextLayoutKey, layoutResult, coordinates)
+    }
+
+    val plainTextSelectionModifier =
+        if (textSelectionMode) {
+            Modifier.onGloballyPositioned { coordinates ->
+                plainTextLayoutTracker.coordinates = coordinates
+                reportPlainTextLayoutIfReady()
+            }
+        } else {
+            Modifier
+        }
+    val textSelectionBoundsModifier =
+        if (textSelectionMode) {
+            Modifier.onGloballyPositioned { onTextSelectionBoundsChange(it.boundsInWindow()) }
+        } else {
+            Modifier
+        }
     val deletedBodyText = stringResource(R.string.message_deleted)
     val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
@@ -423,6 +493,7 @@ internal fun MessageBubble(
     LaunchedEffect(deleted) {
         if (deleted) {
             onActionMenuOpenChange(false)
+            onTextSelectionModeChange(false)
             emojiPickerOpen = false
             reactionSheetOpen = false
         }
@@ -433,6 +504,7 @@ internal fun MessageBubble(
     LaunchedEffect(selectionMode) {
         if (selectionMode) {
             onActionMenuOpenChange(false)
+            onTextSelectionModeChange(false)
             forwardSheetOpen = false
             infoSheetOpen = false
             moderatorDeleteConfirmationOpen = false
@@ -479,6 +551,13 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    fun beginTextSelection() {
+        selectableTextLayouts.clear()
+        textSelectionSeeded = false
+        onActionMenuOpenChange(false)
+        onTextSelectionModeChange(true)
+    }
+
     fun beginForward() {
         // Defensive: the menu only renders Forward when forwardBody != null, but
         // gate here too so a stale tap can never open the picker for a non-text
@@ -512,7 +591,7 @@ internal fun MessageBubble(
                     .then(
                         // A deleted or selection-mode message has no actionable
                         // reply gesture; taps are owned by the selection overlay.
-                        if (deleted || readOnly || selectionMode) {
+                        if (deleted || readOnly || selectionMode || textSelectionMode) {
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
@@ -548,9 +627,9 @@ internal fun MessageBubble(
                         // the gesture and opens the actions menu. It self-cancels
                         // on movement beyond touch slop, so swipe-to-reply above
                         // is unaffected.
-                        if (deleted || selectionMode) {
-                            // A deleted message has no actions menu; selection mode
-                            // routes the entire row through its overlay instead.
+                        if (deleted || selectionMode || textSelectionMode) {
+                            // A deleted message has no actions menu; batch selection
+                            // and text selection route the row through their own UI.
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex) {
@@ -559,10 +638,15 @@ internal fun MessageBubble(
                                     val longPress = awaitLongPressOrCancellation(down.id)
                                     if (longPress != null) {
                                         longPress.consume()
-                                        // Capture the press y in window space before
-                                        // opening so the popover anchors at the
-                                        // finger, not the bubble top (#326).
-                                        longPressWindowY = rowBoundsTopPx + longPress.position.y
+                                        // Capture the press in window space before
+                                        // opening so both the popover and text
+                                        // selection seed at the finger (#326, #1370).
+                                        longPressWindowPosition =
+                                            Offset(
+                                                rowBoundsLeftPx + longPress.position.x,
+                                                rowBoundsTopPx + longPress.position.y,
+                                            )
+                                        longPressWindowY = longPressWindowPosition?.y
                                         haptics.performHapticFeedback(
                                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                         )
@@ -581,14 +665,15 @@ internal fun MessageBubble(
                         // Re-publish that action via Modifier.semantics so the
                         // reply/copy/delete/reaction entry point stays reachable
                         // without a hold gesture. Guarded by `!deleted` and
-                        // disabled while the row's selection overlay owns taps.
-                        if (deleted || selectionMode) {
+                        // disabled while batch/text selection owns the row.
+                        if (deleted || selectionMode || textSelectionMode) {
                             Modifier
                         } else {
                             Modifier.semantics {
                                 onLongClick(label = messageActionsLabel) {
                                     // Accessibility entry has no touch point;
-                                    // anchor to the bubble top (#326).
+                                    // anchor to the bubble top and seed the first word.
+                                    longPressWindowPosition = null
                                     longPressWindowY = null
                                     onActionMenuOpenChange(true)
                                     true
@@ -596,9 +681,13 @@ internal fun MessageBubble(
                             }
                         },
                     )
-                    // Window-space top of the row, added to the local press y so
-                    // the popover can be offset against the menu's own anchor (#326).
-                    .onGloballyPositioned { rowBoundsTopPx = it.boundsInWindow().top },
+                    // Window-space row bounds, added to the local press so the
+                    // popover and text-selection seed use the same coordinates.
+                    .onGloballyPositioned {
+                        val bounds = it.boundsInWindow()
+                        rowBoundsLeftPx = bounds.left
+                        rowBoundsTopPx = bounds.top
+                    },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             if (showSenderAvatar) {
@@ -606,7 +695,7 @@ internal fun MessageBubble(
                     modifier =
                         Modifier
                             .clip(CircleShape)
-                            .clickable { appState.presentProfile(appState.npub(record.sender)) },
+                            .clickable(enabled = !textSelectionMode) { appState.presentProfile(appState.npub(record.sender)) },
                 ) {
                     Avatar(
                         title = appState.displayName(record.sender),
@@ -846,9 +935,10 @@ internal fun MessageBubble(
                 // long-click path. Hoisted so every media call site shares one
                 // definition.
                 val onMediaLongPress =
-                    remember(selectionMode, onActionMenuOpenChange) {
+                    remember(textSelectionMode, selectionMode, onActionMenuOpenChange) {
                         {
-                            if (!selectionMode) {
+                            if (!selectionMode && !textSelectionMode) {
+                                longPressWindowPosition = null
                                 longPressWindowY = null
                                 onActionMenuOpenChange(true)
                             }
@@ -1080,6 +1170,11 @@ internal fun MessageBubble(
                 // outside the bubble and retain the page's surface foreground.
                 val timestampColor =
                     if (bodyTextToRender != null) bubbleContentColor else colorScheme.onSurfaceVariant
+                LaunchedEffect(textSelectionMode, bodyTextToRender) {
+                    if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
+                        onTextSelectionModeChange(false)
+                    }
+                }
                 val editedLabel =
                     if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
                         if (editState.count > 1) {
@@ -1097,7 +1192,12 @@ internal fun MessageBubble(
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,
                         editedLabel = editedLabel,
-                        onEditedClick = if (editState != null) ({ editHistoryOpen = true }) else null,
+                        onEditedClick =
+                            if (editState != null && !textSelectionMode) {
+                                { editHistoryOpen = true }
+                            } else {
+                                null
+                            },
                     )
                 }
                 // Last-line geometry of the body so the footer can sit on
@@ -1122,7 +1222,8 @@ internal fun MessageBubble(
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
-                val collapsible = collapseLongMessages && !deleted && !invalidated
+                val collapsible =
+                    collapseLongMessages && !deleted && !invalidated && !textSelectionMode
                 val readMoreLabel = stringResource(R.string.message_read_more)
                 val readMoreStyle =
                     SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
@@ -1225,6 +1326,8 @@ internal fun MessageBubble(
                                                 { bech32: String -> appState.presentNostrProfile(bech32) }
                                             },
                                         onLastTextLayout = { lastLineLayout = it },
+                                        onSelectableTextLayoutChanged =
+                                            if (textSelectionMode) selectableTextLayoutReporter else null,
                                     )
                                 }
                             } else if (plainTextOverflows) {
@@ -1244,20 +1347,39 @@ internal fun MessageBubble(
                                 Text(
                                     clippedText,
                                     style = MaterialTheme.typography.bodyLarge,
+                                    modifier = plainTextSelectionModifier,
                                     // Footer geometry follows the clipped text's
                                     // real last line, not the full measurement.
-                                    onTextLayout = { lastLineLayout = it },
+                                    onTextLayout = {
+                                        lastLineLayout = it
+                                        plainTextLayoutTracker.layoutResult = it
+                                        reportPlainTextLayoutIfReady()
+                                    },
                                 )
                             } else {
                                 Text(
                                     bodyTextToRender,
                                     style = MaterialTheme.typography.bodyLarge,
+                                    modifier = plainTextSelectionModifier,
                                     maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
                                     onTextLayout = {
                                         lastLineLayout = it
                                         bodyFullLayout = it
+                                        plainTextLayoutTracker.layoutResult = it
+                                        reportPlainTextLayoutIfReady()
                                     },
                                 )
+                            }
+                        }
+                        val selectableMessageBody: @Composable () -> Unit = {
+                            if (textSelectionMode) {
+                                CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
+                                    SelectionContainer(state = messageTextSelectionState) {
+                                        messageBody()
+                                    }
+                                }
+                            } else {
+                                messageBody()
                             }
                         }
                         val readMoreFooter: @Composable () -> Unit = {
@@ -1286,7 +1408,7 @@ internal fun MessageBubble(
                                 footer = inlineFooter,
                                 modifier = bodyModifier,
                             ) {
-                                messageBody()
+                                selectableMessageBody()
                             }
                         } else {
                             BubbleFooterLayout(
@@ -1297,7 +1419,7 @@ internal fun MessageBubble(
                                         if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
                                     },
                             ) {
-                                messageBody()
+                                selectableMessageBody()
                             }
                         }
                     } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
@@ -1312,6 +1434,7 @@ internal fun MessageBubble(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             IconButton(
+                                enabled = !textSelectionMode,
                                 onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
                                 modifier = Modifier.size(24.dp),
                             ) {
@@ -1323,6 +1446,7 @@ internal fun MessageBubble(
                                 )
                             }
                             IconButton(
+                                enabled = !textSelectionMode,
                                 onClick = { controller.discardFailedSend(item) },
                                 modifier = Modifier.size(24.dp),
                             ) {
@@ -1352,9 +1476,11 @@ internal fun MessageBubble(
                                 },
                             modifier =
                                 Modifier.combinedClickable(
+                                    enabled = !textSelectionMode,
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                                     onLongClick = {
-                                        if (!deleted && !selectionMode) {
+                                        if (!deleted && !selectionMode && !textSelectionMode) {
+                                            longPressWindowPosition = null
                                             longPressWindowY = null
                                             onActionMenuOpenChange(true)
                                         }
@@ -1374,7 +1500,9 @@ internal fun MessageBubble(
                             isOwn = isOwnReplySender(preview.sender, appState),
                             body = preview.body,
                             mediaKind = preview.mediaKind,
-                            onClick = { onReplyPreviewClick(item) },
+                            onClick = {
+                                if (!textSelectionMode) onReplyPreviewClick(item)
+                            },
                             onDismiss = null,
                             // Fill the content width: in the text bubble the
                             // column is sized to its widest child (IntrinsicSize.Max
@@ -1417,6 +1545,7 @@ internal fun MessageBubble(
                                 invalidated = invalidated,
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
+                                modifier = textSelectionBoundsModifier,
                             ) {
                                 bodyFooterAndRetry()
                             }
@@ -1435,7 +1564,8 @@ internal fun MessageBubble(
                         // Surface keeps only the visual slide driven by swipeDrag.
                         modifier =
                             Modifier
-                                .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
+                                .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
+                                .then(textSelectionBoundsModifier),
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
@@ -1456,9 +1586,9 @@ internal fun MessageBubble(
                     }
                 }
                 MessageActionMenu(
-                    // Never render the menu for a deleted message or while the
-                    // selection overlay owns every row interaction.
-                    expanded = isActionMenuOpen && !deleted && !selectionMode,
+                    // Never render the menu for a deleted message or while batch
+                    // or partial text selection owns the row interaction.
+                    expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
                     anchorWindowYPx = longPressWindowY,
                     alignEnd = mine,
                     canReply = !readOnly,
@@ -1468,6 +1598,7 @@ internal fun MessageBubble(
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !readOnly && forwardBody != null,
                     canSelect = !readOnly && batchSelectable,
+                    canCopyText = !bodyTextToRender.isNullOrBlank(),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -1488,6 +1619,7 @@ internal fun MessageBubble(
                         controller.editingMessageId = record.messageIdHex
                     },
                     onCopyText = ::copyMessageText,
+                    onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
                         onActionMenuOpenChange(false)

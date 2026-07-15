@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,8 +81,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -353,6 +359,16 @@ internal fun ConversationScreen(
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
     var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
+    // Partial text selection is independent from batch message selection. Only
+    // one bubble can own the native SelectionContainer at a time.
+    var textSelectionMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var textSelectionBubbleBounds by remember(chat.id) { mutableStateOf<Rect?>(null) }
+    var transcriptCoordinates by remember(chat.id) { mutableStateOf<LayoutCoordinates?>(null) }
+
+    fun clearTextSelection() {
+        textSelectionMessageId = null
+        textSelectionBubbleBounds = null
+    }
     // Selection is conversation-owned because the contextual top bar, back
     // handling, forwarding sheet, and rows all consume the same stable ids.
     // Each value snapshots the record/action projection so cap-trimmed rows stay
@@ -510,6 +526,9 @@ internal fun ConversationScreen(
         }
     }
     val selectionMode = selectedMessages.isNotEmpty()
+    LaunchedEffect(selectionMode) {
+        if (selectionMode) clearTextSelection()
+    }
     val selectedSelections by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
             derivedStateOf { orderedBatchSelections(selectedMessages.values) }
@@ -1771,9 +1790,11 @@ internal fun ConversationScreen(
         preSearchScrollAnchor = null
     }
 
-    // Back exits selection first, then search, before leaving the conversation.
+    // Back exits partial text selection, then batch selection, then search,
+    // before leaving the conversation.
     BackHandler {
         when {
+            textSelectionMessageId != null -> clearTextSelection()
             selectionMode -> {
                 openActionMenuId = null
                 selectedMessages.clear()
@@ -2724,7 +2745,38 @@ internal fun ConversationScreen(
                     }
                 }
                 else ->
-                    Box(Modifier.fillMaxSize()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .onGloballyPositioned { transcriptCoordinates = it }
+                                .pointerInput(textSelectionMessageId, textSelectionBubbleBounds) {
+                                    if (textSelectionMessageId == null) return@pointerInput
+                                    awaitEachGesture {
+                                        val down =
+                                            awaitFirstDown(
+                                                requireUnconsumed = false,
+                                                pass = PointerEventPass.Initial,
+                                            )
+                                        var moved = false
+                                        while (true) {
+                                            val event = awaitPointerEvent(PointerEventPass.Final)
+                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                                moved = true
+                                            }
+                                            if (!change.pressed) {
+                                                val bounds = textSelectionBubbleBounds
+                                                val windowPosition = transcriptCoordinates?.localToWindow(down.position)
+                                                if (!moved && bounds != null && windowPosition != null && !bounds.contains(windowPosition)) {
+                                                    clearTextSelection()
+                                                }
+                                                break
+                                            }
+                                        }
+                                    }
+                                },
+                    ) {
                         LazyColumn(
                             state = listState,
                             modifier =
@@ -2840,6 +2892,22 @@ internal fun ConversationScreen(
                                         composerTextState = composerTextState,
                                         highlighted = item.record.messageIdHex == highlightedMessageId,
                                         selectionMode = selectionMode,
+                                        textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
+                                        onTextSelectionModeChange = { enabled ->
+                                            val messageId = item.record.messageIdHex
+                                            if (enabled) {
+                                                openActionMenuId = null
+                                                textSelectionMessageId = messageId
+                                                textSelectionBubbleBounds = null
+                                            } else if (textSelectionMessageId == messageId) {
+                                                clearTextSelection()
+                                            }
+                                        },
+                                        onTextSelectionBoundsChange = { bounds ->
+                                            if (textSelectionMessageId == item.record.messageIdHex) {
+                                                textSelectionBubbleBounds = bounds
+                                            }
+                                        },
                                         batchSelectable = item.record.messageIdHex in selectableMessages,
                                         selected = selectedMessages.containsKey(item.record.messageIdHex),
                                         onToggleSelection = {
@@ -2853,6 +2921,7 @@ internal fun ConversationScreen(
                                         quickReactionEmojis = quickReactionEmojis,
                                         isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
                                         onActionMenuOpenChange = { open ->
+                                            if (open) clearTextSelection()
                                             openActionMenuId = if (open) item.record.messageIdHex else null
                                         },
                                         // Lambdas, not method references: the Compose

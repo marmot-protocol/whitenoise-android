@@ -251,6 +251,7 @@
     <string name="waiting_for_stream">En attente du flux...</string>
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
+    <string name="select_text">Sélectionner le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
     <string name="show_keyboard">Afficher le clavier</string>
     <string name="emoji_backspace">Supprimer l’émoji</string>

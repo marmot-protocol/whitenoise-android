@@ -263,6 +263,7 @@
     <string name="waiting_for_stream">Ожидание потока...</string>
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
+    <string name="select_text">Выбрать текст</string>
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
     <string name="show_keyboard">Показать клавиатуру</string>
     <string name="emoji_backspace">Удалить эмодзи</string>
