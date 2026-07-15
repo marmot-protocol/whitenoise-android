@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -88,10 +89,33 @@ class ChatRowPreviewMarkdownSourceTest {
         assertNull(chatRowPreviewMarkdownSource(rowWith(lastMessage = null)))
     }
 
+    @Test
+    fun captionlessMediaRowRequestsTypedFallbackResolve() {
+        assertEquals("message-1", chatRowNeedsMediaKindResolve(rowWith(plaintext = "")))
+    }
+
+    @Test
+    fun stickerRowNeverRequestsMediaFallbackResolve() {
+        assertNull(
+            chatRowNeedsMediaKindResolve(
+                rowWith(
+                    plaintext = "",
+                    sticker =
+                        StickerRefFfi(
+                            packCoordinate = "30031:author:cats",
+                            shortcode = "cat",
+                            plaintextSha256 = "a".repeat(64),
+                        ),
+                ),
+            ),
+        )
+    }
+
     private fun rowWith(
         kind: ULong = 9uL,
         plaintext: String = "body",
         deleted: Boolean = false,
+        sticker: StickerRefFfi? = null,
         lastMessage: ChatListMessagePreviewFfi? =
             ChatListMessagePreviewFfi(
                 messageIdHex = "message-1",
@@ -100,6 +124,7 @@ class ChatRowPreviewMarkdownSourceTest {
                 plaintext = plaintext,
                 contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = kind,
+                sticker = sticker,
                 timelineAt = 1uL,
                 deleted = deleted,
             ),

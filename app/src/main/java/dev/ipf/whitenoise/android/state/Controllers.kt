@@ -578,6 +578,7 @@ internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
     if (preview.deleted) return null
     if (preview.kind != 9uL) return null
     if (preview.plaintext.isNotBlank()) return null
+    if (preview.sticker != null) return null
     return preview.messageIdHex.takeIf { it.isNotBlank() }
 }
 
@@ -4597,6 +4598,13 @@ class ConversationController(
                 key = key,
                 optimistic = optimistic,
                 timelineOrder = order,
+            )
+            suppressProjectedTimelineItems(
+                unpublishedProjectionIdsMatchingMessage(
+                    timelineRecords = timelineRecords,
+                    message = optimistic,
+                    activeAccountIdHex = conversationAccountIdHex,
+                ),
             )
             publishTimelineFromIndexes()
             appState.present(

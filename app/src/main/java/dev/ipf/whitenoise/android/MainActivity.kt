@@ -141,15 +141,17 @@ class MainActivity : FragmentActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
+        val dataString = intent?.dataString
         val parsedTarget =
             NotificationNavigation.parse(intent) { notificationKey, tapToken ->
                 notificationTapTokens.isValid(notificationKey, tapToken)
             }
-        val stickerInput = if (parsedTarget == null) StickerLinks.classify(intent?.dataString) else null
+        val sensitiveSignalStickerRoute = parsedTarget == null && StickerLinks.isSignalStickerRoute(dataString)
+        val stickerInput = if (parsedTarget == null) StickerLinks.classify(dataString) else null
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
-                dataString = intent?.dataString.takeIf { stickerInput == null },
+                dataString = profilePayloadDataString(dataString, stickerInput, sensitiveSignalStickerRoute),
                 current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
             )
         inboundNotificationTarget = routing.notificationTarget
@@ -161,8 +163,16 @@ class MainActivity : FragmentActivity() {
                 inboundProfilePayload = null
                 inboundStickerInput = stickerInput
             }
+
+            sensitiveSignalStickerRoute -> {
+                // A malformed Signal link can still carry `pack_key`. Drop it
+                // from every retained route even though it cannot be imported.
+                inboundNotificationTarget = null
+                inboundProfilePayload = null
+                inboundStickerInput = null
+            }
         }
-        if (shouldClearInboundActivityIntent(parsedTarget != null, stickerInput)) {
+        if (shouldClearInboundActivityIntent(parsedTarget != null, stickerInput, sensitiveSignalStickerRoute)) {
             // Notification taps are one-shot navigation requests. Replace the
             // stored intent after parsing so activity recreation cannot replay
             // the same target after the UI has already consumed it. This is
@@ -327,7 +337,14 @@ class MainActivity : FragmentActivity() {
 internal fun shouldClearInboundActivityIntent(
     hasNotificationTarget: Boolean,
     stickerInput: StickerInput?,
-): Boolean = hasNotificationTarget || stickerInput != null
+    sensitiveSignalStickerRoute: Boolean = false,
+): Boolean = hasNotificationTarget || stickerInput != null || sensitiveSignalStickerRoute
+
+internal fun profilePayloadDataString(
+    dataString: String?,
+    stickerInput: StickerInput?,
+    sensitiveSignalStickerRoute: Boolean,
+): String? = dataString.takeIf { stickerInput == null && !sensitiveSignalStickerRoute }
 
 internal fun preComposeThemeFor(
     themeMode: AppThemeMode,

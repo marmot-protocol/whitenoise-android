@@ -99,7 +99,10 @@ internal fun MainShell(
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
-    var pendingStickerInput by remember { mutableStateOf<StickerInput?>(null) }
+    // A Signal import carries its decryption key in this short-lived value.
+    // Key it to the active account so an account switch destroys the pending
+    // input before the Settings surface for the new account can consume it.
+    var pendingStickerInput by remember(appState.activeAccountRef) { mutableStateOf<StickerInput?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }

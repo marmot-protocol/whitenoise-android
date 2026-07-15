@@ -28,6 +28,20 @@ object StickerLinks {
         return null
     }
 
+    /**
+     * Whether Android routed this URI through the Signal sticker intent
+     * filter. This deliberately accepts malformed/incomplete links that
+     * [classify] rejects: their fragments may still contain `pack_key`, so the
+     * Activity must scrub them instead of treating them as profile payloads.
+     */
+    fun isSignalStickerRoute(raw: String?): Boolean {
+        val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        val uri = parseUri(value) ?: return false
+        return uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host.equals("signal.art", ignoreCase = true) &&
+            uri.path?.trimEnd('/') == "/addstickers"
+    }
+
     private fun isSignalLink(value: String): Boolean {
         val uri = parseUri(value) ?: return false
         if (!uri.scheme.equals("https", ignoreCase = true)) return false
