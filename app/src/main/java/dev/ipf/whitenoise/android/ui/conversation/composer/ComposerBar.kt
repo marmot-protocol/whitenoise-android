@@ -196,6 +196,24 @@ internal fun insertComposerEmoji(
     return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
 }
 
+/** Deletes the selected range, or the code point before a clamped caret. */
+internal fun deleteComposerSelectionOrPreviousCodePoint(value: TextFieldValue): TextFieldValue? {
+    val text = value.text
+    val selectionStart = value.selection.start.coerceIn(0, text.length)
+    val selectionEnd = value.selection.end.coerceIn(0, text.length)
+    val rangeStart = minOf(selectionStart, selectionEnd)
+    val rangeEnd = maxOf(selectionStart, selectionEnd)
+    val deleteStart =
+        if (rangeStart != rangeEnd) {
+            rangeStart
+        } else {
+            if (rangeStart == 0) return null
+            text.offsetByCodePoints(rangeStart, -1)
+        }
+    val updatedText = text.removeRange(deleteStart, rangeEnd)
+    return value.copy(text = updatedText, selection = TextRange(deleteStart), composition = null)
+}
+
 /**
  * Hoisted composer text state (#1206). Sharing one instance across the main
  * composer and the long-message reader's composer keeps their in-progress text
@@ -603,22 +621,8 @@ internal fun ComposerBar(
     }
 
     fun deleteFromComposer() {
-        val selection = textFieldValue.selection
-        val textValue = textFieldValue.text
-        val deleteStart =
-            when {
-                selection.start != selection.end -> minOf(selection.start, selection.end)
-                selection.start <= 0 -> return
-                else -> textValue.offsetByCodePoints(selection.start, -1)
-            }
-        val deleteEnd =
-            if (selection.start != selection.end) {
-                maxOf(selection.start, selection.end)
-            } else {
-                selection.start
-            }
-        val updatedText = textValue.removeRange(deleteStart, deleteEnd)
-        applyComposerFieldValue(TextFieldValue(updatedText, selection = TextRange(deleteStart)))
+        val updatedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
+        applyComposerFieldValue(updatedValue)
     }
 
     fun openComposerEmojiPane() {

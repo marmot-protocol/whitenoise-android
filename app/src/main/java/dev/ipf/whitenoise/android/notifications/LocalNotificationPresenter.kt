@@ -674,7 +674,11 @@ class LocalNotificationPresenter(
         conversationShortcutId: String,
     ): String? {
         val conversationChannelId = ConversationNotificationChannels.conversationChannelId(parentChannelId, conversationShortcutId)
-        if (conversationChannelId in ensuredConversationChannels) return conversationChannelId
+        if (conversationChannelId in ensuredConversationChannels) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (manager?.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
+            ensuredConversationChannels.remove(conversationChannelId)
+        }
         val created = ConversationNotificationChannels.ensureConversationChannel(context, parentChannelId, conversationShortcutId)
         if (created != null) ensuredConversationChannels.add(created)
         return created

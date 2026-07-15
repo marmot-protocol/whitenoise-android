@@ -10,7 +10,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class AttachmentCachePublicationTest {
     private lateinit var dir: File
@@ -18,6 +21,8 @@ class AttachmentCachePublicationTest {
     @After
     fun tearDown() {
         AttachmentCachePublication.commitAwaiterForTests = null
+        AttachmentCachePublication.renameFileForTests = null
+        AttachmentCachePublication.deleteFileForTests = null
         if (::dir.isInitialized) dir.deleteRecursively()
     }
 
@@ -87,6 +92,86 @@ class AttachmentCachePublicationTest {
 
         assertFalse("an empty payload must not report a published cache file", published)
         assertFalse("an empty payload must not create the final path", finalFile.exists())
+    }
+
+    @Test
+    fun renameIoOnOneStripeDoesNotBlockPermitCaptureOnAnotherStripe() {
+        dir = Files.createTempDirectory("attachment-cache-rename-stripe").toFile()
+        val attachmentKey = AttachmentCachePublication.attachmentKey("rename-source", 0, 1uL)
+        val unrelatedKey = keyOnDifferentStripe(attachmentKey, "rename-other")
+        val finalFile = File(dir, "rename-source.mp4")
+        val permit = AttachmentCachePublication.capturePermit(attachmentKey)!!
+        val renameEntered = CountDownLatch(1)
+        val releaseRename = CountDownLatch(1)
+        AttachmentCachePublication.renameFileForTests = { source, target ->
+            renameEntered.countDown()
+            check(releaseRename.await(5, TimeUnit.SECONDS))
+            source.renameTo(target)
+        }
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val publish =
+                executor.submit<Boolean> {
+                    AttachmentCachePublication.publishWithPermit(
+                        attachmentKey = attachmentKey,
+                        finalFile = finalFile,
+                        bytes = byteArrayOf(1, 2, 3),
+                        permit = permit,
+                    )
+                }
+            assertTrue(renameEntered.await(5, TimeUnit.SECONDS))
+
+            val unrelatedPermit = executor.submit<AttachmentCachePublication.Permit?> { AttachmentCachePublication.capturePermit(unrelatedKey) }
+            assertNotNull(unrelatedPermit.get(1, TimeUnit.SECONDS))
+
+            releaseRename.countDown()
+            assertTrue(publish.get(5, TimeUnit.SECONDS))
+        } finally {
+            releaseRename.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun deleteIoOnOneStripeDoesNotBlockPermitCaptureOnAnotherStripe() {
+        dir = Files.createTempDirectory("attachment-cache-delete-stripe").toFile()
+        val attachmentKey = AttachmentCachePublication.attachmentKey("delete-source", 0, 1uL)
+        val unrelatedKey = keyOnDifferentStripe(attachmentKey, "delete-other")
+        val finalFile = File(dir, "delete-source.mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val deleteEntered = CountDownLatch(1)
+        val releaseDelete = CountDownLatch(1)
+        val deleteCalls = AtomicInteger()
+        AttachmentCachePublication.deleteFileForTests = { file ->
+            if (deleteCalls.incrementAndGet() == 1) {
+                deleteEntered.countDown()
+                check(releaseDelete.await(5, TimeUnit.SECONDS))
+            }
+            file.delete()
+        }
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val invalidation =
+                executor.submit {
+                    runBlocking {
+                        AttachmentCachePublication.invalidateAttachmentCache(
+                            attachmentKey = attachmentKey,
+                            finalFile = finalFile,
+                            evictPlaintext = {},
+                        )
+                    }
+                }
+            assertTrue(deleteEntered.await(5, TimeUnit.SECONDS))
+
+            val unrelatedPermit = executor.submit<AttachmentCachePublication.Permit?> { AttachmentCachePublication.capturePermit(unrelatedKey) }
+            assertNotNull(unrelatedPermit.get(1, TimeUnit.SECONDS))
+
+            releaseDelete.countDown()
+            invalidation.get(5, TimeUnit.SECONDS)
+            assertFalse(finalFile.exists())
+        } finally {
+            releaseDelete.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -365,4 +450,12 @@ class AttachmentCachePublicationTest {
             executor.shutdownNow()
         }
     }
+
+    private fun keyOnDifferentStripe(
+        reference: String,
+        prefix: String,
+    ): String =
+        generateSequence(0) { it + 1 }
+            .map { AttachmentCachePublication.attachmentKey("$prefix-$it", 0, 1uL) }
+            .first { candidate -> (candidate.hashCode() and 63) != (reference.hashCode() and 63) }
 }

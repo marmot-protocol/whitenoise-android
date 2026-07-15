@@ -20,12 +20,24 @@ internal object AttachmentCachePublication {
     private const val STRIPE_COUNT = 64
     private val tmpCounter = AtomicLong()
     private val stripes = Array(STRIPE_COUNT) { Stripe() }
+
+    @Volatile
     private var wipeGeneration = 0
+
+    @Volatile
     private var wipesInProgress = 0
 
     @VisibleForTesting
     @Volatile
     var commitAwaiterForTests: (() -> Unit)? = null
+
+    @VisibleForTesting
+    @Volatile
+    var renameFileForTests: ((File, File) -> Boolean)? = null
+
+    @VisibleForTesting
+    @Volatile
+    var deleteFileForTests: ((File) -> Boolean)? = null
 
     data class Permit(
         val wipeGeneration: Int,
@@ -60,11 +72,13 @@ internal object AttachmentCachePublication {
      * Returns null when the stripe is mid-invalidation.
      */
     fun capturePermit(attachmentKey: String): Permit? {
+        val stripe = stripeFor(attachmentKey)
         synchronized(this) {
             if (wipesInProgress > 0) return null
-            val stripe = stripeFor(attachmentKey)
-            if (stripe.invalidatingCount > 0) return null
-            return Permit(wipeGeneration, stripe.generation)
+            synchronized(stripe) {
+                if (stripe.invalidatingCount > 0) return null
+                return Permit(wipeGeneration, stripe.generation)
+            }
         }
     }
 
@@ -99,20 +113,27 @@ internal object AttachmentCachePublication {
         }
         val tmp = writeTempFile(finalFile, bytes) ?: return false
         commitAwaiterForTests?.invoke()
-        synchronized(this) {
-            val stripe = stripeFor(attachmentKey)
+        val stripe = stripeFor(attachmentKey)
+        synchronized(stripe) {
             if (!permitStillValid(stripe, permit)) {
                 runCatching { tmp.delete() }
                 return false
             }
-            finalFile.parentFile?.mkdirs()
-            if (!permitStillValid(stripe, permit)) {
+            val renamed =
+                try {
+                    renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
+                } catch (throwable: Throwable) {
+                    runCatching { tmp.delete() }
+                    throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                }
+            if (!renamed) {
                 runCatching { tmp.delete() }
-                return false
-            }
-            if (!tmp.renameTo(finalFile)) {
-                runCatching { tmp.delete() }
+                if (!permitStillValid(stripe, permit)) return false
                 throw IOException("failed to publish attachment cache ${finalFile.name}")
+            }
+            if (!permitStillValid(stripe, permit)) {
+                deleteFinalFile(finalFile)
+                return false
             }
             return true
         }
@@ -128,28 +149,27 @@ internal object AttachmentCachePublication {
         var evictionError: Throwable? = null
         var deleteError: IOException? = null
         withContext(Dispatchers.IO) {
-            synchronized(this@AttachmentCachePublication) {
+            synchronized(stripe) {
                 stripe.invalidatingCount++
+                stripe.generation++
                 try {
-                    bumpStripeGenerationAndDelete(stripe, finalFile)
+                    deleteFinalFile(finalFile)
                 } catch (e: IOException) {
-                    // A failed first delete must not skip plaintext eviction —
-                    // record it and continue. invalidatingCount stays raised and
-                    // is balanced by the finally below.
+                    // A failed first delete must not skip plaintext eviction.
                     deleteError = e
-                } catch (t: Throwable) {
-                    stripe.invalidatingCount--
-                    throw t
                 }
             }
             try {
-                evictPlaintext()
-            } catch (t: Throwable) {
-                evictionError = t
+                try {
+                    evictPlaintext()
+                } catch (t: Throwable) {
+                    evictionError = t
+                }
             } finally {
-                synchronized(this@AttachmentCachePublication) {
+                synchronized(stripe) {
                     try {
-                        bumpStripeGenerationAndDelete(stripe, finalFile)
+                        stripe.generation++
+                        deleteFinalFile(finalFile)
                     } catch (e: IOException) {
                         if (deleteError == null) deleteError = e
                     } finally {
@@ -168,22 +188,24 @@ internal object AttachmentCachePublication {
         permit: Permit,
     ): Boolean {
         val parent = finalFile.parentFile ?: return false
-        synchronized(this) {
-            val stripe = stripeFor(attachmentKey)
+        val stripe = stripeFor(attachmentKey)
+        synchronized(stripe) {
             if (!permitStillValid(stripe, permit)) return false
             parent.mkdirs()
             return permitStillValid(stripe, permit)
         }
     }
 
-    private fun bumpStripeGenerationAndDelete(
-        stripe: Stripe,
-        finalFile: File,
-    ) {
-        stripe.generation++
+    @Throws(IOException::class)
+    private fun deleteFinalFile(finalFile: File) {
         // delete() first, then treat an already-gone file as success — avoids the
         // exists()/delete() race where a concurrent removal makes delete() fail.
-        val deleted = finalFile.delete() || !finalFile.exists()
+        val deleted =
+            try {
+                (deleteFileForTests?.invoke(finalFile) ?: finalFile.delete()) || !finalFile.exists()
+            } catch (throwable: Throwable) {
+                throw IOException("failed to delete corrupt attachment cache ${finalFile.absolutePath}", throwable)
+            }
         if (!deleted) {
             throw IOException("failed to delete corrupt attachment cache ${finalFile.absolutePath}")
         }
