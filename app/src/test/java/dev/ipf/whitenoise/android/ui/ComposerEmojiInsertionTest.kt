@@ -23,6 +23,30 @@ class ComposerEmojiInsertionTest {
     }
 
     @Test
+    fun insertionMovesAStaleCaretPastASurrogatePair() {
+        val result =
+            insertComposerEmoji(
+                TextFieldValue(text = "🙂", selection = TextRange(1)),
+                "👍",
+            )
+
+        assertEquals("🙂👍", result.text)
+        assertEquals(result.text.length, result.selection.start)
+    }
+
+    @Test
+    fun insertionExpandsASelectionThatSplitsASurrogatePair() {
+        val result =
+            insertComposerEmoji(
+                TextFieldValue(text = "🙂", selection = TextRange(0, 1)),
+                "👍",
+            )
+
+        assertEquals("👍", result.text)
+        assertEquals(result.text.length, result.selection.start)
+    }
+
+    @Test
     fun replacesSelectedTextWithEmoji() {
         val result =
             insertComposerEmoji(
@@ -68,6 +92,28 @@ class ComposerEmojiInsertionTest {
 
         assertEquals("hello", result.text)
         assertEquals(5, result.selection.start)
+    }
+
+    @Test
+    fun backspaceMovesAStaleCaretPastASurrogatePair() {
+        val result =
+            deleteComposerSelectionOrPreviousCodePoint(
+                TextFieldValue(text = "🙂", selection = TextRange(1)),
+            )!!
+
+        assertEquals("", result.text)
+        assertEquals(0, result.selection.start)
+    }
+
+    @Test
+    fun backspaceExpandsASelectionThatSplitsASurrogatePair() {
+        val result =
+            deleteComposerSelectionOrPreviousCodePoint(
+                TextFieldValue(text = "🙂", selection = TextRange(0, 1)),
+            )!!
+
+        assertEquals("", result.text)
+        assertEquals(0, result.selection.start)
     }
 
     @Test
