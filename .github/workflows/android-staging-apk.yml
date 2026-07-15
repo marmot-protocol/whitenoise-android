@@ -146,7 +146,7 @@ jobs:
           # identically-named zips that collide on disk when downloaded.
           # See issue #992.
           name: whitenoise-staging-v8a-release-${{ github.run_number }}-${{ steps.sha.outputs.short }}
-          path: app/build/outputs/apk/staging/release/whitenoise-staging-v8a-release-*.apk
+          path: app/build/outputs/apk/stagingZapstore/release/whitenoise-staging-v8a-release-*.apk
           if-no-files-found: error
           # Short retention on purpose: the signed APK bakes in the staging
           # OTLP/audit-log auth tokens, so every day it sits in Actions
