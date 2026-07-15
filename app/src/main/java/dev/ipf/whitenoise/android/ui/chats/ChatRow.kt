@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -281,25 +282,44 @@ internal fun ChatRow(
                 }
             },
             trailingContent = {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        rememberedRelativeTime(timestampAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color =
-                            if (rowHasUnread) {
+                if (selectionMode) {
+                    Icon(
+                        imageVector =
+                            if (selected) {
+                                Icons.Default.CheckCircle
+                            } else {
+                                Icons.Default.RadioButtonUnchecked
+                            },
+                        contentDescription = stringResource(if (selected) R.string.selected else R.string.select),
+                        tint =
+                            if (selected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
+                        modifier = Modifier.size(24.dp),
                     )
-                    if (item.group.pendingConfirmation) {
-                        Badge { Text(stringResource(R.string.invited)) }
-                    } else if (rowHasUnread) {
-                        // Surface the highest-signal unread: an @ badge beside the
-                        // count when one of the unread messages mentions you (#611).
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (item.unreadMention) MentionBadge()
-                            UnreadCountBadge(rowUnreadCount)
+                } else {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            rememberedRelativeTime(timestampAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color =
+                                if (rowHasUnread) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        )
+                        if (item.group.pendingConfirmation) {
+                            Badge { Text(stringResource(R.string.invited)) }
+                        } else if (rowHasUnread) {
+                            // Surface the highest-signal unread: an @ badge beside the
+                            // count when one of the unread messages mentions you (#611).
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (item.unreadMention) MentionBadge()
+                                UnreadCountBadge(rowUnreadCount)
+                            }
                         }
                     }
                 }
@@ -316,20 +336,7 @@ internal fun ChatRow(
                             Color.Transparent
                         },
                     ),
-            ) {
-                if (selected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.selected),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier =
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 16.dp)
-                                .size(24.dp),
-                    )
-                }
-            }
+            )
         }
     }
 }
