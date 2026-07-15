@@ -180,6 +180,32 @@ class MentionComposerTest {
         assertEquals("@$bobNpub ", result.text)
     }
 
+    @Test
+    fun insertClampsAStaleQueryBeyondTheCurrentText() {
+        val result =
+            MentionComposer.insertMention(
+                text = "short",
+                active = MentionComposer.ActiveQuery(start = 99, query = "alice"),
+                candidate = alice,
+            )
+
+        assertEquals("short@$aliceNpub ", result.text)
+        assertEquals(result.text.length, result.selection)
+    }
+
+    @Test
+    fun insertClampsAQueryWhoseEndExceedsTheCurrentText() {
+        val result =
+            MentionComposer.insertMention(
+                text = "say @a",
+                active = MentionComposer.ActiveQuery(start = 4, query = "alice"),
+                candidate = alice,
+            )
+
+        assertEquals("say @$aliceNpub ", result.text)
+        assertEquals(result.text.length, result.selection)
+    }
+
     // --- wholeChipBackspace -------------------------------------------------
 
     @Test

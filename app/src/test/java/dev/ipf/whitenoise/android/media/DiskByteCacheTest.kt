@@ -1248,6 +1248,20 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun blankLegacyTagCannotDowngradeAuthenticatedEnvelopeMetadata() {
+        val key = "acct|grp|expired-msg|0"
+        val writer = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        writer.put(key, ByteArray(40) { 7 }, writer.capturePublicationToken(), "expired-hash")
+        File(dir, sha256Hex(key) + ".tag").writeText("")
+
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+
+        assertEquals(1, reopened.removeByCiphertextTags(setOf("expired-hash")))
+        assertNull(reopened.get(key))
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".tag") } ?: true)
+    }
+
+    @Test
     fun taggedPut_failsClosed_whenCommitCannotComplete() {
         // The ciphertext tag authorizes hash-based expiry deletion, so a tagged
         // write must fail closed: if the envelope cannot be published, no
