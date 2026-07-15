@@ -349,6 +349,9 @@
     <string name="delete">Delete</string>
     <string name="delete_for_me">Delete for me</string>
     <string name="delete_for_everyone">Delete for everyone</string>
+    <string name="delete_message_title">Delete message?</string>
+    <string name="delete_message_scope_choice">Remove this message from this device only, or delete it for everyone in this chat. Deleting for everyone can\'t be undone.</string>
+    <string name="delete_message_local_only">This removes the message from this device only. Other people can still see it.</string>
     <string name="confirm_delete_member_message_title">Delete message from %1$s?</string>
     <string name="confirm_delete_member_message_message">This removes the message for everyone in the group. It can\'t be undone.</string>
     <string name="sent">Sent</string>

@@ -274,6 +274,9 @@
     <string name="delete">Elimina</string>
     <string name="delete_for_me">Elimina per me</string>
     <string name="delete_for_everyone">Elimina per tutti</string>
+    <string name="delete_message_title">Eliminare il messaggio?</string>
+    <string name="delete_message_scope_choice">Rimuovi questo messaggio solo da questo dispositivo oppure eliminalo per tutti in questa chat. L\'eliminazione per tutti non può essere annullata.</string>
+    <string name="delete_message_local_only">Questo rimuove il messaggio solo da questo dispositivo. Le altre persone possono ancora vederlo.</string>
     <string name="confirm_delete_member_message_title">Eliminare il messaggio di %1$s?</string>
     <string name="confirm_delete_member_message_message">Il messaggio verrà eliminato per tutti nel gruppo. Questa azione non può essere annullata.</string>
     <string name="sent">Inviato</string>

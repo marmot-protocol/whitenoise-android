@@ -274,6 +274,9 @@
     <string name="delete">Sil</string>
     <string name="delete_for_me">Benim için sil</string>
     <string name="delete_for_everyone">Herkes için sil</string>
+    <string name="delete_message_title">Mesaj silinsin mi?</string>
+    <string name="delete_message_scope_choice">Bu mesajı yalnızca bu cihazdan kaldırın veya bu sohbetteki herkes için silin. Herkes için silme geri alınamaz.</string>
+    <string name="delete_message_local_only">Bu, mesajı yalnızca bu cihazdan kaldırır. Diğer kişiler mesajı görmeye devam edebilir.</string>
     <string name="confirm_delete_member_message_title">%1$s adlı üyenin mesajı silinsin mi?</string>
     <string name="confirm_delete_member_message_message">Bu işlem mesajı gruptaki herkes için siler ve geri alınamaz.</string>
     <string name="sent">Gönderildi</string>

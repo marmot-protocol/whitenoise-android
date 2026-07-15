@@ -274,6 +274,9 @@
     <string name="delete">Excluir</string>
     <string name="delete_for_me">Excluir para mim</string>
     <string name="delete_for_everyone">Excluir para todos</string>
+    <string name="delete_message_title">Apagar mensagem?</string>
+    <string name="delete_message_scope_choice">Remova esta mensagem apenas deste dispositivo ou apague-a para todos nesta conversa. Apagar para todos não pode ser desfeito.</string>
+    <string name="delete_message_local_only">Isto remove a mensagem apenas deste dispositivo. As outras pessoas ainda podem vê-la.</string>
     <string name="confirm_delete_member_message_title">Excluir a mensagem de %1$s?</string>
     <string name="confirm_delete_member_message_message">Isso excluirá a mensagem para todos no grupo. Esta ação não pode ser desfeita.</string>
     <string name="sent">Enviado</string>

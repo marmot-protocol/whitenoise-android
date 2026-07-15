@@ -268,6 +268,9 @@
     <string name="delete">刪除</string>
     <string name="delete_for_me">僅為我刪除</string>
     <string name="delete_for_everyone">為所有人刪除</string>
+    <string name="delete_message_title">刪除訊息？</string>
+    <string name="delete_message_scope_choice">僅從此裝置移除這則訊息，或為此聊天中的所有人刪除它。為所有人刪除後無法復原。</string>
+    <string name="delete_message_local_only">這只會從此裝置移除該訊息。其他人仍然可以看到它。</string>
     <string name="confirm_delete_member_message_title">刪除 %1$s 的訊息？</string>
     <string name="confirm_delete_member_message_message">此操作會為群組中的所有人刪除該訊息，且無法復原。</string>
     <string name="sent">已傳送</string>

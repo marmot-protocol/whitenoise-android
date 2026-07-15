@@ -274,6 +274,9 @@
     <string name="delete">Supprimer</string>
     <string name="delete_for_me">Supprimer pour moi</string>
     <string name="delete_for_everyone">Supprimer pour tout le monde</string>
+    <string name="delete_message_title">Supprimer le message ?</string>
+    <string name="delete_message_scope_choice">Retirez ce message uniquement de cet appareil, ou supprimez-le pour tout le monde dans cette discussion. La suppression pour tout le monde est irréversible.</string>
+    <string name="delete_message_local_only">Cela retire le message uniquement de cet appareil. Les autres peuvent toujours le voir.</string>
     <string name="confirm_delete_member_message_title">Supprimer le message de %1$s ?</string>
     <string name="confirm_delete_member_message_message">Ce message sera supprimé pour tous les membres du groupe. Cette action est irréversible.</string>
     <string name="sent">Envoyé</string>

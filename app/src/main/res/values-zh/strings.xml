@@ -268,6 +268,9 @@
     <string name="delete">删除</string>
     <string name="delete_for_me">仅为我删除</string>
     <string name="delete_for_everyone">为所有人删除</string>
+    <string name="delete_message_title">删除消息？</string>
+    <string name="delete_message_scope_choice">仅从此设备移除这条消息，或为此聊天中的所有人删除它。为所有人删除后无法撤销。</string>
+    <string name="delete_message_local_only">这只会从此设备移除该消息。其他人仍然可以看到它。</string>
     <string name="confirm_delete_member_message_title">删除 %1$s 的消息？</string>
     <string name="confirm_delete_member_message_message">此操作会为群组中的所有人删除该消息，且无法撤销。</string>
     <string name="sent">已发送</string>

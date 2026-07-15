@@ -692,13 +692,67 @@ internal fun profileAddableGroupItems(
         }.distinctBy { it.group.groupIdHex.lowercase() }
 }
 
-internal fun canDeleteMessageForEveryone(
-    actionsEnabled: Boolean,
+/**
+ * The two deletion scopes a user may apply to one message. This is the single
+ * authoritative deletion-capability model: both the action UI (which choices
+ * the delete surface offers) and the controller mutation path (which requests
+ * it accepts) derive from [messageDeleteCapability], so button visibility is
+ * never the security boundary.
+ */
+@Immutable
+data class MessageDeleteCapability(
+    val canDeleteForMe: Boolean,
+    val canDeleteForEveryone: Boolean,
+) {
+    val canDeleteAtAll: Boolean get() = canDeleteForMe || canDeleteForEveryone
+}
+
+/**
+ * Whether the runtime can actually deliver a moderator's delete of another
+ * member's group message. The Marmot timeline ingest currently honours a
+ * delete only when its author matches the target's author (self-retraction),
+ * so a moderator's delete would look deleted locally while every other member
+ * silently ignores it — worse than not offering the action. Flip this when
+ * the runtime ships admin moderation (marmot-protocol/mdk#873); the
+ * capability policy, moderator copy, and their tests are already in place
+ * behind it.
+ */
+internal const val GROUP_MODERATION_DELETE_SUPPORTED = false
+
+/**
+ * Deletion-capability matrix:
+ *
+ *  - Own message (direct or group): delete for me, delete for everyone.
+ *  - Someone else's direct message: delete for me only. A direct conversation
+ *    has no moderation, whatever admin flags its underlying two-member group
+ *    carries — DM creators are often marked admin at the MLS layer, and an
+ *    admin role held in any other group never reaches here at all (each
+ *    conversation's controller only passes its own membership role).
+ *  - Another member's group message: delete for everyone only when the
+ *    current user moderates this group (admin/owner) and the runtime supports
+ *    delivering it ([moderationDeleteSupported]); regular members get
+ *    delete for me only.
+ *
+ * [localDeleteSupported] and [remoteDeleteSupported] carry the plumbing facts
+ * (usable message id, live membership / publish path); this function owns only
+ * the ownership/role policy layered on top of them.
+ */
+internal fun messageDeleteCapability(
+    isDirectConversation: Boolean,
     mine: Boolean,
     selfIsAdmin: Boolean,
-    messageIdHex: String,
-    deleted: Boolean,
-): Boolean = actionsEnabled && (mine || selfIsAdmin) && messageIdHex.isNotBlank() && !deleted
+    localDeleteSupported: Boolean,
+    remoteDeleteSupported: Boolean,
+    alreadyDeleted: Boolean,
+    moderationDeleteSupported: Boolean = GROUP_MODERATION_DELETE_SUPPORTED,
+): MessageDeleteCapability {
+    if (alreadyDeleted) return MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)
+    val moderatesOthersMessages = !isDirectConversation && selfIsAdmin && moderationDeleteSupported
+    return MessageDeleteCapability(
+        canDeleteForMe = localDeleteSupported,
+        canDeleteForEveryone = remoteDeleteSupported && (mine || moderatesOthersMessages),
+    )
+}
 
 enum class MessageStatus {
     Received,
@@ -3653,6 +3707,37 @@ class ConversationController(
     val isSelfAdmin: Boolean
         get() = GroupProjector.isAdminRef(group, conversationAccountIdHex)
 
+    /**
+     * DM classification for the deletion-capability matrix. Uses the same
+     * headcount/name signals as the chat list. While the roster is still
+     * unverified this can transiently misclassify, but every path that grants
+     * delete-for-everyone also requires [canSendMessages] (which includes
+     * membersVerified), so no moderation capability is granted from an
+     * unverified roster.
+     */
+    val isDirectConversation: Boolean
+        get() = GroupProjector.isDm(members.size, group.name)
+
+    /**
+     * The authoritative deletion capability for [message], shared by the
+     * delete surface (what to offer) and [deleteMessage] (what to accept).
+     * [alreadyDeleted] defaults to the controller's optimistic/reconciled
+     * tombstone set; the UI passes its projection-aware `deleted` instead so
+     * a remotely deleted message reads as undeletable there too.
+     */
+    fun deleteCapabilityFor(
+        message: AppMessageRecordFfi,
+        alreadyDeleted: Boolean = message.messageIdHex in deletedMessageIds,
+    ): MessageDeleteCapability =
+        messageDeleteCapability(
+            isDirectConversation = isDirectConversation,
+            mine = isMessageMine(message),
+            selfIsAdmin = isSelfAdmin,
+            localDeleteSupported = message.messageIdHex.isNotBlank(),
+            remoteDeleteSupported = canSendMessages && message.messageIdHex.isNotBlank(),
+            alreadyDeleted = alreadyDeleted,
+        )
+
     fun isMessageMine(message: AppMessageRecordFfi): Boolean = MessageProjector.isMine(message, conversationAccountIdHex)
 
     val isSelfMember: Boolean
@@ -5004,15 +5089,12 @@ class ConversationController(
         presentFailure: Boolean = true,
     ): Boolean {
         val account = conversationAccountRef ?: return false
-        if (
-            !canDeleteMessageForEveryone(
-                actionsEnabled = canSendMessages,
-                mine = isMessageMine(message),
-                selfIsAdmin = isSelfAdmin,
-                messageIdHex = message.messageIdHex,
-                deleted = message.messageIdHex in deletedMessageIds,
-            )
-        ) {
+        // Same capability model the delete surface renders from; re-checked
+        // here so the mutation path stays authoritative even if a stale or
+        // forged UI state requests an unauthorized scope. Also makes repeat
+        // requests idempotent: once the optimistic tombstone is set, the
+        // capability reads alreadyDeleted and the second call is a no-op.
+        if (!deleteCapabilityFor(message).canDeleteForEveryone) {
             return false
         }
         val target = message.messageIdHex
