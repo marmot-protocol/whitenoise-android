@@ -60,7 +60,7 @@ class LocalNotificationPresenterConversationTest {
 
         val posted =
             runBlocking {
-                presenter.show(update(isMention = false), previewTextOverride = "hi")
+                presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
             }
 
         assertTrue(posted)
@@ -85,7 +85,7 @@ class LocalNotificationPresenterConversationTest {
     fun mentionPostsOnTheMentionConversationChannelForTheSameConversation() {
         presenter.ensureChannels()
 
-        runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi") }
+        runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" }) }
 
         val shortcutId = conversationShortcutId("account-a", "group-a")
         val notification = manager.activeNotifications.single().notification
@@ -99,7 +99,13 @@ class LocalNotificationPresenterConversationTest {
     @Test
     fun deletedConversationChannelIsRecreatedWithoutAProcessRestart() {
         presenter.ensureChannels()
-        runBlocking { presenter.show(update(isMention = false), previewTextOverride = "first") }
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "first",
+                shortNpub = { "npub1test" },
+            )
+        }
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val channelId =
             ConversationNotificationChannels.conversationChannelId(
@@ -112,7 +118,14 @@ class LocalNotificationPresenterConversationTest {
         assertNull(manager.getNotificationChannel(channelId))
         manager.cancelAll()
 
-        val reposted = runBlocking { presenter.show(update(isMention = false), previewTextOverride = "second") }
+        val reposted =
+            runBlocking {
+                presenter.show(
+                    update(isMention = false),
+                    previewTextOverride = "second",
+                    shortNpub = { "npub1test" },
+                )
+            }
 
         assertTrue(reposted)
         assertNotNull(manager.getNotificationChannel(channelId))
@@ -126,7 +139,12 @@ class LocalNotificationPresenterConversationTest {
 
     @Test
     fun senderPersonUsesTheResolvedAvatarBitmap() {
-        val content = LocalNotificationFormatter.content(update(isMention = false), context)!!
+        val content =
+            LocalNotificationFormatter.content(
+                update = update(isMention = false),
+                context = context,
+                shortNpub = { "npub1test" },
+            )!!
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
 
         assertNotNull(notificationSenderPerson(content, bitmap).icon)

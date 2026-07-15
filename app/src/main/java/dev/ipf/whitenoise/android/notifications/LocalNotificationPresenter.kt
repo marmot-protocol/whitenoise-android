@@ -195,6 +195,7 @@ class LocalNotificationPresenter(
         redactContent: Boolean = false,
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
+        shortNpub: (String) -> String,
     ): Boolean {
         val formattedContent =
             LocalNotificationFormatter.content(
@@ -205,6 +206,7 @@ class LocalNotificationPresenter(
                 reactedToPreviewOverride = reactedToPreviewOverride,
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
+                shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
         val canPost = formatterReturnedContent && canPostNotifications()
