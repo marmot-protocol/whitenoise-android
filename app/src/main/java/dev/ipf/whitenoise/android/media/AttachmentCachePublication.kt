@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import androidx.annotation.VisibleForTesting
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -162,6 +163,8 @@ internal object AttachmentCachePublication {
             try {
                 try {
                     evictPlaintext()
+                } catch (cancel: CancellationException) {
+                    throw cancel
                 } catch (t: Throwable) {
                     evictionError = t
                 }
@@ -219,7 +222,10 @@ internal object AttachmentCachePublication {
             permit.stripeGeneration == stripe.generation &&
             stripe.invalidatingCount == 0
 
-    private fun stripeFor(attachmentKey: String): Stripe = stripes[attachmentKey.hashCode() and (STRIPE_COUNT - 1)]
+    @VisibleForTesting
+    internal fun stripeIndex(attachmentKey: String): Int = attachmentKey.hashCode() and (STRIPE_COUNT - 1)
+
+    private fun stripeFor(attachmentKey: String): Stripe = stripes[stripeIndex(attachmentKey)]
 
     private fun writeTempFile(
         finalFile: File,

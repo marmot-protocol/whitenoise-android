@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -9,6 +10,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -388,6 +390,35 @@ class AttachmentCachePublicationTest {
     }
 
     @Test
+    fun cancellationDuringEvictionIsNotMaskedByAFinalDeleteFailure() {
+        dir = Files.createTempDirectory("attachment-cache-cancel-eviction").toFile()
+        val finalFile = File(dir, "cancel.mp4").apply { writeBytes(byteArrayOf(1)) }
+        val attachmentKey = AttachmentCachePublication.attachmentKey("msg-cancel", 0, 1uL)
+        val deleteCalls = AtomicInteger()
+        AttachmentCachePublication.deleteFileForTests = {
+            if (deleteCalls.incrementAndGet() == 1) {
+                true
+            } else {
+                throw IOException("final delete failed")
+            }
+        }
+
+        val failure =
+            runCatching {
+                runBlocking {
+                    AttachmentCachePublication.invalidateAttachmentCache(
+                        attachmentKey = attachmentKey,
+                        finalFile = finalFile,
+                        evictPlaintext = { throw CancellationException("cancelled") },
+                    )
+                }
+            }.exceptionOrNull()
+
+        assertTrue(failure is CancellationException)
+        assertNotNull(AttachmentCachePublication.capturePermit(attachmentKey))
+    }
+
+    @Test
     fun publishDuringEviction_isRejectedAndLeavesNoFinalFile() {
         dir = Files.createTempDirectory("attachment-cache-eviction-window").toFile()
         val finalFile = File(dir, "msg-evict-1.mp4")
@@ -457,5 +488,7 @@ class AttachmentCachePublicationTest {
     ): String =
         generateSequence(0) { it + 1 }
             .map { AttachmentCachePublication.attachmentKey("$prefix-$it", 0, 1uL) }
-            .first { candidate -> (candidate.hashCode() and 63) != (reference.hashCode() and 63) }
+            .first { candidate ->
+                AttachmentCachePublication.stripeIndex(candidate) != AttachmentCachePublication.stripeIndex(reference)
+            }
 }

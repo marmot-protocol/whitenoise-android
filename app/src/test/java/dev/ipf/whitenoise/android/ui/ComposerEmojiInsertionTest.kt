@@ -4,6 +4,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.ui.conversation.composer.deleteComposerSelectionOrPreviousCodePoint
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertComposerEmoji
+import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerMentionEdit
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -77,5 +78,17 @@ class ComposerEmojiInsertionTest {
             )
 
         assertEquals(null, result)
+    }
+
+    @Test
+    fun emojiBackspaceRemovesAWholeMentionChip() {
+        val npub = "npub1" + "a".repeat(58)
+        val oldValue = TextFieldValue(text = "hello @$npub ", selection = TextRange("hello @$npub ".length))
+        val proposedValue = deleteComposerSelectionOrPreviousCodePoint(oldValue)!!
+
+        val result = repairComposerMentionEdit(oldValue, proposedValue, clampMentionSelection = true)
+
+        assertEquals("hello ", result.text)
+        assertEquals("hello ".length, result.selection.start)
     }
 }
