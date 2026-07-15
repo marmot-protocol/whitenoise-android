@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
@@ -336,7 +337,7 @@ internal fun MediaViewerFrame(
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                            listOf(Color.Transparent, Color.Black.copy(alpha = ScrimAlpha.Gradient)),
                         ),
                     ).navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),

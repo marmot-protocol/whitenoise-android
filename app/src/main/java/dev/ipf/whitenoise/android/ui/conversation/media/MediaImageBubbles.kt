@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -320,7 +321,7 @@ internal fun MediaImageBubble(
             }
             if (uploading) {
                 Surface(
-                    color = Color.Black.copy(alpha = 0.55f),
+                    color = Color.Black.copy(alpha = ScrimAlpha.Strong),
                     shape = CircleShape,
                     modifier = Modifier.size(48.dp),
                 ) {
@@ -664,7 +665,7 @@ internal fun MediaImageGridTile(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
+                        .background(Color.Black.copy(alpha = ScrimAlpha.MediumEmphasis)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -677,7 +678,7 @@ internal fun MediaImageGridTile(
         }
         if (uploading) {
             Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.Light)),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(

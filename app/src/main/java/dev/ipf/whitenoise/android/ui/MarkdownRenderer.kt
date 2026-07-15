@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,6 +67,7 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.ui.theme.AppDivider
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -530,7 +530,7 @@ private fun MarkdownBlockView(
                 onTextLayout = onTextLayout,
             )
         MarkdownBlockFfi.ThematicBreak ->
-            HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
+            AppDivider()
         is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content, ctx.useDecorativeBackgrounds)
         is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth)
         is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth)
@@ -665,7 +665,7 @@ private fun MarkdownTableView(
     val visibleTable = markdownVisibleTable(block.header, block.rows)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx)
-        HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
+        AppDivider()
         visibleTable.rows.forEach { row ->
             MarkdownTableRowView(row, block.alignments, header = false, ctx)
         }

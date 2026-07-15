@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.theme.AppDivider
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,21 +103,21 @@ internal fun SecurityPrivacyScreen(
                             }
                         }
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.force_incognito_keyboard),
                         subtitle = stringResource(R.string.force_incognito_keyboard_subtitle),
                         checked = appState.forceIncognitoKeyboard,
                         onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
                     )
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.allow_chat_screenshots),
                         subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
                         checked = !appState.allowChatScreenshotsInChats,
                         onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
                     )
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.telemetry),
                         subtitle = stringResource(R.string.telemetry_settings_subtitle),
@@ -135,7 +135,7 @@ internal fun SecurityPrivacyScreen(
                             }
                         },
                     )
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.audit_logs),
                         subtitle = stringResource(R.string.audit_logs_settings_subtitle),
@@ -153,7 +153,7 @@ internal fun SecurityPrivacyScreen(
                             }
                         },
                     )
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
                     Row(
                         Modifier
@@ -217,9 +217,9 @@ internal fun SecurityPrivacyScreen(
                         onCheckedChange = { appState.updateDeveloperMode(it) },
                     )
                     if (appState.developerMode) {
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                        AppDivider(Modifier.padding(vertical = 12.dp))
                         SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                        AppDivider(Modifier.padding(vertical = 12.dp))
                         SettingsSwitchRow(
                             title = stringResource(R.string.streaming_debug),
                             subtitle = stringResource(R.string.streaming_debug_subtitle),

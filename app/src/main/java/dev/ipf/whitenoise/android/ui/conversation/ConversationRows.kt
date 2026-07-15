@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -57,6 +56,7 @@ import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.theme.AppDivider
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.time.Instant
 import java.time.LocalDate
@@ -76,9 +76,8 @@ internal fun UnreadMessagesDivider(count: Int) {
                 .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HorizontalDivider(
+        AppDivider(
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.outlineVariant,
         )
         Text(
             text = text,
@@ -92,9 +91,8 @@ internal fun UnreadMessagesDivider(count: Int) {
                         shape = RoundedCornerShape(12.dp),
                     ).padding(horizontal = 10.dp, vertical = 4.dp),
         )
-        HorizontalDivider(
+        AppDivider(
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
 }

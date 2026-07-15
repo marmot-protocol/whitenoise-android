@@ -56,7 +56,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -133,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
+import dev.ipf.whitenoise.android.ui.theme.AppDivider
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -694,7 +694,7 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            AppDivider()
             SettingsActionRow(
                 icon = Icons.Default.Schedule,
                 title = stringResource(R.string.disappearing_messages),
@@ -721,7 +721,7 @@ internal fun GroupDetailsScreen(
                     appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                 },
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            AppDivider()
             SectionHeader(stringResource(R.string.notifications))
             SettingsActionRow(
                 icon = Icons.Default.Notifications,
@@ -805,7 +805,7 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            AppDivider()
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -961,7 +961,7 @@ internal fun GroupDetailsScreen(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            AppDivider()
             SectionHeader(stringResource(R.string.info))
             Column(
                 Modifier
@@ -1035,7 +1035,7 @@ internal fun GroupDetailsScreen(
             // sole-admin and sole-member cases get their own confirm copy. On
             // failure the controller's lastMutationError surfaces inline here
             // (in addition to the snackbar) so the user can retry in place.
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            AppDivider()
             val selfMember =
                 controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
             if (canEdit && selfMember != null) {
@@ -1631,9 +1631,8 @@ private fun PushDeliveryDebugSection(
                     )
                     info.tokens.forEachIndexed { index, token ->
                         if (index > 0) {
-                            HorizontalDivider(
+                            AppDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             )
                         }
                         PushTokenDebugRows(token, appState, yesNo)

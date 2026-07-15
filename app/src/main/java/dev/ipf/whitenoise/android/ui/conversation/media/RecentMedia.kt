@@ -52,6 +52,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -271,7 +272,7 @@ private fun RecentThumb(
                         .align(Alignment.Center)
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f)),
+                        .background(Color.Black.copy(alpha = ScrimAlpha.MediumEmphasis)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

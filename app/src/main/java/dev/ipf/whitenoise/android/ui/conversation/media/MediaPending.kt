@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -103,7 +104,7 @@ internal fun MediaPendingPlaceholder(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
-                        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+                        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = ScrimAlpha.Light)))
                     }
                     PendingStatusOverlay(
                         failed = failed,
@@ -136,7 +137,7 @@ internal fun MediaPendingPlaceholder(
                         )
                     }
                     Box(
-                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
+                        Modifier.matchParentSize().background(Color.Black.copy(alpha = ScrimAlpha.Light)),
                     )
                     PendingStatusOverlay(
                         failed = failed,
@@ -224,7 +225,7 @@ private fun PendingGridTile(
         }
         if (overflowCount > 0 && preview != null) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)),
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.MediumEmphasis)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

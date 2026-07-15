@@ -61,6 +61,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executor
@@ -146,7 +147,7 @@ internal fun QrScannerSheetContent(
                         Modifier
                             .padding(
                                 16.dp,
-                            ).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                            ).background(Color.Black.copy(alpha = ScrimAlpha.Strong), RoundedCornerShape(24.dp))
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
