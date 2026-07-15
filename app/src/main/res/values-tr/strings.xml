@@ -1006,16 +1006,16 @@
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
     <string name="group_add_members_after_create">Üyeleri grubu oluşturduktan sonra ekleyebilirsiniz.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Tek yönetici sensin. %1$s yönetici olur ve siz gruptan ayrılırsınız.</string>
-    <string name="app_updates">App updates</string>
-    <string name="app_update_settings_title">Zapstore release</string>
-    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
-    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
-    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
-    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
-    <string name="app_update_available_title">Update available</string>
-    <string name="app_update_persistent_title">Important update available</string>
-    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
-    <string name="app_update_now">Update now</string>
+    <string name="app_updates">Uygulama güncellemeleri</string>
+    <string name="app_update_settings_title">Zapstore sürümü</string>
+    <string name="app_update_settings_unknown">Yüklü: %1$s — En son: bilinmiyor — kontrol etmek için dokunun</string>
+    <string name="app_update_settings_current">Yüklü: %1$s — Güncel</string>
+    <string name="app_update_settings_available">Yüklü: %1$s — En son: %2$s — güncelleme mevcut</string>
+    <string name="app_update_settings_available_with_count">Yüklü: %1$s — En son: %2$s — %3$d sürüm geride</string>
+    <string name="app_update_available_title">Güncelleme mevcut</string>
+    <string name="app_update_persistent_title">Önemli güncelleme mevcut</string>
+    <string name="app_update_available_description">%1$s sürümü Zapstore\'da mevcut.</string>
+    <string name="app_update_now">Şimdi güncelle</string>
     <string name="app_self_update_resolving">Sürüm kontrol ediliyor</string>
     <string name="app_self_update_resolving_body">İmzalı Zapstore sürüm bilgileri alınıyor…</string>
     <string name="app_self_update_confirm_title">Güncelleme indirilsin mi?</string>
@@ -1040,10 +1040,10 @@
     <string name="app_self_update_error_title">Güncelleme başarısız</string>
     <string name="app_self_update_size_unknown">bilinmeyen boyut</string>
     <plurals name="app_update_releases_behind">
-        <item quantity="one">%1$d release behind</item>
-        <item quantity="other">%1$d releases behind</item>
+        <item quantity="one">%1$d sürüm geride</item>
+        <item quantity="other">%1$d sürüm geride</item>
     </plurals>
-    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
-    <string name="notification_channel_app_updates">App updates</string>
-    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+    <string name="toast_zapstore_unavailable">Zapstore açılamadı</string>
+    <string name="notification_channel_app_updates">Uygulama güncellemeleri</string>
+    <string name="notification_channel_app_updates_description">Zapstore sürüm uyarıları</string>
 </resources>

@@ -993,16 +993,16 @@
     <string name="sign_in_error_public_key">这是公钥。请输入你的私钥（nsec）登录。</string>
     <string name="group_add_members_after_create">创建群组后可以添加成员。</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">你是唯一的管理员。%1$s 将成为管理员，你将退出群组。</string>
-    <string name="app_updates">App updates</string>
-    <string name="app_update_settings_title">Zapstore release</string>
-    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
-    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
-    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
-    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
-    <string name="app_update_available_title">Update available</string>
-    <string name="app_update_persistent_title">Important update available</string>
-    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
-    <string name="app_update_now">Update now</string>
+    <string name="app_updates">应用更新</string>
+    <string name="app_update_settings_title">Zapstore 版本</string>
+    <string name="app_update_settings_unknown">已安装：%1$s — 最新：未知 — 点按检查更新</string>
+    <string name="app_update_settings_current">已安装：%1$s — 已是最新</string>
+    <string name="app_update_settings_available">已安装：%1$s — 最新：%2$s — 有可用更新</string>
+    <string name="app_update_settings_available_with_count">已安装：%1$s — 最新：%2$s — 落后 %3$d 个版本</string>
+    <string name="app_update_available_title">有可用更新</string>
+    <string name="app_update_persistent_title">有重要更新</string>
+    <string name="app_update_available_description">Zapstore 上已提供 %1$s 版本。</string>
+    <string name="app_update_now">立即更新</string>
     <string name="app_self_update_resolving">正在检查版本</string>
     <string name="app_self_update_resolving_body">正在获取已签名的 Zapstore 版本元数据…</string>
     <string name="app_self_update_confirm_title">下载更新？</string>
@@ -1027,10 +1027,10 @@
     <string name="app_self_update_error_title">更新失败</string>
     <string name="app_self_update_size_unknown">未知大小</string>
     <plurals name="app_update_releases_behind">
-        <item quantity="one">%1$d release behind</item>
-        <item quantity="other">%1$d releases behind</item>
+        <item quantity="one">落后 %1$d 个版本</item>
+        <item quantity="other">落后 %1$d 个版本</item>
     </plurals>
-    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
-    <string name="notification_channel_app_updates">App updates</string>
-    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+    <string name="toast_zapstore_unavailable">无法打开 Zapstore</string>
+    <string name="notification_channel_app_updates">应用更新</string>
+    <string name="notification_channel_app_updates_description">Zapstore 版本提醒</string>
 </resources>
