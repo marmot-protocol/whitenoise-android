@@ -972,6 +972,8 @@
     <string name="see_all_members">查看全部 %1$d 位成员</string>
     <string name="chat_lock">聊天锁定</string>
     <string name="collapse_long_messages">折叠长消息</string>
+    <string name="markdown_details_collapsed_state">已折叠</string>
+    <string name="markdown_details_expanded_state">已展开</string>
     <string name="notify">通知方式</string>
     <string name="notify_all_messages">所有消息</string>
     <string name="notify_only_mentions">仅提及</string>

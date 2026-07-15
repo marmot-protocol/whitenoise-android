@@ -987,6 +987,8 @@
     <string name="see_all_members">Ver todos os %1$d membros</string>
     <string name="chat_lock">Bloqueio de conversa</string>
     <string name="collapse_long_messages">Recolher mensagens longas</string>
+    <string name="markdown_details_collapsed_state">recolhido</string>
+    <string name="markdown_details_expanded_state">expandido</string>
     <string name="notify">Notificar</string>
     <string name="notify_all_messages">Todas as mensagens</string>
     <string name="notify_only_mentions">Apenas menções</string>

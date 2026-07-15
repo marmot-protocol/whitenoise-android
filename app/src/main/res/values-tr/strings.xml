@@ -985,6 +985,8 @@
     <string name="see_all_members">%1$d üyenin tümünü gör</string>
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="collapse_long_messages">Uzun mesajları daralt</string>
+    <string name="markdown_details_collapsed_state">daraltılmış</string>
+    <string name="markdown_details_expanded_state">genişletilmiş</string>
     <string name="notify">Bildirimler</string>
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>

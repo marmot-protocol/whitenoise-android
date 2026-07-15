@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +12,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,9 +30,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
@@ -94,6 +104,9 @@ import java.util.Locale
 internal fun MarkdownMessageBody(
     document: MarkdownDocumentFfi,
     modifier: Modifier = Modifier,
+    // Raw Markdown is required to distinguish authored disclosure tags from
+    // escaped/entity-encoded text, which the FFI AST intentionally decodes.
+    source: String? = null,
     mentionDisplayName: ((String) -> String?)? = null,
     // Whether a mention entity's bech32 resolves to a current member of the
     // active group. Only a member gets the "@" mention treatment; a resolved
@@ -107,6 +120,9 @@ internal fun MarkdownMessageBody(
     // the elision marker when the top-level block cap hides later siblings;
     // other block types leave it unset.
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
+    // Lets a size-constraining parent discard a stale overflow measurement when
+    // disclosure content appears or disappears.
+    onDisclosureStateChange: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -134,8 +150,14 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, isGroupMember) {
-            MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember)
+        remember(linkListener, mentionDisplayName, isGroupMember, source, onDisclosureStateChange) {
+            MarkdownBodyContext(
+                linkListener = linkListener,
+                mentionDisplayName = mentionDisplayName,
+                isGroupMember = isGroupMember,
+                detailsEnabled = markdownSourceAllowsDetails(source, document.truncated),
+                onDisclosureStateChange = onDisclosureStateChange,
+            )
         }
     MarkdownBlockList(
         blocks = document.blocks,
@@ -229,7 +251,288 @@ private data class MarkdownBodyContext(
     val linkListener: LinkInteractionListener,
     val mentionDisplayName: ((String) -> String?)?,
     val isGroupMember: ((String) -> Boolean)?,
+    val detailsEnabled: Boolean,
+    val onDisclosureStateChange: (() -> Unit)?,
 )
+
+private const val MARKDOWN_DETAILS_SOURCE_SCAN_MAX_LENGTH = 65_536
+private const val MARKDOWN_DETAILS_TAG_MAX_LENGTH = 1_024
+private val markdownDisclosureTag =
+    Regex(
+        """</?(?:details|summary)(?=\s|>)[^>\r\n]{0,$MARKDOWN_DETAILS_TAG_MAX_LENGTH}>""",
+        RegexOption.IGNORE_CASE,
+    )
+private val markdownDetailsSourceOpenTag = Regex("""^<details(?=\s|>)""", RegexOption.IGNORE_CASE)
+private const val MARKDOWN_ESCAPABLE_PUNCTUATION = "!\"#\$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+private const val MARKDOWN_CHARACTER_REFERENCE_MAX_LENGTH = 16
+
+private fun markdownDisclosureTags(
+    value: String,
+    skipEscaped: Boolean,
+): List<String> {
+    val tags = mutableListOf<String>()
+    var index = 0
+    while (index < value.length) {
+        val start = value.indexOf('<', index)
+        if (start < 0) break
+        var end = start + 1
+        val limit = (start + MARKDOWN_DETAILS_TAG_MAX_LENGTH).coerceAtMost(value.lastIndex)
+        while (end <= limit && value[end] != '>' && value[end] != '<' && value[end] != '\r' && value[end] != '\n') {
+            end += 1
+        }
+        if (end <= limit && value[end] == '>') {
+            val tag = value.substring(start, end + 1)
+            if ((!skipEscaped || !markdownIsBackslashEscaped(value, start)) && markdownDisclosureTag.matches(tag)) {
+                tags += tag
+            }
+            index = end + 1
+        } else {
+            index = start + 1
+        }
+    }
+    return tags
+}
+
+/**
+ * The FFI tree contains decoded text, so escaped or entity-encoded tags look
+ * identical to authored HTML tags. Compare the raw source with a Markdown-style
+ * decoded copy and only upgrade disclosures when every relevant tag already
+ * existed literally in the source. Ambiguous mixed input intentionally falls
+ * back to literal text rather than guessing which decoded AST node was raw.
+ */
+private fun markdownSourceAllowsDetails(
+    source: String?,
+    documentTruncated: Boolean,
+): Boolean {
+    if (source == null || documentTruncated || source.length > MARKDOWN_DETAILS_SOURCE_SCAN_MAX_LENGTH) return false
+    val decoded = markdownDecodeDisclosureSyntax(source)
+    val rawTags = markdownDisclosureTags(source, skipEscaped = true)
+    if (rawTags.none(markdownDetailsSourceOpenTag::containsMatchIn)) return false
+    val decodedTags = markdownDisclosureTags(decoded, skipEscaped = false)
+    return rawTags == decodedTags
+}
+
+private fun markdownIsBackslashEscaped(
+    value: String,
+    index: Int,
+): Boolean {
+    var backslashes = 0
+    var cursor = index - 1
+    while (cursor >= 0 && value[cursor] == '\\') {
+        backslashes += 1
+        cursor -= 1
+    }
+    return backslashes % 2 == 1
+}
+
+private fun markdownDecodeDisclosureSyntax(value: String): String =
+    buildString(value.length) {
+        var index = 0
+        while (index < value.length) {
+            when {
+                value[index] == '\\' &&
+                    index + 1 < value.length &&
+                    value[index + 1] in MARKDOWN_ESCAPABLE_PUNCTUATION -> {
+                    append(value[index + 1])
+                    index += 2
+                }
+                value[index] == '&' -> {
+                    var end = index + 1
+                    val limit = (index + MARKDOWN_CHARACTER_REFERENCE_MAX_LENGTH).coerceAtMost(value.lastIndex)
+                    while (end <= limit && value[end] != ';') end += 1
+                    val reference = if (end <= limit && value[end] == ';') value.substring(index, end + 1) else null
+                    val decoded = reference?.let(::markdownDecodeCharacterReference)
+                    if (reference != null && decoded != null) {
+                        appendCodePoint(decoded)
+                        index = end + 1
+                    } else {
+                        append(value[index])
+                        index += 1
+                    }
+                }
+                else -> {
+                    append(value[index])
+                    index += 1
+                }
+            }
+        }
+    }
+
+private fun markdownDecodeCharacterReference(reference: String): Int? =
+    when {
+        reference.startsWith("&#x", ignoreCase = true) -> reference.drop(3).dropLast(1).toIntOrNull(16)
+        reference.startsWith("&#") -> reference.drop(2).dropLast(1).toIntOrNull()
+        else ->
+            when (reference.drop(1).dropLast(1).lowercase()) {
+                "lt" -> '<'.code
+                "gt" -> '>'.code
+                "sol" -> '/'.code
+                "tab" -> '\t'.code
+                "newline" -> '\n'.code
+                "equals" -> '='.code
+                "quot" -> '"'.code
+                "apos" -> '\''.code
+                "amp" -> '&'.code
+                else -> null
+            }
+    }?.takeIf(Character::isValidCodePoint)
+
+/** One renderer node: either an unchanged Markdown block or a native disclosure section. */
+private sealed interface MarkdownRenderBlock {
+    data class Plain(
+        val block: MarkdownBlockFfi,
+    ) : MarkdownRenderBlock
+
+    data class Details(
+        val summary: String,
+        val body: List<MarkdownBlockFfi>,
+        val initiallyExpanded: Boolean,
+    ) : MarkdownRenderBlock
+}
+
+private data class MarkdownDetailsOpening(
+    val summary: String,
+    val initiallyExpanded: Boolean,
+)
+
+private val markdownDetailsTagPrefix = Regex("""^\s*<details(?=\s|>)""", RegexOption.IGNORE_CASE)
+private val markdownDetailsParagraph =
+    Regex(
+        """^\s*<details(?=\s|>)([^>\r\n]{0,$MARKDOWN_DETAILS_TAG_MAX_LENGTH})>\s*""" +
+            """<summary(?=\s|>)([^>\r\n]{0,$MARKDOWN_DETAILS_TAG_MAX_LENGTH})>(.*?)</summary\s*>\s*$""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+    )
+private const val MARKDOWN_ATTRIBUTE_NAME_FORBIDDEN = "\"'<>/=`&\\"
+private const val MARKDOWN_UNQUOTED_ATTRIBUTE_VALUE_FORBIDDEN = "\"'=<>`&\\"
+
+private fun markdownDetailsInitiallyExpanded(attributes: String): Boolean? {
+    var index = 0
+    var expanded = false
+    while (true) {
+        while (index < attributes.length && attributes[index].isWhitespace()) index += 1
+        if (index == attributes.length) return expanded
+
+        val nameStart = index
+        while (
+            index < attributes.length &&
+            !attributes[index].isWhitespace() &&
+            attributes[index] !in MARKDOWN_ATTRIBUTE_NAME_FORBIDDEN
+        ) {
+            index += 1
+        }
+        if (index == nameStart) return null
+        val name = attributes.substring(nameStart, index)
+        while (index < attributes.length && attributes[index].isWhitespace()) index += 1
+
+        if (index < attributes.length && attributes[index] == '=') {
+            index += 1
+            while (index < attributes.length && attributes[index].isWhitespace()) index += 1
+            if (index == attributes.length) return null
+            val quote = attributes[index].takeIf { it == '"' || it == '\'' }
+            if (quote != null) {
+                val valueEnd = attributes.indexOf(quote, index + 1)
+                if (valueEnd < 0) return null
+                index = valueEnd + 1
+                if (index < attributes.length && !attributes[index].isWhitespace()) return null
+            } else {
+                val valueStart = index
+                while (index < attributes.length && !attributes[index].isWhitespace()) {
+                    if (attributes[index] in MARKDOWN_UNQUOTED_ATTRIBUTE_VALUE_FORBIDDEN) return null
+                    index += 1
+                }
+                if (index == valueStart) return null
+            }
+        }
+        if (name.equals("open", ignoreCase = true)) expanded = true
+    }
+}
+
+/**
+ * Recognizes the literal tag paragraph emitted by marmot-markdown for GFM-style
+ * `<details>/<summary>` input. The core deliberately keeps raw HTML as text, so
+ * the Android renderer upgrades this one safe, inert tag pair without adding an
+ * HTML engine or executing arbitrary markup.
+ */
+private fun markdownDetailsOpening(block: MarkdownBlockFfi): MarkdownDetailsOpening? {
+    val paragraph = block as? MarkdownBlockFfi.Paragraph ?: return null
+    if (markdownSiblingsElided(paragraph.inlines)) return null
+    val tagText =
+        buildString {
+            markdownVisibleSiblings(paragraph.inlines).forEach { inline ->
+                when (inline) {
+                    is MarkdownInlineFfi.Text -> append(inline.content)
+                    MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
+                    else -> return null
+                }
+            }
+        }
+    val match = markdownDetailsParagraph.matchEntire(tagText) ?: return null
+    val attributes = match.groupValues[1]
+    val summaryAttributes = match.groupValues[2]
+    val summary = match.groupValues[3].trim()
+    val initiallyExpanded = markdownDetailsInitiallyExpanded(attributes) ?: return null
+    if (markdownDetailsInitiallyExpanded(summaryAttributes) == null || summary.isEmpty()) return null
+    return MarkdownDetailsOpening(
+        summary = summary,
+        initiallyExpanded = initiallyExpanded,
+    )
+}
+
+private fun markdownIsDetailsOpening(block: MarkdownBlockFfi): Boolean {
+    val paragraph = block as? MarkdownBlockFfi.Paragraph ?: return false
+    val first = paragraph.inlines.firstOrNull() as? MarkdownInlineFfi.Text ?: return false
+    return markdownDetailsTagPrefix.containsMatchIn(first.content)
+}
+
+private fun markdownIsDetailsClosing(block: MarkdownBlockFfi): Boolean {
+    val paragraph = block as? MarkdownBlockFfi.Paragraph ?: return false
+    val text = paragraph.inlines.singleOrNull() as? MarkdownInlineFfi.Text ?: return false
+    return text.content.trim().equals("</details>", ignoreCase = true)
+}
+
+private fun markdownMatchingDetailsClose(
+    blocks: List<MarkdownBlockFfi>,
+    openingIndex: Int,
+): Int? {
+    var nestedDetails = 0
+    for (index in openingIndex + 1 until blocks.size) {
+        val block = blocks[index]
+        val closesDetails = markdownIsDetailsClosing(block)
+        when {
+            markdownIsDetailsOpening(block) -> nestedDetails += 1
+            closesDetails && nestedDetails > 0 -> nestedDetails -= 1
+            closesDetails -> return index
+        }
+    }
+    return null
+}
+
+private fun markdownRenderBlocks(
+    blocks: List<MarkdownBlockFfi>,
+    depth: Int,
+): List<MarkdownRenderBlock> {
+    if (markdownDepthExceeded(depth)) return blocks.map(MarkdownRenderBlock::Plain)
+
+    val rendered = mutableListOf<MarkdownRenderBlock>()
+    var index = 0
+    while (index < blocks.size) {
+        val opening = markdownDetailsOpening(blocks[index])
+        val closingIndex = opening?.let { markdownMatchingDetailsClose(blocks, index) }
+        if (opening == null || closingIndex == null) {
+            rendered += MarkdownRenderBlock.Plain(blocks[index])
+            index += 1
+        } else {
+            rendered +=
+                MarkdownRenderBlock.Details(
+                    summary = opening.summary,
+                    body = blocks.subList(index + 1, closingIndex),
+                    initiallyExpanded = opening.initiallyExpanded,
+                )
+            index = closingIndex + 1
+        }
+    }
+    return rendered
+}
 
 @Composable
 private fun MarkdownBlockList(
@@ -241,17 +544,79 @@ private fun MarkdownBlockList(
 ) {
     val visibleBlocks = markdownVisibleSiblings(blocks)
     val blocksElided = markdownSiblingsElided(blocks)
+    val renderBlocks =
+        remember(visibleBlocks, depth, ctx.detailsEnabled) {
+            if (ctx.detailsEnabled) {
+                markdownRenderBlocks(visibleBlocks, depth)
+            } else {
+                visibleBlocks.map(MarkdownRenderBlock::Plain)
+            }
+        }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        visibleBlocks.forEachIndexed { index, block ->
-            MarkdownBlockView(
-                block,
-                ctx,
-                depth = depth,
-                onTextLayout = if (!blocksElided && index == visibleBlocks.lastIndex) onLastTextLayout else null,
-            )
+        renderBlocks.forEachIndexed { index, block ->
+            when (block) {
+                is MarkdownRenderBlock.Plain ->
+                    MarkdownBlockView(
+                        block.block,
+                        ctx,
+                        depth = depth,
+                        onTextLayout = if (!blocksElided && index == renderBlocks.lastIndex) onLastTextLayout else null,
+                    )
+                is MarkdownRenderBlock.Details -> MarkdownDetailsView(block, ctx, depth)
+            }
         }
         if (blocksElided) {
             MarkdownElisionMarker(onTextLayout = onLastTextLayout)
+        }
+    }
+}
+
+@Composable
+private fun MarkdownDetailsView(
+    details: MarkdownRenderBlock.Details,
+    ctx: MarkdownBodyContext,
+    depth: Int,
+) {
+    var expanded by remember(details) { mutableStateOf(details.initiallyExpanded) }
+    val disclosureState =
+        stringResource(
+            if (expanded) R.string.markdown_details_expanded_state else R.string.markdown_details_collapsed_state,
+        )
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button) {
+                        expanded = !expanded
+                        ctx.onDisclosureStateChange?.invoke()
+                    }.semantics { stateDescription = disclosureState }
+                    .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.ExpandMore,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(20.dp)
+                        .rotate(if (expanded) 0f else -90f),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                remember(details.summary) { markdownSafeDisplayText(details.summary) },
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (expanded && details.body.isNotEmpty()) {
+            MarkdownBlockList(
+                blocks = details.body,
+                ctx = ctx,
+                depth = depth + 1,
+                modifier = Modifier.padding(start = 24.dp),
+            )
         }
     }
 }

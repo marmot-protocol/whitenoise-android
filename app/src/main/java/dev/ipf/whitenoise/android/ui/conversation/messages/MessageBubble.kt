@@ -46,9 +46,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,6 +133,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+
+@Composable
+internal fun rememberMovableBubbleBody(content: @Composable () -> Unit): @Composable () -> Unit {
+    val latestContent = rememberUpdatedState(content)
+    return remember { movableContentOf { latestContent.value() } }
+}
 
 @Composable
 internal fun messageBubbleBorder(
@@ -1086,7 +1094,8 @@ internal fun MessageBubble(
                         // content (clipToBounds is visual only and doesn't
                         // constrain it); the overflow flag latches true so
                         // applying the cap can't shrink the measurement and
-                        // flip it back.
+                        // flip it back. Disclosure toggles explicitly clear the
+                        // latch before their new natural height is measured.
                         val lineHeightPx =
                             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
                         val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
@@ -1146,7 +1155,8 @@ internal fun MessageBubble(
                                             }
                                         }
                                     MarkdownMessageBody(
-                                        markdownDocument,
+                                        document = markdownDocument,
+                                        source = bodyTextToRender,
                                         mentionDisplayName =
                                             remember(appState) {
                                                 { bech32: String -> appState.mentionDisplayName(bech32) }
@@ -1157,6 +1167,7 @@ internal fun MessageBubble(
                                                 { bech32: String -> appState.presentNostrProfile(bech32) }
                                             },
                                         onLastTextLayout = { lastLineLayout = it },
+                                        onDisclosureStateChange = { markdownOverflows = false },
                                     )
                                 }
                             } else if (plainTextOverflows) {
@@ -1192,6 +1203,10 @@ internal fun MessageBubble(
                                 )
                             }
                         }
+                        // The body moves between collapsed and regular footer layouts as
+                        // its measured height changes. Movable content keeps disclosure
+                        // and other remembered body state attached during that move.
+                        val movableMessageBody = rememberMovableBubbleBody(messageBody)
                         val readMoreFooter: @Composable () -> Unit = {
                             Text(
                                 readMoreLabel,
@@ -1218,7 +1233,7 @@ internal fun MessageBubble(
                                 footer = inlineFooter,
                                 modifier = bodyModifier,
                             ) {
-                                messageBody()
+                                movableMessageBody()
                             }
                         } else {
                             BubbleFooterLayout(
@@ -1229,7 +1244,7 @@ internal fun MessageBubble(
                                         if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
                                     },
                             ) {
-                                messageBody()
+                                movableMessageBody()
                             }
                         }
                     } else if (!footerOnVisualMedia && !footerOnPendingVisual) {

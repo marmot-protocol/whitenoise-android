@@ -1013,6 +1013,8 @@
     <string name="see_all_members">Показать всех участников (%1$d)</string>
     <string name="chat_lock">Блокировка чата</string>
     <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
+    <string name="markdown_details_collapsed_state">свернуто</string>
+    <string name="markdown_details_expanded_state">развернуто</string>
     <string name="notify">Уведомлять</string>
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
