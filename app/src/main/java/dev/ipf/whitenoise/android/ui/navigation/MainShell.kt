@@ -64,9 +64,6 @@ internal fun MainShell(
     // open path (row tap, notification, new-chat), which lands at the normal
     // unread/newest anchor.
     var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
-    // Whether the focused message also gets the brief highlight flash. Search
-    // hits highlight; a notification tap scrolls to it without the color flash.
-    var selectedChatFocusHighlight by remember { mutableStateOf(true) }
     // True only when `selectedChat` was opened by tapping a message notification.
     // A message notification implies current group membership, so the composer
     // shows immediately instead of a placeholder while membership verification
@@ -214,7 +211,7 @@ internal fun MainShell(
                         // the conversation composition so a quick back press
                         // cannot cancel the scroll-driven mark-read before it
                         // reaches the store (#1016).
-                        step.focusMessageIdHex?.let { messageIdHex ->
+                        step.readThroughMessageIdHex?.let { messageIdHex ->
                             appState.launchMutation {
                                 appState.markNotificationMessageRead(
                                     accountRef = target.accountRef,
@@ -223,11 +220,10 @@ internal fun MainShell(
                                 )
                             }
                         }
-                        // Scroll to the notified message, reusing the search-hit
-                        // focus path. The id is resolved (and MESSAGE-gated) in
-                        // the nav FSM. No highlight flash on a notification tap.
-                        selectedChatFocusMessageId = step.focusMessageIdHex
-                        selectedChatFocusHighlight = false
+                        // A notification's latest message id is a read-through
+                        // cursor, not a search target. Keep focus null so the
+                        // conversation lands on its normal first-unread anchor.
+                        selectedChatFocusMessageId = null
                         selectedChatOpenedFromNotification = true
                         // Notification routing is never a just-created open, so
                         // clear any stale justCreated flag carried over from a
@@ -388,7 +384,6 @@ internal fun MainShell(
             appState = appState,
             chat = openChat,
             focusMessageId = selectedChatFocusMessageId,
-            highlightFocusMessage = selectedChatFocusHighlight,
             openedFromNotification = selectedChatOpenedFromNotification,
             justCreated = selectedChatJustCreated,
             openedAsDmHint = selectedChatOpenedAsDmHint,
@@ -437,7 +432,6 @@ internal fun MainShell(
                 },
                 onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
                     selectedChatFocusMessageId = focusMessageId
-                    selectedChatFocusHighlight = true
                     selectedChatOpenedFromNotification = false
                     selectedChatJustCreated = justCreated
                     // `justCreated` is true only for freshly-created DMs; group

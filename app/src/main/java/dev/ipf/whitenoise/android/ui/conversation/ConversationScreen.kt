@@ -233,9 +233,6 @@ internal fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
-    // Whether [focusMessageId] also gets the brief highlight flash. Search hits
-    // do; a notification tap scrolls without the color flash.
-    highlightFocusMessage: Boolean = true,
     // True when opened by tapping a message notification: receiving a message
     // implies current membership, so the composer shows immediately rather than
     // a placeholder while membership verification catches up after the switch.
@@ -2110,12 +2107,10 @@ internal fun ConversationScreen(
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         // Center the match so prior + subsequent context is visible (#595).
         centerTimelineItemAt(target, 1 + olderMessagesHeaderCount + timelineIndex)
-        if (highlightFocusMessage) {
-            highlightedMessageId = target
-            delay(1_500L)
-            if (highlightedMessageId == target) {
-                highlightedMessageId = null
-            }
+        highlightedMessageId = target
+        delay(1_500L)
+        if (highlightedMessageId == target) {
+            highlightedMessageId = null
         }
     }
 

@@ -580,7 +580,7 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun nav_messageNotificationOpen_carriesMessageFocus() {
+    fun nav_messageNotificationOpen_carriesReadThroughCursor() {
         val messageIdHex = "a".repeat(64)
         val step =
             resolveNotificationNav(
