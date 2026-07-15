@@ -161,11 +161,12 @@ object MentionComposer {
         active: ActiveQuery,
         candidate: Candidate,
     ): Insertion {
-        val start = active.start.coerceIn(0, text.length)
-        val replaceEnd =
+        val start = text.codePointBoundaryAtOrAfter(active.start)
+        val rawReplaceEnd =
             (active.start.toLong() + 1L + active.query.length)
                 .coerceIn(start.toLong(), text.length.toLong())
                 .toInt()
+        val replaceEnd = text.codePointBoundaryAtOrAfter(rawReplaceEnd)
         val before = text.substring(0, start)
         val after = text.substring(replaceEnd)
         val needsSpace = after.firstOrNull()?.isWhitespace() != true

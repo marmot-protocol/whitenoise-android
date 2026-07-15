@@ -73,10 +73,13 @@ internal object AttachmentCachePublication {
      * Returns null when the stripe is mid-invalidation.
      */
     fun capturePermit(attachmentKey: String): Permit? {
+        if (wipesInProgress > 0) return null
         val stripe = stripeFor(attachmentKey)
-        synchronized(this) {
-            if (wipesInProgress > 0) return null
-            synchronized(stripe) {
+        synchronized(stripe) {
+            // Take the coordinator only after the stripe so a same-stripe
+            // waiter cannot convoy unrelated permit captures behind it.
+            synchronized(this) {
+                if (wipesInProgress > 0) return null
                 if (stripe.invalidatingCount > 0) return null
                 return Permit(wipeGeneration, stripe.generation)
             }
