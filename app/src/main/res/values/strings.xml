@@ -1016,6 +1016,7 @@
     <string name="chat_lock">Chat lock</string>
     <string name="collapse_long_messages">Collapse long messages</string>
     <string name="collapse_long_messages_subtitle">Show a Read More shortcut for long messages in this chat</string>
+    <!-- TalkBack state descriptions for the collapsible Markdown summary button. -->
     <string name="markdown_details_collapsed_state">collapsed</string>
     <string name="markdown_details_expanded_state">expanded</string>
     <string name="notify">Notify</string>

@@ -447,6 +447,44 @@ private fun markdownDetailsInitiallyExpanded(attributes: String): Boolean? {
     }
 }
 
+private fun StringBuilder.appendMarkdownDetailsText(value: String): Boolean {
+    if (value.length > MARKDOWN_DETAILS_SOURCE_SCAN_MAX_LENGTH - length) return false
+    append(value)
+    return true
+}
+
+/** Flattens summary formatting because the whole disclosure header is one tap target. */
+private fun StringBuilder.appendMarkdownDetailsInlines(
+    inlines: List<MarkdownInlineFfi>,
+    depth: Int,
+): Boolean {
+    if (markdownInlineDepthExceeded(depth) || markdownSiblingsElided(inlines)) return false
+    for (inline in inlines) {
+        val appended =
+            when (inline) {
+                is MarkdownInlineFfi.Text -> appendMarkdownDetailsText(inline.content)
+                MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> appendMarkdownDetailsText("\n")
+                is MarkdownInlineFfi.Code -> appendMarkdownDetailsText(inline.content)
+                is MarkdownInlineFfi.Emph -> appendMarkdownDetailsInlines(inline.children, depth + 1)
+                is MarkdownInlineFfi.Strong -> appendMarkdownDetailsInlines(inline.children, depth + 1)
+                is MarkdownInlineFfi.Strikethrough -> appendMarkdownDetailsInlines(inline.children, depth + 1)
+                is MarkdownInlineFfi.Link -> appendMarkdownDetailsInlines(inline.children, depth + 1)
+                is MarkdownInlineFfi.Image -> appendMarkdownDetailsInlines(inline.alt, depth + 1)
+                is MarkdownInlineFfi.Autolink -> appendMarkdownDetailsText(inline.url)
+                is MarkdownInlineFfi.Math -> appendMarkdownDetailsText(inline.content)
+                is MarkdownInlineFfi.NostrMention -> appendMarkdownDetailsText("@${inline.entity.bech32}")
+                is MarkdownInlineFfi.NostrUri -> appendMarkdownDetailsText(inline.entity.bech32)
+            }
+        if (!appended) return false
+    }
+    return true
+}
+
+private fun markdownDetailsInlineText(inlines: List<MarkdownInlineFfi>): String? =
+    StringBuilder()
+        .takeIf { it.appendMarkdownDetailsInlines(inlines, depth = 0) }
+        ?.toString()
+
 /**
  * Recognizes the literal tag paragraph emitted by marmot-markdown for GFM-style
  * `<details>/<summary>` input. The core deliberately keeps raw HTML as text, so
@@ -456,16 +494,7 @@ private fun markdownDetailsInitiallyExpanded(attributes: String): Boolean? {
 private fun markdownDetailsOpening(block: MarkdownBlockFfi): MarkdownDetailsOpening? {
     val paragraph = block as? MarkdownBlockFfi.Paragraph ?: return null
     if (markdownSiblingsElided(paragraph.inlines)) return null
-    val tagText =
-        buildString {
-            markdownVisibleSiblings(paragraph.inlines).forEach { inline ->
-                when (inline) {
-                    is MarkdownInlineFfi.Text -> append(inline.content)
-                    MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
-                    else -> return null
-                }
-            }
-        }
+    val tagText = markdownDetailsInlineText(paragraph.inlines) ?: return null
     val match = markdownDetailsParagraph.matchEntire(tagText) ?: return null
     val attributes = match.groupValues[1]
     val summaryAttributes = match.groupValues[2]

@@ -113,6 +113,39 @@ class MarkdownMessageBodyTest {
     }
 
     @Test
+    fun detailsSummaryFlattensInlineMarkdownToPlainButtonText() {
+        val blocks =
+            listOf(
+                MarkdownBlockFfi.Paragraph(
+                    listOf(
+                        MarkdownInlineFfi.Text("<details>"),
+                        MarkdownInlineFfi.SoftBreak,
+                        MarkdownInlineFfi.Text("<summary>"),
+                        MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("bold"))),
+                        MarkdownInlineFfi.Text(" and "),
+                        MarkdownInlineFfi.Emph(listOf(MarkdownInlineFfi.Text("italic"))),
+                        MarkdownInlineFfi.Text(" with "),
+                        MarkdownInlineFfi.Link(
+                            dest = "https://example.com",
+                            title = null,
+                            children = listOf(MarkdownInlineFfi.Code("linked")),
+                        ),
+                        MarkdownInlineFfi.Text("</summary>"),
+                    ),
+                ),
+                paragraph("secret"),
+                MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("</details>"))),
+            )
+        val source =
+            "<details>\n<summary>**bold** and *italic* with [`linked`](https://example.com)</summary>\n\nsecret\n\n</details>"
+
+        render(blocks, source)
+
+        composeRule.onNodeWithText("bold and italic with linked").assert(buttonRole()).assert(stateDescription("collapsed"))
+        composeRule.onNodeWithText("secret").assertDoesNotExist()
+    }
+
+    @Test
     fun detailsOpenAttributeStartsExpandedAndRendersNestedMarkdownBlocks() {
         val details =
             details(
