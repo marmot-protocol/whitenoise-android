@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.oss.licenses) apply false
     alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.kover) apply false
 }

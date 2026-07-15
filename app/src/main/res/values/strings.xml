@@ -362,15 +362,15 @@
     <string name="settings">Settings</string>
     <string name="account">Account</string>
     <string name="profile_settings_subtitle">Publish your Nostr kind:0 profile</string>
-    <string name="identity_and_keys">Identity &amp; Keys</string>
-    <string name="identity_settings_subtitle">Public key, npub, signing status</string>
+    <string name="account_and_keys">Account &amp; keys</string>
+    <string name="account_and_keys_settings_subtitle">npub · backup · sign out</string>
     <string name="relays_settings_subtitle">White Noise-managed relay lists</string>
     <string name="key_packages">Key Packages</string>
     <string name="key_packages_settings_subtitle">Published key packages and rotation</string>
     <string name="notifications">Notifications</string>
     <string name="notifications_settings_subtitle">Local alerts and background connection</string>
-    <string name="security_and_privacy">Security &amp; Privacy</string>
-    <string name="security_privacy_settings_subtitle">Screen lock, keyboard privacy, telemetry</string>
+    <string name="device_privacy">Device privacy</string>
+    <string name="device_privacy_settings_subtitle">App lock, keyboard, screenshots, telemetry</string>
     <string name="require_app_unlock">Require unlock to open app</string>
     <string name="require_app_unlock_subtitle">Ask for your device screen lock — fingerprint, face, PIN, pattern, or password — before showing White Noise.</string>
     <string name="app_lock_screen_lock_required_hint">Set a screen lock in Android Settings first.</string>
@@ -404,6 +404,7 @@
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
+    <string name="developer_tools_unlocked">Developer tools unlocked</string>
     <string name="group_system_show_details">Show details</string>
     <string name="group_system_hide_details">Hide details</string>
     <string name="local_notifications">Local notifications</string>
@@ -745,9 +746,20 @@
     <string name="appearance_settings_subtitle">Theme and language</string>
     <string name="data_and_storage">Data and storage</string>
     <string name="data_and_storage_settings_subtitle">Media auto-download</string>
+    <string name="help">Help</string>
+    <string name="help_settings_subtitle">Report a bug · about &amp; licenses</string>
+    <string name="report_a_bug">Report a bug</string>
+    <string name="report_a_bug_subtitle">Open a prefilled GitHub issue</string>
+    <string name="about_and_licenses">About &amp; licenses</string>
+    <string name="about_and_licenses_subtitle">Version, MarmotKit, licenses, privacy policy</string>
+    <string name="open_source_licenses">Open source licenses</string>
+    <string name="open_source_licenses_subtitle">View included dependency licenses</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_subtitle">How White Noise handles information</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Version %1$s</string>
     <string name="settings_mdk_version_label" translatable="false">MDK %1$s</string>
+    <string name="settings_marmotkit_sha_label" translatable="false">MarmotKit SHA %1$s</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>
     <string name="support_the_project">Support the project</string>
@@ -884,6 +896,7 @@
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
     <string name="media_quality_footer">Location and device metadata (EXIF GPS, make and model) are always removed from photos, even on Original. Videos and picked audio files are sent as-is; the audio bitrate applies to recorded voice notes.</string>
+    <string name="composer">Composer</string>
     <string name="enter_key_behavior_title">Enter key behavior</string>
     <string name="enter_key_behavior_send">Send message</string>
     <string name="enter_key_behavior_newline">New line</string>

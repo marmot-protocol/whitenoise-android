@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.navigation.settingsHomeDetails
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
@@ -88,6 +91,8 @@ internal fun SettingsScreen(
             // Font size is a level-2 subscreen reached from Appearance, so
             // back returns there rather than jumping to the Settings home.
             detail == SettingsDetail.FontSize -> onDetailChange(SettingsDetail.Appearance)
+            detail == SettingsDetail.KeyPackages -> onDetailChange(SettingsDetail.AccountKeys)
+            detail == SettingsDetail.About -> onDetailChange(SettingsDetail.Help)
             detail != null -> onDetailChange(null)
             else -> onBackToChats()
         }
@@ -103,12 +108,28 @@ internal fun SettingsScreen(
         SettingsDetail.FontSize -> FontSizeScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.AccountKeys ->
+            AccountKeysScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+                onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
+            )
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(SettingsDetail.AccountKeys) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.SecurityPrivacy ->
-            SecurityPrivacyScreen(
+        SettingsDetail.DevicePrivacy ->
+            DevicePrivacyScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+            )
+        SettingsDetail.Help ->
+            HelpScreen(
+                onBack = { onDetailChange(null) },
+                onOpenAbout = { onDetailChange(SettingsDetail.About) },
+            )
+        SettingsDetail.About -> AboutScreen(appState = appState, onBack = { onDetailChange(SettingsDetail.Help) })
+        SettingsDetail.Developer ->
+            DeveloperScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
@@ -172,40 +193,18 @@ private fun SettingsHomeScreen(
                             onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
                         )
                     }
-                    SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }
                     SettingsRow(
-                        stringResource(R.string.identity_and_keys),
-                        stringResource(R.string.identity_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Identity) }
-                    SettingsRow(stringResource(R.string.relays), stringResource(R.string.relays_settings_subtitle)) { onOpenDetail(SettingsDetail.Relays) }
-                    SettingsRow(
-                        stringResource(R.string.key_packages),
-                        stringResource(R.string.key_packages_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.KeyPackages) }
+                        stringResource(R.string.profile),
+                        stringResource(R.string.profile_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Profile) }
                 }
             }
-            item {
-                SectionCard(title = stringResource(R.string.app_preferences)) {
-                    SettingsRow(
-                        stringResource(R.string.appearance),
-                        stringResource(R.string.appearance_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Appearance) }
-                    SettingsRow(
-                        stringResource(R.string.data_and_storage),
-                        stringResource(R.string.data_and_storage_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Data) }
-                    SettingsRow(
-                        stringResource(R.string.notifications),
-                        stringResource(R.string.notifications_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Notifications) }
-                    SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
-                        onOpenDetail(SettingsDetail.SecurityPrivacy)
-                    }
-                }
+            items(settingsHomeDetails(appState.developerMode)) { detail ->
+                SettingsHomeRow(detail = detail, onOpenDetail = onOpenDetail)
             }
             item {
-                // Navigation row to the donation page, matching the other
-                // Settings sections' row -> detail-screen shape.
+                // Keep the existing support card on Settings home; Help is for
+                // support information, not a replacement for project funding.
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
                     colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
@@ -322,6 +321,46 @@ private fun SettingsHomeScreen(
     }
     if (showAddIdentity) {
         AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+    }
+}
+
+@Composable
+private fun SettingsHomeRow(
+    detail: SettingsDetail,
+    onOpenDetail: (SettingsDetail) -> Unit,
+) {
+    val (titleRes, subtitleRes) =
+        when (detail) {
+            SettingsDetail.Notifications -> R.string.notifications to R.string.notifications_settings_subtitle
+            SettingsDetail.DevicePrivacy -> R.string.device_privacy to R.string.device_privacy_settings_subtitle
+            SettingsDetail.Data -> R.string.data_and_storage to R.string.data_and_storage_settings_subtitle
+            SettingsDetail.Appearance -> R.string.appearance to R.string.appearance_settings_subtitle
+            SettingsDetail.Relays -> R.string.relays to R.string.relays_settings_subtitle
+            SettingsDetail.AccountKeys -> R.string.account_and_keys to R.string.account_and_keys_settings_subtitle
+            SettingsDetail.Help -> R.string.help to R.string.help_settings_subtitle
+            SettingsDetail.Developer -> R.string.developer to R.string.developer_mode_subtitle
+            else -> return
+        }
+    SettingsCardRow(
+        title = stringResource(titleRes),
+        subtitle = stringResource(subtitleRes),
+        onClick = { onOpenDetail(detail) },
+    )
+}
+
+@Composable
+internal fun SettingsCardRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
+        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+    ) {
+        CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+            SettingsRow(title = title, subtitle = subtitle, onClick = onClick)
+        }
     }
 }
 

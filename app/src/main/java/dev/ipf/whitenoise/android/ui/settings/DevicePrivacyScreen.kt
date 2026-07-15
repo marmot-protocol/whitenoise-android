@@ -43,10 +43,9 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SecurityPrivacyScreen(
+internal fun DevicePrivacyScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
 ) {
     var telemetryBusy by remember { mutableStateOf(false) }
     var auditLogsBusy by remember { mutableStateOf(false) }
@@ -59,7 +58,7 @@ internal fun SecurityPrivacyScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.security_and_privacy)) },
+                title = { Text(stringResource(R.string.device_privacy)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -70,7 +69,7 @@ internal fun SecurityPrivacyScreen(
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = stringResource(R.string.security_and_privacy)) {
+                SectionCard(title = stringResource(R.string.device_privacy)) {
                     SettingsSwitchRow(
                         title = stringResource(R.string.require_app_unlock),
                         subtitle =
@@ -204,27 +203,6 @@ internal fun SecurityPrivacyScreen(
                                     Text(stringResource(R.string.cancel))
                                 }
                             },
-                        )
-                    }
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.developer)) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.developer_mode),
-                        subtitle = stringResource(R.string.developer_mode_subtitle),
-                        checked = appState.developerMode,
-                        onCheckedChange = { appState.updateDeveloperMode(it) },
-                    )
-                    if (appState.developerMode) {
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                        SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
-                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.streaming_debug),
-                            subtitle = stringResource(R.string.streaming_debug_subtitle),
-                            checked = appState.streamingDebugMode,
-                            onCheckedChange = { appState.updateStreamingDebugMode(it) },
                         )
                     }
                 }

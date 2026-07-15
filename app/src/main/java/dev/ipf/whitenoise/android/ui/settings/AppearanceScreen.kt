@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -116,7 +117,11 @@ internal fun AppearanceScreen(
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.enter_key_behavior_title)) {
+                SectionCard(title = stringResource(R.string.composer)) {
+                    Text(
+                        text = stringResource(R.string.enter_key_behavior_title),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                     EnterKeyBehavior.entries.forEach { behavior ->
                         SelectableSettingsRow(
                             title = stringResource(behavior.labelRes),
