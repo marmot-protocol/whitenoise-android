@@ -71,6 +71,7 @@ internal fun AppearanceScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenFontSize: () -> Unit,
+    onOpenChatBubbleColors: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -94,6 +95,11 @@ internal fun AppearanceScreen(
                             onClick = { appState.updateThemeMode(mode) },
                         )
                     }
+                    SettingsRow(
+                        title = stringResource(R.string.chat_bubble_colors),
+                        subtitle = stringResource(R.string.chat_bubble_colors_global_subtitle),
+                        onClick = onOpenChatBubbleColors,
+                    )
                 }
             }
             item {

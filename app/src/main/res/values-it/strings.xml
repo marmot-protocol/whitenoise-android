@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">Impossibile aprire Zapstore</string>
     <string name="notification_channel_app_updates">Aggiornamenti dell\'app</string>
     <string name="notification_channel_app_updates_description">Avvisi sulle versioni di Zapstore</string>
+
+    <string name="chat_bubble_colors">Colori dei fumetti</string>
+    <string name="chat_bubble_colors_global_subtitle">Scegli i valori predefiniti per il tema corrente. I colori chiaro, scuro e AMOLED vengono salvati separatamente.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Sostituisci i colori dei fumetti solo per questa conversazione. Reimposta per ereditare i valori di Aspetto.</string>
+    <string name="bubble_color_preview">Anteprima</string>
+    <string name="bubble_color_current_theme">Tema corrente: %1$s</string>
+    <string name="bubble_my_messages">I miei messaggi</string>
+    <string name="bubble_other_messages">Altri messaggi</string>
+    <string name="bubble_preview_other">Ciao, ecco come appaiono le risposte.</string>
+    <string name="bubble_preview_mine">Per me va bene.</string>
+    <string name="bubble_color_swatch_content_description">Colore fumetto %1$s</string>
+    <string name="more_colors">Altri colori</string>
+    <string name="custom_hex_color">Colore esadecimale personalizzato</string>
+    <string name="invalid_hex_color">Inserisci un colore come #336699.</string>
+    <string name="apply_color">Applica colore</string>
+    <string name="reset_to_default">Ripristina predefiniti</string>
 </resources>

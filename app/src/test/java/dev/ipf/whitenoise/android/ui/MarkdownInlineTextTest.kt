@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -476,6 +477,32 @@ class MarkdownInlineTextTest {
         assertEquals(FontWeight.Bold, bold.item.fontWeight)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
         assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
+    fun customBubbleMentionOmitsDecorativeBackground() {
+        val npub = "npub1" + "q".repeat(58)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = SpanStyle(color = Color.Black),
+                mentionDisplayName = { "Alice" },
+                isGroupMember = { true },
+                useDecorativeBackgrounds = false,
+            )
+
+        assertEquals(
+            Color.Unspecified,
+            annotated.spanStyles
+                .single()
+                .item.background,
+        )
     }
 
     @Test

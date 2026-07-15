@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">Não foi possível abrir o Zapstore</string>
     <string name="notification_channel_app_updates">Atualizações do app</string>
     <string name="notification_channel_app_updates_description">Alertas de versões do Zapstore</string>
+
+    <string name="chat_bubble_colors">Cores dos balões</string>
+    <string name="chat_bubble_colors_global_subtitle">Escolha os padrões do tema atual. As cores clara, escura e AMOLED são guardadas separadamente.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Substitua as cores dos balões apenas para esta conversa. Reponha para herdar os padrões de Aparência.</string>
+    <string name="bubble_color_preview">Pré-visualização</string>
+    <string name="bubble_color_current_theme">Tema atual: %1$s</string>
+    <string name="bubble_my_messages">Minhas mensagens</string>
+    <string name="bubble_other_messages">Outras mensagens</string>
+    <string name="bubble_preview_other">Olá — é assim que as respostas aparecem.</string>
+    <string name="bubble_preview_mine">Parece-me bem.</string>
+    <string name="bubble_color_swatch_content_description">Cor do balão %1$s</string>
+    <string name="more_colors">Mais cores</string>
+    <string name="custom_hex_color">Cor hexadecimal personalizada</string>
+    <string name="invalid_hex_color">Introduza uma cor como #336699.</string>
+    <string name="apply_color">Aplicar cor</string>
+    <string name="reset_to_default">Repor predefinição</string>
 </resources>

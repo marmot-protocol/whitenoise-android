@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -102,6 +103,7 @@ internal fun MarkdownMessageBody(
     // behavior — so DM/preview callers without a roster are unchanged.
     isGroupMember: ((String) -> Boolean)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
+    useDecorativeBackgrounds: Boolean = true,
     // Reports the layout of the final rendered text line so a caller can place
     // an inline footer against it. Fires for a text-bearing last block, or for
     // the elision marker when the top-level block cap hides later siblings;
@@ -134,8 +136,8 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, isGroupMember) {
-            MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember)
+        remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds) {
+            MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds)
         }
     MarkdownBlockList(
         blocks = document.blocks,
@@ -229,6 +231,7 @@ private data class MarkdownBodyContext(
     val linkListener: LinkInteractionListener,
     val mentionDisplayName: ((String) -> String?)?,
     val isGroupMember: ((String) -> Boolean)?,
+    val useDecorativeBackgrounds: Boolean,
 )
 
 @Composable
@@ -299,13 +302,13 @@ private fun MarkdownBlockView(
             )
         MarkdownBlockFfi.ThematicBreak ->
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
-        is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content)
+        is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content, ctx.useDecorativeBackgrounds)
         is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth)
         is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth)
         is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx)
         // No math typesetting in v1 — show the raw TeX in the code treatment
         // so it at least reads as "source", not as broken prose.
-        is MarkdownBlockFfi.MathBlock -> MarkdownCodeBlockView(block.content)
+        is MarkdownBlockFfi.MathBlock -> MarkdownCodeBlockView(block.content, ctx.useDecorativeBackgrounds)
     }
 }
 
@@ -333,7 +336,10 @@ internal fun markdownHeadingTextStyle(
     }.copy(fontWeight = FontWeight.SemiBold)
 
 @Composable
-private fun MarkdownCodeBlockView(content: String) {
+private fun MarkdownCodeBlockView(
+    content: String,
+    useDecorativeBackground: Boolean,
+) {
     // The parser keeps the block's trailing newline; trimming it avoids a
     // phantom empty line inside the chip. Code/math blocks can be large, so
     // cache the sanitization work instead of repeating it on every recomposition.
@@ -345,8 +351,10 @@ private fun MarkdownCodeBlockView(content: String) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(LocalContentColor.current.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .background(
+                    if (useDecorativeBackground) LocalContentColor.current.copy(alpha = 0.08f) else Color.Transparent,
+                    RoundedCornerShape(8.dp),
+                ).padding(horizontal = 10.dp, vertical = 8.dp),
     )
 }
 
@@ -492,7 +500,12 @@ private fun rememberMarkdownInlineText(
             codeStyle =
                 SpanStyle(
                     fontFamily = FontFamily.Monospace,
-                    background = contentColor.copy(alpha = 0.08f),
+                    background =
+                        if (ctx.useDecorativeBackgrounds) {
+                            contentColor.copy(alpha = 0.08f)
+                        } else {
+                            Color.Unspecified
+                        },
                 ),
             linkStyle =
                 SpanStyle(
@@ -502,6 +515,7 @@ private fun rememberMarkdownInlineText(
             linkListener = ctx.linkListener,
             mentionDisplayName = mentionNames::get,
             isGroupMember = ctx.isGroupMember,
+            useDecorativeBackgrounds = ctx.useDecorativeBackgrounds,
         )
     }
 }
@@ -625,11 +639,19 @@ internal fun markdownInlinesToAnnotatedString(
     linkListener: LinkInteractionListener? = null,
     mentionDisplayName: ((String) -> String?)? = null,
     isGroupMember: ((String) -> Boolean)? = null,
+    useDecorativeBackgrounds: Boolean = true,
 ): AnnotatedString =
     buildAnnotatedString {
         appendMarkdownInlines(
             inlines,
-            MarkdownInlineRenderContext(codeStyle, linkStyle, linkListener, mentionDisplayName, isGroupMember),
+            MarkdownInlineRenderContext(
+                codeStyle,
+                linkStyle,
+                linkListener,
+                mentionDisplayName,
+                isGroupMember,
+                useDecorativeBackgrounds,
+            ),
             depth = 0,
         )
     }
@@ -641,6 +663,7 @@ private class MarkdownInlineRenderContext(
     val linkListener: LinkInteractionListener?,
     val mentionDisplayName: ((String) -> String?)?,
     val isGroupMember: ((String) -> Boolean)?,
+    val useDecorativeBackgrounds: Boolean,
 )
 
 private fun AnnotatedString.Builder.appendMarkdownInlines(
@@ -759,7 +782,12 @@ private fun AnnotatedString.Builder.appendNostrEntity(
                 SpanStyle(
                     color = ctx.linkStyle.color,
                     fontWeight = FontWeight.Bold,
-                    background = ctx.linkStyle.color.copy(alpha = 0.12f),
+                    background =
+                        if (ctx.useDecorativeBackgrounds) {
+                            ctx.linkStyle.color.copy(alpha = 0.12f)
+                        } else {
+                            Color.Unspecified
+                        },
                 )
             name != null -> ctx.linkStyle
             else -> ctx.codeStyle.copy(color = ctx.linkStyle.color)

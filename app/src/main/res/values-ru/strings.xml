@@ -1073,4 +1073,20 @@
     <string name="toast_zapstore_unavailable">Не удалось открыть Zapstore</string>
     <string name="notification_channel_app_updates">Обновления приложения</string>
     <string name="notification_channel_app_updates_description">Уведомления о версиях Zapstore</string>
+
+    <string name="chat_bubble_colors">Цвета сообщений</string>
+    <string name="chat_bubble_colors_global_subtitle">Выберите цвета по умолчанию для текущей темы. Светлая, тёмная и AMOLED-тема хранят цвета отдельно.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Измените цвета сообщений только для этой беседы. Сбросьте настройки, чтобы использовать значения оформления.</string>
+    <string name="bubble_color_preview">Предпросмотр</string>
+    <string name="bubble_color_current_theme">Текущая тема: %1$s</string>
+    <string name="bubble_my_messages">Мои сообщения</string>
+    <string name="bubble_other_messages">Другие сообщения</string>
+    <string name="bubble_preview_other">Привет — так выглядят ответы.</string>
+    <string name="bubble_preview_mine">Мне нравится.</string>
+    <string name="bubble_color_swatch_content_description">Цвет сообщения %1$s</string>
+    <string name="more_colors">Другие цвета</string>
+    <string name="custom_hex_color">Свой шестнадцатеричный цвет</string>
+    <string name="invalid_hex_color">Введите цвет, например #336699.</string>
+    <string name="apply_color">Применить цвет</string>
+    <string name="reset_to_default">Сбросить</string>
 </resources>

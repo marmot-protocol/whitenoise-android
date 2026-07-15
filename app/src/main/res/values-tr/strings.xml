@@ -1043,4 +1043,20 @@
     <string name="toast_zapstore_unavailable">Zapstore açılamadı</string>
     <string name="notification_channel_app_updates">Uygulama güncellemeleri</string>
     <string name="notification_channel_app_updates_description">Zapstore sürüm uyarıları</string>
+
+    <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
+    <string name="chat_bubble_colors_global_subtitle">Geçerli tema için varsayılanları seçin. Açık, koyu ve AMOLED renkleri ayrı kaydedilir.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Balon renklerini yalnızca bu konuşma için değiştirin. Görünüm varsayılanlarını devralmak için sıfırlayın.</string>
+    <string name="bubble_color_preview">Önizleme</string>
+    <string name="bubble_color_current_theme">Geçerli tema: %1$s</string>
+    <string name="bubble_my_messages">Mesajlarım</string>
+    <string name="bubble_other_messages">Diğer mesajlar</string>
+    <string name="bubble_preview_other">Merhaba — yanıtlar böyle görünür.</string>
+    <string name="bubble_preview_mine">Bence güzel.</string>
+    <string name="bubble_color_swatch_content_description">Balon rengi %1$s</string>
+    <string name="more_colors">Daha fazla renk</string>
+    <string name="custom_hex_color">Özel onaltılık renk</string>
+    <string name="invalid_hex_color">#336699 gibi bir renk girin.</string>
+    <string name="apply_color">Rengi uygula</string>
+    <string name="reset_to_default">Varsayılana sıfırla</string>
 </resources>

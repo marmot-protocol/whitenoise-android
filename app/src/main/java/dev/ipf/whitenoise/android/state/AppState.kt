@@ -1112,6 +1112,17 @@ class WhiteNoiseAppState(
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
 
+    private val globalBubbleColors =
+        mutableStateMapOf<Pair<BubbleTheme, BubbleSide>, Long?>().apply {
+            BubbleTheme.entries.forEach { theme ->
+                BubbleSide.entries.forEach { side ->
+                    this[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
+                }
+            }
+        }
+    private val chatBubbleColorCache = mutableMapOf<String, Pair<Int, Long?>>()
+    private var chatBubbleColorRevision by mutableStateOf(0)
+
     /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
      * the active account changes (see [reloadMediaAutoDownloadMatrix]); the
@@ -3022,6 +3033,50 @@ class WhiteNoiseAppState(
     fun updateFontScale(scale: AppFontScale) {
         fontScale = scale
         preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply()
+    }
+
+    internal fun globalBubbleColorArgb(
+        theme: BubbleTheme,
+        side: BubbleSide,
+    ): Long? = globalBubbleColors[theme to side]
+
+    internal fun chatBubbleColorArgb(
+        groupIdHex: String,
+        side: BubbleSide,
+    ): Long? {
+        val revision = chatBubbleColorRevision
+        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return null
+        chatBubbleColorCache[key]?.takeIf { it.first == revision }?.let { return it.second }
+        val color = BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
+        chatBubbleColorCache[key] = revision to color
+        return color
+    }
+
+    internal fun effectiveBubbleColorArgb(
+        theme: BubbleTheme,
+        side: BubbleSide,
+        groupIdHex: String,
+    ): Long? = chatBubbleColorArgb(groupIdHex, side) ?: globalBubbleColorArgb(theme, side)
+
+    internal fun updateGlobalBubbleColor(
+        theme: BubbleTheme,
+        side: BubbleSide,
+        argb: Long?,
+    ) {
+        BubbleColorPreferences.writeGlobalColor(preferences, theme, side, argb)
+        globalBubbleColors[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
+    }
+
+    internal fun updateChatBubbleColor(
+        groupIdHex: String,
+        side: BubbleSide,
+        argb: Long?,
+    ) {
+        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return
+        BubbleColorPreferences.writeChatColor(preferences, activeAccountRef, groupIdHex, side, argb)
+        chatBubbleColorRevision += 1
+        chatBubbleColorCache[key] =
+            chatBubbleColorRevision to BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
     }
 
     /**

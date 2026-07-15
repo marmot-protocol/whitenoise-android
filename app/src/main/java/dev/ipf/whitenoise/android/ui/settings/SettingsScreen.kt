@@ -87,7 +87,8 @@ internal fun SettingsScreen(
         when {
             // Font size is a level-2 subscreen reached from Appearance, so
             // back returns there rather than jumping to the Settings home.
-            detail == SettingsDetail.FontSize -> onDetailChange(SettingsDetail.Appearance)
+            detail == SettingsDetail.FontSize || detail == SettingsDetail.ChatBubbleColors ->
+                onDetailChange(SettingsDetail.Appearance)
             detail != null -> onDetailChange(null)
             else -> onBackToChats()
         }
@@ -99,7 +100,10 @@ internal fun SettingsScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
                 onOpenFontSize = { onDetailChange(SettingsDetail.FontSize) },
+                onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
             )
+        SettingsDetail.ChatBubbleColors ->
+            ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.FontSize -> FontSizeScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
