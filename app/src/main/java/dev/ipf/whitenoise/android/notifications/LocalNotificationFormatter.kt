@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 
@@ -149,9 +148,12 @@ object LocalNotificationFormatter {
         // (the caption is shown verbatim via the preview overrides).
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         conversationTitleOverride: String? = null,
+        // AppState owns hex→npub conversion through Marmot; requiring its
+        // shortener here keeps this pure formatter from duplicating bech32.
+        shortNpub: (String) -> String,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null
-        val senderName = senderName(update.sender, senderNameOverride)
+        val senderName = senderName(update.sender, senderNameOverride, shortNpub)
         val title =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context, senderName)
@@ -188,7 +190,7 @@ object LocalNotificationFormatter {
             body = body,
             senderName = senderName,
             senderKey = update.sender.accountIdHex,
-            selfName = displayName(update.receiver),
+            selfName = displayName(update.receiver, shortNpub),
             selfKey = update.receiver.accountIdHex,
             isGroupConversation = !update.isDm,
             conversationTitle = if (!update.isDm) clean(conversationTitleOverride) ?: clean(update.groupName) else null,
@@ -262,15 +264,17 @@ object LocalNotificationFormatter {
     // Sender-name priority for an incoming notification:
     //   1. caller-resolved override (profile / contact name, else npub),
     //   2. the FFI payload's own displayName (when present),
-    //   3. a shortened key as the last resort.
-    // The override is npub-formatted by the caller, so a raw hex pubkey only
-    // ever surfaces when nothing — no name and no npub — could be resolved.
+    //   3. a shortened npub supplied by AppState as the last resort.
     private fun senderName(
         user: NotificationUserFfi,
         override: String?,
-    ): String = clean(override) ?: displayName(user)
+        shortNpub: (String) -> String,
+    ): String = clean(override) ?: displayName(user, shortNpub)
 
-    private fun displayName(user: NotificationUserFfi): String = clean(user.displayName) ?: IdentityFormatter.short(user.accountIdHex)
+    private fun displayName(
+        user: NotificationUserFfi,
+        shortNpub: (String) -> String,
+    ): String = clean(user.displayName) ?: shortNpub(user.accountIdHex)
 
     private fun clean(value: String?): String? {
         if (value == null) return null

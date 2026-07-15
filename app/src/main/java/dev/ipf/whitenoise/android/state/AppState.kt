@@ -905,6 +905,12 @@ internal fun isLocalContactAccount(
     accountIdHex: String,
 ): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
 
+internal fun networkDisplayNameFallback(
+    accountLabel: String?,
+    accountIdHex: String,
+    shortNpub: (String) -> String,
+): String = accountLabel?.takeIf { it.isNotBlank() } ?: shortNpub(accountIdHex)
+
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 class WhiteNoiseAppState(
@@ -4313,10 +4319,8 @@ class WhiteNoiseAppState(
     fun networkDisplayName(accountIdHex: String): String {
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
-        accounts.firstOrNull { it.accountIdHex == accountIdHex }?.let {
-            return it.label.ifBlank { IdentityFormatter.short(accountIdHex) }
-        }
-        return IdentityFormatter.short(accountIdHex)
+        val accountLabel = accounts.firstOrNull { it.accountIdHex == accountIdHex }?.label
+        return networkDisplayNameFallback(accountLabel, accountIdHex, ::shortNpub)
     }
 
     fun chatMemberTitle(accountIdHex: String): String {
@@ -5231,6 +5235,7 @@ class WhiteNoiseAppState(
                 redactContent = redactNotificationContent,
                 conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
                 senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
+                shortNpub = ::shortNpub,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

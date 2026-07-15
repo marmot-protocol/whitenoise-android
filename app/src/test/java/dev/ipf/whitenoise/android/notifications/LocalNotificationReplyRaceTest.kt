@@ -113,6 +113,7 @@ class LocalNotificationReplyRaceTest {
                     assertTrue(
                         appStatePresenter.show(
                             messageUpdate("msg-b", previewText = "new during window", timestampMs = 2_000L),
+                            shortNpub = { "npub1test" },
                         ),
                     )
                 }
@@ -196,6 +197,7 @@ class LocalNotificationReplyRaceTest {
                     assertTrue(
                         presenterB.show(
                             messageUpdate("msg-b", previewText = "message-b", timestampMs = 2_000L),
+                            shortNpub = { "npub1test" },
                         ),
                     )
                 }
@@ -213,6 +215,7 @@ class LocalNotificationReplyRaceTest {
                     assertTrue(
                         presenterC.show(
                             messageUpdate("msg-c", previewText = "message-c", timestampMs = 3_000L),
+                            shortNpub = { "npub1test" },
                         ),
                     )
                 }
@@ -303,6 +306,7 @@ class LocalNotificationReplyRaceTest {
                     assertTrue(
                         appStatePresenter.show(
                             messageUpdate("msg-b", previewText = "new during window", timestampMs = 2_000L),
+                            shortNpub = { "npub1test" },
                         ),
                     )
                 }
