@@ -1,11 +1,18 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +21,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.settings.FontSizePreviewBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -46,6 +55,29 @@ class MessageBubbleChromeScreenshotTest {
     fun bubbleChromeDark() {
         render(darkTheme = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_bubble_chrome_dark.png")
+    }
+
+    @Test
+    fun bubbleChromeAmoledDirectionAccents() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(color = Color.Black) {
+                    Column(
+                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(TAG),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        DirectionalBubble(text = "Incoming message", time = "12:34", mine = false)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            DirectionalBubble(text = "Outgoing message", time = "12:35", mine = true)
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithTag(TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_chrome_amoled.png")
     }
 
     private fun render(darkTheme: Boolean) {
@@ -95,5 +127,28 @@ class MessageBubbleChromeScreenshotTest {
 
     private companion object {
         const val TAG = "bubble-chrome"
+    }
+}
+
+@Composable
+private fun DirectionalBubble(
+    text: String,
+    time: String,
+    mine: Boolean,
+) {
+    Surface(
+        color = Color.Black,
+        contentColor = Color.White,
+        shape = RoundedCornerShape(18.dp),
+        border = messageBubbleBorder(highlighted = false, mine = mine),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(text)
+            Text(
+                text = time,
+                style = MaterialTheme.typography.labelSmall,
+                color = messageBubbleTimestampColor(invalidated = false, mine = mine, deleted = false),
+            )
+        }
     }
 }

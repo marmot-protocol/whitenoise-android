@@ -124,7 +124,6 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -136,12 +135,42 @@ import kotlin.math.roundToInt
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
-): BorderStroke? =
-    when {
+    invalidated: Boolean = false,
+): BorderStroke? {
+    val amoledAccent = amoledMessageBubbleAccentColor(mine)
+    return when {
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
-        mine && isAmoledSurfaceTheme() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        else -> amoledSurfaceBorderStroke()
+        invalidated -> null
+        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
+        else -> null
     }
+}
+
+@Composable
+private fun amoledMessageBubbleAccentColor(mine: Boolean): Color? =
+    if (!isAmoledSurfaceTheme()) {
+        null
+    } else if (mine) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    }
+
+@Composable
+internal fun messageBubbleTimestampColor(
+    invalidated: Boolean,
+    mine: Boolean,
+    deleted: Boolean,
+): Color {
+    val colorScheme = MaterialTheme.colorScheme
+    val amoledAccent = amoledMessageBubbleAccentColor(mine)
+    return when {
+        invalidated -> colorScheme.onErrorContainer
+        amoledAccent != null -> amoledAccent
+        mine && !deleted -> colorScheme.onPrimaryContainer
+        else -> colorScheme.onSurfaceVariant
+    }
+}
 
 @Composable
 internal fun rememberMessageMediaReferences(
@@ -297,16 +326,10 @@ internal fun MessageBubble(
             memberCount = controller.members.size,
             mine = mine,
         )
-    // Match the timestamp to the bubble's on-color family. The mine bubble
-    // fills with primaryContainer, so the M3 paired token is onPrimaryContainer;
-    // using onSurfaceVariant there blends into the tint and reads as invisible.
-    val timestampColor =
-        when {
-            invalidated -> MaterialTheme.colorScheme.onErrorContainer
-            amoledSurfaceTheme -> MaterialTheme.colorScheme.onSurfaceVariant
-            mine && !deleted -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        }
+    // Match the timestamp to the bubble's visual cue. AMOLED uses the same
+    // directional accent as the border; other themes keep their paired M3
+    // on-color tokens.
+    val timestampColor = messageBubbleTimestampColor(invalidated, mine, deleted)
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // A long body clips to a few lines with an inline Read More; opening it
     // routes through a full-screen view rather than expanding in place, so the
@@ -1336,7 +1359,7 @@ internal fun MessageBubble(
                             Surface(
                                 color = bubbleColor,
                                 shape = RoundedCornerShape(18.dp),
-                                border = messageBubbleBorder(highlighted, mine),
+                                border = messageBubbleBorder(highlighted, mine, invalidated),
                                 tonalElevation = if (mine) 1.dp else 0.dp,
                             ) {
                                 Column(
@@ -1365,7 +1388,7 @@ internal fun MessageBubble(
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         color = bubbleColor,
                         shape = RoundedCornerShape(18.dp),
-                        border = messageBubbleBorder(highlighted, mine),
+                        border = messageBubbleBorder(highlighted, mine, invalidated),
                         tonalElevation = if (mine) 1.dp else 0.dp,
                     ) {
                         Column(
