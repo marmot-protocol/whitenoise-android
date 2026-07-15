@@ -48,11 +48,11 @@ class LocalNotificationPresenter(
     private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
         ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
     },
+    private val nowMillis: () -> Long = System::currentTimeMillis,
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
 ) {
-    private val redactedPublicVersions = ConcurrentHashMap<String, Notification>()
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
@@ -268,7 +268,6 @@ class LocalNotificationPresenter(
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(false)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setPublicVersion(redactedPublicVersion(decision.channelId, decision.category))
                 .setSilent(false)
         // Name the recipient identity in the header when multi-account (#836).
         if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
@@ -391,8 +390,8 @@ class LocalNotificationPresenter(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
                     )
-                    val presentationTimestampMs = System.currentTimeMillis()
-                    builder.setWhen(presentationTimestampMs)
+                    val presentationTimestampMs = nowMillis()
+                    stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                     builder.setStyle(
                         messagingStyle(
                             notificationContent,
@@ -416,7 +415,8 @@ class LocalNotificationPresenter(
                     notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
                 }
             } else {
-                builder.setWhen(System.currentTimeMillis())
+                val presentationTimestampMs = nowMillis()
+                stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                 val notification = builder.build()
                 if (decision.replaceExistingBeforePost) {
                     notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
@@ -438,6 +438,16 @@ class LocalNotificationPresenter(
             ChannelImportance.LOW -> NotificationCompat.PRIORITY_LOW
         }
 
+    private fun stampPresentationTime(
+        builder: NotificationCompat.Builder,
+        channelId: String,
+        category: String,
+        presentationTimestampMs: Long,
+    ) {
+        builder.setWhen(presentationTimestampMs)
+        builder.setPublicVersion(redactedPublicVersion(channelId, category, presentationTimestampMs))
+    }
+
     // Shown in place of the real card whenever the lockscreen redacts private
     // notifications. The OS can auto-generate one, but that behaviour varies by
     // OEM; supplying our own guarantees no sender, body, or group name ever
@@ -445,16 +455,16 @@ class LocalNotificationPresenter(
     private fun redactedPublicVersion(
         channelId: String,
         category: String,
+        presentationTimestampMs: Long,
     ): Notification =
-        redactedPublicVersions.getOrPut("$channelId\u0000$category") {
-            NotificationCompat
-                .Builder(context, channelId)
-                .setSmallIcon(R.drawable.ic_stat_whitenoise)
-                .setContentTitle(context.getString(R.string.app_name))
-                .setCategory(category)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .build()
-        }
+        NotificationCompat
+            .Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setCategory(category)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setWhen(presentationTimestampMs)
+            .build()
 
     fun cancel(
         notificationTag: String,

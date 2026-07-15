@@ -200,10 +200,52 @@ class LocalNotificationPresenterConversationTest {
             notification.`when`,
             newestMessage.timestamp,
         )
+    }
+
+    @Test
+    fun reusedPresenterRestampsPublicVersionOnEachPost() {
+        var clockMs = 1_000_000L
+        val clockPresenter =
+            LocalNotificationPresenter(
+                context = context,
+                shortcutPublisher = { shortcut ->
+                    publishedShortcut = shortcut
+                    ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+                },
+                nowMillis = { clockMs },
+            )
+        clockPresenter.ensureChannels()
+
+        val firstPresentationMs = clockMs
+        assertTrue(
+            runBlocking {
+                clockPresenter.show(update(isMention = false), previewTextOverride = "first")
+            },
+        )
+
+        clockMs = 5_000_000L
+        val secondPresentationMs = clockMs
+        assertTrue(
+            runBlocking {
+                clockPresenter.show(
+                    update(isMention = false, messageIdHex = "message-2"),
+                    previewTextOverride = "second",
+                )
+            },
+        )
+
+        val notification = manager.activeNotifications.single().notification
+        assertEquals(secondPresentationMs, notification.`when`)
+        val publicVersion = checkNotNull(notification.publicVersion)
         assertEquals(
-            "New MessagingStyle line must use the same presentation time as Notification.when",
-            notification.`when`,
-            newestMessage.timestamp,
+            "publicVersion.when must match the second post's presentation time",
+            secondPresentationMs,
+            publicVersion.`when`,
+        )
+        assertNotEquals(
+            "publicVersion.when must not retain the first post's cached timestamp",
+            firstPresentationMs,
+            publicVersion.`when`,
         )
     }
 
@@ -268,6 +310,7 @@ class LocalNotificationPresenterConversationTest {
     private fun update(
         isMention: Boolean,
         timestampMs: Long = 1234,
+        messageIdHex: String = "message",
     ) = NotificationUpdateFfi(
         notificationKey = "key",
         conversationKey = "conversation",
@@ -278,7 +321,7 @@ class LocalNotificationPresenterConversationTest {
         groupName = "General",
         isDm = false,
         isMention = isMention,
-        messageIdHex = "message",
+        messageIdHex = messageIdHex,
         sender = user(displayName = "Alice"),
         receiver = user(accountIdHex = "self", displayName = "Me"),
         previewText = "hi",
