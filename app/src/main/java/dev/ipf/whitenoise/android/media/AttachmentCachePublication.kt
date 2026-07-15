@@ -74,12 +74,14 @@ internal object AttachmentCachePublication {
      */
     fun capturePermit(attachmentKey: String): Permit? {
         val stripe = stripeFor(attachmentKey)
-        synchronized(this) {
-            if (wipesInProgress > 0) return null
-            synchronized(stripe) {
-                if (stripe.invalidatingCount > 0) return null
-                return Permit(wipeGeneration, stripe.generation)
+        val snapshotWipeGeneration =
+            synchronized(this) {
+                if (wipesInProgress > 0) return null
+                wipeGeneration
             }
+        synchronized(stripe) {
+            if (stripe.invalidatingCount > 0) return null
+            return Permit(snapshotWipeGeneration, stripe.generation)
         }
     }
 

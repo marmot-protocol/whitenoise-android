@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -16,6 +17,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class AttachmentCachePublicationTest {
     private lateinit var dir: File
@@ -127,6 +129,73 @@ class AttachmentCachePublicationTest {
             assertNotNull(unrelatedPermit.get(1, TimeUnit.SECONDS))
 
             releaseRename.countDown()
+            assertTrue(publish.get(5, TimeUnit.SECONDS))
+        } finally {
+            releaseRename.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun sameStripePermitWaiterDoesNotBlockPermitCaptureOnAnotherStripe() {
+        dir = Files.createTempDirectory("attachment-cache-same-stripe-waiter").toFile()
+        val attachmentKey = AttachmentCachePublication.attachmentKey("convoy-source", 0, 1uL)
+        val unrelatedKey = keyOnDifferentStripe(attachmentKey, "convoy-other")
+        assertTrue(
+            "regression requires keys on different stripes",
+            AttachmentCachePublication.stripeIndex(attachmentKey) !=
+                AttachmentCachePublication.stripeIndex(unrelatedKey),
+        )
+        val finalFile = File(dir, "convoy-source.mp4")
+        val permit = AttachmentCachePublication.capturePermit(attachmentKey)!!
+        val renameEntered = CountDownLatch(1)
+        val releaseRename = CountDownLatch(1)
+        AttachmentCachePublication.renameFileForTests = { source, target ->
+            renameEntered.countDown()
+            check(releaseRename.await(5, TimeUnit.SECONDS))
+            source.renameTo(target)
+        }
+        val executor = Executors.newFixedThreadPool(3)
+        val sameStripeThread = AtomicReference<Thread>()
+        try {
+            val publish =
+                executor.submit<Boolean> {
+                    AttachmentCachePublication.publishWithPermit(
+                        attachmentKey = attachmentKey,
+                        finalFile = finalFile,
+                        bytes = byteArrayOf(1, 2, 3),
+                        permit = permit,
+                    )
+                }
+            assertTrue(renameEntered.await(5, TimeUnit.SECONDS))
+
+            val sameStripeCapture =
+                executor.submit<AttachmentCachePublication.Permit?> {
+                    sameStripeThread.set(Thread.currentThread())
+                    AttachmentCachePublication.capturePermit(attachmentKey)
+                }
+            val blockedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (System.nanoTime() < blockedDeadline) {
+                if (sameStripeThread.get()?.state == Thread.State.BLOCKED) break
+                Thread.sleep(10)
+            }
+            assertEquals(
+                "same-stripe capturePermit must block acquiring the stripe while rename is held",
+                Thread.State.BLOCKED,
+                sameStripeThread.get()?.state,
+            )
+
+            val unrelatedPermit =
+                executor.submit<AttachmentCachePublication.Permit?> {
+                    AttachmentCachePublication.capturePermit(unrelatedKey)
+                }
+            assertNotNull(
+                "unrelated stripe permit capture must not convoy behind a blocked same-stripe waiter",
+                unrelatedPermit.get(1, TimeUnit.SECONDS),
+            )
+
+            releaseRename.countDown()
+            assertNotNull(sameStripeCapture.get(5, TimeUnit.SECONDS))
             assertTrue(publish.get(5, TimeUnit.SECONDS))
         } finally {
             releaseRename.countDown()
