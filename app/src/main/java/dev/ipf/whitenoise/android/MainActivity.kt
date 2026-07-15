@@ -172,6 +172,8 @@ class MainActivity : FragmentActivity() {
                 inboundProfilePayload = null
                 inboundStickerRequest = null
             }
+
+            inboundProfilePayload != null -> inboundStickerRequest = null
         }
         if (shouldClearInboundActivityIntent(parsedTarget != null, stickerInput, sensitiveSignalStickerRoute)) {
             // Notification taps are one-shot navigation requests. Replace the

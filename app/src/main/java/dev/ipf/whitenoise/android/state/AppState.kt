@@ -1893,42 +1893,46 @@ class WhiteNoiseAppState(
         }
 
     /** Fetches a native-authorized sticker asset and shares concurrent loads. */
-    suspend fun stickerAsset(stickerRef: StickerRefFfi): StickerAssetFfi {
-        val account = activeAccountRef ?: error("No active account")
-        val cacheEpoch = stickerAssetCacheEpoch.get()
-        val cacheKey =
-            StickerAssetCacheKey(
-                accountRef = account,
-                packCoordinate = stickerRef.packCoordinate,
-                shortcode = stickerRef.shortcode,
-                plaintextSha256 = stickerRef.plaintextSha256.lowercase(Locale.ROOT),
-            )
-        stickerAssetCache.get(cacheKey)?.let { return it }
+    suspend fun stickerAsset(stickerRef: StickerRefFfi): StickerAssetFfi =
+        withContext(Dispatchers.Main.immediate) {
+            // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap.
+            // Keep every sticker cache read/write Main-confined while the native
+            // fetch itself continues on IO through marmotIo.
+            val account = activeAccountRef ?: error("No active account")
+            val cacheEpoch = stickerAssetCacheEpoch.get()
+            val cacheKey =
+                StickerAssetCacheKey(
+                    accountRef = account,
+                    packCoordinate = stickerRef.packCoordinate,
+                    shortcode = stickerRef.shortcode,
+                    plaintextSha256 = stickerRef.plaintextSha256.lowercase(Locale.ROOT),
+                )
+            stickerAssetCache.get(cacheKey)?.let { return@withContext it }
 
-        val deferred =
-            synchronized(inFlightStickerAssetsLock) {
-                inFlightStickerAssets[cacheKey]?.takeIf { it.isActive }
-                    ?: mutationsScope
-                        .async {
-                            marmotIo { fetchStickerAsset(account, stickerRef) }
-                        }.also { created ->
-                            inFlightStickerAssets[cacheKey] = created
-                            created.invokeOnCompletion {
-                                synchronized(inFlightStickerAssetsLock) {
-                                    if (inFlightStickerAssets[cacheKey] === created) {
-                                        inFlightStickerAssets.remove(cacheKey)
+            val deferred =
+                synchronized(inFlightStickerAssetsLock) {
+                    inFlightStickerAssets[cacheKey]?.takeIf { it.isActive }
+                        ?: mutationsScope
+                            .async {
+                                marmotIo { fetchStickerAsset(account, stickerRef) }
+                            }.also { created ->
+                                inFlightStickerAssets[cacheKey] = created
+                                created.invokeOnCompletion {
+                                    synchronized(inFlightStickerAssetsLock) {
+                                        if (inFlightStickerAssets[cacheKey] === created) {
+                                            inFlightStickerAssets.remove(cacheKey)
+                                        }
                                     }
                                 }
                             }
-                        }
+                }
+            val asset = deferred.await()
+            if (!shouldAcceptStickerAssetResult(account, cacheEpoch, activeAccountRef, stickerAssetCacheEpoch.get())) {
+                throw CancellationException("Sticker asset request invalidated")
             }
-        val asset = deferred.await()
-        if (!shouldAcceptStickerAssetResult(account, cacheEpoch, activeAccountRef, stickerAssetCacheEpoch.get())) {
-            throw CancellationException("Sticker asset request invalidated")
+            stickerAssetCache.put(cacheKey, asset)
+            asset
         }
-        stickerAssetCache.put(cacheKey, asset)
-        return asset
-    }
 
     /**
      * Drive Marmot's per-account catch-up so every signed-in account on this
@@ -2522,10 +2526,6 @@ class WhiteNoiseAppState(
         synchronized(inFlightDownloadsLock) {
             inFlightDownloads.values.forEach { it.cancel() }
             inFlightDownloads.clear()
-        }
-        synchronized(inFlightStickerAssetsLock) {
-            inFlightStickerAssets.values.forEach { it.cancel() }
-            inFlightStickerAssets.clear()
         }
     }
 

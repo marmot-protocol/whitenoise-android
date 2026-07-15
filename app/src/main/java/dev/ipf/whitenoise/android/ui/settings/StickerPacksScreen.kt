@@ -38,7 +38,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -57,7 +59,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.stickers.StickerImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -71,57 +76,92 @@ internal fun StickerPacksScreen(
     var packs by remember(appState.activeAccountRef) { mutableStateOf(emptyList<StickerPackFfi>()) }
     var search by remember(account) { mutableStateOf("") }
     var input by remember(account) { mutableStateOf("") }
-    var busy by remember(account) { mutableStateOf(false) }
+    var operationOwner by remember(account) { mutableStateOf<Any?>(null) }
+    var busyOwner by remember(account) { mutableStateOf<Any?>(null) }
     var error by remember(account) { mutableStateOf<String?>(null) }
     var preview by remember(account) { mutableStateOf<StickerPackFfi?>(null) }
+    val operationMutex = remember(account) { Mutex() }
     val scope = rememberCoroutineScope()
+    val latestInitialInput by rememberUpdatedState(initialInput)
+    val latestInitialInputConsumed by rememberUpdatedState(onInitialInputConsumed)
     val unsupportedImportError = stringResource(R.string.sticker_external_signer_unsupported)
     val genericStickerError = stringResource(R.string.sticker_operation_failed)
+    val operationInProgress = operationOwner != null
+    val busy = busyOwner != null
 
-    suspend fun reload() {
-        val current = account ?: return
-        packs =
+    suspend fun reload(
+        current: String,
+        requestedSearch: String?,
+    ) {
+        val loaded =
             appState.marmotIo {
                 stickerPacks(
                     accountRef = current,
                     installedOnly = false,
-                    search = search.trim().takeIf { it.isNotEmpty() },
+                    search = requestedSearch,
                     limit = 100u,
                 )
             }
-    }
-
-    suspend fun runAction(action: suspend () -> Unit) {
-        busy = true
-        error = null
-        try {
-            action()
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (failure: Throwable) {
-            error = sanitizedStickerActionError(failure, unsupportedImportError, genericStickerError)
-        } finally {
-            busy = false
+        if (
+            shouldApplyStickerPackReload(
+                requestedAccount = current,
+                requestedSearch = requestedSearch,
+                activeAccount = appState.activeAccountRef,
+                activeSearch = search.trim().takeIf { it.isNotEmpty() },
+            )
+        ) {
+            packs = loaded
         }
     }
 
-    suspend fun processStickerInput(stickerInput: StickerInput) {
-        val current = account ?: return
-        runAction {
+    suspend fun runAction(
+        showBusy: Boolean = true,
+        reportFailure: Boolean = true,
+        action: suspend (String) -> Unit,
+    ) {
+        val requestedAccount = account ?: return
+        operationMutex.withLock {
+            if (appState.activeAccountRef != requestedAccount) return@withLock
+            val owner = Any()
+            operationOwner = owner
+            if (showBusy) busyOwner = owner
+            if (reportFailure) error = null
+            try {
+                action(requestedAccount)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Throwable) {
+                if (reportFailure && appState.activeAccountRef == requestedAccount) {
+                    error = sanitizedStickerActionError(failure, unsupportedImportError, genericStickerError)
+                }
+            } finally {
+                if (busyOwner === owner) busyOwner = null
+                if (operationOwner === owner) operationOwner = null
+            }
+        }
+    }
+
+    suspend fun processStickerInput(
+        stickerInput: StickerInput,
+        onStarted: () -> Unit = {},
+    ) {
+        runAction { current ->
+            // Clear inbound Signal key material only after this operation owns
+            // the account-scoped lock, but still before entering native code.
+            onStarted()
             when (stickerInput.kind) {
                 StickerInputKind.Pack -> {
-                    preview = appState.marmotIo { fetchStickerPack(current, stickerInput.value) }
+                    val loadedPreview = appState.marmotIo { fetchStickerPack(current, stickerInput.value) }
+                    if (appState.activeAccountRef == current) preview = loadedPreview
                 }
 
                 StickerInputKind.SignalImport -> {
-                    // The Signal key is cleared from Compose/Activity state before
-                    // entering native code and is never persisted Android-side.
                     val result =
                         appState.marmotIo {
                             importSignalStickerPack(current, stickerInput.value, null)
                         }
-                    preview = result.pack
-                    reload()
+                    if (appState.activeAccountRef == current) preview = result.pack
+                    reload(current, search.trim().takeIf { it.isNotEmpty() })
                 }
             }
         }
@@ -129,27 +169,33 @@ internal fun StickerPacksScreen(
 
     LaunchedEffect(account) {
         if (account == null) return@LaunchedEffect
-        runAction {
-            reload()
-            runCatching { appState.marmotIo { syncStickerPacks(account) } }
+        runAction { current ->
+            reload(current, search.trim().takeIf { it.isNotEmpty() })
+            runCatching { appState.marmotIo { syncStickerPacks(current) } }
                 .onFailure { if (it is CancellationException) throw it }
-            reload()
+            reload(current, search.trim().takeIf { it.isNotEmpty() })
         }
     }
 
     LaunchedEffect(search, account) {
         if (account == null) return@LaunchedEffect
+        val requestedSearch = search.trim().takeIf { it.isNotEmpty() }
         delay(250)
-        runCatching { reload() }
-            .onFailure { if (it is CancellationException) throw it }
+        runAction(showBusy = false, reportFailure = false) { current ->
+            reload(current, requestedSearch)
+        }
     }
 
-    LaunchedEffect(initialInput, account) {
-        val pending = initialInput ?: return@LaunchedEffect
+    LaunchedEffect(account) {
         if (account == null) return@LaunchedEffect
-        input = ""
-        onInitialInputConsumed(pending)
-        processStickerInput(pending)
+        snapshotFlow { latestInitialInput }
+            .filterNotNull()
+            .collect { pending ->
+                input = ""
+                processStickerInput(pending) {
+                    latestInitialInputConsumed(pending)
+                }
+            }
     }
 
     Scaffold(
@@ -163,12 +209,12 @@ internal fun StickerPacksScreen(
                 },
                 actions = {
                     IconButton(
-                        enabled = !busy && account != null,
+                        enabled = !operationInProgress && account != null,
                         onClick = {
                             scope.launch {
-                                runAction {
-                                    appState.marmotIo { syncStickerPacks(account!!) }
-                                    reload()
+                                runAction { current ->
+                                    appState.marmotIo { syncStickerPacks(current) }
+                                    reload(current, search.trim().takeIf { it.isNotEmpty() })
                                 }
                             }
                         },
@@ -207,7 +253,7 @@ internal fun StickerPacksScreen(
                             ),
                     )
                     IconButton(
-                        enabled = !busy && StickerLinks.classify(input) != null && account != null,
+                        enabled = !operationInProgress && StickerLinks.classify(input) != null && account != null,
                         onClick = {
                             val classified = StickerLinks.classify(input) ?: return@IconButton
                             input = ""
@@ -251,18 +297,18 @@ internal fun StickerPacksScreen(
                 StickerPackCard(
                     appState = appState,
                     pack = packs[index],
-                    enabled = !busy,
+                    enabled = !operationInProgress,
                     onOpen = { preview = packs[index] },
                     onToggleInstall = {
                         val selected = packs[index]
                         scope.launch {
-                            runAction {
+                            runAction { current ->
                                 if (selected.installed) {
-                                    appState.marmotIo { uninstallStickerPack(account!!, selected.coordinate) }
+                                    appState.marmotIo { uninstallStickerPack(current, selected.coordinate) }
                                 } else {
-                                    appState.marmotIo { installStickerPack(account!!, selected.coordinate) }
+                                    appState.marmotIo { installStickerPack(current, selected.coordinate) }
                                 }
-                                reload()
+                                reload(current, search.trim().takeIf { it.isNotEmpty() })
                             }
                         }
                     },
@@ -296,17 +342,17 @@ internal fun StickerPacksScreen(
             },
             confirmButton = {
                 Button(
-                    enabled = !busy && account != null,
+                    enabled = !operationInProgress && account != null,
                     onClick = {
                         scope.launch {
-                            runAction {
+                            runAction { current ->
                                 if (pack.installed) {
-                                    appState.marmotIo { uninstallStickerPack(account!!, pack.coordinate) }
+                                    appState.marmotIo { uninstallStickerPack(current, pack.coordinate) }
                                 } else {
-                                    appState.marmotIo { installStickerPack(account!!, pack.coordinate) }
+                                    appState.marmotIo { installStickerPack(current, pack.coordinate) }
                                 }
-                                preview = null
-                                reload()
+                                if (appState.activeAccountRef == current) preview = null
+                                reload(current, search.trim().takeIf { it.isNotEmpty() })
                             }
                         }
                     },
@@ -320,6 +366,13 @@ internal fun StickerPacksScreen(
         )
     }
 }
+
+internal fun shouldApplyStickerPackReload(
+    requestedAccount: String,
+    requestedSearch: String?,
+    activeAccount: String?,
+    activeSearch: String?,
+): Boolean = requestedAccount == activeAccount && requestedSearch == activeSearch
 
 internal fun sanitizedStickerActionError(
     failure: Throwable,

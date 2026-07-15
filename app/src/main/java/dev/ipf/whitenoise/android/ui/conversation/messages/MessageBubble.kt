@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -825,7 +826,7 @@ internal fun MessageBubble(
                                 appState = appState,
                                 stickerRef = stickerRef,
                                 contentDescription = stringResource(R.string.sticker),
-                                modifier = Modifier.fillMaxWidth().height(196.dp),
+                                modifier = Modifier.fillMaxSize(),
                             )
                             MediaFooterOverlay(
                                 timeText = rememberedClockTime(record.recordedAt),

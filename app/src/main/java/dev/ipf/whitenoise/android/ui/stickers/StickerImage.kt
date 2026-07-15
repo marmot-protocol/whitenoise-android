@@ -35,15 +35,15 @@ fun StickerImage(
 ) {
     var presentation by remember(stickerRef) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var failed by remember(stickerRef) { mutableStateOf(false) }
-    var resolvedContentDescription by remember(stickerRef, contentDescription) { mutableStateOf(contentDescription) }
+    var loadedAltText by remember(stickerRef) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(stickerRef, contentDescription) {
+    LaunchedEffect(stickerRef) {
         failed = false
         presentation = null
-        resolvedContentDescription = contentDescription
+        loadedAltText = null
         try {
             val asset = appState.stickerAsset(stickerRef)
-            resolvedContentDescription = asset.sticker.alt?.takeIf { it.isNotBlank() } ?: contentDescription
+            loadedAltText = asset.sticker.alt?.takeIf { it.isNotBlank() }
             presentation =
                 decodeMessageAttachmentImage(
                     bytes = asset.bytes,
@@ -62,11 +62,12 @@ fun StickerImage(
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        val finalContentDescription = loadedAltText ?: contentDescription
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->
                 Image(
                     bitmap = current.toImageBitmap(),
-                    contentDescription = resolvedContentDescription,
+                    contentDescription = finalContentDescription,
                     contentScale = contentScale,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -74,7 +75,7 @@ fun StickerImage(
             is DecodedAttachmentPresentation.Animated ->
                 AnimatedDrawableAttachmentImage(
                     drawable = current.drawable,
-                    contentDescription = resolvedContentDescription,
+                    contentDescription = finalContentDescription,
                     contentScale = contentScale,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -83,7 +84,7 @@ fun StickerImage(
                 if (failed) {
                     Icon(
                         imageVector = Icons.Default.BrokenImage,
-                        contentDescription = resolvedContentDescription,
+                        contentDescription = finalContentDescription,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
