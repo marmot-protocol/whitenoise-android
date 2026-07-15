@@ -192,6 +192,7 @@ class LocalNotificationPresenterConversationTest {
                 presenter.show(
                     update(isMention = false, timestampMs = staleFfiTimestampMs),
                     previewTextOverride = "hi",
+                    shortNpub = { "npub1test" },
                 )
             }
         val afterPostMs = System.currentTimeMillis()
@@ -237,7 +238,7 @@ class LocalNotificationPresenterConversationTest {
         val firstPresentationMs = clockMs
         assertTrue(
             runBlocking {
-                clockPresenter.show(update(isMention = false), previewTextOverride = "first")
+                clockPresenter.show(update(isMention = false), previewTextOverride = "first", shortNpub = { "npub1test" })
             },
         )
 
@@ -248,6 +249,7 @@ class LocalNotificationPresenterConversationTest {
                 clockPresenter.show(
                     update(isMention = false, messageIdHex = "message-2"),
                     previewTextOverride = "second",
+                    shortNpub = { "npub1test" },
                 )
             },
         )
@@ -285,6 +287,7 @@ class LocalNotificationPresenterConversationTest {
                 presenter.show(
                     update(isMention = false, timestampMs = staleFfiTimestampMs),
                     previewTextOverride = "new line",
+                    shortNpub = { "npub1test" },
                 )
             }
         val afterPostMs = System.currentTimeMillis()

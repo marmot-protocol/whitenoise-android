@@ -264,7 +264,7 @@ internal fun MainShell(
         sectionName = MainSection.Chats.name
         settingsDetailName = null
         selectedChat = null
-        selectedChatFocusMessageId = null
+        selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = false
         routingNotification = false
         appState.showAppUpdateBannerFromNotification()
