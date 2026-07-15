@@ -30,10 +30,10 @@ sealed interface NotificationNavStep {
     /** Right account is active but its chat list hasn't loaded yet — wait. */
     data object AwaitChatList : NotificationNavStep
 
-    /** Ready: open this conversation, optionally focused on the tapped message. */
+    /** Ready: open this conversation and optionally persist its read-through cursor. */
     data class OpenConversation(
         val groupIdHex: String,
-        val focusMessageIdHex: String?,
+        val readThroughMessageIdHex: String?,
     ) : NotificationNavStep
 
     /** Target account no longer exists locally — fall back to the chat list. */
@@ -53,7 +53,7 @@ sealed interface NotificationNavStep {
  *  - active account, chat list not ready → [NotificationNavStep.AwaitChatList]
  *  - ready + group present → [NotificationNavStep.OpenConversation], carrying the
  *    notified message id (already non-blank and MESSAGE-only by construction) so
- *    the conversation can scroll to it
+ *    the persisted read cursor can advance before composition
  *  - ready + group absent → [NotificationNavStep.MissingConversation]
  *
  * @param chatListReady true only when the chat list is bound to [target]'s

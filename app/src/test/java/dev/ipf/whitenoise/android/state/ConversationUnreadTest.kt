@@ -72,6 +72,24 @@ class ConversationUnreadTest {
         assertEquals(0, firstUnreadReceivedIndex(timeline, unreadCount = 1))
     }
 
+    @Test
+    fun firstUnread_notificationBacklogAnchorsOldestInsteadOfNewestNotifiedMessage() {
+        val newestNotificationMessageId = "r5"
+        val timeline =
+            listOf(
+                received("r1"),
+                received("r2"),
+                received("r3"),
+                received("r4"),
+                received(newestNotificationMessageId),
+            )
+
+        val anchorIndex = firstUnreadReceivedIndex(timeline, unreadCount = 5)
+
+        assertEquals("r1", timeline[anchorIndex].record.messageIdHex)
+        assertEquals(newestNotificationMessageId, timeline.last().record.messageIdHex)
+    }
+
     // ---- countUnreadIncoming ------------------------------------------------
 
     @Test

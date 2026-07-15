@@ -39,6 +39,16 @@ internal data class ConversationScrollSnapshot(
     val anchorMessageIdHex: String? = null,
 )
 
+/** Whether a saved history position may own this conversation open. */
+internal fun shouldRestoreConversationScrollSnapshot(
+    focusMessageId: String?,
+    justCreated: Boolean,
+    notificationOpenRequestId: Long,
+): Boolean =
+    focusMessageId == null &&
+        !justCreated &&
+        notificationOpenRequestId == 0L
+
 internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,
