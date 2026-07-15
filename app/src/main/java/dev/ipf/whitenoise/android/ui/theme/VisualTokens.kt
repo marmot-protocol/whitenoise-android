@@ -4,7 +4,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 
 /** Semantic opacity tokens for black scrims drawn over media. */
 object ScrimAlpha {
@@ -19,12 +18,9 @@ object ScrimAlpha {
 
 /** App-wide horizontal separator using Material's divider-specific color role. */
 @Composable
-internal fun appDividerColor(): Color = MaterialTheme.colorScheme.outlineVariant
-
-@Composable
 fun AppDivider(modifier: Modifier = Modifier) {
     HorizontalDivider(
         modifier = modifier,
-        color = appDividerColor(),
+        color = MaterialTheme.colorScheme.outlineVariant,
     )
 }

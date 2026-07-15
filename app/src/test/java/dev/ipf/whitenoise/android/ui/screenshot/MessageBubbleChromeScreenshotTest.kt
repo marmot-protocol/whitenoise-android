@@ -18,8 +18,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MarkdownAlignmentFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
@@ -80,6 +86,30 @@ class MessageBubbleChromeScreenshotTest {
             .captureRoboImage("src/test/snapshots/message_bubble_chrome_amoled.png")
     }
 
+    @Test
+    fun bubbleMarkdownDividersLight() {
+        renderMarkdownDividers(darkTheme = false, amoled = false)
+        composeRule
+            .onNodeWithTag(MARKDOWN_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_markdown_dividers_light.png")
+    }
+
+    @Test
+    fun bubbleMarkdownDividersDark() {
+        renderMarkdownDividers(darkTheme = true, amoled = false)
+        composeRule
+            .onNodeWithTag(MARKDOWN_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_markdown_dividers_dark.png")
+    }
+
+    @Test
+    fun bubbleMarkdownDividersAmoled() {
+        renderMarkdownDividers(darkTheme = true, amoled = true)
+        composeRule
+            .onNodeWithTag(MARKDOWN_TAG)
+            .captureRoboImage("src/test/snapshots/message_bubble_markdown_dividers_amoled.png")
+    }
+
     private fun render(darkTheme: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -125,10 +155,75 @@ class MessageBubbleChromeScreenshotTest {
         }
     }
 
+    private fun renderMarkdownDividers(
+        darkTheme: Boolean,
+        amoled: Boolean,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
+                Surface {
+                    Column(
+                        modifier = Modifier.width(360.dp).padding(16.dp).testTag(MARKDOWN_TAG),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        MarkdownDividerBubble(mine = false, amoled = amoled)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            MarkdownDividerBubble(mine = true, amoled = amoled)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "bubble-chrome"
+        const val MARKDOWN_TAG = "bubble-markdown-dividers"
     }
 }
+
+@Composable
+private fun MarkdownDividerBubble(
+    mine: Boolean,
+    amoled: Boolean,
+) {
+    val bubbleColor =
+        when {
+            amoled -> Color.Black
+            mine -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        }
+    val label = if (mine) "Sent" else "Received"
+
+    Surface(
+        color = bubbleColor,
+        shape = RoundedCornerShape(18.dp),
+        border = messageBubbleBorder(highlighted = false, mine = mine),
+        tonalElevation = if (mine) 1.dp else 0.dp,
+    ) {
+        MarkdownMessageBody(
+            document = markdownDividerDocument(label),
+            modifier = Modifier.width(260.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+    }
+}
+
+private fun markdownDividerDocument(label: String): MarkdownDocumentFfi =
+    MarkdownDocumentFfi(
+        blocks =
+            listOf(
+                MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("$label markdown rule"))),
+                MarkdownBlockFfi.ThematicBreak,
+                MarkdownBlockFfi.Table(
+                    alignments = listOf(MarkdownAlignmentFfi.NONE, MarkdownAlignmentFfi.NONE),
+                    header = listOf(markdownTableCell("Token"), markdownTableCell("Value")),
+                    rows = listOf(listOf(markdownTableCell("Divider"), markdownTableCell("Visible"))),
+                ),
+            ),
+        truncated = false,
+    )
+
+private fun markdownTableCell(text: String): MarkdownTableCellFfi = MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text(text)))
 
 @Composable
 private fun DirectionalBubble(
