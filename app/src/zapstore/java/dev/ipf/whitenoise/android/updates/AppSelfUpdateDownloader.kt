@@ -1,13 +1,17 @@
 package dev.ipf.whitenoise.android.updates
 
+import dev.ipf.whitenoise.android.core.HostSafety
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
 
@@ -81,10 +85,27 @@ class AppSelfUpdateDownloader(
     class HashMismatchException : IOException("APK hash mismatch")
 
     companion object {
+        // Reject any host that resolves to a private/loopback/link-local address
+        // before a byte is fetched — defence in depth, even though the download
+        // URL is publisher-signed. Catches both literal-private hosts and
+        // public names that resolve inward (DNS rebinding). Tests inject their
+        // own client, so their loopback mock server is unaffected.
+        private val ssrfSafeDns =
+            object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> {
+                    val addresses = Dns.SYSTEM.lookup(hostname)
+                    if (addresses.any(HostSafety::isPrivateOrLoopbackAddress)) {
+                        throw UnknownHostException("Refusing private/loopback host: $hostname")
+                    }
+                    return addresses
+                }
+            }
+
         private fun defaultHttpClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
                 .followSslRedirects(false)
+                .dns(ssrfSafeDns)
                 .build()
     }
 }

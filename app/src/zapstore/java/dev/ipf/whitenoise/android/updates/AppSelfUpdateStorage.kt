@@ -12,7 +12,13 @@ object AppSelfUpdateStorage {
     fun apkFileForVersion(
         context: Context,
         version: String,
-    ): File = File(updatesDirectory(context), "darkmatter-$version.apk")
+    ): File {
+        // Defence in depth: the version is CalVer-validated upstream, but never
+        // let a path separator reach the filename regardless of the caller, so a
+        // crafted version can't escape the updates directory.
+        val safeVersion = version.filter { it.isDigit() || it == '.' }
+        return File(updatesDirectory(context), "darkmatter-$safeVersion.apk")
+    }
 
     fun deleteFile(file: File?) {
         if (file == null) return
