@@ -39,8 +39,9 @@ Direct Gradle equivalents (Zapstore debug is the default local dev flavor):
 The app also has a `distribution` flavor dimension, orthogonal to the
 environment above: **`zapstore`** enables verified direct-APK self-updates (the
 Zapstore manifest permissions and the installer implementation in the `zapstore`
-source set); **`play`** omits that installer machinery entirely and routes
-"Update now" to the external Zapstore listing. Every build combines one
+source set); **`play`** omits that installer machinery entirely and shows no
+in-app update UI at all — the distributing store (e.g. Google Play) owns
+updates, and Play policy forbids sending users off-store to update. Every build combines one
 environment with one distribution and a build type — e.g.
 `assembleDevZapstoreDebug`, `assembleProductionPlayRelease`.
 

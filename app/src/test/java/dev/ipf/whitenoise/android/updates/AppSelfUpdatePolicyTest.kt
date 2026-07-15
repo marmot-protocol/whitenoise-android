@@ -8,12 +8,10 @@ class AppSelfUpdatePolicyTest {
     @Test
     fun zapstoreBuildStartsInAppFlow() {
         assertTrue(shouldStartInAppSelfUpdate(selfUpdateEnabled = true))
-        assertFalse(shouldOpenExternalZapstoreListing(selfUpdateEnabled = true))
     }
 
     @Test
-    fun playBuildOpensExternalListing() {
+    fun playBuildDoesNotSelfUpdate() {
         assertFalse(shouldStartInAppSelfUpdate(selfUpdateEnabled = false))
-        assertTrue(shouldOpenExternalZapstoreListing(selfUpdateEnabled = false))
     }
 }

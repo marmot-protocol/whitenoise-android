@@ -224,21 +224,25 @@ private fun SettingsHomeScreen(
                     )
                 }
             }
-            item {
-                SectionCard(title = stringResource(R.string.app_updates)) {
-                    AppUpdateSettingsRow(
-                        info = appState.appUpdateInfo,
-                        onClick = {
-                            // Await the check before acting, so a first tap in the
-                            // unknown state still routes on the fresh result.
-                            scope.launch {
-                                if (appState.appUpdateInfo.latestVersion == null) {
-                                    appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+            // No in-app update UI on store-managed builds (Google Play): the
+            // store owns updates, and off-store update redirects violate policy.
+            if (BuildConfig.SELF_UPDATE_ENABLED) {
+                item {
+                    SectionCard(title = stringResource(R.string.app_updates)) {
+                        AppUpdateSettingsRow(
+                            info = appState.appUpdateInfo,
+                            onClick = {
+                                // Await the check before acting, so a first tap in the
+                                // unknown state still routes on the fresh result.
+                                scope.launch {
+                                    if (appState.appUpdateInfo.latestVersion == null) {
+                                        appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+                                    }
+                                    appState.handleAppUpdateAction(context)
                                 }
-                                appState.handleAppUpdateAction(context)
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
             }
             item {

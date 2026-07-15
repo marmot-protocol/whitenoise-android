@@ -1277,9 +1277,11 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
-        // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
-        mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
-        notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
+        if (BuildConfig.SELF_UPDATE_ENABLED) {
+            // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
+            mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
+            notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
+        }
         // Off-main: the ConnectivityManager registration + seed query are
         // binder IPCs and this constructor runs on the main thread. Until the
         // seed lands, the snapshot reads as offline/no-networks — the same
@@ -3675,8 +3677,12 @@ class WhiteNoiseAppState(
     }
 
     fun handleAppUpdateAction(context: Context = appContext) {
+        // Builds that don't self-update (the Google Play distribution) leave
+        // updates entirely to the distributing store — no in-app flow and no
+        // off-store listing redirect, which Play policy forbids.
+        if (!shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED)) return
         val latest = appUpdateInfo.latestVersion
-        if (shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED) && latest != null) {
+        if (latest != null) {
             startAppSelfUpdate(latest)
             return
         }

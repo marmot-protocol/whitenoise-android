@@ -1,7 +1,8 @@
 package dev.ipf.whitenoise.android.updates
 
-/** Whether the active build should run the in-app self-update flow instead of an external listing. */
+/**
+ * Whether the active build runs the in-app self-update flow. Builds that don't
+ * (the Google Play distribution) surface no in-app update UI at all — the
+ * distributing store owns updates, and off-store update redirects violate policy.
+ */
 fun shouldStartInAppSelfUpdate(selfUpdateEnabled: Boolean): Boolean = selfUpdateEnabled
-
-/** Whether the active build should open the external Zapstore listing for updates. */
-fun shouldOpenExternalZapstoreListing(selfUpdateEnabled: Boolean): Boolean = !selfUpdateEnabled

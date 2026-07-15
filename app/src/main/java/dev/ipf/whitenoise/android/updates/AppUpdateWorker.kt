@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import dev.ipf.whitenoise.android.BuildConfig
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
@@ -45,6 +46,9 @@ class AppUpdateWorker(
             }
 
         fun schedule(context: Context) {
+            // No update polling on builds that don't self-update — the
+            // distributing store (e.g. Google Play) owns updates there.
+            if (!BuildConfig.SELF_UPDATE_ENABLED) return
             val request =
                 PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS)
                     .setConstraints(
