@@ -22,8 +22,7 @@ internal class NotificationReplyCompletionStore(
     fun hasStarted(key: String): Boolean = startedAt(key) != null
 
     fun abandonedOutcome(key: String): NotificationReplyAbandonedOutcome? =
-        preferences
-            .getString(abandonedOutcomeStorageKey(key), null)
+        readString(abandonedOutcomeStorageKey(key))
             ?.let { stored -> NotificationReplyAbandonedOutcome.entries.firstOrNull { it.name == stored } }
 
     fun startedRecoveryState(key: String): NotificationReplyRecoveryState? =
@@ -62,7 +61,7 @@ internal class NotificationReplyCompletionStore(
         val canonicalBoundary = recoveryBoundary.copy(messageIdHex = recoveryBoundary.messageIdHex.lowercase())
         val now = nowMillis()
         return synchronized(STATE_LOCK) {
-            val previousSequence = preferences.getLong(NEXT_RECOVERY_SEQUENCE_KEY, 0L)
+            val previousSequence = readLong(NEXT_RECOVERY_SEQUENCE_KEY, 0L)
             if (previousSequence == Long.MAX_VALUE) return@synchronized null
             val sequence = previousSequence + 1L
             val persistedBoundary = strictlyLaterBoundary(scope, canonicalBoundary) ?: return@synchronized null
@@ -175,39 +174,53 @@ internal class NotificationReplyCompletionStore(
 
     private fun recoveryState(key: String): NotificationReplyRecoveryState? {
         val timelineAt =
-            preferences
-                .getLong(recoveryTimelineAtStorageKey(key), MISSING_TIMESTAMP)
+            readLong(recoveryTimelineAtStorageKey(key), MISSING_TIMESTAMP)
                 .takeUnless { it == MISSING_TIMESTAMP || it < 0L }
                 ?.toULong()
                 ?: return null
         val messageId =
-            preferences
-                .getString(recoveryMessageIdStorageKey(key), null)
+            readString(recoveryMessageIdStorageKey(key))
                 ?.takeIf(MESSAGE_ID::matches)
                 ?: return null
-        val scope = preferences.getString(recoveryScopeStorageKey(key), null)?.takeIf { it.isNotBlank() } ?: return null
+        val scope = readString(recoveryScopeStorageKey(key))?.takeIf { it.isNotBlank() } ?: return null
         val sequence =
-            preferences
-                .getLong(recoverySequenceStorageKey(key), MISSING_SEQUENCE)
+            readLong(recoverySequenceStorageKey(key), MISSING_SEQUENCE)
                 .takeUnless { it == MISSING_SEQUENCE || it <= 0L }
                 ?: return null
         return NotificationReplyRecoveryState(
             boundary = NotificationReplyRecoveryBoundary(timelineAt = timelineAt, messageIdHex = messageId),
             scope = scope,
             sequence = sequence,
-            committedMessageIdHex = preferences.getString(committedMessageIdStorageKey(key), null),
+            committedMessageIdHex = readString(committedMessageIdStorageKey(key)),
         )
     }
 
     private fun completedAt(key: String): Long? =
-        preferences
-            .getLong(completedStorageKey(key), MISSING_TIMESTAMP)
+        readLong(completedStorageKey(key), MISSING_TIMESTAMP)
             .takeUnless { it == MISSING_TIMESTAMP }
 
     private fun startedAt(key: String): Long? =
-        preferences
-            .getLong(startedStorageKey(key), MISSING_TIMESTAMP)
+        readLong(startedStorageKey(key), MISSING_TIMESTAMP)
             .takeUnless { it == MISSING_TIMESTAMP }
+
+    // getLong/getString throw if a value was persisted under a different type — treat any
+    // such legacy mismatch as absent rather than let it crash the recovery path.
+    private fun readLong(
+        key: String,
+        default: Long,
+    ): Long =
+        try {
+            preferences.getLong(key, default)
+        } catch (_: ClassCastException) {
+            default
+        }
+
+    private fun readString(key: String): String? =
+        try {
+            preferences.getString(key, null)
+        } catch (_: ClassCastException) {
+            null
+        }
 
     private fun pruneUnneededRecoveryStates() {
         val terminalKeys =

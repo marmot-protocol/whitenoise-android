@@ -60,6 +60,29 @@ class NotificationReplyCompletionStoreTest {
     }
 
     @Test
+    fun legacyTypeMismatchesAreTreatedAsAbsentWithoutCrashing() {
+        // getLong mismatch: a String persisted where a timestamp is expected.
+        val longMismatch = FakeSharedPreferences()
+        longMismatch
+            .edit()
+            .putString(NotificationReplyCompletionStore.startedStorageKey("legacy"), "not-a-long")
+            .commit()
+        val longStore = NotificationReplyCompletionStore(longMismatch, nowMillis = { 1_000L })
+        assertFalse(longStore.hasStarted("legacy"))
+
+        // getString mismatch: a Long persisted where a message id is expected.
+        val stringMismatch = FakeSharedPreferences()
+        val stringStore = NotificationReplyCompletionStore(stringMismatch, nowMillis = { 1_000L })
+        stringStore.markStarted("reply", "group", boundary(10uL, "before"))
+        stringMismatch
+            .edit()
+            .putLong(NotificationReplyCompletionStore.recoveryMessageIdStorageKey("reply"), 1L)
+            .commit()
+        assertNull(stringStore.startedRecoveryState("reply"))
+        assertEquals(NotificationReplyRecoveryLookup.Indeterminate, stringStore.recoveryLookup("reply"))
+    }
+
+    @Test
     fun distinctRequestsPersistIndependentRecoveryBoundaries() {
         val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
 
@@ -213,14 +236,20 @@ class NotificationReplyCompletionStoreTest {
         override fun getLong(
             key: String?,
             defValue: Long,
-        ): Long = values[key] as? Long ?: defValue
+        ): Long {
+            val value = values[key] ?: return defValue
+            return value as? Long ?: throw ClassCastException("value for $key is not a Long")
+        }
 
         override fun edit(): SharedPreferences.Editor = FakeEditor()
 
         override fun getString(
             key: String?,
             defValue: String?,
-        ): String? = values[key] as? String ?: defValue
+        ): String? {
+            val value = values[key] ?: return defValue
+            return value as? String ?: throw ClassCastException("value for $key is not a String")
+        }
 
         override fun getStringSet(
             key: String?,
