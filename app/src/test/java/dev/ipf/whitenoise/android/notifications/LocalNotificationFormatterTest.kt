@@ -23,7 +23,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun redactedContentDropsSenderBodyAndConversationTitle() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupName = "Launch",
@@ -46,7 +46,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun messageNotificationUsesSenderGroupAndPreviewText() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupName = "Launch",
@@ -68,7 +68,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun directMessageIsNotMarkedAsGroupConversation() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = true, groupName = null),
             )
 
@@ -79,7 +79,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun inviteNotificationUsesInviteCopy() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.GROUP_INVITE,
                     groupName = null,
@@ -95,7 +95,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun reactionWithPreviewReadsAsAReactionLine() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     reactionEmoji = "👍",
@@ -109,7 +109,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun reactionWithoutPreviewOmitsTheReactedToClause() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     reactionEmoji = "👍",
@@ -126,11 +126,11 @@ class LocalNotificationFormatterTest {
         // share the (tag, id) Android keys on, or one would mutate the other's
         // card and "mute reactions, keep messages" would break.
         val message =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"),
             )
         val reaction =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
             )
 
@@ -145,11 +145,11 @@ class LocalNotificationFormatterTest {
         // Mentions route to their own channel, so they also need their own
         // Android (tag, id); channel alone is not part of notification identity.
         val message =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"),
             )
         val mention =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", isMention = true),
             )
 
@@ -162,7 +162,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun mentionDismissalKeyMatchesThePostedMentionIdentity() {
         val mention =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", isMention = true),
             )
         val dismissal = LocalNotificationFormatter.mentionDismissalKey("account", "group-a")
@@ -177,11 +177,11 @@ class LocalNotificationFormatterTest {
         // (distinct from the message card), so they stay independently mute-able
         // without fragmenting into N alerts.
         val first =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
             )
         val second =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "❤️"),
             )
 
@@ -195,7 +195,7 @@ class LocalNotificationFormatterTest {
         // card must live outside that key so dismissing a conversation's messages
         // does not silently clear its reactions and vice versa.
         val reaction =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
             )
         val dismissal = LocalNotificationFormatter.conversationDismissalKey("account", "group-a")
@@ -209,7 +209,7 @@ class LocalNotificationFormatterTest {
         // Opening a conversation must cancel the exact (tag, id) the reaction
         // card was posted under, or reaction cards linger after read.
         val reaction =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
             )
         val dismissal = LocalNotificationFormatter.reactionDismissalKey("account", "group-a")
@@ -222,7 +222,7 @@ class LocalNotificationFormatterTest {
     fun blankReactionEmojiKeepsTheNormalMessageIdentity() {
         // A blank emoji is not a reaction — it stays on the message card.
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "   "),
             )
 
@@ -233,7 +233,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun nonReactionMessageStillUsesPreviewText() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     previewText = "We are go",
@@ -246,7 +246,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun messageBodyUsesCallerResolvedPreviewText() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     previewText = "hello @npub1rawmention",
@@ -263,7 +263,7 @@ class LocalNotificationFormatterTest {
         // normal message: the caller resolves the "old → new" diff string and
         // it must render verbatim as the body without special casing.
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupName = "Marmot Protocol",
@@ -279,7 +279,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun reactionBodyUsesCallerResolvedReactedToPreview() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     reactionEmoji = "👍",
@@ -294,7 +294,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun blankPreviewOverrideFallsBackToPayloadPreviewText() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     previewText = "We are go",
@@ -308,11 +308,10 @@ class LocalNotificationFormatterTest {
     @Test
     fun captionlessAttachmentsNameTheirMediaTypeInsteadOfNewMessage() {
         fun body(kind: ReplyMediaKind) =
-            LocalNotificationFormatter
-                .content(
-                    update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = null),
-                    mediaKind = kind,
-                )?.body
+            content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = null),
+                mediaKind = kind,
+            )?.body
 
         assertEquals("sent a picture", body(ReplyMediaKind.Photo))
         assertEquals("sent a video", body(ReplyMediaKind.Video))
@@ -325,7 +324,7 @@ class LocalNotificationFormatterTest {
         // A media message with text resolves to its caption; the type-aware
         // label is only for the captionless case.
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = "on the beach 🏖️"),
                 mediaKind = ReplyMediaKind.Photo,
             )
@@ -336,7 +335,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun unclassifiedEmptyMessageStillFallsBackToNewMessage() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = null),
                 mediaKind = ReplyMediaKind.None,
             )
@@ -398,7 +397,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun selfAuthoredNotificationsAreSuppressed() {
         assertNull(
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isFromSelf = true,
@@ -411,8 +410,8 @@ class LocalNotificationFormatterTest {
     fun messagesInTheSameConversationShareATag() {
         // Different per-message keys, same account + group: they must collapse
         // onto one tag so the card accumulates instead of stacking.
-        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-1"))
-        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-2"))
+        val first = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-1"))
+        val second = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-2"))
 
         assertEquals(first?.notificationTag, second?.notificationTag)
         assertEquals(first?.notificationId, second?.notificationId)
@@ -421,7 +420,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun conversationDismissalKeyMatchesPostedMessageNotificationKey() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupIdHex = "group-a",
@@ -442,16 +441,16 @@ class LocalNotificationFormatterTest {
 
     @Test
     fun differentConversationsGetDistinctTags() {
-        val launch = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
-        val ops = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-b"))
+        val launch = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
+        val ops = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-b"))
 
         assertNotEquals(launch?.notificationTag, ops?.notificationTag)
     }
 
     @Test
     fun invitesStayIndividualPerNotificationKey() {
-        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-1"))
-        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-2"))
+        val first = content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-1"))
+        val second = content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-2"))
 
         assertNotEquals(first?.notificationTag, second?.notificationTag)
     }
@@ -462,7 +461,7 @@ class LocalNotificationFormatterTest {
         // else npub). When present it must win over the FFI payload name and the
         // hex-key fallback.
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     groupName = "Launch",
@@ -481,7 +480,7 @@ class LocalNotificationFormatterTest {
         // the sender. The override must be used instead of the raw hex key.
         val npub = "npub1qy88wumn8ghj7"
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isDm = true,
@@ -498,7 +497,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun blankSenderNameOverrideFallsBackToPayloadName() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isDm = true,
@@ -512,10 +511,11 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
-    fun missingNameEverywhereStillShortensTheKeyAsALastResort() {
-        // With no override and no payload name, fall back to a shortened key.
+    fun missingNameEverywhereFallsBackToShortNpub() {
+        // With no override and no payload name, fall back to the user-facing
+        // npub rather than leaking the internal hex account id.
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     isDm = true,
@@ -525,18 +525,14 @@ class LocalNotificationFormatterTest {
                 senderNameOverride = null,
             )
 
-        // Never the full raw hex key.
-        assertNotEquals(
-            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            content?.senderName,
-        )
-        assertTrue(content?.senderName?.contains("...") == true)
+        assertEquals("npub1qy352...hstefp92", content?.senderName)
+        assertEquals("npub1qy352...hstefp92", content?.title)
     }
 
     @Test
     fun inviteBodyUsesSenderNameOverride() {
         val content =
-            LocalNotificationFormatter.content(
+            content(
                 update(
                     trigger = NotificationTriggerFfi.GROUP_INVITE,
                     groupName = null,
@@ -548,6 +544,25 @@ class LocalNotificationFormatterTest {
 
         assertEquals("Invite from Carol", content?.body)
     }
+
+    private fun content(
+        update: NotificationUpdateFfi,
+        senderNameOverride: String? = null,
+        previewTextOverride: String? = null,
+        reactedToPreviewOverride: String? = null,
+        mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+    ): LocalNotificationContent? =
+        LocalNotificationFormatter.content(
+            update = update,
+            senderNameOverride = senderNameOverride,
+            previewTextOverride = previewTextOverride,
+            reactedToPreviewOverride = reactedToPreviewOverride,
+            mediaKind = mediaKind,
+            shortNpub = { accountIdHex ->
+                check(accountIdHex == SAMPLE_ACCOUNT_ID_HEX) { "Unexpected unnamed test user: $accountIdHex" }
+                SAMPLE_SHORT_NPUB
+            },
+        )
 
     private fun update(
         trigger: NotificationTriggerFfi,
@@ -582,11 +597,16 @@ class LocalNotificationFormatterTest {
     )
 
     private fun user(
-        accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        accountIdHex: String = SAMPLE_ACCOUNT_ID_HEX,
         displayName: String? = null,
     ) = NotificationUserFfi(
         accountIdHex = accountIdHex,
         displayName = displayName,
         pictureUrl = null,
     )
+
+    private companion object {
+        const val SAMPLE_ACCOUNT_ID_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        const val SAMPLE_SHORT_NPUB = "npub1qy352...hstefp92"
+    }
 }

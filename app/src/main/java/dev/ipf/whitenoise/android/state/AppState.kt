@@ -4179,9 +4179,9 @@ class WhiteNoiseAppState(
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         accounts.firstOrNull { it.accountIdHex == accountIdHex }?.let {
-            return it.label.ifBlank { IdentityFormatter.short(accountIdHex) }
+            return it.label.ifBlank { shortNpub(accountIdHex) }
         }
-        return IdentityFormatter.short(accountIdHex)
+        return shortNpub(accountIdHex)
     }
 
     fun chatMemberTitle(accountIdHex: String): String {
@@ -5096,6 +5096,7 @@ class WhiteNoiseAppState(
                 redactContent = redactNotificationContent,
                 conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
                 senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
+                shortNpub = ::shortNpub,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the
