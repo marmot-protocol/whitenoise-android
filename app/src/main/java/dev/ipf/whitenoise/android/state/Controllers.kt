@@ -920,6 +920,30 @@ internal fun appendCappedAgentStreamPreview(
     }
 }
 
+internal data class StreamFinalDisplayPosition(
+    val recordedAt: ULong,
+    val timelineOrder: ULong,
+)
+
+/**
+ * Sort position for a durable stream final replacing its currently displayed
+ * start/preview row. The two records can carry timestamps from different
+ * clocks; never let that reconciliation move the answer earlier than the row
+ * the user was already reading.
+ */
+internal fun streamFinalDisplayPosition(
+    finalRecord: AppMessageRecordFfi,
+    displayedStream: TimelineMessage?,
+): StreamFinalDisplayPosition? {
+    if (!MessageProjector.isStreamFinal(finalRecord)) return null
+    val streamId = MessageProjector.streamId(finalRecord) ?: return null
+    val displayed = displayedStream?.takeIf { it.id == "stream:$streamId" } ?: return null
+    return StreamFinalDisplayPosition(
+        recordedAt = displayed.record.recordedAt,
+        timelineOrder = displayed.timelineOrder,
+    )
+}
+
 /**
  * Whether [throwable] is a relay-connectivity failure that proves the event was
  * **never transmitted to any relay**, and is therefore safe to re-send by
@@ -6876,6 +6900,7 @@ class ConversationController(
         timelineRecords[record.messageIdHex] = record
         projectedMessageIds.add(record.messageIdHex)
         preserveOptimisticDisplayPosition(record.messageIdHex, record.messageIdHex)
+        preserveStreamFinalDisplayPosition(record.messageIdHex, actionRecord)
         optimisticMessageIdForProjection(
             optimisticMessages.values,
             actionRecord,
@@ -6913,6 +6938,18 @@ class ConversationController(
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
         localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
+    }
+
+    private fun preserveStreamFinalDisplayPosition(
+        projectedId: String,
+        actionRecord: AppMessageRecordFfi,
+    ) {
+        val streamId = MessageProjector.streamId(actionRecord) ?: return
+        val itemId = "stream:$streamId"
+        val displayedStream = optimisticMessages[itemId] ?: timelineItemsById[itemId]
+        val position = streamFinalDisplayPosition(actionRecord, displayedStream) ?: return
+        localTimelineOrderOverrides[projectedId] = position.timelineOrder
+        localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
 
     private fun removeProjectedRecord(messageIdHex: String) {
