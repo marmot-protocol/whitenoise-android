@@ -1,5 +1,5 @@
 source=vincenzopalazzo/mdk
-mdk-sha=e3c8068f61d0c4d572c65dbdc12b3c150ff5042d
-mdk-short-sha=e3c8068c
+mdk-sha=2100e15de736b683a9d8a099d755d45f3d00acef
+mdk-short-sha=2100e15d
 mdk-branch=codex/sonar-stickers
 features=otlp-export
