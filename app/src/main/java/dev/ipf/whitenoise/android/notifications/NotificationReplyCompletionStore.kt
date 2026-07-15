@@ -57,12 +57,15 @@ internal class NotificationReplyCompletionStore(
         ) {
             return null
         }
+        // Persist and compare boundaries in lowercase so the fence orders consistently
+        // against the engine's canonical (lowercase) timeline ids.
+        val canonicalBoundary = recoveryBoundary.copy(messageIdHex = recoveryBoundary.messageIdHex.lowercase())
         val now = nowMillis()
         return synchronized(STATE_LOCK) {
             val previousSequence = preferences.getLong(NEXT_RECOVERY_SEQUENCE_KEY, 0L)
             if (previousSequence == Long.MAX_VALUE) return@synchronized null
             val sequence = previousSequence + 1L
-            val persistedBoundary = strictlyLaterBoundary(scope, recoveryBoundary) ?: return@synchronized null
+            val persistedBoundary = strictlyLaterBoundary(scope, canonicalBoundary) ?: return@synchronized null
             val persisted =
                 preferences
                     .edit()
@@ -90,9 +93,10 @@ internal class NotificationReplyCompletionStore(
         messageIdHex: String,
     ): Boolean {
         if (!MESSAGE_ID.matches(messageIdHex)) return false
+        val canonicalMessageId = messageIdHex.lowercase()
         return synchronized(STATE_LOCK) {
             if (!hasStarted(key)) return@synchronized false
-            preferences.edit().putString(committedMessageIdStorageKey(key), messageIdHex).commit()
+            preferences.edit().putString(committedMessageIdStorageKey(key), canonicalMessageId).commit()
         }
     }
 

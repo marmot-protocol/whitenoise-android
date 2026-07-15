@@ -48,6 +48,18 @@ class NotificationReplyCompletionStoreTest {
     }
 
     @Test
+    fun mixedCaseBoundaryAndCommitIdsPersistAsLowercase() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+
+        val persisted = store.markStarted("reply", "group", NotificationReplyRecoveryBoundary(10uL, "A".repeat(64)))
+        assertEquals("a".repeat(64), persisted?.messageIdHex)
+        assertEquals("a".repeat(64), store.startedRecoveryState("reply")?.boundary?.messageIdHex)
+
+        assertTrue(store.markCommittedMessage("reply", "B".repeat(64)))
+        assertEquals("b".repeat(64), store.startedRecoveryState("reply")?.committedMessageIdHex)
+    }
+
+    @Test
     fun distinctRequestsPersistIndependentRecoveryBoundaries() {
         val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
 
