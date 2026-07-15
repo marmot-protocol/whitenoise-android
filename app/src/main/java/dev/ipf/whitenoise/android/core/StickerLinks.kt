@@ -12,6 +12,12 @@ data class StickerInput(
     val kind: StickerInputKind,
 )
 
+/** Short-lived deep-link request bound to the account active at receipt. */
+data class InboundStickerRequest(
+    val input: StickerInput,
+    val accountRef: String?,
+)
+
 /**
  * Classifies untrusted share/deep-link input without interpreting protocol
  * metadata. Native Marmot performs canonical coordinate, signature, and pack

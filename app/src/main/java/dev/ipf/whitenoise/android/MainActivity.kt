@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
+import dev.ipf.whitenoise.android.core.InboundStickerRequest
 import dev.ipf.whitenoise.android.core.StickerInput
 import dev.ipf.whitenoise.android.core.StickerLinks
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
@@ -42,7 +43,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
-    private var inboundStickerInput by mutableStateOf<StickerInput?>(null)
+    private var inboundStickerRequest by mutableStateOf<InboundStickerRequest?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
@@ -109,9 +110,9 @@ class MainActivity : FragmentActivity() {
                     onProfilePayloadHandled = { handled ->
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
                     },
-                    inboundStickerInput = inboundStickerInput,
-                    onStickerInputHandled = { handled ->
-                        if (inboundStickerInput == handled) inboundStickerInput = null
+                    inboundStickerRequest = inboundStickerRequest,
+                    onStickerRequestHandled = { handled ->
+                        if (inboundStickerRequest == handled) inboundStickerRequest = null
                     },
                     inboundNotificationTarget = inboundNotificationTarget,
                     onNotificationTargetHandled = { handled ->
@@ -157,11 +158,11 @@ class MainActivity : FragmentActivity() {
         inboundNotificationTarget = routing.notificationTarget
         inboundProfilePayload = routing.profilePayload
         when {
-            parsedTarget != null -> inboundStickerInput = null
+            parsedTarget != null -> inboundStickerRequest = null
             stickerInput != null -> {
                 inboundNotificationTarget = null
                 inboundProfilePayload = null
-                inboundStickerInput = stickerInput
+                inboundStickerRequest = InboundStickerRequest(stickerInput, appState.activeAccountRef)
             }
 
             sensitiveSignalStickerRoute -> {
@@ -169,7 +170,7 @@ class MainActivity : FragmentActivity() {
                 // from every retained route even though it cannot be imported.
                 inboundNotificationTarget = null
                 inboundProfilePayload = null
-                inboundStickerInput = null
+                inboundStickerRequest = null
             }
         }
         if (shouldClearInboundActivityIntent(parsedTarget != null, stickerInput, sensitiveSignalStickerRoute)) {
