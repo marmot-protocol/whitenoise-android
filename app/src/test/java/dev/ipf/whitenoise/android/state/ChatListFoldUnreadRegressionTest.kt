@@ -3,24 +3,21 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /**
- * Regression for issue #1383: a stale chat-list subscription row must not
- * overwrite a fresher in-memory row and resurrect an inflated [unreadCount].
- * [foldChatRow] delegates to [mergeMarkReadChatListRow]; these tests pin the
- * merge contract subscription folding relies on.
+ * Regression for issue #1383: stale chat-list subscription rows must not
+ * overwrite a fresher in-memory read watermark or resurrect an inflated
+ * [unreadCount]. Exercises [reduceSubscriptionChatListRow] directly.
  */
 class ChatListFoldUnreadRegressionTest {
     @Test
-    fun staleSubscriptionWithOlderReadWatermarkIsRejected() {
+    fun delayedPreMarkReadSubscription_keepsNewerReadWatermarkAndUnread() {
         val current =
             row(
                 messageId = idTail,
@@ -38,11 +35,281 @@ class ChatListFoldUnreadRegressionTest {
                 lastReadMessageIdHex = idAnchor,
             )
 
-        assertNull(mergeMarkReadChatListRow(current, staleSubscription))
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                staleSubscription,
+                ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+            )
+
+        assertEquals(0uL, folded.unreadCount)
+        assertEquals(false, folded.hasUnread)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idTail, folded.lastReadMessageIdHex)
+        assertEquals(idTail, folded.lastMessage?.messageIdHex)
     }
 
     @Test
-    fun delayedBackfillWithSameProjectionTuplesCanIncreaseUnread() {
+    fun incompleteReadTuple_keepsWatermarkAndRejectsInflatedUnread() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idTail,
+            )
+        val staleSubscription =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                lastReadTimelineAt = null,
+                lastReadMessageIdHex = null,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                staleSubscription,
+                ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+            )
+
+        assertEquals(0uL, folded.unreadCount)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idTail, folded.lastReadMessageIdHex)
+    }
+
+    @Test
+    fun newLastMessage_adoptsPreviewWhilePreservingNewerReadWatermark() {
+        val current =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(idTail, folded.lastMessage?.messageIdHex)
+        assertEquals(100uL, folded.lastReadTimelineAt)
+        assertEquals(idMid, folded.lastReadMessageIdHex)
+        assertEquals(1uL, folded.unreadCount)
+        assertEquals(true, folded.hasUnread)
+    }
+
+    @Test
+    fun lastMessageDeleted_adoptsBackwardPreviewAndPreservesReadWatermark() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idTail,
+            )
+        val incoming =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+            )
+
+        assertEquals(idMid, folded.lastMessage?.messageIdHex)
+        assertEquals(100uL, folded.lastMessage?.timelineAt)
+        assertEquals(false, folded.lastMessage?.deleted)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idTail, folded.lastReadMessageIdHex)
+        assertEquals(0uL, folded.unreadCount)
+    }
+
+    @Test
+    fun lastMessageDeleted_adoptsNullPreviewWhenTimelineEmpties() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idTail,
+            )
+        val incoming =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+                includeLastMessage = false,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+            )
+
+        assertNull(folded.lastMessage)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idTail, folded.lastReadMessageIdHex)
+    }
+
+    @Test
+    fun newLastMessage_incrementsExistingUnreadWhenStaleRead() {
+        val current =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 3uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+                firstUnreadMessageIdHex = idA,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(4uL, folded.unreadCount)
+        assertEquals(true, folded.hasUnread)
+        assertEquals(idA, folded.firstUnreadMessageIdHex)
+    }
+
+    @Test
+    fun newLastMessage_setsFirstUnreadToNewMessageWhenWasRead() {
+        val current =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = idAnchor,
+                firstUnreadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(1uL, folded.unreadCount)
+        assertEquals(idTail, folded.firstUnreadMessageIdHex)
+    }
+
+    @Test
+    fun newLastMessage_doesNotIncrementWhenReadWatermarkCoversPreview() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idTail,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(0uL, folded.unreadCount)
+        assertEquals(false, folded.hasUnread)
+        assertEquals(200uL, folded.lastReadTimelineAt)
+        assertEquals(idTail, folded.lastReadMessageIdHex)
+    }
+
+    @Test
+    fun newLastMessage_boundedMentionIncrementWhenStaleRead() {
+        val current =
+            row(
+                messageId = idMid,
+                lastMessageAt = 100uL,
+                unreadCount = 2uL,
+                unreadMentionCount = 1uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idMid,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 47uL,
+                unreadMentionCount = 9uL,
+                unreadMention = true,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = idAnchor,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(3uL, folded.unreadCount)
+        assertEquals(2uL, folded.unreadMentionCount)
+        assertEquals(true, folded.unreadMention)
+    }
+
+    @Test
+    fun unreadChangedBackfill_increasesUnreadWhenReadTupleIsCurrent() {
         val current =
             row(
                 messageId = idTail,
@@ -60,13 +327,19 @@ class ChatListFoldUnreadRegressionTest {
                 lastReadMessageIdHex = idAnchor,
             )
 
-        val merged = requireNotNull(mergeMarkReadChatListRow(current, delayedBackfill))
-        assertEquals(2uL, merged.unreadCount)
-        assertEquals(true, merged.hasUnread)
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                delayedBackfill,
+                ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+            )
+
+        assertEquals(2uL, folded.unreadCount)
+        assertEquals(true, folded.hasUnread)
     }
 
     @Test
-    fun freshSubscriptionWithNewLastMessageAdoptsUnread() {
+    fun freshNewLastMessage_adoptsUnreadWhenReadTupleMatches() {
         val current =
             row(
                 messageId = idMid,
@@ -84,9 +357,46 @@ class ChatListFoldUnreadRegressionTest {
                 lastReadMessageIdHex = idAnchor,
             )
 
-        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
-        assertEquals(2uL, merged.unreadCount)
-        assertEquals(idTail, merged.lastMessage?.messageIdHex)
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+            )
+
+        assertEquals(2uL, folded.unreadCount)
+        assertEquals(idTail, folded.lastMessage?.messageIdHex)
+    }
+
+    @Test
+    fun equalTimestampLowerReadMessageId_keepsCurrentWatermarkAndUnread() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+            )
+        val incoming =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 3uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idA,
+            )
+
+        val folded =
+            reduceSubscriptionChatListRow(
+                current,
+                incoming,
+                ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+            )
+
+        assertEquals(0uL, folded.unreadCount)
+        assertEquals(idB, folded.lastReadMessageIdHex)
+        assertEquals(100uL, folded.lastReadTimelineAt)
     }
 
     @Test
@@ -113,8 +423,7 @@ class ChatListFoldUnreadRegressionTest {
     @Test
     fun unreadCountDivergenceReport_isNullWhenProjectionExceedsLoadedWindow() {
         val timeline = listOf(received("r1"), received("r2"))
-        assertEquals(
-            null,
+        assertNull(
             unreadCountDivergenceReport(
                 projectionUnread = 47,
                 timeline = timeline,
@@ -126,8 +435,7 @@ class ChatListFoldUnreadRegressionTest {
     @Test
     fun unreadCountDivergenceReport_isNullWhenProjectionIsNotAboveTimeline() {
         val timeline = listOf(received("r1"), received("r2"))
-        assertEquals(
-            null,
+        assertNull(
             unreadCountDivergenceReport(
                 projectionUnread = 1,
                 timeline = timeline,
@@ -136,26 +444,11 @@ class ChatListFoldUnreadRegressionTest {
         )
     }
 
-    @Test
-    fun foldChatRow_usesMonotonicMergeForSubscriptionRows() {
-        val body = controllersSource().readText().kotlinFunctionBody("foldChatRow")
-
-        assertTrue(
-            "subscription folds must merge against the current row before replacing it",
-            "mergeMarkReadChatListRow" in body,
-        )
-    }
-
-    private fun controllersSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing Controllers.kt source file")
-
     private val idAnchor = "a".repeat(64)
     private val idMid = "b".repeat(64)
     private val idTail = "c".repeat(64)
+    private val idA = "d".repeat(64)
+    private val idB = "e".repeat(64)
 
     private fun row(
         messageId: String,
@@ -163,10 +456,15 @@ class ChatListFoldUnreadRegressionTest {
         unreadCount: ULong,
         lastReadTimelineAt: ULong?,
         lastReadMessageIdHex: String?,
+        deleted: Boolean = false,
+        includeLastMessage: Boolean = true,
+        firstUnreadMessageIdHex: String = messageId,
+        unreadMentionCount: ULong = 0uL,
+        unreadMention: Boolean = unreadMentionCount > 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
-        unreadMentionCount = 0uL,
-        unreadMention = false,
+        unreadMentionCount = unreadMentionCount,
+        unreadMention = unreadMention,
         groupIdHex = "group",
         archived = false,
         pendingConfirmation = false,
@@ -175,19 +473,23 @@ class ChatListFoldUnreadRegressionTest {
         avatarUrl = null,
         avatar = null,
         lastMessage =
-            ChatListMessagePreviewFfi(
-                messageIdHex = messageId,
-                sender = "sender",
-                senderDisplayName = "Sender",
-                plaintext = "hello",
-                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
-                kind = 9uL,
-                timelineAt = lastMessageAt,
-                deleted = false,
-            ),
+            if (includeLastMessage) {
+                ChatListMessagePreviewFfi(
+                    messageIdHex = messageId,
+                    sender = "sender",
+                    senderDisplayName = "Sender",
+                    plaintext = "hello",
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    kind = 9uL,
+                    timelineAt = lastMessageAt,
+                    deleted = deleted,
+                )
+            } else {
+                null
+            },
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
-        firstUnreadMessageIdHex = messageId,
+        firstUnreadMessageIdHex = firstUnreadMessageIdHex,
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
         updatedAt = lastMessageAt,

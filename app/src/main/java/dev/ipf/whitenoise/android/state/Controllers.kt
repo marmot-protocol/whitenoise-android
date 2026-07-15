@@ -396,10 +396,9 @@ private fun mergeMarkReadReadWatermark(
 }
 
 /**
- * Reconcile an incoming chat-list row (mark-read return or subscription
- * update) with the in-memory row. Returns null when the incoming projection
- * is strictly older than what is already folded (a superseded concurrent
- * mark-read or stale subscription unread).
+ * Reconcile a [markTimelineMessageRead] return row with the in-memory row.
+ * Returns null when the incoming projection is strictly older than what is
+ * already folded (a superseded concurrent mark-read).
  */
 internal fun mergeMarkReadChatListRow(
     current: ChatListRowFfi,
@@ -438,6 +437,90 @@ internal fun mergeMarkReadChatListRow(
         lastMessage = incoming.lastMessage ?: current.lastMessage,
         lastReadMessageIdHex = readMessageIdHex,
         lastReadTimelineAt = readTimelineAt,
+    )
+}
+
+/**
+ * Field-wise reducer for live chat-list subscription rows. Subscription rows
+ * are ordered full projections, so all non-read fields are authoritative — in
+ * particular, a deletion may move [ChatListRowFfi.lastMessage] backwards or to
+ * null. Only the read-dependent fields can be stale when a synchronous
+ * [markTimelineMessageRead] return races a previously queued subscription row.
+ */
+internal fun reduceSubscriptionChatListRow(
+    current: ChatListRowFfi,
+    incoming: ChatListRowFfi,
+    trigger: ChatListUpdateTriggerFfi,
+): ChatListRowFfi {
+    val incomingReadComplete = incoming.lastReadTimelineAt != null && incoming.lastReadMessageIdHex != null
+    val currentReadComplete = current.lastReadTimelineAt != null && current.lastReadMessageIdHex != null
+    val incomingReadCompare =
+        compareOptionalTimelineAtMessageIdHex(
+            incoming.lastReadTimelineAt,
+            incoming.lastReadMessageIdHex,
+            current.lastReadTimelineAt,
+            current.lastReadMessageIdHex,
+        )
+    val incomingReadTrusted = incomingReadComplete && (!currentReadComplete || incomingReadCompare!! >= 0)
+    if (incomingReadTrusted) return incoming
+
+    val newLastMessage = incoming.lastMessage
+    val currentLastMessage = current.lastMessage
+    val advancesLastMessage =
+        newLastMessage != null &&
+            (
+                currentLastMessage == null ||
+                    compareTimelineAtMessageIdHex(
+                        newLastMessage.timelineAt,
+                        newLastMessage.messageIdHex,
+                        currentLastMessage.timelineAt,
+                        currentLastMessage.messageIdHex,
+                    ) > 0
+            )
+    val advancesPastRead =
+        newLastMessage != null &&
+            currentReadComplete &&
+            compareTimelineAtMessageIdHex(
+                newLastMessage.timelineAt,
+                newLastMessage.messageIdHex,
+                current.lastReadTimelineAt!!,
+                current.lastReadMessageIdHex!!,
+            ) > 0
+    val addsUnread =
+        trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE &&
+            advancesLastMessage &&
+            advancesPastRead &&
+            incoming.unreadCount > current.unreadCount
+
+    val unreadCount =
+        if (addsUnread && current.unreadCount != ULong.MAX_VALUE) {
+            current.unreadCount + 1uL
+        } else {
+            current.unreadCount
+        }
+    val unreadMentionCount =
+        if (
+            addsUnread &&
+            incoming.unreadMentionCount > current.unreadMentionCount &&
+            current.unreadMentionCount != ULong.MAX_VALUE
+        ) {
+            current.unreadMentionCount + 1uL
+        } else {
+            current.unreadMentionCount
+        }
+    return incoming.copy(
+        lastReadTimelineAt = current.lastReadTimelineAt,
+        lastReadMessageIdHex = current.lastReadMessageIdHex,
+        unreadCount = unreadCount,
+        hasUnread = unreadCount > 0uL,
+        firstUnreadMessageIdHex =
+            if (addsUnread && current.unreadCount == 0uL) {
+                newLastMessage.messageIdHex
+            } else {
+                current.firstUnreadMessageIdHex
+            },
+        unreadMentionCount = unreadMentionCount,
+        unreadMention = unreadMentionCount > 0uL,
     )
 }
 
@@ -1863,7 +1946,7 @@ class ChatsController(
                                             chatsDebug {
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
-                                            foldChatRow(row)
+                                            foldChatRow(row, update.trigger)
                                         }
                                         is ChatListSubscriptionUpdateFfi.RemoveRow -> {
                                             chatsDebug {
@@ -2194,30 +2277,21 @@ class ChatsController(
             currentProjectedItems().filterNot { it.group.pendingConfirmation },
         )
 
-    private fun foldChatRow(row: ChatListRowFfi) {
+    private fun foldChatRow(
+        row: ChatListRowFfi,
+        trigger: ChatListUpdateTriggerFfi? = null,
+    ) {
         val key = chatRowKey(row.groupIdHex)
         val current = chatRowsByGroup[key]
         val folded =
             when {
                 current == null -> row
-                else -> mergeMarkReadChatListRow(current, row)
+                trigger != null -> reduceSubscriptionChatListRow(current, row, trigger)
+                else -> row
             }
-        if (folded == null) {
-            if (current != null && row.unreadCount > current.unreadCount) {
-                logStaleChatListUnreadRejected(
-                    keptUnread = current.unreadCount,
-                    rejectedUnread = row.unreadCount,
-                )
-            }
-            return
-        }
-        if (
-            current != null &&
-            row.unreadCount > current.unreadCount &&
-            folded.unreadCount == current.unreadCount
-        ) {
+        if (current != null && row.unreadCount > folded.unreadCount) {
             logStaleChatListUnreadRejected(
-                keptUnread = current.unreadCount,
+                keptUnread = folded.unreadCount,
                 rejectedUnread = row.unreadCount,
             )
         }
