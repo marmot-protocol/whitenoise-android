@@ -1034,16 +1034,16 @@
     <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
     <string name="group_add_members_after_create">Участников можно добавить после создания группы.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Вы единственный админ. %1$s станет админом, а вы покинете группу.</string>
-    <string name="app_updates">App updates</string>
-    <string name="app_update_settings_title">Zapstore release</string>
-    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
-    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
-    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
-    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
-    <string name="app_update_available_title">Update available</string>
-    <string name="app_update_persistent_title">Important update available</string>
-    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
-    <string name="app_update_now">Update now</string>
+    <string name="app_updates">Обновления приложения</string>
+    <string name="app_update_settings_title">Версия Zapstore</string>
+    <string name="app_update_settings_unknown">Установлена: %1$s — Последняя: неизвестно — нажмите, чтобы проверить</string>
+    <string name="app_update_settings_current">Установлена: %1$s — Актуальна</string>
+    <string name="app_update_settings_available">Установлена: %1$s — Последняя: %2$s — доступно обновление</string>
+    <string name="app_update_settings_available_with_count">Установлена: %1$s — Последняя: %2$s — отстаёт на %3$d версий</string>
+    <string name="app_update_available_title">Доступно обновление</string>
+    <string name="app_update_persistent_title">Доступно важное обновление</string>
+    <string name="app_update_available_description">Версия %1$s доступна в Zapstore.</string>
+    <string name="app_update_now">Обновить</string>
     <string name="app_self_update_resolving">Проверка версии</string>
     <string name="app_self_update_resolving_body">Получение подписанных метаданных Zapstore…</string>
     <string name="app_self_update_confirm_title">Скачать обновление?</string>
@@ -1068,12 +1068,12 @@
     <string name="app_self_update_error_title">Ошибка обновления</string>
     <string name="app_self_update_size_unknown">неизвестный размер</string>
     <plurals name="app_update_releases_behind">
-        <item quantity="one">%1$d release behind</item>
-        <item quantity="few">%1$d releases behind</item>
-        <item quantity="many">%1$d releases behind</item>
-        <item quantity="other">%1$d releases behind</item>
+        <item quantity="one">отстаёт на %1$d версию</item>
+        <item quantity="few">отстаёт на %1$d версии</item>
+        <item quantity="many">отстаёт на %1$d версий</item>
+        <item quantity="other">отстаёт на %1$d версии</item>
     </plurals>
-    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
-    <string name="notification_channel_app_updates">App updates</string>
-    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+    <string name="toast_zapstore_unavailable">Не удалось открыть Zapstore</string>
+    <string name="notification_channel_app_updates">Обновления приложения</string>
+    <string name="notification_channel_app_updates_description">Уведомления о версиях Zapstore</string>
 </resources>

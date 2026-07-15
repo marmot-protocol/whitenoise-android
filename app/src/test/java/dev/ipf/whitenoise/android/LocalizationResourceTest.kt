@@ -278,21 +278,6 @@ class LocalizationResourceTest {
                 // spelled identically in several locales (DE/ES/FR/IT).
                 "quick_action_audio",
                 "quick_action_video",
-                // App-update UX copy ships English placeholders in every locale
-                // until real translations land, so waive the copied-English check.
-                "app_updates",
-                "app_update_settings_title",
-                "app_update_settings_unknown",
-                "app_update_settings_current",
-                "app_update_settings_available",
-                "app_update_settings_available_with_count",
-                "app_update_available_title",
-                "app_update_persistent_title",
-                "app_update_available_description",
-                "app_update_now",
-                "toast_zapstore_unavailable",
-                "notification_channel_app_updates",
-                "notification_channel_app_updates_description",
                 "app_self_update_resolving",
                 "app_self_update_resolving_body",
                 "app_self_update_confirm_title",

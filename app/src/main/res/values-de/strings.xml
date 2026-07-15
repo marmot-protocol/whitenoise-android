@@ -1006,16 +1006,16 @@
     <string name="sign_in_error_public_key">Das ist ein öffentlicher Schlüssel. Gib deinen geheimen Schlüssel (nsec) ein, um dich anzumelden.</string>
     <string name="group_add_members_after_create">Mitglieder kannst du nach dem Erstellen der Gruppe hinzufügen.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Du bist der einzige Admin. %1$s wird Admin und du verlässt die Gruppe.</string>
-    <string name="app_updates">App updates</string>
-    <string name="app_update_settings_title">Zapstore release</string>
-    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
-    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
-    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
-    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
-    <string name="app_update_available_title">Update available</string>
-    <string name="app_update_persistent_title">Important update available</string>
-    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
-    <string name="app_update_now">Update now</string>
+    <string name="app_updates">App-Updates</string>
+    <string name="app_update_settings_title">Zapstore-Version</string>
+    <string name="app_update_settings_unknown">Installiert: %1$s — Neueste: unbekannt — zum Prüfen tippen</string>
+    <string name="app_update_settings_current">Installiert: %1$s — Aktuell</string>
+    <string name="app_update_settings_available">Installiert: %1$s — Neueste: %2$s — Update verfügbar</string>
+    <string name="app_update_settings_available_with_count">Installiert: %1$s — Neueste: %2$s — %3$d Versionen zurück</string>
+    <string name="app_update_available_title">Update verfügbar</string>
+    <string name="app_update_persistent_title">Wichtiges Update verfügbar</string>
+    <string name="app_update_available_description">Version %1$s ist auf Zapstore verfügbar.</string>
+    <string name="app_update_now">Jetzt aktualisieren</string>
     <string name="app_self_update_resolving">Versionsstatus wird geprüft</string>
     <string name="app_self_update_resolving_body">Signierte Zapstore-Versionsmetadaten werden abgerufen…</string>
     <string name="app_self_update_confirm_title">Update herunterladen?</string>
@@ -1040,10 +1040,10 @@
     <string name="app_self_update_error_title">Update fehlgeschlagen</string>
     <string name="app_self_update_size_unknown">unbekannte Größe</string>
     <plurals name="app_update_releases_behind">
-        <item quantity="one">%1$d release behind</item>
-        <item quantity="other">%1$d releases behind</item>
+        <item quantity="one">%1$d Version zurück</item>
+        <item quantity="other">%1$d Versionen zurück</item>
     </plurals>
-    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
-    <string name="notification_channel_app_updates">App updates</string>
-    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+    <string name="toast_zapstore_unavailable">Zapstore konnte nicht geöffnet werden</string>
+    <string name="notification_channel_app_updates">App-Updates</string>
+    <string name="notification_channel_app_updates_description">Benachrichtigungen zu Zapstore-Versionen</string>
 </resources>
