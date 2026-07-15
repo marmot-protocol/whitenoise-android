@@ -1061,4 +1061,5 @@
     <string name="sticker_no_installed">Installa un pacchetto di adesivi nelle Impostazioni per usarlo qui.</string>
     <string name="notification_sent_sticker">ha inviato un adesivo</string>
     <string name="sticker_external_signer_unsupported">L’importazione di adesivi Signal richiede una chiave di firma archiviata localmente.</string>
+    <string name="sticker_operation_failed">Operazione sugli sticker non riuscita. Controlla la connessione e riprova.</string>
 </resources>

@@ -1061,4 +1061,5 @@
     <string name="sticker_no_installed">Instale um pacote de figurinhas nas Configurações para usá-lo aqui.</string>
     <string name="notification_sent_sticker">enviou uma figurinha</string>
     <string name="sticker_external_signer_unsupported">A importação de figurinhas do Signal exige uma chave de assinatura armazenada localmente.</string>
+    <string name="sticker_operation_failed">A ação do sticker falhou. Verifique a conexão e tente novamente.</string>
 </resources>

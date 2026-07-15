@@ -101,6 +101,11 @@ internal fun composerBottomClusterAppliesImePadding(
     showAttachmentPane: Boolean = false,
 ): Boolean = (!showEmojiPane || composerEmojiSearchActive) && !showAttachmentPane
 
+internal fun canPickSticker(
+    isReplying: Boolean,
+    isEditing: Boolean,
+): Boolean = !isReplying && !isEditing
+
 internal fun composerBottomClusterModifier(
     showEmojiPane: Boolean,
     composerEmojiSearchActive: Boolean,
@@ -985,15 +990,18 @@ internal fun ComposerBar(
                         stickerPacks = stickerPacks,
                         onStickerPaneOpened = onStickerPaneOpened,
                         onStickerPicked =
-                            onStickerSend?.let { sendSticker ->
-                                { sticker ->
-                                    sendSticker(sticker) {
-                                        composerEmojiPickerOpen = false
-                                        composerEmojiPickerRequested = false
-                                        onAfterSend()
+                            onStickerSend
+                                ?.takeIf {
+                                    canPickSticker(replyingTo != null, editingMessageId != null)
+                                }?.let { sendSticker ->
+                                    { sticker ->
+                                        sendSticker(sticker) {
+                                            composerEmojiPickerOpen = false
+                                            composerEmojiPickerRequested = false
+                                            onAfterSend()
+                                        }
                                     }
-                                }
-                            },
+                                },
                     )
                 }
                 if (showAttachmentPane) {

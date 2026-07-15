@@ -1089,4 +1089,5 @@
     <string name="sticker_no_installed">Установите набор стикеров в настройках, чтобы использовать его здесь.</string>
     <string name="notification_sent_sticker">отправил(а) стикер</string>
     <string name="sticker_external_signer_unsupported">Для импорта стикеров Signal нужен локально сохранённый ключ подписи.</string>
+    <string name="sticker_operation_failed">Не удалось выполнить действие со стикером. Проверьте подключение и повторите попытку.</string>
 </resources>

@@ -76,6 +76,7 @@ internal fun StickerPacksScreen(
     var preview by remember(account) { mutableStateOf<StickerPackFfi?>(null) }
     val scope = rememberCoroutineScope()
     val unsupportedImportError = stringResource(R.string.sticker_external_signer_unsupported)
+    val genericStickerError = stringResource(R.string.sticker_operation_failed)
 
     suspend fun reload() {
         val current = account ?: return
@@ -98,12 +99,7 @@ internal fun StickerPacksScreen(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (failure: Throwable) {
-            error =
-                if (failure is MarmotKitException.StickerImportUnsupported) {
-                    unsupportedImportError
-                } else {
-                    failure.message?.takeIf { it.isNotBlank() } ?: failure::class.java.simpleName
-                }
+            error = sanitizedStickerActionError(failure, unsupportedImportError, genericStickerError)
         } finally {
             busy = false
         }
@@ -324,6 +320,19 @@ internal fun StickerPacksScreen(
         )
     }
 }
+
+internal fun sanitizedStickerActionError(
+    failure: Throwable,
+    unsupportedImportError: String,
+    genericStickerError: String,
+): String =
+    if (failure is MarmotKitException.StickerImportUnsupported) {
+        unsupportedImportError
+    } else {
+        // Native import errors can contain the full Signal URL, including its
+        // decryption key. Keep all backend details out of the rendered UI.
+        genericStickerError
+    }
 
 @Composable
 private fun StickerPackCard(

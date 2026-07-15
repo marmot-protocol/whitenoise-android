@@ -86,8 +86,16 @@
                     android:path="/stickers"
                     android:scheme="https" />
                 <data
+                    android:host="sonarprivacy.xyz"
+                    android:path="/stickers/"
+                    android:scheme="https" />
+                <data
                     android:host="www.sonarprivacy.xyz"
                     android:path="/stickers"
+                    android:scheme="https" />
+                <data
+                    android:host="www.sonarprivacy.xyz"
+                    android:path="/stickers/"
                     android:scheme="https" />
             </intent-filter>
             <intent-filter>
@@ -99,6 +107,10 @@
                 <data
                     android:host="signal.art"
                     android:path="/addstickers"
+                    android:scheme="https" />
+                <data
+                    android:host="signal.art"
+                    android:path="/addstickers/"
                     android:scheme="https" />
             </intent-filter>
         </activity>

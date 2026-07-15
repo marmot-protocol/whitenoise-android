@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -142,4 +145,38 @@ class TransientRelaySendErrorTest {
         assertTrue(SEND_RETRY_ATTEMPTS in 2..6)
         assertTrue(SEND_RETRY_BACKOFF_MS in 100L..3_000L)
     }
+
+    @Test
+    fun retryRunnerRecoversFromConnectPhaseFailure() =
+        runTest {
+            var calls = 0
+            val result =
+                retryTransientRelaySend(attempts = 3, backoffMs = 0) {
+                    calls += 1
+                    if (calls < 3) throw RuntimeException("connect relay timed out")
+                    "sent"
+                }
+
+            assertEquals("sent", result)
+            assertEquals(3, calls)
+        }
+
+    @Test
+    fun retryRunnerFailsFastForAmbiguousPostSendFailure() =
+        runTest {
+            var calls = 0
+            val terminal = RuntimeException("send event timed out")
+            var thrown: Throwable? = null
+            try {
+                retryTransientRelaySend(attempts = 3, backoffMs = 0) {
+                    calls += 1
+                    throw terminal
+                }
+            } catch (failure: Throwable) {
+                thrown = failure
+            }
+
+            assertSame(terminal, thrown)
+            assertEquals(1, calls)
+        }
 }

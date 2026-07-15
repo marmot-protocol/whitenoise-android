@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -923,6 +924,28 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
         ("connection refused" in text) ||
         ("connection reset" in text) ||
         ("no relay endpoints" in text)
+}
+
+internal suspend fun <T> retryTransientRelaySend(
+    attempts: Int = SEND_RETRY_ATTEMPTS,
+    backoffMs: Long = SEND_RETRY_BACKOFF_MS,
+    onTransientFailure: suspend (attempt: Int, failure: Throwable) -> Unit = { _, _ -> },
+    operation: suspend () -> T,
+): T {
+    require(attempts > 0) { "attempts must be positive" }
+    var lastTransient: Throwable? = null
+    for (attempt in 1..attempts) {
+        try {
+            return operation()
+        } catch (failure: Throwable) {
+            if (failure is CancellationException) throw failure
+            if (!isTransientRelaySendError(failure)) throw failure
+            lastTransient = failure
+            onTransientFailure(attempt, failure)
+            if (attempt < attempts) delay(backoffMs)
+        }
+    }
+    throw lastTransient ?: IllegalStateException("send retry budget exhausted")
 }
 
 internal fun mediaCacheKey(
@@ -4489,6 +4512,10 @@ class ConversationController(
         sticker: StickerFfi,
         onAccepted: () -> Unit = {},
     ) {
+        // Sticker messages do not yet carry reply/edit metadata. Refuse the
+        // action if stale UI invokes it while either mode is active rather than
+        // silently discarding the user's reply or edit context.
+        if (replyingTo != null || editingMessageId != null) return
         val account = conversationAccountRef
         if (account == null || !canSendMessages) {
             if (account != null) appState.present(R.string.toast_send_not_ready)
@@ -4531,13 +4558,12 @@ class ConversationController(
                     deleted = false,
                 ),
             )?.let { optimisticChatListPreviewRows[key] = it }
-        replyingTo = null
         onAccepted()
 
         try {
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { sendSticker(account, group.groupIdHex, stickerRef) }
+                    publishStickerWithRetry(account, stickerRef)
                 }
             val reconciliation =
                 reconcileSuccessfulTextSend(
@@ -4649,6 +4675,16 @@ class ConversationController(
         // Budget exhausted on a sustained connectivity gap: surface the failure.
         throw lastTransient ?: IllegalStateException("send retry budget exhausted")
     }
+
+    private suspend fun publishStickerWithRetry(
+        account: String,
+        stickerRef: StickerRefFfi,
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        retryTransientRelaySend(
+            onTransientFailure = { attempt, failure -> logSendRetry(attempt, failure) },
+        ) {
+            appState.marmotIo { sendSticker(account, group.groupIdHex, stickerRef) }
+        }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.
@@ -5688,7 +5724,7 @@ class ConversationController(
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (stickerRef != null) {
-                        appState.marmotIo { sendSticker(account, group.groupIdHex, stickerRef) }
+                        publishStickerWithRetry(account, stickerRef)
                     } else if (replyTarget != null) {
                         appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, requireNotNull(text)) }
                     } else {

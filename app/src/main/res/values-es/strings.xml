@@ -1061,4 +1061,5 @@
     <string name="sticker_no_installed">Instala un paquete de pegatinas en Ajustes para usarlo aquí.</string>
     <string name="notification_sent_sticker">envió una pegatina</string>
     <string name="sticker_external_signer_unsupported">La importación de pegatinas de Signal requiere una clave de firma almacenada localmente.</string>
+    <string name="sticker_operation_failed">La acción del sticker falló. Comprueba tu conexión e inténtalo de nuevo.</string>
 </resources>

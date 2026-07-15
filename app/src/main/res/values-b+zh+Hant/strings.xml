@@ -1046,4 +1046,5 @@
     <string name="sticker_no_installed">請先在設定中安裝貼圖包，再於此使用。</string>
     <string name="notification_sent_sticker">傳送了一張貼圖</string>
     <string name="sticker_external_signer_unsupported">匯入 Signal 貼圖需要儲存在本機的簽署金鑰。</string>
+    <string name="sticker_operation_failed">貼圖操作失敗。請檢查網路連線後再試一次。</string>
 </resources>

@@ -116,8 +116,9 @@ internal fun MainShell(
         chatsController.bind(appState.activeAccountRef)
     }
 
-    LaunchedEffect(inboundStickerInput) {
+    LaunchedEffect(inboundStickerInput, appState.appLockScreenVisible) {
         val input = inboundStickerInput ?: return@LaunchedEffect
+        if (!shouldRouteInboundStickerInput(input, appState.appLockScreenVisible)) return@LaunchedEffect
         chatListReturnHeadSnap = resetChatListReturnHeadSnap()
         selectedChat = null
         selectedChatFocusMessageId = null
@@ -513,3 +514,8 @@ internal fun MainShell(
             )
     }
 }
+
+internal fun shouldRouteInboundStickerInput(
+    input: StickerInput?,
+    appLockScreenVisible: Boolean,
+): Boolean = input != null && !appLockScreenVisible

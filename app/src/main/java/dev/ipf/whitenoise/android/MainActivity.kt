@@ -162,7 +162,7 @@ class MainActivity : FragmentActivity() {
                 inboundStickerInput = stickerInput
             }
         }
-        if (parsedTarget != null || stickerInput != null) {
+        if (shouldClearInboundActivityIntent(parsedTarget != null, stickerInput)) {
             // Notification taps are one-shot navigation requests. Replace the
             // stored intent after parsing so activity recreation cannot replay
             // the same target after the UI has already consumed it. This is
@@ -323,6 +323,11 @@ class MainActivity : FragmentActivity() {
         window.setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
     }
 }
+
+internal fun shouldClearInboundActivityIntent(
+    hasNotificationTarget: Boolean,
+    stickerInput: StickerInput?,
+): Boolean = hasNotificationTarget || stickerInput != null
 
 internal fun preComposeThemeFor(
     themeMode: AppThemeMode,

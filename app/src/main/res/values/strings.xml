@@ -1089,4 +1089,5 @@
     <string name="sticker_no_installed">Install a sticker pack in Settings to use it here.</string>
     <string name="notification_sent_sticker">sent a sticker</string>
     <string name="sticker_external_signer_unsupported">Signal sticker import requires a locally stored signing key.</string>
+    <string name="sticker_operation_failed">Sticker action failed. Check your connection and try again.</string>
 </resources>

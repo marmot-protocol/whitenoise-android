@@ -1059,4 +1059,5 @@
     <string name="sticker_no_installed">Burada kullanmak için Ayarlar’dan bir çıkartma paketi yükleyin.</string>
     <string name="notification_sent_sticker">bir çıkartma gönderdi</string>
     <string name="sticker_external_signer_unsupported">Signal çıkartmalarını içe aktarmak için yerel olarak saklanan bir imzalama anahtarı gerekir.</string>
+    <string name="sticker_operation_failed">Çıkartma işlemi başarısız oldu. Bağlantınızı kontrol edip tekrar deneyin.</string>
 </resources>

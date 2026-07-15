@@ -1059,4 +1059,5 @@
     <string name="sticker_no_installed">Installiere in den Einstellungen ein Stickerpaket, um es hier zu verwenden.</string>
     <string name="notification_sent_sticker">hat einen Sticker gesendet</string>
     <string name="sticker_external_signer_unsupported">Für den Import von Signal-Stickern ist ein lokal gespeicherter Signierschlüssel erforderlich.</string>
+    <string name="sticker_operation_failed">Sticker-Aktion fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.</string>
 </resources>

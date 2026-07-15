@@ -13,6 +13,10 @@ class StickerLinksTest {
             StickerInputKind.Pack,
             StickerLinks.classify("https://sonarprivacy.xyz/stickers?a=30031%3Aauthor%3Acats&relay=wss%3A%2F%2Fevil.test")?.kind,
         )
+        assertEquals(
+            StickerInputKind.Pack,
+            StickerLinks.classify("https://www.sonarprivacy.xyz/stickers/?a=30031%3Aauthor%3Acats")?.kind,
+        )
     }
 
     @Test
@@ -21,6 +25,7 @@ class StickerLinksTest {
             "https://signal.art/addstickers/#pack_id=abcdefabcdef1234567890abcdef1234&" +
                 "pack_key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         assertEquals(StickerInput(value = link, kind = StickerInputKind.SignalImport), StickerLinks.classify(link))
+        assertEquals(StickerInputKind.SignalImport, StickerLinks.classify(link.replace("/addstickers/", "/addstickers"))?.kind)
     }
 
     @Test

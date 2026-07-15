@@ -1061,4 +1061,5 @@
     <string name="sticker_no_installed">Installez un pack d’autocollants dans les paramètres pour l’utiliser ici.</string>
     <string name="notification_sent_sticker">a envoyé un autocollant</string>
     <string name="sticker_external_signer_unsupported">L’import d’autocollants Signal nécessite une clé de signature stockée localement.</string>
+    <string name="sticker_operation_failed">L’action sur le sticker a échoué. Vérifiez votre connexion et réessayez.</string>
 </resources>
