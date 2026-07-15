@@ -1030,4 +1030,20 @@
     <string name="toast_zapstore_unavailable">无法打开 Zapstore</string>
     <string name="notification_channel_app_updates">应用更新</string>
     <string name="notification_channel_app_updates_description">Zapstore 版本提醒</string>
+    <string name="sticker">贴图</string>
+    <string name="stickers">贴图</string>
+    <string name="stickers_settings_subtitle">发现、导入和管理贴图包</string>
+    <string name="sticker_import_notice">粘贴 Sonar 贴图包链接或 Signal 贴图链接。Signal 导入内容会公开上传到 Blossom，并发布为 Sonar 贴图包。</string>
+    <string name="sticker_pack_input_hint">Sonar 或 Signal 贴图链接</string>
+    <string name="sticker_import">导入贴图包</string>
+    <string name="sticker_search_hint">搜索贴图包</string>
+    <string name="sticker_no_packs">未找到贴图包</string>
+    <string name="sticker_install">安装</string>
+    <string name="sticker_uninstall">卸载</string>
+    <string name="sticker_count">%1$d 张贴图</string>
+    <string name="sticker_emoji_tab">表情符号</string>
+    <string name="sticker_stickers_tab">贴图</string>
+    <string name="sticker_no_installed">请先在设置中安装贴图包，然后在此使用。</string>
+    <string name="notification_sent_sticker">发送了一张贴图</string>
+    <string name="sticker_external_signer_unsupported">导入 Signal 贴图需要本地存储的签名密钥。</string>
 </resources>

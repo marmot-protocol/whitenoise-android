@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.StickerInput
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
@@ -77,6 +78,8 @@ internal fun SettingsScreen(
     onOpenDiagnostics: () -> Unit,
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
+    initialStickerInput: StickerInput? = null,
+    onStickerInputConsumed: (StickerInput) -> Unit = {},
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -107,6 +110,13 @@ internal fun SettingsScreen(
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Stickers ->
+            StickerPacksScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+                initialInput = initialStickerInput,
+                onInitialInputConsumed = onStickerInputConsumed,
+            )
         SettingsDetail.SecurityPrivacy ->
             SecurityPrivacyScreen(
                 appState = appState,
@@ -198,6 +208,10 @@ private fun SettingsHomeScreen(
                         stringResource(R.string.notifications),
                         stringResource(R.string.notifications_settings_subtitle),
                     ) { onOpenDetail(SettingsDetail.Notifications) }
+                    SettingsRow(
+                        stringResource(R.string.stickers),
+                        stringResource(R.string.stickers_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Stickers) }
                     SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
                         onOpenDetail(SettingsDetail.SecurityPrivacy)
                     }

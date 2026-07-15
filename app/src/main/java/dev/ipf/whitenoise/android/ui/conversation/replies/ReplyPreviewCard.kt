@@ -79,6 +79,7 @@ internal fun ReplyPreviewCard(
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> stringResource(R.string.reply_media_video)
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> stringResource(R.string.reply_media_voice)
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> stringResource(R.string.reply_media_document)
+            dev.ipf.whitenoise.android.core.ReplyMediaKind.Sticker -> stringResource(R.string.sticker)
             dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
         }
     val mediaIcon =
@@ -87,6 +88,7 @@ internal fun ReplyPreviewCard(
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> Icons.Default.Movie
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> Icons.Default.Mic
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
+            dev.ipf.whitenoise.android.core.ReplyMediaKind.Sticker -> Icons.Default.Image
             dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
         }
     // Media path shows a label; only the plaintext body carries raw profile

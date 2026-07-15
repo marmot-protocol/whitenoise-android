@@ -1043,4 +1043,20 @@
     <string name="toast_zapstore_unavailable">Zapstore konnte nicht geöffnet werden</string>
     <string name="notification_channel_app_updates">App-Updates</string>
     <string name="notification_channel_app_updates_description">Benachrichtigungen zu Zapstore-Versionen</string>
+    <string name="sticker">Aufkleber</string>
+    <string name="stickers">Aufkleber</string>
+    <string name="stickers_settings_subtitle">Stickerpakete entdecken, importieren und verwalten</string>
+    <string name="sticker_import_notice">Füge einen Sonar-Paketlink oder einen Signal-Stickerlink ein. Signal-Importe werden öffentlich zu Blossom hochgeladen und als Sonar-Paket veröffentlicht.</string>
+    <string name="sticker_pack_input_hint">Sonar- oder Signal-Stickerlink</string>
+    <string name="sticker_import">Stickerpaket importieren</string>
+    <string name="sticker_search_hint">Stickerpakete suchen</string>
+    <string name="sticker_no_packs">Keine Stickerpakete gefunden</string>
+    <string name="sticker_install">Installieren</string>
+    <string name="sticker_uninstall">Deinstallieren</string>
+    <string name="sticker_count">%1$d Sticker</string>
+    <string name="sticker_emoji_tab">Emojis</string>
+    <string name="sticker_stickers_tab">Sticker</string>
+    <string name="sticker_no_installed">Installiere in den Einstellungen ein Stickerpaket, um es hier zu verwenden.</string>
+    <string name="notification_sent_sticker">hat einen Sticker gesendet</string>
+    <string name="sticker_external_signer_unsupported">Für den Import von Signal-Stickern ist ein lokal gespeicherter Signierschlüssel erforderlich.</string>
 </resources>

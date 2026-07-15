@@ -317,6 +317,7 @@ class LocalNotificationFormatterTest {
         assertEquals("sent a video", body(ReplyMediaKind.Video))
         assertEquals("sent a voice message", body(ReplyMediaKind.Voice))
         assertEquals("sent a file", body(ReplyMediaKind.Document))
+        assertEquals("sent a sticker", body(ReplyMediaKind.Sticker))
     }
 
     @Test

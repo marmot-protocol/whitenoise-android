@@ -1073,4 +1073,20 @@
     <string name="toast_zapstore_unavailable">Не удалось открыть Zapstore</string>
     <string name="notification_channel_app_updates">Обновления приложения</string>
     <string name="notification_channel_app_updates_description">Уведомления о версиях Zapstore</string>
+    <string name="sticker">Стикер</string>
+    <string name="stickers">Стикеры</string>
+    <string name="stickers_settings_subtitle">Поиск, импорт и управление наборами стикеров</string>
+    <string name="sticker_import_notice">Вставьте ссылку на набор Sonar или стикеры Signal. Импортированные из Signal файлы будут публично загружены в Blossom и опубликованы как набор Sonar.</string>
+    <string name="sticker_pack_input_hint">Ссылка на стикеры Sonar или Signal</string>
+    <string name="sticker_import">Импортировать набор стикеров</string>
+    <string name="sticker_search_hint">Поиск наборов стикеров</string>
+    <string name="sticker_no_packs">Наборы стикеров не найдены</string>
+    <string name="sticker_install">Установить</string>
+    <string name="sticker_uninstall">Удалить</string>
+    <string name="sticker_count">Стикеров: %1$d</string>
+    <string name="sticker_emoji_tab">Эмодзи</string>
+    <string name="sticker_stickers_tab">Стикеры</string>
+    <string name="sticker_no_installed">Установите набор стикеров в настройках, чтобы использовать его здесь.</string>
+    <string name="notification_sent_sticker">отправил(а) стикер</string>
+    <string name="sticker_external_signer_unsupported">Для импорта стикеров Signal нужен локально сохранённый ключ подписи.</string>
 </resources>

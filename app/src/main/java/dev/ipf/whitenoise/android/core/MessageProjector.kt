@@ -21,6 +21,7 @@ data class MessageTextCopy(
     val mediaVideo: String = "Video",
     val mediaVoice: String = "Voice message",
     val mediaDocument: String = "File",
+    val sticker: String = "Sticker",
     val message: String,
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
@@ -32,6 +33,7 @@ data class MessageTextCopy(
             ReplyMediaKind.Video -> mediaVideo
             ReplyMediaKind.Voice -> mediaVoice
             ReplyMediaKind.Document -> mediaDocument
+            ReplyMediaKind.Sticker -> sticker
             ReplyMediaKind.None -> mediaAttachment
         }
 
@@ -66,6 +68,7 @@ data class MediaPreviewFallback(
             ReplyMediaKind.Photo,
             ReplyMediaKind.Video,
             ReplyMediaKind.Voice,
+            ReplyMediaKind.Sticker,
             -> copy.mediaLabel(kind)
             ReplyMediaKind.Document,
             ReplyMediaKind.None,
@@ -101,6 +104,7 @@ object MessageProjector {
             // body. The conversation row builds the name-resolved summary;
             // this name-free form covers reply previews and copy-text.
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
+            message.sticker != null -> copy.sticker
             isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext
         }
@@ -117,6 +121,7 @@ object MessageProjector {
             isStreamStart(message) -> copy.agentStreamStarted
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
+            message.sticker != null -> copy.sticker
             isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext.ifBlank { copy.message }
         }

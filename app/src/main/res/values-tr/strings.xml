@@ -1043,4 +1043,20 @@
     <string name="toast_zapstore_unavailable">Zapstore açılamadı</string>
     <string name="notification_channel_app_updates">Uygulama güncellemeleri</string>
     <string name="notification_channel_app_updates_description">Zapstore sürüm uyarıları</string>
+    <string name="sticker">Çıkartma</string>
+    <string name="stickers">Çıkartmalar</string>
+    <string name="stickers_settings_subtitle">Çıkartma paketlerini keşfet, içe aktar ve yönet</string>
+    <string name="sticker_import_notice">Bir Sonar paket bağlantısı veya Signal çıkartma bağlantısı yapıştırın. Signal içe aktarımları Blossom’a herkese açık olarak yüklenir ve Sonar paketi olarak yayımlanır.</string>
+    <string name="sticker_pack_input_hint">Sonar veya Signal çıkartma bağlantısı</string>
+    <string name="sticker_import">Çıkartma paketini içe aktar</string>
+    <string name="sticker_search_hint">Çıkartma paketlerinde ara</string>
+    <string name="sticker_no_packs">Çıkartma paketi bulunamadı</string>
+    <string name="sticker_install">Yükle</string>
+    <string name="sticker_uninstall">Kaldır</string>
+    <string name="sticker_count">%1$d çıkartma</string>
+    <string name="sticker_emoji_tab">İfadeler</string>
+    <string name="sticker_stickers_tab">Çıkartmalar</string>
+    <string name="sticker_no_installed">Burada kullanmak için Ayarlar’dan bir çıkartma paketi yükleyin.</string>
+    <string name="notification_sent_sticker">bir çıkartma gönderdi</string>
+    <string name="sticker_external_signer_unsupported">Signal çıkartmalarını içe aktarmak için yerel olarak saklanan bir imzalama anahtarı gerekir.</string>
 </resources>

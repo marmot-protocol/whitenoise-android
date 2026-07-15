@@ -124,6 +124,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.stickers.StickerImage
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -772,6 +774,7 @@ internal fun MessageBubble(
                     }
                 val footerOnPendingVisual =
                     !deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.size == 1
+                val footerOnSticker = !deleted && !invalidated && record.sticker != null
                 val showPendingPlaceholder =
                     !deleted &&
                         !invalidated &&
@@ -790,6 +793,7 @@ internal fun MessageBubble(
                         !invalidated &&
                         (
                             anyConfirmedMedia ||
+                                record.sticker != null ||
                                 pendingAudio.isNotEmpty() ||
                                 pendingVisualRefs.isNotEmpty() ||
                                 showPendingPlaceholder ||
@@ -816,6 +820,21 @@ internal fun MessageBubble(
                         }
                     }
                 val mediaBlocks: @Composable ColumnScope.() -> Unit = {
+                    record.sticker?.takeIf { !deleted && !invalidated }?.let { stickerRef ->
+                        Box(modifier = Modifier.size(196.dp)) {
+                            StickerImage(
+                                appState = appState,
+                                stickerRef = stickerRef,
+                                contentDescription = stringResource(R.string.sticker),
+                                modifier = Modifier.fillMaxWidth().height(196.dp),
+                            )
+                            MediaFooterOverlay(
+                                timeText = rememberedClockTime(record.recordedAt),
+                                showStatus = mine,
+                                status = item.status,
+                            )
+                        }
+                    }
                     if (sharedLocation != null) {
                         val shareContext = LocalContext.current
                         LocationMessageBubble(
@@ -1031,6 +1050,7 @@ internal fun MessageBubble(
                         // The contact card / location bubble / user card carry
                         // the body, so the raw caption/link/npub text is hidden.
                         sharedContact != null || sharedLocation != null || sharedUser != null -> null
+                        record.sticker != null -> null
                         mediaPendingName != null && !anyConfirmedMedia -> null
                         anyConfirmedMedia ->
                             (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }
@@ -1255,7 +1275,7 @@ internal fun MessageBubble(
                                 messageBody()
                             }
                         }
-                    } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                    } else if (!footerOnVisualMedia && !footerOnPendingVisual && !footerOnSticker) {
                         Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
                             inlineFooter()
                         }
@@ -1419,7 +1439,13 @@ internal fun MessageBubble(
                     canReact = !readOnly,
                     canDeleteForMe = !readOnly && record.messageIdHex.isNotBlank() && !deleted,
                     canDeleteForEveryone = canDeleteForEveryone,
-                    canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                    canEdit =
+                        !readOnly &&
+                            mine &&
+                            record.kind == 9uL &&
+                            record.sticker == null &&
+                            record.messageIdHex.isNotBlank() &&
+                            !deleted,
                     canForward = !readOnly && forwardBody != null,
                     canSelect = !readOnly && batchSelectable,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1532,6 +1558,13 @@ internal fun MessageBubble(
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                            stickerPacks = controller.installedStickerPacks,
+                                            onStickerSend = { sticker, onAccepted ->
+                                                appState.launchMutation { controller.sendSticker(sticker, onAccepted) }
+                                            },
+                                            onStickerPaneOpened = {
+                                                appState.launchMutation { controller.refreshStickerPacks() }
+                                            },
                                             initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                                             onDraftChange = { appState.setDraft(groupIdHex, it) },
                                             draftKey = groupIdHex,

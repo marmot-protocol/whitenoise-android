@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">No se pudo abrir Zapstore</string>
     <string name="notification_channel_app_updates">Actualizaciones de la aplicación</string>
     <string name="notification_channel_app_updates_description">Alertas de versiones de Zapstore</string>
+    <string name="sticker">Pegatina</string>
+    <string name="stickers">Pegatinas</string>
+    <string name="stickers_settings_subtitle">Descubre, importa y administra paquetes de pegatinas</string>
+    <string name="sticker_import_notice">Pega un enlace de paquete de Sonar o de pegatinas de Signal. Las importaciones de Signal se suben públicamente a Blossom y se publican como un paquete de Sonar.</string>
+    <string name="sticker_pack_input_hint">Enlace de pegatinas de Sonar o Signal</string>
+    <string name="sticker_import">Importar paquete de pegatinas</string>
+    <string name="sticker_search_hint">Buscar paquetes de pegatinas</string>
+    <string name="sticker_no_packs">No se encontraron paquetes de pegatinas</string>
+    <string name="sticker_install">Instalar</string>
+    <string name="sticker_uninstall">Desinstalar</string>
+    <string name="sticker_count">%1$d pegatinas</string>
+    <string name="sticker_emoji_tab">Emojis</string>
+    <string name="sticker_stickers_tab">Pegatinas</string>
+    <string name="sticker_no_installed">Instala un paquete de pegatinas en Ajustes para usarlo aquí.</string>
+    <string name="notification_sent_sticker">envió una pegatina</string>
+    <string name="sticker_external_signer_unsupported">La importación de pegatinas de Signal requiere una clave de firma almacenada localmente.</string>
 </resources>

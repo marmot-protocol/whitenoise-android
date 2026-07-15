@@ -2567,6 +2567,13 @@ internal fun ConversationScreen(
                                     messageTextCopy = messageTextCopy,
                                     onCancelReply = { controller.replyingTo = null },
                                     onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                    stickerPacks = controller.installedStickerPacks,
+                                    onStickerSend = { sticker, onAccepted ->
+                                        appState.launchMutation { controller.sendSticker(sticker, onAccepted) }
+                                    },
+                                    onStickerPaneOpened = {
+                                        appState.launchMutation { controller.refreshStickerPacks() }
+                                    },
                                     initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                                     onDraftChange = { appState.setDraft(groupIdHex, it) },
                                     draftKey = groupIdHex,

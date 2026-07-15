@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -10,6 +11,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageProjectorTest {
+    @Test
+    fun stickerUsesTypedDisplayCopyAndIsNotForwardedAsText() {
+        val sticker =
+            message(id = "sticker", plaintext = "")
+                .copy(
+                    sticker =
+                        StickerRefFfi(
+                            packCoordinate = "30031:${"ab".repeat(32)}:cats",
+                            shortcode = "wave",
+                            plaintextSha256 = "11".repeat(32),
+                        ),
+                )
+
+        assertEquals("Sticker", MessageProjector.displayBody(sticker))
+        assertEquals("Sticker", MessageProjector.previewText(sticker))
+        assertNull(MessageProjector.forwardableText(sticker))
+    }
+
     @Test
     fun reactedToMessageIdReadsEventTagOnKindSeven() {
         assertEquals(

@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -24,6 +25,34 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 class ConversationTranscriptExportTest {
+    @Test
+    fun documentIncludesStructuredStickerReference() {
+        val sticker =
+            StickerRefFfi(
+                packCoordinate = "30031:${"ab".repeat(32)}:cats",
+                shortcode = "wave",
+                plaintextSha256 = "11".repeat(32),
+            )
+        val document =
+            ConversationTranscriptExport.makeDocument(
+                group = testExportGroup(name = "Cats", groupIdHex = "aa".repeat(32)),
+                messages =
+                    listOf(
+                        timelineRecord(
+                            messageIdHex = "22".repeat(32),
+                            plaintext = "",
+                            timelineAt = 1uL,
+                            sticker = sticker,
+                        ),
+                    ),
+            )
+
+        val encoded = document.getJSONArray("events").getJSONObject(0).getJSONObject("sticker")
+        assertEquals(sticker.packCoordinate, encoded.getString("pack_coordinate"))
+        assertEquals("wave", encoded.getString("shortcode"))
+        assertEquals(sticker.plaintextSha256, encoded.getString("plaintext_sha256"))
+    }
+
     @Test
     fun documentEncodesTimelineMetadataInChronologicalOrder() {
         val groupId = "aa".repeat(32)
@@ -409,6 +438,7 @@ class ConversationTranscriptExportTest {
         timelineAt: ULong,
         reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         groupSystem: GroupSystemEventFfi? = null,
+        sticker: StickerRefFfi? = null,
     ) = TimelineMessageRecordFfi(
         messageIdHex = messageIdHex,
         sourceMessageIdHex = null,
@@ -419,6 +449,7 @@ class ConversationTranscriptExportTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
         tags = tags,
+        sticker = sticker,
         timelineAt = timelineAt,
         receivedAt = timelineAt,
         replyToMessageIdHex = null,

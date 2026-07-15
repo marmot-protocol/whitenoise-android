@@ -10,7 +10,7 @@ data class TimelineReplyDisplay(
     val mediaKind: ReplyMediaKind = ReplyMediaKind.None,
 )
 
-enum class ReplyMediaKind { None, Photo, Video, Voice, Document }
+enum class ReplyMediaKind { None, Photo, Video, Voice, Document, Sticker }
 
 fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
     if (mime.isNullOrBlank()) return ReplyMediaKind.None
@@ -48,6 +48,7 @@ object TimelineProjector {
             tags = record.tags,
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
+            sticker = record.sticker,
         )
 
     fun displayBody(
@@ -78,7 +79,7 @@ object TimelineProjector {
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy),
-            mediaKind = replyMediaKindFromJson(preview.mediaJson),
+            mediaKind = if (preview.sticker != null) ReplyMediaKind.Sticker else replyMediaKindFromJson(preview.mediaJson),
         )
     }
 
@@ -130,6 +131,7 @@ object TimelineProjector {
             tags = emptyList(),
             recordedAt = 0uL,
             receivedAt = 0uL,
+            sticker = sticker,
         )
 
     private fun projectedBody(

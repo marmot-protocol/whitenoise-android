@@ -42,6 +42,8 @@ import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.StickerAssetFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
@@ -913,6 +915,13 @@ internal fun networkDisplayNameFallback(
 
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
+private data class StickerAssetCacheKey(
+    val accountRef: String,
+    val packCoordinate: String,
+    val shortcode: String,
+    val plaintextSha256: String,
+)
+
 class WhiteNoiseAppState(
     context: Context,
 ) {
@@ -950,6 +959,18 @@ class WhiteNoiseAppState(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             sizeOf = { it.allocationByteCount },
+        )
+
+    /**
+     * Session-only cache of verified sticker assets. Marmot's SQLite sticker
+     * tables remain the source of truth; this LRU only avoids re-fetching the
+     * same immutable, hash-addressed bytes while their bubbles are visible.
+     */
+    private val stickerAssetCache =
+        dev.ipf.whitenoise.android.media.ByteSizeLruCache<StickerAssetCacheKey, StickerAssetFfi>(
+            maxBytes = STICKER_ASSET_CACHE_MAX_BYTES,
+            maxEntryBytes = STICKER_ASSET_CACHE_MAX_ENTRY_BYTES,
+            sizeOf = { it.bytes.size },
         )
 
     /**
@@ -1230,6 +1251,8 @@ class WhiteNoiseAppState(
     // Deferred instead of spawning a second Blossom fetch.
     private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
     private val inFlightDownloadsLock = Any()
+    private val inFlightStickerAssets = mutableMapOf<StickerAssetCacheKey, Deferred<StickerAssetFfi>>()
+    private val inFlightStickerAssetsLock = Any()
     private val inFlightMediaUploads = InFlightMediaUploads()
 
     // Bound attachment fetches without making a visible album wait for one
@@ -1859,6 +1882,38 @@ class WhiteNoiseAppState(
             marmot().block()
         }
 
+    /** Fetches a native-authorized sticker asset and shares concurrent loads. */
+    suspend fun stickerAsset(stickerRef: StickerRefFfi): StickerAssetFfi {
+        val account = activeAccountRef ?: error("No active account")
+        val cacheKey =
+            StickerAssetCacheKey(
+                accountRef = account,
+                packCoordinate = stickerRef.packCoordinate,
+                shortcode = stickerRef.shortcode,
+                plaintextSha256 = stickerRef.plaintextSha256.lowercase(Locale.ROOT),
+            )
+        stickerAssetCache.get(cacheKey)?.let { return it }
+
+        val deferred =
+            synchronized(inFlightStickerAssetsLock) {
+                inFlightStickerAssets[cacheKey]?.takeIf { it.isActive }
+                    ?: mutationsScope
+                        .async {
+                            marmotIo { fetchStickerAsset(account, stickerRef) }
+                        }.also { created ->
+                            inFlightStickerAssets[cacheKey] = created
+                            created.invokeOnCompletion {
+                                synchronized(inFlightStickerAssetsLock) {
+                                    if (inFlightStickerAssets[cacheKey] === created) {
+                                        inFlightStickerAssets.remove(cacheKey)
+                                    }
+                                }
+                            }
+                        }
+            }
+        return deferred.await().also { stickerAssetCache.put(cacheKey, it) }
+    }
+
     /**
      * Drive Marmot's per-account catch-up so every signed-in account on this
      * device processes the events its worker has pending — most importantly
@@ -2403,6 +2458,7 @@ class WhiteNoiseAppState(
     private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        stickerAssetCache.clear()
         MediaInventory.clear()
         mediaUploadSessionEpoch.incrementAndGet()
         // Uploads run on the app-lifetime mutation scope so they can survive
@@ -2442,6 +2498,10 @@ class WhiteNoiseAppState(
         synchronized(inFlightDownloadsLock) {
             inFlightDownloads.values.forEach { it.cancel() }
             inFlightDownloads.clear()
+        }
+        synchronized(inFlightStickerAssetsLock) {
+            inFlightStickerAssets.values.forEach { it.cancel() }
+            inFlightStickerAssets.clear()
         }
     }
 
@@ -5043,7 +5103,11 @@ class WhiteNoiseAppState(
     // the stored record (recent history tail) and match by id; a miss or a
     // non-media record yields None and the generic "New message" body stands.
     private suspend fun notificationMediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
-        notificationMessageRecord(update)?.let(MessageProjector::mediaKind) ?: ReplyMediaKind.None
+        if (update.sticker != null) {
+            ReplyMediaKind.Sticker
+        } else {
+            notificationMessageRecord(update)?.let(MessageProjector::mediaKind) ?: ReplyMediaKind.None
+        }
 
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
@@ -5473,6 +5537,8 @@ class WhiteNoiseAppState(
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+        private const val STICKER_ASSET_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+        private const val STICKER_ASSET_CACHE_MAX_ENTRY_BYTES: Long = 4L * 1024L * 1024L
 
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.

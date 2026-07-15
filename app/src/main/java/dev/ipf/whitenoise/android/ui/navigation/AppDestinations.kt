@@ -18,6 +18,7 @@ internal enum class SettingsDetail {
     Relays,
     KeyPackages,
     Notifications,
+    Stickers,
     SecurityPrivacy,
     Donate,
 }

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -88,10 +89,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ipf.marmotkit.StickerFfi
+import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.reference
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
+import dev.ipf.whitenoise.android.ui.stickers.StickerImage
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -176,8 +182,13 @@ internal fun ComposerEmojiPickerPane(
     onEmojiPicked: (String) -> Unit,
     onBackspace: () -> Unit,
     onSearchActiveChange: (Boolean) -> Unit,
+    appState: WhiteNoiseAppState? = null,
+    stickerPacks: List<StickerPackFfi> = emptyList(),
+    onStickerPicked: ((StickerFfi) -> Unit)? = null,
+    onStickerPaneOpened: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var stickersSelected by rememberSaveable { mutableStateOf(false) }
     Surface(
         modifier =
             modifier
@@ -189,17 +200,94 @@ internal fun ComposerEmojiPickerPane(
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
-        EmojiPickerContent(
-            onEmojiPicked = onEmojiPicked,
-            recordRecentPicks = false,
-            onBackspace = onBackspace,
-            searchStartsOpen = false,
-            onSearchActiveChange = onSearchActiveChange,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+        Column(Modifier.fillMaxSize()) {
+            if (appState != null && onStickerPicked != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = !stickersSelected,
+                        onClick = { stickersSelected = false },
+                        label = { Text(stringResource(R.string.sticker_emoji_tab)) },
+                    )
+                    FilterChip(
+                        selected = stickersSelected,
+                        onClick = {
+                            if (!stickersSelected) onStickerPaneOpened()
+                            stickersSelected = true
+                            onSearchActiveChange(false)
+                        },
+                        label = { Text(stringResource(R.string.sticker_stickers_tab)) },
+                    )
+                }
+            }
+            if (stickersSelected && appState != null && onStickerPicked != null) {
+                StickerPickerGrid(
+                    appState = appState,
+                    packs = stickerPacks,
+                    onStickerPicked = onStickerPicked,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                EmojiPickerContent(
+                    onEmojiPicked = onEmojiPicked,
+                    recordRecentPicks = false,
+                    onBackspace = onBackspace,
+                    searchStartsOpen = false,
+                    onSearchActiveChange = onSearchActiveChange,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StickerPickerGrid(
+    appState: WhiteNoiseAppState,
+    packs: List<StickerPackFfi>,
+    onStickerPicked: (StickerFfi) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (packs.isEmpty()) {
+        Box(modifier = modifier.padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.sticker_no_installed),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(72.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        packs.forEach { pack ->
+            item(span = { GridItemSpan(maxLineSpan) }, key = "pack:${pack.coordinate}") {
+                Text(pack.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+            }
+            items(pack.stickers, key = { "${pack.coordinate}:${it.shortcode}:${it.sha256}" }) { sticker ->
+                Surface(
+                    modifier = Modifier.aspectRatio(1f).clickable { onStickerPicked(sticker) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    StickerImage(
+                        appState = appState,
+                        stickerRef = sticker.reference(),
+                        contentDescription = sticker.alt ?: sticker.shortcode,
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+            }
+        }
     }
 }
 

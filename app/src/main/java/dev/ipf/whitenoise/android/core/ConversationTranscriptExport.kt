@@ -151,7 +151,15 @@ object ConversationTranscriptExport {
             .put("kind", record.kind.jsonNumber())
             .put("content", record.plaintext)
             .put("tags", tagsJson(record.tags))
-            .put("direction", record.direction)
+            .putNullable(
+                "sticker",
+                record.sticker?.let {
+                    JSONObject()
+                        .put("pack_coordinate", it.packCoordinate)
+                        .put("shortcode", it.shortcode)
+                        .put("plaintext_sha256", it.plaintextSha256)
+                },
+            ).put("direction", record.direction)
             .put("sender", record.sender)
             .put("timeline_at", record.timelineAt.jsonNumber())
             .put("received_at", record.receivedAt.jsonNumber())

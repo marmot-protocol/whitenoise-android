@@ -1073,4 +1073,20 @@
     <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="notification_channel_app_updates">App updates</string>
     <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+    <string name="sticker">Sticker</string>
+    <string name="stickers">Stickers</string>
+    <string name="stickers_settings_subtitle">Discover, import, and manage sticker packs</string>
+    <string name="sticker_import_notice">Paste a Sonar pack link or a Signal sticker link. Signal imports are uploaded publicly to Blossom and published as a Sonar pack.</string>
+    <string name="sticker_pack_input_hint">Sonar or Signal sticker link</string>
+    <string name="sticker_import">Import sticker pack</string>
+    <string name="sticker_search_hint">Search sticker packs</string>
+    <string name="sticker_no_packs">No sticker packs found</string>
+    <string name="sticker_install">Install</string>
+    <string name="sticker_uninstall">Uninstall</string>
+    <string name="sticker_count">%1$d stickers</string>
+    <string name="sticker_emoji_tab">Emoji</string>
+    <string name="sticker_stickers_tab">Stickers</string>
+    <string name="sticker_no_installed">Install a sticker pack in Settings to use it here.</string>
+    <string name="notification_sent_sticker">sent a sticker</string>
+    <string name="sticker_external_signer_unsupported">Signal sticker import requires a locally stored signing key.</string>
 </resources>

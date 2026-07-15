@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.StickerInput
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
@@ -51,6 +52,8 @@ internal fun MainShell(
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
+    inboundStickerInput: StickerInput? = null,
+    onStickerInputHandled: (StickerInput) -> Unit = {},
 ) {
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -96,6 +99,7 @@ internal fun MainShell(
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
+    var pendingStickerInput by remember { mutableStateOf<StickerInput?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -110,6 +114,19 @@ internal fun MainShell(
 
     LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration) {
         chatsController.bind(appState.activeAccountRef)
+    }
+
+    LaunchedEffect(inboundStickerInput) {
+        val input = inboundStickerInput ?: return@LaunchedEffect
+        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+        selectedChat = null
+        selectedChatFocusMessageId = null
+        selectedChatJustCreated = false
+        selectedChatOpenedAsDmHint = false
+        sectionName = MainSection.Settings.name
+        settingsDetailName = SettingsDetail.Stickers.name
+        pendingStickerInput = input
+        onStickerInputHandled(input)
     }
 
     // Freshness model for #6: the chat-list subscription stays bound while a
@@ -479,6 +496,10 @@ internal fun MainShell(
                 },
                 detail = settingsDetail,
                 onDetailChange = { settingsDetailName = it?.name },
+                initialStickerInput = pendingStickerInput,
+                onStickerInputConsumed = { consumed ->
+                    if (pendingStickerInput == consumed) pendingStickerInput = null
+                },
             )
         MainSection.Diagnostics ->
             DiagnosticsScreen(

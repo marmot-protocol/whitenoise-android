@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">Não foi possível abrir o Zapstore</string>
     <string name="notification_channel_app_updates">Atualizações do app</string>
     <string name="notification_channel_app_updates_description">Alertas de versões do Zapstore</string>
+    <string name="sticker">Figurinha</string>
+    <string name="stickers">Figurinhas</string>
+    <string name="stickers_settings_subtitle">Descubra, importe e gerencie pacotes de figurinhas</string>
+    <string name="sticker_import_notice">Cole um link de pacote do Sonar ou de figurinhas do Signal. As importações do Signal são enviadas publicamente ao Blossom e publicadas como um pacote do Sonar.</string>
+    <string name="sticker_pack_input_hint">Link de figurinhas do Sonar ou Signal</string>
+    <string name="sticker_import">Importar pacote de figurinhas</string>
+    <string name="sticker_search_hint">Buscar pacotes de figurinhas</string>
+    <string name="sticker_no_packs">Nenhum pacote de figurinhas encontrado</string>
+    <string name="sticker_install">Instalar</string>
+    <string name="sticker_uninstall">Desinstalar</string>
+    <string name="sticker_count">%1$d figurinhas</string>
+    <string name="sticker_emoji_tab">Emojis</string>
+    <string name="sticker_stickers_tab">Figurinhas</string>
+    <string name="sticker_no_installed">Instale um pacote de figurinhas nas Configurações para usá-lo aqui.</string>
+    <string name="notification_sent_sticker">enviou uma figurinha</string>
+    <string name="sticker_external_signer_unsupported">A importação de figurinhas do Signal exige uma chave de assinatura armazenada localmente.</string>
 </resources>

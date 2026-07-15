@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">Impossible d\'ouvrir Zapstore</string>
     <string name="notification_channel_app_updates">Mises à jour de l\'application</string>
     <string name="notification_channel_app_updates_description">Alertes de versions Zapstore</string>
+    <string name="sticker">Autocollant</string>
+    <string name="stickers">Autocollants</string>
+    <string name="stickers_settings_subtitle">Découvrir, importer et gérer des packs d’autocollants</string>
+    <string name="sticker_import_notice">Collez un lien de pack Sonar ou d’autocollants Signal. Les imports Signal sont téléversés publiquement sur Blossom et publiés comme pack Sonar.</string>
+    <string name="sticker_pack_input_hint">Lien d’autocollants Sonar ou Signal</string>
+    <string name="sticker_import">Importer un pack d’autocollants</string>
+    <string name="sticker_search_hint">Rechercher des packs d’autocollants</string>
+    <string name="sticker_no_packs">Aucun pack d’autocollants trouvé</string>
+    <string name="sticker_install">Installer</string>
+    <string name="sticker_uninstall">Désinstaller</string>
+    <string name="sticker_count">%1$d autocollants</string>
+    <string name="sticker_emoji_tab">Émojis</string>
+    <string name="sticker_stickers_tab">Autocollants</string>
+    <string name="sticker_no_installed">Installez un pack d’autocollants dans les paramètres pour l’utiliser ici.</string>
+    <string name="notification_sent_sticker">a envoyé un autocollant</string>
+    <string name="sticker_external_signer_unsupported">L’import d’autocollants Signal nécessite une clé de signature stockée localement.</string>
 </resources>

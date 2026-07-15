@@ -1045,4 +1045,20 @@
     <string name="toast_zapstore_unavailable">Impossibile aprire Zapstore</string>
     <string name="notification_channel_app_updates">Aggiornamenti dell\'app</string>
     <string name="notification_channel_app_updates_description">Avvisi sulle versioni di Zapstore</string>
+    <string name="sticker">Adesivo</string>
+    <string name="stickers">Adesivi</string>
+    <string name="stickers_settings_subtitle">Scopri, importa e gestisci pacchetti di adesivi</string>
+    <string name="sticker_import_notice">Incolla un link a un pacchetto Sonar o agli adesivi Signal. Le importazioni da Signal vengono caricate pubblicamente su Blossom e pubblicate come pacchetto Sonar.</string>
+    <string name="sticker_pack_input_hint">Link adesivi Sonar o Signal</string>
+    <string name="sticker_import">Importa pacchetto di adesivi</string>
+    <string name="sticker_search_hint">Cerca pacchetti di adesivi</string>
+    <string name="sticker_no_packs">Nessun pacchetto di adesivi trovato</string>
+    <string name="sticker_install">Installa</string>
+    <string name="sticker_uninstall">Disinstalla</string>
+    <string name="sticker_count">%1$d adesivi</string>
+    <string name="sticker_emoji_tab">Faccine</string>
+    <string name="sticker_stickers_tab">Adesivi</string>
+    <string name="sticker_no_installed">Installa un pacchetto di adesivi nelle Impostazioni per usarlo qui.</string>
+    <string name="notification_sent_sticker">ha inviato un adesivo</string>
+    <string name="sticker_external_signer_unsupported">L’importazione di adesivi Signal richiede una chiave di firma archiviata localmente.</string>
 </resources>

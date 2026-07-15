@@ -289,6 +289,9 @@ internal fun ComposerBar(
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
+    stickerPacks: List<dev.ipf.marmotkit.StickerPackFfi> = emptyList(),
+    onStickerSend: ((dev.ipf.marmotkit.StickerFfi, onAccepted: () -> Unit) -> Unit)? = null,
+    onStickerPaneOpened: () -> Unit = {},
     modifier: Modifier = Modifier,
     initialDraft: String = "",
     onDraftChange: (String) -> Unit = {},
@@ -978,6 +981,19 @@ internal fun ComposerBar(
                             composerEmojiSearchActive = it
                             onBottomInputChanged()
                         },
+                        appState = appState,
+                        stickerPacks = stickerPacks,
+                        onStickerPaneOpened = onStickerPaneOpened,
+                        onStickerPicked =
+                            onStickerSend?.let { sendSticker ->
+                                { sticker ->
+                                    sendSticker(sticker) {
+                                        composerEmojiPickerOpen = false
+                                        composerEmojiPickerRequested = false
+                                        onAfterSend()
+                                    }
+                                }
+                            },
                     )
                 }
                 if (showAttachmentPane) {

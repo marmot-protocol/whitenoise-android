@@ -243,6 +243,7 @@ object LocalNotificationFormatter {
             ReplyMediaKind.Video -> text(context, R.string.notification_sent_video, "sent a video")
             ReplyMediaKind.Voice -> text(context, R.string.notification_sent_voice_message, "sent a voice message")
             ReplyMediaKind.Document -> text(context, R.string.notification_sent_file, "sent a file")
+            ReplyMediaKind.Sticker -> text(context, R.string.notification_sent_sticker, "sent a sticker")
             ReplyMediaKind.None -> null
         }
 

@@ -22,6 +22,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
+import dev.ipf.whitenoise.android.core.StickerInput
+import dev.ipf.whitenoise.android.core.StickerLinks
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
@@ -40,6 +42,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
+    private var inboundStickerInput by mutableStateOf<StickerInput?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
@@ -106,6 +109,10 @@ class MainActivity : FragmentActivity() {
                     onProfilePayloadHandled = { handled ->
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
                     },
+                    inboundStickerInput = inboundStickerInput,
+                    onStickerInputHandled = { handled ->
+                        if (inboundStickerInput == handled) inboundStickerInput = null
+                    },
                     inboundNotificationTarget = inboundNotificationTarget,
                     onNotificationTargetHandled = { handled ->
                         if (inboundNotificationTarget == handled) inboundNotificationTarget = null
@@ -138,18 +145,29 @@ class MainActivity : FragmentActivity() {
             NotificationNavigation.parse(intent) { notificationKey, tapToken ->
                 notificationTapTokens.isValid(notificationKey, tapToken)
             }
+        val stickerInput = if (parsedTarget == null) StickerLinks.classify(intent?.dataString) else null
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
-                dataString = intent?.dataString,
+                dataString = intent?.dataString.takeIf { stickerInput == null },
                 current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
             )
         inboundNotificationTarget = routing.notificationTarget
         inboundProfilePayload = routing.profilePayload
-        if (parsedTarget != null) {
+        when {
+            parsedTarget != null -> inboundStickerInput = null
+            stickerInput != null -> {
+                inboundNotificationTarget = null
+                inboundProfilePayload = null
+                inboundStickerInput = stickerInput
+            }
+        }
+        if (parsedTarget != null || stickerInput != null) {
             // Notification taps are one-shot navigation requests. Replace the
             // stored intent after parsing so activity recreation cannot replay
-            // the same target after the UI has already consumed it.
+            // the same target after the UI has already consumed it. This is
+            // mandatory for Signal links because their fragment contains key
+            // material that must not remain attached to the Activity intent.
             setIntent(Intent(this, MainActivity::class.java))
         }
     }

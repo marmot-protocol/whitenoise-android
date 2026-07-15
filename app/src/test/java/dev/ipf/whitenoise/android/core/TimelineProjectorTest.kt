@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
@@ -10,6 +11,30 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TimelineProjectorTest {
+    private val stickerRef =
+        StickerRefFfi(
+            packCoordinate = "30031:${"ab".repeat(32)}:cats",
+            shortcode = "wave",
+            plaintextSha256 = "11".repeat(32),
+        )
+
+    @Test
+    fun stickerProjectsIntoTimelineAndReplyPreview() {
+        val record =
+            timelineRecord(
+                plaintext = "",
+                sticker = stickerRef,
+                replyPreview = replyPreview(plaintext = "", sticker = stickerRef),
+            )
+
+        assertEquals("Sticker", TimelineProjector.displayBody(record))
+        assertEquals(stickerRef, TimelineProjector.toAppMessageRecord(record).sticker)
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "Sticker", mediaKind = ReplyMediaKind.Sticker),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
     @Test
     fun projectedRecordProvidesBodyReplyPreviewAndReactionTallies() {
         val record =
@@ -172,12 +197,14 @@ class TimelineProjectorTest {
         kind: ULong = 9uL,
         sender: String = "alice",
         deleted: Boolean = false,
+        sticker: StickerRefFfi? = null,
     ) = TimelineReplyPreviewFfi(
         messageIdHex = "parent",
         sender = sender,
         plaintext = plaintext,
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
+        sticker = sticker,
         mediaJson = null,
         media = emptyList(),
         agentTextStreamJson = null,
@@ -193,6 +220,7 @@ class TimelineProjectorTest {
         deleted: Boolean = false,
         deletedByMessageIdHex: String? = null,
         invalidationStatus: String? = null,
+        sticker: StickerRefFfi? = null,
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -203,6 +231,7 @@ class TimelineProjectorTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = 9uL,
         tags = emptyList<MessageTagFfi>(),
+        sticker = sticker,
         timelineAt = timelineAt,
         receivedAt = timelineAt,
         replyToMessageIdHex = replyPreview?.messageIdHex,

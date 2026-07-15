@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.StickerInput
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -44,6 +45,8 @@ fun WhiteNoiseApp(
     appState: WhiteNoiseAppState,
     inboundProfilePayload: String? = null,
     onProfilePayloadHandled: (String) -> Unit = {},
+    inboundStickerInput: StickerInput? = null,
+    onStickerInputHandled: (StickerInput) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
@@ -143,6 +146,8 @@ fun WhiteNoiseApp(
                                 onNotificationTargetHandled = onNotificationTargetHandled,
                                 inboundAppUpdateTap = inboundAppUpdateTap,
                                 onAppUpdateTapHandled = onAppUpdateTapHandled,
+                                inboundStickerInput = inboundStickerInput,
+                                onStickerInputHandled = onStickerInputHandled,
                             )
                         is AppPhase.Failed ->
                             FailureScreen(

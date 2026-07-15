@@ -31,6 +31,8 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.StickerFfi
+import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -60,6 +62,8 @@ import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.aggregateEdits
+import dev.ipf.whitenoise.android.core.messageTag
+import dev.ipf.whitenoise.android.core.reference
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
@@ -242,6 +246,7 @@ data class ChatListItem(
             // otherwise leak its raw JSON content into the chat list.
             MessageProjector.isGroupSystemKind(preview.kind) ->
                 GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
+            preview.sticker != null -> copy.sticker
             preview.plaintext.isNotBlank() -> preview.plaintext
             resolvedMediaPreviewFallback != null -> resolvedMediaPreviewFallback.text(copy)
             else -> MessageProjector.previewText(latest, copy, copy.message)
@@ -327,6 +332,7 @@ internal fun chatListItemFromProjection(
                     contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
+                    sticker = preview.sticker,
                     recordedAt = preview.timelineAt,
                     receivedAt = preview.timelineAt,
                 )
@@ -3417,6 +3423,9 @@ class ConversationController(
         private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
 
+    var installedStickerPacks by mutableStateOf<List<StickerPackFfi>>(emptyList())
+        private set
+
     /** Per-target edit history for kind-1009 events, recomputed on every
      * timeline publish. The bubble reads `.latestText` and the "(edited · N)"
      * affordance reads `.count`. Null entry == message never edited. */
@@ -3728,6 +3737,7 @@ class ConversationController(
                     // group-state + timeline subscriptions below still fold in
                     // peer commits as they arrive.
                     launch { appState.catchUpAccounts() }
+                    launch { refreshStickerPacks(sync = true) }
                     // Local NIP-40 enforcement (#333) + secure delete (#334): on open
                     // and then at the next loaded row's expiry boundary, securely wipe
                     // plaintext past the retention window via the engine and re-publish
@@ -4305,6 +4315,7 @@ class ConversationController(
                         ?.let {
                             listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
                         }.orEmpty(),
+                sticker = null,
                 recordedAt = now,
                 receivedAt = now,
             )
@@ -4333,6 +4344,7 @@ class ConversationController(
                     plaintext = trimmed,
                     contentTokens = optimistic.contentTokens,
                     kind = 9uL,
+                    sticker = null,
                     timelineAt = now,
                     deleted = false,
                 ),
@@ -4453,6 +4465,119 @@ class ConversationController(
             )
             forgetSendTrace(tempId)
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+        }
+    }
+
+    /** Refreshes the native-owned installed-pack projection for the composer. */
+    suspend fun refreshStickerPacks(sync: Boolean = false) {
+        val account = conversationAccountRef ?: return
+        if (sync) {
+            runCatching { appState.marmotIo { syncStickerPacks(account) } }
+                .onFailure { it.rethrowIfCancellation() }
+        }
+        installedStickerPacks =
+            runCatching {
+                appState.marmotIo {
+                    stickerPacks(account, installedOnly = true, search = null, limit = 100u)
+                }
+            }.onFailure { it.rethrowIfCancellation() }
+                .getOrElse { emptyList() }
+    }
+
+    /** Sends a native-authorized sticker with the same optimistic lifecycle as text. */
+    suspend fun sendSticker(
+        sticker: StickerFfi,
+        onAccepted: () -> Unit = {},
+    ) {
+        val account = conversationAccountRef
+        if (account == null || !canSendMessages) {
+            if (account != null) appState.present(R.string.toast_send_not_ready)
+            return
+        }
+        val stickerRef = sticker.reference()
+        val tempId = UUID.randomUUID().toString()
+        val now = nowSeconds()
+        val optimistic =
+            AppMessageRecordFfi(
+                messageIdHex = tempId,
+                direction = "sent",
+                groupIdHex = group.groupIdHex,
+                sender = conversationAccountIdHex ?: "",
+                plaintext = "",
+                contentTokens = appState.parseMarkdownOrEmpty(""),
+                kind = 9uL,
+                tags = listOf(MessageTagFfi(stickerRef.messageTag())),
+                sticker = stickerRef,
+                recordedAt = now,
+                receivedAt = now,
+            )
+        val order = nextOptimisticTimelineOrder()
+        val key = "msg:$tempId"
+        optimisticMessages[key] = TimelineMessage(key, optimistic, MessageStatus.Pending, timelineOrder = order)
+        messageById[tempId] = optimistic
+        publishTimelineFromIndexes()
+        appState
+            .applyOptimisticSentPreview(
+                group.groupIdHex,
+                ChatListMessagePreviewFfi(
+                    messageIdHex = tempId,
+                    sender = conversationAccountIdHex ?: "",
+                    senderDisplayName = null,
+                    plaintext = "",
+                    contentTokens = optimistic.contentTokens,
+                    kind = 9uL,
+                    sticker = stickerRef,
+                    timelineAt = now,
+                    deleted = false,
+                ),
+            )?.let { optimisticChatListPreviewRows[key] = it }
+        replyingTo = null
+        onAccepted()
+
+        try {
+            val summary =
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { sendSticker(account, group.groupIdHex, stickerRef) }
+                }
+            val reconciliation =
+                reconcileSuccessfulTextSend(
+                    summaryMessageIds = summary.messageIds,
+                    optimisticKey = key,
+                    tempId = tempId,
+                    optimisticRecord = optimistic,
+                    optimisticMessages = optimisticMessages,
+                    messageById = messageById,
+                    projectedMessageIds = projectedMessageIds,
+                    timelineOrder = order,
+                )
+            optimisticChatListPreviewRows.remove(key)
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
+                .forEach(::removeProjectedRecord)
+            publishTimelineFromIndexes()
+        } catch (throwable: Throwable) {
+            throwable.rethrowIfCancellation()
+            if (throwable.isUseAfterEviction()) {
+                rollbackOptimisticChatListPreview(key, tempId)
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
+                publishTimelineFromIndexes()
+                markActiveAccountRemovedFromMembers(account)
+                return
+            }
+            rollbackOptimisticChatListPreview(key, tempId)
+            retainFailedOptimisticTextSend(
+                optimisticMessages = optimisticMessages,
+                messageById = messageById,
+                key = key,
+                optimistic = optimistic,
+                timelineOrder = order,
+            )
+            publishTimelineFromIndexes()
+            appState.present(
+                R.string.toast_send_failed,
+                AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
+                copyable = true,
+            )
         }
     }
 
@@ -4638,6 +4763,7 @@ class ConversationController(
                     attachments.map {
                         MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
                     },
+                sticker = null,
                 recordedAt = now,
                 receivedAt = now,
             )
@@ -5513,7 +5639,9 @@ class ConversationController(
             return
         }
         val tempId = current.record.messageIdHex
-        val text = current.record.plaintext.takeIf { it.isNotBlank() } ?: return
+        val stickerRef = current.record.sticker
+        val text = current.record.plaintext.takeIf { it.isNotBlank() }
+        if (stickerRef == null && text == null) return
         val replyTarget = MessageProjector.replyTargetMessageId(current.record)
         val refreshedRecord = current.record.copy()
         val order = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
@@ -5559,10 +5687,12 @@ class ConversationController(
             }
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (replyTarget != null) {
-                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
+                    if (stickerRef != null) {
+                        appState.marmotIo { sendSticker(account, group.groupIdHex, stickerRef) }
+                    } else if (replyTarget != null) {
+                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, requireNotNull(text)) }
                     } else {
-                        appState.marmotIo { sendText(account, group.groupIdHex, text) }
+                        appState.marmotIo { sendText(account, group.groupIdHex, requireNotNull(text)) }
                     }
                 }
             if (discardedDuringRetry.remove(key)) {
@@ -7517,6 +7647,7 @@ class ConversationController(
                 contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = STREAM_DEBUG_KIND,
                 tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
+                sticker = null,
                 recordedAt = now,
                 receivedAt = now,
             )
@@ -7584,6 +7715,7 @@ class ConversationController(
                     contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
+                    sticker = null,
                     recordedAt = nowSeconds(),
                     receivedAt = nowSeconds(),
                 )

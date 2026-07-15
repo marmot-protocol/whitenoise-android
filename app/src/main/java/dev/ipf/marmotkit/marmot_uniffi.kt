@@ -1057,6 +1057,24 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1195,6 +1213,10 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_export_encrypted_secret_key(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_fetch_sticker_asset(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`stickerRef`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_fetch_sticker_pack(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`input`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_management_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1205,8 +1227,12 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_push_debug_info(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_import_signal_sticker_pack(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`signalLink`: RustBuffer.ByValue,`blossomServer`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_install_sticker_pack(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`input`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_invite_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
@@ -1291,6 +1317,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_send_sticker(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`stickerRef`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_send_text(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
@@ -1323,6 +1351,10 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_start_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`quicCandidates`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_sticker_pack(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`input`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_sticker_packs(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`installedOnly`: Byte,`search`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chats(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
@@ -1337,10 +1369,14 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_sync_sticker_packs(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_uninstall_sticker_pack(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`input`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_update_group_avatar_url(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`dim`: RustBuffer.ByValue,`thumbhash`: RustBuffer.ByValue,
@@ -1583,6 +1619,10 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_fetch_sticker_asset(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_fetch_sticker_pack(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
@@ -1593,7 +1633,11 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_import_signal_sticker_pack(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_install_sticker_pack(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members(
     ): Short
@@ -1679,6 +1723,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_send_sticker(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_send_text(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_inbox_relays(
@@ -1711,6 +1757,10 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_sticker_pack(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_sticker_packs(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chats(
@@ -1725,9 +1775,13 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_sync_sticker_packs(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_uninstall_sticker_pack(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message(
     ): Short
@@ -1909,6 +1963,12 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 16556.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_fetch_sticker_asset() != 2773.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_fetch_sticker_pack() != 49097.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1924,7 +1984,13 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info() != 25626.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_import_signal_sticker_pack() != 63971.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state() != 22879.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_install_sticker_pack() != 38221.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_invite_members() != 53648.toShort()) {
@@ -2053,6 +2119,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference() != 40798.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_sticker() != 37879.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_text() != 60625.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2101,6 +2170,12 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream() != 35574.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sticker_pack() != 54721.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sticker_packs() != 4339.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list() != 8274.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2122,10 +2197,16 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages() != 20678.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sync_sticker_packs() != 36641.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id() != 40706.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages() != 49184.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_uninstall_sticker_pack() != 21379.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message() != 11846.toShort()) {
@@ -4642,6 +4723,10 @@ public interface MarmotInterface {
      */
     fun `exportEncryptedSecretKey`(`accountRef`: kotlin.String, `passphrase`: kotlin.String): kotlin.String
     
+    suspend fun `fetchStickerAsset`(`accountRef`: kotlin.String, `stickerRef`: StickerRefFfi): StickerAssetFfi
+    
+    suspend fun `fetchStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String): StickerPackFfi
+    
     /**
      * Group plus enriched member rows for detail screens.
      */
@@ -4665,12 +4750,16 @@ public interface MarmotInterface {
     
     suspend fun `groupPushDebugInfo`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupPushDebugInfoFfi
     
+    suspend fun `importSignalStickerPack`(`accountRef`: kotlin.String, `signalLink`: kotlin.String, `blossomServer`: kotlin.String?): StickerImportResultFfi
+    
     /**
      * Establish the unread baseline the first time a user opens a group.
      * Existing kind-9 history remains read; later remote kind-9 messages count
      * until marked visible via `mark_timeline_message_read`.
      */
     fun `initializeChatReadState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatListRowFfi?
+    
+    suspend fun `installStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String): StickerPackFfi
     
     suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
     
@@ -4935,6 +5024,13 @@ public interface MarmotInterface {
     suspend fun `sendMediaReference`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi, `caption`: kotlin.String?): SendSummaryFfi
     
     /**
+     * Send a Sonar sticker as a kind-9 message carrying the immutable
+     * coordinate/shortcode/plaintext-hash reference. Native storage must
+     * currently authorize the exact reference before the send is accepted.
+     */
+    suspend fun `sendSticker`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `stickerRef`: StickerRefFfi): SendSummaryFfi
+    
+    /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
      * replies, deletes, media) go through dedicated methods.
      */
@@ -5047,6 +5143,13 @@ public interface MarmotInterface {
      */
     suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: List<kotlin.String>): AgentStreamStartFfi
     
+    fun `stickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String): StickerPackFfi?
+    
+    /**
+     * Read the encrypted native sticker projection. Call off the UI thread.
+     */
+    fun `stickerPacks`(`accountRef`: kotlin.String, `installedOnly`: kotlin.Boolean, `search`: kotlin.String?, `limit`: kotlin.UInt?): List<StickerPackFfi>
+    
     /**
      * Per-account durable chat-list projection. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
@@ -5093,6 +5196,8 @@ public interface MarmotInterface {
      */
     suspend fun `subscribeTimelineMessages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): TimelineMessagesSubscription
     
+    suspend fun `syncStickerPacks`(`accountRef`: kotlin.String): StickerSyncResultFfi
+    
     /**
      * Stable random identifier for this app install, suitable for the OTLP
      * `service.instance.id` resource attribute. Separate from audit-log device
@@ -5117,6 +5222,8 @@ public interface MarmotInterface {
      * thread. Retained for one-shot diagnostics/tooling only.
      */
     fun `timelineMessages`(`accountRef`: kotlin.String, `query`: TimelineMessageQueryFfi): TimelinePageFfi
+    
+    suspend fun `uninstallStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String)
     
     /**
      * Remove this account's reaction from `target_message_id`.
@@ -5872,6 +5979,48 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
 
     
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchStickerAsset`(`accountRef`: kotlin.String, `stickerRef`: StickerRefFfi) : StickerAssetFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_fetch_sticker_asset(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterTypeStickerRefFfi.lower(`stickerRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeStickerAssetFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String) : StickerPackFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_fetch_sticker_pack(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`input`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeStickerPackFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
     /**
      * Group plus enriched member rows for detail screens.
      */
@@ -5990,6 +6139,27 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
 
     
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `importSignalStickerPack`(`accountRef`: kotlin.String, `signalLink`: kotlin.String, `blossomServer`: kotlin.String?) : StickerImportResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_import_signal_sticker_pack(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`signalLink`),FfiConverterOptionalString.lower(`blossomServer`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeStickerImportResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
     /**
      * Establish the unread baseline the first time a user opens a group.
      * Existing kind-9 history remains read; later remote kind-9 messages count
@@ -6006,6 +6176,27 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
     
+
+    
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `installStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String) : StickerPackFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_install_sticker_pack(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`input`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeStickerPackFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
 
     
     @Throws(MarmotKitException::class)
@@ -6973,6 +7164,32 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Send a Sonar sticker as a kind-9 message carrying the immutable
+     * coordinate/shortcode/plaintext-hash reference. Native storage must
+     * currently authorize the exact reference before the send is accepted.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `sendSticker`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `stickerRef`: StickerRefFfi) : SendSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_sticker(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeStickerRefFfi.lower(`stickerRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSendSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
      * replies, deletes, media) go through dedicated methods.
      */
@@ -7375,6 +7592,35 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
 
     
+    @Throws(MarmotKitException::class)override fun `stickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String): StickerPackFfi? {
+            return FfiConverterOptionalTypeStickerPackFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_sticker_pack(
+        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`input`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Read the encrypted native sticker projection. Call off the UI thread.
+     */
+    @Throws(MarmotKitException::class)override fun `stickerPacks`(`accountRef`: kotlin.String, `installedOnly`: kotlin.Boolean, `search`: kotlin.String?, `limit`: kotlin.UInt?): List<StickerPackFfi> {
+            return FfiConverterSequenceTypeStickerPackFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_sticker_packs(
+        it, FfiConverterString.lower(`accountRef`),FfiConverterBoolean.lower(`installedOnly`),FfiConverterOptionalString.lower(`search`),FfiConverterOptionalUInt.lower(`limit`),_status)
+}
+    }
+    )
+    }
+    
+
+    
     /**
      * Per-account durable chat-list projection. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
@@ -7545,6 +7791,27 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
 
     
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `syncStickerPacks`(`accountRef`: kotlin.String) : StickerSyncResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_sync_sticker_packs(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeStickerSyncResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
     /**
      * Stable random identifier for this app install, suitable for the OTLP
      * `service.instance.id` resource attribute. Separate from audit-log device
@@ -7590,6 +7857,28 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
     
+
+    
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `uninstallStickerPack`(`accountRef`: kotlin.String, `input`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_uninstall_sticker_pack(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`input`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
 
     
     /**
@@ -9257,6 +9546,7 @@ data class AppMessageRecordFfi (
      * Nostr `tags` of the inner Marmot app event.
      */
     var `tags`: List<MessageTagFfi>, 
+    var `sticker`: StickerRefFfi? = null, 
     var `recordedAt`: kotlin.ULong, 
     var `receivedAt`: kotlin.ULong
 ) {
@@ -9278,6 +9568,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
         )
@@ -9292,6 +9583,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterULong.allocationSize(value.`recordedAt`) +
             FfiConverterULong.allocationSize(value.`receivedAt`)
     )
@@ -9305,6 +9597,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
     }
@@ -9707,6 +10000,7 @@ data class ChatListMessagePreviewFfi (
     var `plaintext`: kotlin.String, 
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
+    var `sticker`: StickerRefFfi? = null, 
     var `timelineAt`: kotlin.ULong, 
     var `deleted`: kotlin.Boolean
 ) {
@@ -9726,6 +10020,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.read(buf),
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
         )
@@ -9738,6 +10033,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.allocationSize(value.`plaintext`) +
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterULong.allocationSize(value.`timelineAt`) +
             FfiConverterBoolean.allocationSize(value.`deleted`)
     )
@@ -9749,6 +10045,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.write(value.`plaintext`, buf)
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterULong.write(value.`timelineAt`, buf)
             FfiConverterBoolean.write(value.`deleted`, buf)
     }
@@ -10998,6 +11295,7 @@ data class NotificationUpdateFfi (
     var `sender`: NotificationUserFfi, 
     var `receiver`: NotificationUserFfi, 
     var `previewText`: kotlin.String?, 
+    var `sticker`: StickerRefFfi? = null, 
     var `reactionEmoji`: kotlin.String?, 
     var `reactedToPreview`: kotlin.String?, 
     var `timestampMs`: kotlin.Long, 
@@ -11026,6 +11324,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.read(buf),
             FfiConverterTypeNotificationUserFfi.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterLong.read(buf),
@@ -11047,6 +11346,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`sender`) +
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`receiver`) +
             FfiConverterOptionalString.allocationSize(value.`previewText`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterOptionalString.allocationSize(value.`reactionEmoji`) +
             FfiConverterOptionalString.allocationSize(value.`reactedToPreview`) +
             FfiConverterLong.allocationSize(value.`timestampMs`) +
@@ -11067,6 +11367,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.write(value.`sender`, buf)
             FfiConverterTypeNotificationUserFfi.write(value.`receiver`, buf)
             FfiConverterOptionalString.write(value.`previewText`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterOptionalString.write(value.`reactionEmoji`, buf)
             FfiConverterOptionalString.write(value.`reactedToPreview`, buf)
             FfiConverterLong.write(value.`timestampMs`, buf)
@@ -11187,6 +11488,7 @@ data class ReceivedMessageFfi (
      * Nostr `tags` of the inner Marmot app event.
      */
     var `tags`: List<MessageTagFfi>, 
+    var `sticker`: StickerRefFfi? = null, 
     /**
      * Source-event timestamp (seconds since epoch) for the MLS-delivered
      * message. Clients should sort the timeline by this value so chronology
@@ -11213,6 +11515,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterULong.read(buf),
         )
     }
@@ -11226,6 +11529,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterULong.allocationSize(value.`recordedAt`)
     )
 
@@ -11238,6 +11542,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
     }
 }
@@ -11697,6 +12002,274 @@ public object FfiConverterTypeSignOutOutcomeFfi: FfiConverterRustBuffer<SignOutO
 
 
 
+data class StickerAssetFfi (
+    var `sticker`: StickerFfi, 
+    var `bytes`: kotlin.ByteArray
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerAssetFfi: FfiConverterRustBuffer<StickerAssetFfi> {
+    override fun read(buf: ByteBuffer): StickerAssetFfi {
+        return StickerAssetFfi(
+            FfiConverterTypeStickerFfi.read(buf),
+            FfiConverterByteArray.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerAssetFfi) = (
+            FfiConverterTypeStickerFfi.allocationSize(value.`sticker`) +
+            FfiConverterByteArray.allocationSize(value.`bytes`)
+    )
+
+    override fun write(value: StickerAssetFfi, buf: ByteBuffer) {
+            FfiConverterTypeStickerFfi.write(value.`sticker`, buf)
+            FfiConverterByteArray.write(value.`bytes`, buf)
+    }
+}
+
+
+
+data class StickerFfi (
+    var `packCoordinate`: kotlin.String, 
+    var `shortcode`: kotlin.String, 
+    var `url`: kotlin.String, 
+    var `sha256`: kotlin.String, 
+    var `mime`: kotlin.String, 
+    var `width`: kotlin.UInt?, 
+    var `height`: kotlin.UInt?, 
+    var `alt`: kotlin.String?, 
+    var `emoji`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerFfi: FfiConverterRustBuffer<StickerFfi> {
+    override fun read(buf: ByteBuffer): StickerFfi {
+        return StickerFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerFfi) = (
+            FfiConverterString.allocationSize(value.`packCoordinate`) +
+            FfiConverterString.allocationSize(value.`shortcode`) +
+            FfiConverterString.allocationSize(value.`url`) +
+            FfiConverterString.allocationSize(value.`sha256`) +
+            FfiConverterString.allocationSize(value.`mime`) +
+            FfiConverterOptionalUInt.allocationSize(value.`width`) +
+            FfiConverterOptionalUInt.allocationSize(value.`height`) +
+            FfiConverterOptionalString.allocationSize(value.`alt`) +
+            FfiConverterOptionalString.allocationSize(value.`emoji`)
+    )
+
+    override fun write(value: StickerFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`packCoordinate`, buf)
+            FfiConverterString.write(value.`shortcode`, buf)
+            FfiConverterString.write(value.`url`, buf)
+            FfiConverterString.write(value.`sha256`, buf)
+            FfiConverterString.write(value.`mime`, buf)
+            FfiConverterOptionalUInt.write(value.`width`, buf)
+            FfiConverterOptionalUInt.write(value.`height`, buf)
+            FfiConverterOptionalString.write(value.`alt`, buf)
+            FfiConverterOptionalString.write(value.`emoji`, buf)
+    }
+}
+
+
+
+data class StickerImportResultFfi (
+    var `pack`: StickerPackFfi, 
+    var `skippedSignalStickerIds`: List<kotlin.UInt>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerImportResultFfi: FfiConverterRustBuffer<StickerImportResultFfi> {
+    override fun read(buf: ByteBuffer): StickerImportResultFfi {
+        return StickerImportResultFfi(
+            FfiConverterTypeStickerPackFfi.read(buf),
+            FfiConverterSequenceUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerImportResultFfi) = (
+            FfiConverterTypeStickerPackFfi.allocationSize(value.`pack`) +
+            FfiConverterSequenceUInt.allocationSize(value.`skippedSignalStickerIds`)
+    )
+
+    override fun write(value: StickerImportResultFfi, buf: ByteBuffer) {
+            FfiConverterTypeStickerPackFfi.write(value.`pack`, buf)
+            FfiConverterSequenceUInt.write(value.`skippedSignalStickerIds`, buf)
+    }
+}
+
+
+
+data class StickerPackFfi (
+    var `coordinate`: kotlin.String, 
+    var `authorPubkeyHex`: kotlin.String, 
+    var `identifier`: kotlin.String, 
+    var `eventIdHex`: kotlin.String, 
+    var `createdAt`: kotlin.ULong, 
+    var `title`: kotlin.String, 
+    var `description`: kotlin.String?, 
+    var `cover`: StickerFfi?, 
+    var `stickers`: List<StickerFfi>, 
+    var `license`: kotlin.String?, 
+    var `installed`: kotlin.Boolean
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerPackFfi: FfiConverterRustBuffer<StickerPackFfi> {
+    override fun read(buf: ByteBuffer): StickerPackFfi {
+        return StickerPackFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeStickerFfi.read(buf),
+            FfiConverterSequenceTypeStickerFfi.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerPackFfi) = (
+            FfiConverterString.allocationSize(value.`coordinate`) +
+            FfiConverterString.allocationSize(value.`authorPubkeyHex`) +
+            FfiConverterString.allocationSize(value.`identifier`) +
+            FfiConverterString.allocationSize(value.`eventIdHex`) +
+            FfiConverterULong.allocationSize(value.`createdAt`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterOptionalString.allocationSize(value.`description`) +
+            FfiConverterOptionalTypeStickerFfi.allocationSize(value.`cover`) +
+            FfiConverterSequenceTypeStickerFfi.allocationSize(value.`stickers`) +
+            FfiConverterOptionalString.allocationSize(value.`license`) +
+            FfiConverterBoolean.allocationSize(value.`installed`)
+    )
+
+    override fun write(value: StickerPackFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`coordinate`, buf)
+            FfiConverterString.write(value.`authorPubkeyHex`, buf)
+            FfiConverterString.write(value.`identifier`, buf)
+            FfiConverterString.write(value.`eventIdHex`, buf)
+            FfiConverterULong.write(value.`createdAt`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterOptionalString.write(value.`description`, buf)
+            FfiConverterOptionalTypeStickerFfi.write(value.`cover`, buf)
+            FfiConverterSequenceTypeStickerFfi.write(value.`stickers`, buf)
+            FfiConverterOptionalString.write(value.`license`, buf)
+            FfiConverterBoolean.write(value.`installed`, buf)
+    }
+}
+
+
+
+data class StickerRefFfi (
+    var `packCoordinate`: kotlin.String, 
+    var `shortcode`: kotlin.String, 
+    var `plaintextSha256`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerRefFfi: FfiConverterRustBuffer<StickerRefFfi> {
+    override fun read(buf: ByteBuffer): StickerRefFfi {
+        return StickerRefFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerRefFfi) = (
+            FfiConverterString.allocationSize(value.`packCoordinate`) +
+            FfiConverterString.allocationSize(value.`shortcode`) +
+            FfiConverterString.allocationSize(value.`plaintextSha256`)
+    )
+
+    override fun write(value: StickerRefFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`packCoordinate`, buf)
+            FfiConverterString.write(value.`shortcode`, buf)
+            FfiConverterString.write(value.`plaintextSha256`, buf)
+    }
+}
+
+
+
+data class StickerSyncResultFfi (
+    var `discovered`: kotlin.UInt, 
+    var `updated`: kotlin.UInt, 
+    var `installed`: kotlin.UInt, 
+    var `pendingOperations`: kotlin.UInt
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStickerSyncResultFfi: FfiConverterRustBuffer<StickerSyncResultFfi> {
+    override fun read(buf: ByteBuffer): StickerSyncResultFfi {
+        return StickerSyncResultFfi(
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StickerSyncResultFfi) = (
+            FfiConverterUInt.allocationSize(value.`discovered`) +
+            FfiConverterUInt.allocationSize(value.`updated`) +
+            FfiConverterUInt.allocationSize(value.`installed`) +
+            FfiConverterUInt.allocationSize(value.`pendingOperations`)
+    )
+
+    override fun write(value: StickerSyncResultFfi, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`discovered`, buf)
+            FfiConverterUInt.write(value.`updated`, buf)
+            FfiConverterUInt.write(value.`installed`, buf)
+            FfiConverterUInt.write(value.`pendingOperations`, buf)
+    }
+}
+
+
+
 data class TimelineMessageQueryFfi (
     var `groupIdHex`: kotlin.String?, 
     var `search`: kotlin.String?, 
@@ -11771,6 +12344,7 @@ data class TimelineMessageRecordFfi (
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `tags`: List<MessageTagFfi>, 
+    var `sticker`: StickerRefFfi? = null, 
     var `timelineAt`: kotlin.ULong, 
     var `receivedAt`: kotlin.ULong, 
     var `replyToMessageIdHex`: kotlin.String?, 
@@ -11821,6 +12395,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -11846,6 +12421,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterULong.allocationSize(value.`timelineAt`) +
             FfiConverterULong.allocationSize(value.`receivedAt`) +
             FfiConverterOptionalString.allocationSize(value.`replyToMessageIdHex`) +
@@ -11870,6 +12446,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterULong.write(value.`timelineAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
             FfiConverterOptionalString.write(value.`replyToMessageIdHex`, buf)
@@ -12051,6 +12628,7 @@ data class TimelineReplyPreviewFfi (
     var `plaintext`: kotlin.String, 
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
+    var `sticker`: StickerRefFfi? = null, 
     var `mediaJson`: kotlin.String?, 
     /**
      * Fully-resolved, downloadable media references for the previewed message,
@@ -12077,6 +12655,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.read(buf),
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterOptionalTypeStickerRefFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -12090,6 +12669,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.allocationSize(value.`plaintext`) +
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
+            FfiConverterOptionalTypeStickerRefFfi.allocationSize(value.`sticker`) +
             FfiConverterOptionalString.allocationSize(value.`mediaJson`) +
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.allocationSize(value.`media`) +
             FfiConverterOptionalString.allocationSize(value.`agentTextStreamJson`) +
@@ -12102,6 +12682,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.write(value.`plaintext`, buf)
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
+            FfiConverterOptionalTypeStickerRefFfi.write(value.`sticker`, buf)
             FfiConverterOptionalString.write(value.`mediaJson`, buf)
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.write(value.`media`, buf)
             FfiConverterOptionalString.write(value.`agentTextStreamJson`, buf)
@@ -14254,6 +14835,42 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = ""
     }
     
+    class InvalidSticker(
+        
+        val `details`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "details=${ `details` }"
+    }
+    
+    class StickerNotFound(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
+    class StickerNetwork(
+        
+        val `details`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "details=${ `details` }"
+    }
+    
+    class StickerImport(
+        
+        val `details`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "details=${ `details` }"
+    }
+    
+    class StickerImportUnsupported(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
     class Runtime(
         
         val `details`: kotlin.String
@@ -14346,7 +14963,18 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 )
             24 -> MarmotKitException.ExternalSignerMismatch()
             25 -> MarmotKitException.ExternalSignerRejected()
-            26 -> MarmotKitException.Runtime(
+            26 -> MarmotKitException.InvalidSticker(
+                FfiConverterString.read(buf),
+                )
+            27 -> MarmotKitException.StickerNotFound()
+            28 -> MarmotKitException.StickerNetwork(
+                FfiConverterString.read(buf),
+                )
+            29 -> MarmotKitException.StickerImport(
+                FfiConverterString.read(buf),
+                )
+            30 -> MarmotKitException.StickerImportUnsupported()
+            31 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -14475,6 +15103,29 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 4UL
             )
             is MarmotKitException.ExternalSignerRejected -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is MarmotKitException.InvalidSticker -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`details`)
+            )
+            is MarmotKitException.StickerNotFound -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is MarmotKitException.StickerNetwork -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`details`)
+            )
+            is MarmotKitException.StickerImport -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`details`)
+            )
+            is MarmotKitException.StickerImportUnsupported -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -14611,8 +15262,31 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 buf.putInt(25)
                 Unit
             }
-            is MarmotKitException.Runtime -> {
+            is MarmotKitException.InvalidSticker -> {
                 buf.putInt(26)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.StickerNotFound -> {
+                buf.putInt(27)
+                Unit
+            }
+            is MarmotKitException.StickerNetwork -> {
+                buf.putInt(28)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.StickerImport -> {
+                buf.putInt(29)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.StickerImportUnsupported -> {
+                buf.putInt(30)
+                Unit
+            }
+            is MarmotKitException.Runtime -> {
+                buf.putInt(31)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
@@ -15630,6 +16304,102 @@ public object FfiConverterOptionalTypeSendSummaryFfi: FfiConverterRustBuffer<Sen
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeStickerFfi: FfiConverterRustBuffer<StickerFfi?> {
+    override fun read(buf: ByteBuffer): StickerFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeStickerFfi.read(buf)
+    }
+
+    override fun allocationSize(value: StickerFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeStickerFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: StickerFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeStickerFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeStickerPackFfi: FfiConverterRustBuffer<StickerPackFfi?> {
+    override fun read(buf: ByteBuffer): StickerPackFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeStickerPackFfi.read(buf)
+    }
+
+    override fun allocationSize(value: StickerPackFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeStickerPackFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: StickerPackFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeStickerPackFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeStickerRefFfi: FfiConverterRustBuffer<StickerRefFfi?> {
+    override fun read(buf: ByteBuffer): StickerRefFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeStickerRefFfi.read(buf)
+    }
+
+    override fun allocationSize(value: StickerRefFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeStickerRefFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: StickerRefFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeStickerRefFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeTimelinePageFfi: FfiConverterRustBuffer<TimelinePageFfi?> {
     override fun read(buf: ByteBuffer): TimelinePageFfi? {
         if (buf.get().toInt() == 0) {
@@ -15904,6 +16674,34 @@ public object FfiConverterSequenceUShort: FfiConverterRustBuffer<List<kotlin.USh
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterUShort.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceUInt: FfiConverterRustBuffer<List<kotlin.UInt>> {
+    override fun read(buf: ByteBuffer): List<kotlin.UInt> {
+        val len = buf.getInt()
+        return List<kotlin.UInt>(len) {
+            FfiConverterUInt.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.UInt>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterUInt.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.UInt>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterUInt.write(it, buf)
         }
     }
 }
@@ -16642,6 +17440,62 @@ public object FfiConverterSequenceTypeRelayFailureFfi: FfiConverterRustBuffer<Li
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeStickerFfi: FfiConverterRustBuffer<List<StickerFfi>> {
+    override fun read(buf: ByteBuffer): List<StickerFfi> {
+        val len = buf.getInt()
+        return List<StickerFfi>(len) {
+            FfiConverterTypeStickerFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<StickerFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeStickerFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<StickerFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeStickerFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeStickerPackFfi: FfiConverterRustBuffer<List<StickerPackFfi>> {
+    override fun read(buf: ByteBuffer): List<StickerPackFfi> {
+        val len = buf.getInt()
+        return List<StickerPackFfi>(len) {
+            FfiConverterTypeStickerPackFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<StickerPackFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeStickerPackFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<StickerPackFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeStickerPackFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<List<TimelineMessageRecordFfi>> {
     override fun read(buf: ByteBuffer): List<TimelineMessageRecordFfi> {
         val len = buf.getInt()
@@ -16887,7 +17741,6 @@ public object FfiConverterSequenceSequenceTypeMarkdownTableCellFfi: FfiConverter
         }
     }
 }
-
 
 
 

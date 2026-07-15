@@ -1,5 +1,5 @@
-source=marmot-protocol/mdk
-mdk-sha=b9ac1146a5379506ab67cb6b90c9158b6f3ebb6e
-mdk-short-sha=b9ac1146
-mdk-branch=pip/mdk-1266-v2
+source=vincenzopalazzo/mdk
+mdk-sha=64dea573a99bcc4c6a7de1a5658a64c05849fdb5
+mdk-short-sha=64dea573
+mdk-branch=codex/sonar-stickers
 features=otlp-export
