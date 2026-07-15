@@ -128,7 +128,7 @@ internal fun MainShell(
             InboundStickerRoutingDecision.Route -> {
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                 selectedChat = null
-                selectedChatFocusMessageId = null
+                selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
                 sectionName = MainSection.Settings.name

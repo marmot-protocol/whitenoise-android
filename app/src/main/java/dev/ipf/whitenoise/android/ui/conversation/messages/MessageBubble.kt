@@ -125,7 +125,6 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromT
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.stickers.StickerImage
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
