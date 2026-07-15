@@ -1,16 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -59,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -73,9 +69,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -86,6 +80,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -119,262 +114,194 @@ internal fun MessageActionMenu(
     onDeleteForMe: () -> Unit,
     onDeleteForEveryone: () -> Unit,
 ) {
-    // focusable = false keeps the soft keyboard up while this menu is open.
-    // A focusable popup window steals window focus from the conversation's
-    // host window, and Android dismisses the IME when the window holding the
-    // focused composer loses focus. That collapse then removes the composer's
-    // imePadding, reflowing the transcript down by the keyboard height mid
-    // gesture — so the long-press popover lands at a shifted position rather
-    // than where the user pressed (#284). Same "modal UI fights the IME"
-    // family as the voice-record bar in #207.
-    //
-    // A non-focusable popup has two gaps versus the old focusable menu that we
-    // restore explicitly here, without re-focusing (which would collapse the
-    // IME again):
-    //   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the
-    //      popup is non-focusable, so a Back press would fall through to the
-    //      IME/activity instead of closing the menu. A host-window BackHandler
-    //      (same pattern as QuickActionFabMenu) closes the menu on Back. It
-    //      runs in the conversation window and does not touch IME focus.
-    //   2. Outside-tap click-through — events outside a non-focusable popup are
-    //      delivered to the windows beneath it, so a dismiss tap would also
-    //      activate the underlying chat content (open a profile, a link, the
-    //      media viewer, etc.). A full-window, non-focusable scrim Popup placed
-    //      below this menu consumes those taps: tapping it dismisses the menu
-    //      and the press is consumed so it never reaches the transcript. The
-    //      scrim is itself non-focusable, so it preserves the open keyboard.
-    //
-    // Everything below is wrapped in a single zero-size Box so this composable
-    // always contributes exactly ONE (zero-height) child to the caller's
-    // spacedBy bubble Column, whether or not the menu is open. Emitting the
-    // scrim popup as a second sibling only while expanded would otherwise add
-    // an extra Arrangement.spacedBy gap, visibly growing the bubble height on
-    // long-press (#284 review).
     val density = LocalDensity.current
-    // Single zero-size Box wrapper: this composable always contributes exactly
-    // ONE (zero-height) child to the caller's spacedBy bubble Column, open or
-    // not. Emitting the scrim + menu popups as bare siblings only while expanded
-    // adds extra Arrangement.spacedBy gaps that visibly grow the bubble on
-    // long-press (#284 review). The popups themselves render in their own
-    // windows, so the Box stays zero-size either way.
-    Box {
-        if (!expanded) return@Box
-        BackHandler(enabled = true) { onDismissRequest() }
-        // Scrim popup: composed before the menu so the menu renders on top of it.
-        // Fills the window and swallows any tap as a pure dismissal.
-        Popup(
-            properties =
-                PopupProperties(
-                    focusable = false,
-                    // We own dismissal via the tap handler below; let the menu's own
-                    // outside-tap detection stay off so a single outside tap is
-                    // handled exactly once, here, and consumed.
-                    dismissOnClickOutside = false,
-                ),
-            onDismissRequest = onDismissRequest,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures { onDismissRequest() }
-                        },
-            )
+    // Position the popup purely from the captured window touch y, independent of
+    // any anchor's layout position. DropdownMenu derived flip-above from the
+    // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
+    // could send the menu above the finger even with room below (#326). This
+    // provider clamps/flips against the window directly.
+    val edgeInsetPx = with(density) { 8.dp.roundToPx() }
+    // Compose runs calculatePosition on the FIRST layout pass with
+    // popupContentSize == (0,0) (content not yet measured). With height 0 the
+    // "fits below" branch is always true, so a near-top message would place
+    // the menu top AT touchY on frame 1, then flip/clamp once the real tall
+    // height arrives — a visible above-then-below jump (#389). Decide the side
+    // deterministically from frame 1 by feeding a non-zero height into the
+    // provider: the real measured height once known, else a per-variant
+    // estimate derived from the menu's own layout so frame 1 already matches
+    // the height the side decision will settle on.
+    // Key to expanded so a previous menu variant's measured height cannot win
+    // over the new variant's estimate on the first frame after reopening.
+    var measuredPopupHeightPx by remember(expanded) { mutableStateOf(0) }
+    // First-frame fallback only. A flat constant (the previous 240.dp) both
+    // overestimated short menus — flipping them above even when they fit
+    // below — and underestimated tall menus, so the measured height could
+    // still flip the side on frame 2 (the same jump #389 set out to remove,
+    // see #517). Instead, predict the height from the exact menu layout:
+    //   - one emoji/quick-reaction Row (36.dp)
+    //   - a HorizontalDivider (1.dp)
+    //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
+    //       Copy and Info always; +Reply when canReply; +Edit when canEdit;
+    //       +Forward when canForward; +Select when canSelect;
+    //       +Delete for me when canDeleteForMe;
+    //       +Delete for everyone when canDeleteForEveryone
+    //   - the outer Column's 8.dp padding (top + bottom) and its two
+    //     spacedBy(8.dp) gaps between the three sections.
+    // Keep this in sync with the menu Column below if its layout changes.
+    val estimatedPopupHeightPx =
+        with(density) {
+            val actionButtonCount =
+                2 +
+                    (if (canReply) 1 else 0) +
+                    (if (canEdit) 1 else 0) +
+                    (if (canForward) 1 else 0) +
+                    (if (canSelect) 1 else 0) +
+                    (if (canDeleteForMe) 1 else 0) +
+                    (if (canDeleteForEveryone) 1 else 0)
+            val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
+            val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
+            val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
+            totalHeight.roundToPx()
         }
-        // Position the popup purely from the captured window touch y, independent of
-        // any anchor's layout position. DropdownMenu derived flip-above from the
-        // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
-        // could send the menu above the finger even with room below (#326). This
-        // provider clamps/flips against the window directly.
-        val edgeInsetPx = with(density) { 8.dp.roundToPx() }
-        // Compose runs calculatePosition on the FIRST layout pass with
-        // popupContentSize == (0,0) (content not yet measured). With height 0 the
-        // "fits below" branch is always true, so a near-top message would place
-        // the menu top AT touchY on frame 1, then flip/clamp once the real tall
-        // height arrives — a visible above-then-below jump (#389). Decide the side
-        // deterministically from frame 1 by feeding a non-zero height into the
-        // provider: the real measured height once known, else a per-variant
-        // estimate derived from the menu's own layout so frame 1 already matches
-        // the height the side decision will settle on.
-        var measuredPopupHeightPx by remember { mutableStateOf(0) }
-        // First-frame fallback only. A flat constant (the previous 240.dp) both
-        // overestimated short menus — flipping them above even when they fit
-        // below — and underestimated tall menus, so the measured height could
-        // still flip the side on frame 2 (the same jump #389 set out to remove,
-        // see #517). Instead, predict the height from the exact menu layout:
-        //   - one emoji/quick-reaction Row (36.dp)
-        //   - a HorizontalDivider (1.dp)
-        //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-        //       Copy and Info always; +Reply when canReply; +Edit when canEdit;
-        //       +Forward when canForward; +Select when canSelect;
-        //       +Delete for me when canDeleteForMe;
-        //       +Delete for everyone when canDeleteForEveryone
-        //   - the outer Column's 8.dp padding (top + bottom) and its two
-        //     spacedBy(8.dp) gaps between the three sections.
-        // Keep this in sync with the menu Column below if its layout changes.
-        val estimatedPopupHeightPx =
-            with(density) {
-                val actionButtonCount =
-                    2 +
-                        (if (canReply) 1 else 0) +
-                        (if (canEdit) 1 else 0) +
-                        (if (canForward) 1 else 0) +
-                        (if (canSelect) 1 else 0) +
-                        (if (canDeleteForMe) 1 else 0) +
-                        (if (canDeleteForEveryone) 1 else 0)
-                val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
-                val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
-                val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
-                totalHeight.roundToPx()
-            }
-        val positionProvider =
-            remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, estimatedPopupHeightPx) {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
-                        // Horizontal: hug the bubble side, clamped inside the window.
-                        val x =
-                            if (alignEnd) {
-                                windowSize.width - popupContentSize.width - edgeInsetPx
-                            } else {
-                                edgeInsetPx
-                            }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                        // Decide vertical placement against a non-zero height so the
-                        // chosen side is stable from the first frame. Once the popup
-                        // has any real measurement (content or onSizeChanged), use it
-                        // directly so the *settled* placement reflects the true menu
-                        // height; the per-variant estimate is consulted only on the
-                        // first frame before either is known (#517).
-                        val measuredHeight = maxOf(popupContentSize.height, measuredPopupHeightPx)
-                        val effectiveHeight =
-                            if (measuredHeight > 0) measuredHeight else estimatedPopupHeightPx
-                        // Vertical: top at the touch y; flip upward if it would spill
-                        // past the bottom inset; if it still doesn't fit, clamp to top.
-                        val bottomLimit = windowSize.height - edgeInsetPx
-                        val y =
-                            when {
-                                touchY + effectiveHeight <= bottomLimit -> touchY
-                                effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
-                                else -> edgeInsetPx
-                            }.coerceIn(edgeInsetPx, (windowSize.height - effectiveHeight).coerceAtLeast(0))
-                        return IntOffset(x, y)
-                    }
+    val positionProvider =
+        remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, estimatedPopupHeightPx) {
+            object : PopupPositionProvider {
+                override fun calculatePosition(
+                    anchorBounds: IntRect,
+                    windowSize: IntSize,
+                    layoutDirection: LayoutDirection,
+                    popupContentSize: IntSize,
+                ): IntOffset {
+                    val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
+                    // Horizontal: hug the bubble side, clamped inside the window.
+                    val x =
+                        if (alignEnd) {
+                            windowSize.width - popupContentSize.width - edgeInsetPx
+                        } else {
+                            edgeInsetPx
+                        }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                    // Decide vertical placement against a non-zero height so the
+                    // chosen side is stable from the first frame. Once the popup
+                    // has any real measurement (content or onSizeChanged), use it
+                    // directly so the *settled* placement reflects the true menu
+                    // height; the per-variant estimate is consulted only on the
+                    // first frame before either is known (#517).
+                    val measuredHeight = maxOf(popupContentSize.height, measuredPopupHeightPx)
+                    val effectiveHeight =
+                        if (measuredHeight > 0) measuredHeight else estimatedPopupHeightPx
+                    // Vertical: top at the touch y; flip upward if it would spill
+                    // past the bottom inset; if it still doesn't fit, clamp to top.
+                    val bottomLimit = windowSize.height - edgeInsetPx
+                    val y =
+                        when {
+                            touchY + effectiveHeight <= bottomLimit -> touchY
+                            effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
+                            else -> edgeInsetPx
+                        }.coerceIn(edgeInsetPx, (windowSize.height - effectiveHeight).coerceAtLeast(0))
+                    return IntOffset(x, y)
                 }
             }
-        Popup(
-            popupPositionProvider = positionProvider,
-            onDismissRequest = onDismissRequest,
-            properties =
-                PopupProperties(
-                    focusable = false,
-                    // Outside taps are handled by the scrim above (which also blocks
-                    // click-through); disabling the menu's own outside-dismiss keeps a
-                    // single tap from being processed twice.
-                    dismissOnClickOutside = false,
-                ),
+        }
+    KeyboardSafePopup(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        popupPositionProvider = positionProvider,
+    ) {
+        // Surface restores the menu chrome (rounded shape + elevation) that
+        // DropdownMenu provided.
+        Surface(
+            modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
+            shape = RoundedCornerShape(12.dp),
+            border = amoledSurfaceBorderStroke(),
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
         ) {
-            // Surface restores the menu chrome (rounded shape + elevation) that
-            // DropdownMenu provided.
-            Surface(
-                modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
-                shape = RoundedCornerShape(12.dp),
-                border = amoledSurfaceBorderStroke(),
-                tonalElevation = 3.dp,
-                shadowElevation = 6.dp,
+            Column(
+                modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
-                    modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (canReact) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            quickReactionEmojis.forEach { emoji ->
-                                EmojiActionButton(
-                                    emoji = emoji,
-                                    onClick = { onReact(emoji) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                            IconButton(
-                                onClick = onOpenEmojiPicker,
-                                modifier = Modifier.size(36.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.EmojiEmotions,
-                                    contentDescription = stringResource(R.string.open_emoji_picker),
-                                )
-                            }
-                        }
-                        HorizontalDivider()
-                    }
-                    Column(
+                if (canReact) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (canReply) {
-                            MessageActionButton(
-                                label = stringResource(R.string.reply),
-                                icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onReply,
+                        quickReactionEmojis.forEach { emoji ->
+                            EmojiActionButton(
+                                emoji = emoji,
+                                onClick = { onReact(emoji) },
+                                modifier = Modifier.weight(1f),
                             )
                         }
-                        if (canEdit) {
-                            MessageActionButton(
-                                label = stringResource(R.string.edit),
-                                icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onEdit,
+                        IconButton(
+                            onClick = onOpenEmojiPicker,
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEmotions,
+                                contentDescription = stringResource(R.string.open_emoji_picker),
                             )
                         }
-                        if (canSelect) {
-                            MessageActionButton(
-                                label = stringResource(R.string.select),
-                                icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onSelect,
-                            )
-                        }
+                    }
+                    HorizontalDivider()
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (canReply) {
                         MessageActionButton(
-                            label = stringResource(R.string.copy_text),
-                            icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onCopyText,
+                            label = stringResource(R.string.reply),
+                            icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onReply,
                         )
-                        if (canForward) {
-                            MessageActionButton(
-                                label = stringResource(R.string.forward),
-                                icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onForward,
-                            )
-                        }
+                    }
+                    if (canEdit) {
                         MessageActionButton(
-                            label = stringResource(R.string.message_info),
-                            icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onInfo,
+                            label = stringResource(R.string.edit),
+                            icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onEdit,
                         )
-                        if (canDeleteForMe) {
-                            MessageActionButton(
-                                label = stringResource(R.string.delete_for_me),
-                                icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onDeleteForMe,
-                                isDestructive = true,
-                            )
-                        }
-                        if (canDeleteForEveryone) {
-                            MessageActionButton(
-                                label = stringResource(R.string.delete_for_everyone),
-                                icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onDeleteForEveryone,
-                                isDestructive = true,
-                            )
-                        }
+                    }
+                    if (canSelect) {
+                        MessageActionButton(
+                            label = stringResource(R.string.select),
+                            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onSelect,
+                        )
+                    }
+                    MessageActionButton(
+                        label = stringResource(R.string.copy_text),
+                        icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onCopyText,
+                    )
+                    if (canForward) {
+                        MessageActionButton(
+                            label = stringResource(R.string.forward),
+                            icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onForward,
+                        )
+                    }
+                    MessageActionButton(
+                        label = stringResource(R.string.message_info),
+                        icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onInfo,
+                    )
+                    if (canDeleteForMe) {
+                        MessageActionButton(
+                            label = stringResource(R.string.delete_for_me),
+                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onDeleteForMe,
+                            isDestructive = true,
+                        )
+                    }
+                    if (canDeleteForEveryone) {
+                        MessageActionButton(
+                            label = stringResource(R.string.delete_for_everyone),
+                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onDeleteForEveryone,
+                            isDestructive = true,
+                        )
                     }
                 }
             }

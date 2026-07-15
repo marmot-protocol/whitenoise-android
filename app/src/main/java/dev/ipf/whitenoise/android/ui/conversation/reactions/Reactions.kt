@@ -26,7 +26,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,6 +57,8 @@ import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
+import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
+import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -112,7 +113,6 @@ internal fun ReactionSummaryChip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
@@ -135,50 +135,57 @@ internal fun ReactionDetailsSheet(
             selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
         }
 
-    ModalBottomSheet(
+    KeyboardSafePopup(
+        expanded = true,
         onDismissRequest = onDismissRequest,
-        containerColor = amoledSheetContainerColor(),
+        popupPositionProvider = BottomAnchoredPopupPositionProvider,
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = amoledSheetContainerColor(),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                FilterChip(
-                    selected = selectedEmoji == null,
-                    onClick = { selectedEmoji = null },
-                    label = { Text("${stringResource(R.string.reaction_filter_all)} · ${participants.size}") },
-                )
-                emojiCounts.forEach { (emoji, count) ->
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     FilterChip(
-                        selected = selectedEmoji == emoji,
-                        onClick = { selectedEmoji = emoji },
-                        label = { Text("$emoji $count") },
+                        selected = selectedEmoji == null,
+                        onClick = { selectedEmoji = null },
+                        label = { Text("${stringResource(R.string.reaction_filter_all)} · ${participants.size}") },
                     )
+                    emojiCounts.forEach { (emoji, count) ->
+                        FilterChip(
+                            selected = selectedEmoji == emoji,
+                            onClick = { selectedEmoji = emoji },
+                            label = { Text("$emoji $count") },
+                        )
+                    }
                 }
-            }
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                itemsIndexed(
-                    visibleParticipants,
-                    key = { _, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
-                ) { _, participant ->
-                    val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
-                    ReactionParticipantRow(
-                        participant = participant,
-                        appState = appState,
-                        mine = isMine,
-                        onRemove = if (isMine && onRemoveOwnReaction != null) ({ onRemoveOwnReaction(participant.emoji) }) else null,
-                    )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(
+                        visibleParticipants,
+                        key = { _, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
+                    ) { _, participant ->
+                        val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
+                        ReactionParticipantRow(
+                            participant = participant,
+                            appState = appState,
+                            mine = isMine,
+                            onRemove = if (isMine && onRemoveOwnReaction != null) ({ onRemoveOwnReaction(participant.emoji) }) else null,
+                        )
+                    }
                 }
             }
         }
