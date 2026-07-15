@@ -335,6 +335,49 @@ internal fun sharedMediaFallbackContent(
         else -> SharedMediaFallback(SharedMediaFallbackType.Generic)
     }
 
+@Composable
+internal fun SharedMediaFallbackRow(
+    fallback: SharedMediaFallback,
+    onSeeAll: () -> Unit,
+) {
+    val icon =
+        when (fallback.type) {
+            SharedMediaFallbackType.Generic -> Icons.Default.Image
+            SharedMediaFallbackType.Voice -> Icons.Default.Mic
+            SharedMediaFallbackType.Files -> Icons.Default.Description
+            SharedMediaFallbackType.Urls -> Icons.Default.Language
+        }
+    val label =
+        when (fallback.type) {
+            SharedMediaFallbackType.Generic -> stringResource(R.string.shared_media_view)
+            SharedMediaFallbackType.Voice ->
+                pluralStringResource(R.plurals.shared_media_voice_count, fallback.count, fallback.count)
+            SharedMediaFallbackType.Files ->
+                pluralStringResource(R.plurals.shared_media_files_count, fallback.count, fallback.count)
+            SharedMediaFallbackType.Urls ->
+                pluralStringResource(R.plurals.shared_media_links_count, fallback.count, fallback.count)
+        }
+    SectionCard(title = stringResource(R.string.shared_media)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .amoledSurfaceBorder(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onSeeAll() }
+                    .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
 /**
  * "Shared media" section for the group/DM details sheet. Shows a horizontal
  * strip of the most recent image thumbnails with a "See all" affordance into
@@ -354,49 +397,16 @@ internal fun SharedMediaSection(
     if (tiles.isEmpty) return
 
     if (tiles.images.isEmpty()) {
-        val fallback =
-            sharedMediaFallbackContent(
-                videoCount = tiles.videos.size,
-                voiceCount = tiles.voice.size,
-                fileCount = tiles.files.size,
-                urlCount = tiles.urls.size,
-            )
-        val icon =
-            when (fallback.type) {
-                SharedMediaFallbackType.Generic -> Icons.Default.Image
-                SharedMediaFallbackType.Voice -> Icons.Default.Mic
-                SharedMediaFallbackType.Files -> Icons.Default.Description
-                SharedMediaFallbackType.Urls -> Icons.Default.Language
-            }
-        val label =
-            when (fallback.type) {
-                SharedMediaFallbackType.Generic -> stringResource(R.string.shared_media_view)
-                SharedMediaFallbackType.Voice ->
-                    pluralStringResource(R.plurals.shared_media_voice_count, fallback.count, fallback.count)
-                SharedMediaFallbackType.Files ->
-                    pluralStringResource(R.plurals.shared_media_files_count, fallback.count, fallback.count)
-                SharedMediaFallbackType.Urls ->
-                    pluralStringResource(R.plurals.shared_media_links_count, fallback.count, fallback.count)
-            }
-        SectionCard(title = stringResource(R.string.shared_media)) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .amoledSurfaceBorder(RoundedCornerShape(8.dp))
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onSeeAll() }
-                        .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(icon, contentDescription = null)
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
+        SharedMediaFallbackRow(
+            fallback =
+                sharedMediaFallbackContent(
+                    videoCount = tiles.videos.size,
+                    voiceCount = tiles.voice.size,
+                    fileCount = tiles.files.size,
+                    urlCount = tiles.urls.size,
+                ),
+            onSeeAll = onSeeAll,
+        )
         return
     }
 
