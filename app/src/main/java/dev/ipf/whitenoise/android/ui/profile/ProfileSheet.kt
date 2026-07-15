@@ -210,7 +210,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var showStartGroup by remember(npub) { mutableStateOf(false) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
-    var showNicknameDialog by remember(npub) { mutableStateOf(false) }
+    var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     val activeAccountHex = appState.activeAccount?.accountIdHex
     // UI guard covers both profile actions, including "Start new group". The
@@ -266,14 +266,16 @@ internal fun ProfileSheet(
         return
     }
 
-    if (showNicknameDialog && hex != null && !targetIsSelf) {
-        ContactNicknameDialog(
+    if (showContactEditorDialog && hex != null && !targetIsSelf) {
+        ContactPrivateDetailsDialog(
             profileName = title,
             initialNickname = contactNickname.orEmpty(),
-            onDismiss = { showNicknameDialog = false },
-            onSave = { nickname ->
+            initialNotes = appState.contactNotes(hex!!).orEmpty(),
+            onDismiss = { showContactEditorDialog = false },
+            onSave = { nickname, notes ->
                 appState.setContactNickname(hex!!, nickname)
-                showNicknameDialog = false
+                appState.setContactNotes(hex!!, notes)
+                showContactEditorDialog = false
             },
         )
     }
@@ -369,30 +371,6 @@ internal fun ProfileSheet(
                     clipboard = clipboard,
                     appState = appState,
                 )
-                if (hex != null && !targetIsSelf) {
-                    SectionCard(title = stringResource(R.string.profile_private_nickname)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                stringResource(R.string.profile_name_from_profile, title),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.profile_your_nickname,
-                                    contactNickname ?: stringResource(R.string.profile_nickname_not_set),
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                stringResource(R.string.profile_nickname_private_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
                 SectionCard(title = stringResource(R.string.about)) {
                     Text(
                         about ?: stringResource(R.string.profile_no_bio),
@@ -425,17 +403,12 @@ internal fun ProfileSheet(
                 Column(Modifier.fillMaxWidth()) {
                     SettingsActionRow(
                         icon = Icons.Default.Edit,
-                        title =
-                            stringResource(
-                                if (contactNickname == null) {
-                                    R.string.profile_set_nickname
-                                } else {
-                                    R.string.profile_edit_nickname
-                                },
-                            ),
-                        value = contactNickname,
+                        title = stringResource(R.string.profile_nickname_and_notes),
+                        value =
+                            contactNickname
+                                ?: stringResource(R.string.profile_add_nickname_and_notes),
                         enabled = !creatingChat,
-                        onClick = { showNicknameDialog = true },
+                        onClick = { showContactEditorDialog = true },
                     )
                     SettingsActionRow(
                         icon = Icons.Default.Group,
@@ -482,17 +455,19 @@ internal fun ProfileSheet(
 }
 
 @Composable
-private fun ContactNicknameDialog(
+private fun ContactPrivateDetailsDialog(
     profileName: String,
     initialNickname: String,
+    initialNotes: String,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
+    onSave: (nickname: String, notes: String) -> Unit,
 ) {
     var nickname by remember(initialNickname) { mutableStateOf(initialNickname) }
+    var notes by remember(initialNotes) { mutableStateOf(initialNotes) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.profile_nickname_dialog_title)) },
+        title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
@@ -502,19 +477,27 @@ private fun ContactNicknameDialog(
                 OutlinedTextField(
                     value = nickname,
                     onValueChange = { nickname = it },
-                    label = { Text(stringResource(R.string.profile_nickname_hint)) },
+                    label = { Text(stringResource(R.string.profile_contact_name_hint)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
+                    singleLine = false,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Text(
-                    stringResource(R.string.profile_nickname_private_hint),
+                    stringResource(R.string.profile_contact_editor_private_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(nickname) }) {
+            TextButton(onClick = { onSave(nickname, notes) }) {
                 Text(stringResource(R.string.save))
             }
         },

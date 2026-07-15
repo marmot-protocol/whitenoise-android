@@ -291,6 +291,11 @@ class LocalizationResourceTest {
         // English there — but nowhere else (de "Minuten", es "minutos", …).
         val localeScopedAllowedKeys: Map<String, Set<String>> =
             mapOf(
+                "values-de" to
+                    setOf(
+                        // "Name" is the German word for "name".
+                        "profile_contact_name_hint",
+                    ),
                 "values-fr" to
                     setOf(
                         "disappearing_unit_minutes",

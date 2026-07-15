@@ -127,6 +127,71 @@ class WhiteNoiseAppStatePreferencesTest {
     }
 
     @Test
+    fun contactNotesDefaultsAbsent() {
+        assertEquals(null, ContactNotesPreferences.readNotes(preferences, "account-a", "contact-a"))
+    }
+
+    @Test
+    fun contactNotesPersistsPerAccountAndContact() {
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "CONTACT-A", "Met at conference")
+        ContactNotesPreferences.writeNotes(preferences, "account-b", "contact-a", "Coworker on project X")
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "contact-b", "Other notes")
+
+        assertEquals("Met at conference", ContactNotesPreferences.readNotes(preferences, "account-a", "contact-a"))
+        assertEquals("Coworker on project X", ContactNotesPreferences.readNotes(preferences, "account-b", "contact-a"))
+        assertEquals("Other notes", ContactNotesPreferences.readNotes(preferences, "account-a", "contact-b"))
+    }
+
+    @Test
+    fun contactNotesBlankClearsOverride() {
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "contact-a", "Remember birthday")
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "contact-a", "   ")
+
+        assertEquals(null, ContactNotesPreferences.readNotes(preferences, "account-a", "contact-a"))
+    }
+
+    @Test
+    fun contactNotesPreservesMultiline() {
+        val notes = "Line one\nLine two\n\nLine four"
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "contact-a", notes)
+
+        assertEquals(notes, ContactNotesPreferences.readNotes(preferences, "account-a", "contact-a"))
+    }
+
+    @Test
+    fun contactNotesClearAllForAccountDoesNotClearSimilarPrefixes() {
+        ContactNotesPreferences.writeNotes(preferences, "a", "contact-a", "short")
+        ContactNotesPreferences.writeNotes(preferences, "a:long", "contact-a", "long")
+
+        assertTrue(ContactNotesPreferences.clearAllForAccount(preferences, "a"))
+
+        assertEquals(null, ContactNotesPreferences.readNotes(preferences, "a", "contact-a"))
+        assertEquals("long", ContactNotesPreferences.readNotes(preferences, "a:long", "contact-a"))
+        assertFalse(ContactNotesPreferences.clearAllForAccount(preferences, "missing"))
+    }
+
+    @Test
+    fun contactNotesAccessPolicyUsesActiveAccountAndIgnoresSelf() {
+        val accounts = listOf(account("account-a", "self-a"), account("account-b", "self-b"))
+
+        assertNull(contactNicknameAccountRefForAccess("account-a", accounts, "self-a"))
+        ContactNotesPreferences.writeNotes(preferences, "account-a", "contact-a", "Notes for Alex")
+        ContactNotesPreferences.writeNotes(preferences, "account-b", "contact-a", "Other account notes")
+
+        val activeAccountForContact = contactNicknameAccountRefForAccess("account-a", accounts, "contact-a")
+        val otherAccountForContact = contactNicknameAccountRefForAccess("account-b", accounts, "contact-a")
+
+        assertEquals(
+            "Notes for Alex",
+            ContactNotesPreferences.readNotes(preferences, activeAccountForContact, "contact-a"),
+        )
+        assertEquals(
+            "Other account notes",
+            ContactNotesPreferences.readNotes(preferences, otherAccountForContact, "contact-a"),
+        )
+    }
+
+    @Test
     fun contactNicknameAccessPolicyUsesActiveAccountAndIgnoresSelf() {
         val accounts = listOf(account("account-a", "self-a"), account("account-b", "self-b"))
 

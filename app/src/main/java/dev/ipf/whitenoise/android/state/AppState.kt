@@ -2460,10 +2460,11 @@ class WhiteNoiseAppState(
         }
     }
 
-    private fun clearContactNicknamesForAccount(accountRef: String) {
+    private fun clearContactPrivateDetailsForAccount(accountRef: String) {
         if (ContactNicknamePreferences.clearAllForAccount(preferences, accountRef)) {
             contactNicknameRevision += 1
         }
+        ContactNotesPreferences.clearAllForAccount(preferences, accountRef)
     }
 
     /**
@@ -2543,7 +2544,7 @@ class WhiteNoiseAppState(
                 // KeyPackage cleanup is the engine's to retry on next sign-in.
                 pushTokenStore.recordPendingDisable(signedOutRef)
             }.getOrNull()
-        clearContactNicknamesForAccount(signedOutRef)
+        clearContactPrivateDetailsForAccount(signedOutRef)
         refreshAccounts()
         val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
         val next = outcome.nextActiveRef
@@ -2612,7 +2613,7 @@ class WhiteNoiseAppState(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return null
             }
-        clearContactNicknamesForAccount(wipedRef)
+        clearContactPrivateDetailsForAccount(wipedRef)
         wipeDecryptedMediaFromDisk()
         clearHiddenMessagesForAccount(wipedRef)
         val refreshedAccounts = runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())
@@ -4201,6 +4202,19 @@ class WhiteNoiseAppState(
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
         }
+    }
+
+    fun contactNotes(accountIdHex: String): String? {
+        val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return null
+        return ContactNotesPreferences.readNotes(preferences, account, accountIdHex)
+    }
+
+    fun setContactNotes(
+        accountIdHex: String,
+        notes: String,
+    ) {
+        val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return
+        ContactNotesPreferences.writeNotes(preferences, account, accountIdHex, notes)
     }
 
     private fun displayNameForAccount(
