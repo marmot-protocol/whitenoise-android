@@ -121,7 +121,9 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
+import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.nextReadAnchor
+import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
@@ -1815,6 +1817,7 @@ internal fun ConversationScreen(
     // doesn't keep moving as the user scrolls and marks messages as read.
     val entryUnreadCount = remember(chat.id) { chat.unreadCount.toInt().coerceAtLeast(0) }
     var entryFirstUnreadMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var unreadDivergenceLogged by remember(chat.id) { mutableStateOf(false) }
     LaunchedEffect(chat.id, controller.timeline.size) {
         if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
             val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
@@ -1828,6 +1831,17 @@ internal fun ConversationScreen(
                         .takeIf { it.isNotBlank() }
             }
         }
+    }
+    LaunchedEffect(chat.id, initialTimelineAnchored, controller.timeline.size) {
+        if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
+        unreadCountDivergenceReport(
+            projectionUnread = entryUnreadCount,
+            timeline = controller.timeline,
+            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+        )?.let { report ->
+            logUnreadCountDivergence("DMConversation", report)
+        }
+        unreadDivergenceLogged = true
     }
     // Boolean-edge key avoids per-frame coroutine cancellation. The IME open
     // animation takes ~200ms; the LazyColumn measures a smaller viewport on
