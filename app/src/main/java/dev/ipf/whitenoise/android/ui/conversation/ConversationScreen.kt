@@ -233,10 +233,10 @@ internal fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
-    // True when opened by tapping a message notification: receiving a message
-    // implies current membership, so the composer shows immediately rather than
-    // a placeholder while membership verification catches up after the switch.
-    openedFromNotification: Boolean = false,
+    // Non-zero when opened by tapping a message notification. Each tap gets a
+    // fresh id so an already-mounted conversation re-runs its first-unread
+    // anchor; it also implies current membership while verification catches up.
+    notificationOpenRequestId: Long = 0L,
     // True only when this conversation was just created in the same navigation
     // step (issue #321) — drives a one-shot composer focus + keyboard raise so
     // the user can type the first message without an extra tap. False for row
@@ -329,8 +329,11 @@ internal fun ConversationScreen(
     // at/near the bottom — then the existing unread/newest anchor runs.
     val scrollRestore =
         restoredScrollSnapshot?.takeIf {
-            focusMessageId == null &&
-                !justCreated
+            shouldRestoreConversationScrollSnapshot(
+                focusMessageId = focusMessageId,
+                justCreated = justCreated,
+                notificationOpenRequestId = notificationOpenRequestId,
+            )
         }
     val positionalScrollRestore =
         scrollRestore?.takeIf {
@@ -361,7 +364,8 @@ internal fun ConversationScreen(
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var showBatchDeleteConfirm by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
-    var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
+    var initialTimelineAnchored by
+        remember(chat.id, notificationOpenRequestId) { mutableStateOf(false) }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
@@ -1997,7 +2001,7 @@ internal fun ConversationScreen(
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
-    LaunchedEffect(latestTimelineItemId) {
+    LaunchedEffect(latestTimelineItemId, notificationOpenRequestId) {
         if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
                 if (scrollRestore != null) {
@@ -2191,7 +2195,7 @@ internal fun ConversationScreen(
             isSelfMember = controller.isSelfMember,
             seededSelfMember = controller.seededSelfMember,
             seededMembershipKnown = controller.seededMembershipKnown,
-            assumeMemberUntilVerified = openedFromNotification,
+            assumeMemberUntilVerified = notificationOpenRequestId != 0L,
         )
     val mentionPicker =
         rememberConversationMentionPickerState(

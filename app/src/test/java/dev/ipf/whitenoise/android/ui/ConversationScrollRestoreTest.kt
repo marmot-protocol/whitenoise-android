@@ -5,8 +5,11 @@ import dev.ipf.whitenoise.android.ui.conversation.conversationJumpToNewestTarget
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollRestoreListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollSnapshotOnLeave
+import dev.ipf.whitenoise.android.ui.conversation.shouldRestoreConversationScrollSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -61,6 +64,28 @@ class ConversationScrollRestoreTest {
                 nearBottom = false,
                 anchorItemId = "msg:reader",
                 anchorMessageIdHex = "reader",
+            ),
+        )
+    }
+
+    @Test
+    fun ordinaryReopenRestoresSavedHistoryPosition() {
+        assertTrue(
+            shouldRestoreConversationScrollSnapshot(
+                focusMessageId = null,
+                justCreated = false,
+                notificationOpenRequestId = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun notificationOpenIgnoresSavedHistoryPosition() {
+        assertFalse(
+            shouldRestoreConversationScrollSnapshot(
+                focusMessageId = null,
+                justCreated = false,
+                notificationOpenRequestId = 1L,
             ),
         )
     }
