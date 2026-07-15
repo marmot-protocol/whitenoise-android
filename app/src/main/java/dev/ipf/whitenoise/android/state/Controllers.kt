@@ -6961,6 +6961,7 @@ class ConversationController(
     private var publishPending = false
 
     private inline fun coalesceTimelinePublishes(block: () -> Unit) {
+        assertMainThread { "coalesceTimelinePublishes" }
         publishSuppressionDepth += 1
         try {
             block()
@@ -6974,6 +6975,7 @@ class ConversationController(
     }
 
     private fun publishTimelineFromIndexes() {
+        assertMainThread { "publishTimelineFromIndexes" }
         if (publishSuppressionDepth > 0) {
             publishPending = true
             return

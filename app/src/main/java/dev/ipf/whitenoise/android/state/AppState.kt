@@ -3995,6 +3995,7 @@ class WhiteNoiseAppState(
      * Main-thread only (invoked from `onStartCommand`). See #164.
      */
     fun onBackgroundConnectionStartRejected() {
+        assertMainThread { "onBackgroundConnectionStartRejected" }
         if (!backgroundConnectionEnabled) return
         updateBackgroundConnectionPreference(false)
         present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
