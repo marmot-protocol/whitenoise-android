@@ -1,14 +1,22 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.content.ClipboardManager
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
@@ -26,6 +34,52 @@ internal data class SelectableTextLayout(
 internal class SelectableTextLayoutTracker {
     var layoutResult: TextLayoutResult? = null
     var coordinates: LayoutCoordinates? = null
+}
+
+/**
+ * Observes taps across the whole conversation chrome without consuming child
+ * gestures. A tap inside the selected bubble is left to SelectionContainer;
+ * a stationary tap anywhere else (transcript, top bar, or composer) exits mode.
+ */
+@Composable
+internal fun Modifier.dismissTextSelectionOnOutsideTap(
+    active: Boolean,
+    selectedBoundsInWindow: Rect?,
+    onDismiss: () -> Unit,
+): Modifier {
+    var regionCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    return this
+        .onGloballyPositioned { regionCoordinates = it }
+        .pointerInput(active, selectedBoundsInWindow) {
+            if (!active) return@pointerInput
+            awaitEachGesture {
+                val down =
+                    awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial,
+                    )
+                var moved = false
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Final)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                        moved = true
+                    }
+                    if (!change.pressed) {
+                        val windowPosition = regionCoordinates?.localToWindow(down.position)
+                        if (
+                            !moved &&
+                            selectedBoundsInWindow != null &&
+                            windowPosition != null &&
+                            !selectedBoundsInWindow.contains(windowPosition)
+                        ) {
+                            onDismiss()
+                        }
+                        break
+                    }
+                }
+            }
+        }
 }
 
 internal fun nearestNonWhitespaceOffset(

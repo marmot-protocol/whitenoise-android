@@ -2,20 +2,34 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.app.Application
 import android.content.ClipData
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -48,10 +62,58 @@ class MessageTextSelectionTest {
 
     @Test
     fun textActionsAreHiddenWhenTheBubbleHasNoText() {
-        renderActionMenu(canCopyText = false)
+        renderActionMenu(canCopyText = false, canSelectText = false)
 
         composeRule.onNodeWithText(string(R.string.select_text)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.copy_text)).assertDoesNotExist()
+    }
+
+    @Test
+    fun wholeMessageCopyRemainsVisibleWhenRenderedTextCannotBeSelected() {
+        renderActionMenu(canCopyText = true, canSelectText = false)
+
+        composeRule.onNodeWithText(string(R.string.select_text)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.copy_text)).assertIsDisplayed()
+    }
+
+    @Test
+    fun selectionDismissRegionIgnoresBubbleTapAndDismissesChromeTap() {
+        var dismissals = 0
+        composeRule.setContent {
+            var bubbleBounds by remember { mutableStateOf<Rect?>(null) }
+            WhiteNoiseTheme {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(240.dp)
+                            .dismissTextSelectionOnOutsideTap(
+                                active = true,
+                                selectedBoundsInWindow = bubbleBounds,
+                                onDismiss = { dismissals++ },
+                            ),
+                ) {
+                    Box(
+                        Modifier
+                            .size(80.dp)
+                            .align(Alignment.Center)
+                            .onGloballyPositioned { bubbleBounds = it.boundsInWindow() }
+                            .testTag("selected-bubble"),
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .testTag("outside-chrome"),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("selected-bubble").performTouchInput { click() }
+        composeRule.runOnIdle { assertEquals(0, dismissals) }
+
+        composeRule.onNodeWithTag("outside-chrome").performTouchInput { click(Offset(8f, 8f)) }
+        composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
     @Test
@@ -138,6 +200,7 @@ class MessageTextSelectionTest {
 
     private fun renderActionMenu(
         canCopyText: Boolean,
+        canSelectText: Boolean = canCopyText,
         onSelectText: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -154,6 +217,7 @@ class MessageTextSelectionTest {
                     canForward = false,
                     canSelect = false,
                     canCopyText = canCopyText,
+                    canSelectText = canSelectText,
                     quickReactionEmojis = emptyList(),
                     onDismissRequest = {},
                     onReact = {},

@@ -1598,7 +1598,12 @@ internal fun MessageBubble(
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !readOnly && forwardBody != null,
                     canSelect = !readOnly && batchSelectable,
-                    canCopyText = !bodyTextToRender.isNullOrBlank(),
+                    // Whole-message Copy keeps using its actual clipboard payload,
+                    // including card-style bubbles whose body is rendered by the
+                    // card rather than the text renderer. Partial selection is only
+                    // available when this bubble has selectable rendered text.
+                    canCopyText = displayedBody.isNotBlank(),
+                    canSelectText = !bodyTextToRender.isNullOrBlank(),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->

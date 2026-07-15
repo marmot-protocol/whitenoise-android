@@ -103,6 +103,7 @@ internal fun MessageActionMenu(
     canForward: Boolean,
     canSelect: Boolean,
     canCopyText: Boolean,
+    canSelectText: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -144,7 +145,7 @@ internal fun MessageActionMenu(
     //   - one emoji/quick-reaction Row (36.dp)
     //   - a HorizontalDivider (1.dp)
     //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-    //       Info always; +Select text and Copy when canCopyText;
+    //       Info always; +Select text when canSelectText; +Copy when canCopyText;
     //       +Reply when canReply; +Edit when canEdit;
     //       +Forward when canForward; +Select when canSelect;
     //       +Delete for me when canDeleteForMe;
@@ -156,7 +157,8 @@ internal fun MessageActionMenu(
         with(density) {
             val actionButtonCount =
                 1 +
-                    (if (canCopyText) 2 else 0) +
+                    (if (canSelectText) 1 else 0) +
+                    (if (canCopyText) 1 else 0) +
                     (if (canReply) 1 else 0) +
                     (if (canEdit) 1 else 0) +
                     (if (canForward) 1 else 0) +
@@ -275,12 +277,14 @@ internal fun MessageActionMenu(
                             onClick = onSelect,
                         )
                     }
-                    if (canCopyText) {
+                    if (canSelectText) {
                         MessageActionButton(
                             label = stringResource(R.string.select_text),
                             icon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onSelectText,
                         )
+                    }
+                    if (canCopyText) {
                         MessageActionButton(
                             label = stringResource(R.string.copy_text),
                             icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },

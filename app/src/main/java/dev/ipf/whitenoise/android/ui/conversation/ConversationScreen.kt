@@ -7,8 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,10 +81,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -171,6 +166,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
@@ -363,7 +359,6 @@ internal fun ConversationScreen(
     // one bubble can own the native SelectionContainer at a time.
     var textSelectionMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var textSelectionBubbleBounds by remember(chat.id) { mutableStateOf<Rect?>(null) }
-    var transcriptCoordinates by remember(chat.id) { mutableStateOf<LayoutCoordinates?>(null) }
 
     fun clearTextSelection() {
         textSelectionMessageId = null
@@ -2266,6 +2261,14 @@ internal fun ConversationScreen(
             )
     }
     Scaffold(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .dismissTextSelectionOnOutsideTap(
+                    active = textSelectionMessageId != null,
+                    selectedBoundsInWindow = textSelectionBubbleBounds,
+                    onDismiss = ::clearTextSelection,
+                ),
         // The transcript consumes IME insets; the composer bottom bar is the sole
         // owner of keyboard padding so the reply-preview chip and input row move
         // as one cluster (#895, #1109).
@@ -2748,34 +2751,7 @@ internal fun ConversationScreen(
                     Box(
                         modifier =
                             Modifier
-                                .fillMaxSize()
-                                .onGloballyPositioned { transcriptCoordinates = it }
-                                .pointerInput(textSelectionMessageId, textSelectionBubbleBounds) {
-                                    if (textSelectionMessageId == null) return@pointerInput
-                                    awaitEachGesture {
-                                        val down =
-                                            awaitFirstDown(
-                                                requireUnconsumed = false,
-                                                pass = PointerEventPass.Initial,
-                                            )
-                                        var moved = false
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Final)
-                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                                                moved = true
-                                            }
-                                            if (!change.pressed) {
-                                                val bounds = textSelectionBubbleBounds
-                                                val windowPosition = transcriptCoordinates?.localToWindow(down.position)
-                                                if (!moved && bounds != null && windowPosition != null && !bounds.contains(windowPosition)) {
-                                                    clearTextSelection()
-                                                }
-                                                break
-                                            }
-                                        }
-                                    }
-                                },
+                                .fillMaxSize(),
                     ) {
                         LazyColumn(
                             state = listState,
