@@ -930,6 +930,24 @@
     <string name="shared_media">Общие медиафайлы</string>
     <string name="shared_media_see_all">Показать все</string>
     <string name="shared_media_view">Посмотреть общие медиафайлы</string>
+    <plurals name="shared_media_links_count">
+        <item quantity="one">%1$d ссылка отправлена</item>
+        <item quantity="few">%1$d ссылки отправлены</item>
+        <item quantity="many">%1$d ссылок отправлено</item>
+        <item quantity="other">%1$d ссылок отправлено</item>
+    </plurals>
+    <plurals name="shared_media_files_count">
+        <item quantity="one">%1$d файл отправлен</item>
+        <item quantity="few">%1$d файла отправлены</item>
+        <item quantity="many">%1$d файлов отправлено</item>
+        <item quantity="other">%1$d файлов отправлено</item>
+    </plurals>
+    <plurals name="shared_media_voice_count">
+        <item quantity="one">%1$d голосовое сообщение отправлено</item>
+        <item quantity="few">%1$d голосовых сообщения отправлены</item>
+        <item quantity="many">%1$d голосовых сообщений отправлено</item>
+        <item quantity="other">%1$d голосовых сообщений отправлено</item>
+    </plurals>
     <string name="shared_media_tab_images">Изображения</string>
     <string name="shared_media_tab_videos">Видео</string>
     <string name="shared_media_tab_voice">Голос</string>

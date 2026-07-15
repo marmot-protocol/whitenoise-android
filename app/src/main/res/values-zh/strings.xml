@@ -889,6 +889,15 @@
     <string name="shared_media">共享媒体</string>
     <string name="shared_media_see_all">查看全部</string>
     <string name="shared_media_view">查看共享媒体</string>
+    <plurals name="shared_media_links_count">
+        <item quantity="other">已分享 %1$d 个链接</item>
+    </plurals>
+    <plurals name="shared_media_files_count">
+        <item quantity="other">已分享 %1$d 个文件</item>
+    </plurals>
+    <plurals name="shared_media_voice_count">
+        <item quantity="other">已分享 %1$d 条语音消息</item>
+    </plurals>
     <string name="shared_media_tab_images">图片</string>
     <string name="shared_media_tab_videos">视频</string>
     <string name="shared_media_tab_voice">语音</string>
