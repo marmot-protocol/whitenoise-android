@@ -409,6 +409,22 @@ internal fun conversationOpenDismissalTarget(
     return ConversationNotificationTarget(account, group)
 }
 
+/**
+ * The still-open conversation that becomes visible when the app returns to the
+ * foreground. Backgrounding deliberately retains the active conversation, so
+ * an unchanged Compose effect does not call [WhiteNoiseAppState.setActiveConversation]
+ * again on resume. Do not clear its tray cards while the app lock covers it.
+ */
+internal fun visibleConversationDismissalTarget(
+    appInForeground: Boolean,
+    appLockScreenVisible: Boolean,
+    activeAccountRef: String?,
+    groupIdHex: String?,
+): ConversationNotificationTarget? {
+    if (!appInForeground || appLockScreenVisible) return null
+    return conversationOpenDismissalTarget(activeAccountRef, groupIdHex)
+}
+
 internal suspend fun dismissConversationNotificationsOnOpen(
     activeAccountRef: String?,
     groupIdHex: String?,
@@ -2885,6 +2901,7 @@ class WhiteNoiseAppState(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        dismissVisibleConversationNotifications()
     }
 
     fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
@@ -3324,6 +3341,7 @@ class WhiteNoiseAppState(
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             maybeShowAppLockForForeground()
+            dismissVisibleConversationNotifications()
         } else {
             recordAppLockBackgrounded()
         }
@@ -3336,6 +3354,19 @@ class WhiteNoiseAppState(
         if (!foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
         if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
         if (foreground) refreshAppSelfUpdateInstallPermission()
+    }
+
+    private fun dismissVisibleConversationNotifications() {
+        val target =
+            visibleConversationDismissalTarget(
+                appInForeground = appInForeground,
+                appLockScreenVisible = appLockScreenVisible,
+                activeAccountRef = activeConversationAccountRef,
+                groupIdHex = activeConversationGroupIdHex,
+            ) ?: return
+        notificationScope.launch {
+            dismissConversationNotifications(target.accountRef, target.groupIdHex)
+        }
     }
 
     /**
