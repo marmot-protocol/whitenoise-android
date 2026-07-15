@@ -35,6 +35,14 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 
+internal data class ConversationOpenContext(
+    val focusMessageId: String? = null,
+    val notificationOpenRequestId: Long = 0L,
+)
+
+internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
+    ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MainShell(
@@ -61,20 +69,10 @@ internal fun MainShell(
     // attempt. Once that attempt runs — or the user explicitly navigates —
     // the sync effect below owns the saved id and this stays true.
     var hasRestoredSelectedChat by remember { mutableStateOf(false) }
-    // When a conversation is opened from a chat-list message-body search hit
-    // (issue #290), this carries the matched message id so ConversationScreen
-    // can scroll to and briefly highlight it on open. Null for every other
-    // open path (row tap, notification, new-chat), which lands at the normal
-    // unread/newest anchor.
-    var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
-    // Whether the focused message also gets the brief highlight flash. Search
-    // hits highlight; a notification tap scrolls to it without the color flash.
-    var selectedChatFocusHighlight by remember { mutableStateOf(true) }
-    // True only when `selectedChat` was opened by tapping a message notification.
-    // A message notification implies current group membership, so the composer
-    // shows immediately instead of a placeholder while membership verification
-    // catches up after the account switch.
-    var selectedChatOpenedFromNotification by remember { mutableStateOf(false) }
+    // Open-time conversation state. Search hits carry a focus id; every
+    // notification tap advances the request id so an already-mounted
+    // ConversationScreen re-runs its first-unread anchor.
+    var selectedChatOpenContext by remember { mutableStateOf(ConversationOpenContext()) }
     // True only when `selectedChat` was opened straight off a just-completed
     // New Chat / Create Group flow (issue #321), so ConversationScreen raises
     // the composer + keyboard once on entry. Plain `remember` (not
@@ -179,7 +177,7 @@ internal fun MainShell(
             // clear any leftover open-time state from a prior New Chat / Create
             // Group flow; otherwise a stale justCreated flag would auto-raise
             // the IME on the next opened conversation (issue #321 guard).
-            selectedChatFocusMessageId = null
+            selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
         }
@@ -196,7 +194,7 @@ internal fun MainShell(
                 // as tapping after returning to the chat list.
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                 selectedChat = null
-                selectedChatFocusMessageId = null
+                selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
                 // This effect is keyed on activeAccountRef, so an inline suspend
@@ -217,7 +215,7 @@ internal fun MainShell(
                         // the conversation composition so a quick back press
                         // cannot cancel the scroll-driven mark-read before it
                         // reaches the store (#1016).
-                        step.focusMessageIdHex?.let { messageIdHex ->
+                        step.readThroughMessageIdHex?.let { messageIdHex ->
                             appState.launchMutation {
                                 appState.markNotificationMessageRead(
                                     accountRef = target.accountRef,
@@ -226,12 +224,11 @@ internal fun MainShell(
                                 )
                             }
                         }
-                        // Scroll to the notified message, reusing the search-hit
-                        // focus path. The id is resolved (and MESSAGE-gated) in
-                        // the nav FSM. No highlight flash on a notification tap.
-                        selectedChatFocusMessageId = step.focusMessageIdHex
-                        selectedChatFocusHighlight = false
-                        selectedChatOpenedFromNotification = true
+                        // A notification's latest message id is a read-through
+                        // cursor, not a search target. Advance the request so the
+                        // first-unread anchor also re-runs for an already-mounted chat.
+                        selectedChatOpenContext =
+                            nextNotificationConversationOpenContext(selectedChatOpenContext)
                         // Notification routing is never a just-created open, so
                         // clear any stale justCreated flag carried over from a
                         // prior New Chat / Create Group flow before showing the
@@ -297,8 +294,7 @@ internal fun MainShell(
                 .firstOrNull { it.group.groupIdHex == savedGroupId }
                 ?.let {
                     chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                    selectedChatFocusMessageId = null
-                    selectedChatOpenedFromNotification = false
+                    selectedChatOpenContext = ConversationOpenContext()
                     selectedChatOpenedAsDmHint = false
                     selectedChat = it
                 }
@@ -347,7 +343,7 @@ internal fun MainShell(
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
             selectedChat = null
-            selectedChatFocusMessageId = null
+            selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
@@ -363,8 +359,7 @@ internal fun MainShell(
     // both surfaces behave identically.
     val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
         chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
-        selectedChatFocusMessageId = null
-        selectedChatOpenedFromNotification = false
+        selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = justCreated
         // `justCreated` is true only for freshly-created DMs; group creation and
         // existing-DM opens pass false. Reuse that DM-only invariant for the
@@ -405,9 +400,8 @@ internal fun MainShell(
         ConversationScreen(
             appState = appState,
             chat = openChat,
-            focusMessageId = selectedChatFocusMessageId,
-            highlightFocusMessage = selectedChatFocusHighlight,
-            openedFromNotification = selectedChatOpenedFromNotification,
+            focusMessageId = selectedChatOpenContext.focusMessageId,
+            notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
             justCreated = selectedChatJustCreated,
             openedAsDmHint = selectedChatOpenedAsDmHint,
             restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
@@ -420,7 +414,7 @@ internal fun MainShell(
             },
             onBack = {
                 selectedChat = null
-                selectedChatFocusMessageId = null
+                selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
             },
@@ -454,9 +448,7 @@ internal fun MainShell(
                     settingsDetailName = null
                 },
                 onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
-                    selectedChatFocusMessageId = focusMessageId
-                    selectedChatFocusHighlight = true
-                    selectedChatOpenedFromNotification = false
+                    selectedChatOpenContext = ConversationOpenContext(focusMessageId = focusMessageId)
                     selectedChatJustCreated = justCreated
                     // `justCreated` is true only for freshly-created DMs; group
                     // creation and existing-DM opens pass false. Reuse that DM-only
