@@ -17,12 +17,13 @@ class BubblePresentationTest {
             surfaceContentArgb = 0xFF444748,
             mineBackgroundArgb = 0xFFB5EFFF,
             mineContentArgb = 0xFF001F28,
+            mentionAccentArgb = 0xFF006780,
         )
 
     @Test
     fun semanticBubblesIgnoreCustomColors() {
         assertEquals(
-            BubblePresentation(0xFFFFDAD6, 0xFF410002),
+            BubblePresentation(0xFFFFDAD6, 0xFF410002, 0xFF006780),
             resolveBubblePresentationArgb(
                 invalidated = true,
                 deleted = false,
@@ -33,7 +34,7 @@ class BubblePresentationTest {
             ),
         )
         assertEquals(
-            BubblePresentation(OPAQUE_BLACK_ARGB, 0xFF444748),
+            BubblePresentation(OPAQUE_BLACK_ARGB, 0xFF444748, 0xFF006780),
             resolveBubblePresentationArgb(
                 invalidated = false,
                 deleted = true,
@@ -65,6 +66,13 @@ class BubblePresentationTest {
     }
 
     @Test
+    fun customColorKeepsSemanticMentionAccent() {
+        val presentation = resolveBubblePresentationArgb(false, false, false, false, 0xFF336699, tokens)
+
+        assertEquals(0xFF006780, presentation.mentionAccentArgb)
+    }
+
+    @Test
     fun composeColorConversionPreservesArgbBits() {
         assertEquals(0xFF336699.toInt(), colorFromArgb(0xFF336699).toArgb())
     }
@@ -72,11 +80,11 @@ class BubblePresentationTest {
     @Test
     fun standardColorsKeepMaterialPairedContentTokens() {
         assertEquals(
-            BubblePresentation(0xFFB5EFFF, 0xFF001F28),
+            BubblePresentation(0xFFB5EFFF, 0xFF001F28, 0xFF006780),
             resolveBubblePresentationArgb(false, false, false, true, null, tokens),
         )
         assertEquals(
-            BubblePresentation(0xFFE1E3E4, 0xFF444748),
+            BubblePresentation(0xFFE1E3E4, 0xFF444748, 0xFF006780),
             resolveBubblePresentationArgb(false, false, false, false, null, tokens),
         )
     }

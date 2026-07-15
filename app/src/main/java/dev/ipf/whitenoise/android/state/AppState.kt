@@ -11,6 +11,7 @@ import android.os.LocaleList
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -1120,8 +1121,7 @@ class WhiteNoiseAppState(
                 }
             }
         }
-    private val chatBubbleColorCache = mutableMapOf<String, Pair<Int, Long?>>()
-    private var chatBubbleColorRevision by mutableStateOf(0)
+    private val chatBubbleColors = mutableMapOf<String, MutableState<Long?>>()
 
     /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
@@ -2520,6 +2520,7 @@ class WhiteNoiseAppState(
      */
     private fun clearCrossAccountCaches() {
         profileCacheEpoch.incrementAndGet()
+        chatBubbleColors.clear()
         npubs.clear()
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
@@ -3044,12 +3045,11 @@ class WhiteNoiseAppState(
         groupIdHex: String,
         side: BubbleSide,
     ): Long? {
-        val revision = chatBubbleColorRevision
         val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return null
-        chatBubbleColorCache[key]?.takeIf { it.first == revision }?.let { return it.second }
-        val color = BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
-        chatBubbleColorCache[key] = revision to color
-        return color
+        return chatBubbleColors
+            .getOrPut(key) {
+                mutableStateOf(BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side))
+            }.value
     }
 
     internal fun effectiveBubbleColorArgb(
@@ -3074,9 +3074,8 @@ class WhiteNoiseAppState(
     ) {
         val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return
         BubbleColorPreferences.writeChatColor(preferences, activeAccountRef, groupIdHex, side, argb)
-        chatBubbleColorRevision += 1
-        chatBubbleColorCache[key] =
-            chatBubbleColorRevision to BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
+        val color = BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
+        chatBubbleColors.getOrPut(key) { mutableStateOf(color) }.value = color
     }
 
     /**

@@ -9,6 +9,7 @@ internal fun colorFromArgb(argb: Long): Color = Color(argb)
 internal data class BubblePresentation(
     val backgroundArgb: Long,
     val contentArgb: Long,
+    val mentionAccentArgb: Long,
 )
 
 internal data class BubblePresentationTokens(
@@ -18,6 +19,7 @@ internal data class BubblePresentationTokens(
     val surfaceContentArgb: Long,
     val mineBackgroundArgb: Long,
     val mineContentArgb: Long,
+    val mentionAccentArgb: Long,
 )
 
 /** Keeps invalidation/tombstone semantics fixed while allowing an explicit
@@ -31,15 +33,16 @@ internal fun resolveBubblePresentationArgb(
     tokens: BubblePresentationTokens,
 ): BubblePresentation =
     when {
-        invalidated -> BubblePresentation(tokens.errorBackgroundArgb, tokens.errorContentArgb)
-        deleted && amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb)
-        deleted -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb)
+        invalidated -> BubblePresentation(tokens.errorBackgroundArgb, tokens.errorContentArgb, tokens.mentionAccentArgb)
+        deleted && amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
+        deleted -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
         customArgb != null ->
             BubblePresentation(
                 backgroundArgb = customArgb,
                 contentArgb = readableTextArgb(customArgb) ?: tokens.surfaceContentArgb,
+                mentionAccentArgb = tokens.mentionAccentArgb,
             )
-        amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb)
-        mine -> BubblePresentation(tokens.mineBackgroundArgb, tokens.mineContentArgb)
-        else -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb)
+        amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
+        mine -> BubblePresentation(tokens.mineBackgroundArgb, tokens.mineContentArgb, tokens.mentionAccentArgb)
+        else -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
     }

@@ -197,6 +197,7 @@ private fun BubbleColorPreview(
             surfaceContentArgb = scheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
             mineBackgroundArgb = scheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
             mineContentArgb = scheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+            mentionAccentArgb = scheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
         )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         PreviewBubble(
