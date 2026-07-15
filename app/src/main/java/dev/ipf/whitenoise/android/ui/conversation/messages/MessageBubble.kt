@@ -124,6 +124,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -137,7 +138,7 @@ internal fun messageBubbleBorder(
     mine: Boolean,
     invalidated: Boolean = false,
 ): BorderStroke? {
-    val amoledAccent = amoledMessageBubbleAccentColor(mine)
+    val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         invalidated -> null
@@ -147,23 +148,13 @@ internal fun messageBubbleBorder(
 }
 
 @Composable
-private fun amoledMessageBubbleAccentColor(mine: Boolean): Color? =
-    if (!isAmoledSurfaceTheme()) {
-        null
-    } else if (mine) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-    }
-
-@Composable
 internal fun messageBubbleTimestampColor(
     invalidated: Boolean,
     mine: Boolean,
     deleted: Boolean,
 ): Color {
     val colorScheme = MaterialTheme.colorScheme
-    val amoledAccent = amoledMessageBubbleAccentColor(mine)
+    val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
         invalidated -> colorScheme.onErrorContainer
         amoledAccent != null -> amoledAccent

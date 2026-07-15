@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -59,11 +60,42 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+
+@Composable
+internal fun reactionSummaryChipBorder(mine: Boolean): BorderStroke {
+    val colorScheme = MaterialTheme.colorScheme
+    val amoledAccent = amoledDirectionalAccentColor(mine)
+    return when {
+        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
+        else -> BorderStroke(1.5.dp, colorScheme.surface)
+    }
+}
+
+@Composable
+internal fun reactionSummaryChipContainerColor(mine: Boolean): Color {
+    val colorScheme = MaterialTheme.colorScheme
+    return when {
+        isAmoledSurfaceTheme() -> Color.Black
+        mine -> colorScheme.secondaryContainer
+        else -> colorScheme.surfaceContainerHigh
+    }
+}
+
+@Composable
+internal fun reactionSummaryChipContentColor(mine: Boolean): Color {
+    val colorScheme = MaterialTheme.colorScheme
+    return when {
+        isAmoledSurfaceTheme() -> colorScheme.onSurface
+        mine -> colorScheme.onSecondaryContainer
+        else -> colorScheme.onSurface
+    }
+}
 
 /**
  * One consolidated reaction pill: the distinct emojis clustered together with a
@@ -76,17 +108,10 @@ internal fun ReactionSummaryChip(
     tallies: List<ReactionTally>,
     onClick: () -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
     val mine = tallies.any { it.mine }
     val total = tallies.sumOf { it.count }
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
-    val border =
-        if (isAmoledSurfaceTheme()) {
-            BorderStroke(1.dp, colorScheme.outlineVariant)
-        } else {
-            BorderStroke(1.5.dp, colorScheme.surface)
-        }
     Surface(
         modifier =
             Modifier
@@ -95,9 +120,9 @@ internal fun ReactionSummaryChip(
                 .clip(RoundedCornerShape(percent = 50))
                 .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
         shape = RoundedCornerShape(percent = 50),
-        color = if (mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
-        contentColor = if (mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-        border = border,
+        color = reactionSummaryChipContainerColor(mine),
+        contentColor = reactionSummaryChipContentColor(mine),
+        border = reactionSummaryChipBorder(mine),
         tonalElevation = 1.dp,
     ) {
         Row(
