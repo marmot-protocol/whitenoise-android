@@ -44,7 +44,7 @@ class AndroidKeystoreDiskByteCacheKeyProviderTest {
         firstCache.put(
             key = cacheKey,
             bytes = plaintext,
-            expectedGeneration = firstCache.generation(),
+            token = firstCache.capturePublicationToken(),
         )
 
         val encryptedEntry = cacheDir.listFiles().orEmpty().single { it.extension == "enc" }
