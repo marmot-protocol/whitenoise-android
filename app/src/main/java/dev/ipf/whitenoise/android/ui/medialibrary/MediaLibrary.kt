@@ -365,7 +365,7 @@ internal fun SharedMediaFallbackRow(
                     .amoledSurfaceBorder(RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onSeeAll() }
-                    .padding(vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
