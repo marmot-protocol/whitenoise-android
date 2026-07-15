@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class AttachmentCachePublicationTest {
     private lateinit var dir: File
@@ -128,6 +129,53 @@ class AttachmentCachePublicationTest {
 
             releaseRename.countDown()
             assertTrue(publish.get(5, TimeUnit.SECONDS))
+        } finally {
+            releaseRename.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun sameStripeWaiterDoesNotConvoyAnUnrelatedPermitCapture() {
+        dir = Files.createTempDirectory("attachment-cache-permit-convoy").toFile()
+        val attachmentKey = AttachmentCachePublication.attachmentKey("convoy-source", 0, 1uL)
+        val unrelatedKey = keyOnDifferentStripe(attachmentKey, "convoy-other")
+        val finalFile = File(dir, "convoy-source.mp4")
+        val permit = AttachmentCachePublication.capturePermit(attachmentKey)!!
+        val renameEntered = CountDownLatch(1)
+        val releaseRename = CountDownLatch(1)
+        AttachmentCachePublication.renameFileForTests = { source, target ->
+            renameEntered.countDown()
+            check(releaseRename.await(10, TimeUnit.SECONDS))
+            source.renameTo(target)
+        }
+        val executor = Executors.newFixedThreadPool(3)
+        try {
+            val publish =
+                executor.submit<Boolean> {
+                    AttachmentCachePublication.publishWithPermit(
+                        attachmentKey = attachmentKey,
+                        finalFile = finalFile,
+                        bytes = byteArrayOf(1, 2, 3),
+                        permit = permit,
+                    )
+                }
+            assertTrue(renameEntered.await(5, TimeUnit.SECONDS))
+
+            val waiterThread = AtomicReference<Thread>()
+            val sameStripePermit =
+                executor.submit<AttachmentCachePublication.Permit?> {
+                    waiterThread.set(Thread.currentThread())
+                    AttachmentCachePublication.capturePermit(attachmentKey)
+                }
+            assertTrue(waitUntilBlocked(waiterThread))
+
+            val unrelatedPermit = executor.submit<AttachmentCachePublication.Permit?> { AttachmentCachePublication.capturePermit(unrelatedKey) }
+            assertNotNull(unrelatedPermit.get(2, TimeUnit.SECONDS))
+
+            releaseRename.countDown()
+            assertTrue(publish.get(5, TimeUnit.SECONDS))
+            assertNotNull(sameStripePermit.get(5, TimeUnit.SECONDS))
         } finally {
             releaseRename.countDown()
             executor.shutdownNow()
@@ -491,4 +539,13 @@ class AttachmentCachePublicationTest {
             .first { candidate ->
                 AttachmentCachePublication.stripeIndex(candidate) != AttachmentCachePublication.stripeIndex(reference)
             }
+
+    private fun waitUntilBlocked(threadReference: AtomicReference<Thread>): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            if (threadReference.get()?.state == Thread.State.BLOCKED) return true
+            Thread.sleep(5)
+        }
+        return false
+    }
 }

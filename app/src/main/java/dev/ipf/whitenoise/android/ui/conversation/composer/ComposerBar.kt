@@ -74,6 +74,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
+import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
@@ -180,12 +182,16 @@ internal fun insertComposerEmoji(
     emoji: String,
 ): TextFieldValue {
     val text = value.text
+    val rawStart = minOf(value.selection.start, value.selection.end).coerceIn(0, text.length)
+    val rawEnd = maxOf(value.selection.start, value.selection.end).coerceIn(rawStart, text.length)
+    val collapsed = rawStart == rawEnd
     val start =
-        minOf(value.selection.start, value.selection.end)
-            .coerceIn(0, text.length)
-    val end =
-        maxOf(value.selection.start, value.selection.end)
-            .coerceIn(start, text.length)
+        if (collapsed) {
+            text.codePointBoundaryAtOrAfter(rawStart)
+        } else {
+            text.codePointBoundaryAtOrBefore(rawStart)
+        }
+    val end = if (collapsed) start else text.codePointBoundaryAtOrAfter(rawEnd)
     val updatedText =
         buildString {
             append(text, 0, start)
@@ -199,17 +205,18 @@ internal fun insertComposerEmoji(
 /** Deletes the selected range, or the code point before a clamped caret. */
 internal fun deleteComposerSelectionOrPreviousCodePoint(value: TextFieldValue): TextFieldValue? {
     val text = value.text
-    val selectionStart = value.selection.start.coerceIn(0, text.length)
-    val selectionEnd = value.selection.end.coerceIn(0, text.length)
-    val rangeStart = minOf(selectionStart, selectionEnd)
-    val rangeEnd = maxOf(selectionStart, selectionEnd)
-    val deleteStart =
-        if (rangeStart != rangeEnd) {
-            rangeStart
+    val rawStart = minOf(value.selection.start, value.selection.end).coerceIn(0, text.length)
+    val rawEnd = maxOf(value.selection.start, value.selection.end).coerceIn(rawStart, text.length)
+    val hasSelection = rawStart != rawEnd
+    val rangeStart =
+        if (hasSelection) {
+            text.codePointBoundaryAtOrBefore(rawStart)
         } else {
-            if (rangeStart == 0) return null
-            text.offsetByCodePoints(rangeStart, -1)
+            text.codePointBoundaryAtOrAfter(rawStart)
         }
+    val rangeEnd = if (hasSelection) text.codePointBoundaryAtOrAfter(rawEnd) else rangeStart
+    if (rangeStart == 0 && !hasSelection) return null
+    val deleteStart = if (hasSelection) rangeStart else text.offsetByCodePoints(rangeStart, -1)
     val updatedText = text.removeRange(deleteStart, rangeEnd)
     return value.copy(text = updatedText, selection = TextRange(deleteStart), composition = null)
 }

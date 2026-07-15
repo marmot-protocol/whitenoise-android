@@ -206,6 +206,19 @@ class MentionComposerTest {
         assertEquals(result.text.length, result.selection)
     }
 
+    @Test
+    fun insertMovesAStaleStartPastASurrogatePair() {
+        val result =
+            MentionComposer.insertMention(
+                text = "🙂 rest",
+                active = MentionComposer.ActiveQuery(start = 1, query = ""),
+                candidate = alice,
+            )
+
+        assertEquals("🙂@$aliceNpub rest", result.text)
+        assertEquals(("🙂@$aliceNpub").length, result.selection)
+    }
+
     // --- wholeChipBackspace -------------------------------------------------
 
     @Test
