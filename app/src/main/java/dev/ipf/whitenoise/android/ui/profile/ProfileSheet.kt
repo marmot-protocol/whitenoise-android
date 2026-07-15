@@ -112,6 +112,17 @@ import kotlinx.coroutines.flow.map
  * has no member record in this group, which fails scope and yields an empty
  * list regardless of the other inputs.
  */
+internal fun profileSheetContactPrivateDetailsRowValue(
+    contactNickname: String?,
+    contactNotes: String?,
+    addNicknameAndNotesLabel: String,
+    notesLabel: String,
+): String {
+    contactNickname?.takeIf { it.isNotBlank() }?.let { return it }
+    if (!contactNotes.isNullOrBlank()) return notesLabel
+    return addNicknameAndNotesLabel
+}
+
 internal fun profileSheetAdminActions(
     viewerIsMember: Boolean,
     viewerIsAdmin: Boolean,
@@ -164,6 +175,7 @@ internal fun ProfileSheet(
     val profile = hex?.let { appState.userProfile(it) }
     val title = hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
     val contactNickname = hex?.let { appState.contactNickname(it) }
+    val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
@@ -270,7 +282,7 @@ internal fun ProfileSheet(
         ContactPrivateDetailsDialog(
             profileName = title,
             initialNickname = contactNickname.orEmpty(),
-            initialNotes = appState.contactNotes(hex!!).orEmpty(),
+            initialNotes = contactNotes.orEmpty(),
             onDismiss = { showContactEditorDialog = false },
             onSave = { nickname, notes ->
                 appState.setContactNickname(hex!!, nickname)
@@ -405,8 +417,12 @@ internal fun ProfileSheet(
                         icon = Icons.Default.Edit,
                         title = stringResource(R.string.profile_nickname_and_notes),
                         value =
-                            contactNickname
-                                ?: stringResource(R.string.profile_add_nickname_and_notes),
+                            profileSheetContactPrivateDetailsRowValue(
+                                contactNickname = contactNickname,
+                                contactNotes = contactNotes,
+                                addNicknameAndNotesLabel = stringResource(R.string.profile_add_nickname_and_notes),
+                                notesLabel = stringResource(R.string.profile_contact_notes_hint),
+                            ),
                         enabled = !creatingChat,
                         onClick = { showContactEditorDialog = true },
                     )
@@ -469,7 +485,13 @@ private fun ContactPrivateDetailsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Text(
                     stringResource(R.string.profile_name_from_profile, profileName),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -487,6 +509,7 @@ private fun ContactPrivateDetailsDialog(
                     label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
                     singleLine = false,
                     minLines = 3,
+                    maxLines = 8,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
