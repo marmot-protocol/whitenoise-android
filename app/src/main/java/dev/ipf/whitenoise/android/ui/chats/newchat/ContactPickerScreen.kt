@@ -38,10 +38,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.core.ProfileLink
-import dev.ipf.whitenoise.android.core.RecipientReference
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
+import dev.ipf.whitenoise.android.ui.qr.QrScanResult
+import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
@@ -263,11 +264,12 @@ internal fun ContactPickerScreen(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false
-                val ref = ProfileLink.parse(raw)?.npub ?: RecipientReference.normalize(raw)
-                if (ref == null) {
-                    appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
-                } else {
-                    query = ref
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.PickRecipient)) {
+                    is QrScanOutcome.FillRecipientQuery -> query = outcome.reference
+                    QrScanOutcome.Invalid ->
+                        appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
+                    is QrScanOutcome.OpenProfileNpub, is QrScanOutcome.OpenProfileNprofile ->
+                        appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
                 }
             },
         )

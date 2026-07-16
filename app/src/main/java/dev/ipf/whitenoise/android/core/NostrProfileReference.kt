@@ -1,15 +1,18 @@
 package dev.ipf.whitenoise.android.core
 
 /**
- * Minimal NIP-19 `nprofile` decoder for profile mentions.
+ * Minimal NIP-19 Bech32 decoder for profile mentions and QR scan validation.
  *
  * Rust's current `accountIdHex` FFI helper normalizes npub/hex but not nprofile
- * TLVs. Android only needs the embedded type-0 pubkey so pasted nprofile
- * mentions can use the same profile-cache and roster-membership paths as npub
- * mentions (#1017). Relay TLVs are deliberately ignored here; profile fetching
- * still flows through the app's existing relay/profile cache machinery.
+ * TLVs. Android needs the embedded type-0 pubkey so pasted nprofile mentions can
+ * use the same profile-cache and roster-membership paths as npub mentions (#1017),
+ * and so QR scans can reject checksum-invalid npub/nprofile payloads without
+ * duplicating a second Bech32 implementation. Relay TLVs are deliberately
+ * ignored here; profile fetching still flows through the app's existing
+ * relay/profile cache machinery.
  */
 internal object NostrProfileReference {
+    private const val HRP_NPUB = "npub"
     private const val HRP_NPROFILE = "nprofile"
     private const val TLV_PUBKEY = 0
     private const val PUBKEY_BYTES = 32
@@ -26,19 +29,34 @@ internal object NostrProfileReference {
         return firstPubkeyTlvHex(payload)
     }
 
+    fun isValidNpub(reference: String): Boolean {
+        val decoded = decodeBech32(reference.trim()) ?: return false
+        if (decoded.hrp != HRP_NPUB) return false
+        return pubkeyHex(decoded.data) != null
+    }
+
+    private fun pubkeyHex(data: List<Int>): String? {
+        val payload = convertBits(data, fromBits = 5, toBits = 8, pad = false) ?: return null
+        if (payload.size != PUBKEY_BYTES) return null
+        return payload.toHexString()
+    }
+
     private fun firstPubkeyTlvHex(payload: List<Int>): String? {
         var offset = 0
-        while (offset + 2 <= payload.size) {
+        var pubkeyHex: String? = null
+        while (offset < payload.size) {
+            if (offset + 2 > payload.size) return null
             val type = payload[offset]
             val length = payload[offset + 1]
             offset += 2
             if (offset + length > payload.size) return null
-            if (type == TLV_PUBKEY && length == PUBKEY_BYTES) {
-                return payload.subList(offset, offset + PUBKEY_BYTES).toHexString()
+            if (type == TLV_PUBKEY) {
+                if (length != PUBKEY_BYTES || pubkeyHex != null) return null
+                pubkeyHex = payload.subList(offset, offset + PUBKEY_BYTES).toHexString()
             }
             offset += length
         }
-        return null
+        return pubkeyHex
     }
 
     private data class Bech32Decoded(
