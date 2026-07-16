@@ -1108,4 +1108,16 @@
     <string name="invalid_hex_color">Введите цвет, например #336699.</string>
     <string name="apply_color">Применить цвет</string>
     <string name="reset_to_default">Сбросить</string>
+
+    <string name="tts_warning_title">Внешний движок синтеза речи</string>
+    <string name="tts_warning_message">Выбранный движок синтеза речи — отдельное приложение, которое может отправлять расшифрованный текст сообщения на серверы разработчика. Для речи на устройстве установите RHVoice или eSpeak NG из F-Droid или Zapstore и выберите его в настройках.</string>
+    <string name="tts_warning_proceed">Всё равно озвучить</string>
+    <string name="tts_settings_title">Синтез речи</string>
+    <string name="tts_settings_subtitle">Озвучивать сообщения и выбрать локальный движок</string>
+    <string name="tts_settings_about_title">О речи</string>
+    <string name="tts_settings_explainer_usable">«Озвучить» читает текст сообщения выбранным движком синтеза речи. Локальные движки обрабатывают речь на этом устройстве.</string>
+    <string name="tts_settings_explainer_no_engine">Нет установленного пригодного движка синтеза речи. Установите RHVoice или eSpeak NG из F-Droid или Zapstore и выберите его ниже.</string>
+    <string name="tts_settings_engine_title">Движок</string>
+    <string name="tts_settings_engine_local">Движок на устройстве</string>
+    <string name="tts_settings_engine_unknown">Может использовать сеть</string>
 </resources>

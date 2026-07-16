@@ -1104,4 +1104,16 @@
     <string name="invalid_hex_color">Enter a color like #336699.</string>
     <string name="apply_color">Apply color</string>
     <string name="reset_to_default">Reset to default</string>
+
+    <string name="tts_warning_title">External text-to-speech engine</string>
+    <string name="tts_warning_message">The selected text-to-speech engine is a separate app that may send decrypted message text to its developer\'s servers. For on-device speech, install RHVoice or eSpeak NG from F-Droid or Zapstore and choose it in Settings.</string>
+    <string name="tts_warning_proceed">Speak anyway</string>
+    <string name="tts_settings_title">Text to speech</string>
+    <string name="tts_settings_subtitle">Speak messages and choose an on-device engine</string>
+    <string name="tts_settings_about_title">About speech</string>
+    <string name="tts_settings_explainer_usable">Speak reads message text aloud using your chosen text-to-speech engine. Local engines process speech on this device.</string>
+    <string name="tts_settings_explainer_no_engine">No usable text-to-speech engine is installed. Install RHVoice or eSpeak NG from F-Droid or Zapstore, then select it below.</string>
+    <string name="tts_settings_engine_title">Engine</string>
+    <string name="tts_settings_engine_local">On-device engine</string>
+    <string name="tts_settings_engine_unknown">May use network speech</string>
 </resources>

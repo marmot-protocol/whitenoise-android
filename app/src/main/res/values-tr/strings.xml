@@ -1072,4 +1072,16 @@
     <string name="invalid_hex_color">#336699 gibi bir renk girin.</string>
     <string name="apply_color">Rengi uygula</string>
     <string name="reset_to_default">Varsayılana sıfırla</string>
+
+    <string name="tts_warning_title">Harici metin okuma motoru</string>
+    <string name="tts_warning_message">Seçilen metin okuma motoru, şifresi çözülmüş mesaj metnini geliştiricisinin sunucularına gönderebilen ayrı bir uygulamadır. Cihaz üzerinde konuşma için F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve Ayarlar\'dan seçin.</string>
+    <string name="tts_warning_proceed">Yine de oku</string>
+    <string name="tts_settings_title">Metin okuma</string>
+    <string name="tts_settings_subtitle">Mesajları sesli oku ve yerel bir motor seç</string>
+    <string name="tts_settings_about_title">Konuşma hakkında</string>
+    <string name="tts_settings_explainer_usable">Sesli oku, seçtiğiniz metin okuma motoruyla mesaj metnini yüksek sesle okur. Yerel motorlar konuşmayı bu cihazda işler.</string>
+    <string name="tts_settings_explainer_no_engine">Kullanılabilir bir metin okuma motoru yüklü değil. F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve aşağıdan seçin.</string>
+    <string name="tts_settings_engine_title">Motor</string>
+    <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
+    <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>
 </resources>
