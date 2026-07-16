@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +68,14 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
+import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
+import dev.ipf.whitenoise.android.ui.common.VIEWER_MIN_SCALE
+import dev.ipf.whitenoise.android.ui.common.ViewerTransform
+import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
+import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
+import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
+import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -162,30 +171,26 @@ internal fun AvatarFullScreenViewer(
                 securePolicy = securePolicy,
             ),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-                    .pointerInput(scale, dismissThresholdPx) {
-                        if (scale <= 1f) {
-                            var draggedDown = 0f
-                            detectVerticalDragGestures(
-                                onDragEnd = { draggedDown = 0f },
-                                onDragCancel = { draggedDown = 0f },
-                                onVerticalDrag = { change, dragAmount ->
-                                    if (dragAmount > 0f || draggedDown > 0f) {
-                                        draggedDown = (draggedDown + dragAmount).coerceAtLeast(0f)
-                                        change.consume()
-                                        if (draggedDown >= dismissThresholdPx) {
-                                            draggedDown = 0f
-                                            onDismiss()
-                                        }
-                                    }
-                                },
-                            )
+        AvatarViewerFrame(
+            scale = scale,
+            dismissThresholdPx = dismissThresholdPx,
+            onDismiss = onDismiss,
+            menuOpen = menuOpen,
+            onMenuOpenChange = { menuOpen = it },
+            saveEnabled = ready != null,
+            editActionLabel = editActionLabel,
+            onEditPicture = onEditPicture,
+            onSave = {
+                val bytes = ready?.bytes ?: return@AvatarViewerFrame
+                scope.launch {
+                    val ok =
+                        withContext(Dispatchers.IO) {
+                            saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
                         }
-                    },
+                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                }
+            },
+            snackbarHostState = snackbarHostState,
         ) {
             when (val state = imageState) {
                 AvatarViewerImageState.Loading ->
@@ -215,69 +220,117 @@ internal fun AvatarFullScreenViewer(
                     )
                 }
             }
+        }
+    }
+}
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
-                }
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = stringResource(R.string.actions),
-                            tint = Color.White,
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.media_save)) },
-                            leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
-                            enabled = ready != null,
-                            onClick = {
-                                menuOpen = false
-                                val bytes = ready?.bytes ?: return@DropdownMenuItem
-                                scope.launch {
-                                    val ok =
-                                        withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
-                                        }
-                                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+@Composable
+internal fun AvatarViewerFrame(
+    scale: Float,
+    dismissThresholdPx: Float,
+    onDismiss: () -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    saveEnabled: Boolean,
+    editActionLabel: String?,
+    onEditPicture: (() -> Unit)?,
+    onSave: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    body: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(scale, dismissThresholdPx) {
+                    if (scale <= VIEWER_MIN_SCALE) {
+                        var draggedDown = 0f
+                        detectVerticalDragGestures(
+                            onDragEnd = { draggedDown = 0f },
+                            onDragCancel = { draggedDown = 0f },
+                            onVerticalDrag = { change, dragAmount ->
+                                when (
+                                    val result =
+                                        applyAvatarDownwardDrag(
+                                            scale = scale,
+                                            state = AvatarDragDismissState(draggedDown),
+                                            dragAmount = dragAmount,
+                                            dismissThresholdPx = dismissThresholdPx,
+                                        )
+                                ) {
+                                    AvatarDragDismissResult.Ignored -> Unit
+                                    is AvatarDragDismissResult.Tracking -> {
+                                        draggedDown = result.state.draggedDownPx
+                                        change.consume()
+                                    }
+                                    is AvatarDragDismissResult.Dismiss -> {
+                                        draggedDown = result.state.draggedDownPx
+                                        change.consume()
+                                        onDismiss()
+                                    }
                                 }
                             },
                         )
-                        if (editActionLabel != null && onEditPicture != null) {
-                            DropdownMenuItem(
-                                text = { Text(editActionLabel) },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    onEditPicture()
-                                },
-                            )
-                        }
+                    }
+                },
+    ) {
+        body()
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+            }
+            Box {
+                IconButton(onClick = { onMenuOpenChange(true) }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.actions),
+                        tint = Color.White,
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { onMenuOpenChange(false) },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.media_save)) },
+                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                        enabled = saveEnabled,
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onSave()
+                        },
+                    )
+                    if (editActionLabel != null && onEditPicture != null) {
+                        DropdownMenuItem(
+                            text = { Text(editActionLabel) },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = {
+                                onMenuOpenChange(false)
+                                onEditPicture()
+                            },
+                        )
                     }
                 }
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-            )
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+        )
     }
 }
 
@@ -307,28 +360,20 @@ private fun ZoomableAvatarImage(
                 .pointerInput(image) {
                     detectTapGestures(
                         onDoubleTap = {
-                            if (latestScale > 1f) {
-                                latestOnScaleChange(1f)
-                                latestOnOffsetChange(Offset.Zero)
+                            if (latestScale > VIEWER_MIN_SCALE) {
+                                val reset = resetViewerTransform()
+                                latestOnScaleChange(reset.scale)
+                                latestOnOffsetChange(reset.offset)
                             } else {
                                 val viewportW = size.width.toFloat()
                                 val viewportH = size.height.toFloat()
-                                val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
-                                val viewportAspect = viewportW / viewportH
-                                val baseWidth: Float
-                                val baseHeight: Float
-                                if (imageAspect > viewportAspect) {
-                                    baseWidth = viewportW
-                                    baseHeight = viewportW / imageAspect
-                                } else {
-                                    baseHeight = viewportH
-                                    baseWidth = viewportH * imageAspect
-                                }
                                 val oneToOneScale =
-                                    maxOf(
-                                        bitmapWidth / baseWidth,
-                                        bitmapHeight / baseHeight,
-                                    ).coerceIn(1f, 5f)
+                                    viewerOneToOneScale(
+                                        viewportWidth = viewportW,
+                                        viewportHeight = viewportH,
+                                        imageWidth = bitmapWidth,
+                                        imageHeight = bitmapHeight,
+                                    )
                                 latestOnScaleChange(oneToOneScale)
                                 latestOnOffsetChange(Offset.Zero)
                             }
@@ -344,36 +389,21 @@ private fun ZoomableAvatarImage(
                             val pan = event.calculatePan()
                             val currentScale = latestScale
                             val currentOffset = latestOffset
-                            val handleAsTransform = pressedCount >= 2 || currentScale > 1f
+                            val handleAsTransform = pressedCount >= 2 || currentScale > VIEWER_MIN_SCALE
                             if (!handleAsTransform) continue
 
-                            val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
-                            if (nextScale != currentScale) latestOnScaleChange(nextScale)
-                            if (nextScale > 1f) {
-                                val viewportW = size.width.toFloat()
-                                val viewportH = size.height.toFloat()
-                                val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
-                                val viewportAspect = viewportW / viewportH
-                                val baseWidth: Float
-                                val baseHeight: Float
-                                if (imageAspect > viewportAspect) {
-                                    baseWidth = viewportW
-                                    baseHeight = viewportW / imageAspect
-                                } else {
-                                    baseHeight = viewportH
-                                    baseWidth = viewportH * imageAspect
-                                }
-                                val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
-                                val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
-                                latestOnOffsetChange(
-                                    Offset(
-                                        (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
-                                        (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
-                                    ),
+                            val next =
+                                applyViewerTransformGesture(
+                                    current = ViewerTransform(currentScale, currentOffset),
+                                    zoomFactor = zoom,
+                                    panDelta = pan,
+                                    viewportWidth = size.width.toFloat(),
+                                    viewportHeight = size.height.toFloat(),
+                                    imageWidth = bitmapWidth,
+                                    imageHeight = bitmapHeight,
                                 )
-                            } else if (currentOffset != Offset.Zero) {
-                                latestOnOffsetChange(Offset.Zero)
-                            }
+                            if (next.scale != currentScale) latestOnScaleChange(next.scale)
+                            if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
                             event.changes.forEach { it.consume() }
                         } while (true)
                     }
