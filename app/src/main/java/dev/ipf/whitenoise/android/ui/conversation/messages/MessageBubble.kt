@@ -183,6 +183,7 @@ internal fun MessageBubbleFrame(
     presentation: BubblePresentation,
     highlighted: Boolean,
     mine: Boolean,
+    invalidated: Boolean,
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
@@ -220,7 +221,7 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted, mine),
+        border = messageBubbleBorder(highlighted, mine, invalidated),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
@@ -1422,6 +1423,7 @@ internal fun MessageBubble(
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,
                                 mine = mine,
+                                invalidated = invalidated,
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                             ) {
@@ -1446,6 +1448,7 @@ internal fun MessageBubble(
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
+                        invalidated = invalidated,
                         mentionedSelf = mentionedSelf,
                         mentionedYouLabel = mentionedYouLabel,
                         // With a reply quote present, size the column to its
