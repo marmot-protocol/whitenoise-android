@@ -33,6 +33,10 @@ class MessageBubbleTextTest {
             "markdown overflow must be invalidated when the bubble width changes",
             "remember(record.messageIdHex, bodyTextToRender, bubbleColumnMaxWidth) { mutableStateOf(false) }" in source,
         )
+        assertTrue(
+            "selection gutter must shrink the bubble width budget",
+            "maxWidth * 0.95f - selectionGutterWidth" in source,
+        )
     }
 
     private fun messageBubbleSource(): File =
