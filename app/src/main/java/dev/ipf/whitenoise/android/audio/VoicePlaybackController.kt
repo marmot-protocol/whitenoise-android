@@ -373,11 +373,11 @@ object VoicePlaybackController {
             }.isSuccess
 
     private fun requestFocus(): Boolean =
-        AudioFocusOwner.acquire(
+        AudioFocusOwner.acquireWithFocusChanges(
             owner = AudioFocusOwner.Owner.Voice,
             audioAttributes = speechAudioAttributes,
             focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
-            onFocusLoss = ::pause,
+            onFocusChange = ::handleAudioFocusChange,
             onOwnerSurrender = ::stopForAudioHandoff,
         )
 

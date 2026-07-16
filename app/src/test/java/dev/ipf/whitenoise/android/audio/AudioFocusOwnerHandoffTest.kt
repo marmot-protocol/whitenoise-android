@@ -36,7 +36,7 @@ class AudioFocusOwnerHandoffTest {
         setField("audioManager", null)
         setField("focusRequest", null)
         setField("currentOwner", null)
-        setField("onLoss", null)
+        setField("onFocusChange", null)
         setField("onSurrender", null)
         setField("activeCallbacks", 0)
     }
@@ -198,6 +198,35 @@ class AudioFocusOwnerHandoffTest {
     }
 
     @Test
+    fun surrenderFailureRollsBackNewOwnerAndFocus() {
+        attachAudioManager()
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = { error("surrender failed") },
+            ),
+        )
+
+        var failure: IllegalStateException? = null
+        try {
+            AudioFocusOwner.acquireForTts(
+                onFocusLoss = {},
+                onOwnerSurrender = {},
+            )
+        } catch (error: IllegalStateException) {
+            failure = error
+        }
+
+        assertEquals("surrender failed", failure?.message)
+        assertNull(field("currentOwner"))
+        assertNull(field("focusRequest"))
+        assertEquals(0, field("activeCallbacks"))
+    }
+
+    @Test
     fun reacquisitionIsRejectedWhileFocusLossCallbackRuns() {
         attachAudioManager()
         val callbackStarted = CountDownLatch(1)
@@ -251,7 +280,7 @@ class AudioFocusOwnerHandoffTest {
         AudioFocusOwner.releaseTts()
 
         assertNull(field("currentOwner"))
-        assertNull(field("onLoss"))
+        assertNull(field("onFocusChange"))
         assertNull(field("onSurrender"))
         assertNull(field("focusRequest"))
     }

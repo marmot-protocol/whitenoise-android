@@ -26,7 +26,7 @@ object AudioFocusOwner {
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
     private var currentOwner: Owner? = null
-    private var onLoss: (() -> Unit)? = null
+    private var onFocusChange: ((Int) -> Unit)? = null
     private var onSurrender: (() -> Unit)? = null
     private var focusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var nextGeneration = 0L
@@ -46,13 +46,45 @@ object AudioFocusOwner {
         focusGain: Int,
         onFocusLoss: () -> Unit,
         onOwnerSurrender: () -> Unit,
+    ): Boolean =
+        acquireWithFocusChanges(
+            owner = owner,
+            audioAttributes = audioAttributes,
+            focusGain = focusGain,
+            onFocusChange = { change ->
+                when (change) {
+                    AudioManager.AUDIOFOCUS_LOSS,
+                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                    -> onFocusLoss()
+                }
+            },
+            onOwnerSurrender = onOwnerSurrender,
+        )
+
+    /** Acquires focus while preserving the specific loss kind and paired gain. */
+    fun acquireWithFocusChanges(
+        owner: Owner,
+        audioAttributes: AudioAttributes,
+        focusGain: Int,
+        onFocusChange: (Int) -> Unit,
+        onOwnerSurrender: () -> Unit,
     ): Boolean {
         val result =
             synchronized(focusLock) {
-                acquireLocked(owner, audioAttributes, focusGain, onFocusLoss, onOwnerSurrender)
+                acquireLocked(owner, audioAttributes, focusGain, onFocusChange, onOwnerSurrender)
             }
         try {
             result.previousOwnerSurrender?.invoke()
+        } catch (error: Throwable) {
+            runCatching {
+                synchronized(focusLock) {
+                    if (currentOwner == owner) {
+                        abandonFocusInternal()
+                    }
+                }
+            }.exceptionOrNull()?.let(error::addSuppressed)
+            throw error
         } finally {
             if (result.previousOwnerSurrender != null) {
                 completeCallback()
@@ -65,7 +97,7 @@ object AudioFocusOwner {
         owner: Owner,
         audioAttributes: AudioAttributes,
         focusGain: Int,
-        onFocusLoss: () -> Unit,
+        onFocusChange: (Int) -> Unit,
         onOwnerSurrender: () -> Unit,
     ): AcquisitionResult {
         if (activeCallbacks > 0) {
@@ -78,19 +110,19 @@ object AudioFocusOwner {
                 activeCallbacks += 1
             }
             currentOwner = owner
-            onLoss = onFocusLoss
+            this.onFocusChange = onFocusChange
             onSurrender = onOwnerSurrender
             return AcquisitionResult(acquired = true, previousOwnerSurrender = previousSurrender)
         }
         if (focusRequest != null && currentOwner == owner) {
-            onLoss = onFocusLoss
+            this.onFocusChange = onFocusChange
             onSurrender = onOwnerSurrender
             return AcquisitionResult(acquired = true)
         }
         val generation = ++nextGeneration
         val listener =
             AudioManager.OnAudioFocusChangeListener { change ->
-                val lossCallback =
+                val focusChangeCallback =
                     synchronized(focusLock) {
                         if (generation != currentGeneration || currentOwner != owner) {
                             null
@@ -99,15 +131,16 @@ object AudioFocusOwner {
                                 AudioManager.AUDIOFOCUS_LOSS,
                                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
                                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-                                -> onLoss
+                                AudioManager.AUDIOFOCUS_GAIN,
+                                -> this.onFocusChange
                                 else -> null
                             }?.also { activeCallbacks += 1 }
                         }
                     }
                 try {
-                    lossCallback?.invoke()
+                    focusChangeCallback?.invoke(change)
                 } finally {
-                    if (lossCallback != null) {
+                    if (focusChangeCallback != null) {
                         completeCallback()
                     }
                 }
@@ -130,7 +163,7 @@ object AudioFocusOwner {
         }
         focusRequest = req
         currentOwner = owner
-        onLoss = onFocusLoss
+        this.onFocusChange = onFocusChange
         onSurrender = onOwnerSurrender
         focusListener = listener
         currentGeneration = generation
@@ -180,7 +213,7 @@ object AudioFocusOwner {
         }
         focusRequest = null
         currentOwner = null
-        onLoss = null
+        onFocusChange = null
         onSurrender = null
         focusListener = null
         currentGeneration = 0L

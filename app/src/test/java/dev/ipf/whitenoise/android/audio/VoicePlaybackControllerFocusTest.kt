@@ -28,7 +28,7 @@ class VoicePlaybackControllerFocusTest {
         setAudioFocusOwnerField("audioManager", null)
         setAudioFocusOwnerField("focusRequest", null)
         setAudioFocusOwnerField("currentOwner", null)
-        setAudioFocusOwnerField("onLoss", null)
+        setAudioFocusOwnerField("onFocusChange", null)
         setAudioFocusOwnerField("onSurrender", null)
     }
 
@@ -144,14 +144,14 @@ class VoicePlaybackControllerFocusTest {
         val mediaPlayer = TrackingMediaPlayer()
         primeActivePlayer(mediaPlayer)
 
-        handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        audioFocusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
 
         assertFalse(mediaPlayer.playing)
         assertFalse(VoicePlaybackController.state.value.isPlaying)
         assertSame(heldFocusRequest, audioFocusOwnerField("focusRequest"))
         assertTrue(controllerField("resumeOnAudioFocusGain") as Boolean)
 
-        handleAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        audioFocusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
 
         assertTrue(mediaPlayer.playing)
         assertTrue(VoicePlaybackController.state.value.isPlaying)
@@ -370,6 +370,8 @@ class VoicePlaybackControllerFocusTest {
         field.isAccessible = true
         return field.get(AudioFocusOwner)
     }
+
+    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
 
     private fun setAudioFocusOwnerField(
         name: String,
