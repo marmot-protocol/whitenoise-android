@@ -138,11 +138,12 @@ class LocalNotificationPresenter(
     fun dismissActionNotificationAndOlderSiblings(
         notificationTag: String,
         notificationId: Int,
+        actedMessageIdHex: String?,
         accountRef: String,
         groupIdHex: String,
         sinceMs: Long,
     ): Boolean {
-        cancel(notificationTag, notificationId)
+        cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)
         return dismissConversationSiblingCardsNotNewerThan(accountRef, groupIdHex, sinceMs)
     }
 
@@ -411,18 +412,12 @@ class LocalNotificationPresenter(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
                     )
-                    if (decision.replaceExistingBeforePost) {
-                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                    }
                     notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
                 }
             } else {
                 val presentationTimestampMs = nowMillis()
                 stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                 val notification = builder.build()
-                if (decision.replaceExistingBeforePost) {
-                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                }
                 notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
             }
         }
@@ -486,6 +481,14 @@ class LocalNotificationPresenter(
         notificationId: Int,
         repliedMessageIdHex: String?,
     ) {
+        cancelConversationCardIfSameGeneration(notificationTag, notificationId, repliedMessageIdHex)
+    }
+
+    internal fun cancelConversationCardIfSameGeneration(
+        notificationTag: String,
+        notificationId: Int,
+        actedMessageIdHex: String?,
+    ) {
         ConversationCardPostSynchronizer.withLock(
             notificationTag,
             notificationId,
@@ -498,7 +501,7 @@ class LocalNotificationPresenter(
                 notificationTag,
                 notificationId,
             )
-            if (shouldCancelRepliedConversationCard(repliedMessageIdHex, liveCardMessageIdHex)) {
+            if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
                 NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
                 notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
             }

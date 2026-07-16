@@ -1297,7 +1297,7 @@ object MediaPipeline {
                 runCatching { mmr.release() }
             }
         } finally {
-            runCatching { tmp.delete() }
+            releaseVideoMetadataTempFile(tmp)
         }
     }
 
@@ -1341,6 +1341,16 @@ object MediaPipeline {
     internal fun createVideoMetadataTempFile(cacheDir: java.io.File): java.io.File? =
         runCatching {
             val dir = java.io.File(cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }
-            java.io.File.createTempFile("vidmeta-", null, dir)
+            java.io.File
+                .createTempFile("vidmeta-", null, dir)
+                .also(AttachmentPlaintextCache::protectPublicationFile)
         }.getOrNull()
+
+    internal fun releaseVideoMetadataTempFile(file: java.io.File) {
+        try {
+            runCatching { file.delete() }
+        } finally {
+            AttachmentPlaintextCache.unprotectPublicationFile(file)
+        }
+    }
 }

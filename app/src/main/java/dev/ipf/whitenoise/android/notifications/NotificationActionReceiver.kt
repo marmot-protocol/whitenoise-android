@@ -23,8 +23,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
     ) {
         val action = NotificationActions.parse(intent) ?: return
         val pending = goAsync()
-        // Keep receiver orchestration and presenter Binder work off the main
-        // thread; handleAction hops to main only for AppState mutations.
+        // Keep receiver orchestration and WorkManager persistence off the main
+        // thread; workers hop to main only for AppState mutations.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope.launch {
             try {
@@ -32,7 +32,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     withTimeoutOrNull(GO_ASYNC_BUDGET_MS) {
                         when (action.kind) {
                             NotificationActionKind.REPLY -> enqueueReplyAction(context.applicationContext, action, intent)
-                            NotificationActionKind.MARK_READ -> handleAction(context.applicationContext, action)
+                            NotificationActionKind.MARK_READ -> enqueueMarkReadAction(context.applicationContext, action)
                         }
                         true
                     }
@@ -92,45 +92,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun handleAction(
+    private suspend fun enqueueMarkReadAction(
         appContext: Context,
         action: NotificationAction,
     ) {
-        val application = appContext as? WhiteNoiseApplication ?: return
-        val appState = application.appState
-        if (!appState.notificationActionsAllowed) {
+        val enqueued =
+            withContext(Dispatchers.IO) {
+                NotificationMarkReadWorker.enqueue(appContext, action)
+            }
+        if (!enqueued) {
             Log.w(
                 "DMNotifyAction",
-                "notification action blocked by app lock kind=${action.kind} group=${action.target.groupIdHex.take(8)}",
+                "failed to persist notification mark-read group=${action.target.groupIdHex.take(8)}",
             )
-            return
-        }
-        when (action.kind) {
-            NotificationActionKind.REPLY -> return
-            NotificationActionKind.MARK_READ -> {
-                // Baseline before the mark-read round-trip so a message, reaction,
-                // or mention arriving while it runs keeps its card.
-                val dismissBaselineMs = System.currentTimeMillis()
-                val markedRead =
-                    withContext(Dispatchers.Main.immediate) {
-                        appState.ensureNotificationRuntimeStarted()
-                        appState.markNotificationMessageRead(
-                            accountRef = action.target.accountRef,
-                            groupIdHex = action.target.groupIdHex,
-                            messageIdHex = action.target.messageIdHex.orEmpty(),
-                        )
-                    }
-                if (markedRead) {
-                    val presenter = LocalNotificationPresenter(appContext)
-                    presenter.dismissActionNotificationAndOlderSiblings(
-                        notificationTag = action.notificationTag,
-                        notificationId = action.notificationId,
-                        accountRef = action.target.accountRef,
-                        groupIdHex = action.target.groupIdHex,
-                        sinceMs = dismissBaselineMs,
-                    )
-                }
-            }
         }
     }
 }

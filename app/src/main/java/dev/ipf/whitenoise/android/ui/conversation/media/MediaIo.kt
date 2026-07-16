@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.type
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -66,6 +67,12 @@ internal fun decodeUriListTokens(encoded: String): List<String> =
     } else {
         encoded.split('\n').filter { it.isNotEmpty() }
     }
+
+/** Returns and promotes a still-present plaintext cache entry, or null after eviction. */
+internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
+    file
+        ?.takeIf { it.isFile && it.length() > 0L }
+        ?.also(AttachmentPlaintextCache::touch)
 
 /**
  * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
@@ -355,6 +362,7 @@ internal fun sweepStaleSharedMedia(
                 }
             }
         }
+        AttachmentPlaintextCache.trimKnownDirectories(context.cacheDir)
     }
 }
 

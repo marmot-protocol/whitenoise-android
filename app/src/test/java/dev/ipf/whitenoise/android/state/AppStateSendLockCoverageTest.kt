@@ -320,6 +320,28 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun messageOverlaysArePrunedWithTimelineWindowAndDirectRemovals() {
+        val applyTimelinePage = controllerFunctionBody("applyTimelinePage")
+        val applyTimelineChanges = controllerFunctionBody("applyTimelineChanges")
+        val removeProjectedRecord = controllerFunctionBody("removeProjectedRecord")
+        val pruneMessageOverlaysToWindow = controllerFunctionBody("pruneMessageOverlaysToWindow")
+
+        assertTrue("window replacement must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelinePage)
+        assertTrue("live timeline updates must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelineChanges)
+        assertTrue(
+            "direct record removal must clear delete and reaction overlays",
+            "deletedMessageIds = deletedMessageIds - messageIdHex" in removeProjectedRecord &&
+                "optimisticReactionChanges.entries.removeAll" in removeProjectedRecord &&
+                "reactionsState.remove(messageIdHex)" in removeProjectedRecord,
+        )
+        assertTrue(
+            "window pruning must retain timeline and optimistic targets only",
+            "retainedMessageOverlayTargets(" in pruneMessageOverlaysToWindow &&
+                "optimisticReactionChanges.entries.removeAll" in pruneMessageOverlaysToWindow,
+        )
+    }
+
+    @Test
     fun mediaKindResolveFanoutSwallowsUnexpectedProjectionFailures() {
         val body = controllerFunctionBody("schedulePendingMediaKindResolves")
 
