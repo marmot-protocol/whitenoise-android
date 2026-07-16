@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -52,6 +53,26 @@ class ForwardMessageSheetCoverageTest {
             "remember(body, appState.profileRevisionForCompose) { resolveMentionsInPlaintext(body)" in body,
         )
         assertTrue("Text( forwardPreviewText," in body)
+    }
+
+    @Test
+    fun groupMemberPreviewsUsePrivateContactNicknames() {
+        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
+
+        assertTrue(
+            "forward-sheet group member previews must use contactDisplayNameCached so private nicknames are shown",
+            Regex(
+                """forwardTargetMembersPreview\s*\([^)]*\)\s*\{\s*memberIdHex\s*->\s*appState\.contactDisplayNameCached\s*\(\s*memberIdHex\s*\)\s*\}""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(body),
+        )
+        assertFalse(
+            "forward-sheet group member previews must not use chatMemberTitleCached, which skips private nicknames",
+            Regex(
+                """forwardTargetMembersPreview\s*\([^)]*\)\s*\{[^}]*appState\.chatMemberTitleCached\s*\(""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(body),
+        )
     }
 
     @Test
