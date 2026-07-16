@@ -1039,4 +1039,20 @@
     <string name="toast_zapstore_unavailable">無法開啟 Zapstore</string>
     <string name="notification_channel_app_updates">應用程式更新</string>
     <string name="notification_channel_app_updates_description">Zapstore 版本提醒</string>
+
+    <string name="chat_bubble_colors">聊天氣泡顏色</string>
+    <string name="chat_bubble_colors_global_subtitle">為目前主題選擇預設值。淺色、深色和 AMOLED 顏色會分別儲存。</string>
+    <string name="chat_bubble_colors_chat_subtitle">僅為目前對話覆寫氣泡顏色。重設後將沿用「外觀」預設值。</string>
+    <string name="bubble_color_preview">預覽</string>
+    <string name="bubble_color_current_theme">目前主題：%1$s</string>
+    <string name="bubble_my_messages">我的訊息</string>
+    <string name="bubble_other_messages">其他訊息</string>
+    <string name="bubble_preview_other">你好——回覆會顯示成這樣。</string>
+    <string name="bubble_preview_mine">看起來不錯。</string>
+    <string name="bubble_color_swatch_content_description">氣泡顏色 %1$s</string>
+    <string name="more_colors">更多顏色</string>
+    <string name="custom_hex_color">自訂十六進位顏色</string>
+    <string name="invalid_hex_color">請輸入類似 #336699 的顏色。</string>
+    <string name="apply_color">套用顏色</string>
+    <string name="reset_to_default">恢復預設值</string>
 </resources>

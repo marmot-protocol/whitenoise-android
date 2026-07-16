@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -57,6 +58,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -87,6 +89,8 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipe
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.state.BubbleSide
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -172,6 +176,65 @@ internal fun messageBubbleTimestampColor(
     }
 }
 
+/** Shared frame for caption and plain-text bubbles so both render paths use
+ * the same background/content pairing and semantic mention accent. */
+@Composable
+internal fun MessageBubbleFrame(
+    presentation: BubblePresentation,
+    highlighted: Boolean,
+    mine: Boolean,
+    invalidated: Boolean,
+    mentionedSelf: Boolean,
+    mentionedYouLabel: String,
+    modifier: Modifier = Modifier,
+    contentModifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val mentionRailModifier =
+        if (mentionedSelf) {
+            Modifier
+                .semantics { contentDescription = mentionedYouLabel }
+                .drawBehind {
+                    val railWidth = 3.dp.toPx()
+                    val inset = 4.dp.toPx()
+                    val radius =
+                        androidx.compose.ui.geometry
+                            .CornerRadius(railWidth / 2f, railWidth / 2f)
+                    drawRoundRect(
+                        color = colorFromArgb(presentation.mentionAccentArgb),
+                        topLeft =
+                            androidx.compose.ui.geometry
+                                .Offset(inset, inset),
+                        size =
+                            androidx.compose.ui.geometry.Size(
+                                railWidth,
+                                (size.height - inset * 2).coerceAtLeast(railWidth),
+                            ),
+                        cornerRadius = radius,
+                    )
+                }
+        } else {
+            Modifier
+        }
+    Surface(
+        modifier = modifier,
+        color = colorFromArgb(presentation.backgroundArgb),
+        contentColor = colorFromArgb(presentation.contentArgb),
+        shape = RoundedCornerShape(18.dp),
+        border = messageBubbleBorder(highlighted, mine, invalidated),
+        tonalElevation = if (mine) 1.dp else 0.dp,
+    ) {
+        Column(
+            modifier =
+                mentionRailModifier
+                    .then(contentModifier)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            content = content,
+        )
+    }
+}
+
 @Composable
 internal fun rememberMessageMediaReferences(
     tags: List<MessageTagFfi>,
@@ -228,14 +291,35 @@ internal fun MessageBubble(
     // the group. The record survives as a tombstone, so flag it (an explicit
     // delete takes precedence over an invalidation tombstone).
     val invalidated = !deleted && item.projected?.invalidationStatus != null
-    val bubbleColor =
-        when {
-            invalidated -> MaterialTheme.colorScheme.errorContainer
-            amoledSurfaceTheme -> Color.Black
-            deleted -> MaterialTheme.colorScheme.surfaceVariant
-            mine -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        }
+    val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
+    val bubbleSide = if (mine) BubbleSide.Mine else BubbleSide.Other
+    val customBubbleArgb =
+        appState.effectiveBubbleColorArgb(
+            theme = bubbleTheme,
+            side = bubbleSide,
+            groupIdHex = controller.group.groupIdHex,
+        )
+    val colorScheme = MaterialTheme.colorScheme
+    val customBubbleColorActive = customBubbleArgb != null && !deleted && !invalidated
+    val bubblePresentation =
+        resolveBubblePresentationArgb(
+            invalidated = invalidated,
+            deleted = deleted,
+            amoled = amoledSurfaceTheme,
+            mine = mine,
+            customArgb = customBubbleArgb,
+            tokens =
+                BubblePresentationTokens(
+                    errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                    errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                    surfaceBackgroundArgb = colorScheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
+                    surfaceContentArgb = colorScheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
+                    mineBackgroundArgb = colorScheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                    mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                    mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
+                ),
+        )
+    val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     // #414: "you were mentioned" treatment. A received (not mine), live (not
     // deleted/invalidated) message whose markdown body @-mentions the current
     // account gets a left-edge accent line so a self-mention is spottable while
@@ -546,42 +630,6 @@ internal fun MessageBubble(
                 modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
-                // #414: left-edge accent in the bubble's start gutter when
-                // the current account is mentioned. Drawn in the 14.dp
-                // start padding so it reads as a rail without reflowing the
-                // content; uses the same content-derived accent the mention
-                // highlight uses. drawBehind paints over the surface fill
-                // (it's the Column's own background layer), so it stays
-                // visible on the surfaceVariant received bubble. Hoisted out
-                // of the bubble Surface so the caption bubble can reuse it when
-                // media renders on its own (#527).
-                val mentionAccentColor = MaterialTheme.colorScheme.primary
-                val mentionRailModifier =
-                    if (mentionedSelf) {
-                        Modifier
-                            .semantics { contentDescription = mentionedYouLabel }
-                            .drawBehind {
-                                val railWidth = 3.dp.toPx()
-                                val inset = 4.dp.toPx()
-                                val radius =
-                                    androidx.compose.ui.geometry
-                                        .CornerRadius(railWidth / 2f, railWidth / 2f)
-                                drawRoundRect(
-                                    color = mentionAccentColor,
-                                    topLeft =
-                                        androidx.compose.ui.geometry
-                                            .Offset(inset, inset),
-                                    size =
-                                        androidx.compose.ui.geometry.Size(
-                                            railWidth,
-                                            (size.height - inset * 2).coerceAtLeast(railWidth),
-                                        ),
-                                    cornerRadius = radius,
-                                )
-                            }
-                    } else {
-                        Modifier
-                    }
                 // Resolved before the content column so its presence can pick
                 // the column's width strategy (#428).
                 //
@@ -1036,6 +1084,11 @@ internal fun MessageBubble(
                             (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }
                         else -> displayedBody
                     }
+                // Captions/plain bodies sit on the resolved bubble background and therefore use
+                // its paired WCAG-safe content color. Footer-only media rows are
+                // outside the bubble and retain the page's surface foreground.
+                val timestampColor =
+                    if (bodyTextToRender != null) bubbleContentColor else colorScheme.onSurfaceVariant
                 val editedLabel =
                     if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
                         if (editState.count > 1) {
@@ -1081,7 +1134,7 @@ internal fun MessageBubble(
                 val collapsible = collapseLongMessages && !deleted && !invalidated
                 val readMoreLabel = stringResource(R.string.message_read_more)
                 val readMoreStyle =
-                    SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                    SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
                 // The body/caption text + inline footer, plus the failed-send
                 // retry row. Hoisted into a lambda so it can render either inside
                 // the single text bubble (no media) or inside the caption bubble
@@ -1175,6 +1228,7 @@ internal fun MessageBubble(
                                                 { bech32: String -> appState.mentionDisplayName(bech32) }
                                             },
                                         isGroupMember = mentionMembershipResolver,
+                                        useDecorativeBackgrounds = !customBubbleColorActive,
                                         onNostrProfileTap =
                                             remember(appState) {
                                                 { bech32: String -> appState.presentNostrProfile(bech32) }
@@ -1294,12 +1348,17 @@ internal fun MessageBubble(
                 // The sender-name label (group chats only). Rendered above the
                 // media + caption when media is present (#527), or as the first
                 // child of the single text bubble otherwise.
-                val senderNameLabel: @Composable () -> Unit = {
+                val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderAvatar) {
                         Text(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color =
+                                if (insideBubble && customBubbleColorActive) {
+                                    bubbleContentColor
+                                } else {
+                                    colorScheme.onSurfaceVariant
+                                },
                             modifier =
                                 Modifier.combinedClickable(
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
@@ -1316,8 +1375,9 @@ internal fun MessageBubble(
                 // The reply quote card. Self-contained (own translucent Surface),
                 // so it renders correctly whether inside the text bubble or
                 // standalone above the media (#527).
-                val replyPreviewCard: @Composable () -> Unit = {
+                val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
+                        val useCustomBubbleColors = insideBubble && customBubbleColorActive
                         ReplyPreviewCard(
                             senderTitle = senderTitleForReply(preview.sender, appState),
                             isOwn = isOwnReplySender(preview.sender, appState),
@@ -1337,6 +1397,9 @@ internal fun MessageBubble(
                                 remember(appState, appState.profileRevisionForCompose) {
                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                 },
+                            containerColor = if (useCustomBubbleColors) Color.Transparent else null,
+                            contentColor = if (useCustomBubbleColors) bubbleContentColor else null,
+                            accentColor = if (useCustomBubbleColors) bubbleContentColor else null,
                         )
                     }
                 }
@@ -1349,26 +1412,22 @@ internal fun MessageBubble(
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        senderNameLabel()
-                        replyPreviewCard()
+                        senderNameLabel(false)
+                        replyPreviewCard(false)
                         mediaBlocks()
                         // Caption: only when a non-blank caption accompanies the
                         // media. It gets the same colored bubble look as a plain
                         // text message, placed directly below the media.
                         if (bodyTextToRender != null) {
-                            Surface(
-                                color = bubbleColor,
-                                shape = RoundedCornerShape(18.dp),
-                                border = messageBubbleBorder(highlighted, mine, invalidated),
-                                tonalElevation = if (mine) 1.dp else 0.dp,
+                            MessageBubbleFrame(
+                                presentation = bubblePresentation,
+                                highlighted = highlighted,
+                                mine = mine,
+                                invalidated = invalidated,
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
                             ) {
-                                Column(
-                                    mentionRailModifier
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    bodyFooterAndRetry()
-                                }
+                                bodyFooterAndRetry()
                             }
                         } else {
                             // No caption: the footer (time/status) for audio,
@@ -1379,34 +1438,30 @@ internal fun MessageBubble(
                         }
                     }
                 } else {
-                    Surface(
+                    MessageBubbleFrame(
                         // Swipe-to-reply and long-press now live on the parent Row
                         // (see #204) so the whole message row is the hitbox. The
                         // Surface keeps only the visual slide driven by swipeDrag.
                         modifier =
                             Modifier
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
-                        color = bubbleColor,
-                        shape = RoundedCornerShape(18.dp),
-                        border = messageBubbleBorder(highlighted, mine, invalidated),
-                        tonalElevation = if (mine) 1.dp else 0.dp,
+                        presentation = bubblePresentation,
+                        highlighted = highlighted,
+                        mine = mine,
+                        invalidated = invalidated,
+                        mentionedSelf = mentionedSelf,
+                        mentionedYouLabel = mentionedYouLabel,
+                        // With a reply quote present, size the column to its
+                        // widest child so the inner quote can fill the bubble
+                        // width instead of hugging its own (possibly short)
+                        // text and leaving a gap on the right (#428). Non-reply
+                        // bubbles keep the wrap-content path untouched, so only
+                        // reply-bubble measurement changes.
+                        contentModifier = if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier,
                     ) {
-                        Column(
-                            mentionRailModifier
-                                // With a reply quote present, size the column to its
-                                // widest child so the inner quote can fill the bubble
-                                // width instead of hugging its own (possibly short)
-                                // text and leaving a gap on the right (#428). Non-reply
-                                // bubbles keep the wrap-content path untouched, so only
-                                // reply-bubble measurement changes.
-                                .then(if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier)
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            senderNameLabel()
-                            replyPreviewCard()
-                            bodyFooterAndRetry()
-                        }
+                        senderNameLabel(true)
+                        replyPreviewCard(true)
+                        bodyFooterAndRetry()
                     }
                 }
                 MessageActionMenu(

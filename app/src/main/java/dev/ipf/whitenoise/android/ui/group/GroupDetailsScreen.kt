@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -131,6 +132,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
+import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
@@ -411,6 +413,7 @@ internal fun GroupDetailsScreen(
 
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
     var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
 
@@ -422,6 +425,16 @@ internal fun GroupDetailsScreen(
             appState = appState,
             onBack = { showMediaLibrary = false },
             onJumpToMessage = onJumpToMessage,
+        )
+        return
+    }
+
+    if (showBubbleColors) {
+        BackHandler { showBubbleColors = false }
+        ChatBubbleColorsScreen(
+            appState = appState,
+            onBack = { showBubbleColors = false },
+            groupIdHex = controller.group.groupIdHex,
         )
         return
     }
@@ -693,6 +706,11 @@ internal fun GroupDetailsScreen(
                     } else {
                         null
                     },
+            )
+            SettingsActionRow(
+                icon = Icons.Default.Palette,
+                title = stringResource(R.string.chat_bubble_colors),
+                onClick = { showBubbleColors = true },
             )
             GroupSwitchActionRow(
                 icon = Icons.AutoMirrored.Filled.WrapText,

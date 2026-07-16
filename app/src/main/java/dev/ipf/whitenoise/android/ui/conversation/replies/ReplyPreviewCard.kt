@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +72,9 @@ internal fun ReplyPreviewCard(
     // width even when the quote and reply text are both short.
     fillWidth: Boolean = true,
     mentionDisplayName: ((String) -> String?)? = null,
+    containerColor: Color? = null,
+    contentColor: Color? = null,
+    accentColor: Color? = null,
 ) {
     val title = if (isOwn) stringResource(R.string.reply_you) else senderTitle
     val mediaLabel =
@@ -95,15 +99,19 @@ internal fun ReplyPreviewCard(
         remember(body, mediaLabel, mentionDisplayName) {
             mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
         }
-    val accent =
-        if (isOwn) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.tertiary
-        }
-    val container = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f)
+    val resolvedAccentColor =
+        accentColor
+            ?: if (isOwn) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.tertiary
+            }
+    val resolvedContainerColor = containerColor ?: MaterialTheme.colorScheme.surface.copy(alpha = 0.58f)
+    val resolvedContentColor = contentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val resolvedSurfaceContentColor = contentColor ?: MaterialTheme.colorScheme.onSurface
     Surface(
-        color = container,
+        color = resolvedContainerColor,
+        contentColor = resolvedSurfaceContentColor,
         shape = RoundedCornerShape(10.dp),
         border = amoledSurfaceBorderStroke(),
         modifier =
@@ -117,7 +125,7 @@ internal fun ReplyPreviewCard(
                     Modifier
                         .width(3.dp)
                         .fillMaxHeight()
-                        .background(accent),
+                        .background(resolvedAccentColor),
             )
             Row(
                 // weight(1f) forces this Row to fill the parent's width, which
@@ -134,7 +142,7 @@ internal fun ReplyPreviewCard(
                     Text(
                         title,
                         style = MaterialTheme.typography.labelMedium,
-                        color = accent,
+                        color = resolvedAccentColor,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -148,13 +156,13 @@ internal fun ReplyPreviewCard(
                                 mediaIcon,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = resolvedContentColor,
                             )
                         }
                         Text(
                             bodyText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = resolvedContentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
