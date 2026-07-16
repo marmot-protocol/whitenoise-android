@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -57,6 +59,14 @@ import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)
 internal fun Modifier.chatListSelectionRowClickable(onClick: () -> Unit): Modifier = combinedClickable(onClick = onClick, onLongClick = {})
+
+internal fun Modifier.chatListSelectionRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+): Modifier =
+    fillMaxWidth()
+        .semantics { this.selected = selected }
+        .chatListSelectionRowClickable(onClick)
 
 /**
  * Chat list row with long-press selection entry (#1169). Long-press enters
@@ -169,10 +179,10 @@ internal fun ChatRow(
     val rowModifier =
         when {
             selectionMode ->
-                Modifier
-                    .fillMaxWidth()
-                    .semantics { this.selected = selected }
-                    .chatListSelectionRowClickable(onClick = onClick)
+                Modifier.chatListSelectionRow(
+                    selected = selected,
+                    onClick = onClick,
+                )
             onLongClick != null ->
                 Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
             else -> Modifier.clickable(onClick = onClick)
@@ -281,28 +291,15 @@ internal fun ChatRow(
                 }
             },
             trailingContent = {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        rememberedRelativeTime(timestampAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color =
-                            if (rowHasUnread) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    )
-                    if (item.group.pendingConfirmation) {
-                        Badge { Text(stringResource(R.string.invited)) }
-                    } else if (rowHasUnread) {
-                        // Surface the highest-signal unread: an @ badge beside the
-                        // count when one of the unread messages mentions you (#611).
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (item.unreadMention) MentionBadge()
-                            UnreadCountBadge(rowUnreadCount)
-                        }
-                    }
-                }
+                ChatRowTrailingContent(
+                    selectionMode = selectionMode,
+                    selected = selected,
+                    timestampAt = timestampAt,
+                    pendingConfirmation = item.group.pendingConfirmation,
+                    rowHasUnread = rowHasUnread,
+                    rowUnreadCount = rowUnreadCount,
+                    unreadMention = item.unreadMention,
+                )
             },
         )
         if (selectionMode) {
@@ -316,18 +313,57 @@ internal fun ChatRow(
                             Color.Transparent
                         },
                     ),
-            ) {
+            )
+        }
+    }
+}
+
+internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
+
+@Composable
+internal fun ChatRowTrailingContent(
+    selectionMode: Boolean,
+    selected: Boolean,
+    timestampAt: ULong,
+    pendingConfirmation: Boolean,
+    rowHasUnread: Boolean,
+    rowUnreadCount: ULong,
+    unreadMention: Boolean,
+) {
+    if (selectionMode) {
+        Icon(
+            imageVector = chatRowSelectionIcon(selected),
+            // The clickable row already exposes selected semantics. Keeping the
+            // visual indicator decorative avoids a second TalkBack announcement.
+            contentDescription = null,
+            tint =
                 if (selected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.selected),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier =
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 16.dp)
-                                .size(24.dp),
-                    )
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            modifier = Modifier.size(24.dp),
+        )
+    } else {
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                rememberedRelativeTime(timestampAt),
+                style = MaterialTheme.typography.labelSmall,
+                color =
+                    if (rowHasUnread) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+            if (pendingConfirmation) {
+                Badge { Text(stringResource(R.string.invited)) }
+            } else if (rowHasUnread) {
+                // Surface the highest-signal unread: an @ badge beside the
+                // count when one of the unread messages mentions you (#611).
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (unreadMention) MentionBadge()
+                    UnreadCountBadge(rowUnreadCount)
                 }
             }
         }
