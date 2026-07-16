@@ -411,18 +411,12 @@ class LocalNotificationPresenter(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
                     )
-                    if (decision.replaceExistingBeforePost) {
-                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                    }
                     notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
                 }
             } else {
                 val presentationTimestampMs = nowMillis()
                 stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                 val notification = builder.build()
-                if (decision.replaceExistingBeforePost) {
-                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                }
                 notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
             }
         }

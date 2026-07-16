@@ -54,6 +54,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
@@ -715,7 +716,13 @@ private suspend fun materializeVideoAttachmentOnce(
     file: java.io.File,
     resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
-    if (file.isFile && file.length() > 0L) return file
+    val cachedFile =
+        withContext(Dispatchers.IO) {
+            file
+                .takeIf { it.isFile && it.length() > 0L }
+                ?.also(AttachmentPlaintextCache::touch)
+        }
+    if (cachedFile != null) return cachedFile
     val published =
         AttachmentCachePublication.publishAfterLoad(
             attachmentKey = attachmentKey,
@@ -808,6 +815,7 @@ internal fun cachedVideoAttachmentFile(
         attachmentIndex = attachmentIndex,
         reference = reference,
     ).takeIf { it.isFile && it.length() > 0L }
+        ?.also(AttachmentPlaintextCache::touch)
 
 @Composable
 private fun rememberCachedVideoAttachmentFileState(
@@ -935,6 +943,7 @@ private fun FullscreenVideoPlayer(
                         controllerShowTimeoutMs = 2500
                     }
                 },
+                onRelease = { playerView -> playerView.player = null },
             )
             IconButton(
                 onClick = onDismiss,
@@ -1135,5 +1144,6 @@ internal fun VideoViewerPage(
                 controllerShowTimeoutMs = 2500
             }
         },
+        onRelease = { playerView -> playerView.player = null },
     )
 }

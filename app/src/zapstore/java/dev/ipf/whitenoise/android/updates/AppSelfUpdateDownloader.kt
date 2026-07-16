@@ -28,6 +28,7 @@ class AppSelfUpdateDownloader(
             AppSelfUpdateStorage.deleteFile(destination)
             AppSelfUpdateStorage.deleteFile(partial)
             try {
+                requireApkLengthWithinLimit(asset.sizeBytes, "published asset")
                 val request = Request.Builder().url(asset.downloadUrl).build()
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
@@ -37,7 +38,9 @@ class AppSelfUpdateDownloader(
                         throw IOException("Non-HTTPS download URL")
                     }
                     val body = response.body ?: throw IOException("Empty response body")
-                    val totalBytes = asset.sizeBytes ?: body.contentLength().takeIf { it > 0L }
+                    val responseBytes = body.contentLength().takeIf { it >= 0L }
+                    requireApkLengthWithinLimit(responseBytes, "HTTP response")
+                    val totalBytes = asset.sizeBytes ?: responseBytes?.takeIf { it > 0L }
                     val digest = MessageDigest.getInstance("SHA-256")
                     body.byteStream().use { input ->
                         partial.outputStream().use { output ->
@@ -47,9 +50,9 @@ class AppSelfUpdateDownloader(
                                 coroutineContext.ensureActive()
                                 val read = input.read(buffer)
                                 if (read == -1) break
+                                downloaded = checkedDownloadedApkBytes(downloaded, read.toLong())
                                 digest.update(buffer, 0, read)
                                 output.write(buffer, 0, read)
-                                downloaded += read
                                 onProgress(downloaded, totalBytes)
                             }
                             if (asset.sizeBytes != null && downloaded != asset.sizeBytes) {
@@ -84,7 +87,32 @@ class AppSelfUpdateDownloader(
 
     class HashMismatchException : IOException("APK hash mismatch")
 
+    class ApkTooLargeException(
+        detail: String = "APK exceeds the download size limit",
+    ) : IOException(detail)
+
     companion object {
+        internal const val MAX_APK_BYTES: Long = 256L * 1024L * 1024L
+
+        internal fun requireApkLengthWithinLimit(
+            bytes: Long?,
+            source: String,
+        ) {
+            if (bytes != null && (bytes <= 0L || bytes > MAX_APK_BYTES)) {
+                throw ApkTooLargeException("Invalid $source length: $bytes")
+            }
+        }
+
+        internal fun checkedDownloadedApkBytes(
+            downloaded: Long,
+            nextChunkBytes: Long,
+        ): Long {
+            if (downloaded < 0L || nextChunkBytes < 0L || nextChunkBytes > MAX_APK_BYTES - downloaded) {
+                throw ApkTooLargeException()
+            }
+            return downloaded + nextChunkBytes
+        }
+
         // Reject any host that resolves to a private/loopback/link-local address
         // before a byte is fetched — defence in depth, even though the download
         // URL is publisher-signed. Catches both literal-private hosts and

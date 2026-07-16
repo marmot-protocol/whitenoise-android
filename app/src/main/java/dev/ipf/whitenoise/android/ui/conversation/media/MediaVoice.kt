@@ -58,6 +58,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -526,7 +527,13 @@ private suspend fun materializeVoiceAttachmentOnce(
     file: java.io.File,
     resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
-    if (file.isFile && file.length() > 0L) return file
+    val cachedFile =
+        withContext(Dispatchers.IO) {
+            file
+                .takeIf { it.isFile && it.length() > 0L }
+                ?.also(AttachmentPlaintextCache::touch)
+        }
+    if (cachedFile != null) return cachedFile
     val published =
         AttachmentCachePublication.publishAfterLoad(
             attachmentKey = attachmentKey,
@@ -551,6 +558,7 @@ internal fun cachedVoiceAttachmentFile(
         attachmentIndex = attachmentIndex,
         reference = reference,
     ).takeIf { it.isFile && it.length() > 0L }
+        ?.also(AttachmentPlaintextCache::touch)
 
 @Composable
 private fun rememberCachedVoiceAttachmentFileState(

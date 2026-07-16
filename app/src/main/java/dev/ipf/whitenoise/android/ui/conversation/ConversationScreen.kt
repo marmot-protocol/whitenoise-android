@@ -125,6 +125,7 @@ import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.nextReadAnchor
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
+import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
@@ -593,9 +594,10 @@ internal fun ConversationScreen(
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
     // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
     // mention classification, reusing the #414 per-message detection.
-    val unreadMentionMessageIds by remember(controller, chat.id) {
+    val selfAccountIdHex = appState.activeAccount?.accountIdHex
+    val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }
+    val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
         derivedStateOf {
-            val selfAccountIdHex = appState.activeAccount?.accountIdHex
             // Anchor on the UI read high-water mark. It advances immediately when
             // the user visits a mention and when the visible row settles, so a
             // recreated controller cannot briefly resurrect already-read mentions.
@@ -603,11 +605,13 @@ internal fun ConversationScreen(
                 emptyList()
             } else {
                 unreadReceivedMentionIds(controller.timeline, readAnchorMessageId) { msg ->
-                    documentMentionsAccount(
-                        document = msg.record.contentTokens,
-                        accountIdHex = selfAccountIdHex,
-                        resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
-                    )
+                    mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
+                        documentMentionsAccount(
+                            document = msg.record.contentTokens,
+                            accountIdHex = selfAccountIdHex,
+                            resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
+                        )
+                    }
                 }
             }
         }

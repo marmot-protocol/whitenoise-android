@@ -9,7 +9,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
-import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
@@ -77,13 +76,8 @@ class NotificationReplyWorker(
             null -> Unit
         }
         if (!application.appState.notificationActionsAllowed) {
-            val persisted =
-                withContext(Dispatchers.IO) {
-                    completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)
-                }
-            if (!persisted) return Result.retry()
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
-            return Result.success()
+            return Result.retry()
         }
 
         return try {
@@ -231,13 +225,6 @@ class NotificationReplyWorker(
 
     companion object {
         private const val TAG = "DMReplyWorker"
-        private const val KEY_ACTION = "action"
-        private const val KEY_ACCOUNT_REF = "account_ref"
-        private const val KEY_GROUP_ID_HEX = "group_id_hex"
-        private const val KEY_MESSAGE_ID_HEX = "message_id_hex"
-        private const val KEY_TARGET_KIND = "target_kind"
-        private const val KEY_NOTIFICATION_TAG = "notification_tag"
-        private const val KEY_NOTIFICATION_ID = "notification_id"
         private const val KEY_LEGACY_REPLY = "reply"
         private const val KEY_REPLY_IV = "reply_iv"
         private const val KEY_REPLY_CIPHERTEXT = "reply_ciphertext"
@@ -299,17 +286,12 @@ class NotificationReplyWorker(
             action: NotificationAction,
             encryptedReply: EncryptedNotificationReply,
         ): Data =
-            workDataOf(
-                KEY_ACTION to NotificationActions.ACTION_REPLY,
-                KEY_ACCOUNT_REF to action.target.accountRef,
-                KEY_GROUP_ID_HEX to action.target.groupIdHex,
-                KEY_MESSAGE_ID_HEX to action.target.messageIdHex.orEmpty(),
-                KEY_TARGET_KIND to action.target.kind.name,
-                KEY_NOTIFICATION_TAG to action.notificationTag,
-                KEY_NOTIFICATION_ID to action.notificationId,
-                KEY_REPLY_IV to encryptedReply.initializationVector,
-                KEY_REPLY_CIPHERTEXT to encryptedReply.ciphertext,
-            )
+            Data
+                .Builder()
+                .putAll(NotificationActionWorkData.encode(action))
+                .putByteArray(KEY_REPLY_IV, encryptedReply.initializationVector)
+                .putByteArray(KEY_REPLY_CIPHERTEXT, encryptedReply.ciphertext)
+                .build()
 
         internal fun notificationReplyFromInput(data: Data): NotificationReplyInput {
             val initializationVector = data.getByteArray(KEY_REPLY_IV)
@@ -324,16 +306,7 @@ class NotificationReplyWorker(
             }
         }
 
-        internal fun notificationReplyActionFromInput(data: Data): NotificationAction? =
-            NotificationActions.parseRawFields(
-                action = data.getString(KEY_ACTION),
-                accountRef = data.getString(KEY_ACCOUNT_REF),
-                groupIdHex = data.getString(KEY_GROUP_ID_HEX),
-                messageIdHex = data.getString(KEY_MESSAGE_ID_HEX),
-                targetKindName = data.getString(KEY_TARGET_KIND),
-                notificationTag = data.getString(KEY_NOTIFICATION_TAG),
-                notificationId = data.getInt(KEY_NOTIFICATION_ID, Int.MIN_VALUE).takeUnless { it == Int.MIN_VALUE },
-            )
+        internal fun notificationReplyActionFromInput(data: Data): NotificationAction? = NotificationActionWorkData.decode(data)
 
         internal fun notificationReplyCompletionKey(workRequestId: UUID): String = COMPLETION_KEY_PREFIX + workRequestId
 

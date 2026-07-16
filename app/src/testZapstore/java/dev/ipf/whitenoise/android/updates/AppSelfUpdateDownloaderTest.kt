@@ -12,6 +12,7 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -106,6 +107,72 @@ class AppSelfUpdateDownloaderTest {
             assertFalse(destination.exists())
             assertFalse(File(tempDir, "${destination.name}.part").exists())
         }
+
+    @Test
+    fun oversizedPublishedAssetIsRejectedBeforeNetworkOrDiskWrite() =
+        runBlocking {
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset =
+                assetForBody(
+                    hash = "a".repeat(64),
+                    sizeBytes = AppSelfUpdateDownloader.MAX_APK_BYTES + 1L,
+                )
+
+            val result =
+                AppSelfUpdateDownloader(httpClient).downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.ApkTooLargeException)
+            assertEquals(0, server.requestCount)
+            assertFalse(destination.exists())
+            assertFalse(File(tempDir, "${destination.name}.part").exists())
+        }
+
+    @Test
+    fun oversizedHttpBodyIsRejectedBeforeStreaming() =
+        runBlocking {
+            server.enqueue(
+                MockResponse()
+                    .setBody(byteArrayOf(1, 2, 3).toRequestBody())
+                    .setHeader("Content-Length", AppSelfUpdateDownloader.MAX_APK_BYTES + 1L),
+            )
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset = assetForBody(hash = "a".repeat(64), sizeBytes = null)
+
+            val result =
+                AppSelfUpdateDownloader(httpClient).downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.ApkTooLargeException)
+            assertFalse(destination.exists())
+            assertFalse(File(tempDir, "${destination.name}.part").exists())
+        }
+
+    @Test
+    fun streamedByteCounterRejectsChunkThatCrossesLimitWithoutOverflow() {
+        assertEquals(
+            AppSelfUpdateDownloader.MAX_APK_BYTES,
+            AppSelfUpdateDownloader.checkedDownloadedApkBytes(
+                downloaded = AppSelfUpdateDownloader.MAX_APK_BYTES - 2L,
+                nextChunkBytes = 2L,
+            ),
+        )
+        assertThrows(AppSelfUpdateDownloader.ApkTooLargeException::class.java) {
+            AppSelfUpdateDownloader.checkedDownloadedApkBytes(
+                downloaded = AppSelfUpdateDownloader.MAX_APK_BYTES - 2L,
+                nextChunkBytes = 3L,
+            )
+        }
+        assertThrows(AppSelfUpdateDownloader.ApkTooLargeException::class.java) {
+            AppSelfUpdateDownloader.checkedDownloadedApkBytes(Long.MAX_VALUE, 1L)
+        }
+    }
 
     @Test
     fun cancellationCleansUpPartialAndDestination() =

@@ -42,11 +42,15 @@ class FreshSweepCoverageTest {
         assertTrue(source.contains("val unreadIncomingCount by remember(controller, chat.id)"))
         assertTrue(
             source.contains(
-                "val unreadMentionMessageIds by remember(controller, chat.id) { derivedStateOf { " +
-                    "val selfAccountIdHex = appState.activeAccount?.accountIdHex",
+                "val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }",
             ),
         )
-        assertFalse(source.contains("selfAccountIdHexForMentions"))
+        assertTrue(
+            source.contains(
+                "val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache)",
+            ),
+        )
+        assertTrue(source.contains("mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens)"))
     }
 
     @Test
@@ -81,7 +85,7 @@ class FreshSweepCoverageTest {
     fun notificationReplyEncryptionLeavesReceiverMainThreadAndReportsFailure() {
         val receiver = source("notifications/NotificationActionReceiver.kt")
         val onReceive = receiver.section("override fun onReceive(", "private suspend fun enqueueReplyAction")
-        val enqueueReply = receiver.section("private suspend fun enqueueReplyAction", "private suspend fun handleAction")
+        val enqueueReply = receiver.section("private suspend fun enqueueReplyAction", "private suspend fun enqueueMarkReadAction")
 
         assertTrue("reply handling must be protected by goAsync", "val pending = goAsync()" in onReceive)
         assertFalse(
@@ -97,17 +101,29 @@ class FreshSweepCoverageTest {
     }
 
     @Test
-    fun notificationMarkReadConfinesAppStateMutationsToMainThread() {
-        val source = source("notifications/NotificationActionReceiver.kt")
-        val markReadBranch = source.section("NotificationActionKind.MARK_READ -> {", "val presenter")
+    fun notificationActionsAreDurableAndMessagingUpdatesDoNotPreCancel() {
+        val receiver = source("notifications/NotificationActionReceiver.kt")
+        val markReadEnqueue = receiver.section("private suspend fun enqueueMarkReadAction", "\n}")
+        val markReadWorker = source("notifications/NotificationMarkReadWorker.kt")
+        val replyWorker = source("notifications/NotificationReplyWorker.kt")
+        val presenter = source("notifications/LocalNotificationPresenter.kt")
         val mainConfinedMutations =
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
-                    """appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
-                    """appState\.markNotificationMessageRead\(""",
+                    """application\.appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
+                    """application\.appState\.markNotificationMessageRead\(""",
             )
 
-        assertTrue(mainConfinedMutations.containsMatchIn(markReadBranch))
+        assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)
+        assertTrue("mark-read mutations must remain main-confined", mainConfinedMutations.containsMatchIn(markReadWorker))
+        assertTrue("locked mark-read work must wait for unlock", "return Result.retry()" in markReadWorker)
+        assertTrue("locked replies must wait for unlock", "if (!application.appState.notificationActionsAllowed)" in replyWorker)
+        assertFalse(
+            "a lock race must not terminally record a dropped reply as success",
+            "markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)" in replyWorker,
+        )
+        val postPath = presenter.section("if (messaging != null)", "notificationDebug {")
+        assertFalse("routine notification updates must not cancel before notify", "notificationManager.cancel(" in postPath)
     }
 
     @Test

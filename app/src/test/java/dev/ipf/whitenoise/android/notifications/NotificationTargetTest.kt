@@ -358,6 +358,26 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun markReadWorkerRequest_roundTripsActionAndUsesBoundedBackoff() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.MARK_READ,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 7,
+            )
+
+        val request = NotificationMarkReadWorker.notificationMarkReadRequest(action)
+
+        assertEquals(action, NotificationActionWorkData.decode(request.workSpec.input))
+        assertEquals(BackoffPolicy.EXPONENTIAL, request.workSpec.backoffPolicy)
+        assertEquals(30_000L, request.workSpec.backoffDelayDuration)
+        assertTrue(NotificationMarkReadWorker.shouldRetryAfterFailure(0))
+        assertTrue(NotificationMarkReadWorker.shouldRetryAfterFailure(1))
+        assertFalse(NotificationMarkReadWorker.shouldRetryAfterFailure(2))
+    }
+
+    @Test
     fun replyWorkerInput_doesNotPersistPlaintext() {
         val action =
             NotificationAction(
