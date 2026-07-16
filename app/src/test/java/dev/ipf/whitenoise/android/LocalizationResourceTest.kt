@@ -14,7 +14,7 @@ class LocalizationResourceTest {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
                 .first { it.exists() }
-        val defaultKeys = stringKeys(File(resDir, "values/strings.xml"))
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
 
         resDir
             .listFiles()
@@ -23,7 +23,7 @@ class LocalizationResourceTest {
             .map { File(it, "strings.xml") }
             .filter { it.exists() }
             .forEach { localized ->
-                assertEquals(localized.path, defaultKeys, stringKeys(localized))
+                assertEquals(localized.path, defaultKeys, resourceNames(localized))
             }
     }
 
@@ -76,11 +76,70 @@ class LocalizationResourceTest {
                     """.trimIndent(),
             )
 
-        val defaultKeys = stringKeys(File(resDir, "values/strings.xml"))
-        val localizedKeys = stringKeys(File(resDir, "values-fr/strings.xml"))
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
 
-        assertTrue(defaultKeys.contains("items_count"))
+        assertTrue(defaultKeys.plurals.contains("items_count"))
         assertNotEquals(defaultKeys, localizedKeys)
+    }
+
+    @Test
+    fun mismatchedStringAndPluralResourceTypesAreDetectedByParityCheck() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="items_count">%d éléments</string>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
+
+        assertNotEquals(defaultKeys, localizedKeys)
+    }
+
+    @Test
+    fun nonTranslatablePluralIsExcludedFromParityCheck() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Hello</string>
+                        <plurals name="internal_count" translatable="false">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Bonjour</string>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
+
+        assertEquals(defaultKeys, localizedKeys)
     }
 
     @Test
@@ -148,8 +207,8 @@ class LocalizationResourceTest {
                 localizedDirName = "values-ru",
             )
 
-        val defaultKeys = stringKeys(File(resDir, "values/strings.xml"))
-        val localizedKeys = stringKeys(File(resDir, "values-ru/strings.xml"))
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-ru/strings.xml"))
 
         assertEquals(defaultKeys, localizedKeys)
         assertTrue(
@@ -218,9 +277,9 @@ class LocalizationResourceTest {
         )
     }
 
-    private fun stringKeys(file: File): Set<String> {
+    private fun resourceNames(file: File): ResourceNames {
         val content = parseStringsFile(file)
-        return content.strings.keys + content.plurals.keys
+        return ResourceNames(strings = content.strings.keys, plurals = content.plurals.keys)
     }
 
     private fun stringValues(file: File): Map<String, String> = parseStringsFile(file).strings
@@ -265,6 +324,11 @@ class LocalizationResourceTest {
         val plurals: Map<String, Map<String, String>>,
     )
 
+    private data class ResourceNames(
+        val strings: Set<String>,
+        val plurals: Set<String>,
+    )
+
     private fun parseStringsFile(file: File): StringsFileContent {
         val document =
             DocumentBuilderFactory
@@ -289,6 +353,7 @@ class LocalizationResourceTest {
                 val nodes = document.getElementsByTagName("plurals")
                 for (index in 0 until nodes.length) {
                     val node = nodes.item(index)
+                    if (node.attributes.getNamedItem("translatable")?.nodeValue == "false") continue
                     val name = node.attributes.getNamedItem("name").nodeValue
                     val quantities =
                         buildMap {
