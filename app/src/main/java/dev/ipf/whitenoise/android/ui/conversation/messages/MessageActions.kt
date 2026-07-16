@@ -466,7 +466,7 @@ internal fun ForwardMessageSheet(
                         val membersPreview =
                             remember(item, appState.profileRevisionForCompose) {
                                 forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
-                                    appState.chatMemberTitleCached(memberIdHex)
+                                    appState.contactDisplayNameCached(memberIdHex)
                                 }
                             }
                         ContactRow(
