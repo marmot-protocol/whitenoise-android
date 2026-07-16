@@ -38,6 +38,21 @@ class ScopedCacheTest {
     }
 
     @Test
+    fun removeAllDropsOnlyMatchingEntries() {
+        val registry = ScopedCacheRegistry()
+        val cache = ScopedCache<String, String>(registry, name = "hidden-messages", maxEntries = 4)
+        cache.put("account-a:group-1", "A1")
+        cache.put("account-a:group-2", "A2")
+        cache.put("account-b:group-1", "B1")
+
+        cache.removeAll { it.startsWith("account-a:") }
+
+        assertNull(cache["account-a:group-1"])
+        assertNull(cache["account-a:group-2"])
+        assertEquals("B1", cache["account-b:group-1"])
+    }
+
+    @Test
     fun scopedSetRegistersWithRegistryAndStaysBounded() {
         val registry = ScopedCacheRegistry()
         val set = ScopedSet<String>(registry, name = "materializing-profiles", maxEntries = 2)

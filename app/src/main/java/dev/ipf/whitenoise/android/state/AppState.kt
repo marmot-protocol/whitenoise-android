@@ -283,6 +283,42 @@ internal object LongMessageCollapsePreferences {
     }
 }
 
+/** Observable, account-scoped view of the persisted long-message preference. */
+internal class LongMessageCollapseState(
+    registry: ScopedCacheRegistry,
+    private val preferences: SharedPreferences,
+    maxEntries: Int,
+) {
+    private val values =
+        ScopedCache<String, MutableState<Boolean>>(
+            registry = registry,
+            name = "collapse-long-messages",
+            maxEntries = maxEntries,
+            observable = true,
+        )
+
+    fun collapseLongMessages(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Boolean {
+        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return true
+        return values
+            .getOrPut(key) {
+                mutableStateOf(LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key))
+            }.value
+    }
+
+    fun updateCollapseLongMessages(
+        accountRef: String?,
+        groupIdHex: String,
+        enabled: Boolean,
+    ) {
+        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return
+        values.getOrPut(key) { mutableStateOf(enabled) }.value = enabled
+        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
+    }
+}
+
 internal data class ProfileGroupInviteToast(
     @param:StringRes val messageRes: Int,
     val detail: AppText? = null,
@@ -1146,6 +1182,7 @@ class WhiteNoiseAppState(
             registry = accountScopedCaches,
             name = "chat-bubble-colors",
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
         )
 
     /**
@@ -1213,9 +1250,8 @@ class WhiteNoiseAppState(
         private set
 
     private val npubs =
-        ScopedCache<String, String>(
+        BoundedNpubCache(
             registry = accountScopedCaches,
-            name = "npubs",
             maxEntries = BoundedNpubCache.DEFAULT_MAX_ENTRIES,
         )
     private var profileRevision by mutableStateOf(0)
@@ -1276,10 +1312,10 @@ class WhiteNoiseAppState(
             lock = groupMemberSnapshotLock,
         )
     private val conversationStateLock = Any()
-    private val collapseLongMessagesByAccountGroup =
-        ScopedCache<String, MutableState<Boolean>>(
+    private val longMessageCollapseState =
+        LongMessageCollapseState(
             registry = accountScopedCaches,
-            name = "collapse-long-messages",
+            preferences = preferences,
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
         )
     private val hiddenMessageIdsByAccountGroup =
@@ -1287,6 +1323,7 @@ class WhiteNoiseAppState(
             registry = accountScopedCaches,
             name = "hidden-message-ids",
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
         )
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
@@ -3126,21 +3163,13 @@ class WhiteNoiseAppState(
      * gate (#1180). Default ON preserves the existing Read More behavior for every
      * account/group until the user disables it from that group's details screen.
      */
-    fun collapseLongMessagesInGroup(groupIdHex: String): Boolean {
-        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return true
-        return collapseLongMessagesByAccountGroup[key]?.value
-            ?: LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key)
-    }
+    fun collapseLongMessagesInGroup(groupIdHex: String): Boolean = longMessageCollapseState.collapseLongMessages(activeAccountRef, groupIdHex)
 
     fun updateCollapseLongMessagesInGroup(
         groupIdHex: String,
         enabled: Boolean,
     ) {
-        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return
-        collapseLongMessagesByAccountGroup
-            .getOrPut(key) { mutableStateOf(enabled) }
-            .value = enabled
-        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
+        longMessageCollapseState.updateCollapseLongMessages(activeAccountRef, groupIdHex, enabled)
     }
 
     fun isConversationMuted(groupIdHex: String): Boolean {
@@ -3193,7 +3222,8 @@ class WhiteNoiseAppState(
 
     fun clearHiddenMessagesForAccount(accountRef: String) {
         MessageHidePreferences.clearAccount(preferences, accountRef)
-        accountScopedCaches.clearAll()
+        val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return
+        hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
     }
 
     /**

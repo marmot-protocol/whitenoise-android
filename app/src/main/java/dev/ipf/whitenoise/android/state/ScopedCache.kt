@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.mutableIntStateOf
 import java.util.IdentityHashMap
 
 /**
@@ -49,37 +51,64 @@ internal interface ScopedCacheRegistration {
 internal class ScopedCache<K : Any, V : Any>(
     registry: ScopedCacheRegistry,
     override val name: String,
-    private val maxEntries: Int,
+    maxEntries: Int,
     override val lock: Any = Any(),
+    observable: Boolean = false,
 ) : ScopedCacheRegistration {
-    private val entries =
-        object : LinkedHashMap<K, V>(16, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean = size > maxEntries
-        }
+    private val entries = BoundedEntryCache<K, V>(maxEntries)
+    private val observableRevision: MutableIntState? = if (observable) mutableIntStateOf(0) else null
 
     init {
-        require(maxEntries > 0) { "maxEntries must be positive, was $maxEntries" }
         registry.register(this)
     }
 
-    operator fun get(key: K): V? = synchronized(lock) { entries[key] }
+    operator fun get(key: K): V? =
+        synchronized(lock) {
+            entries[key].also { observeRevisionLocked() }
+        }
 
     fun put(
         key: K,
         value: V,
-    ): V? = synchronized(lock) { entries.put(key, value) }
+    ): V? =
+        synchronized(lock) {
+            entries.put(key, value).also { advanceRevisionLocked() }
+        }
 
     fun getOrPut(
         key: K,
         defaultValue: () -> V,
-    ): V = synchronized(lock) { entries.getOrPut(key, defaultValue) }
+    ): V =
+        synchronized(lock) {
+            entries[key]?.also {
+                observeRevisionLocked()
+            } ?: defaultValue().also { value ->
+                entries.put(key, value)
+                advanceRevisionLocked()
+                observeRevisionLocked()
+            }
+        }
 
-    fun remove(key: K): V? = synchronized(lock) { entries.remove(key) }
+    fun remove(key: K): V? =
+        synchronized(lock) {
+            entries.remove(key).also { advanceRevisionLocked() }
+        }
 
-    fun containsKey(key: K): Boolean = synchronized(lock) { entries.containsKey(key) }
+    fun removeAll(predicate: (K) -> Boolean): Boolean =
+        synchronized(lock) {
+            entries.removeAll(predicate).also { advanceRevisionLocked() }
+        }
+
+    fun containsKey(key: K): Boolean =
+        synchronized(lock) {
+            entries.containsKey(key).also { observeRevisionLocked() }
+        }
 
     val size: Int
-        get() = synchronized(lock) { entries.size }
+        get() =
+            synchronized(lock) {
+                entries.size().also { observeRevisionLocked() }
+            }
 
     fun clear() {
         synchronized(lock) { clearLocked() }
@@ -87,6 +116,15 @@ internal class ScopedCache<K : Any, V : Any>(
 
     override fun clearLocked() {
         entries.clear()
+        advanceRevisionLocked()
+    }
+
+    private fun observeRevisionLocked() {
+        observableRevision?.intValue
+    }
+
+    private fun advanceRevisionLocked() {
+        observableRevision?.let { it.intValue += 1 }
     }
 }
 
