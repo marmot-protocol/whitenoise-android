@@ -28,8 +28,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -63,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -304,12 +307,84 @@ private val mediaMonthGroupingZone: ZoneId = ZoneId.systemDefault()
 
 private val ThumbStripSize = 96.dp
 
+internal enum class SharedMediaFallbackType {
+    Generic,
+    Voice,
+    Files,
+    Urls,
+}
+
+internal data class SharedMediaFallback(
+    val type: SharedMediaFallbackType,
+    val count: Int = 0,
+)
+
+internal fun sharedMediaFallbackContent(
+    videoCount: Int,
+    voiceCount: Int,
+    fileCount: Int,
+    urlCount: Int,
+): SharedMediaFallback =
+    when {
+        videoCount == 0 && voiceCount > 0 && fileCount == 0 && urlCount == 0 ->
+            SharedMediaFallback(SharedMediaFallbackType.Voice, voiceCount)
+        videoCount == 0 && voiceCount == 0 && fileCount > 0 && urlCount == 0 ->
+            SharedMediaFallback(SharedMediaFallbackType.Files, fileCount)
+        videoCount == 0 && voiceCount == 0 && fileCount == 0 && urlCount > 0 ->
+            SharedMediaFallback(SharedMediaFallbackType.Urls, urlCount)
+        else -> SharedMediaFallback(SharedMediaFallbackType.Generic)
+    }
+
+@Composable
+internal fun SharedMediaFallbackRow(
+    fallback: SharedMediaFallback,
+    onSeeAll: () -> Unit,
+) {
+    val icon =
+        when (fallback.type) {
+            SharedMediaFallbackType.Generic -> Icons.Default.Image
+            SharedMediaFallbackType.Voice -> Icons.Default.Mic
+            SharedMediaFallbackType.Files -> Icons.Default.Description
+            SharedMediaFallbackType.Urls -> Icons.Default.Language
+        }
+    val label =
+        when (fallback.type) {
+            SharedMediaFallbackType.Generic -> stringResource(R.string.shared_media_view)
+            SharedMediaFallbackType.Voice ->
+                pluralStringResource(R.plurals.shared_media_voice_count, fallback.count, fallback.count)
+            SharedMediaFallbackType.Files ->
+                pluralStringResource(R.plurals.shared_media_files_count, fallback.count, fallback.count)
+            SharedMediaFallbackType.Urls ->
+                pluralStringResource(R.plurals.shared_media_links_count, fallback.count, fallback.count)
+        }
+    SectionCard(title = stringResource(R.string.shared_media)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .amoledSurfaceBorder(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onSeeAll() }
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
 /**
  * "Shared media" section for the group/DM details sheet. Shows a horizontal
  * strip of the most recent image thumbnails with a "See all" affordance into
- * [MediaLibraryRoute]. When there are no images but other media exists, it
- * collapses to a single "View shared media" row. Renders nothing when the
- * conversation has no media at all.
+ * [MediaLibraryRoute]. When there are no images or videos and exactly one of
+ * voice, files, or URLs exists, it collapses to a type-specific counted row;
+ * videos and mixed media retain the generic "View shared media" row. Renders
+ * nothing when the conversation has no media at all.
  */
 @Composable
 internal fun SharedMediaSection(
@@ -322,25 +397,16 @@ internal fun SharedMediaSection(
     if (tiles.isEmpty) return
 
     if (tiles.images.isEmpty()) {
-        SectionCard(title = stringResource(R.string.shared_media)) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .amoledSurfaceBorder(RoundedCornerShape(8.dp))
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onSeeAll() }
-                        .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Image, contentDescription = null)
-                Text(
-                    stringResource(R.string.shared_media_view),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
+        SharedMediaFallbackRow(
+            fallback =
+                sharedMediaFallbackContent(
+                    videoCount = tiles.videos.size,
+                    voiceCount = tiles.voice.size,
+                    fileCount = tiles.files.size,
+                    urlCount = tiles.urls.size,
+                ),
+            onSeeAll = onSeeAll,
+        )
         return
     }
 
