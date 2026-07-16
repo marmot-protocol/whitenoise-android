@@ -74,6 +74,25 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun visibleConversationDismissalStaysWiredToResumeAndUnlock() {
+        val foregroundBody = appStateFunctionBody("setAppInForeground")
+        val foregroundLockGate = foregroundBody.indexOf("maybeShowAppLockForForeground()")
+        val foregroundDismissal = foregroundBody.indexOf("dismissVisibleConversationNotifications()")
+        assertTrue(
+            "foreground resume must dismiss only after deciding whether app lock covers the conversation",
+            foregroundLockGate >= 0 && foregroundDismissal > foregroundLockGate,
+        )
+
+        val unlockBody = appStateFunctionBody("markAppUnlockSucceeded")
+        val hideLock = unlockBody.indexOf("appLockScreenVisible = false")
+        val unlockedDismissal = unlockBody.indexOf("dismissVisibleConversationNotifications()")
+        assertTrue(
+            "successful unlock must dismiss after revealing the retained conversation",
+            hideLock >= 0 && unlockedDismissal > hideLock,
+        )
+    }
+
+    @Test
     fun destructiveWipeDropsSyncedPushFingerprintUnderNativePushMutex() {
         val body = appStateFunctionBody("signOutAndWipeActiveAccount")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
