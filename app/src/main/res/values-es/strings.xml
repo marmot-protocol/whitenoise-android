@@ -1082,6 +1082,7 @@
     <string name="tts_settings_subtitle">Leer mensajes en voz alta y elegir un motor local</string>
     <string name="tts_settings_about_title">Acerca de la voz</string>
     <string name="tts_settings_explainer_usable">Hablar lee el texto del mensaje en voz alta con el motor de texto a voz elegido. Los motores locales procesan la voz en este dispositivo.</string>
+    <string name="tts_settings_explainer_discovering">Comprobando los motores de texto a voz instalados en este dispositivo…</string>
     <string name="tts_settings_explainer_no_engine">No hay un motor de texto a voz utilizable instalado. Instala RHVoice o eSpeak NG desde F-Droid o Zapstore y selecciónalo abajo.</string>
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_engine_local">Motor en el dispositivo</string>

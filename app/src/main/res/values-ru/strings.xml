@@ -1116,6 +1116,7 @@
     <string name="tts_settings_subtitle">Озвучивать сообщения и выбрать локальный движок</string>
     <string name="tts_settings_about_title">О речи</string>
     <string name="tts_settings_explainer_usable">«Озвучить» читает текст сообщения выбранным движком синтеза речи. Локальные движки обрабатывают речь на этом устройстве.</string>
+    <string name="tts_settings_explainer_discovering">Проверка установленных на устройстве движков синтеза речи…</string>
     <string name="tts_settings_explainer_no_engine">Нет установленного пригодного движка синтеза речи. Установите RHVoice или eSpeak NG из F-Droid или Zapstore и выберите его ниже.</string>
     <string name="tts_settings_engine_title">Движок</string>
     <string name="tts_settings_engine_local">Движок на устройстве</string>

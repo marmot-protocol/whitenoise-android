@@ -1064,6 +1064,7 @@
     <string name="tts_settings_subtitle">朗讀訊息並選擇本機引擎</string>
     <string name="tts_settings_about_title">關於朗讀</string>
     <string name="tts_settings_explainer_usable">「朗讀」會使用你選擇的文字轉語音引擎大聲讀出訊息文字。本機引擎在此裝置上處理語音。</string>
+    <string name="tts_settings_explainer_discovering">正在檢查此裝置上已安裝的文字轉語音引擎…</string>
     <string name="tts_settings_explainer_no_engine">未安裝可用的文字轉語音引擎。請從 F-Droid 或 Zapstore 安裝 RHVoice 或 eSpeak NG，然後在下方選擇。</string>
     <string name="tts_settings_engine_title">引擎</string>
     <string name="tts_settings_engine_local">本機引擎</string>

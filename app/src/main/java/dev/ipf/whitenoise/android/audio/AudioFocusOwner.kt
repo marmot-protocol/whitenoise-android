@@ -31,9 +31,13 @@ object AudioFocusOwner {
     private var focusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var nextGeneration = 0L
     private var currentGeneration = 0L
+    private var activeCallbacks = 0
+    private val focusLock = Any()
 
     fun attach(context: Context) {
-        audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
+        synchronized(focusLock) {
+            audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
+        }
     }
 
     fun acquire(
@@ -43,30 +47,68 @@ object AudioFocusOwner {
         onFocusLoss: () -> Unit,
         onOwnerSurrender: () -> Unit,
     ): Boolean {
+        val result =
+            synchronized(focusLock) {
+                acquireLocked(owner, audioAttributes, focusGain, onFocusLoss, onOwnerSurrender)
+            }
+        try {
+            result.previousOwnerSurrender?.invoke()
+        } finally {
+            if (result.previousOwnerSurrender != null) {
+                completeCallback()
+            }
+        }
+        return result.acquired
+    }
+
+    private fun acquireLocked(
+        owner: Owner,
+        audioAttributes: AudioAttributes,
+        focusGain: Int,
+        onFocusLoss: () -> Unit,
+        onOwnerSurrender: () -> Unit,
+    ): AcquisitionResult {
+        if (activeCallbacks > 0) {
+            return AcquisitionResult(acquired = false)
+        }
         val am = audioManager
         if (am == null) {
-            if (currentOwner != null && currentOwner != owner) {
-                onSurrender?.invoke()
+            val previousSurrender = onSurrender.takeIf { currentOwner != null && currentOwner != owner }
+            if (previousSurrender != null) {
+                activeCallbacks += 1
             }
             currentOwner = owner
             onLoss = onFocusLoss
             onSurrender = onOwnerSurrender
-            return true
+            return AcquisitionResult(acquired = true, previousOwnerSurrender = previousSurrender)
         }
         if (focusRequest != null && currentOwner == owner) {
             onLoss = onFocusLoss
             onSurrender = onOwnerSurrender
-            return true
+            return AcquisitionResult(acquired = true)
         }
         val generation = ++nextGeneration
         val listener =
             AudioManager.OnAudioFocusChangeListener { change ->
-                if (generation == currentGeneration && currentOwner == owner) {
-                    when (change) {
-                        AudioManager.AUDIOFOCUS_LOSS,
-                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-                        -> onLoss?.invoke()
+                val lossCallback =
+                    synchronized(focusLock) {
+                        if (generation != currentGeneration || currentOwner != owner) {
+                            null
+                        } else {
+                            when (change) {
+                                AudioManager.AUDIOFOCUS_LOSS,
+                                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                                -> onLoss
+                                else -> null
+                            }?.also { activeCallbacks += 1 }
+                        }
+                    }
+                try {
+                    lossCallback?.invoke()
+                } finally {
+                    if (lossCallback != null) {
+                        completeCallback()
                     }
                 }
             }
@@ -77,22 +119,35 @@ object AudioFocusOwner {
                 .setOnAudioFocusChangeListener(listener)
                 .build()
         val granted = am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (granted) {
-            val previousRequest = focusRequest
-            val previousSurrender = onSurrender.takeIf { currentOwner != null && currentOwner != owner }
-            focusRequest = req
-            currentOwner = owner
-            onLoss = onFocusLoss
-            onSurrender = onOwnerSurrender
-            focusListener = listener
-            currentGeneration = generation
-            try {
-                previousSurrender?.invoke()
-            } finally {
-                previousRequest?.let(am::abandonAudioFocusRequest)
-            }
+        if (!granted) {
+            return AcquisitionResult(acquired = false)
         }
-        return granted
+
+        val previousRequest = focusRequest
+        val previousSurrender = onSurrender.takeIf { currentOwner != null && currentOwner != owner }
+        if (previousSurrender != null) {
+            activeCallbacks += 1
+        }
+        focusRequest = req
+        currentOwner = owner
+        onLoss = onFocusLoss
+        onSurrender = onOwnerSurrender
+        focusListener = listener
+        currentGeneration = generation
+        previousRequest?.let(am::abandonAudioFocusRequest)
+        return AcquisitionResult(acquired = true, previousOwnerSurrender = previousSurrender)
+    }
+
+    private data class AcquisitionResult(
+        val acquired: Boolean,
+        val previousOwnerSurrender: (() -> Unit)? = null,
+    )
+
+    private fun completeCallback() {
+        synchronized(focusLock) {
+            check(activeCallbacks > 0)
+            activeCallbacks -= 1
+        }
     }
 
     fun acquireForTts(
@@ -108,8 +163,10 @@ object AudioFocusOwner {
         )
 
     fun release(owner: Owner) {
-        if (currentOwner != owner) return
-        abandonFocusInternal()
+        synchronized(focusLock) {
+            if (currentOwner != owner) return
+            abandonFocusInternal()
+        }
     }
 
     fun releaseTts() {

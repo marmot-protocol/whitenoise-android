@@ -15,6 +15,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -35,6 +38,7 @@ class AudioFocusOwnerHandoffTest {
         setField("currentOwner", null)
         setField("onLoss", null)
         setField("onSurrender", null)
+        setField("activeCallbacks", 0)
     }
 
     @Test
@@ -110,6 +114,126 @@ class AudioFocusOwnerHandoffTest {
         listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
 
         assertTrue(focusLost)
+    }
+
+    @Test
+    fun focusLossCallbackRunsOutsideStateLock() {
+        attachAudioManager()
+        var callbackHeldLock = true
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = { callbackHeldLock = Thread.holdsLock(field("focusLock")!!) },
+                onOwnerSurrender = {},
+            ),
+        )
+
+        focusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+
+        assertFalse(callbackHeldLock)
+    }
+
+    @Test
+    fun ownerSurrenderCallbackRunsOutsideStateLock() {
+        attachAudioManager()
+        var callbackHeldLock = true
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = { callbackHeldLock = Thread.holdsLock(field("focusLock")!!) },
+            ),
+        )
+
+        assertTrue(AudioFocusOwner.acquireForTts(onFocusLoss = {}, onOwnerSurrender = {}))
+
+        assertFalse(callbackHeldLock)
+    }
+
+    @Test
+    fun concurrentHandoffIsRejectedWhileSurrenderCallbackRuns() {
+        attachAudioManager()
+        val callbackStarted = CountDownLatch(1)
+        val allowCallbackToReturn = CountDownLatch(1)
+        val handoffResult = AtomicReference<Boolean>()
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = {
+                    callbackStarted.countDown()
+                    allowCallbackToReturn.await(2, TimeUnit.SECONDS)
+                },
+            ),
+        )
+        val handoffThread =
+            Thread {
+                handoffResult.set(AudioFocusOwner.acquireForTts(onFocusLoss = {}, onOwnerSurrender = {}))
+            }.apply { start() }
+        assertTrue(callbackStarted.await(2, TimeUnit.SECONDS))
+
+        assertFalse(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = {},
+            ),
+        )
+
+        allowCallbackToReturn.countDown()
+        handoffThread.join(2_000)
+        assertFalse(handoffThread.isAlive)
+        assertTrue(handoffResult.get())
+    }
+
+    @Test
+    fun reacquisitionIsRejectedWhileFocusLossCallbackRuns() {
+        attachAudioManager()
+        val callbackStarted = CountDownLatch(1)
+        val allowCallbackToReturn = CountDownLatch(1)
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {
+                    callbackStarted.countDown()
+                    allowCallbackToReturn.await(2, TimeUnit.SECONDS)
+                },
+                onOwnerSurrender = {},
+            ),
+        )
+        val lossThread =
+            Thread {
+                focusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            }.apply { start() }
+        assertTrue(callbackStarted.await(2, TimeUnit.SECONDS))
+
+        assertFalse(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = {},
+            ),
+        )
+
+        allowCallbackToReturn.countDown()
+        lossThread.join(2_000)
+        assertFalse(lossThread.isAlive)
     }
 
     @Test

@@ -52,7 +52,12 @@ import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
+import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
+import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -1090,6 +1095,8 @@ class WhiteNoiseAppState(
     internal val ttsEngineResolver = TtsEngineResolver(appContext)
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
+    val ttsDiscoveryComplete: Boolean
+        get() = ttsResolution != null
     val ttsHasUsableEngine: Boolean
         get() = ttsResolution?.hasUsableEngine == true
     private val pushTokenStore = PushTokenStore.create(appContext)
@@ -1488,6 +1495,7 @@ class WhiteNoiseAppState(
         // Wipe pre-encryption cache entries promptly after upgrade without doing
         // directory I/O in this main-thread constructor.
         mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+        mutationsScope.launch { refreshTtsAvailability() }
     }
 
     val activeAccount: AccountSummaryFfi?
@@ -2187,7 +2195,6 @@ class WhiteNoiseAppState(
                 }
                 refreshLocalNotificationSettings()
                 phase = AppPhase.Ready
-                mutationsScope.launch { refreshTtsAvailability() }
                 activeAccount?.accountIdHex?.let { warmProfile(it) }
             }
         } catch (error: Throwable) {
@@ -3278,6 +3285,42 @@ class WhiteNoiseAppState(
         ttsWarningPreferences.acknowledge(enginePackage)
     }
 
+    fun runtimeTrustForTtsSelectionWarning(enginePackage: String) =
+        runtimeTrustForSelectionWarning(
+            enginePackage = enginePackage,
+            adoptedHandle = ttsResolution?.handle,
+            selectedOverride = ttsEnginePreferences.selectedEngine(),
+        )
+
+    fun selectTtsEngine(enginePackage: String) {
+        mutationsScope.launch {
+            selectTtsEngineLocked(enginePackage)
+        }
+    }
+
+    private suspend fun selectTtsEngineLocked(enginePackage: String) {
+        ttsRefreshMutex.withLock {
+            val current =
+                TtsEngineSelectionSnapshot(
+                    resolution = ttsResolution,
+                    selectedOverride = ttsEnginePreferences.selectedEngine(),
+                )
+            val candidate = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage) }
+            when (val outcome = adoptTtsEngineSelection(current, candidate, enginePackage)) {
+                is TtsEngineSelectionResult.Adopted -> {
+                    ttsEnginePreferences.setSelectedEngine(outcome.selectedOverride)
+                    ttsResolution = outcome.resolution
+                    outcome.releasedHandles.forEach { handle -> runCatching { handle.release() } }
+                }
+                is TtsEngineSelectionResult.Retained -> {
+                    withContext(Dispatchers.IO) {
+                        candidate.handle?.let { handle -> runCatching { handle.release() } }
+                    }
+                }
+            }
+        }
+    }
+
     suspend fun refreshTtsAvailability() =
         ttsRefreshMutex.withLock {
             val previousHandle = ttsResolution?.handle
@@ -3285,7 +3328,7 @@ class WhiteNoiseAppState(
             var adoptedHandle: TtsEngineHandle? = null
             var replacementPublished = false
             try {
-                val bootstrap = ttsEngineResolver.resolve(enginePackage = null)
+                val bootstrap = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage = null) }
                 bootstrap.handle?.let(candidateHandles::add)
                 val selectedOverride = ttsEnginePreferences.selectedEngine()
                 val preferredPackage =
@@ -3299,9 +3342,9 @@ class WhiteNoiseAppState(
                         preferredPackage == null -> bootstrap.copy(handle = null)
                         preferredPackage == bootstrap.handle?.enginePackage -> bootstrap
                         else -> {
-                            val selected = ttsEngineResolver.resolve(preferredPackage)
+                            val selected = resolveTtsOnDispatcher { ttsEngineResolver.resolve(preferredPackage) }
                             selected.handle?.let(candidateHandles::add)
-                            if (selected.handle != null) {
+                            if (selected.handle?.enginePackage == preferredPackage) {
                                 selected
                             } else {
                                 bootstrap.copy(handle = null)
@@ -3309,19 +3352,15 @@ class WhiteNoiseAppState(
                         }
                     }
 
-                withContext(NonCancellable) {
-                    adoptedHandle = replacement.handle
-                    ttsResolution = replacement
-                    replacementPublished = true
-                }
+                adoptedHandle = replacement.handle
+                ttsResolution = replacement
+                replacementPublished = true
             } finally {
-                withContext(NonCancellable) {
-                    candidateHandles
-                        .filter { it !== adoptedHandle }
-                        .forEach { handle -> runCatching { handle.release() } }
-                    if (replacementPublished && previousHandle !== adoptedHandle) {
-                        runCatching { previousHandle?.release() }
-                    }
+                candidateHandles
+                    .filter { it !== adoptedHandle }
+                    .forEach { handle -> runCatching { handle.release() } }
+                if (replacementPublished && previousHandle !== adoptedHandle) {
+                    runCatching { previousHandle?.release() }
                 }
             }
         }

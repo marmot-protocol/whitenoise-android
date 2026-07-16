@@ -1080,6 +1080,7 @@
     <string name="tts_settings_subtitle">Mesajları sesli oku ve yerel bir motor seç</string>
     <string name="tts_settings_about_title">Konuşma hakkında</string>
     <string name="tts_settings_explainer_usable">Sesli oku, seçtiğiniz metin okuma motoruyla mesaj metnini yüksek sesle okur. Yerel motorlar konuşmayı bu cihazda işler.</string>
+    <string name="tts_settings_explainer_discovering">Bu cihazdaki yüklü metin okuma motorları denetleniyor…</string>
     <string name="tts_settings_explainer_no_engine">Kullanılabilir bir metin okuma motoru yüklü değil. F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve aşağıdan seçin.</string>
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>

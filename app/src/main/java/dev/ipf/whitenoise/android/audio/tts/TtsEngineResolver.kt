@@ -4,9 +4,11 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 
 enum class EngineTrust {
@@ -70,6 +72,7 @@ class TtsEngineResolver(
     private val appContext: Context,
     private val ttsFactory: TtsFactory = DefaultTtsFactory,
     private val engineCatalog: TtsEngineCatalog = AndroidTtsEngineCatalog,
+    private val initTimeoutMs: Long = TTS_INIT_TIMEOUT_MS,
 ) {
     private val speechAudioAttributes: AudioAttributes =
         AudioAttributes
@@ -89,89 +92,95 @@ class TtsEngineResolver(
 
     suspend fun resolve(enginePackage: String? = null): TtsResolutionResult =
         resolutionMutex.withLock {
-            suspendCancellableCoroutine { cont ->
-                val initLock = Any()
-                var created: TextToSpeech? = null
-                var pendingStatus: Int? = null
-                var callbackHandled = false
-                var cancelled = false
+            try {
+                withTimeout(initTimeoutMs) {
+                    suspendCancellableCoroutine { cont ->
+                        val initLock = Any()
+                        var created: TextToSpeech? = null
+                        var pendingStatus: Int? = null
+                        var callbackHandled = false
+                        var cancelled = false
 
-                fun completeInit(
-                    tts: TextToSpeech,
-                    status: Int,
-                ) {
-                    val result =
-                        runCatching {
-                            if (status != TextToSpeech.SUCCESS) {
-                                tts.shutdown()
-                                unusableResolution(status)
+                        fun completeInit(
+                            tts: TextToSpeech,
+                            status: Int,
+                        ) {
+                            val result =
+                                runCatching {
+                                    if (status != TextToSpeech.SUCCESS) {
+                                        tts.shutdown()
+                                        unusableResolution(status)
+                                    } else {
+                                        buildResolution(tts, status, enginePackage)
+                                    }
+                                }.getOrElse {
+                                    tts.shutdown()
+                                    unusableResolution(TextToSpeech.ERROR)
+                                }
+                            if (cont.isActive) {
+                                cont.resume(result)
                             } else {
-                                buildResolution(tts, status, enginePackage)
+                                result.handle?.release()
                             }
-                        }.getOrElse {
-                            tts.shutdown()
-                            unusableResolution(TextToSpeech.ERROR)
                         }
-                    if (cont.isActive) {
-                        cont.resume(result)
-                    } else {
-                        result.handle?.release()
-                    }
-                }
 
-                val listener =
-                    TextToSpeech.OnInitListener { status ->
+                        val listener =
+                            TextToSpeech.OnInitListener { status ->
+                                val candidate =
+                                    synchronized(initLock) {
+                                        when {
+                                            cancelled || callbackHandled -> null
+                                            created == null -> {
+                                                if (pendingStatus == null) pendingStatus = status
+                                                null
+                                            }
+                                            else -> {
+                                                callbackHandled = true
+                                                created
+                                            }
+                                        }
+                                    }
+                                candidate?.let { completeInit(it, status) }
+                            }
+
+                        cont.invokeOnCancellation {
+                            val candidate =
+                                synchronized(initLock) {
+                                    cancelled = true
+                                    created
+                                }
+                            candidate?.shutdown()
+                        }
+
                         val candidate =
+                            try {
+                                ttsFactory.create(appContext.applicationContext, listener, enginePackage)
+                            } catch (_: Throwable) {
+                                if (cont.isActive) cont.resume(unusableResolution(TextToSpeech.ERROR))
+                                return@suspendCancellableCoroutine
+                            }
+
+                        val (cancelledAfterCreate, statusAfterCreate) =
                             synchronized(initLock) {
-                                when {
-                                    cancelled || callbackHandled -> null
-                                    created == null -> {
-                                        if (pendingStatus == null) pendingStatus = status
+                                created = candidate
+                                val status =
+                                    if (!cancelled && !callbackHandled && pendingStatus != null) {
+                                        callbackHandled = true
+                                        pendingStatus
+                                    } else {
                                         null
                                     }
-                                    else -> {
-                                        callbackHandled = true
-                                        created
-                                    }
-                                }
+                                cancelled to status
                             }
-                        candidate?.let { completeInit(it, status) }
-                    }
-
-                cont.invokeOnCancellation {
-                    val candidate =
-                        synchronized(initLock) {
-                            cancelled = true
-                            created
+                        if (cancelledAfterCreate) {
+                            candidate.shutdown()
+                        } else {
+                            statusAfterCreate?.let { completeInit(candidate, it) }
                         }
-                    candidate?.shutdown()
-                }
-
-                val candidate =
-                    try {
-                        ttsFactory.create(appContext.applicationContext, listener, enginePackage)
-                    } catch (_: Throwable) {
-                        if (cont.isActive) cont.resume(unusableResolution(TextToSpeech.ERROR))
-                        return@suspendCancellableCoroutine
                     }
-
-                val (cancelledAfterCreate, statusAfterCreate) =
-                    synchronized(initLock) {
-                        created = candidate
-                        val status =
-                            if (!cancelled && !callbackHandled && pendingStatus != null) {
-                                callbackHandled = true
-                                pendingStatus
-                            } else {
-                                null
-                            }
-                        cancelled to status
-                    }
-                if (cancelledAfterCreate) {
-                    candidate.shutdown()
-                } else {
-                    statusAfterCreate?.let { completeInit(candidate, it) }
                 }
+            } catch (_: TimeoutCancellationException) {
+                unusableResolution(TextToSpeech.ERROR)
             }
         }
 
@@ -208,7 +217,8 @@ class TtsEngineResolver(
         val defaultEnginePackage = engineCatalog.defaultEnginePackage(tts)
         val rawEngines = engineCatalog.installedEngines(tts)
         val engines = rawEngines.toTtsEngineInfos()
-        val activePackage = requestedEnginePackage ?: defaultEnginePackage
+        val verifiedPackage = engineCatalog.connectedEnginePackage(tts, requestedEnginePackage)
+        val activePackage = verifiedPackage ?: requestedEnginePackage ?: defaultEnginePackage
         if (engines.isEmpty() || activePackage == null || engines.none { it.packageName == activePackage }) {
             tts.shutdown()
             return TtsResolutionResult(
@@ -227,7 +237,7 @@ class TtsEngineResolver(
                 handle = null,
             )
         }
-        val trust = classify(activePackage)
+        val trust = resolveHandleTrust(requestedEnginePackage, verifiedPackage, activePackage)
         return TtsResolutionResult(
             status = status,
             engines = engines,
@@ -241,11 +251,27 @@ class TtsEngineResolver(
         )
     }
 
+    private fun resolveHandleTrust(
+        requestedEnginePackage: String?,
+        verifiedPackage: String?,
+        activePackage: String,
+    ): EngineTrust =
+        when {
+            requestedEnginePackage != null -> EngineTrust.Unknown
+            verifiedPackage != null -> classify(verifiedPackage)
+            else -> EngineTrust.Unknown
+        }
+
     private fun configureResolvedEngine(tts: TextToSpeech): Boolean {
         if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return false
         val currentVoice = tts.voice ?: return true
-        val preferredVoice = preferOfflineVoice(currentVoice, tts.voices.orEmpty())
-        if (preferredVoice !== currentVoice) tts.voice = preferredVoice
+        val installedVoices =
+            tts.voices.orEmpty().filter { voice ->
+                !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+            }
+        for (candidate in offlineVoiceCandidates(currentVoice, installedVoices)) {
+            if (tts.setVoice(candidate) == TextToSpeech.SUCCESS) return true
+        }
         return true
     }
 
@@ -277,14 +303,20 @@ class TtsEngineResolver(
 
         fun preferOfflineVoice(
             currentVoice: Voice,
-            voices: Set<Voice>,
-        ): Voice {
-            val offlineVoices =
-                voices.filter { voice ->
+            voices: Collection<Voice>,
+        ): Voice = offlineVoiceCandidates(currentVoice, voices).firstOrNull() ?: currentVoice
+
+        fun offlineVoiceCandidates(
+            currentVoice: Voice,
+            voices: Collection<Voice>,
+        ): List<Voice> =
+            voices
+                .filter { voice ->
                     !voice.isNetworkConnectionRequired &&
+                        !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) &&
                         voice.locale.language == currentVoice.locale.language
-                }
-            return offlineVoices.maxByOrNull { it.quality } ?: currentVoice
-        }
+                }.sortedByDescending { it.quality }
+
+        const val TTS_INIT_TIMEOUT_MS = 30_000L
     }
 }

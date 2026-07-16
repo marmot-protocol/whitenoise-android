@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
+import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 
@@ -43,7 +44,8 @@ internal fun TextToSpeechScreen(
 ) {
     val selectedOverride by appState.ttsEnginePreferences.selectedEnginePackage.collectAsState()
     val engineChoice = appState.ttsEngineChoice()
-    val usable = appState.ttsHasUsableEngine
+    val ttsResolution = appState.ttsResolution
+    val reportNoEngine = shouldReportNoTtsEngine(ttsResolution)
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshToken by remember { mutableIntStateOf(0) }
     var pendingEnginePackage by remember { mutableStateOf<String?>(null) }
@@ -58,7 +60,7 @@ internal fun TextToSpeechScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(selectedOverride, refreshToken) {
+    LaunchedEffect(refreshToken) {
         appState.refreshTtsAvailability()
     }
 
@@ -68,7 +70,7 @@ internal fun TextToSpeechScreen(
     val resolvedPackage = appState.resolvedTtsEnginePackage()
 
     fun selectEngine(enginePackage: String) {
-        appState.ttsEnginePreferences.setSelectedEngine(enginePackage)
+        appState.selectTtsEngine(enginePackage)
     }
 
     Scaffold(
@@ -91,10 +93,10 @@ internal fun TextToSpeechScreen(
                 SectionCard(title = stringResource(R.string.tts_settings_about_title)) {
                     Text(
                         text =
-                            if (usable) {
-                                stringResource(R.string.tts_settings_explainer_usable)
-                            } else {
-                                stringResource(R.string.tts_settings_explainer_no_engine)
+                            when {
+                                reportNoEngine -> stringResource(R.string.tts_settings_explainer_no_engine)
+                                !appState.ttsDiscoveryComplete -> stringResource(R.string.tts_settings_explainer_discovering)
+                                else -> stringResource(R.string.tts_settings_explainer_usable)
                             },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -117,7 +119,13 @@ internal fun TextToSpeechScreen(
                                 subtitle = trustLabel,
                                 selected = selected,
                                 onClick = {
-                                    if (requiresTtsTrustWarning(engine.packageName, engine.trust, appState.ttsWarningPreferences)) {
+                                    if (
+                                        requiresTtsTrustWarning(
+                                            engine.packageName,
+                                            appState.runtimeTrustForTtsSelectionWarning(engine.packageName),
+                                            appState.ttsWarningPreferences,
+                                        )
+                                    ) {
                                         pendingEnginePackage = engine.packageName
                                         trustWarningOpen = true
                                     } else {

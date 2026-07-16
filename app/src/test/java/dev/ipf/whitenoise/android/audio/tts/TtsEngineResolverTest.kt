@@ -1,18 +1,23 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -380,6 +385,266 @@ class TtsEngineResolverTest {
         assertSame(current, TtsEngineResolver.preferOfflineVoice(current, emptySet()))
     }
 
+    @Test
+    fun requestedLocalEngineFallbackToUnknownActivePackageMarksHandleUnverified() =
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines =
+                                listOf(
+                                    engineInfo("com.github.olga_yakovleva.rhvoice.android", "RHVoice"),
+                                    engineInfo("com.google.android.tts", "Google"),
+                                ),
+                            defaultEngine = "com.google.android.tts",
+                            connectedEngineForRequest = { requested ->
+                                when (requested) {
+                                    "com.github.olga_yakovleva.rhvoice.android" -> "com.google.android.tts"
+                                    else -> requested ?: "com.google.android.tts"
+                                }
+                            },
+                        ),
+                )
+
+            val deferred =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    resolver.resolve("com.github.olga_yakovleva.rhvoice.android")
+                }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertNotNull(result.handle)
+            assertEquals(EngineTrust.Unknown, result.handle?.trust)
+            assertEquals("com.google.android.tts", result.handle?.enginePackage)
+            result.handle?.release()
+            Unit
+        }
+
+    @Test
+    fun explicitLocalEngineRequestUsesUnverifiedHandleTrustEvenWhenConnectedMatches() =
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines = listOf(engineInfo("com.github.olga_yakovleva.rhvoice.android", "RHVoice")),
+                            defaultEngine = "com.github.olga_yakovleva.rhvoice.android",
+                            connectedEngineForRequest = { requested ->
+                                requested ?: "com.github.olga_yakovleva.rhvoice.android"
+                            },
+                        ),
+                )
+
+            val deferred =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    resolver.resolve("com.github.olga_yakovleva.rhvoice.android")
+                }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertNotNull(result.handle)
+            assertEquals(EngineTrust.Unknown, result.handle?.trust)
+            assertEquals("com.github.olga_yakovleva.rhvoice.android", result.handle?.enginePackage)
+            result.handle?.release()
+            Unit
+        }
+
+    @Test
+    fun productionCatalogNeverClaimsDefaultOrExplicitEngineIsConnected() {
+        val tts = TrackingTextToSpeech(context)
+        try {
+            assertNull(AndroidTtsEngineCatalog.connectedEnginePackage(tts, null))
+            assertNull(AndroidTtsEngineCatalog.connectedEnginePackage(tts, "com.google.android.tts"))
+        } finally {
+            tts.shutdown()
+        }
+    }
+
+    @Test
+    fun defaultBootstrapWithUnverifiableIdentityFailsClosedToUnknownTrust() =
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val localDefault = "com.github.olga_yakovleva.rhvoice.android"
+            val unknownFallback = "com.google.android.tts"
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines =
+                                listOf(
+                                    engineInfo(localDefault, "RHVoice"),
+                                    engineInfo(unknownFallback, "Google"),
+                                ),
+                            defaultEngine = localDefault,
+                            connectedEngineForRequest = { null },
+                        ),
+                )
+
+            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertNotNull(result.handle)
+            assertEquals(localDefault, result.handle?.enginePackage)
+            assertEquals(EngineTrust.Unknown, result.handle?.trust)
+            result.handle?.release()
+            Unit
+        }
+
+    @Test
+    fun initTimeoutReturnsQuietUnusableResultAndShutsDownCandidate() =
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    initTimeoutMs = 50L,
+                )
+
+            val result = resolver.resolve(null)
+
+            assertFalse(result.hasUsableEngine)
+            assertNull(result.handle)
+            assertEquals(1, factory.instances.single().shutdownCount)
+        }
+
+    @Test
+    fun externalCancellationStillPropagatesFromResolve() {
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    initTimeoutMs = 5_000L,
+                )
+
+            val resolution = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve() }
+            resolution.cancelAndJoin()
+
+            assertEquals(1, factory.instances.single().shutdownCount)
+            assertThrows(CancellationException::class.java) {
+                runBlocking { resolution.await() }
+            }
+        }
+    }
+
+    @Test
+    fun outerTimeoutCancellationStillPropagatesFromResolve() {
+        val factory = ControllableTtsFactory()
+        val resolver =
+            TtsEngineResolver(
+                context,
+                ttsFactory = factory,
+                initTimeoutMs = 5_000L,
+            )
+
+        assertThrows(TimeoutCancellationException::class.java) {
+            runBlocking {
+                withTimeout(50L) {
+                    resolver.resolve()
+                }
+            }
+        }
+        assertEquals(1, factory.instances.single().shutdownCount)
+    }
+
+    @Test
+    fun offlineVoiceTriesNextCandidateWhenHighestQualitySetVoiceFails() =
+        runBlocking {
+            val current = voice("current-network", Locale.US, quality = 300, networkRequired = true)
+            val lowerQualityEnglish = voice("english-low", Locale.UK, quality = 200)
+            val higherQualityEnglish = voice("english-high", Locale.CANADA, quality = 400)
+            val factory =
+                VoiceConfigurableTtsFactory(
+                    currentVoice = current,
+                    voices = setOf(current, lowerQualityEnglish, higherQualityEnglish),
+                    setVoiceResults =
+                        mapOf(
+                            higherQualityEnglish to TextToSpeech.ERROR,
+                            lowerQualityEnglish to TextToSpeech.SUCCESS,
+                        ),
+                )
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines = listOf(engineInfo("com.google.android.tts", "Google")),
+                            defaultEngine = "com.google.android.tts",
+                        ),
+                )
+
+            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertTrue(result.hasUsableEngine)
+            assertNotNull(result.handle)
+            assertEquals(lowerQualityEnglish, factory.instance.voice)
+            result.handle?.release()
+            Unit
+        }
+
+    @Test
+    fun offlineVoiceKeepsCurrentWhenAllCandidatesFailSetVoice() =
+        runBlocking {
+            val current = voice("current-network", Locale.US, quality = 300, networkRequired = true)
+            val offlineEnglish = voice("english-offline", Locale.UK, quality = 400)
+            val factory =
+                VoiceConfigurableTtsFactory(
+                    currentVoice = current,
+                    voices = setOf(current, offlineEnglish),
+                    setVoiceResults = mapOf(offlineEnglish to TextToSpeech.ERROR),
+                )
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines = listOf(engineInfo("com.google.android.tts", "Google")),
+                            defaultEngine = "com.google.android.tts",
+                        ),
+                )
+
+            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertTrue(result.hasUsableEngine)
+            assertNotNull(result.handle)
+            assertEquals(current, factory.instance.voice)
+            result.handle?.release()
+            Unit
+        }
+
+    @Test
+    fun offlineVoicePreferenceSkipsNotInstalledVoices() {
+        val current = voice("current", Locale.US, quality = 300, networkRequired = true)
+        val notInstalled = voice("offline-high", Locale.CANADA, quality = 500, features = setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))
+        val installed = voice("offline-low", Locale.UK, quality = 200)
+
+        val preferred =
+            TtsEngineResolver.preferOfflineVoice(
+                current,
+                setOf(notInstalled, installed),
+            )
+
+        assertSame(installed, preferred)
+    }
+
     private fun engineInfo(
         name: String,
         label: String,
@@ -394,15 +659,24 @@ class TtsEngineResolverTest {
         locale: Locale,
         quality: Int,
         networkRequired: Boolean = false,
-    ): Voice = Voice(name, locale, quality, 100, networkRequired, emptySet())
+        features: Set<String> = emptySet(),
+    ): Voice = Voice(name, locale, quality, 100, networkRequired, features)
 
     private class FakeTtsEngineCatalog(
         private val engines: List<TextToSpeech.EngineInfo>,
         private val defaultEngine: String? = null,
+        private val connectedEngineForRequest: (String?) -> String? = { requested ->
+            if (requested == null) defaultEngine else null
+        },
     ) : TtsEngineCatalog {
         override fun installedEngines(tts: TextToSpeech): List<TextToSpeech.EngineInfo> = engines
 
         override fun defaultEnginePackage(tts: TextToSpeech): String? = defaultEngine
+
+        override fun connectedEnginePackage(
+            tts: TextToSpeech,
+            requestedPackage: String?,
+        ): String? = connectedEngineForRequest(requestedPackage)
     }
 
     private class ControllableTtsFactory : TtsFactory {
@@ -452,5 +726,57 @@ class TtsEngineResolverTest {
             shutdownCount += 1
             super.shutdown()
         }
+    }
+
+    private class VoiceConfigurableTtsFactory(
+        private val currentVoice: Voice,
+        private val voices: Set<Voice>,
+        private val setVoiceResults: Map<Voice, Int>,
+    ) : TtsFactory {
+        private var listener: TextToSpeech.OnInitListener? = null
+        lateinit var instance: VoiceConfigurableTextToSpeech
+
+        override fun create(
+            context: Context,
+            listener: TextToSpeech.OnInitListener,
+            engine: String?,
+        ): TextToSpeech {
+            this.listener = listener
+            instance =
+                VoiceConfigurableTextToSpeech(
+                    context = context,
+                    currentVoice = currentVoice,
+                    availableVoices = voices,
+                    setVoiceResults = setVoiceResults,
+                )
+            return instance
+        }
+
+        fun completeInit(status: Int) {
+            listener?.onInit(status)
+        }
+    }
+
+    private class VoiceConfigurableTextToSpeech(
+        context: Context,
+        currentVoice: Voice,
+        private val availableVoices: Set<Voice>,
+        private val setVoiceResults: Map<Voice, Int>,
+    ) : TextToSpeech(context, {}) {
+        private var activeVoice: Voice = currentVoice
+
+        override fun getVoice(): Voice = activeVoice
+
+        override fun getVoices(): MutableSet<Voice> = availableVoices.toMutableSet()
+
+        override fun setVoice(voice: Voice?): Int {
+            val result = setVoiceResults[voice] ?: TextToSpeech.SUCCESS
+            if (result == TextToSpeech.SUCCESS && voice != null) {
+                activeVoice = voice
+            }
+            return result
+        }
+
+        override fun setAudioAttributes(attributes: AudioAttributes?): Int = TextToSpeech.SUCCESS
     }
 }

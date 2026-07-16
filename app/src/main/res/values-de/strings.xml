@@ -1080,6 +1080,7 @@
     <string name="tts_settings_subtitle">Nachrichten vorlesen und eine lokale Engine wählen</string>
     <string name="tts_settings_about_title">Über Sprachausgabe</string>
     <string name="tts_settings_explainer_usable">„Sprechen“ liest Nachrichtentext mit Ihrer gewählten Sprachausgabe vor. Lokale Engines verarbeiten Sprache auf diesem Gerät.</string>
+    <string name="tts_settings_explainer_discovering">Installierte Sprachausgaben auf diesem Gerät werden geprüft…</string>
     <string name="tts_settings_explainer_no_engine">Keine nutzbare Sprachausgabe installiert. Installieren Sie RHVoice oder eSpeak NG über F-Droid oder Zapstore und wählen Sie es unten aus.</string>
     <string name="tts_settings_engine_title">Sprachmodul</string>
     <string name="tts_settings_engine_local">Engine auf dem Gerät</string>

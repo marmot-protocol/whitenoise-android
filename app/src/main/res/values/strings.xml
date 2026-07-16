@@ -1112,6 +1112,7 @@
     <string name="tts_settings_subtitle">Speak messages and choose an on-device engine</string>
     <string name="tts_settings_about_title">About speech</string>
     <string name="tts_settings_explainer_usable">Speak reads message text aloud using your chosen text-to-speech engine. Local engines process speech on this device.</string>
+    <string name="tts_settings_explainer_discovering">Checking installed text-to-speech engines on this device…</string>
     <string name="tts_settings_explainer_no_engine">No usable text-to-speech engine is installed. Install RHVoice or eSpeak NG from F-Droid or Zapstore, then select it below.</string>
     <string name="tts_settings_engine_title">Engine</string>
     <string name="tts_settings_engine_local">On-device engine</string>
