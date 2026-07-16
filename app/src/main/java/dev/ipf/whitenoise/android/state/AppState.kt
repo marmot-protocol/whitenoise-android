@@ -283,6 +283,42 @@ internal object LongMessageCollapsePreferences {
     }
 }
 
+/** Observable, account-scoped view of the persisted long-message preference. */
+internal class LongMessageCollapseState(
+    registry: ScopedCacheRegistry,
+    private val preferences: SharedPreferences,
+    maxEntries: Int,
+) {
+    private val values =
+        ScopedCache<String, MutableState<Boolean>>(
+            registry = registry,
+            name = "collapse-long-messages",
+            maxEntries = maxEntries,
+            observable = true,
+        )
+
+    fun collapseLongMessages(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Boolean {
+        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return true
+        return values
+            .getOrPut(key) {
+                mutableStateOf(LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key))
+            }.value
+    }
+
+    fun updateCollapseLongMessages(
+        accountRef: String?,
+        groupIdHex: String,
+        enabled: Boolean,
+    ) {
+        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return
+        values.getOrPut(key) { mutableStateOf(enabled) }.value = enabled
+        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
+    }
+}
+
 internal data class ProfileGroupInviteToast(
     @param:StringRes val messageRes: Int,
     val detail: AppText? = null,
@@ -1129,6 +1165,10 @@ class WhiteNoiseAppState(
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
 
+    private val accountScopedCaches = ScopedCacheRegistry()
+    private val profilePresentationLock = Any()
+    private val groupMemberSnapshotLock = Any()
+
     private val globalBubbleColors =
         mutableStateMapOf<Pair<BubbleTheme, BubbleSide>, Long?>().apply {
             BubbleTheme.entries.forEach { theme ->
@@ -1137,7 +1177,13 @@ class WhiteNoiseAppState(
                 }
             }
         }
-    private val chatBubbleColors = mutableMapOf<String, MutableState<Long?>>()
+    private val chatBubbleColors =
+        ScopedCache<String, MutableState<Long?>>(
+            registry = accountScopedCaches,
+            name = "chat-bubble-colors",
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
+        )
 
     /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
@@ -1203,7 +1249,11 @@ class WhiteNoiseAppState(
     )
         private set
 
-    private val npubs = BoundedNpubCache()
+    private val npubs =
+        BoundedNpubCache(
+            registry = accountScopedCaches,
+            maxEntries = BoundedNpubCache.DEFAULT_MAX_ENTRIES,
+        )
     private var profileRevision by mutableStateOf(0)
     private var contactNicknameRevision by mutableStateOf(0)
 
@@ -1216,26 +1266,65 @@ class WhiteNoiseAppState(
      */
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
-    private val profilePresentations = BoundedEntryCache<String, ProfilePresentation>(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
+    private val profilePresentations =
+        ScopedCache<String, ProfilePresentation>(
+            registry = accountScopedCaches,
+            name = "profile-presentations",
+            maxEntries = MAX_PROFILE_PRESENTATION_CACHE_ENTRIES,
+            lock = profilePresentationLock,
+        )
 
     // Materialized profile metadata, populated off-main by [refreshProfile].
     // Read accessors serve from here so composition never crosses the FFI.
-    private val userProfiles = BoundedEntryCache<String, UserProfileMetadataFfi>(MAX_USER_PROFILE_CACHE_ENTRIES)
+    private val userProfiles =
+        ScopedCache<String, UserProfileMetadataFfi>(
+            registry = accountScopedCaches,
+            name = "user-profiles",
+            maxEntries = MAX_USER_PROFILE_CACHE_ENTRIES,
+            lock = profilePresentationLock,
+        )
 
     // Profile ids whose avatar image was requested by a recent/live conversation
     // projection. Kept separate from general profile materialization so opening a
     // large roster does not trigger unsolicited image-host traffic.
-    private val pendingAvatarPreWarmAccountIds = linkedSetOf<String>()
+    private val pendingAvatarPreWarmAccountIds =
+        ScopedSet<String>(
+            registry = accountScopedCaches,
+            name = "pending-avatar-prewarms",
+            maxEntries = MAX_PENDING_AVATAR_PREWARMS,
+            lock = profilePresentationLock,
+        )
 
     // Ids with an in-flight local materialization, so a cache miss launches at
     // most one local read per id. Distinct from the relay-refresh cooldown gate.
-    private val materializingProfiles = mutableSetOf<String>()
-    private val profilePresentationLock = Any()
-    private val groupMemberSnapshots = BoundedEntryCache<String, GroupMemberSnapshot>(MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES)
-    private val groupMemberSnapshotLock = Any()
+    private val materializingProfiles =
+        ScopedSet<String>(
+            registry = accountScopedCaches,
+            name = "materializing-profiles",
+            maxEntries = MAX_MATERIALIZING_PROFILES,
+            lock = profilePresentationLock,
+        )
+    private val groupMemberSnapshots =
+        ScopedCache<String, GroupMemberSnapshot>(
+            registry = accountScopedCaches,
+            name = "group-member-snapshots",
+            maxEntries = MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES,
+            lock = groupMemberSnapshotLock,
+        )
     private val conversationStateLock = Any()
-    private val collapseLongMessagesByAccountGroup = mutableStateMapOf<String, Boolean>()
-    private val hiddenMessageIdsByAccountGroup = mutableStateMapOf<String, Set<String>>()
+    private val longMessageCollapseState =
+        LongMessageCollapseState(
+            registry = accountScopedCaches,
+            preferences = preferences,
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+        )
+    private val hiddenMessageIdsByAccountGroup =
+        ScopedCache<String, MutableState<Set<String>>>(
+            registry = accountScopedCaches,
+            name = "hidden-message-ids",
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
+        )
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
@@ -2517,24 +2606,13 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Drop per-account identity/metadata caches so account A's data isn't
-     * reachable after switching to B, and so they don't grow unbounded across
-     * many account switches: the npub cache, resolved profile presentations,
-     * and group-member snapshots. Bumps [profileRevision] so any visible
-     * profile re-resolves for the now-active account. Called on account switch
-     * and sign-out.
+     * Drop every registered account-scoped cache so account A's data isn't
+     * reachable after switching to B. New caches participate by construction;
+     * this boundary must never grow another hand-maintained field list.
      */
     private fun clearCrossAccountCaches() {
         profileCacheEpoch.incrementAndGet()
-        chatBubbleColors.clear()
-        npubs.clear()
-        synchronized(profilePresentationLock) {
-            profilePresentations.clear()
-            userProfiles.clear()
-            pendingAvatarPreWarmAccountIds.clear()
-            materializingProfiles.clear()
-        }
-        synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
+        accountScopedCaches.clearAll()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
     }
@@ -3085,19 +3163,13 @@ class WhiteNoiseAppState(
      * gate (#1180). Default ON preserves the existing Read More behavior for every
      * account/group until the user disables it from that group's details screen.
      */
-    fun collapseLongMessagesInGroup(groupIdHex: String): Boolean {
-        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return true
-        return collapseLongMessagesByAccountGroup[key]
-            ?: LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key)
-    }
+    fun collapseLongMessagesInGroup(groupIdHex: String): Boolean = longMessageCollapseState.collapseLongMessages(activeAccountRef, groupIdHex)
 
     fun updateCollapseLongMessagesInGroup(
         groupIdHex: String,
         enabled: Boolean,
     ) {
-        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return
-        collapseLongMessagesByAccountGroup[key] = enabled
-        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
+        longMessageCollapseState.updateCollapseLongMessages(activeAccountRef, groupIdHex, enabled)
     }
 
     fun isConversationMuted(groupIdHex: String): Boolean {
@@ -3131,7 +3203,7 @@ class WhiteNoiseAppState(
         groupIdHex: String,
     ): Set<String> {
         val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
-        return hiddenMessageIdsByAccountGroup[key]
+        return hiddenMessageIdsByAccountGroup[key]?.value
             ?: MessageHidePreferences.readHiddenMessageIdsByKey(preferences, key)
     }
 
@@ -3142,16 +3214,16 @@ class WhiteNoiseAppState(
     ): Set<String> {
         val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
         val updated = MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
-        hiddenMessageIdsByAccountGroup[key] = updated
+        hiddenMessageIdsByAccountGroup
+            .getOrPut(key) { mutableStateOf(updated) }
+            .value = updated
         return updated
     }
 
     fun clearHiddenMessagesForAccount(accountRef: String) {
         MessageHidePreferences.clearAccount(preferences, accountRef)
         val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return
-        hiddenMessageIdsByAccountGroup.keys
-            .filter { it.startsWith(prefix) }
-            .forEach(hiddenMessageIdsByAccountGroup::remove)
+        hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
     }
 
     /**
@@ -4514,13 +4586,6 @@ class WhiteNoiseAppState(
                     // Reinsert to keep the set in recent-conversation order; a
                     // live sender must not sit behind old avatarless profiles.
                     pendingAvatarPreWarmAccountIds.remove(id)
-                    if (pendingAvatarPreWarmAccountIds.size >= MAX_PENDING_AVATAR_PREWARMS) {
-                        val oldest = pendingAvatarPreWarmAccountIds.iterator()
-                        if (oldest.hasNext()) {
-                            oldest.next()
-                            oldest.remove()
-                        }
-                    }
                     pendingAvatarPreWarmAccountIds.add(id)
                 }
                 avatar
@@ -5549,7 +5614,9 @@ class WhiteNoiseAppState(
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
         private const val MAX_PENDING_AVATAR_PREWARMS = 64
+        private const val MAX_MATERIALIZING_PROFILES = 4096
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
+        private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L

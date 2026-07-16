@@ -9,7 +9,7 @@ import org.junit.Test
 class BoundedNpubCacheTest {
     @Test
     fun keepsCacheBounded() {
-        val cache = BoundedNpubCache(maxEntries = 4)
+        val cache = BoundedNpubCache(ScopedCacheRegistry(), maxEntries = 4)
 
         repeat(100) { i -> cache.put("hex-$i", "npub-$i") }
 
@@ -20,7 +20,7 @@ class BoundedNpubCacheTest {
 
     @Test
     fun lookupPromotesEntryBeforeEviction() {
-        val cache = BoundedNpubCache(maxEntries = 3)
+        val cache = BoundedNpubCache(ScopedCacheRegistry(), maxEntries = 3)
         cache.put("a", "npub-a")
         cache.put("b", "npub-b")
         cache.put("c", "npub-c")
@@ -36,7 +36,7 @@ class BoundedNpubCacheTest {
 
     @Test
     fun clearDropsEntries() {
-        val cache = BoundedNpubCache(maxEntries = 2)
+        val cache = BoundedNpubCache(ScopedCacheRegistry(), maxEntries = 2)
         cache.put("a", "npub-a")
         cache.put("b", "npub-b")
 
@@ -47,10 +47,24 @@ class BoundedNpubCacheTest {
     }
 
     @Test
+    fun registryClearDropsEntries() {
+        val registry = ScopedCacheRegistry()
+        val cache = BoundedNpubCache(registry, maxEntries = 2)
+        cache.put("a", "npub-a")
+        cache.put("b", "npub-b")
+
+        registry.clearAll()
+
+        assertNull(cache.get("a"))
+        assertNull(cache.get("b"))
+        assertEquals(0, cache.size())
+    }
+
+    @Test
     fun rejectsNonPositiveCap() {
         val thrown =
             assertThrows(IllegalArgumentException::class.java) {
-                BoundedNpubCache(maxEntries = 0)
+                BoundedNpubCache(ScopedCacheRegistry(), maxEntries = 0)
             }
 
         assertTrue(thrown.message!!.contains("positive"))

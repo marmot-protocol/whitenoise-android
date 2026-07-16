@@ -25,6 +25,15 @@ internal class BoundedEntryCache<K : Any, V : Any>(
         value: V,
     ): V? = entries.put(key, value)
 
+    fun getOrPut(
+        key: K,
+        defaultValue: () -> V,
+    ): V = entries.getOrPut(key, defaultValue)
+
+    fun remove(key: K): V? = entries.remove(key)
+
+    fun removeAll(predicate: (K) -> Boolean): Boolean = entries.keys.removeAll(predicate)
+
     fun containsKey(key: K): Boolean = entries.containsKey(key)
 
     fun clear() {
