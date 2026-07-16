@@ -20,12 +20,8 @@ class MediaMemoryCacheEvictionTest {
                 removeMediaMemoryCacheKeys(
                     cacheKeys = listOf("one", "two"),
                     dispatcher = dispatcher,
-                    removePlaintext = { key ->
-                        removals += "plain:$key"
-                        threads += Thread.currentThread().name
-                    },
-                    removeThumbnail = { key ->
-                        removals += "thumb:$key"
+                    removeEntry = { key ->
+                        removals += key
                         threads += Thread.currentThread().name
                     },
                 )
@@ -33,7 +29,7 @@ class MediaMemoryCacheEvictionTest {
         }
 
         assertEquals(
-            listOf("plain:one", "thumb:one", "plain:two", "thumb:two"),
+            listOf("one", "two"),
             removals,
         )
         assertTrue(

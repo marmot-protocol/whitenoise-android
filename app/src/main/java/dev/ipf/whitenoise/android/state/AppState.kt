@@ -978,7 +978,7 @@ class WhiteNoiseAppState(
      * controller) so re-opening a chat doesn't re-download media already
      * fetched this session. Bounded in bytes; see [dev.ipf.whitenoise.android.media.ByteSizeLruCache].
      */
-    internal val mediaPlaintextCache =
+    private val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
@@ -998,12 +998,44 @@ class WhiteNoiseAppState(
      * are GC-reclaimed once unreferenced, so the caps bound retention and GC
      * frees the rest — no recycle() needed, and adding one back is unsafe.
      */
-    internal val mediaThumbnailCache =
+    private val mediaThumbnailCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             sizeOf = { it.allocationByteCount },
         )
+
+    internal fun cachedMediaPlaintext(cacheKey: String): ByteArray? {
+        assertMainThread { "cachedMediaPlaintext" }
+        return mediaPlaintextCache.get(cacheKey)
+    }
+
+    internal fun cacheMediaPlaintext(
+        cacheKey: String,
+        plaintext: ByteArray,
+    ) {
+        assertMainThread { "cacheMediaPlaintext" }
+        mediaPlaintextCache.put(cacheKey, plaintext)
+    }
+
+    internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
+        assertMainThread { "cachedMediaThumbnail" }
+        return mediaThumbnailCache.get(cacheKey)
+    }
+
+    internal fun cacheMediaThumbnail(
+        cacheKey: String,
+        thumbnail: android.graphics.Bitmap,
+    ) {
+        assertMainThread { "cacheMediaThumbnail" }
+        mediaThumbnailCache.put(cacheKey, thumbnail)
+    }
+
+    internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
+        assertMainThread { "removeMediaMemoryCacheEntry" }
+        mediaPlaintextCache.remove(cacheKey)
+        mediaThumbnailCache.remove(cacheKey)
+    }
 
     /**
      * Persistent (L2) cache of decrypted attachment bytes. Survives process
@@ -2511,6 +2543,7 @@ class WhiteNoiseAppState(
      * cost. The L2 disk cache is also deliberately preserved.
      */
     private fun clearInMemoryMediaCaches() {
+        assertMainThread { "clearInMemoryMediaCaches" }
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
         MediaInventory.clear()
@@ -2611,6 +2644,7 @@ class WhiteNoiseAppState(
      * this boundary must never grow another hand-maintained field list.
      */
     private fun clearCrossAccountCaches() {
+        assertMainThread { "clearCrossAccountCaches" }
         profileCacheEpoch.incrementAndGet()
         accountScopedCaches.clearAll()
         pruneIdleGroupCommitLocks()
@@ -3764,8 +3798,7 @@ class WhiteNoiseAppState(
         removeMediaMemoryCacheKeys(
             cacheKeys = cacheKeys,
             dispatcher = Dispatchers.Main.immediate,
-            removePlaintext = { key -> mediaPlaintextCache.remove(key) },
-            removeThumbnail = { key -> mediaThumbnailCache.remove(key) },
+            removeEntry = ::removeMediaMemoryCacheEntry,
         )
         withContext(Dispatchers.IO) {
             cacheKeys.forEach { diskMediaCache.remove(it) }
@@ -4760,9 +4793,10 @@ class WhiteNoiseAppState(
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
-            if (profileCacheEpoch.get() == epoch) {
-                synchronized(profilePresentationLock) { userProfiles.put(accountIdHex, profile) }
-                applyProfilePresentation(accountIdHex, presentation)
+            withContext(Dispatchers.Main.immediate) {
+                if (profileCacheEpoch.get() == epoch) {
+                    applyProfilePresentation(accountIdHex, profile, presentation)
+                }
             }
         }
     }
@@ -5521,9 +5555,10 @@ class WhiteNoiseAppState(
                 displayName = displayName,
                 avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
             )
-        if (profileCacheEpoch.get() == epoch) {
-            synchronized(profilePresentationLock) { profile?.let { userProfiles.put(id, it) } }
-            applyProfilePresentation(id, presentation)
+        withContext(Dispatchers.Main.immediate) {
+            if (profileCacheEpoch.get() == epoch) {
+                applyProfilePresentation(id, profile, presentation)
+            }
         }
     }
 
@@ -5535,10 +5570,13 @@ class WhiteNoiseAppState(
      */
     private fun applyProfilePresentation(
         accountIdHex: String,
+        profile: UserProfileMetadataFfi?,
         presentation: ProfilePresentation,
     ) {
+        assertMainThread { "applyProfilePresentation" }
         val (changed, shouldPreWarm) =
             synchronized(profilePresentationLock) {
+                profile?.let { userProfiles.put(accountIdHex, it) }
                 val changed = profilePresentations.put(accountIdHex, presentation) != presentation
                 val shouldPreWarm =
                     presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)
@@ -5553,6 +5591,7 @@ class WhiteNoiseAppState(
     }
 
     private fun notifyProfilesChanged() {
+        assertMainThread { "notifyProfilesChanged" }
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
             userProfiles.clear()
