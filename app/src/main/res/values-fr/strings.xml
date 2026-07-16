@@ -904,6 +904,18 @@
     <string name="shared_media">Médias partagés</string>
     <string name="shared_media_see_all">Tout voir</string>
     <string name="shared_media_view">Voir les médias partagés</string>
+    <plurals name="shared_media_links_count">
+        <item quantity="one">%1$d lien partagé</item>
+        <item quantity="other">%1$d liens partagés</item>
+    </plurals>
+    <plurals name="shared_media_files_count">
+        <item quantity="one">%1$d fichier partagé</item>
+        <item quantity="other">%1$d fichiers partagés</item>
+    </plurals>
+    <plurals name="shared_media_voice_count">
+        <item quantity="one">%1$d message vocal partagé</item>
+        <item quantity="other">%1$d messages vocaux partagés</item>
+    </plurals>
     <string name="shared_media_tab_images">Images</string>
     <string name="shared_media_tab_videos">Vidéos</string>
     <string name="shared_media_tab_voice">Vocal</string>

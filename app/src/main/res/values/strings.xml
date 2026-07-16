@@ -932,6 +932,18 @@
     <string name="shared_media">Shared media</string>
     <string name="shared_media_see_all">See all</string>
     <string name="shared_media_view">View shared media</string>
+    <plurals name="shared_media_links_count">
+        <item quantity="one">%1$d link shared</item>
+        <item quantity="other">%1$d links shared</item>
+    </plurals>
+    <plurals name="shared_media_files_count">
+        <item quantity="one">%1$d file shared</item>
+        <item quantity="other">%1$d files shared</item>
+    </plurals>
+    <plurals name="shared_media_voice_count">
+        <item quantity="one">%1$d voice message shared</item>
+        <item quantity="other">%1$d voice messages shared</item>
+    </plurals>
     <string name="shared_media_tab_images">Images</string>
     <string name="shared_media_tab_videos">Videos</string>
     <string name="shared_media_tab_voice">Voice</string>

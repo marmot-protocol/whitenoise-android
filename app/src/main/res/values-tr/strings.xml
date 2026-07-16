@@ -902,6 +902,18 @@
     <string name="shared_media">Paylaşılan medya</string>
     <string name="shared_media_see_all">Tümünü gör</string>
     <string name="shared_media_view">Paylaşılan medyayı gör</string>
+    <plurals name="shared_media_links_count">
+        <item quantity="one">%1$d bağlantı paylaşıldı</item>
+        <item quantity="other">%1$d bağlantı paylaşıldı</item>
+    </plurals>
+    <plurals name="shared_media_files_count">
+        <item quantity="one">%1$d dosya paylaşıldı</item>
+        <item quantity="other">%1$d dosya paylaşıldı</item>
+    </plurals>
+    <plurals name="shared_media_voice_count">
+        <item quantity="one">%1$d sesli mesaj paylaşıldı</item>
+        <item quantity="other">%1$d sesli mesaj paylaşıldı</item>
+    </plurals>
     <string name="shared_media_tab_images">Görseller</string>
     <string name="shared_media_tab_videos">Videolar</string>
     <string name="shared_media_tab_voice">Ses</string>
