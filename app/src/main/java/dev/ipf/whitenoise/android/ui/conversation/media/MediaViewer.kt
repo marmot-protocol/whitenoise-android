@@ -174,7 +174,8 @@ internal fun FullScreenMediaViewer(
         )
     // pagerState outlives a shrinking pages list (album reconcile): currentPage
     // isn't re-clamped to the new lastIndex for a frame, so clamp at the read.
-    val currentPage = pages[clampViewerPageIndex(pagerState.currentPage, pages.size)]
+    val currentPageIndex = clampViewerPageIndex(pagerState.currentPage, pages.size)
+    val currentPage = pages[currentPageIndex]
     val currentReference = currentPage.reference
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
@@ -203,7 +204,7 @@ internal fun FullScreenMediaViewer(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         MediaViewerFrame(
-            pageIndex = pagerState.currentPage,
+            pageIndex = currentPageIndex,
             pageCount = pages.size,
             senderLabel = appState.displayName(currentPage.sender),
             recordedAtLabel = currentRecordedAtLabel,

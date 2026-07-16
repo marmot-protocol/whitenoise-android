@@ -67,15 +67,27 @@ class ViewerStateTest {
                 imageWidth = 1200,
                 imageHeight = 800,
             )
-        val (maxX, _) =
-            viewerPanExtents(
+        // Landscape 1200×800 in 360×780 at 2×: width-limited fit → maxX=180, maxY=0.
+        assertEquals(180f, result.offset.x, 0.001f)
+        assertEquals(0f, result.offset.y, 0.001f)
+        assertEquals(2f, result.scale)
+    }
+
+    @Test
+    fun applyViewerTransformGestureClampsVerticalPanWithinZoomExtents() {
+        val result =
+            applyViewerTransformGesture(
+                current = ViewerTransform(scale = 2f, offset = Offset(0f, 40f)),
+                zoomFactor = 1f,
+                panDelta = Offset(0f, 500f),
                 viewportWidth = 360f,
                 viewportHeight = 780f,
-                imageWidth = 1200,
-                imageHeight = 800,
-                scale = 2f,
+                imageWidth = 300,
+                imageHeight = 2000,
             )
-        assertEquals(maxX, result.offset.x, 0.001f)
+        // Portrait 300×2000 in 360×780 at 2×: height-limited fit → maxX=0, maxY=390.
+        assertEquals(0f, result.offset.x, 0.001f)
+        assertEquals(390f, result.offset.y, 0.001f)
         assertEquals(2f, result.scale)
     }
 
