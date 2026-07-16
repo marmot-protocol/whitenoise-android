@@ -315,6 +315,7 @@
     <string name="waiting_for_stream">Waiting for stream...</string>
     <string name="stream_failed_format">Stream failed: %1$s</string>
     <string name="copy_text">Copy text</string>
+    <string name="select_text">Select text</string>
     <string name="open_emoji_picker">Open emoji picker</string>
     <string name="show_keyboard">Show keyboard</string>
     <string name="emoji_backspace">Delete emoji</string>

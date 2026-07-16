@@ -245,6 +245,7 @@
     <string name="waiting_for_stream">正在等待串流...</string>
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
+    <string name="select_text">選取文字</string>
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
     <string name="show_keyboard">顯示鍵盤</string>
     <string name="emoji_backspace">刪除表情符號</string>
