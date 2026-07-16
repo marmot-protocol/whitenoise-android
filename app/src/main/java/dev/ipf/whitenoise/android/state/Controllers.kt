@@ -985,7 +985,6 @@ private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
 ) {
     val media =
         runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
-            .onFailure(::rethrowIfCancellation)
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
             ?: return
@@ -2492,7 +2491,6 @@ class ChatsController(
             }
             true
         }.onFailure {
-            if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
         }.getOrDefault(false)
     }
@@ -2578,7 +2576,6 @@ class ChatsController(
             appState.present(R.string.toast_left_chat)
             true
         }.onFailure {
-            if (it is CancellationException) throw it
             val errorText = AppText.Plain(it.message ?: it.javaClass.simpleName)
             if (demotedBeforeLeave) {
                 // User was demoted but we couldn't complete the leave.
@@ -2640,7 +2637,6 @@ class ChatsController(
         val activeIdHex = appState.activeAccount?.accountIdHex
         val liveMembers =
             runCatchingCancellable { appState.marmotIo { groupMembers(account, groupIdHex) } }
-                .onFailure(::rethrowIfCancellation)
                 .getOrNull()
         val stillMember =
             liveMembers?.any { GroupProjector.isActiveAccountMember(it, activeIdHex) }
@@ -2682,7 +2678,6 @@ class ChatsController(
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         val members =
             runCatchingCancellable { appState.marmotIo { groupMembers(account, groupIdHex) } }
-                .onFailure(::rethrowIfCancellation)
                 .getOrNull()
                 ?: return null
         if (GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)) return null
@@ -2799,7 +2794,6 @@ class ChatsController(
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
         }.onFailure {
-            if (it is CancellationException) throw it
             // Quiet for the user (marking read is an idempotent
             // affordance and surfacing a toast on every flake would be
             // noisy) — but still log the failure so the trace surfaces
@@ -3676,7 +3670,6 @@ class ConversationController(
         val memberCount =
             if (account != null) {
                 runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
-                    .onFailure(::rethrowIfCancellation)
                     .getOrNull()
                     ?.size
             } else {
@@ -3798,7 +3791,7 @@ class ConversationController(
                             appState.dismissConversationNotifications(account, group.groupIdHex)
                         }
                         evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
-                    }.onFailure { it.rethrowIfCancellation() }
+                    }
                 }
                 publishTimelineFromIndexes()
             }
@@ -4996,7 +4989,6 @@ class ConversationController(
             // must not remove a reaction that has already been published.
             runCatchingCancellable { markReadUpTo(target) }
                 .onFailure {
-                    it.rethrowIfCancellation()
                     Log.w("DMConversation", "mark-read after reaction failed target=${target.take(8)}", it)
                 }
         }
@@ -5306,7 +5298,6 @@ class ConversationController(
                         val safeReference = assertMediaLocatorsResolveSafe(reference)
                         appState.marmotIo { downloadMedia(account, groupIdHex, safeReference) }
                     }.onFailure {
-                        if (it is CancellationException) throw it
                         // Strip path AND query/fragment so any signed tokens or
                         // capabilities in the locator don't end up in logs — a
                         // path-less locator like `https://host?token=…` would
@@ -5679,7 +5670,6 @@ class ConversationController(
             // sole-admin transfer gate and dissolve the group with local cleanup.
             val liveMembers =
                 runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
-                    .onFailure(::rethrowIfCancellation)
                     .getOrNull()
             val memberCount = liveMembers?.size ?: members.size
             val soleMember =
@@ -5832,7 +5822,6 @@ class ConversationController(
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message), copyable = true)
@@ -5848,7 +5837,6 @@ class ConversationController(
                 appState.present(R.string.toast_chat_deleted_local)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(message), copyable = true)
@@ -5878,7 +5866,6 @@ class ConversationController(
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
@@ -5905,7 +5892,6 @@ class ConversationController(
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
@@ -6043,7 +6029,6 @@ class ConversationController(
                 }
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
@@ -6077,14 +6062,12 @@ class ConversationController(
                 // failure toast — log it and fall back to an in-memory re-filter.
                 runCatchingCancellable { refreshCurrentTimeline(account) }
                     .onFailure { refreshError ->
-                        refreshError.rethrowIfCancellation()
                         Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
                         publishTimelineFromIndexes()
                     }
                 appState.present(R.string.toast_disappearing_messages_updated)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message), copyable = true)
@@ -6109,7 +6092,6 @@ class ConversationController(
                 appState.present(R.string.toast_admin_removed)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
@@ -6154,8 +6136,8 @@ class ConversationController(
                     applyMutationDetails(account, promoteResult.details)
                     // The grant has already landed on the MLS group. If the scope is
                     // cancelled now, skipping the demote would strand both accounts as
-                    // admin without telling the caller (rethrowIfCancellation below
-                    // jumps past the partial-state branch). Run it to completion.
+                    // admin without telling the caller (runCatchingCancellable propagates
+                    // cancellation past the partial-state branch). Run it to completion.
                     withContext(NonCancellable) {
                         val demoteResult =
                             appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
@@ -6165,7 +6147,6 @@ class ConversationController(
                 appState.present(R.string.toast_admin_transferred)
                 true
             }.onFailure {
-                it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
                 if (grantedBeforeDemote) {
@@ -6191,7 +6172,6 @@ class ConversationController(
         return runCatchingCancellable {
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
-            if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
         }.getOrNull()
     }
@@ -6201,7 +6181,6 @@ class ConversationController(
         return runCatchingCancellable {
             appState.marmotIo { groupPushDebugInfo(account, group.groupIdHex) }
         }.onFailure {
-            if (it is CancellationException) throw it
             appState.present(
                 R.string.toast_couldnt_load_push_debug_info,
                 AppText.Plain(it.message ?: it.javaClass.simpleName),
@@ -6244,7 +6223,6 @@ class ConversationController(
                 )
             }
         }.onFailure {
-            it.rethrowIfCancellation()
             appState.present(
                 R.string.toast_couldnt_export_transcript,
                 AppText.Plain(DiagnosticFormatter.redactError(it.message ?: it.javaClass.simpleName)),
@@ -6300,7 +6278,6 @@ class ConversationController(
                 appState.marmotIo { messages(account, group.groupIdHex, 120u) }
             }
         }.onFailure {
-            it.rethrowIfCancellation()
             Log.w(
                 "DMConversation",
                 "lookup message failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
@@ -6618,7 +6595,6 @@ class ConversationController(
         runCatchingCancellable {
             appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
         }.onFailure {
-            it.rethrowIfCancellation()
             Log.w("DMConversation", "initialize read state failed for ${group.groupIdHex.take(8)}", it)
         }
     }
@@ -6671,7 +6647,6 @@ class ConversationController(
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
-            if (it is CancellationException) throw it
             Log.w("DMConversation", "dismiss read notifications failed for ${group.groupIdHex.take(8)}", it)
         }
     }
@@ -7260,7 +7235,6 @@ class ConversationController(
             val applied = applyGroupDetails(account, details)
             appState.applyLocalGroupDetails(account, applied.group, applied.members)
         }.onFailure {
-            if (it is CancellationException) throw it
             if (it.isUseAfterEviction()) {
                 markActiveAccountRemovedFromMembers(account)
                 return
@@ -7323,7 +7297,6 @@ class ConversationController(
                         group.sortedBy { it.attachmentIndex }.map { it.reference }
                     }
         }.onFailure {
-            if (it is CancellationException) throw it
             Log.w("DMConversation", "listMedia failed for ${group.groupIdHex.take(8)}", it)
         }
     }

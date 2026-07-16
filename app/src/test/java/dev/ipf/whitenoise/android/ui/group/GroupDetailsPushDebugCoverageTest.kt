@@ -28,8 +28,8 @@ class GroupDetailsPushDebugCoverageTest {
             ).containsMatchIn(controller),
         )
         assertTrue(
-            "push debug load must rethrow cancellation like the neighboring MLS loader",
-            "if (it is CancellationException) throw it" in controller.functionBody("groupPushDebugInfo"),
+            "push debug load must structurally rethrow cancellation like the neighboring MLS loader",
+            "runCatchingCancellable {" in controller.functionBody("groupPushDebugInfo"),
         )
         assertTrue(
             "push debug load failures should surface a copyable diagnostic toast",
