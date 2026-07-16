@@ -19,6 +19,16 @@ internal val LocalAmoledSurfaceTheme = staticCompositionLocalOf { false }
 internal fun isAmoledSurfaceTheme(): Boolean = LocalAmoledSurfaceTheme.current
 
 @Composable
+internal fun amoledDirectionalAccentColor(mine: Boolean): Color? =
+    if (!isAmoledSurfaceTheme()) {
+        null
+    } else if (mine) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    }
+
+@Composable
 internal fun amoledSurfaceBorderStroke(width: Dp = 1.dp): BorderStroke? =
     if (isAmoledSurfaceTheme()) {
         BorderStroke(width, MaterialTheme.colorScheme.outlineVariant)
