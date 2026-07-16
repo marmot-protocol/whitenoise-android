@@ -1802,7 +1802,7 @@ class WhiteNoiseAppState(
         var failures = 0
         var firstFailure: AppText? = null
         for (groupIdHex in targets) {
-            runCatching {
+            runCatchingCancellable {
                 withGroupCommitLock(account, groupIdHex) {
                     val result =
                         marmotIo {
@@ -1901,7 +1901,7 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun catchUpAccountsBestEffort(): Boolean =
-        runCatching { marmotIo { catchUpAccounts() } }
+        runCatchingCancellable { marmotIo { catchUpAccounts() } }
             .onFailure {
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
@@ -2230,7 +2230,7 @@ class WhiteNoiseAppState(
      */
     private suspend fun reregisterExternalSigners() {
         accounts.filter { it.externalSigning }.forEach { account ->
-            runCatching {
+            runCatchingCancellable {
                 marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
             }.onFailure {
                 rethrowIfCancellation(it)
@@ -2271,7 +2271,7 @@ class WhiteNoiseAppState(
         }
         val previous = accountUnreadCounts
         val rawCountsByHex =
-            runCatching {
+            runCatchingCancellable {
                 marmotIo { accountUnreadSummary().associateBy { it.accountIdHex } }
             }.onFailure {
                 rethrowIfCancellation(it)
@@ -2328,7 +2328,7 @@ class WhiteNoiseAppState(
         memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
     ): ULong? {
         val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             marmotIo {
                 val rows = chatList(ref, includeArchived = true)
                 val membersByGroupId =
@@ -2390,7 +2390,7 @@ class WhiteNoiseAppState(
         }
         val target = accounts.firstOrNull { it.label == label }
         if (target?.signedOut == true) {
-            runCatching {
+            runCatchingCancellable {
                 marmotIo { signInAccount(label) }
             }.onFailure {
                 rethrowIfCancellation(it)
@@ -2482,22 +2482,22 @@ class WhiteNoiseAppState(
                 // Each target holds decrypted plaintext, so wipe them independently
                 // and best-effort: a failure in one (IO error, locked file) must not
                 // skip the others, and a swallowed failure should still be visible.
-                runCatching { diskMediaCache.clear() }
+                runCatchingCancellable { diskMediaCache.clear() }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
                     }
-                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }
+                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "voice attachment wipe failed: ${it.readableMessage()}" }
                     }
-                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VIDEO).deleteRecursively() }
+                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VIDEO).deleteRecursively() }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
                     }
-                runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
+                runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
@@ -2573,7 +2573,7 @@ class WhiteNoiseAppState(
         // The account is signed out engine-side once this returns; no code
         // below may issue further account-scoped FFI calls for signedOutRef.
         val engineOutcome =
-            runCatching {
+            runCatchingCancellable {
                 marmotIo { signOut(signedOutRef, deleteKeyPackages) }
             }.onSuccess {
                 // The engine deactivated the account (including its push
@@ -2616,7 +2616,7 @@ class WhiteNoiseAppState(
 
     suspend fun exportActiveAccountNsec(): String? {
         val accountRef = activeAccountRef ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             marmotIo { revealNsec(accountRef) }
         }.onFailure {
             rethrowIfCancellation(it)
@@ -2686,7 +2686,7 @@ class WhiteNoiseAppState(
 
     suspend fun exportEncryptedSecretKeyBackup(passphrase: String): String? {
         val account = activeAccountRef ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             marmotIo { exportEncryptedSecretKey(account, passphrase) }
         }.onSuccess {
             present(R.string.toast_encrypted_backup_created)
@@ -2736,7 +2736,7 @@ class WhiteNoiseAppState(
                 return accountRelayLists()
             }
         }
-        return runCatching {
+        return runCatchingCancellable {
             marmotIo {
                 when (kind) {
                     RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
@@ -3016,7 +3016,7 @@ class WhiteNoiseAppState(
         var anyDeleted = false
         for (file in files) {
             val outcome =
-                runCatching { marmotIo { deleteAuditLogFile(file.path) } }
+                runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
                     .onFailure {
                         if (it is CancellationException) throw it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
@@ -3201,7 +3201,7 @@ class WhiteNoiseAppState(
         // Seed before registering so the first composition doesn't read an
         // empty snapshot while the callback's initial dispatch is in flight;
         // that dispatch then overwrites the seed with the same current state.
-        runCatching {
+        runCatchingCancellable {
             val network = cm.activeNetwork
             hasActiveNetworkSnapshot = network != null
             activeNetworkTypesSnapshot =
@@ -3213,7 +3213,7 @@ class WhiteNoiseAppState(
             // callback path falls back to.
             appStateDebug(it) { "network snapshot seed failed: ${it.readableMessage()}" }
         }
-        runCatching {
+        runCatchingCancellable {
             cm.registerDefaultNetworkCallback(
                 object : android.net.ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: android.net.Network) {
@@ -3419,7 +3419,7 @@ class WhiteNoiseAppState(
         accountRef: String,
         groupIdHex: String,
     ) {
-        runCatching {
+        runCatchingCancellable {
             localNotificationPresenter.dismissConversationMessages(accountRef, groupIdHex)
         }.onFailure {
             rethrowIfCancellation(it)
@@ -3463,7 +3463,7 @@ class WhiteNoiseAppState(
 
     private suspend fun sweepExpiredForAccount(accountRef: String) {
         val rows =
-            runCatching { marmotIo { chatList(accountRef, includeArchived = true) } }
+            runCatchingCancellable { marmotIo { chatList(accountRef, includeArchived = true) } }
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug(it) { "sweep chat-list load failed account=${accountRef.take(8)}: ${it.readableMessage()}" }
@@ -3482,7 +3482,7 @@ class WhiteNoiseAppState(
         chatRow: ChatListRowFfi,
     ) {
         val retentionSecs =
-            runCatching { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
+            runCatchingCancellable { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug(it) { "sweep retention read failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
@@ -3501,10 +3501,10 @@ class WhiteNoiseAppState(
         ) {
             return
         }
-        runCatching {
+        runCatchingCancellable {
             withGroupCommitLock(accountRef, groupIdHex) {
                 val mediaBeforePrune =
-                    runCatching { marmotIo { listMedia(accountRef, groupIdHex, null) } }
+                    runCatchingCancellable { marmotIo { listMedia(accountRef, groupIdHex, null) } }
                         .onFailure {
                             rethrowIfCancellation(it)
                             appStateDebug(it) {
@@ -3583,7 +3583,7 @@ class WhiteNoiseAppState(
         while (pagesScanned < DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES) {
             currentCoroutineContext().ensureActive()
             val page =
-                runCatching {
+                runCatchingCancellable {
                     marmotIo {
                         timelineMessages(
                             accountRef,
@@ -3684,7 +3684,7 @@ class WhiteNoiseAppState(
             return appUpdateInfo
         }
         val info =
-            runCatching { appUpdateRepository.refresh() }
+            runCatchingCancellable { appUpdateRepository.refresh() }
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug(it) { "app update check failed: ${it.readableMessage()}" }
@@ -3804,7 +3804,7 @@ class WhiteNoiseAppState(
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.Failed
         if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) return NotificationReplySendOutcome.Failed
         val body = text.trim().takeIf { it.isNotEmpty() } ?: return NotificationReplySendOutcome.Failed
-        return runCatching {
+        return runCatchingCancellable {
             withGroupCommitLock(account, group) {
                 val recoveryLookup =
                     withContext(Dispatchers.IO) {
@@ -3884,7 +3884,7 @@ class WhiteNoiseAppState(
         ) {
             return NotificationReplyCommitProbe.Indeterminate
         }
-        return runCatching {
+        return runCatchingCancellable {
             probeNotificationReplyCommit(
                 recoveryState = recoveryState,
                 nextAttemptBoundary = nextAttemptBoundary,
@@ -3933,7 +3933,7 @@ class WhiteNoiseAppState(
         val account = accountRef.takeIf { it.isNotBlank() } ?: return false
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
         val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
-        return runCatching {
+        return runCatchingCancellable {
             // markTimelineMessageRead advances the persisted cursor monotonically;
             // an old notification tap must not move the read marker backwards.
             val row = marmotIo { markTimelineMessageRead(account, group, message) }
@@ -4120,7 +4120,7 @@ class WhiteNoiseAppState(
     private suspend fun drainPendingPushClears() {
         for (account in pushTokenStore.pendingClears()) {
             val cleared =
-                runCatching { marmotIo { clearPushRegistration(account) } }
+                runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "pending clearPushRegistration retry failed: ${it.readableMessage()}" }
@@ -4136,7 +4136,7 @@ class WhiteNoiseAppState(
     private suspend fun drainPendingPushDisables() {
         for (account in pushTokenStore.pendingDisables()) {
             val disabled =
-                runCatching { marmotIo { setNativePushEnabled(account, false) } }
+                runCatchingCancellable { marmotIo { setNativePushEnabled(account, false) } }
                     .onFailure {
                         rethrowIfCancellation(it)
                         appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
@@ -4264,7 +4264,7 @@ class WhiteNoiseAppState(
 
     private suspend fun clearPushRegistrationForAccountLocked(account: String) {
         perAccountSyncedFingerprints.remove(account)
-        runCatching { marmotIo { clearPushRegistration(account) } }
+        runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
             .onSuccess { pushTokenStore.clearPending(account) }
             .onFailure {
                 rethrowIfCancellation(it)
@@ -4276,7 +4276,7 @@ class WhiteNoiseAppState(
     private suspend fun fetchFcmTokenOrNull(): String? {
         if (!isNativePushAvailable()) return null
         val token =
-            runCatching {
+            runCatchingCancellable {
                 suspendCancellableCoroutine<String?> { continuation ->
                     // The Firebase Task API has no cancel surface, so the
                     // completion listener can fire after this coroutine is
@@ -4796,7 +4796,7 @@ class WhiteNoiseAppState(
 
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return
-        runCatching {
+        runCatchingCancellable {
             val profileRelayCount =
                 marmotIo {
                     val relayLists = accountRelayLists(account)
@@ -4863,7 +4863,7 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun configurePrivacyRuntime() {
-        runCatching {
+        runCatchingCancellable {
             withContext(Dispatchers.IO) {
                 marmot().configurePrivacyRuntime()
             }

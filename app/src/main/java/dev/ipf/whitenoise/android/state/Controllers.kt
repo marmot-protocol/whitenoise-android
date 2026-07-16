@@ -984,7 +984,7 @@ private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     groupIdHex: String,
 ) {
     val media =
-        runCatching { marmotIo { listMedia(account, groupIdHex, null) } }
+        runCatchingCancellable { marmotIo { listMedia(account, groupIdHex, null) } }
             .onFailure(::rethrowIfCancellation)
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
@@ -2482,7 +2482,7 @@ class ChatsController(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
-        return runCatching {
+        return runCatchingCancellable {
             appState.withGroupCommitLock(account, groupIdHex) {
                 val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
                 appState.applyLocalGroupUpdate(updated)
@@ -2520,7 +2520,7 @@ class ChatsController(
         // toast that names the inconsistency (user is demoted but still
         // in the group) rather than the generic "couldn't leave" copy.
         var demotedBeforeLeave = false
-        return runCatching {
+        return runCatchingCancellable {
             val members = appState.marmotIo { groupMembers(account, groupIdHex) }
             val memberCount = members.size
             // #811: when the live roster is just you there is no one to
@@ -2537,7 +2537,7 @@ class ChatsController(
                     R.string.toast_make_another_admin_before_leaving,
                     R.string.toast_group_needs_admin,
                 )
-                return@runCatching false
+                return@runCatchingCancellable false
             }
             appState.withGroupCommitLock(account, groupIdHex) {
                 if (soleMember) {
@@ -2639,7 +2639,7 @@ class ChatsController(
         // to the caller's hint only if the membership read fails.
         val activeIdHex = appState.activeAccount?.accountIdHex
         val liveMembers =
-            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+            runCatchingCancellable { appState.marmotIo { groupMembers(account, groupIdHex) } }
                 .onFailure(::rethrowIfCancellation)
                 .getOrNull()
         val stillMember =
@@ -2681,7 +2681,7 @@ class ChatsController(
         val group = groupRecordsById[groupIdHex] ?: return null
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         val members =
-            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+            runCatchingCancellable { appState.marmotIo { groupMembers(account, groupIdHex) } }
                 .onFailure(::rethrowIfCancellation)
                 .getOrNull()
                 ?: return null
@@ -2793,7 +2793,7 @@ class ChatsController(
                 ?.lastMessage
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() } ?: return false
-        return runCatching {
+        return runCatchingCancellable {
             val row = appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
             row?.let(::applyChatListRow)
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
@@ -3675,7 +3675,7 @@ class ConversationController(
         val account = conversationAccountRef
         val memberCount =
             if (account != null) {
-                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
+                runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
                     .onFailure(::rethrowIfCancellation)
                     .getOrNull()
                     ?.size
@@ -3786,7 +3786,7 @@ class ConversationController(
                     // loaded them yet when this first sweep runs, and listMedia must be
                     // read before secureDeleteExpired removes the rows.
                     refreshMediaReferences()
-                    runCatching {
+                    runCatchingCancellable {
                         appState.withGroupCommitLock(account, group.groupIdHex) {
                             appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
                         }
@@ -4994,7 +4994,7 @@ class ConversationController(
             // advance the read marker through it. Keep this best-effort and
             // outside the reaction commit rollback path: a read-marker failure
             // must not remove a reaction that has already been published.
-            runCatching { markReadUpTo(target) }
+            runCatchingCancellable { markReadUpTo(target) }
                 .onFailure {
                     it.rethrowIfCancellation()
                     Log.w("DMConversation", "mark-read after reaction failed target=${target.take(8)}", it)
@@ -5302,7 +5302,7 @@ class ConversationController(
                 // mid-download rejects the L2 persist below. See #154, #1373.
                 val publicationToken = appState.diskMediaCache.capturePublicationToken()
                 val result =
-                    runCatching {
+                    runCatchingCancellable {
                         val safeReference = assertMediaLocatorsResolveSafe(reference)
                         appState.marmotIo { downloadMedia(account, groupIdHex, safeReference) }
                     }.onFailure {
@@ -5678,7 +5678,7 @@ class ConversationController(
             // you there is no one to coordinate an MLS commit with, so bypass the
             // sole-admin transfer gate and dissolve the group with local cleanup.
             val liveMembers =
-                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
+                runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
                     .onFailure(::rethrowIfCancellation)
                     .getOrNull()
             val memberCount = liveMembers?.size ?: members.size
@@ -5823,7 +5823,7 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
                     group = updated
@@ -5843,7 +5843,7 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatching {
+            runCatchingCancellable {
                 appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                 appState.present(R.string.toast_chat_deleted_local)
                 true
@@ -5864,7 +5864,7 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val updatedName = name.trim().takeIf { it.isNotEmpty() }
             val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo {
                         updateGroupProfile(
@@ -5893,7 +5893,7 @@ class ConversationController(
             // private hosts). We only set the URL here; dim/thumbhash are
             // optimization hints we don't compute on Android, so clear them.
             val normalized = url?.trim()?.takeIf { it.isNotEmpty() }
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo {
                         updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
@@ -6027,7 +6027,7 @@ class ConversationController(
                 appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
                 return@withMutationLockResult false
             }
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (admin) {
                         val result =
@@ -6063,7 +6063,7 @@ class ConversationController(
             // here); activeAccountRef could shift if the user switches accounts
             // before this completes, sending the retention change to the wrong store.
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
                 }
@@ -6075,7 +6075,7 @@ class ConversationController(
                 // after leaving and re-entering the chat. The retention change has
                 // already succeeded, so a refresh failure must NOT flip this to a
                 // failure toast — log it and fall back to an in-memory re-filter.
-                runCatching { refreshCurrentTimeline(account) }
+                runCatchingCancellable { refreshCurrentTimeline(account) }
                     .onFailure { refreshError ->
                         refreshError.rethrowIfCancellation()
                         Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
@@ -6101,7 +6101,7 @@ class ConversationController(
                 appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
                 return@withMutationLockResult false
             }
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val result = appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
                     applyMutationDetails(account, result.details)
@@ -6146,7 +6146,7 @@ class ConversationController(
             // Tracks whether the grant landed before the self-demote attempt so
             // a self-demote failure reports the partial state honestly.
             var grantedBeforeDemote = false
-            runCatching {
+            runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val promoteResult =
                         appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
@@ -6188,7 +6188,7 @@ class ConversationController(
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
         val account = conversationAccountRef ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
             if (it is CancellationException) throw it
@@ -6198,7 +6198,7 @@ class ConversationController(
 
     suspend fun groupPushDebugInfo(): GroupPushDebugInfoFfi? {
         val account = conversationAccountRef ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             appState.marmotIo { groupPushDebugInfo(account, group.groupIdHex) }
         }.onFailure {
             if (it is CancellationException) throw it
@@ -6215,7 +6215,7 @@ class ConversationController(
         // One timestamp for the whole export so the JSON `exported_at` and the
         // file name stamp match instead of drifting across two now() reads.
         val exportedAt = java.time.Instant.now()
-        return runCatching {
+        return runCatchingCancellable {
             val messages =
                 withContext(Dispatchers.Default) {
                     ConversationTranscriptExport.fetchAllMessages(
@@ -6295,7 +6295,7 @@ class ConversationController(
     private suspend fun lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
         messageById[messageIdHex]?.let { return it }
         val account = conversationAccountRef ?: return null
-        return runCatching {
+        return runCatchingCancellable {
             withContext(Dispatchers.IO) {
                 appState.marmotIo { messages(account, group.groupIdHex, 120u) }
             }
@@ -6615,7 +6615,7 @@ class ConversationController(
     }
 
     private suspend fun initializeReadState(account: String) {
-        runCatching {
+        runCatchingCancellable {
             appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
         }.onFailure {
             it.rethrowIfCancellation()
@@ -6668,7 +6668,7 @@ class ConversationController(
         }
         val anchoredAtSeconds = (System.currentTimeMillis() / 1_000L).toULong()
         anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
-        runCatching {
+        runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
             if (it is CancellationException) throw it
@@ -7246,7 +7246,7 @@ class ConversationController(
 
     private suspend fun refreshMembers(probeEviction: Boolean = true) {
         val account = conversationAccountRef ?: return
-        runCatching {
+        runCatchingCancellable {
             if (probeEviction) {
                 // Force OpenMLS replay before trusting cached group details.
                 // For an evicted account this is where Rust currently reports
@@ -7311,7 +7311,7 @@ class ConversationController(
      */
     private suspend fun refreshMediaReferences() {
         val account = conversationAccountRef ?: return
-        runCatching {
+        runCatchingCancellable {
             appState.marmotIo { listMedia(account, group.groupIdHex, null) }
         }.onSuccess { records ->
             // Group by messageId (one message → N attachments); sort each
@@ -7417,69 +7417,69 @@ class ConversationController(
         val text = StringBuilder()
         var subscription: AgentStreamSubscription? = null
         try {
-            val streamSubscription =
-                appState.marmotIo {
-                    watchAgentTextStream(
-                        accountRef = account,
-                        groupIdHex = group.groupIdHex,
-                        streamIdHex = streamId,
-                        serverCertDer = null,
-                        insecureLocal = false,
-                    )
-                }
-            subscription = streamSubscription
-            while (true) {
-                val update =
-                    withContext(Dispatchers.IO) {
-                        streamSubscription.next()
-                    } ?: break
-                if (streamId in removedStreamIds) {
-                    break
-                }
-                // When the developer toggle is on, surface every live
-                // agent-stream update as a transient inline debug row. No-op
-                // (and allocation-free past the boolean read) when off.
-                appendStreamDebugEvent(streamId, update)
-                when (update) {
-                    is AgentStreamUpdateFfi.Chunk -> {
-                        appendCappedAgentStreamPreview(text, update.text)
-                        updateStreamPreview(streamId, text.toString(), MessageStatus.Streaming)
-                    }
-                    is AgentStreamUpdateFfi.Finished -> {
-                        text.clear()
-                        text.append(update.text)
-                        // Parse once on completion only — per-chunk parsing
-                        // would be an FFI round-trip per token batch for a
-                        // document that's still mutating. Chunks render as
-                        // plain text; the finished message gets markdown.
-                        updateStreamPreview(
-                            streamId,
-                            text.toString(),
-                            MessageStatus.Sent,
-                            tokens = appState.parseMarkdownOrEmpty(update.text),
+            runCatchingCancellable {
+                val streamSubscription =
+                    appState.marmotIo {
+                        watchAgentTextStream(
+                            accountRef = account,
+                            groupIdHex = group.groupIdHex,
+                            streamIdHex = streamId,
+                            serverCertDer = null,
+                            insecureLocal = false,
                         )
                     }
-                    is AgentStreamUpdateFfi.Failed -> {
-                        updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
+                subscription = streamSubscription
+                while (true) {
+                    val update =
+                        withContext(Dispatchers.IO) {
+                            streamSubscription.next()
+                        } ?: break
+                    if (streamId in removedStreamIds) {
+                        break
                     }
-                    // Typed Hermes-agent variants (Progress / Record / Status)
-                    // are surfaced only through the streaming-debug rows above;
-                    // they carry no user-visible preview text, so drop them here
-                    // and let the loop keep consuming the next chunk.
-                    is AgentStreamUpdateFfi.Progress,
-                    is AgentStreamUpdateFfi.Record,
-                    is AgentStreamUpdateFfi.Status,
-                    -> Unit
+                    // When the developer toggle is on, surface every live
+                    // agent-stream update as a transient inline debug row. No-op
+                    // (and allocation-free past the boolean read) when off.
+                    appendStreamDebugEvent(streamId, update)
+                    when (update) {
+                        is AgentStreamUpdateFfi.Chunk -> {
+                            appendCappedAgentStreamPreview(text, update.text)
+                            updateStreamPreview(streamId, text.toString(), MessageStatus.Streaming)
+                        }
+                        is AgentStreamUpdateFfi.Finished -> {
+                            text.clear()
+                            text.append(update.text)
+                            // Parse once on completion only — per-chunk parsing
+                            // would be an FFI round-trip per token batch for a
+                            // document that's still mutating. Chunks render as
+                            // plain text; the finished message gets markdown.
+                            updateStreamPreview(
+                                streamId,
+                                text.toString(),
+                                MessageStatus.Sent,
+                                tokens = appState.parseMarkdownOrEmpty(update.text),
+                            )
+                        }
+                        is AgentStreamUpdateFfi.Failed -> {
+                            updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
+                        }
+                        // Typed Hermes-agent variants (Progress / Record / Status)
+                        // are surfaced only through the streaming-debug rows above;
+                        // they carry no user-visible preview text, so drop them here
+                        // and let the loop keep consuming the next chunk.
+                        is AgentStreamUpdateFfi.Progress,
+                        is AgentStreamUpdateFfi.Record,
+                        is AgentStreamUpdateFfi.Status,
+                        -> Unit
+                    }
                 }
+            }.onFailure { throwable ->
+                updateStreamPreview(
+                    streamId,
+                    agentStreamFailureText(throwable, copy),
+                    MessageStatus.Failed,
+                )
             }
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (throwable: Throwable) {
-            updateStreamPreview(
-                streamId,
-                agentStreamFailureText(throwable, copy),
-                MessageStatus.Failed,
-            )
         } finally {
             withContext(NonCancellable + Dispatchers.IO) {
                 runCatching { subscription?.close() }
