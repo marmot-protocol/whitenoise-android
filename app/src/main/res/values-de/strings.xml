@@ -1055,4 +1055,20 @@
     <string name="toast_zapstore_unavailable">Zapstore konnte nicht geöffnet werden</string>
     <string name="notification_channel_app_updates">App-Updates</string>
     <string name="notification_channel_app_updates_description">Benachrichtigungen zu Zapstore-Versionen</string>
+
+    <string name="chat_bubble_colors">Farben der Chatblasen</string>
+    <string name="chat_bubble_colors_global_subtitle">Wähle Standardfarben für das aktuelle Design. Helle, dunkle und AMOLED-Farben werden getrennt gespeichert.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Überschreibe die Blasenfarben nur für diese Unterhaltung. Zurücksetzen übernimmt wieder die Darstellungsvorgaben.</string>
+    <string name="bubble_color_preview">Vorschau</string>
+    <string name="bubble_color_current_theme">Aktuelles Design: %1$s</string>
+    <string name="bubble_my_messages">Meine Nachrichten</string>
+    <string name="bubble_other_messages">Andere Nachrichten</string>
+    <string name="bubble_preview_other">Hallo – so sehen Antworten aus.</string>
+    <string name="bubble_preview_mine">Sieht für mich gut aus.</string>
+    <string name="bubble_color_swatch_content_description">Blasenfarbe %1$s</string>
+    <string name="more_colors">Weitere Farben</string>
+    <string name="custom_hex_color">Benutzerdefinierte Hex-Farbe</string>
+    <string name="invalid_hex_color">Gib eine Farbe wie #336699 ein.</string>
+    <string name="apply_color">Farbe anwenden</string>
+    <string name="reset_to_default">Auf Standard zurücksetzen</string>
 </resources>

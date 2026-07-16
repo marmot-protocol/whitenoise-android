@@ -1085,4 +1085,20 @@
     <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="notification_channel_app_updates">App updates</string>
     <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
+
+    <string name="chat_bubble_colors">Chat bubble colors</string>
+    <string name="chat_bubble_colors_global_subtitle">Choose defaults for the current theme. Light, dark, and AMOLED colors are stored separately.</string>
+    <string name="chat_bubble_colors_chat_subtitle">Override bubble colors only for this conversation. Reset to inherit the Appearance defaults.</string>
+    <string name="bubble_color_preview">Preview</string>
+    <string name="bubble_color_current_theme">Current theme: %1$s</string>
+    <string name="bubble_my_messages">My messages</string>
+    <string name="bubble_other_messages">Other messages</string>
+    <string name="bubble_preview_other">Hello — this is how replies look.</string>
+    <string name="bubble_preview_mine">Looks good to me.</string>
+    <string name="bubble_color_swatch_content_description">Bubble color %1$s</string>
+    <string name="more_colors">More colors</string>
+    <string name="custom_hex_color">Custom hex color</string>
+    <string name="invalid_hex_color">Enter a color like #336699.</string>
+    <string name="apply_color">Apply color</string>
+    <string name="reset_to_default">Reset to default</string>
 </resources>

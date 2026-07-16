@@ -11,6 +11,7 @@ import android.os.LocaleList
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -1127,6 +1128,16 @@ class WhiteNoiseAppState(
      */
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
+
+    private val globalBubbleColors =
+        mutableStateMapOf<Pair<BubbleTheme, BubbleSide>, Long?>().apply {
+            BubbleTheme.entries.forEach { theme ->
+                BubbleSide.entries.forEach { side ->
+                    this[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
+                }
+            }
+        }
+    private val chatBubbleColors = mutableMapOf<String, MutableState<Long?>>()
 
     /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
@@ -2525,6 +2536,7 @@ class WhiteNoiseAppState(
      */
     private fun clearCrossAccountCaches() {
         profileCacheEpoch.incrementAndGet()
+        chatBubbleColors.clear()
         npubs.clear()
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
@@ -3039,6 +3051,48 @@ class WhiteNoiseAppState(
     fun updateFontScale(scale: AppFontScale) {
         fontScale = scale
         preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply()
+    }
+
+    internal fun globalBubbleColorArgb(
+        theme: BubbleTheme,
+        side: BubbleSide,
+    ): Long? = globalBubbleColors[theme to side]
+
+    internal fun chatBubbleColorArgb(
+        groupIdHex: String,
+        side: BubbleSide,
+    ): Long? {
+        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return null
+        return chatBubbleColors
+            .getOrPut(key) {
+                mutableStateOf(BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side))
+            }.value
+    }
+
+    internal fun effectiveBubbleColorArgb(
+        theme: BubbleTheme,
+        side: BubbleSide,
+        groupIdHex: String,
+    ): Long? = chatBubbleColorArgb(groupIdHex, side) ?: globalBubbleColorArgb(theme, side)
+
+    internal fun updateGlobalBubbleColor(
+        theme: BubbleTheme,
+        side: BubbleSide,
+        argb: Long?,
+    ) {
+        BubbleColorPreferences.writeGlobalColor(preferences, theme, side, argb)
+        globalBubbleColors[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
+    }
+
+    internal fun updateChatBubbleColor(
+        groupIdHex: String,
+        side: BubbleSide,
+        argb: Long?,
+    ) {
+        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return
+        BubbleColorPreferences.writeChatColor(preferences, activeAccountRef, groupIdHex, side, argb)
+        val color = BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
+        chatBubbleColors.getOrPut(key) { mutableStateOf(color) }.value = color
     }
 
     /**
