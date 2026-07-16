@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 import javax.xml.parsers.DocumentBuilderFactory
 
 class LocalizationResourceTest {
@@ -12,7 +14,7 @@ class LocalizationResourceTest {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
                 .first { it.exists() }
-        val defaultKeys = stringKeys(File(resDir, "values/strings.xml"))
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
 
         resDir
             .listFiles()
@@ -21,7 +23,7 @@ class LocalizationResourceTest {
             .map { File(it, "strings.xml") }
             .filter { it.exists() }
             .forEach { localized ->
-                assertEquals(localized.path, defaultKeys, stringKeys(localized))
+                assertEquals(localized.path, defaultKeys, resourceNames(localized))
             }
     }
 
@@ -30,7 +32,7 @@ class LocalizationResourceTest {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
                 .first { it.exists() }
-        val englishValues = stringValues(File(resDir, "values/strings.xml"))
+        val englishFile = File(resDir, "values/strings.xml")
 
         resDir
             .listFiles()
@@ -40,16 +42,182 @@ class LocalizationResourceTest {
             .filter { it.exists() }
             .forEach { localized ->
                 val copiedKeys =
-                    stringValues(localized)
-                        .filter { (key, value) ->
-                            key !in identicalValueAllowedKeys &&
-                                key !in localeScopedAllowedKeys[localized.parentFile.name].orEmpty() &&
-                                value.isNotBlank() &&
-                                value == englishValues[key]
-                        }.keys
+                    copiedEnglishResourceKeys(
+                        englishFile = englishFile,
+                        localizedFile = localized,
+                        localeDirName = requireNotNull(localized.parentFile).name,
+                    )
 
                 assertTrue("${localized.path} copies English for $copiedKeys", copiedKeys.isEmpty())
             }
+    }
+
+    @Test
+    fun missingPluralResourceNameIsDetectedByParityCheck() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Hello</string>
+                        <plurals name="items_count">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Bonjour</string>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
+
+        assertTrue(defaultKeys.plurals.contains("items_count"))
+        assertNotEquals(defaultKeys, localizedKeys)
+    }
+
+    @Test
+    fun mismatchedStringAndPluralResourceTypesAreDetectedByParityCheck() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="items_count">%d éléments</string>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
+
+        assertNotEquals(defaultKeys, localizedKeys)
+    }
+
+    @Test
+    fun nonTranslatablePluralIsExcludedFromParityCheck() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Hello</string>
+                        <plurals name="internal_count" translatable="false">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <string name="hello">Bonjour</string>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-fr/strings.xml"))
+
+        assertEquals(defaultKeys, localizedKeys)
+    }
+
+    @Test
+    fun copiedEnglishPluralItemTextIsDetected() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="few">%d items</item>
+                            <item quantity="other">%d éléments</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+            )
+
+        val copiedKeys =
+            copiedEnglishResourceKeys(
+                englishFile = File(resDir, "values/strings.xml"),
+                localizedFile = File(resDir, "values-fr/strings.xml"),
+                localeDirName = "values-fr",
+            )
+
+        assertEquals(setOf("items_count[few]"), copiedKeys)
+    }
+
+    @Test
+    fun differingPluralQuantitySetsAreAccepted() {
+        val resDir =
+            writeFixtureResDir(
+                defaultStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="one">%d item</item>
+                            <item quantity="other">%d items</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedStrings =
+                    """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <resources>
+                        <plurals name="items_count">
+                            <item quantity="one">%d элемент</item>
+                            <item quantity="few">%d элемента</item>
+                            <item quantity="many">%d элементов</item>
+                            <item quantity="other">%d элементов</item>
+                        </plurals>
+                    </resources>
+                    """.trimIndent(),
+                localizedDirName = "values-ru",
+            )
+
+        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val localizedKeys = resourceNames(File(resDir, "values-ru/strings.xml"))
+
+        assertEquals(defaultKeys, localizedKeys)
+        assertTrue(
+            copiedEnglishResourceKeys(
+                englishFile = File(resDir, "values/strings.xml"),
+                localizedFile = File(resDir, "values-ru/strings.xml"),
+                localeDirName = "values-ru",
+            ).isEmpty(),
+        )
     }
 
     @Test
@@ -109,31 +277,122 @@ class LocalizationResourceTest {
         )
     }
 
-    private fun stringKeys(file: File): Set<String> = stringValues(file).keys
+    private fun resourceNames(file: File): ResourceNames {
+        val content = parseStringsFile(file)
+        return ResourceNames(strings = content.strings.keys, plurals = content.plurals.keys)
+    }
 
-    private fun stringValues(file: File): Map<String, String> {
+    private fun stringValues(file: File): Map<String, String> = parseStringsFile(file).strings
+
+    private fun copiedEnglishResourceKeys(
+        englishFile: File,
+        localizedFile: File,
+        localeDirName: String,
+    ): Set<String> {
+        val english = parseStringsFile(englishFile)
+        val localized = parseStringsFile(localizedFile)
+        val localeExemptions = localeScopedAllowedKeys[localeDirName].orEmpty()
+
+        val copiedStringKeys =
+            localized.strings
+                .filter { (key, value) ->
+                    key !in identicalValueAllowedKeys &&
+                        key !in localeExemptions &&
+                        value.isNotBlank() &&
+                        value == english.strings[key]
+                }.keys
+
+        val copiedPluralKeys =
+            localized.plurals.flatMap { (name, localizedQuantities) ->
+                if (name in identicalValueAllowedKeys || name in localeExemptions) {
+                    emptyList()
+                } else {
+                    val englishValues = english.plurals[name].orEmpty().values
+                    localizedQuantities
+                        .filter { (_, localizedValue) ->
+                            localizedValue.isNotBlank() &&
+                                localizedValue in englishValues
+                        }.map { (quantity, _) -> "$name[$quantity]" }
+                }
+            }
+
+        return copiedStringKeys + copiedPluralKeys.toSet()
+    }
+
+    private data class StringsFileContent(
+        val strings: Map<String, String>,
+        val plurals: Map<String, Map<String, String>>,
+    )
+
+    private data class ResourceNames(
+        val strings: Set<String>,
+        val plurals: Set<String>,
+    )
+
+    private fun parseStringsFile(file: File): StringsFileContent {
         val document =
             DocumentBuilderFactory
                 .newInstance()
                 .newDocumentBuilder()
                 .parse(file)
-        val strings = document.getElementsByTagName("string")
-        return buildMap {
-            for (index in 0 until strings.length) {
-                val item = strings.item(index)
-                // translatable="false" strings (format-only or fixed keywords)
-                // live in the default values only and must not be replicated to
-                // locale files, so they are not part of the parity contract.
-                if (item.attributes.getNamedItem("translatable")?.nodeValue == "false") continue
-                put(item.attributes.getNamedItem("name").nodeValue, item.textContent)
+        val strings =
+            buildMap {
+                val nodes = document.getElementsByTagName("string")
+                for (index in 0 until nodes.length) {
+                    val item = nodes.item(index)
+                    // translatable="false" strings (format-only or fixed keywords)
+                    // live in the default values only and must not be replicated to
+                    // locale files, so they are not part of the parity contract.
+                    if (item.attributes.getNamedItem("translatable")?.nodeValue == "false") continue
+                    put(item.attributes.getNamedItem("name").nodeValue, item.textContent)
+                }
             }
-        }
+
+        val plurals =
+            buildMap {
+                val nodes = document.getElementsByTagName("plurals")
+                for (index in 0 until nodes.length) {
+                    val node = nodes.item(index)
+                    if (node.attributes.getNamedItem("translatable")?.nodeValue == "false") continue
+                    val name = node.attributes.getNamedItem("name").nodeValue
+                    val quantities =
+                        buildMap {
+                            val items = node.childNodes
+                            for (i in 0 until items.length) {
+                                val child = items.item(i)
+                                if (child.nodeName == "item") {
+                                    val quantity =
+                                        child.attributes?.getNamedItem("quantity")?.nodeValue
+                                            ?: "unknown"
+                                    put(quantity, child.textContent)
+                                }
+                            }
+                        }
+                    put(name, quantities)
+                }
+            }
+
+        return StringsFileContent(strings = strings, plurals = plurals)
+    }
+
+    private fun writeFixtureResDir(
+        defaultStrings: String,
+        localizedStrings: String,
+        localizedDirName: String = "values-fr",
+    ): File {
+        val resDir = Files.createTempDirectory("localization-resource-test").toFile()
+        val valuesDir = File(resDir, "values").also { it.mkdirs() }
+        val localizedDir = File(resDir, localizedDirName).also { it.mkdirs() }
+        File(valuesDir, "strings.xml").writeText(defaultStrings)
+        File(localizedDir, "strings.xml").writeText(localizedStrings)
+        return resDir
     }
 
     // Extracts every *user-visible* localized resource value: plain <string>
     // entries plus the <item> children of <plurals> and <string-array>. Unlike
-    // stringValues (used for the key-parity contract, which intentionally keys
-    // only on <string> names), this powers the NIP guard so a raw NIP token
+    // parseStringsFile (used for the key-parity contract, which keys on
+    // <string> and <plurals> names but not per-quantity categories), this
+    // powers the NIP guard so a raw NIP token
     // cannot slip in through a quantity string or array item. translatable=
     // "false" strings are included here because they are still rendered to the
     // user; only their absence from locale files is exempt from parity, not
@@ -319,6 +578,11 @@ class LocalizationResourceTest {
                         // "Name" is the German word for "name".
                         "profile_contact_name_hint",
                     ),
+                "values-es" to
+                    setOf(
+                        // "chat"/"chats" are common loan words in Spanish.
+                        "archived_chats_count",
+                    ),
                 "values-fr" to
                     setOf(
                         "disappearing_unit_minutes",
@@ -328,6 +592,11 @@ class LocalizationResourceTest {
                         "contacts",
                         // "Contact" is spelled identically in French.
                         "attach_contact",
+                    ),
+                "values-it" to
+                    setOf(
+                        // "chat" is a common loan word in Italian.
+                        "archived_chats_count",
                     ),
             )
     }
