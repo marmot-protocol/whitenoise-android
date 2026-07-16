@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -142,6 +143,71 @@ class MessageBubbleAmoledStyleTest {
             assertNull(receivedBorder)
             assertEquals(expectedSentTimestamp, sentTimestamp)
             assertEquals(expectedReceivedTimestamp, receivedTimestamp)
+        }
+    }
+
+    @Test
+    fun messageBubbleFillColorPreservesThemeAndSemanticPrecedence() {
+        val customArgb = 0xFF336699L
+        var lightMine = Color.Unspecified
+        var lightMineExpected = Color.Unspecified
+        var darkReceived = Color.Unspecified
+        var darkReceivedExpected = Color.Unspecified
+        var customBackgroundArgb = 0L
+        var customContentArgb = 0L
+        var amoledMine = Color.Unspecified
+        var amoledDeleted = Color.Unspecified
+        var amoledInvalidated = Color.Unspecified
+        var amoledInvalidatedExpected = Color.Unspecified
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                val actual = messageBubbleFillColor(invalidated = false, deleted = false, mine = true)
+                val expected = MaterialTheme.colorScheme.primaryContainer
+                SideEffect {
+                    lightMine = actual
+                    lightMineExpected = expected
+                }
+            }
+            WhiteNoiseTheme(darkTheme = true, amoled = false) {
+                val actual = messageBubbleFillColor(invalidated = false, deleted = false, mine = false)
+                val expected = MaterialTheme.colorScheme.surfaceVariant
+                val custom =
+                    messageBubblePresentation(
+                        invalidated = false,
+                        deleted = false,
+                        mine = true,
+                        customArgb = customArgb,
+                    )
+                SideEffect {
+                    darkReceived = actual
+                    darkReceivedExpected = expected
+                    customBackgroundArgb = custom.backgroundArgb
+                    customContentArgb = custom.contentArgb
+                }
+            }
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val mine = messageBubbleFillColor(invalidated = false, deleted = false, mine = true)
+                val deleted = messageBubbleFillColor(invalidated = false, deleted = true, mine = false)
+                val invalidated = messageBubbleFillColor(invalidated = true, deleted = false, mine = true)
+                val invalidatedExpected = MaterialTheme.colorScheme.errorContainer
+                SideEffect {
+                    amoledMine = mine
+                    amoledDeleted = deleted
+                    amoledInvalidated = invalidated
+                    amoledInvalidatedExpected = invalidatedExpected
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(lightMineExpected, lightMine)
+            assertEquals(darkReceivedExpected, darkReceived)
+            assertEquals(customArgb, customBackgroundArgb)
+            assertEquals(readableTextArgb(customArgb), customContentArgb)
+            assertEquals(Color.Black, amoledMine)
+            assertEquals(Color.Black, amoledDeleted)
+            assertEquals(amoledInvalidatedExpected, amoledInvalidated)
         }
     }
 
