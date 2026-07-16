@@ -361,9 +361,17 @@ object MessageProjector {
         editedText: String? = null,
     ): String? {
         if (message.kind != KindChat || streamId(message) != null) return null
-        val body = editedText?.takeIf { it.isNotBlank() } ?: message.plaintext
+        val editedBody = editedText?.takeIf { it.isNotBlank() }
+        val body = editedBody ?: message.plaintext
+        if (editedBody == null && isPendingMedia(message) && body == pendingMediaPlaceholder(message)) return null
         return body.takeIf { it.isNotBlank() }
     }
+
+    /** Read-aloud is deliberately available for exactly the text Copy exposes. */
+    fun canSpeak(
+        message: AppMessageRecordFfi,
+        editedText: String? = null,
+    ): Boolean = copyableText(message, editedText) != null
 
     fun replyTargetMessageId(message: AppMessageRecordFfi): String? = tagValue(message, QuoteRefTag)
 
@@ -385,6 +393,18 @@ object MessageProjector {
 
     private fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat && message.tags.any { it.values.firstOrNull() == PendingMediaTag }
+
+    private fun pendingMediaPlaceholder(message: AppMessageRecordFfi): String? {
+        val pendingTags = message.tags.filter { it.values.firstOrNull() == PendingMediaTag }
+        if (pendingTags.isEmpty()) return null
+        val label =
+            if (pendingTags.size == 1) {
+                pendingTags.single().values.getOrNull(1) ?: return null
+            } else {
+                "${pendingTags.size} attachments"
+            }
+        return "📎 $label"
+    }
 
     private fun mediaBodyText(
         message: AppMessageRecordFfi,
