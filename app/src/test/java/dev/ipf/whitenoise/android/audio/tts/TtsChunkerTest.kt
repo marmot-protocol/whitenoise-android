@@ -23,6 +23,22 @@ class TtsChunkerTest {
     }
 
     @Test
+    fun midSentenceTitleAbbreviationDoesNotCreateAnExtraChunk() {
+        val chunks =
+            TtsChunker.chunk(
+                text = "I met Dr. Smith in Washington. He arrived.",
+                locale = Locale.US,
+                maxChunkLength = 4_000,
+            )
+
+        assertEquals(
+            listOf("I met Dr. Smith in Washington.", "He arrived."),
+            chunks.map(TtsChunk::text),
+        )
+        assertEquals(listOf(0, 1), chunks.map(TtsChunk::index))
+    }
+
+    @Test
     fun whitespaceOnlyInputProducesNoChunks() {
         assertTrue(TtsChunker.chunk("  \n\t", Locale.US, maxChunkLength = 10).isEmpty())
     }

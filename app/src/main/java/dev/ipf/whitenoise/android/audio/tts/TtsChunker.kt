@@ -38,7 +38,7 @@ object TtsChunker {
         while (end != BreakIterator.DONE) {
             val candidate = text.substring(start, end)
             if (candidate.isNotBlank()) {
-                if (candidate.trim().lowercase(locale) in commonTitleAbbreviations) {
+                if (candidate.endsWithCommonTitleAbbreviation(locale)) {
                     pendingPrefix += candidate
                 } else {
                     sentences += (pendingPrefix + candidate).trim()
@@ -55,6 +55,11 @@ object TtsChunker {
             .filter(String::isNotBlank)
             .mapIndexed { index, chunk -> TtsChunk(text = chunk, index = index) }
     }
+
+    private fun String.endsWithCommonTitleAbbreviation(locale: Locale): Boolean =
+        trimEnd()
+            .takeLastWhile { !it.isWhitespace() }
+            .lowercase(locale) in commonTitleAbbreviations
 
     private fun splitLongSentence(
         sentence: String,

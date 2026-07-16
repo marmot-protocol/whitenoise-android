@@ -64,6 +64,13 @@ internal class TtsPlaybackQueue(
         enqueueFromCurrentIndex()
     }
 
+    fun failBeforePlayback(
+        error: TtsError,
+        chunkCount: Int,
+    ) {
+        fail(error = error, chunkIndex = 0, chunkCount = chunkCount)
+    }
+
     fun pause() {
         val speaking = _state.value as? TtsState.Speaking ?: return
         stopEngine()
@@ -129,17 +136,27 @@ internal class TtsPlaybackQueue(
     ) {
         val failedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
         if (_state.value !is TtsState.Speaking || failedIndex < currentIndex) return
-        val chunkCount = chunks.size
+        val error =
+            when (errorCode) {
+                TextToSpeech.ERROR_NETWORK,
+                TextToSpeech.ERROR_NETWORK_TIMEOUT,
+                -> TtsError.Network
+
+                else -> TtsError.Synthesis
+            }
+        fail(error = error, chunkIndex = failedIndex, chunkCount = chunks.size)
+    }
+
+    private fun fail(
+        error: TtsError,
+        chunkIndex: Int,
+        chunkCount: Int,
+    ) {
         stopEngine()
         generation += 1
         chunks = emptyList()
-        currentIndex = failedIndex
-        _state.value =
-            TtsState.Error(
-                error = if (errorCode == TextToSpeech.ERROR_NETWORK) TtsError.Network else TtsError.Synthesis,
-                chunkIndex = failedIndex,
-                chunkCount = chunkCount,
-            )
+        currentIndex = chunkIndex
+        _state.value = TtsState.Error(error, chunkIndex, chunkCount)
         onTerminal()
     }
 

@@ -84,24 +84,26 @@ class TtsPlaybackQueueTest {
 
     @Test
     fun networkFailureIsDistinctFromOtherSynthesisFailures() {
-        val enqueued = mutableListOf<Pair<TtsChunk, String>>()
-        val queue =
-            TtsPlaybackQueue(
-                stopEngine = {},
-                enqueue = { chunk, utteranceId ->
-                    enqueued += chunk to utteranceId
-                    TextToSpeech.SUCCESS
-                },
-            )
-        queue.start(chunks("One."))
+        listOf(TextToSpeech.ERROR_NETWORK, TextToSpeech.ERROR_NETWORK_TIMEOUT).forEach { errorCode ->
+            val enqueued = mutableListOf<Pair<TtsChunk, String>>()
+            val queue =
+                TtsPlaybackQueue(
+                    stopEngine = {},
+                    enqueue = { chunk, utteranceId ->
+                        enqueued += chunk to utteranceId
+                        TextToSpeech.SUCCESS
+                    },
+                )
+            queue.start(chunks("One."))
 
-        queue.onError(enqueued.single().second, TextToSpeech.ERROR_NETWORK)
+            queue.onError(enqueued.single().second, errorCode)
 
-        val failure = queue.state.value
-        assertTrue(failure is TtsState.Error)
-        assertEquals(TtsError.Network, (failure as TtsState.Error).error)
-        assertEquals(0, failure.chunkIndex)
-        assertEquals(1, failure.chunkCount)
+            val failure = queue.state.value
+            assertTrue(failure is TtsState.Error)
+            assertEquals(TtsError.Network, (failure as TtsState.Error).error)
+            assertEquals(0, failure.chunkIndex)
+            assertEquals(1, failure.chunkCount)
+        }
     }
 
     @Test

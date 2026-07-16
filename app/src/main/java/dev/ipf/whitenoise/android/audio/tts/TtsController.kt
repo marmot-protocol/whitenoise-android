@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
+import android.speech.tts.TextToSpeech
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
@@ -45,7 +46,7 @@ class TtsController internal constructor(
         TtsPlaybackQueue(
             stopEngine = { engine?.stop() },
             enqueue = { chunk, utteranceId ->
-                engine?.speak(chunk.text, utteranceId) ?: android.speech.tts.TextToSpeech.ERROR
+                engine?.speak(chunk.text, utteranceId) ?: TextToSpeech.ERROR
             },
             onTerminal = audioFocus::release,
         )
@@ -81,7 +82,11 @@ class TtsController internal constructor(
         if (chunks.isEmpty()) return false
         if (!acquireAudioFocus()) return false
 
-        activeEngine.setLanguage(locale)
+        val languageStatus = activeEngine.setLanguage(locale)
+        if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
+            queue.failBeforePlayback(TtsError.Synthesis, chunkCount = chunks.size)
+            return false
+        }
         queue.start(chunks)
         return state.value !is TtsState.Error
     }

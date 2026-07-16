@@ -106,6 +106,21 @@ class TtsControllerTest {
     }
 
     @Test
+    fun unsupportedLocaleDoesNotStartPlaybackAndReleasesFocus() {
+        val engine = FakeTtsSpeechEngine(languageResult = TextToSpeech.LANG_NOT_SUPPORTED)
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+
+        assertFalse(controller.speak("One.", Locale.US))
+
+        assertTrue(engine.spoken.isEmpty())
+        assertEquals(TtsState.Error(TtsError.Synthesis, chunkIndex = 0, chunkCount = 1), controller.state.value)
+        assertEquals(1, focus.acquireCalls)
+        assertEquals(1, focus.releaseCalls)
+    }
+
+    @Test
     fun staleCallbacksFromAReplacedEngineCannotAdvanceTheNewQueue() {
         val firstEngine = FakeTtsSpeechEngine()
         val secondEngine = FakeTtsSpeechEngine()
@@ -136,6 +151,7 @@ class TtsControllerTest {
 
     private class FakeTtsSpeechEngine(
         private val speakResult: Int = TextToSpeech.SUCCESS,
+        private val languageResult: Int = TextToSpeech.LANG_AVAILABLE,
     ) : TtsSpeechEngine {
         val spoken = mutableListOf<Spoken>()
         var stopCalls = 0
@@ -146,7 +162,7 @@ class TtsControllerTest {
 
         override fun setLanguage(locale: Locale): Int {
             this.locale = locale
-            return TextToSpeech.LANG_AVAILABLE
+            return languageResult
         }
 
         override fun setCallbacks(
