@@ -286,8 +286,17 @@ internal fun MediaVoiceBubble(
                                     return@combinedClickable
                                 }
                                 scope.launch {
+                                    val retainedFile =
+                                        withContext(Dispatchers.IO) {
+                                            validatedAttachmentCacheFile(localFile)
+                                        }
+                                    if (retainedFile == null && localFile != null) {
+                                        localFile = null
+                                        realWaveform = null
+                                        totalDurationMs = 0
+                                    }
                                     val file =
-                                        localFile ?: runCatching {
+                                        retainedFile ?: runCatching {
                                             loading = true
                                             materializeVoiceAttachment(
                                                 context = context,
@@ -552,13 +561,14 @@ internal fun cachedVoiceAttachmentFile(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): java.io.File? =
-    voiceAttachmentCacheFile(
-        context = context,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-    ).takeIf { it.isFile && it.length() > 0L }
-        ?.also(AttachmentPlaintextCache::touch)
+    validatedAttachmentCacheFile(
+        voiceAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        ),
+    )
 
 @Composable
 private fun rememberCachedVoiceAttachmentFileState(

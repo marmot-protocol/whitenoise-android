@@ -29,6 +29,7 @@ class AppSelfUpdateDownloader(
             AppSelfUpdateStorage.deleteFile(partial)
             try {
                 requireApkLengthWithinLimit(asset.sizeBytes, "published asset")
+                val maximumDownloadBytes = asset.sizeBytes ?: MAX_APK_BYTES
                 val request = Request.Builder().url(asset.downloadUrl).build()
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
@@ -40,6 +41,9 @@ class AppSelfUpdateDownloader(
                     val body = response.body ?: throw IOException("Empty response body")
                     val responseBytes = body.contentLength().takeIf { it >= 0L }
                     requireApkLengthWithinLimit(responseBytes, "HTTP response")
+                    if (responseBytes != null && responseBytes > maximumDownloadBytes) {
+                        throw ApkTooLargeException("HTTP response exceeds the signed asset length")
+                    }
                     val totalBytes = asset.sizeBytes ?: responseBytes?.takeIf { it > 0L }
                     val digest = MessageDigest.getInstance("SHA-256")
                     body.byteStream().use { input ->
@@ -50,7 +54,7 @@ class AppSelfUpdateDownloader(
                                 coroutineContext.ensureActive()
                                 val read = input.read(buffer)
                                 if (read == -1) break
-                                downloaded = checkedDownloadedApkBytes(downloaded, read.toLong())
+                                downloaded = checkedDownloadedApkBytes(downloaded, read.toLong(), maximumDownloadBytes)
                                 digest.update(buffer, 0, read)
                                 output.write(buffer, 0, read)
                                 onProgress(downloaded, totalBytes)
@@ -106,8 +110,16 @@ class AppSelfUpdateDownloader(
         internal fun checkedDownloadedApkBytes(
             downloaded: Long,
             nextChunkBytes: Long,
+            maximumBytes: Long = MAX_APK_BYTES,
         ): Long {
-            if (downloaded < 0L || nextChunkBytes < 0L || nextChunkBytes > MAX_APK_BYTES - downloaded) {
+            if (
+                maximumBytes <= 0L ||
+                maximumBytes > MAX_APK_BYTES ||
+                downloaded < 0L ||
+                nextChunkBytes < 0L ||
+                downloaded > maximumBytes ||
+                nextChunkBytes > maximumBytes - downloaded
+            ) {
                 throw ApkTooLargeException()
             }
             return downloaded + nextChunkBytes

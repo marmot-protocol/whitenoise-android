@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -9,15 +10,17 @@ class Media3PlayerViewReleaseCoverageTest {
     @Test
     fun everyVideoPlayerViewDetachesItsPlayerOnRelease() {
         val source = mediaVideoSource().readText()
-        val androidViewCount = Regex("AndroidView\\(").findAll(source).count()
-        val detachCount =
-            Regex("onRelease\\s*=\\s*\\{\\s*playerView\\s*->\\s*playerView\\.player\\s*=\\s*null\\s*}")
-                .findAll(source)
-                .count()
+        listOf("FullscreenVideoPlayer", "VideoViewerPage").forEach { functionName ->
+            val body = source.functionBody(functionName)
 
-        assertEquals("test assumes MediaVideo owns exactly two PlayerViews", 2, androidViewCount)
-        assertEquals("every PlayerView must drop its ExoPlayer reference", androidViewCount, detachCount)
-        assertTrue("ExoPlayer instances must still be released", source.contains("onDispose { exo.release() }"))
+            assertEquals("$functionName must own exactly one PlayerView", 1, Regex("AndroidView\\(").findAll(body).count())
+            assertTrue(
+                "$functionName must detach its exact PlayerView on release",
+                Regex("onRelease\\s*=\\s*\\{\\s*playerView\\s*->\\s*playerView\\.player\\s*=\\s*null\\s*}")
+                    .containsMatchIn(body),
+            )
+            assertTrue("$functionName must release its ExoPlayer", "onDispose { exo.release() }" in body)
+        }
     }
 
     private fun mediaVideoSource(): File =

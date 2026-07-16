@@ -331,7 +331,8 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "direct record removal must clear delete and reaction overlays",
             "deletedMessageIds = deletedMessageIds - messageIdHex" in removeProjectedRecord &&
-                "optimisticReactionChanges.entries.removeAll" in removeProjectedRecord,
+                "optimisticReactionChanges.entries.removeAll" in removeProjectedRecord &&
+                "reactionsState.remove(messageIdHex)" in removeProjectedRecord,
         )
         assertTrue(
             "window pruning must retain timeline and optimistic targets only",

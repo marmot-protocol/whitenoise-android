@@ -70,6 +70,27 @@ class AttachmentPlaintextCacheTest {
     }
 
     @Test
+    fun overlappingSamePathPublicationsRemainProtectedUntilLastRelease() {
+        val directory = File(root, MediaCacheDirs.VIDEO).apply { mkdirs() }
+        val active = cacheFile(directory, "same-path.mp4", 8, 1_000L)
+
+        AttachmentPlaintextCache.protectPublicationFile(active)
+        AttachmentPlaintextCache.protectPublicationFile(active)
+        try {
+            AttachmentPlaintextCache.unprotectPublicationFile(active)
+            val stillProtected = AttachmentPlaintextCache.trimDirectoryToByteCap(directory, 0L)
+
+            assertEquals(8L, stillProtected)
+            assertTrue(active.exists())
+        } finally {
+            AttachmentPlaintextCache.unprotectPublicationFile(active)
+        }
+
+        assertEquals(0L, AttachmentPlaintextCache.trimDirectoryToByteCap(directory, 0L))
+        assertFalse(active.exists())
+    }
+
+    @Test
     fun publicationRejectsSingleEntryLargerThanDirectoryLimit() {
         val voiceFile = File(File(root, MediaCacheDirs.VOICE), "too-large.m4a")
         val videoFile = File(File(root, MediaCacheDirs.VIDEO), "too-large.mp4")

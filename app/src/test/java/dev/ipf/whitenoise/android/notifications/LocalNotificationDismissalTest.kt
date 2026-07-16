@@ -151,7 +151,8 @@ class LocalNotificationDismissalTest {
         val group = "group-a"
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
-        listOf(conversation, reaction).forEach { manager.notify(it.tag, it.id, notification()) }
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-a", "hello" to 1_000L))
+        manager.notify(reaction.tag, reaction.id, notification())
         val baseline = manager.activeNotifications.maxOf { it.postTime }
         val providerInvoked = AtomicBoolean(false)
         val presenter =
@@ -169,6 +170,7 @@ class LocalNotificationDismissalTest {
             presenter.dismissActionNotificationAndOlderSiblings(
                 notificationTag = conversation.tag,
                 notificationId = conversation.id,
+                actedMessageIdHex = "msg-a",
                 accountRef = account,
                 groupIdHex = group,
                 sinceMs = baseline,
@@ -177,6 +179,27 @@ class LocalNotificationDismissalTest {
 
         assertTrue(providerInvoked.get())
         assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun actionDismissalKeepsConversationCardUpdatedToANewerMessage() {
+        val account = "account-a"
+        val group = "group-a"
+        val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
+        manager.notify(conversation.tag, conversation.id, messagingNotification("msg-b", "newer" to 2_000L))
+
+        assertTrue(
+            LocalNotificationPresenter(context).dismissActionNotificationAndOlderSiblings(
+                notificationTag = conversation.tag,
+                notificationId = conversation.id,
+                actedMessageIdHex = "msg-a",
+                accountRef = account,
+                groupIdHex = group,
+                sinceMs = manager.activeNotifications.single().postTime - 1L,
+            ),
+        )
+
+        assertEquals("msg-b", LocalNotificationPresenter(context).conversationCardMessageIdHex(conversation.tag, conversation.id))
     }
 
     @Test

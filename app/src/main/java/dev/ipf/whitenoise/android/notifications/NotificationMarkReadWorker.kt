@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -12,6 +13,7 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 class NotificationMarkReadWorker(
@@ -20,14 +22,23 @@ class NotificationMarkReadWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val application = applicationContext as? WhiteNoiseApplication ?: return Result.success()
+        val retryStore = NotificationActionRetryStore.create(applicationContext)
+        val retryKey = id.toString()
         val action =
             NotificationActionWorkData
                 .decode(inputData)
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
-                ?: return Result.failure()
+                ?: return Result.failure().also { retryStore.clear(retryKey) }
         if (!application.appState.notificationActionsAllowed) {
             Log.w(TAG, "mark-read deferred by app lock group=${action.target.groupIdHex.take(8)}")
-            return Result.retry()
+            if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
+                return Result.retry()
+            }
+            Log.w(TAG, "mark-read lock wait expired group=${action.target.groupIdHex.take(8)}")
+            return Result.failure().also { retryStore.clear(retryKey) }
+        }
+        if (retryStore.operationFailureCount(retryKey) >= MAX_ATTEMPTS) {
+            return Result.failure().also { retryStore.clear(retryKey) }
         }
 
         return try {
@@ -43,25 +54,34 @@ class NotificationMarkReadWorker(
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
                 }
-            if (!markedRead) return markReadFailureResult()
+            if (!markedRead) return markReadFailureResult(retryStore, retryKey)
 
             LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
                 notificationTag = action.notificationTag,
                 notificationId = action.notificationId,
+                actedMessageIdHex = action.target.messageIdHex,
                 accountRef = action.target.accountRef,
                 groupIdHex = action.target.groupIdHex,
                 sinceMs = dismissBaselineMs,
             )
-            Result.success()
+            Result.success().also { retryStore.clear(retryKey) }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
             Log.w(TAG, "mark-read worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            markReadFailureResult()
+            markReadFailureResult(retryStore, retryKey)
         }
     }
 
-    private fun markReadFailureResult(): Result = if (shouldRetryAfterFailure(runAttemptCount)) Result.retry() else Result.failure()
+    private fun markReadFailureResult(
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        val operationAttempt = retryStore.recordOperationFailureAttempt(retryKey)
+        if (operationAttempt != null && shouldRetryAfterFailure(operationAttempt)) return Result.retry()
+        retryStore.clear(retryKey)
+        return Result.failure()
+    }
 
     companion object {
         private const val TAG = "DMMarkReadWorker"
@@ -75,8 +95,11 @@ class NotificationMarkReadWorker(
             try {
                 WorkManager
                     .getInstance(context.applicationContext)
-                    .enqueue(notificationMarkReadRequest(action))
-                    .await()
+                    .enqueueUniqueWork(
+                        notificationMarkReadWorkName(action),
+                        ExistingWorkPolicy.KEEP,
+                        notificationMarkReadRequest(action),
+                    ).await()
                 true
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -86,6 +109,20 @@ class NotificationMarkReadWorker(
             }
 
         internal fun shouldRetryAfterFailure(runAttemptCount: Int): Boolean = runAttemptCount < MAX_ATTEMPTS - 1
+
+        internal fun notificationMarkReadWorkName(action: NotificationAction): String {
+            val canonical =
+                listOf(
+                    action.target.accountRef,
+                    action.target.groupIdHex,
+                    action.target.messageIdHex.orEmpty(),
+                ).joinToString("\u0000")
+            val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
+            return "notification_mark_read_" +
+                buildString(digest.size * 2) {
+                    digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+                }
+        }
 
         internal fun notificationMarkReadRequest(action: NotificationAction) =
             OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()

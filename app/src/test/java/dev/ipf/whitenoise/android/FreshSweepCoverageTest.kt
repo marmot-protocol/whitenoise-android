@@ -107,6 +107,11 @@ class FreshSweepCoverageTest {
         val markReadWorker = source("notifications/NotificationMarkReadWorker.kt")
         val replyWorker = source("notifications/NotificationReplyWorker.kt")
         val presenter = source("notifications/LocalNotificationPresenter.kt")
+        val replyLockBranch =
+            replyWorker.section(
+                "if (!application.appState.notificationActionsAllowed)",
+                "if (retryStore.operationFailureCount",
+            )
         val mainConfinedMutations =
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
@@ -117,10 +122,24 @@ class FreshSweepCoverageTest {
         assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)
         assertTrue("mark-read mutations must remain main-confined", mainConfinedMutations.containsMatchIn(markReadWorker))
         assertTrue("locked mark-read work must wait for unlock", "return Result.retry()" in markReadWorker)
-        assertTrue("locked replies must wait for unlock", "if (!application.appState.notificationActionsAllowed)" in replyWorker)
+        assertTrue(
+            "mark-read work must deduplicate repeated notification actions",
+            ".enqueueUniqueWork(" in markReadWorker && "ExistingWorkPolicy.KEEP" in markReadWorker,
+        )
+        assertTrue(
+            "only encrypted replies may wait for unlock",
+            "if (containsLegacyPlaintext)" in replyLockBranch &&
+                "Result.failure()" in replyLockBranch &&
+                "retryStore.shouldDeferForLock" in replyLockBranch &&
+                "return Result.retry()" in replyLockBranch,
+        )
         assertFalse(
             "a lock race must not terminally record a dropped reply as success",
             "markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)" in replyWorker,
+        )
+        assertTrue(
+            "mark-read cleanup must preserve a newer conversation-card generation",
+            "cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)" in presenter,
         )
         val postPath = presenter.section("if (messaging != null)", "notificationDebug {")
         assertFalse("routine notification updates must not cancel before notify", "notificationManager.cancel(" in postPath)
@@ -135,6 +154,32 @@ class FreshSweepCoverageTest {
         assertTrue(source.contains("delay(relativeTimeRefreshDelayMillis(Instant.now()))"))
         assertEquals(60_000L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(120_000L)))
         assertEquals(1L, relativeTimeRefreshDelayMillis(Instant.ofEpochMilli(179_999L)))
+    }
+
+    @Test
+    fun retainedMediaFilesAreRevalidatedBeforePlayback() {
+        val voice = source("ui/conversation/media/MediaVoice.kt")
+        val video = source("ui/conversation/media/MediaVideo.kt")
+        val voiceBubble = voice.section("internal fun MediaVoiceBubble(", "private fun VoiceSpeedPill(")
+        val videoBubble = video.section("internal fun MediaVideoBubble(", "internal fun cachedVideoAttachmentFile(")
+        val videoGridTile = video.section("internal fun MediaVideoGridTile(", "internal fun MediaVideoBubble(")
+
+        assertTrue(
+            "voice playback must rematerialize a retained file that LRU eviction removed",
+            "validatedAttachmentCacheFile(localFile)" in voiceBubble &&
+                "retainedFile ?: runCatching" in voiceBubble,
+        )
+        assertTrue(
+            "video playback must rematerialize a retained file that LRU eviction removed",
+            "validatedAttachmentCacheFile(localFile)" in videoBubble &&
+                "manual materialize failed" in videoBubble,
+        )
+        assertTrue(
+            "album video tiles must rematerialize an evicted retained file before opening",
+            "validatedAttachmentCacheFile(f)" in videoGridTile &&
+                "materializeVideoAttachment(" in videoGridTile &&
+                "onTap(playableFile)" in videoGridTile,
+        )
     }
 
     private fun source(relativePath: String): String =

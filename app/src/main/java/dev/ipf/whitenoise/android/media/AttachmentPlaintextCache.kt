@@ -10,7 +10,7 @@ internal object AttachmentPlaintextCache {
     internal const val VIDEO_MAX_DIRECTORY_BYTES: Long = 128L * 1024L * 1024L
 
     private val trimLock = Any()
-    private val activePublicationPaths = mutableSetOf<String>()
+    private val activePublicationPathCounts = mutableMapOf<String, Int>()
 
     @Throws(IOException::class)
     fun requireEntryWithinLimit(
@@ -40,11 +40,22 @@ internal object AttachmentPlaintextCache {
     }
 
     internal fun protectPublicationFile(file: File) {
-        synchronized(trimLock) { activePublicationPaths.add(file.absolutePath) }
+        synchronized(trimLock) {
+            val path = file.absolutePath
+            activePublicationPathCounts[path] = (activePublicationPathCounts[path] ?: 0) + 1
+        }
     }
 
     internal fun unprotectPublicationFile(file: File) {
-        synchronized(trimLock) { activePublicationPaths.remove(file.absolutePath) }
+        synchronized(trimLock) {
+            val path = file.absolutePath
+            val remaining = (activePublicationPathCounts[path] ?: return@synchronized) - 1
+            if (remaining <= 0) {
+                activePublicationPathCounts.remove(path)
+            } else {
+                activePublicationPathCounts[path] = remaining
+            }
+        }
     }
 
     fun trimKnownDirectories(cacheRoot: File) {
@@ -68,7 +79,7 @@ internal object AttachmentPlaintextCache {
             var totalBytes = files.fold(0L) { total, file -> saturatingAdd(total, file.length()) }
             if (totalBytes <= maxBytes) return@synchronized totalBytes
 
-            val protectedPaths = HashSet(activePublicationPaths)
+            val protectedPaths = HashSet(activePublicationPathCounts.keys)
             protectedFile?.absolutePath?.let(protectedPaths::add)
             files
                 .sortedWith(compareBy<File> { it.lastModified() }.thenBy { it.name })

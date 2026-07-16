@@ -68,6 +68,12 @@ internal fun decodeUriListTokens(encoded: String): List<String> =
         encoded.split('\n').filter { it.isNotEmpty() }
     }
 
+/** Returns and promotes a still-present plaintext cache entry, or null after eviction. */
+internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
+    file
+        ?.takeIf { it.isFile && it.length() > 0L }
+        ?.also(AttachmentPlaintextCache::touch)
+
 /**
  * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
  * for it via the app's FileProvider so an external app (PDF reader, etc.)
