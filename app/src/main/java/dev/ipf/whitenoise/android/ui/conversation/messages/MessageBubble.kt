@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.canDeleteMessageForEveryone
+import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -135,6 +136,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.flow.filter
@@ -358,6 +360,24 @@ internal fun MessageBubble(
     val messageTextSelectionState = rememberSelectionState()
     val selectableTextLayouts =
         remember(record.messageIdHex) { mutableStateMapOf<Any, SelectableTextLayout>() }
+    val markdownLinkLayouts =
+        remember(record.messageIdHex) { mutableStateMapOf<Any, MarkdownLinkTextLayout>() }
+    val markdownLinkLayoutReporter =
+        remember(record.messageIdHex) {
+            {
+                key: Any,
+                text: AnnotatedString,
+                layoutResult: TextLayoutResult?,
+                coordinates: androidx.compose.ui.layout.LayoutCoordinates?,
+                ->
+                if (layoutResult != null && coordinates != null) {
+                    markdownLinkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
+                } else {
+                    markdownLinkLayouts.remove(key)
+                }
+                Unit
+            }
+        }
     var textSelectionSeeded by remember(record.messageIdHex) { mutableStateOf(false) }
     val plainTextLayoutKey = remember(record.messageIdHex) { Any() }
     val plainTextLayoutTracker = remember(record.messageIdHex) { SelectableTextLayoutTracker() }
@@ -551,6 +571,12 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    fun copyMarkdownLink(url: String) {
+        clipboard.setText(AnnotatedString(url))
+        appState.present(R.string.copied)
+        onActionMenuOpenChange(false)
+    }
+
     fun beginTextSelection() {
         selectableTextLayouts.clear()
         textSelectionSeeded = false
@@ -638,19 +664,26 @@ internal fun MessageBubble(
                                     val longPress = awaitLongPressOrCancellation(down.id)
                                     if (longPress != null) {
                                         longPress.consume()
-                                        // Capture the press in window space before
-                                        // opening so both the popover and text
-                                        // selection seed at the finger (#326, #1370).
-                                        longPressWindowPosition =
+                                        val windowPosition =
                                             Offset(
                                                 rowBoundsLeftPx + longPress.position.x,
                                                 rowBoundsTopPx + longPress.position.y,
                                             )
-                                        longPressWindowY = longPressWindowPosition?.y
+                                        val linkDestination =
+                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
                                         haptics.performHapticFeedback(
                                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                         )
-                                        onActionMenuOpenChange(true)
+                                        if (linkDestination != null) {
+                                            copyMarkdownLink(linkDestination)
+                                        } else {
+                                            // Capture the press in window space before
+                                            // opening so both the popover and text
+                                            // selection seed at the finger (#326, #1370).
+                                            longPressWindowPosition = windowPosition
+                                            longPressWindowY = windowPosition.y
+                                            onActionMenuOpenChange(true)
+                                        }
                                     }
                                 }
                             }
@@ -1328,6 +1361,8 @@ internal fun MessageBubble(
                                         onLastTextLayout = { lastLineLayout = it },
                                         onSelectableTextLayoutChanged =
                                             if (textSelectionMode) selectableTextLayoutReporter else null,
+                                        onLinkTextLayoutChanged = markdownLinkLayoutReporter,
+                                        onCopyLink = ::copyMarkdownLink,
                                     )
                                 }
                             } else if (plainTextOverflows) {
