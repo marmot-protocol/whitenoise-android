@@ -66,6 +66,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -245,6 +246,11 @@ internal fun rememberMessageMediaReferences(
         perMessageMediaReferences ?: MediaReferenceParser.parseAllImetaTags(tags)
     }
 
+internal fun messageBubbleLongPressPositionInWindow(
+    rowCoordinates: LayoutCoordinates,
+    localPosition: Offset,
+): Offset = rowCoordinates.localToWindow(localPosition)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MessageBubble(
@@ -347,8 +353,7 @@ internal fun MessageBubble(
     // the action popover; the full point seeds partial text selection (#1370).
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
-    var rowBoundsLeftPx by remember { mutableStateOf(0f) }
-    var rowBoundsTopPx by remember { mutableStateOf(0f) }
+    val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
@@ -665,10 +670,9 @@ internal fun MessageBubble(
                                     if (longPress != null) {
                                         longPress.consume()
                                         val windowPosition =
-                                            Offset(
-                                                rowBoundsLeftPx + longPress.position.x,
-                                                rowBoundsTopPx + longPress.position.y,
-                                            )
+                                            rowCoordinates[0]?.let {
+                                                messageBubbleLongPressPositionInWindow(it, longPress.position)
+                                            } ?: return@awaitEachGesture
                                         val linkDestination =
                                             markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
                                         haptics.performHapticFeedback(
@@ -714,13 +718,9 @@ internal fun MessageBubble(
                             }
                         },
                     )
-                    // Window-space row bounds, added to the local press so the
-                    // popover and text-selection seed use the same coordinates.
-                    .onGloballyPositioned {
-                        val bounds = it.boundsInWindow()
-                        rowBoundsLeftPx = bounds.left
-                        rowBoundsTopPx = bounds.top
-                    },
+                    // Keep the row transform itself: clipped bounds are not the
+                    // row's local origin when a message is partially off-screen.
+                    .onGloballyPositioned { rowCoordinates[0] = it },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             if (showSenderAvatar) {

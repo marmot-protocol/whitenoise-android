@@ -4,10 +4,18 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,13 +23,16 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleLongPressPositionInWindow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,6 +69,16 @@ class MarkdownLinkCopyTest {
         assertEquals(
             LongPressResult(copiedUrl = destination, parentLongPresses = 0),
             longPress(document, visibleText = "visible label"),
+        )
+    }
+
+    @Test
+    fun partiallyClippedRowStillCopiesThePressedLink() {
+        val url = "https://example.com/clipped"
+
+        assertEquals(
+            LongPressResult(copiedUrl = url, parentLongPresses = 0),
+            longPress(autolinkDocument(url), visibleText = url, partiallyClipped = true),
         )
     }
 
@@ -120,44 +141,72 @@ class MarkdownLinkCopyTest {
     private fun longPress(
         document: MarkdownDocumentFfi,
         visibleText: String,
+        partiallyClipped: Boolean = false,
     ): LongPressResult {
         var copiedUrl: String? = null
         var parentLongPresses = 0
+        var clippingVerified = false
 
         composeRule.setContent {
             val linkLayouts = remember { mutableMapOf<Any, MarkdownLinkTextLayout>() }
             val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
-            WhiteNoiseTheme {
-                Box(
+            val clippingModifier =
+                if (partiallyClipped) {
+                    Modifier.size(width = 240.dp, height = 72.dp).clipToBounds()
+                } else {
                     Modifier
-                        .onGloballyPositioned { rowCoordinates[0] = it }
-                        .pointerInput(Unit) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                val longPress = awaitLongPressOrCancellation(down.id)
-                                if (longPress != null) {
-                                    longPress.consume()
-                                    val windowPosition = rowCoordinates[0]?.localToWindow(longPress.position)
-                                    val link = windowPosition?.let { markdownLinkDestinationAt(linkLayouts.values, it) }
-                                    if (link != null) {
-                                        copiedUrl = link
-                                    } else {
-                                        parentLongPresses++
+                }
+            val rowModifier =
+                if (partiallyClipped) {
+                    Modifier.offset(y = (-24).dp).size(width = 240.dp, height = 96.dp)
+                } else {
+                    Modifier
+                }
+            WhiteNoiseTheme {
+                Box(clippingModifier) {
+                    Box(
+                        rowModifier
+                            .onGloballyPositioned {
+                                rowCoordinates[0] = it
+                                if (partiallyClipped) {
+                                    clippingVerified =
+                                        it.boundsInWindow().top >
+                                        it.localToWindow(Offset.Zero).y
+                                }
+                            }.pointerInput(Unit) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val longPress = awaitLongPressOrCancellation(down.id)
+                                    if (longPress != null) {
+                                        longPress.consume()
+                                        val windowPosition =
+                                            rowCoordinates[0]?.let {
+                                                messageBubbleLongPressPositionInWindow(it, longPress.position)
+                                            }
+                                        val link = windowPosition?.let { markdownLinkDestinationAt(linkLayouts.values, it) }
+                                        if (link != null) {
+                                            copiedUrl = link
+                                        } else {
+                                            parentLongPresses++
+                                        }
                                     }
                                 }
-                            }
-                        },
-                ) {
-                    MarkdownMessageBody(
-                        document = document,
-                        onLinkTextLayoutChanged = { key, text, layoutResult, coordinates ->
-                            if (layoutResult != null && coordinates != null) {
-                                linkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
-                            } else {
-                                linkLayouts.remove(key)
-                            }
-                        },
-                    )
+                            },
+                    ) {
+                        Column {
+                            if (partiallyClipped) Spacer(Modifier.height(40.dp))
+                            MarkdownMessageBody(
+                                document = document,
+                                onLinkTextLayoutChanged = { key, text, layoutResult, coordinates ->
+                                    if (layoutResult != null && coordinates != null) {
+                                        linkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
+                                    } else {
+                                        linkLayouts.remove(key)
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -168,6 +217,9 @@ class MarkdownLinkCopyTest {
             up()
         }
         composeRule.waitForIdle()
+        if (partiallyClipped) {
+            assertTrue("test row must have a clipped top edge", clippingVerified)
+        }
 
         return LongPressResult(copiedUrl, parentLongPresses)
     }
