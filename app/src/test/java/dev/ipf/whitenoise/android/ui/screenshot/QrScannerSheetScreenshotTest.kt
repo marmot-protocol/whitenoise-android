@@ -53,4 +53,24 @@ class QrScannerSheetScreenshotTest {
             .onNodeWithTag(QR_SCANNER_SHEET_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/qr_scanner_sheet_idle_dark.png")
     }
+
+    @Test
+    fun qrScannerSheetPermissionDeniedDark() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    QrScannerSheetContent(
+                        permissionGranted = false,
+                        scannerError = null,
+                        onDismiss = {},
+                        onRequestPermission = {},
+                        cameraPreview = {},
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(QR_SCANNER_SHEET_CONTENT_TAG)
+            .captureRoboImage("src/test/snapshots/qr_scanner_sheet_permission_denied_dark.png")
+    }
 }
