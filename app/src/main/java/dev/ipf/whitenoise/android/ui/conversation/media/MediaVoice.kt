@@ -65,7 +65,6 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -74,8 +73,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private val voiceMaterializationLock = Any()
-private val inFlightVoiceMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
+private val voiceMaterializations = SingleFlight<String, java.io.File>()
 
 internal fun voicePlaybackKey(
     messageIdHex: String,
@@ -498,36 +496,8 @@ internal suspend fun materializeVoiceAttachment(
             sourceEpoch = reference.sourceEpoch,
         )
 
-    val key = file.absolutePath
-    var owner = false
-    val shared =
-        synchronized(voiceMaterializationLock) {
-            inFlightVoiceMaterializations[key]
-                ?.takeIf { it.isActive }
-                ?: CompletableDeferred<java.io.File>()
-                    .also {
-                        inFlightVoiceMaterializations[key] = it
-                        owner = true
-                    }
-        }
-    if (!owner) return shared.await()
-
-    return try {
-        val materialized =
-            withContext(NonCancellable) {
-                materializeVoiceAttachmentOnce(attachmentKey, file, resolveBytes)
-            }
-        shared.complete(materialized)
-        materialized
-    } catch (throwable: Throwable) {
-        shared.completeExceptionally(throwable)
-        throw throwable
-    } finally {
-        synchronized(voiceMaterializationLock) {
-            if (inFlightVoiceMaterializations[key] === shared) {
-                inFlightVoiceMaterializations.remove(key)
-            }
-        }
+    return voiceMaterializations.run(file.absolutePath) {
+        materializeVoiceAttachmentOnce(attachmentKey, file, resolveBytes)
     }
 }
 

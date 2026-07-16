@@ -147,6 +147,24 @@ class VoiceAttachmentCacheStateTest {
     }
 
     @Test
+    fun voiceMaterializationUsesSharedSingleFlight() {
+        val source = mediaVoiceSource().readText()
+
+        assertTrue(
+            "voice materialization should use the shared single-flight utility",
+            Regex(
+                """private\s+val\s+voiceMaterializations\s*=\s*SingleFlight<String,\s*java\.io\.File>\(\)""",
+            ).containsMatchIn(source),
+        )
+        assertTrue(
+            "the flight must begin before the materializer checks the cache fast path",
+            Regex(
+                """voiceMaterializations\.run\(file\.absolutePath\)\s*\{\s*materializeVoiceAttachmentOnce\(""",
+            ).containsMatchIn(source),
+        )
+    }
+
+    @Test
     fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
         runBlocking {
             withTimeout(TEST_HANG_GUARD_MS) {
@@ -220,6 +238,13 @@ class VoiceAttachmentCacheStateTest {
             }
         }
     }
+
+    private fun mediaVoiceSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MediaVoice.kt source file")
 
     private fun mediaReference(
         mediaType: String,
