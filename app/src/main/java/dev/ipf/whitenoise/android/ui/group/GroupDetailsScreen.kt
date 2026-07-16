@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -996,34 +995,13 @@ internal fun GroupDetailsScreen(
                     Modifier.padding(horizontal = Dimens.spaceLg),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    SectionCard(title = stringResource(R.string.transcript_export)) {
-                        Text(
-                            stringResource(R.string.transcript_export_description),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        TextButton(
-                            onClick = { exportTranscript() },
-                            enabled = !transcriptExportInFlight && appState.activeAccountRef != null,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            if (transcriptExportInFlight) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Default.Description, contentDescription = null)
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                stringResource(
-                                    if (transcriptExportInFlight) {
-                                        R.string.exporting_transcript
-                                    } else {
-                                        R.string.export_conversation_transcript
-                                    },
-                                ),
-                            )
-                        }
-                    }
+                    SettingsActionRow(
+                        icon = Icons.Default.Description,
+                        title = stringResource(R.string.export_conversation_transcript),
+                        enabled = !transcriptExportInFlight && appState.activeAccountRef != null,
+                        inProgress = transcriptExportInFlight,
+                        onClick = { exportTranscript() },
+                    )
 
                     SectionCard(title = stringResource(R.string.mls)) {
                         when {
