@@ -43,7 +43,7 @@ internal fun rememberConversationMentionPickerState(
                         MentionComposer.Candidate(
                             accountIdHex = member.memberIdHex,
                             npub = appState.npub(member.memberIdHex),
-                            displayName = appState.chatMemberTitleCached(member.memberIdHex),
+                            displayName = appState.contactDisplayNameCached(member.memberIdHex),
                             nip05 = appState.userProfile(member.memberIdHex)?.nip05,
                             avatarUrl = appState.avatarUrl(member.memberIdHex),
                         )
