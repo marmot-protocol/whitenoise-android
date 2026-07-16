@@ -21,12 +21,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -109,6 +114,10 @@ internal fun MarkdownMessageBody(
     // the elision marker when the top-level block cap hides later siblings;
     // other block types leave it unset.
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
+    // Reports every selectable body Text with stable identity plus its latest
+    // layout/coordinates. MessageBubble uses this only while partial text
+    // selection is active to seed the native selection at the original press.
+    onSelectableTextLayoutChanged: SelectableTextLayoutReporter? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -139,13 +148,15 @@ internal fun MarkdownMessageBody(
         remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds) {
             MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds)
         }
-    MarkdownBlockList(
-        blocks = document.blocks,
-        ctx = bodyContext,
-        depth = 0,
-        modifier = modifier,
-        onLastTextLayout = onLastTextLayout,
-    )
+    CompositionLocalProvider(LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged) {
+        MarkdownBlockList(
+            blocks = document.blocks,
+            ctx = bodyContext,
+            depth = 0,
+            modifier = modifier,
+            onLastTextLayout = onLastTextLayout,
+        )
+    }
     pendingLinkUrl?.let { url ->
         AlertDialog(
             onDismissRequest = { pendingLinkUrl = null },
@@ -234,6 +245,57 @@ private data class MarkdownBodyContext(
     val useDecorativeBackgrounds: Boolean,
 )
 
+internal typealias SelectableTextLayoutReporter =
+    (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
+
+private val LocalSelectableTextLayoutReporter =
+    staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
+
+private class MarkdownTextLayoutTracker {
+    var layoutResult: TextLayoutResult? = null
+    var coordinates: LayoutCoordinates? = null
+}
+
+/** Text leaf used by the rendered Markdown document (dialog chrome excluded). */
+@Composable
+private fun MarkdownBodyText(
+    text: AnnotatedString,
+    modifier: Modifier = Modifier,
+    style: TextStyle = TextStyle.Default,
+    textAlign: TextAlign? = null,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
+) {
+    val reporter = LocalSelectableTextLayoutReporter.current
+    val key = remember { Any() }
+    val tracker = remember { MarkdownTextLayoutTracker() }
+
+    DisposableEffect(reporter, key) {
+        onDispose { reporter?.invoke(key, null, null) }
+    }
+
+    fun reportIfReady() {
+        val layoutResult = tracker.layoutResult ?: return
+        val coordinates = tracker.coordinates ?: return
+        reporter?.invoke(key, layoutResult, coordinates)
+    }
+
+    Text(
+        text = text,
+        modifier =
+            modifier.onGloballyPositioned { coordinates ->
+                tracker.coordinates = coordinates
+                reportIfReady()
+            },
+        style = style,
+        textAlign = textAlign,
+        onTextLayout = { layoutResult ->
+            tracker.layoutResult = layoutResult
+            onTextLayout?.invoke(layoutResult)
+            reportIfReady()
+        },
+    )
+}
+
 @Composable
 private fun MarkdownBlockList(
     blocks: List<MarkdownBlockFfi>,
@@ -265,11 +327,11 @@ private fun MarkdownElisionMarker(
     style: TextStyle = MaterialTheme.typography.bodyLarge,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
-    Text(
-        "…",
+    MarkdownBodyText(
+        text = AnnotatedString("…"),
         style = style,
         modifier = modifier,
-        onTextLayout = { onTextLayout?.invoke(it) },
+        onTextLayout = onTextLayout,
     )
 }
 
@@ -289,16 +351,16 @@ private fun MarkdownBlockView(
     }
     when (block) {
         is MarkdownBlockFfi.Paragraph ->
-            Text(
-                rememberMarkdownInlineText(block.inlines, ctx),
+            MarkdownBodyText(
+                text = rememberMarkdownInlineText(block.inlines, ctx),
                 style = MaterialTheme.typography.bodyLarge,
-                onTextLayout = { onTextLayout?.invoke(it) },
+                onTextLayout = onTextLayout,
             )
         is MarkdownBlockFfi.Heading ->
-            Text(
-                rememberMarkdownInlineText(block.inlines, ctx),
+            MarkdownBodyText(
+                text = rememberMarkdownInlineText(block.inlines, ctx),
                 style = markdownHeadingTextStyle(block.level.toInt(), MaterialTheme.typography),
-                onTextLayout = { onTextLayout?.invoke(it) },
+                onTextLayout = onTextLayout,
             )
         MarkdownBlockFfi.ThematicBreak ->
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
@@ -345,8 +407,8 @@ private fun MarkdownCodeBlockView(
     // cache the sanitization work instead of repeating it on every recomposition.
     val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
 
-    Text(
-        text,
+    MarkdownBodyText(
+        text = AnnotatedString(text),
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         modifier =
             Modifier
@@ -395,14 +457,17 @@ private fun MarkdownListView(
     Column(verticalArrangement = Arrangement.spacedBy(if (block.tight) 2.dp else 6.dp)) {
         visibleItems.forEachIndexed { index, item ->
             Row {
-                Text(
+                MarkdownBodyText(
                     // Task-list checkboxes win over the plain bullet/number so
                     // `- [x] done` reads as a checked item, not a bullet.
-                    when (item.checked) {
-                        true -> "☑"
-                        false -> "☐"
-                        null -> markdownListMarker(block.kind, index)
-                    },
+                    text =
+                        AnnotatedString(
+                            when (item.checked) {
+                                true -> "☑"
+                                false -> "☐"
+                                null -> markdownListMarker(block.kind, index)
+                            },
+                        ),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(end = 6.dp),
                 )
@@ -455,8 +520,8 @@ private fun MarkdownTableRowView(
     val cellsElided = markdownSiblingsElided(cells)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         visibleCells.forEachIndexed { index, cell ->
-            Text(
-                rememberMarkdownInlineText(cell.inlines, ctx),
+            MarkdownBodyText(
+                text = rememberMarkdownInlineText(cell.inlines, ctx),
                 style =
                     MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,

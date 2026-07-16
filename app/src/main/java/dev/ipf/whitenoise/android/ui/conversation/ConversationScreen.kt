@@ -79,6 +79,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -165,6 +166,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
@@ -353,6 +355,15 @@ internal fun ConversationScreen(
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
     var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
+    // Partial text selection is independent from batch message selection. Only
+    // one bubble can own the native SelectionContainer at a time.
+    var textSelectionMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var textSelectionBubbleBounds by remember(chat.id) { mutableStateOf<Rect?>(null) }
+
+    fun clearTextSelection() {
+        textSelectionMessageId = null
+        textSelectionBubbleBounds = null
+    }
     // Selection is conversation-owned because the contextual top bar, back
     // handling, forwarding sheet, and rows all consume the same stable ids.
     // Each value snapshots the record/action projection so cap-trimmed rows stay
@@ -510,6 +521,9 @@ internal fun ConversationScreen(
         }
     }
     val selectionMode = selectedMessages.isNotEmpty()
+    LaunchedEffect(selectionMode) {
+        if (selectionMode) clearTextSelection()
+    }
     val selectedSelections by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
             derivedStateOf { orderedBatchSelections(selectedMessages.values) }
@@ -1771,9 +1785,11 @@ internal fun ConversationScreen(
         preSearchScrollAnchor = null
     }
 
-    // Back exits selection first, then search, before leaving the conversation.
+    // Back exits partial text selection, then batch selection, then search,
+    // before leaving the conversation.
     BackHandler {
         when {
+            textSelectionMessageId != null -> clearTextSelection()
             selectionMode -> {
                 openActionMenuId = null
                 selectedMessages.clear()
@@ -2245,6 +2261,14 @@ internal fun ConversationScreen(
             )
     }
     Scaffold(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .dismissTextSelectionOnOutsideTap(
+                    active = textSelectionMessageId != null,
+                    selectedBoundsInWindow = textSelectionBubbleBounds,
+                    onDismiss = ::clearTextSelection,
+                ),
         // The transcript consumes IME insets; the composer bottom bar is the sole
         // owner of keyboard padding so the reply-preview chip and input row move
         // as one cluster (#895, #1109).
@@ -2724,7 +2748,11 @@ internal fun ConversationScreen(
                     }
                 }
                 else ->
-                    Box(Modifier.fillMaxSize()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize(),
+                    ) {
                         LazyColumn(
                             state = listState,
                             modifier =
@@ -2840,6 +2868,22 @@ internal fun ConversationScreen(
                                         composerTextState = composerTextState,
                                         highlighted = item.record.messageIdHex == highlightedMessageId,
                                         selectionMode = selectionMode,
+                                        textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
+                                        onTextSelectionModeChange = { enabled ->
+                                            val messageId = item.record.messageIdHex
+                                            if (enabled) {
+                                                openActionMenuId = null
+                                                textSelectionMessageId = messageId
+                                                textSelectionBubbleBounds = null
+                                            } else if (textSelectionMessageId == messageId) {
+                                                clearTextSelection()
+                                            }
+                                        },
+                                        onTextSelectionBoundsChange = { bounds ->
+                                            if (textSelectionMessageId == item.record.messageIdHex) {
+                                                textSelectionBubbleBounds = bounds
+                                            }
+                                        },
                                         batchSelectable = item.record.messageIdHex in selectableMessages,
                                         selected = selectedMessages.containsKey(item.record.messageIdHex),
                                         onToggleSelection = {
@@ -2853,6 +2897,7 @@ internal fun ConversationScreen(
                                         quickReactionEmojis = quickReactionEmojis,
                                         isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
                                         onActionMenuOpenChange = { open ->
+                                            if (open) clearTextSelection()
                                             openActionMenuId = if (open) item.record.messageIdHex else null
                                         },
                                         // Lambdas, not method references: the Compose

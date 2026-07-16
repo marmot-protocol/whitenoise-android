@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -101,6 +102,8 @@ internal fun MessageActionMenu(
     canEdit: Boolean,
     canForward: Boolean,
     canSelect: Boolean,
+    canCopyText: Boolean,
+    canSelectText: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -109,6 +112,7 @@ internal fun MessageActionMenu(
     onEdit: () -> Unit,
     onForward: () -> Unit,
     onSelect: () -> Unit,
+    onSelectText: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
     onDeleteForMe: () -> Unit,
@@ -141,7 +145,8 @@ internal fun MessageActionMenu(
     //   - one emoji/quick-reaction Row (36.dp)
     //   - a HorizontalDivider (1.dp)
     //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-    //       Copy and Info always; +Reply when canReply; +Edit when canEdit;
+    //       Info always; +Select text when canSelectText; +Copy when canCopyText;
+    //       +Reply when canReply; +Edit when canEdit;
     //       +Forward when canForward; +Select when canSelect;
     //       +Delete for me when canDeleteForMe;
     //       +Delete for everyone when canDeleteForEveryone
@@ -151,7 +156,9 @@ internal fun MessageActionMenu(
     val estimatedPopupHeightPx =
         with(density) {
             val actionButtonCount =
-                2 +
+                1 +
+                    (if (canSelectText) 1 else 0) +
+                    (if (canCopyText) 1 else 0) +
                     (if (canReply) 1 else 0) +
                     (if (canEdit) 1 else 0) +
                     (if (canForward) 1 else 0) +
@@ -270,11 +277,20 @@ internal fun MessageActionMenu(
                             onClick = onSelect,
                         )
                     }
-                    MessageActionButton(
-                        label = stringResource(R.string.copy_text),
-                        icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onCopyText,
-                    )
+                    if (canSelectText) {
+                        MessageActionButton(
+                            label = stringResource(R.string.select_text),
+                            icon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onSelectText,
+                        )
+                    }
+                    if (canCopyText) {
+                        MessageActionButton(
+                            label = stringResource(R.string.copy_text),
+                            icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onCopyText,
+                        )
+                    }
                     if (canForward) {
                         MessageActionButton(
                             label = stringResource(R.string.forward),

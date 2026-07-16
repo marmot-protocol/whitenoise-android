@@ -245,6 +245,7 @@
     <string name="waiting_for_stream">正在等待流...</string>
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>
+    <string name="select_text">选择文本</string>
     <string name="open_emoji_picker">打开表情选择器</string>
     <string name="show_keyboard">显示键盘</string>
     <string name="emoji_backspace">删除表情</string>
