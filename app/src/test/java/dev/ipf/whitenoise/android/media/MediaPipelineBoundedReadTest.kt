@@ -97,8 +97,15 @@ class MediaPipelineBoundedReadTest {
             assertTrue("metadata temp file should exist", tmpFile.exists())
             assertTrue("metadata temp file should use vidmeta prefix", tmpFile.name.startsWith("vidmeta-"))
             assertEquals(File(cacheRoot, MediaCacheDirs.VIDEO).canonicalFile, tmpFile.parentFile!!.canonicalFile)
+            tmpFile.writeBytes(ByteArray(16))
+            assertEquals(
+                "active metadata extraction must survive cache trimming",
+                16L,
+                AttachmentPlaintextCache.trimDirectoryToByteCap(tmpFile.parentFile!!, maxBytes = 0L),
+            )
+            assertTrue(tmpFile.exists())
         } finally {
-            tmp?.delete()
+            tmp?.let(MediaPipeline::releaseVideoMetadataTempFile)
             cacheRoot.deleteRecursively()
         }
     }

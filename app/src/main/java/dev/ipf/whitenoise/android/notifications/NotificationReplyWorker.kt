@@ -9,7 +9,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
-import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
@@ -41,7 +40,11 @@ class NotificationReplyWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val application = applicationContext as? WhiteNoiseApplication ?: return Result.success()
-        val action = notificationReplyActionFromInput(inputData) ?: return Result.failure()
+        val retryStore = NotificationActionRetryStore.create(applicationContext)
+        val retryKey = id.toString()
+        val action =
+            notificationReplyActionFromInput(inputData)
+                ?: return Result.failure().also { retryStore.clear(retryKey) }
         val replyInput = notificationReplyFromInput(inputData)
         // Legacy rows already exist in WorkManager's database after an upgrade.
         // Process them once, but never schedule their plaintext input for backoff.
@@ -59,31 +62,36 @@ class NotificationReplyWorker(
                         throw cancel
                     } catch (failure: Exception) {
                         Log.w(TAG, "failed to decrypt notification reply", failure)
-                        return cryptoFailureResult(failure)
+                        return cryptoFailureResult(failure, retryStore, retryKey)
                     }
-                NotificationReplyInput.Malformed -> return Result.failure()
+                NotificationReplyInput.Malformed -> return Result.failure().also { retryStore.clear(retryKey) }
             }
-        if (reply.isBlank()) return Result.success()
+        if (reply.isBlank()) return Result.success().also { retryStore.clear(retryKey) }
         val completionStore = NotificationReplyCompletionStore.create(applicationContext)
         // WorkManager keeps this id stable across retries and assigns a new one
         // to every separately enqueued reply, even when the text is identical.
         val completionKey = notificationReplyCompletionKey(id)
         if (completionStore.isCompleted(completionKey)) {
-            return completedReplyResult(application, action, reply)
+            return completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
         }
         when (completionStore.abandonedOutcome(completionKey)) {
-            NotificationReplyAbandonedOutcome.Success -> return Result.success()
-            NotificationReplyAbandonedOutcome.Failure -> return Result.failure()
+            NotificationReplyAbandonedOutcome.Success -> return Result.success().also { retryStore.clear(retryKey) }
+            NotificationReplyAbandonedOutcome.Failure -> return Result.failure().also { retryStore.clear(retryKey) }
             null -> Unit
         }
         if (!application.appState.notificationActionsAllowed) {
-            val persisted =
-                withContext(Dispatchers.IO) {
-                    completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Success)
-                }
-            if (!persisted) return Result.retry()
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
-            return Result.success()
+            if (containsLegacyPlaintext) {
+                return Result.failure().also { retryStore.clear(retryKey) }
+            }
+            if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
+                return Result.retry()
+            }
+            Log.w(TAG, "reply lock wait expired group=${action.target.groupIdHex.take(8)}")
+            return Result.failure().also { retryStore.clear(retryKey) }
+        }
+        if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
+            return finalizeReplyFailure(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
         }
 
         return try {
@@ -106,17 +114,17 @@ class NotificationReplyWorker(
                 withContext(Dispatchers.IO) {
                     completionStore.markCompleted(completionKey)
                 }
-                completedReplyResult(application, action, reply)
+                completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
             } else {
                 notificationReplyActionHandled(sent = false)
                 if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
-                replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey)
+                replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
             }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey)
+            replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
         }
     }
 
@@ -151,8 +159,31 @@ class NotificationReplyWorker(
         containsLegacyPlaintext: Boolean,
         completionStore: NotificationReplyCompletionStore,
         completionKey: String,
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
     ): Result {
-        if (shouldRetryAfterFailure(runAttemptCount, containsLegacyPlaintext)) return Result.retry()
+        val operationAttempt = retryStore.recordOperationFailureAttempt(retryKey)
+        if (operationAttempt != null && shouldRetryAfterFailure(operationAttempt, containsLegacyPlaintext)) {
+            return Result.retry()
+        }
+        return finalizeReplyFailure(
+            action,
+            containsLegacyPlaintext,
+            completionStore,
+            completionKey,
+            retryStore,
+            retryKey,
+        )
+    }
+
+    private suspend fun finalizeReplyFailure(
+        action: NotificationAction,
+        containsLegacyPlaintext: Boolean,
+        completionStore: NotificationReplyCompletionStore,
+        completionKey: String,
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
         // Only persist the abandon marker once we're actually giving up (off the
         // worker thread); if it can't be recorded, retry so recovery state isn't lost.
         val persisted =
@@ -161,12 +192,28 @@ class NotificationReplyWorker(
             }
         if (!persisted) return Result.retry()
         val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
-        Log.w(TAG, "reply failed ($reason) group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")
+        Log.w(
+            TAG,
+            "reply failed ($reason) group=${action.target.groupIdHex.take(8)} " +
+                "attempts=${retryStore.operationFailureCount(retryKey)}",
+        )
+        retryStore.clear(retryKey)
         return Result.failure()
     }
 
-    private fun cryptoFailureResult(failure: Throwable): Result =
-        if (shouldRetryAfterCryptoFailure(failure, runAttemptCount)) Result.retry() else Result.failure()
+    private fun cryptoFailureResult(
+        failure: Throwable,
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        val isTerminal = isTerminalCryptoFailure(failure)
+        val operationAttempt = if (isTerminal) null else retryStore.recordOperationFailureAttempt(retryKey)
+        if (operationAttempt != null && shouldRetryAfterCryptoFailure(failure, operationAttempt)) {
+            return Result.retry()
+        }
+        retryStore.clear(retryKey)
+        return Result.failure()
+    }
 
     private suspend fun markReadAfterReply(
         application: WhiteNoiseApplication,
@@ -231,13 +278,6 @@ class NotificationReplyWorker(
 
     companion object {
         private const val TAG = "DMReplyWorker"
-        private const val KEY_ACTION = "action"
-        private const val KEY_ACCOUNT_REF = "account_ref"
-        private const val KEY_GROUP_ID_HEX = "group_id_hex"
-        private const val KEY_MESSAGE_ID_HEX = "message_id_hex"
-        private const val KEY_TARGET_KIND = "target_kind"
-        private const val KEY_NOTIFICATION_TAG = "notification_tag"
-        private const val KEY_NOTIFICATION_ID = "notification_id"
         private const val KEY_LEGACY_REPLY = "reply"
         private const val KEY_REPLY_IV = "reply_iv"
         private const val KEY_REPLY_CIPHERTEXT = "reply_ciphertext"
@@ -273,14 +313,13 @@ class NotificationReplyWorker(
 
         internal fun shouldRetryAfterCryptoFailure(
             failure: Throwable,
-            runAttemptCount: Int,
-        ): Boolean {
-            val isTerminal =
-                generateSequence(failure) { current -> current.cause?.takeUnless { it === current } }.any {
-                    it is IllegalArgumentException || it is BadPaddingException || it is IllegalBlockSizeException
-                }
-            return !isTerminal && shouldRetryAfterFailure(runAttemptCount)
-        }
+            operationFailureAttempt: Int,
+        ): Boolean = !isTerminalCryptoFailure(failure) && shouldRetryAfterFailure(operationFailureAttempt)
+
+        private fun isTerminalCryptoFailure(failure: Throwable): Boolean =
+            generateSequence(failure) { current -> current.cause?.takeUnless { it === current } }.any {
+                it is IllegalArgumentException || it is BadPaddingException || it is IllegalBlockSizeException
+            }
 
         internal fun notificationReplyRequest(
             action: NotificationAction,
@@ -299,17 +338,12 @@ class NotificationReplyWorker(
             action: NotificationAction,
             encryptedReply: EncryptedNotificationReply,
         ): Data =
-            workDataOf(
-                KEY_ACTION to NotificationActions.ACTION_REPLY,
-                KEY_ACCOUNT_REF to action.target.accountRef,
-                KEY_GROUP_ID_HEX to action.target.groupIdHex,
-                KEY_MESSAGE_ID_HEX to action.target.messageIdHex.orEmpty(),
-                KEY_TARGET_KIND to action.target.kind.name,
-                KEY_NOTIFICATION_TAG to action.notificationTag,
-                KEY_NOTIFICATION_ID to action.notificationId,
-                KEY_REPLY_IV to encryptedReply.initializationVector,
-                KEY_REPLY_CIPHERTEXT to encryptedReply.ciphertext,
-            )
+            Data
+                .Builder()
+                .putAll(NotificationActionWorkData.encode(action))
+                .putByteArray(KEY_REPLY_IV, encryptedReply.initializationVector)
+                .putByteArray(KEY_REPLY_CIPHERTEXT, encryptedReply.ciphertext)
+                .build()
 
         internal fun notificationReplyFromInput(data: Data): NotificationReplyInput {
             val initializationVector = data.getByteArray(KEY_REPLY_IV)
@@ -324,16 +358,7 @@ class NotificationReplyWorker(
             }
         }
 
-        internal fun notificationReplyActionFromInput(data: Data): NotificationAction? =
-            NotificationActions.parseRawFields(
-                action = data.getString(KEY_ACTION),
-                accountRef = data.getString(KEY_ACCOUNT_REF),
-                groupIdHex = data.getString(KEY_GROUP_ID_HEX),
-                messageIdHex = data.getString(KEY_MESSAGE_ID_HEX),
-                targetKindName = data.getString(KEY_TARGET_KIND),
-                notificationTag = data.getString(KEY_NOTIFICATION_TAG),
-                notificationId = data.getInt(KEY_NOTIFICATION_ID, Int.MIN_VALUE).takeUnless { it == Int.MIN_VALUE },
-            )
+        internal fun notificationReplyActionFromInput(data: Data): NotificationAction? = NotificationActionWorkData.decode(data)
 
         internal fun notificationReplyCompletionKey(workRequestId: UUID): String = COMPLETION_KEY_PREFIX + workRequestId
 

@@ -54,6 +54,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
@@ -95,6 +96,7 @@ internal fun MediaVideoGridTile(
     uploading: Boolean = false,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val epoch = reference.sourceEpoch
     var localFile by
         rememberCachedVideoAttachmentFileState(
@@ -195,7 +197,30 @@ internal fun MediaVideoGridTile(
                 onClick = {
                     val f = localFile
                     when {
-                        f != null -> onTap(f)
+                        f != null ->
+                            scope.launch {
+                                val playableFile =
+                                    withContext(Dispatchers.IO) {
+                                        validatedAttachmentCacheFile(f)
+                                    } ?: runCatching {
+                                        materializeVideoAttachment(
+                                            context = context,
+                                            controller = controller,
+                                            messageIdHex = messageIdHex,
+                                            attachmentIndex = attachmentIndex,
+                                            reference = reference,
+                                            mine = mine,
+                                        )
+                                    }.getOrElse { error ->
+                                        if (error is CancellationException) throw error
+                                        localFile = null
+                                        failed = true
+                                        return@launch
+                                    }
+                                localFile = playableFile
+                                failed = false
+                                onTap(playableFile)
+                            }
                         failed -> {
                             failed = false
                             reloadToken++
@@ -482,14 +507,47 @@ internal fun MediaVideoBubble(
                                 when {
                                     uploadFailed -> onRetryUpload?.invoke()
                                     loading -> Unit
-                                    else -> {
-                                        val f = localFile
-                                        if (f != null && !failed) {
-                                            playerOpen = true
-                                        } else if (f == null) {
+                                    else ->
+                                        scope.launch {
+                                            val retainedFile =
+                                                withContext(Dispatchers.IO) {
+                                                    validatedAttachmentCacheFile(localFile)
+                                                }
+                                            if (retainedFile != null && !failed) {
+                                                playerOpen = true
+                                                return@launch
+                                            }
+                                            if (localFile != null) {
+                                                localFile = null
+                                                posterBitmap = null
+                                                durationMs = 0L
+                                            }
                                             startDownload = true
+                                            loading = true
+                                            runCatching {
+                                                materializeVideoAttachment(
+                                                    context = context,
+                                                    controller = controller,
+                                                    messageIdHex = messageIdHex,
+                                                    attachmentIndex = attachmentIndex,
+                                                    reference = reference,
+                                                    mine = mine,
+                                                )
+                                            }.onSuccess { file ->
+                                                localFile = file
+                                                failed = false
+                                                playerOpen = true
+                                            }.onFailure {
+                                                if (it is CancellationException) throw it
+                                                Log.w(
+                                                    "MediaVideoBubble",
+                                                    "manual materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex",
+                                                    it,
+                                                )
+                                                failed = true
+                                            }
+                                            loading = false
                                         }
-                                    }
                                 }
                             },
                         ),
@@ -715,7 +773,13 @@ private suspend fun materializeVideoAttachmentOnce(
     file: java.io.File,
     resolveBytes: suspend () -> ByteArray,
 ): java.io.File {
-    if (file.isFile && file.length() > 0L) return file
+    val cachedFile =
+        withContext(Dispatchers.IO) {
+            file
+                .takeIf { it.isFile && it.length() > 0L }
+                ?.also(AttachmentPlaintextCache::touch)
+        }
+    if (cachedFile != null) return cachedFile
     val published =
         AttachmentCachePublication.publishAfterLoad(
             attachmentKey = attachmentKey,
@@ -802,12 +866,14 @@ internal fun cachedVideoAttachmentFile(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): java.io.File? =
-    videoAttachmentCacheFile(
-        context = context,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-    ).takeIf { it.isFile && it.length() > 0L }
+    validatedAttachmentCacheFile(
+        videoAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        ),
+    )
 
 @Composable
 private fun rememberCachedVideoAttachmentFileState(
@@ -935,6 +1001,7 @@ private fun FullscreenVideoPlayer(
                         controllerShowTimeoutMs = 2500
                     }
                 },
+                onRelease = { playerView -> playerView.player = null },
             )
             IconButton(
                 onClick = onDismiss,
@@ -1135,5 +1202,6 @@ internal fun VideoViewerPage(
                 controllerShowTimeoutMs = 2500
             }
         },
+        onRelease = { playerView -> playerView.player = null },
     )
 }

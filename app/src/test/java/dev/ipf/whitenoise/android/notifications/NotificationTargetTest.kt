@@ -358,6 +358,36 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun markReadWorkerRequest_roundTripsActionAndUsesBoundedBackoff() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.MARK_READ,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 7,
+            )
+
+        val request = NotificationMarkReadWorker.notificationMarkReadRequest(action)
+
+        assertEquals(action, NotificationActionWorkData.decode(request.workSpec.input))
+        assertEquals(BackoffPolicy.EXPONENTIAL, request.workSpec.backoffPolicy)
+        assertEquals(30_000L, request.workSpec.backoffDelayDuration)
+        assertEquals(
+            NotificationMarkReadWorker.notificationMarkReadWorkName(action),
+            NotificationMarkReadWorker.notificationMarkReadWorkName(action.copy(notificationId = 99)),
+        )
+        assertNotEquals(
+            NotificationMarkReadWorker.notificationMarkReadWorkName(action),
+            NotificationMarkReadWorker.notificationMarkReadWorkName(
+                action.copy(target = action.target.copy(messageIdHex = "msg-2")),
+            ),
+        )
+        assertTrue(NotificationMarkReadWorker.shouldRetryAfterFailure(0))
+        assertTrue(NotificationMarkReadWorker.shouldRetryAfterFailure(1))
+        assertFalse(NotificationMarkReadWorker.shouldRetryAfterFailure(2))
+    }
+
+    @Test
     fun replyWorkerInput_doesNotPersistPlaintext() {
         val action =
             NotificationAction(
@@ -477,19 +507,19 @@ class NotificationTargetTest {
     fun replyWorkerCryptoFailureRetries_onlyPotentiallyTransientFailures() {
         val transientFailure = KeyStoreException("temporarily unavailable")
 
-        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 0))
-        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 1))
-        assertFalse(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, runAttemptCount = 2))
+        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, operationFailureAttempt = 0))
+        assertTrue(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, operationFailureAttempt = 1))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterCryptoFailure(transientFailure, operationFailureAttempt = 2))
         assertFalse(
             NotificationReplyWorker.shouldRetryAfterCryptoFailure(
                 AEADBadTagException("metadata or ciphertext was tampered"),
-                runAttemptCount = 0,
+                operationFailureAttempt = 0,
             ),
         )
         assertFalse(
             NotificationReplyWorker.shouldRetryAfterCryptoFailure(
                 IllegalArgumentException("malformed encrypted input"),
-                runAttemptCount = 0,
+                operationFailureAttempt = 0,
             ),
         )
         assertSame(

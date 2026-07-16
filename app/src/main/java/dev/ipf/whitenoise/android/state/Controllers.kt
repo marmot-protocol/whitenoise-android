@@ -794,6 +794,16 @@ internal fun pruneMessageByIdToWindow(
     messageById.keys.retainAll(retain)
 }
 
+internal fun retainedMessageOverlayTargets(
+    timelineMessageIds: Collection<String>,
+    optimisticMessageIds: Collection<String>,
+    overlayTargetIds: Collection<String>,
+): Set<String> {
+    val present = HashSet(timelineMessageIds)
+    present.addAll(optimisticMessageIds)
+    return overlayTargetIds.filterTo(linkedSetOf()) { it in present }
+}
+
 data class ReactionParticipant(
     val sender: String,
     val emoji: String,
@@ -6478,6 +6488,7 @@ class ConversationController(
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
+        pruneMessageOverlaysToWindow()
         recomputeReactions()
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
@@ -6551,12 +6562,7 @@ class ConversationController(
                     removeProjectedRecord(change.messageIdHex)
                     messageById.remove(change.messageIdHex)
                     reactionTargets.add(change.messageIdHex)
-                    deletedMessageIds = deletedMessageIds - change.messageIdHex
                     optimisticMessages.remove("msg:${change.messageIdHex}")
-                    optimisticReactionChanges.entries
-                        .filter { (_, reaction) -> reaction.targetMessageId == change.messageIdHex }
-                        .map { it.key }
-                        .forEach(optimisticReactionChanges::remove)
                 }
             }
         }
@@ -6574,6 +6580,7 @@ class ConversationController(
         // grow unbounded for an actively-watched conversation (#373).
         pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
         pruneOptimisticEditsToWindow()
+        pruneMessageOverlaysToWindow()
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
         // (start + final records together) — it was just marked removed. See #25.
@@ -6858,6 +6865,9 @@ class ConversationController(
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
         readAnchoredAtSeconds.remove(messageIdHex)
+        deletedMessageIds = deletedMessageIds - messageIdHex
+        optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId == messageIdHex }
+        reactionsState.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
     }
@@ -6903,6 +6913,26 @@ class ConversationController(
         val present = HashSet(timelineRecords.keys)
         optimisticMessages.values.forEach { present.add(it.record.messageIdHex) }
         optimisticEdits.keys.retainAll { it in present }
+    }
+
+    private fun pruneMessageOverlaysToWindow() {
+        if (deletedMessageIds.isEmpty() && optimisticReactionChanges.isEmpty()) return
+        val optimisticIds = optimisticMessages.values.map { it.record.messageIdHex }
+        val overlayTargets =
+            buildList {
+                addAll(deletedMessageIds)
+                optimisticReactionChanges.values.forEach { add(it.targetMessageId) }
+            }
+        val retained =
+            retainedMessageOverlayTargets(
+                timelineMessageIds = timelineRecords.keys,
+                optimisticMessageIds = optimisticIds,
+                overlayTargetIds = overlayTargets,
+            )
+        if (deletedMessageIds.any { it !in retained }) {
+            deletedMessageIds = deletedMessageIds.filterTo(linkedSetOf()) { it in retained }
+        }
+        optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId !in retained }
     }
 
     private fun timelineMessageFromProjection(

@@ -112,34 +112,44 @@ internal object AttachmentCachePublication {
         if (bytes.isEmpty()) {
             throw IOException("refusing to publish an empty attachment cache ${finalFile.name}")
         }
+        AttachmentPlaintextCache.requireEntryWithinLimit(finalFile, bytes.size.toLong())
         if (!prepareParentForTempWrite(attachmentKey, finalFile, permit)) {
             return false
         }
         val tmp = writeTempFile(finalFile, bytes) ?: return false
-        commitAwaiterForTests?.invoke()
-        val stripe = stripeFor(attachmentKey)
-        synchronized(stripe) {
-            if (!permitStillValid(stripe, permit)) {
-                runCatching { tmp.delete() }
-                return false
-            }
-            val renamed =
-                try {
-                    renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
-                } catch (throwable: Throwable) {
-                    runCatching { tmp.delete() }
-                    throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+        AttachmentPlaintextCache.protectPublicationFile(finalFile)
+        return try {
+            commitAwaiterForTests?.invoke()
+            val stripe = stripeFor(attachmentKey)
+            val published =
+                synchronized(stripe) {
+                    if (!permitStillValid(stripe, permit)) {
+                        runCatching { tmp.delete() }
+                        return@synchronized false
+                    }
+                    val renamed =
+                        try {
+                            renameFileForTests?.invoke(tmp, finalFile) ?: tmp.renameTo(finalFile)
+                        } catch (throwable: Throwable) {
+                            runCatching { tmp.delete() }
+                            throw IOException("failed to publish attachment cache ${finalFile.name}", throwable)
+                        }
+                    if (!renamed) {
+                        runCatching { tmp.delete() }
+                        if (!permitStillValid(stripe, permit)) return@synchronized false
+                        throw IOException("failed to publish attachment cache ${finalFile.name}")
+                    }
+                    if (!permitStillValid(stripe, permit)) {
+                        deleteFinalFile(finalFile)
+                        return@synchronized false
+                    }
+                    true
                 }
-            if (!renamed) {
-                runCatching { tmp.delete() }
-                if (!permitStillValid(stripe, permit)) return false
-                throw IOException("failed to publish attachment cache ${finalFile.name}")
-            }
-            if (!permitStillValid(stripe, permit)) {
-                deleteFinalFile(finalFile)
-                return false
-            }
-            return true
+            if (published) AttachmentPlaintextCache.onPublished(finalFile)
+            published
+        } finally {
+            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
+            AttachmentPlaintextCache.unprotectPublicationFile(finalFile)
         }
     }
 
@@ -240,12 +250,14 @@ internal object AttachmentCachePublication {
                 parent,
                 "${finalFile.name}.cache-${tmpCounter.incrementAndGet()}-${System.nanoTime()}.tmp",
             )
+        AttachmentPlaintextCache.protectPublicationFile(tmp)
         return try {
             tmp.writeBytes(bytes)
             tmp
-        } catch (_: IOException) {
+        } catch (throwable: Throwable) {
             runCatching { tmp.delete() }
-            null
+            AttachmentPlaintextCache.unprotectPublicationFile(tmp)
+            if (throwable is IOException) null else throw throwable
         }
     }
 }

@@ -16,7 +16,6 @@ internal data class NotificationPostDecision(
     val style: NotificationStyleChoice,
     val actions: List<NotificationActionKind>,
     val historyCap: Int,
-    val replaceExistingBeforePost: Boolean,
 )
 
 internal sealed class NotificationStyleChoice {
@@ -62,7 +61,6 @@ internal fun decideNotificationPost(
                 NotificationStyleChoice.Messaging -> CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP
                 else -> 0
             },
-        replaceExistingBeforePost = style == NotificationStyleChoice.Messaging,
     )
 }
 
