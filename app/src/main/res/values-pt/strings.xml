@@ -1047,7 +1047,7 @@
     <string name="notification_channel_app_updates_description">Alertas de versões do Zapstore</string>
 
     <string name="chat_bubble_colors">Cores dos balões</string>
-    <string name="chat_bubble_colors_global_subtitle">Escolha os padrões do tema atual. As cores clara, escura e AMOLED são salvas separadamente.</string>
+    <string name="chat_bubble_colors_global_subtitle">Escolha os padrões do tema atual. As configurações dos temas Claro, Escuro e AMOLED são salvas separadamente.</string>
     <string name="chat_bubble_colors_chat_subtitle">Substitua as cores dos balões apenas para esta conversa. Redefina para herdar os padrões de Aparência.</string>
     <string name="bubble_color_preview">Pré-visualização</string>
     <string name="bubble_color_current_theme">Tema atual: %1$s</string>
