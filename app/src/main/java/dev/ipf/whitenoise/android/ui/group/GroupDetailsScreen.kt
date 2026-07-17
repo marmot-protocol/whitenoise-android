@@ -591,7 +591,8 @@ internal fun GroupDetailsScreen(
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
-        val notificationModes by appState.chatMutePreferences.notificationModes.collectAsState()
+        val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+        val notificationModes = chatNotificationState.notificationModes
         val conversationNotifyMode =
             remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
                 appState.conversationNotifyMode(controller.group.groupIdHex)
