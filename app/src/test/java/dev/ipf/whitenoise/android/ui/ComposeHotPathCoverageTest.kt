@@ -9,10 +9,14 @@ class ComposeHotPathCoverageTest {
     @Test
     fun composerReplyProjectionAndMentionResolverAreRemembered() {
         val source = source("conversation/composer/ComposerBar.kt").readText()
-        val replyBlock =
-            source
-                .substringAfter("} else if (replyingTo != null) {")
-                .substringBefore("// #414: live @-mention picker")
+        val replyMarker = "} else if (replyingTo != null) {"
+        val replyStart = source.indexOf(replyMarker)
+        require(replyStart >= 0) { "Reply branch marker missing" }
+        val replyBodyStart = replyStart + replyMarker.length
+        val mentionPickerMarker = "// #414: live @-mention picker"
+        val mentionPickerStart = source.indexOf(mentionPickerMarker, replyBodyStart)
+        require(mentionPickerStart >= 0) { "Mention picker marker missing" }
+        val replyBlock = source.substring(replyBodyStart, mentionPickerStart)
 
         assertTrue(
             "reply mention resolver must be stable until profile presentation changes",
@@ -25,7 +29,7 @@ class ComposeHotPathCoverageTest {
             "reply body projection must be cached by the reply and localized message copy",
             Regex(
                 """remember\(replyingTo,\s*messageTextCopy\)\s*\{\s*MessageProjector\.displayBody\(replyingTo,\s*messageTextCopy\)""",
-            ).containsMatchIn(source),
+            ).containsMatchIn(replyBlock),
         )
         assertFalse(
             "ReplyPreviewCard must not receive a fresh mention resolver lambda",
@@ -33,7 +37,7 @@ class ComposeHotPathCoverageTest {
         )
         assertFalse(
             "the composer must not subscribe to profile revisions without a reply preview",
-            "profileRevisionForCompose" in source.substringBefore("} else if (replyingTo != null) {"),
+            "profileRevisionForCompose" in source.substring(0, replyStart),
         )
     }
 
