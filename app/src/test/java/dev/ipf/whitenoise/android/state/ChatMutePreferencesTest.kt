@@ -10,6 +10,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -32,7 +33,7 @@ class ChatMutePreferencesTest {
 
         assertFalse(prefs.isMuted("account-a", "group-a"))
         assertEquals(ChatNotifyMode.ALL, prefs.mode("account-a", "group-a"))
-        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.notificationModes.value)
+        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.state.value.notificationModes)
     }
 
     @Test
@@ -58,7 +59,7 @@ class ChatMutePreferencesTest {
         assertTrue(prefs.isMuted("account-a", "group-a"))
         assertFalse(prefs.isMuted("account-a", "group-b"))
         assertFalse(prefs.isMuted("account-b", "group-a"))
-        assertEquals(mapOf("account-a|group-a" to ChatNotifyMode.NONE), prefs.notificationModes.value)
+        assertEquals(mapOf("account-a|group-a" to ChatNotifyMode.NONE), prefs.state.value.notificationModes)
 
         val reloaded = ChatMutePreferences(context)
         assertTrue(reloaded.isMuted("account-a", "group-a"))
@@ -72,7 +73,7 @@ class ChatMutePreferencesTest {
         prefs.setMuted("account-a", "group-a", muted = false)
 
         assertFalse(prefs.isMuted("account-a", "group-a"))
-        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.notificationModes.value)
+        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.state.value.notificationModes)
     }
 
     @Test
@@ -98,7 +99,7 @@ class ChatMutePreferencesTest {
         prefs.setMode("account-a", "group-a", ChatNotifyMode.ALL)
 
         assertEquals(ChatNotifyMode.ALL, prefs.mode("account-a", "group-a"))
-        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.notificationModes.value)
+        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.state.value.notificationModes)
     }
 
     @Test
@@ -118,6 +119,40 @@ class ChatMutePreferencesTest {
         prefs.setMode("account-a", "   ", ChatNotifyMode.MENTIONS_ONLY)
 
         assertFalse(prefs.isMuted("account-a", "group-a"))
-        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.notificationModes.value)
+        assertEquals(emptyMap<String, ChatNotifyMode>(), prefs.state.value.notificationModes)
     }
+
+    @Test
+    fun notificationModesAndMutedKeysPublishAsOneState() {
+        val prefs = ChatMutePreferences(context)
+
+        prefs.setMode("account-a", "group-a", ChatNotifyMode.MENTIONS_ONLY)
+        prefs.setMode("account-a", "group-b", ChatNotifyMode.NONE)
+
+        val state = prefs.state.value
+        assertEquals(
+            mapOf(
+                "account-a|group-a" to ChatNotifyMode.MENTIONS_ONLY,
+                "account-a|group-b" to ChatNotifyMode.NONE,
+            ),
+            state.notificationModes,
+        )
+        assertEquals(setOf("account-a|group-b"), state.mutedConversations)
+    }
+
+    @Test
+    fun mutationAndPersistenceStayInsideOneSerializedStateUpdate() {
+        val source = chatMutePreferencesSource().readText()
+        val setMode = source.substringAfter("fun setMode(").substringBefore("fun setMuted(")
+
+        assertTrue("mode updates must be serialized", "synchronized(mutationLock)" in setMode)
+        assertTrue("mode and muted projections must publish together", "_state.value = ChatNotificationState(immutableModes)" in setMode)
+        assertFalse("there must not be a second mutable muted flow", "_mutedConversations" in source)
+    }
+
+    private fun chatMutePreferencesSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/ChatMutePreferences.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ChatMutePreferences.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing ChatMutePreferences.kt")
 }

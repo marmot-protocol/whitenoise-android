@@ -42,7 +42,11 @@ class NotificationTapTokens(
         token: String?,
     ): Boolean {
         val expected = preferences.getString(storageKey(notificationKey), null) ?: return false
-        return expected == token?.takeIf { isPlausibleToken(it) }
+        val candidate = token?.takeIf { isPlausibleToken(it) } ?: return false
+        return MessageDigest.isEqual(
+            expected.toByteArray(Charsets.UTF_8),
+            candidate.toByteArray(Charsets.UTF_8),
+        )
     }
 
     private fun pruneIfNeeded() {

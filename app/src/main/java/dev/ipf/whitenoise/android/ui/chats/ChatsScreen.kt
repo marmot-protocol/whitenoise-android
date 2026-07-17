@@ -129,7 +129,8 @@ internal fun ChatsScreen(
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
-    val mutedConversations by appState.chatMutePreferences.mutedConversations.collectAsState()
+    val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+    val mutedConversations = chatNotificationState.mutedConversations
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
     // + nav icons) for a TextField that filters in real time on title +

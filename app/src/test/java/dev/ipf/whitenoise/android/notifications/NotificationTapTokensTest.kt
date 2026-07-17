@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.util.Collections
 
 class NotificationTapTokensTest {
@@ -61,9 +62,24 @@ class NotificationTapTokensTest {
         assertEquals(NotificationTapTokens.MAX_STORED_TOKENS, prefs.tokenEntryCount())
     }
 
+    @Test
+    fun tokenValidationUsesConstantTimeByteComparison() {
+        val source = notificationTapTokensSource().readText()
+        val validation = source.substringAfter("fun isValid(").substringBefore("private fun pruneIfNeeded")
+
+        assertTrue("tap tokens must use MessageDigest.isEqual", "MessageDigest.isEqual(" in validation)
+        assertFalse("tap tokens must not use String.equals", "expected ==" in validation)
+    }
+
     private fun fillBytes(bytes: ByteArray) {
         bytes.indices.forEach { bytes[it] = it.toByte() }
     }
+
+    private fun notificationTapTokensSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTapTokens.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTapTokens.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing NotificationTapTokens.kt")
 
     private fun FakeSharedPreferences.tokenEntryCount(): Int = all.keys.count { it.startsWith("tap_") && !it.startsWith("tap_time_") }
 
