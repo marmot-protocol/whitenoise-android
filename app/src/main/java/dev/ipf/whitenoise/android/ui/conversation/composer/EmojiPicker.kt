@@ -218,6 +218,11 @@ internal val ComposerEmojiPickerFallbackHeight = 320.dp
 
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
+private data class EmojiSearchSnapshot(
+    val query: String,
+    val results: List<EmojiEntry>,
+)
+
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
     targetImeHeight: Dp,
@@ -347,16 +352,18 @@ private fun EmojiPickerContent(
     val browseEmoji by produceState(initialValue = emptyList<EmojiEntry>(), context) {
         value = withContext(Dispatchers.IO) { EmojiData.load(context) }
     }
-    val searchResults by
-        produceState<List<EmojiEntry>>(initialValue = emptyList(), searchQuery, browseEmoji) {
+    val searchSnapshot by
+        produceState(
+            initialValue = EmojiSearchSnapshot(query = "", results = emptyList()),
+            searchQuery,
+            browseEmoji,
+        ) {
             val query = searchQuery
-            value =
-                if (query.isBlank()) {
-                    emptyList()
-                } else {
-                    withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }
-                }
+            val results =
+                if (query.isBlank()) emptyList() else withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }
+            value = EmojiSearchSnapshot(query = query, results = results)
         }
+    val searchResults = searchSnapshot.results.takeIf { searchSnapshot.query == searchQuery }.orEmpty()
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
     val messageReactions =
         remember(messageReactionEmojis) {

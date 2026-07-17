@@ -9,13 +9,17 @@ class ComposeHotPathCoverageTest {
     @Test
     fun composerReplyProjectionAndMentionResolverAreRemembered() {
         val source = source("conversation/composer/ComposerBar.kt").readText()
+        val replyBlock =
+            source
+                .substringAfter("} else if (replyingTo != null) {")
+                .substringBefore("// #414: live @-mention picker")
 
         assertTrue(
             "reply mention resolver must be stable until profile presentation changes",
             Regex(
                 """remember\(appState,\s*profileRevision\)\s*\{.*?state\.mentionDisplayName\(bech32\).*?}""",
                 RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(source),
+            ).containsMatchIn(replyBlock),
         )
         assertTrue(
             "reply body projection must be cached by the reply and localized message copy",
@@ -27,6 +31,10 @@ class ComposeHotPathCoverageTest {
             "ReplyPreviewCard must not receive a fresh mention resolver lambda",
             "mentionDisplayName = appState?.let" in source,
         )
+        assertFalse(
+            "the composer must not subscribe to profile revisions without a reply preview",
+            "profileRevisionForCompose" in source.substringBefore("} else if (replyingTo != null) {"),
+        )
     }
 
     @Test
@@ -35,7 +43,7 @@ class ComposeHotPathCoverageTest {
 
         assertTrue(
             "emoji search must be produced asynchronously",
-            "produceState<List<EmojiEntry>>(initialValue = emptyList(), searchQuery, browseEmoji)" in source,
+            "initialValue = EmojiSearchSnapshot(query = \"\", results = emptyList())" in source,
         )
         assertTrue(
             "emoji filtering must run on the Default dispatcher",
@@ -45,6 +53,10 @@ class ComposeHotPathCoverageTest {
             "emoji filtering must not run synchronously from remember during composition",
             Regex("""remember\(searchQuery,\s*browseEmoji\)\s*\{\s*EmojiData\.search""")
                 .containsMatchIn(source),
+        )
+        assertTrue(
+            "results from a superseded query must not remain selectable",
+            "searchSnapshot.results.takeIf { searchSnapshot.query == searchQuery }.orEmpty()" in source,
         )
     }
 
