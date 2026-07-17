@@ -43,6 +43,9 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
+import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
+import dev.ipf.whitenoise.android.ui.qr.QrScanResult
+import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -129,12 +132,17 @@ internal fun ProfileQrSheet(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false
-                val scanned = ProfileLink.parse(raw)
-                if (scanned == null) {
-                    scanError = notWhiteNoiseProfileQrError
-                } else {
-                    onDismiss()
-                    appState.presentProfile(scanned.npub)
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
+                    is QrScanOutcome.OpenProfileNpub -> {
+                        onDismiss()
+                        appState.presentProfile(outcome.npub)
+                    }
+                    is QrScanOutcome.OpenProfileNprofile -> {
+                        onDismiss()
+                        appState.presentNostrProfile(outcome.nprofile)
+                    }
+                    QrScanOutcome.Invalid -> scanError = notWhiteNoiseProfileQrError
+                    is QrScanOutcome.FillRecipientQuery -> scanError = notWhiteNoiseProfileQrError
                 }
             },
         )

@@ -65,6 +65,9 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
+import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
+import dev.ipf.whitenoise.android.ui.qr.QrScanResult
+import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -440,12 +443,19 @@ private fun NewMessageScreen(
             onDismiss = { showScanner = false },
             onScan = { raw ->
                 showScanner = false
-                val scanned = ProfileLink.parse(raw)
-                if (scanned == null) {
-                    appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
-                } else {
-                    query = scanned.npub
-                    startChatError = null
+                when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile)) {
+                    is QrScanOutcome.OpenProfileNpub -> {
+                        query = outcome.npub
+                        startChatError = null
+                    }
+                    is QrScanOutcome.OpenProfileNprofile -> {
+                        query = outcome.accountIdHex
+                        startChatError = null
+                    }
+                    QrScanOutcome.Invalid ->
+                        appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
+                    is QrScanOutcome.FillRecipientQuery ->
+                        appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
                 }
             },
         )

@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
@@ -66,6 +67,8 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+
+internal const val QR_SCANNER_SHEET_CONTENT_TAG = "qr_scanner_sheet_content"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,44 +96,66 @@ internal fun QrScannerSheet(
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.scan), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
-                }
+        QrScannerSheetContent(
+            permissionGranted = permissionGranted,
+            scannerError = scannerError,
+            onDismiss = onDismiss,
+            onRequestPermission = { launcher.launch(Manifest.permission.CAMERA) },
+            cameraPreview = {
+                CameraQrScanner(onScan = onScan, onError = { scannerError = it })
+            },
+        )
+    }
+}
+
+@Composable
+internal fun QrScannerSheetContent(
+    permissionGranted: Boolean,
+    scannerError: String?,
+    onDismiss: () -> Unit,
+    onRequestPermission: () -> Unit,
+    cameraPreview: @Composable () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .testTag(QR_SCANNER_SHEET_CONTENT_TAG)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.scan), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
             }
-            if (permissionGranted) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(520.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    CameraQrScanner(onScan = onScan, onError = { scannerError = it })
-                    Text(
-                        scannerError ?: stringResource(R.string.point_camera_at_profile_qr),
-                        color = Color.White,
-                        modifier =
-                            Modifier
-                                .padding(
-                                    16.dp,
-                                ).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                }
-            } else {
-                Text(stringResource(R.string.camera_access_required), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.allow_camera))
-                }
+        }
+        if (permissionGranted) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(520.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                cameraPreview()
+                Text(
+                    scannerError ?: stringResource(R.string.point_camera_at_profile_qr),
+                    color = Color.White,
+                    modifier =
+                        Modifier
+                            .padding(
+                                16.dp,
+                            ).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+        } else {
+            Text(stringResource(R.string.camera_access_required), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onRequestPermission, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.allow_camera))
             }
         }
     }
