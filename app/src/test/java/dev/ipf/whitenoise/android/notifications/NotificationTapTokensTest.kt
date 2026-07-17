@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,7 +66,7 @@ class NotificationTapTokensTest {
     @Test
     fun tokenValidationUsesConstantTimeByteComparison() {
         val source = notificationTapTokensSource().readText()
-        val validation = source.substringAfter("fun isValid(").substringBefore("private fun pruneIfNeeded")
+        val validation = source.functionBody("isValid")
 
         assertTrue("tap tokens must use MessageDigest.isEqual", "MessageDigest.isEqual(" in validation)
         assertFalse("tap tokens must not use String.equals", "expected ==" in validation)

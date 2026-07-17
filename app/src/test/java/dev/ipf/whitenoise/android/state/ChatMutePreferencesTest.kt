@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -146,7 +147,7 @@ class ChatMutePreferencesTest {
     @Test
     fun mutationAndPersistenceStayInsideOneSerializedStateUpdate() {
         val source = chatMutePreferencesSource().readText()
-        val setMode = source.substringAfter("fun setMode(").substringBefore("fun setMuted(")
+        val setMode = source.functionBody("setMode")
 
         assertTrue("mode updates must be serialized", "synchronized(mutationLock)" in setMode)
         assertTrue("mode and muted projections must publish together", "_state.value = ChatNotificationState(immutableModes)" in setMode)
