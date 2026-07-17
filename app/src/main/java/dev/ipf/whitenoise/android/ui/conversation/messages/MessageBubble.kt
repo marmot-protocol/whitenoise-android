@@ -588,14 +588,19 @@ internal fun MessageBubble(
         if (deleteForEveryoneInFlight) return
         deleteForEveryoneInFlight = true
         // launchMutation so the MLS commit + Nostr publish survive navigating
-        // away from the conversation. The sheet stays open with its options
+        // away from the conversation. The dialog stays open with its options
         // disabled until the outcome is known, and stays open on failure so
         // the error toast never explains a surface that silently vanished;
         // the optimistic tombstone rollback restores the bubble either way.
         appState.launchMutation {
-            val removed = controller.deleteMessage(record)
-            deleteForEveryoneInFlight = false
-            if (removed) deleteDialogOpen = false
+            try {
+                val removed = controller.deleteMessage(record)
+                if (removed) deleteDialogOpen = false
+            } finally {
+                // Cancellation must not leave the flag stuck true, which would
+                // disable delete-for-everyone for this bubble's remember scope.
+                deleteForEveryoneInFlight = false
+            }
         }
     }
 

@@ -709,15 +709,14 @@ data class MessageDeleteCapability(
 
 /**
  * Whether the runtime can actually deliver a moderator's delete of another
- * member's group message. The Marmot timeline ingest currently honours a
- * delete only when its author matches the target's author (self-retraction),
- * so a moderator's delete would look deleted locally while every other member
- * silently ignores it — worse than not offering the action. Flip this when
- * the runtime ships admin moderation (marmot-protocol/mdk#873); the
- * capability policy, moderator copy, and their tests are already in place
- * behind it.
+ * member's group message. The Marmot timeline ingest now honours a group
+ * admin's delete of another member's message: the moderation verdict is
+ * evaluated against signed group state when the delete is recorded and
+ * persisted with the event, and direct conversations never grant moderation.
+ * Kept as a constant so the moderator branch can be cut in one place if the
+ * engine behaviour ever has to be rolled back.
  */
-internal const val GROUP_MODERATION_DELETE_SUPPORTED = false
+internal const val GROUP_MODERATION_DELETE_SUPPORTED = true
 
 /**
  * Deletion-capability matrix:

@@ -138,9 +138,9 @@ class MessageDeleteAuthorizationTest {
                     localDeleteSupported = row.localDeleteSupported,
                     remoteDeleteSupported = row.remoteDeleteSupported,
                     alreadyDeleted = row.alreadyDeleted,
-                    // The matrix is the product contract; it is exercised with
-                    // moderation enabled so the policy stays pinned while the
-                    // runtime support flag is off.
+                    // The matrix is the product contract; moderation is passed
+                    // explicitly so the policy stays pinned independently of
+                    // the shipped runtime support flag.
                     moderationDeleteSupported = true,
                 )
             assertEquals("${row.name}: canDeleteForMe", row.expectForMe, capability.canDeleteForMe)
@@ -165,12 +165,10 @@ class MessageDeleteAuthorizationTest {
     }
 
     @Test
-    fun moderationStaysOffUntilTheRuntimeCanDeliverIt() {
-        // The runtime currently honours only self-authored deletes, so with
-        // the shipped default a group admin is NOT offered delete-for-everyone
-        // on another member's message — offering it would delete locally while
-        // every other member silently keeps the message.
-        assertEquals(false, GROUP_MODERATION_DELETE_SUPPORTED)
+    fun moderationShipsOnAndOffersDeleteForEveryoneToGroupAdmins() {
+        // The runtime now delivers a group admin's delete of another member's
+        // message, so the shipped default offers the moderator branch.
+        assertEquals(true, GROUP_MODERATION_DELETE_SUPPORTED)
         val capability =
             messageDeleteCapability(
                 isDirectConversation = false,
@@ -181,6 +179,6 @@ class MessageDeleteAuthorizationTest {
                 alreadyDeleted = false,
             )
         assertEquals(true, capability.canDeleteForMe)
-        assertEquals(false, capability.canDeleteForEveryone)
+        assertEquals(true, capability.canDeleteForEveryone)
     }
 }

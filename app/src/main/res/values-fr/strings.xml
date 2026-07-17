@@ -622,14 +622,14 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Sélectionné</string>
     <string name="select">Sélectionner</string>
-    <string name="batch_delete_own">Supprimer %1$d de vos messages pour tout le monde ?</string>
-    <plurals name="batch_delete_others">
-        <item quantity="one">Masquer %1$d message localement ?</item>
-        <item quantity="other">Masquer %1$d messages localement ?</item>
+    <plurals name="batch_delete_title">
+        <item quantity="one">Supprimer %1$d message ?</item>
+        <item quantity="other">Supprimer %1$d messages ?</item>
     </plurals>
-    <plurals name="batch_delete_mixed">
-        <item quantity="one">Supprimer %1$d de vos messages pour tout le monde et en masquer %2$d autre localement ?</item>
-        <item quantity="other">Supprimer %1$d de vos messages pour tout le monde et en masquer %2$d autres localement ?</item>
+    <string name="batch_delete_scope_choice">Retirez ces messages uniquement de cet appareil, ou supprimez-les pour tout le monde dans cette discussion. La suppression pour tout le monde est irréversible.</string>
+    <plurals name="batch_delete_local_only">
+        <item quantity="one">Cela retire %1$d message uniquement de cet appareil. Les autres peuvent toujours le voir.</item>
+        <item quantity="other">Cela retire %1$d messages uniquement de cet appareil. Les autres peuvent toujours les voir.</item>
     </plurals>
     <string name="batch_delete_complete">Messages sélectionnés retirés</string>
     <string name="batch_delete_partial">Certains messages sélectionnés ont été retirés ; d’autres ont échoué</string>

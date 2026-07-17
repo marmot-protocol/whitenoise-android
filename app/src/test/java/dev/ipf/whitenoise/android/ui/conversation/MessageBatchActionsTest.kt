@@ -62,7 +62,7 @@ class MessageBatchActionsTest {
     fun forwardSheetClosesWhenSelectedRowsLoseTheirLastForwardableBody() {
         val selectedRowsStillPresent =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", "caption", null, mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", "caption", null, canDeleteForEveryone = false),
             )
 
         val afterEligibilityLost =
@@ -84,9 +84,9 @@ class MessageBatchActionsTest {
     fun copyKeepsSendOrderPrefixesMultipleSendersAndSkipsNonText() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", "hi", "hi", mine = false),
-                BatchMessageActionItem("m2", "bob", "Bob", null, null, mine = false),
-                BatchMessageActionItem("m3", "bob", "Bob", "hey", "hey", mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", "hi", "hi", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "bob", "Bob", null, null, canDeleteForEveryone = false),
+                BatchMessageActionItem("m3", "bob", "Bob", "hey", "hey", canDeleteForEveryone = false),
             )
 
         assertEquals("Alice: hi\nBob: hey", batchCopyText(selected))
@@ -96,8 +96,8 @@ class MessageBatchActionsTest {
     fun copyOmitsSenderPrefixWhenOtherSendersHaveNoCopyableText() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", "hello", "hello", mine = false),
-                BatchMessageActionItem("m2", "bob", "Bob", null, null, mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", "hello", "hello", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "bob", "Bob", null, null, canDeleteForEveryone = false),
             )
 
         assertEquals("hello", batchCopyText(selected))
@@ -107,8 +107,8 @@ class MessageBatchActionsTest {
     fun copyOmitsSenderPrefixWhenEverySelectedMessageHasSameSender() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", " first ", "first", mine = false),
-                BatchMessageActionItem("m2", "ALICE", "Alice", "second", "second", mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", " first ", "first", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "ALICE", "Alice", "second", "second", canDeleteForEveryone = false),
             )
 
         assertEquals("first\nsecond", batchCopyText(selected))
@@ -118,9 +118,9 @@ class MessageBatchActionsTest {
     fun forwardBodiesDisableTheEntireBatchWhenAnySelectedMessageIsUnsupported() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", "one", " one ", mine = false),
-                BatchMessageActionItem("m2", "alice", "Alice", "caption", null, mine = false),
-                BatchMessageActionItem("m3", "alice", "Alice", "one", "one", mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", "one", " one ", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "alice", "Alice", "caption", null, canDeleteForEveryone = false),
+                BatchMessageActionItem("m3", "alice", "Alice", "one", "one", canDeleteForEveryone = false),
             )
 
         assertEquals(emptyList<String>(), batchForwardBodies(selected))
@@ -130,8 +130,8 @@ class MessageBatchActionsTest {
     fun forwardBodiesPreserveVerbatimTextTimelineOrderAndDuplicates() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "alice", "Alice", "one", " one ", mine = false),
-                BatchMessageActionItem("m2", "alice", "Alice", "one", "one", mine = false),
+                BatchMessageActionItem("m1", "alice", "Alice", "one", " one ", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "alice", "Alice", "one", "one", canDeleteForEveryone = false),
             )
 
         assertEquals(listOf(" one ", "one"), batchForwardBodies(selected))
@@ -193,28 +193,42 @@ class MessageBatchActionsTest {
     }
 
     @Test
-    fun deleteBreakdownSeparatesOwnMessagesFromLocalHides() {
+    fun deleteBreakdownCountsForEveryoneCapableAgainstLocalOnly() {
         val selected =
             listOf(
-                BatchMessageActionItem("m1", "me", "Me", "one", "one", mine = true),
-                BatchMessageActionItem("m2", "alice", "Alice", "two", "two", mine = false),
-                BatchMessageActionItem("m3", "me", "Me", null, null, mine = true),
+                // Own message and an admin-moderatable other both count as
+                // for-everyone; a non-moderatable other is local-only.
+                BatchMessageActionItem("m1", "me", "Me", "one", "one", canDeleteForEveryone = true),
+                BatchMessageActionItem("m2", "alice", "Alice", "two", "two", canDeleteForEveryone = false),
+                BatchMessageActionItem("m3", "carol", "Carol", null, null, canDeleteForEveryone = true),
             )
 
-        assertEquals(
-            BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 1),
-            batchDeleteBreakdown(selected),
-        )
+        val breakdown = batchDeleteBreakdown(selected)
+        assertEquals(BatchDeleteBreakdown(deleteForEveryone = 2, hideLocally = 1), breakdown)
+        assertTrue(breakdown.canOfferDeleteForEveryone)
     }
 
     @Test
-    fun executeBatchDeleteRoutesOwnAndOtherMessagesAndAggregatesFailures() =
+    fun deleteBreakdownWithNoForEveryoneCapableOffersLocalOnly() {
+        val selected =
+            listOf(
+                BatchMessageActionItem("m1", "alice", "Alice", "one", "one", canDeleteForEveryone = false),
+                BatchMessageActionItem("m2", "bob", "Bob", "two", "two", canDeleteForEveryone = false),
+            )
+
+        val breakdown = batchDeleteBreakdown(selected)
+        assertEquals(BatchDeleteBreakdown(deleteForEveryone = 0, hideLocally = 2), breakdown)
+        assertFalse(breakdown.canOfferDeleteForEveryone)
+    }
+
+    @Test
+    fun executeBatchDeleteEveryoneScopeRoutesByCapabilityAndAggregatesFailures() =
         runBlocking {
             val selections =
                 listOf(
-                    selection("own-ok", recordedAt = 100uL, timelineOrder = 1uL, mine = true),
+                    selection("everyone-ok", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true),
                     selection("other", recordedAt = 200uL, timelineOrder = 2uL),
-                    selection("own-fail", recordedAt = 300uL, timelineOrder = 3uL, mine = true),
+                    selection("everyone-fail", recordedAt = 300uL, timelineOrder = 3uL, canDeleteForEveryone = true),
                 )
             val protocolDeletes = mutableListOf<String>()
             val localHides = mutableListOf<String>()
@@ -222,9 +236,10 @@ class MessageBatchActionsTest {
             val result =
                 executeBatchDelete(
                     selections = selections,
+                    scope = BatchDeleteScope.EVERYONE,
                     deleteForEveryone = { record ->
                         protocolDeletes += record.messageIdHex
-                        record.messageIdHex != "own-fail"
+                        record.messageIdHex != "everyone-fail"
                     },
                     hideLocally = { messageId ->
                         localHides += messageId
@@ -233,18 +248,48 @@ class MessageBatchActionsTest {
                 )
 
             assertEquals(BatchDeleteResult(attempted = 3, succeeded = 2), result)
-            assertEquals(listOf("own-ok", "own-fail"), protocolDeletes)
+            assertEquals(listOf("everyone-ok", "everyone-fail"), protocolDeletes)
             assertEquals(listOf("other"), localHides)
+        }
+
+    @Test
+    fun executeBatchDeleteLocalOnlyScopeHidesEveryMessageAndPublishesNothing() =
+        runBlocking {
+            val selections =
+                listOf(
+                    selection("mine", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true),
+                    selection("other", recordedAt = 200uL, timelineOrder = 2uL),
+                )
+            val protocolDeletes = mutableListOf<String>()
+            val localHides = mutableListOf<String>()
+
+            val result =
+                executeBatchDelete(
+                    selections = selections,
+                    scope = BatchDeleteScope.LOCAL_ONLY,
+                    deleteForEveryone = { record ->
+                        protocolDeletes += record.messageIdHex
+                        true
+                    },
+                    hideLocally = { messageId ->
+                        localHides += messageId
+                        true
+                    },
+                )
+
+            assertEquals(BatchDeleteResult(attempted = 2, succeeded = 2), result)
+            assertEquals(emptyList<String>(), protocolDeletes)
+            assertEquals(listOf("mine", "other"), localHides)
         }
 
     private fun selection(
         id: String,
         recordedAt: ULong,
         timelineOrder: ULong,
-        mine: Boolean = false,
+        canDeleteForEveryone: Boolean = false,
     ): BatchMessageSelection =
         BatchMessageSelection(
-            action = BatchMessageActionItem(id, "alice", "Alice", id, id, mine = mine),
+            action = BatchMessageActionItem(id, "alice", "Alice", id, id, canDeleteForEveryone = canDeleteForEveryone),
             record =
                 AppMessageRecordFfi(
                     messageIdHex = id,

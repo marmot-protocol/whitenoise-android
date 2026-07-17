@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -142,7 +143,7 @@ class MessageDeleteDialogBehaviorTest {
         composeRule.setContent {
             // Mirrors the bubble wiring: the first tap flips the in-flight
             // flag, which disables the option before a second tap can land.
-            var inFlight by mutableStateOf(false)
+            var inFlight by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = false) {
                 Surface {
                     MessageDeleteDialogContent(
@@ -151,6 +152,10 @@ class MessageDeleteDialogBehaviorTest {
                         senderDisplayName = "Member",
                         deleteInFlight = inFlight,
                         onDeleteForEveryone = {
+                            // Same reentry guard as the production wiring: a
+                            // disabled node's semantics click action can still
+                            // fire under the test harness.
+                            if (inFlight) return@MessageDeleteDialogContent
                             remoteDeletes += 1
                             inFlight = true
                         },
@@ -174,7 +179,7 @@ class MessageDeleteDialogBehaviorTest {
             // Mirrors the bubble wiring on failure: the in-flight flag resets
             // but the dialog stays open (only success dismisses it), so the
             // error toast never has to explain a vanished surface.
-            var inFlight by mutableStateOf(false)
+            var inFlight by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = false) {
                 Surface {
                     MessageDeleteDialogContent(
