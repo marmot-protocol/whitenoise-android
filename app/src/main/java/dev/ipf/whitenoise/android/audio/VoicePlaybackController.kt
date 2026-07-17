@@ -405,7 +405,11 @@ object VoicePlaybackController {
     private fun pauseForTransientAudioFocusLoss() {
         val mp = player ?: return
         if (!runCatching { mp.isPlaying }.getOrDefault(false)) return
-        if (runCatching { mp.pause() }.isFailure) return
+        if (runCatching { mp.pause() }.isFailure) {
+            releasePlayerInternal()
+            _state.value = PlaybackState()
+            return
+        }
         resumeOnAudioFocusGain = true
         _state.value =
             _state.value.copy(
@@ -418,7 +422,11 @@ object VoicePlaybackController {
     private fun duckForTransientAudioFocusLoss() {
         val mp = player ?: return
         if (!runCatching { mp.isPlaying }.getOrDefault(false)) return
-        duckedForAudioFocusLoss = runCatching { mp.setVolume(DUCK_VOLUME, DUCK_VOLUME) }.isSuccess
+        if (runCatching { mp.setVolume(DUCK_VOLUME, DUCK_VOLUME) }.isSuccess) {
+            duckedForAudioFocusLoss = true
+        } else {
+            pauseForTransientAudioFocusLoss()
+        }
     }
 
     private fun restoreAfterAudioFocusGain() {

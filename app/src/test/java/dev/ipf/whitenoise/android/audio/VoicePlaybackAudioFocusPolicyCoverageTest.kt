@@ -35,6 +35,7 @@ class VoicePlaybackAudioFocusPolicyCoverageTest {
         assertTrue("transient pause must remember to resume", "resumeOnAudioFocusGain = true" in transientPause)
         assertFalse("transient pause must retain audio focus", "abandonFocus()" in transientPause)
         assertTrue("duck must lower both channels", "setVolume(DUCK_VOLUME, DUCK_VOLUME)" in duck)
+        assertTrue("failed ducking must fall back to a resumable pause", "pauseForTransientAudioFocusLoss()" in duck)
         assertTrue("gain must restore both channels", "setVolume(1f, 1f)" in gain)
         assertTrue("gain must restart only an interrupted clip", "if (!resumeOnAudioFocusGain) return" in gain)
     }
