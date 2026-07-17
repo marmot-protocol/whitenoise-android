@@ -29,11 +29,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
@@ -118,6 +123,11 @@ internal fun MarkdownMessageBody(
     // layout/coordinates. MessageBubble uses this only while partial text
     // selection is active to seed the native selection at the original press.
     onSelectableTextLayoutChanged: SelectableTextLayoutReporter? = null,
+    // Link-bearing text leaves report their layout so the bubble's row-level
+    // long-press detector can distinguish a URL press from a plain-text press.
+    onLinkTextLayoutChanged: MarkdownLinkTextLayoutReporter? = null,
+    // Accessibility actions invoke the same copy path without a pointer event.
+    onCopyLink: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -148,7 +158,11 @@ internal fun MarkdownMessageBody(
         remember(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds) {
             MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember, useDecorativeBackgrounds)
         }
-    CompositionLocalProvider(LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged) {
+    CompositionLocalProvider(
+        LocalSelectableTextLayoutReporter provides onSelectableTextLayoutChanged,
+        LocalMarkdownLinkTextLayoutReporter provides onLinkTextLayoutChanged,
+        LocalMarkdownLinkCopyHandler provides onCopyLink,
+    ) {
         MarkdownBlockList(
             blocks = document.blocks,
             ctx = bodyContext,
@@ -248,8 +262,23 @@ private data class MarkdownBodyContext(
 internal typealias SelectableTextLayoutReporter =
     (key: Any, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
 
+internal typealias MarkdownLinkTextLayoutReporter =
+    (key: Any, text: AnnotatedString, layoutResult: TextLayoutResult?, coordinates: LayoutCoordinates?) -> Unit
+
+internal data class MarkdownLinkTextLayout(
+    val text: AnnotatedString,
+    val layoutResult: TextLayoutResult,
+    val coordinates: LayoutCoordinates,
+)
+
 private val LocalSelectableTextLayoutReporter =
     staticCompositionLocalOf<SelectableTextLayoutReporter?> { null }
+
+private val LocalMarkdownLinkTextLayoutReporter =
+    staticCompositionLocalOf<MarkdownLinkTextLayoutReporter?> { null }
+
+private val LocalMarkdownLinkCopyHandler =
+    staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 private class MarkdownTextLayoutTracker {
     var layoutResult: TextLayoutResult? = null
@@ -266,26 +295,56 @@ private fun MarkdownBodyText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val reporter = LocalSelectableTextLayoutReporter.current
+    val linkReporter = LocalMarkdownLinkTextLayoutReporter.current
+    val onCopyLink = LocalMarkdownLinkCopyHandler.current
+    val copyLabel = stringResource(R.string.copy)
+    val linkDestinations = remember(text) { markdownLinkDestinations(text) }
+    val reportsLinks = linkDestinations.isNotEmpty()
     val key = remember { Any() }
     val tracker = remember { MarkdownTextLayoutTracker() }
 
-    DisposableEffect(reporter, key) {
-        onDispose { reporter?.invoke(key, null, null) }
+    DisposableEffect(reporter, linkReporter, key, text) {
+        onDispose {
+            reporter?.invoke(key, null, null)
+            linkReporter?.invoke(key, text, null, null)
+        }
     }
 
     fun reportIfReady() {
         val layoutResult = tracker.layoutResult ?: return
         val coordinates = tracker.coordinates ?: return
         reporter?.invoke(key, layoutResult, coordinates)
+        if (reportsLinks) {
+            linkReporter?.invoke(key, text, layoutResult, coordinates)
+        } else {
+            linkReporter?.invoke(key, text, null, null)
+        }
     }
+
+    val accessibilityModifier =
+        if (onCopyLink == null || linkDestinations.isEmpty()) {
+            Modifier
+        } else {
+            Modifier.semantics {
+                customActions =
+                    linkDestinations.map { destination ->
+                        CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
+                            onCopyLink(destination)
+                            true
+                        }
+                    }
+            }
+        }
 
     Text(
         text = text,
         modifier =
-            modifier.onGloballyPositioned { coordinates ->
-                tracker.coordinates = coordinates
-                reportIfReady()
-            },
+            modifier
+                .then(accessibilityModifier)
+                .onGloballyPositioned { coordinates ->
+                    tracker.coordinates = coordinates
+                    reportIfReady()
+                },
         style = style,
         textAlign = textAlign,
         onTextLayout = { layoutResult ->
@@ -295,6 +354,55 @@ private fun MarkdownBodyText(
         },
     )
 }
+
+internal fun markdownLinkDestinationAt(
+    layouts: Collection<MarkdownLinkTextLayout>,
+    positionInWindow: Offset,
+): String? =
+    layouts.firstNotNullOfOrNull { textLayout ->
+        if (!textLayout.coordinates.isAttached || !textLayout.coordinates.boundsInWindow().contains(positionInWindow)) {
+            null
+        } else {
+            markdownLinkDestinationAt(
+                textLayout.text,
+                textLayout.layoutResult,
+                textLayout.coordinates.windowToLocal(positionInWindow),
+            )
+        }
+    }
+
+internal fun markdownLinkDestinationAt(
+    text: AnnotatedString,
+    layoutResult: TextLayoutResult,
+    position: Offset,
+): String? {
+    if (text.isEmpty() || position.y !in 0f..layoutResult.size.height.toFloat()) return null
+    val line = layoutResult.getLineForVerticalPosition(position.y)
+    val lineLeft = minOf(layoutResult.getLineLeft(line), layoutResult.getLineRight(line))
+    val lineRight = maxOf(layoutResult.getLineLeft(line), layoutResult.getLineRight(line))
+    if (position.x !in lineLeft..lineRight) return null
+    val offset = layoutResult.getOffsetForPosition(position).coerceIn(0, text.lastIndex)
+    return text
+        .getLinkAnnotations(offset, offset + 1)
+        .firstNotNullOfOrNull { range -> markdownLinkDestination(range.item) }
+}
+
+internal fun markdownLinkDestinations(text: AnnotatedString): List<String> =
+    text
+        .getLinkAnnotations(0, text.length)
+        .mapNotNull { range -> markdownLinkDestination(range.item) }
+        .distinct()
+
+internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
+    when (annotation) {
+        is LinkAnnotation.Url -> annotation.url.takeIf(::isOpenableMarkdownLink)
+        is LinkAnnotation.Clickable ->
+            annotation.tag
+                .takeIf { it.startsWith(CONFIRM_LINK_TAG_PREFIX) }
+                ?.removePrefix(CONFIRM_LINK_TAG_PREFIX)
+                ?.takeIf(::isOpenableMarkdownLink)
+        else -> null
+    }
 
 @Composable
 private fun MarkdownBlockList(
