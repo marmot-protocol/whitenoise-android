@@ -159,6 +159,40 @@ internal fun messageBubbleBorder(
 }
 
 @Composable
+internal fun messageBubblePresentation(
+    invalidated: Boolean,
+    deleted: Boolean,
+    mine: Boolean,
+    customArgb: Long? = null,
+): BubblePresentation {
+    val colorScheme = MaterialTheme.colorScheme
+    return resolveBubblePresentationArgb(
+        invalidated = invalidated,
+        deleted = deleted,
+        amoled = isAmoledSurfaceTheme(),
+        mine = mine,
+        customArgb = customArgb,
+        tokens =
+            BubblePresentationTokens(
+                errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceBackgroundArgb = colorScheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
+                surfaceContentArgb = colorScheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
+                mineBackgroundArgb = colorScheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
+                mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
+            ),
+    )
+}
+
+@Composable
+internal fun messageBubbleFillColor(
+    invalidated: Boolean,
+    deleted: Boolean,
+    mine: Boolean,
+): Color = colorFromArgb(messageBubblePresentation(invalidated, deleted, mine).backgroundArgb)
+
+@Composable
 internal fun messageBubbleTimestampColor(
     invalidated: Boolean,
     mine: Boolean,
@@ -276,7 +310,6 @@ internal fun MessageBubble(
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
 ) {
-    val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
     val mine = controller.isMessageMine(record)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
@@ -303,22 +336,11 @@ internal fun MessageBubble(
     val colorScheme = MaterialTheme.colorScheme
     val customBubbleColorActive = customBubbleArgb != null && !deleted && !invalidated
     val bubblePresentation =
-        resolveBubblePresentationArgb(
+        messageBubblePresentation(
             invalidated = invalidated,
             deleted = deleted,
-            amoled = amoledSurfaceTheme,
             mine = mine,
             customArgb = customBubbleArgb,
-            tokens =
-                BubblePresentationTokens(
-                    errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                    errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                    surfaceBackgroundArgb = colorScheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                    surfaceContentArgb = colorScheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
-                    mineBackgroundArgb = colorScheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                    mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                    mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
-                ),
         )
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
     // #414: "you were mentioned" treatment. A received (not mine), live (not
