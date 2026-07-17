@@ -203,6 +203,73 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
 
+    @Test
+    fun failedUserPauseControlsReleaseBrokenPlayerAndFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        listOf(
+            TrackingMediaPlayer(failPlayingQuery = true),
+            TrackingMediaPlayer(failPause = true),
+        ).forEach { mediaPlayer ->
+            VoicePlaybackController.attach(context)
+            assertTrue(requestFocus())
+            primeActivePlayer(mediaPlayer)
+
+            VoicePlaybackController.pause()
+
+            assertTrue(mediaPlayer.released)
+            assertNull(controllerField("player"))
+            assertNull(controllerField("focusRequest"))
+            assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+        }
+    }
+
+    @Test
+    fun failedFocusLossStateQueriesReleaseBrokenPlayerAndFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        listOf(
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+        ).forEach { focusChange ->
+            VoicePlaybackController.attach(context)
+            assertTrue(requestFocus())
+            val mediaPlayer = TrackingMediaPlayer(failPlayingQuery = true)
+            primeActivePlayer(mediaPlayer)
+
+            handleAudioFocusChange(focusChange)
+
+            assertTrue(mediaPlayer.released)
+            assertNull(controllerField("player"))
+            assertNull(controllerField("focusRequest"))
+            assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+        }
+    }
+
+    @Test
+    fun failedVolumeRestoreReleasesBrokenPlayerAndFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        val restoreActions: List<() -> Unit> =
+            listOf(
+                { handleAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN) },
+                { VoicePlaybackController.pause() },
+            )
+        restoreActions.forEach { restoreAction ->
+            VoicePlaybackController.attach(context)
+            assertTrue(requestFocus())
+            val mediaPlayer = TrackingMediaPlayer(failVolumeRestore = true)
+            primeActivePlayer(mediaPlayer)
+
+            handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            assertEquals(0.2f, mediaPlayer.leftVolume, 0f)
+
+            restoreAction()
+
+            assertTrue(mediaPlayer.released)
+            assertNull(controllerField("player"))
+            assertNull(controllerField("focusRequest"))
+            assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+        }
+    }
+
     // Hit the private focus path directly; public playback needs MediaPlayer file
     // setup and would obscure the focus bookkeeping this regression protects.
     private fun requestFocus(): Boolean {
@@ -279,6 +346,8 @@ class VoicePlaybackControllerFocusTest {
     private class TrackingMediaPlayer(
         private val failPause: Boolean = false,
         private val failVolumeChange: Boolean = false,
+        private val failVolumeRestore: Boolean = false,
+        private val failPlayingQuery: Boolean = false,
     ) : MediaPlayer() {
         var playing = true
         var released = false
@@ -288,7 +357,10 @@ class VoicePlaybackControllerFocusTest {
         val positionMs = 123
         val durationMs = 456
 
-        override fun isPlaying(): Boolean = playing
+        override fun isPlaying(): Boolean {
+            if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
+            return playing
+        }
 
         override fun pause() {
             if (failPause) throw IllegalStateException("pause failed")
@@ -312,7 +384,9 @@ class VoicePlaybackControllerFocusTest {
             leftVolume: Float,
             rightVolume: Float,
         ) {
-            if (failVolumeChange) throw IllegalStateException("setVolume failed")
+            if (failVolumeChange || (failVolumeRestore && leftVolume == 1f && rightVolume == 1f)) {
+                throw IllegalStateException("setVolume failed")
+            }
             this.leftVolume = leftVolume
             this.rightVolume = rightVolume
         }
