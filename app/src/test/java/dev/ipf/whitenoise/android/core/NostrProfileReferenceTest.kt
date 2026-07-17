@@ -36,6 +36,24 @@ class NostrProfileReferenceTest {
         assertNull(NostrProfileReference.accountIdHex(mixedCase))
     }
 
+    @Test
+    fun rejectsMalformedTlvAfterValidPubkey() {
+        val pubkey = List(32) { 0x42 }
+        val truncatedRelay = listOf(1, 4, 1, 2)
+        val encoded = nprofile(listOf(0, pubkey.size) + pubkey + truncatedRelay)
+
+        assertNull(NostrProfileReference.accountIdHex(encoded))
+    }
+
+    @Test
+    fun rejectsDuplicatePubkeyTlvs() {
+        val first = List(32) { 0x42 }
+        val second = List(32) { 0x24 }
+        val encoded = nprofile(listOf(0, first.size) + first + listOf(0, second.size) + second)
+
+        assertNull(NostrProfileReference.accountIdHex(encoded))
+    }
+
     private fun nprofile(bytes: List<Int>): String = bech32Encode("nprofile", convertBits(bytes, fromBits = 8, toBits = 5, pad = true))
 
     private fun bech32Encode(
