@@ -956,14 +956,10 @@ internal fun mediaCacheKeysForCiphertextTags(
 internal suspend fun removeMediaMemoryCacheKeys(
     cacheKeys: Iterable<String>,
     dispatcher: CoroutineDispatcher,
-    removePlaintext: (String) -> Unit,
-    removeThumbnail: (String) -> Unit,
+    removeEntry: (String) -> Unit,
 ) {
     withContext(dispatcher) {
-        cacheKeys.forEach { key ->
-            removePlaintext(key)
-            removeThumbnail(key)
-        }
+        cacheKeys.forEach(removeEntry)
     }
 }
 
@@ -1008,8 +1004,7 @@ private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     removeMediaMemoryCacheKeys(
         cacheKeys = cacheKeys,
         dispatcher = Dispatchers.Main.immediate,
-        removePlaintext = { key -> mediaPlaintextCache.remove(key) },
-        removeThumbnail = { key -> mediaThumbnailCache.remove(key) },
+        removeEntry = ::removeMediaMemoryCacheEntry,
     )
     val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
     withContext(Dispatchers.IO) {
@@ -4677,7 +4672,7 @@ class ConversationController(
      * Shared upload→publish path for both first send and retry. Reads the
      * compressed bytes from [retainedMediaUploads] (keyed by [key]) so it
      * survives a Failed→retry round-trip. On success: drops the optimistic +
-     * retained entry, then seeds [mediaPlaintextCache] with the just-uploaded
+     * retained entry, then seeds [WhiteNoiseAppState.cacheMediaPlaintext] with the just-uploaded
      * plaintext so the sender renders its own image without a download. On
      * failure: flips back to Failed (bytes stay retained for another retry).
      */
@@ -4805,14 +4800,14 @@ class ConversationController(
                     retained.attachments.forEachIndexed { index, attachment ->
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
-                        appState.mediaPlaintextCache.put(confirmedKey, attachment.plaintextBytes)
+                        appState.cacheMediaPlaintext(confirmedKey, attachment.plaintextBytes)
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
                         val decoded = decodeMediaThumbnailOffMain(attachment.plaintextBytes)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
-                            appState.mediaThumbnailCache.put(confirmedKey, decoded)
+                            appState.cacheMediaThumbnail(confirmedKey, decoded)
                         }
                         val bytesToPersist = attachment.plaintextBytes
                         val publicationToken = appState.diskMediaCache.capturePublicationToken()
@@ -5204,10 +5199,11 @@ class ConversationController(
                     if (ref.ciphertextSha256 in expiredCiphertextSha256) mediaCacheKey(account, messageIdHex, index) else null
                 }
             }
-        loadedKeys.forEach { key ->
-            appState.mediaPlaintextCache.remove(key)
-            appState.mediaThumbnailCache.remove(key)
-        }
+        removeMediaMemoryCacheKeys(
+            cacheKeys = loadedKeys,
+            dispatcher = Dispatchers.Main.immediate,
+            removeEntry = appState::removeMediaMemoryCacheEntry,
+        )
         withContext(Dispatchers.IO) {
             loadedKeys.forEach { appState.diskMediaCache.remove(it) }
             // Plus any disk entry stamped with an expired ciphertext tag — the
@@ -5230,7 +5226,7 @@ class ConversationController(
     ): Boolean {
         val account = conversationAccountRef ?: return false
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        if (appState.mediaPlaintextCache.get(cacheKey) != null) return true
+        if (appState.cachedMediaPlaintext(cacheKey) != null) return true
         return appState.diskMediaCache.contains(cacheKey)
     }
 
@@ -5245,8 +5241,9 @@ class ConversationController(
     ) {
         val account = conversationAccountRef ?: return
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        appState.mediaPlaintextCache.remove(cacheKey)
-        appState.mediaThumbnailCache.remove(cacheKey)
+        withContext(Dispatchers.Main.immediate) {
+            appState.removeMediaMemoryCacheEntry(cacheKey)
+        }
         withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
     }
 
@@ -5271,7 +5268,7 @@ class ConversationController(
 
     /**
      * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
-     * LRU ([WhiteNoiseAppState.mediaPlaintextCache], keyed via [mediaCacheKey])
+     * LRU ([WhiteNoiseAppState.cachedMediaPlaintext], keyed via [mediaCacheKey])
      * so re-opening a conversation doesn't re-download media already fetched
      * this session. Throws on download/decrypt failure — the caller surfaces it.
      */
@@ -5285,12 +5282,16 @@ class ConversationController(
         val account = conversationAccountRef ?: error("no active account")
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         // L1: in-memory LRU (hottest cache, instant return).
-        appState.mediaPlaintextCache.get(cacheKey)?.let { return it }
+        withContext(Dispatchers.Main.immediate) {
+            appState.cachedMediaPlaintext(cacheKey)
+        }?.let { return it }
         // L2: disk LRU (survives process restart). Read off the main thread
         // since file I/O on big JPEGs can take 5-30ms.
         val onDisk = withContext(Dispatchers.IO) { appState.diskMediaCache.get(cacheKey) }
         if (onDisk != null) {
-            appState.mediaPlaintextCache.put(cacheKey, onDisk)
+            withContext(Dispatchers.Main.immediate) {
+                appState.cacheMediaPlaintext(cacheKey, onDisk)
+            }
             return onDisk
         }
         // The actual Blossom fetch runs on `mutationsScope` so it continues
@@ -5333,7 +5334,7 @@ class ConversationController(
                 // render as a permanent broken image and short-circuit
                 // tap-to-retry.
                 if (result.plaintext.isNotEmpty()) {
-                    appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
+                    appState.cacheMediaPlaintext(cacheKey, result.plaintext)
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
                     // lifetime as the FFI fetch). Tag the entry with the
@@ -5355,7 +5356,7 @@ class ConversationController(
         attachmentIndex: Int,
     ): android.graphics.Bitmap? {
         val account = conversationAccountRef ?: return null
-        return appState.mediaThumbnailCache.get(mediaCacheKey(account, messageIdHex, attachmentIndex))
+        return appState.cachedMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
     }
 
     /** Cache a decoded thumbnail so re-renders / re-entry skip the decode. */
@@ -5365,7 +5366,7 @@ class ConversationController(
         bitmap: android.graphics.Bitmap,
     ) {
         val account = conversationAccountRef ?: return
-        appState.mediaThumbnailCache.put(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap)
+        appState.cacheMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap)
     }
 
     /**
@@ -5393,7 +5394,7 @@ class ConversationController(
         retained.attachments.forEachIndexed { index, attachment ->
             if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
             val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
-            appState.mediaPlaintextCache.put(cacheKey, attachment.plaintextBytes)
+            appState.cacheMediaPlaintext(cacheKey, attachment.plaintextBytes)
             // Seed the L1 plaintext synchronously above (the bit that stops the
             // bubble's LaunchedEffect from re-downloading from Blossom), but
             // offload the multi-MB ARGB thumbnail decode off this main-thread
@@ -5404,7 +5405,7 @@ class ConversationController(
             appState.launchMutation {
                 val decoded = decodeMediaThumbnailOffMain(plaintextBytes)
                 if (decoded != null && mediaUploadSessionStillCurrent(account)) {
-                    appState.mediaThumbnailCache.put(cacheKey, decoded)
+                    appState.cacheMediaThumbnail(cacheKey, decoded)
                 }
             }
             val bytesToPersist = attachment.plaintextBytes
