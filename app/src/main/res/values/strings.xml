@@ -349,6 +349,9 @@
     <string name="delete">Delete</string>
     <string name="delete_for_me">Delete for me</string>
     <string name="delete_for_everyone">Delete for everyone</string>
+    <string name="delete_message_title">Delete message?</string>
+    <string name="delete_message_scope_choice">Remove this message from this device only, or delete it for everyone in this chat. Deleting for everyone can\'t be undone.</string>
+    <string name="delete_message_local_only">This removes the message from this device only. Other people can still see it.</string>
     <string name="confirm_delete_member_message_title">Delete message from %1$s?</string>
     <string name="confirm_delete_member_message_message">This removes the message for everyone in the group. It can\'t be undone.</string>
     <string name="sent">Sent</string>
@@ -776,14 +779,14 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Selected</string>
     <string name="select">Select</string>
-    <string name="batch_delete_own">Delete %1$d of your messages for everyone?</string>
-    <plurals name="batch_delete_others">
-        <item quantity="one">Hide %1$d message locally?</item>
-        <item quantity="other">Hide %1$d messages locally?</item>
+    <plurals name="batch_delete_title">
+        <item quantity="one">Delete %1$d message?</item>
+        <item quantity="other">Delete %1$d messages?</item>
     </plurals>
-    <plurals name="batch_delete_mixed">
-        <item quantity="one">Delete %1$d of your messages for everyone and hide %2$d other locally?</item>
-        <item quantity="other">Delete %1$d of your messages for everyone and hide %2$d others locally?</item>
+    <string name="batch_delete_scope_choice">Remove these messages from this device only, or delete them for everyone in this chat. Deleting for everyone can\'t be undone.</string>
+    <plurals name="batch_delete_local_only">
+        <item quantity="one">This removes %1$d message from this device only. Other people can still see it.</item>
+        <item quantity="other">This removes %1$d messages from this device only. Other people can still see them.</item>
     </plurals>
     <string name="batch_delete_complete">Selected messages removed</string>
     <string name="batch_delete_partial">Some selected messages were removed; some failed</string>

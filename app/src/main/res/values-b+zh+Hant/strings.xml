@@ -268,6 +268,9 @@
     <string name="delete">刪除</string>
     <string name="delete_for_me">僅為我刪除</string>
     <string name="delete_for_everyone">為所有人刪除</string>
+    <string name="delete_message_title">刪除訊息？</string>
+    <string name="delete_message_scope_choice">僅從此裝置移除這則訊息，或為此聊天中的所有人刪除它。為所有人刪除後無法復原。</string>
+    <string name="delete_message_local_only">這只會從此裝置移除該訊息。其他人仍然可以看到它。</string>
     <string name="confirm_delete_member_message_title">刪除 %1$s 的訊息？</string>
     <string name="confirm_delete_member_message_message">此操作會為群組中的所有人刪除該訊息，且無法復原。</string>
     <string name="sent">已傳送</string>
@@ -613,12 +616,12 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">已選取</string>
     <string name="select">選取</string>
-    <string name="batch_delete_own">要為所有人刪除您的 %1$d 則訊息嗎？</string>
-    <plurals name="batch_delete_others">
-        <item quantity="other">要在本機隱藏 %1$d 則訊息嗎？</item>
+    <plurals name="batch_delete_title">
+        <item quantity="other">刪除 %1$d 則訊息？</item>
     </plurals>
-    <plurals name="batch_delete_mixed">
-        <item quantity="other">要為所有人刪除您的 %1$d 則訊息，並在本機隱藏另外 %2$d 則嗎？</item>
+    <string name="batch_delete_scope_choice">僅從此裝置移除這些訊息，或為此聊天中的所有人刪除它們。為所有人刪除後無法復原。</string>
+    <plurals name="batch_delete_local_only">
+        <item quantity="other">這只會從此裝置移除 %1$d 則訊息。其他人仍然可以看到它們。</item>
     </plurals>
     <string name="batch_delete_complete">已移除所選訊息</string>
     <string name="batch_delete_partial">已移除部分所選訊息；另一些操作失敗</string>

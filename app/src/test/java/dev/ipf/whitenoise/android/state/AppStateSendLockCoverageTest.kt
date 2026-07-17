@@ -144,7 +144,7 @@ class AppStateSendLockCoverageTest {
     @Test
     fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
         val body = controllerFunctionBody("deleteMessage")
-        val authorizationGate = body.indexOf("!canDeleteMessageForEveryone(")
+        val authorizationGate = body.indexOf("!deleteCapabilityFor(message).canDeleteForEveryone")
         val earlyReturn = body.indexOf("return false", startIndex = authorizationGate)
         val optimisticMutation = body.indexOf("deletedMessageIds = deletedMessageIds + target")
         val ffiDelete = body.indexOf("appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }")
@@ -172,7 +172,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "deleteMessage guards must report that no commit occurred",
             "conversationAccountRef ?: return false" in body &&
-                "!canDeleteMessageForEveryone(" in body &&
+                "!deleteCapabilityFor(message).canDeleteForEveryone" in body &&
                 "return false" in body,
         )
         assertTrue(

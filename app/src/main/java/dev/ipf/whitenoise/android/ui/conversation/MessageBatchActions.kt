@@ -10,8 +10,27 @@ internal data class BatchMessageActionItem(
     val senderDisplayName: String,
     val copyableText: String?,
     val forwardableText: String?,
-    val mine: Boolean,
+    /**
+     * Whether this message can be removed for the whole group — the authored
+     * message, or another member's message the selecting user may moderate
+     * (group admin, never a direct conversation). Derived from the same
+     * `deleteCapabilityFor` the single-message surface and the mutation guard
+     * use, so batch routing never diverges from the per-message policy.
+     * Messages without it can only be hidden on this device.
+     */
+    val canDeleteForEveryone: Boolean,
 )
+
+/**
+ * Which removal the user picked in the batch confirm. [EVERYONE] removes each
+ * message for the whole group where the user is allowed to and hides the rest
+ * on this device; [LOCAL_ONLY] hides every selected message on this device and
+ * publishes nothing.
+ */
+internal enum class BatchDeleteScope {
+    EVERYONE,
+    LOCAL_ONLY,
+}
 
 /** Selection snapshot retained independently of the controller's bounded timeline window. */
 internal data class BatchMessageSelection(
@@ -23,7 +42,10 @@ internal data class BatchMessageSelection(
 internal data class BatchDeleteBreakdown(
     val deleteForEveryone: Int,
     val hideLocally: Int,
-)
+) {
+    /** At least one selected message can be removed for the whole group. */
+    val canOfferDeleteForEveryone: Boolean get() = deleteForEveryone > 0
+}
 
 internal data class BatchDeleteResult(
     val attempted: Int,
@@ -92,19 +114,28 @@ internal fun batchForwardBodies(items: List<BatchMessageActionItem>): List<Strin
 
 internal fun batchDeleteBreakdown(items: List<BatchMessageActionItem>): BatchDeleteBreakdown =
     BatchDeleteBreakdown(
-        deleteForEveryone = items.count(BatchMessageActionItem::mine),
-        hideLocally = items.count { !it.mine },
+        deleteForEveryone = items.count(BatchMessageActionItem::canDeleteForEveryone),
+        hideLocally = items.count { !it.canDeleteForEveryone },
     )
 
+/**
+ * Apply the chosen [scope] to every selection. In [BatchDeleteScope.EVERYONE]
+ * each message the user may remove for the group is published as a delete and
+ * the rest fall back to a local hide (mirroring the per-message capability); in
+ * [BatchDeleteScope.LOCAL_ONLY] every message is hidden on this device and
+ * nothing is published.
+ */
 internal suspend fun executeBatchDelete(
     selections: List<BatchMessageSelection>,
+    scope: BatchDeleteScope,
     deleteForEveryone: suspend (AppMessageRecordFfi) -> Boolean,
     hideLocally: suspend (String) -> Boolean,
 ): BatchDeleteResult {
     var succeeded = 0
     selections.forEach { selection ->
+        val removeForEveryone = scope == BatchDeleteScope.EVERYONE && selection.action.canDeleteForEveryone
         val removed =
-            if (selection.action.mine) {
+            if (removeForEveryone) {
                 deleteForEveryone(selection.record)
             } else {
                 hideLocally(selection.action.messageId)

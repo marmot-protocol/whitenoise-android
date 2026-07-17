@@ -274,6 +274,9 @@
     <string name="delete">Eliminar</string>
     <string name="delete_for_me">Eliminar para mí</string>
     <string name="delete_for_everyone">Eliminar para todos</string>
+    <string name="delete_message_title">¿Eliminar mensaje?</string>
+    <string name="delete_message_scope_choice">Quita este mensaje solo de este dispositivo o elimínalo para todos en este chat. Eliminarlo para todos no se puede deshacer.</string>
+    <string name="delete_message_local_only">Esto quita el mensaje solo de este dispositivo. Las demás personas aún pueden verlo.</string>
     <string name="confirm_delete_member_message_title">¿Eliminar el mensaje de %1$s?</string>
     <string name="confirm_delete_member_message_message">Esto eliminará el mensaje para todos en el grupo. Esta acción no se puede deshacer.</string>
     <string name="sent">Enviado</string>
@@ -619,14 +622,14 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Seleccionado</string>
     <string name="select">Seleccionar</string>
-    <string name="batch_delete_own">¿Eliminar %1$d de tus mensajes para todos?</string>
-    <plurals name="batch_delete_others">
-        <item quantity="one">¿Ocultar %1$d mensaje localmente?</item>
-        <item quantity="other">¿Ocultar %1$d mensajes localmente?</item>
+    <plurals name="batch_delete_title">
+        <item quantity="one">¿Eliminar %1$d mensaje?</item>
+        <item quantity="other">¿Eliminar %1$d mensajes?</item>
     </plurals>
-    <plurals name="batch_delete_mixed">
-        <item quantity="one">¿Eliminar %1$d de tus mensajes para todos y ocultar %2$d más localmente?</item>
-        <item quantity="other">¿Eliminar %1$d de tus mensajes para todos y ocultar %2$d más localmente?</item>
+    <string name="batch_delete_scope_choice">Quita estos mensajes solo de este dispositivo o elimínalos para todos en este chat. Eliminarlos para todos no se puede deshacer.</string>
+    <plurals name="batch_delete_local_only">
+        <item quantity="one">Esto quita %1$d mensaje solo de este dispositivo. Las demás personas aún pueden verlo.</item>
+        <item quantity="other">Esto quita %1$d mensajes solo de este dispositivo. Las demás personas aún pueden verlos.</item>
     </plurals>
     <string name="batch_delete_complete">Mensajes seleccionados retirados</string>
     <string name="batch_delete_partial">Se retiraron algunos mensajes seleccionados; otros fallaron</string>
