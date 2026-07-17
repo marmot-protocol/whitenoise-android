@@ -50,7 +50,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -96,9 +95,11 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,6 +230,7 @@ internal fun ChatsScreen(
     // unrelated chat-list republishes or row reordering must not restart a
     // full-corpus body search while the user is typing (#1201).
     val trimmedQuery = searchQuery.trim()
+    val ciSearchNeedle = remember(trimmedQuery) { trimmedQuery.lowercase(Locale.ROOT) }
     val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
     LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds) {
         if (trimmedQuery.isEmpty()) {
@@ -334,19 +336,20 @@ internal fun ChatsScreen(
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
-    // #413). derivedStateOf reads the previous decision so the band is sticky.
+    // #413). The previous decision keeps the band sticky.
     var jumpToTopVisible by remember(showArchived) { mutableStateOf(false) }
-    // Keyed on chatListState: switching active/archived recreates the list
-    // state under key(showArchived) above, so the derived read must re-bind to
-    // the new state or the FAB would keep observing the disposed one and reflect
-    // a stale scroll position after the toggle (issue #413 review).
-    val firstVisibleIndex by remember(chatListState) { derivedStateOf { chatListState.firstVisibleItemIndex } }
-    LaunchedEffect(firstVisibleIndex) {
-        if (firstVisibleIndex >= CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX) {
-            jumpToTopVisible = true
-        } else if (firstVisibleIndex <= CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX) {
-            jumpToTopVisible = false
-        }
+    // Observe scroll-index changes in an effect so the whole screen does not
+    // subscribe to every LazyColumn index update during a fling.
+    LaunchedEffect(chatListState) {
+        snapshotFlow { chatListState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { firstVisibleIndex ->
+                if (firstVisibleIndex >= CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX) {
+                    jumpToTopVisible = true
+                } else if (firstVisibleIndex <= CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX) {
+                    jumpToTopVisible = false
+                }
+            }
     }
     // Snap the list flush to the top when a different chat reorders into
     // position 0 (issue #541 / #1313). A send bumps the messaged conversation
@@ -601,13 +604,22 @@ internal fun ChatsScreen(
                                 // classification can't drift from the filter.
                                 val rawBodyMatch = bodyMatches[item.id]
                                 val bodyMatch =
-                                    rawBodyMatch?.takeUnless {
-                                        ChatListMessageSearch.titleOrPreviewMatches(
-                                            displayTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                                            previewText = item.projectedPreviewText(),
-                                            ciNeedle = trimmedQuery.lowercase(),
-                                            description = item.group.description,
-                                        )
+                                    remember(
+                                        item,
+                                        appState,
+                                        groupTitleCopy,
+                                        ciSearchNeedle,
+                                        profileRev,
+                                        rawBodyMatch,
+                                    ) {
+                                        rawBodyMatch?.takeUnless {
+                                            ChatListMessageSearch.titleOrPreviewMatches(
+                                                displayTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                                                previewText = item.projectedPreviewText(),
+                                                ciNeedle = ciSearchNeedle,
+                                                description = item.group.description,
+                                            )
+                                        }
                                     }
                                 ChatListRow(
                                     item = item,

@@ -347,9 +347,15 @@ private fun EmojiPickerContent(
     val browseEmoji by produceState(initialValue = emptyList<EmojiEntry>(), context) {
         value = withContext(Dispatchers.IO) { EmojiData.load(context) }
     }
-    val searchResults =
-        remember(searchQuery, browseEmoji) {
-            EmojiData.search(browseEmoji, searchQuery)
+    val searchResults by
+        produceState<List<EmojiEntry>>(initialValue = emptyList(), searchQuery, browseEmoji) {
+            val query = searchQuery
+            value =
+                if (query.isBlank()) {
+                    emptyList()
+                } else {
+                    withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }
+                }
         }
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
     val messageReactions =

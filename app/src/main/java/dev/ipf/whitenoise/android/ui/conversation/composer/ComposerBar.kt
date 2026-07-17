@@ -730,6 +730,13 @@ internal fun ComposerBar(
         runCatching { composerFocus.requestFocus() }
         keyboardController?.show()
     }
+    val profileRevision = appState?.profileRevisionForCompose
+    val replyMentionDisplayName =
+        remember(appState, profileRevision) {
+            appState?.let { state ->
+                { bech32: String -> state.mentionDisplayName(bech32) }
+            }
+        }
     Column(
         composerBottomClusterModifier(showEmojiPane, composerEmojiSearchActive, modifier.fillMaxWidth(), showAttachmentPane),
     ) {
@@ -763,6 +770,10 @@ internal fun ComposerBar(
             } else if (replyingTo != null) {
                 val refs = remember(replyingTo.tags) { MediaReferenceParser.parseAllImetaTags(replyingTo.tags) }
                 val mediaKind = remember(refs) { replyMediaKindFromMime(refs.firstOrNull()?.mediaType) }
+                val replyBody =
+                    remember(replyingTo, messageTextCopy) {
+                        MessageProjector.displayBody(replyingTo, messageTextCopy)
+                    }
                 ReplyPreviewCard(
                     senderTitle =
                         if (replyingTo.direction == "sent") {
@@ -771,11 +782,11 @@ internal fun ComposerBar(
                             appState?.displayName(replyingTo.sender) ?: replyingTo.sender.take(8)
                         },
                     isOwn = replyingTo.direction == "sent",
-                    body = MessageProjector.displayBody(replyingTo, messageTextCopy),
+                    body = replyBody,
                     mediaKind = mediaKind,
                     onClick = null,
                     onDismiss = onCancelReply,
-                    mentionDisplayName = appState?.let { state -> { state.mentionDisplayName(it) } },
+                    mentionDisplayName = replyMentionDisplayName,
                 )
             }
             // #414: live @-mention picker. Compute the open query from the current
