@@ -89,7 +89,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -164,6 +163,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
@@ -378,6 +378,8 @@ internal fun ConversationScreen(
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var showBatchDeleteConfirm by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var batchDeleteInFlight by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var initialTimelineAnchored by
         remember(chat.id, notificationOpenRequestId) { mutableStateOf(false) }
     // Id of the newest row the bottom-follow has reacted to. A real append
@@ -438,6 +440,10 @@ internal fun ConversationScreen(
             controller.deletedMessageIds,
             controller.editsByTarget,
             appState.activeAccount?.accountIdHex,
+            // Moderation capability rides on these; re-snapshot when they move
+            // so a promotion/demotion or roster verification is reflected.
+            controller.isSelfAdmin,
+            controller.canSendMessages,
         ) {
             renderedTimeline
                 .mapNotNull { item ->
@@ -467,7 +473,10 @@ internal fun ConversationScreen(
                                 senderDisplayName = record.sender,
                                 copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
                                 forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
-                                mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
+                                // Same authoritative accessor the single-message
+                                // surface and the mutation guard use, so bulk
+                                // routing never diverges from per-message policy.
+                                canDeleteForEveryone = controller.deleteCapabilityFor(record).canDeleteForEveryone,
                             ),
                         record = record,
                         timelineOrder = item.timelineOrder,
@@ -3076,53 +3085,48 @@ internal fun ConversationScreen(
     }
 
     if (showBatchDeleteConfirm && selectedActionItems.isNotEmpty()) {
-        val deleteMessage =
-            when {
-                selectedDeleteBreakdown.deleteForEveryone == 0 ->
-                    pluralStringResource(
-                        R.plurals.batch_delete_others,
-                        selectedDeleteBreakdown.hideLocally,
-                        selectedDeleteBreakdown.hideLocally,
-                    )
-                selectedDeleteBreakdown.hideLocally == 0 ->
-                    stringResource(R.string.batch_delete_own, selectedDeleteBreakdown.deleteForEveryone)
-                else ->
-                    pluralStringResource(
-                        R.plurals.batch_delete_mixed,
-                        selectedDeleteBreakdown.hideLocally,
-                        selectedDeleteBreakdown.deleteForEveryone,
-                        selectedDeleteBreakdown.hideLocally,
-                    )
-            }
-        val hideOnly = selectedDeleteBreakdown.deleteForEveryone == 0
-        ConfirmDialog(
-            title = stringResource(if (hideOnly) R.string.hide else R.string.delete),
-            message = deleteMessage,
-            confirmLabel = stringResource(if (hideOnly) R.string.hide else R.string.delete),
-            onConfirm = {
-                showBatchDeleteConfirm = false
-                selectedMessages.clear()
+        val runBatchDelete: (BatchDeleteScope) -> Unit = { scope ->
+            // In-flight guard on top of the mutation's own idempotency: a
+            // second tap before the first completes is dropped.
+            if (!batchDeleteInFlight) {
+                batchDeleteInFlight = true
+                val selections = selectedSelections
                 appState.launchMutation {
-                    val result =
-                        executeBatchDelete(
-                            selections = selectedSelections,
-                            deleteForEveryone = { record ->
-                                controller.canSendMessages &&
+                    try {
+                        val result =
+                            executeBatchDelete(
+                                selections = selections,
+                                scope = scope,
+                                // deleteMessage re-validates the capability, so it
+                                // is the moderation security boundary — a stale
+                                // snapshot can never publish an unauthorized delete.
+                                deleteForEveryone = { record ->
                                     controller.deleteMessage(record, presentFailure = false)
-                            },
-                            hideLocally = { messageId ->
-                                runCatching { controller.hideMessageForMe(messageId) }.isSuccess
-                            },
-                        )
-                    when (result.succeeded) {
-                        result.attempted -> appState.present(R.string.batch_delete_complete)
-                        0 -> appState.present(R.string.batch_delete_failed, copyable = true)
-                        else -> appState.present(R.string.batch_delete_partial, copyable = true)
+                                },
+                                hideLocally = { messageId ->
+                                    runCatching { controller.hideMessageForMe(messageId) }.isSuccess
+                                },
+                            )
+                        when (result.succeeded) {
+                            result.attempted -> appState.present(R.string.batch_delete_complete)
+                            0 -> appState.present(R.string.batch_delete_failed, copyable = true)
+                            else -> appState.present(R.string.batch_delete_partial, copyable = true)
+                        }
+                    } finally {
+                        batchDeleteInFlight = false
+                        showBatchDeleteConfirm = false
+                        selectedMessages.clear()
                     }
                 }
-            },
-            onDismiss = { showBatchDeleteConfirm = false },
-            destructive = true,
+            }
+        }
+        BatchMessageDeleteDialog(
+            selectedCount = selectedActionItems.size,
+            breakdown = selectedDeleteBreakdown,
+            deleteInFlight = batchDeleteInFlight,
+            onDeleteForEveryone = { runBatchDelete(BatchDeleteScope.EVERYONE) },
+            onDeleteForMe = { runBatchDelete(BatchDeleteScope.LOCAL_ONLY) },
+            onDismissRequest = { if (!batchDeleteInFlight) showBatchDeleteConfirm = false },
         )
     }
 

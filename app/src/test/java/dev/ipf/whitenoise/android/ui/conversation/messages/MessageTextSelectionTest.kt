@@ -211,8 +211,7 @@ class MessageTextSelectionTest {
                     alignEnd = false,
                     canReply = false,
                     canReact = false,
-                    canDeleteForMe = false,
-                    canDeleteForEveryone = false,
+                    canDelete = false,
                     canEdit = false,
                     canForward = false,
                     canSelect = false,
@@ -229,8 +228,7 @@ class MessageTextSelectionTest {
                     onSelectText = onSelectText,
                     onCopyText = {},
                     onInfo = {},
-                    onDeleteForMe = {},
-                    onDeleteForEveryone = {},
+                    onDelete = {},
                 )
             }
         }

@@ -274,6 +274,9 @@
     <string name="delete">Löschen</string>
     <string name="delete_for_me">Für mich löschen</string>
     <string name="delete_for_everyone">Für alle löschen</string>
+    <string name="delete_message_title">Nachricht löschen?</string>
+    <string name="delete_message_scope_choice">Entferne diese Nachricht nur von diesem Gerät oder lösche sie für alle in diesem Chat. Das Löschen für alle kann nicht rückgängig gemacht werden.</string>
+    <string name="delete_message_local_only">Dadurch wird die Nachricht nur von diesem Gerät entfernt. Andere können sie weiterhin sehen.</string>
     <string name="confirm_delete_member_message_title">Nachricht von %1$s löschen?</string>
     <string name="confirm_delete_member_message_message">Dadurch wird die Nachricht für alle in der Gruppe gelöscht. Dies kann nicht rückgängig gemacht werden.</string>
     <string name="sent">Gesendet</string>
@@ -619,14 +622,14 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Ausgewählt</string>
     <string name="select">Auswählen</string>
-    <string name="batch_delete_own">%1$d deiner Nachrichten für alle löschen?</string>
-    <plurals name="batch_delete_others">
-        <item quantity="one">%1$d Nachricht lokal ausblenden?</item>
-        <item quantity="other">%1$d Nachrichten lokal ausblenden?</item>
+    <plurals name="batch_delete_title">
+        <item quantity="one">%1$d Nachricht löschen?</item>
+        <item quantity="other">%1$d Nachrichten löschen?</item>
     </plurals>
-    <plurals name="batch_delete_mixed">
-        <item quantity="one">%1$d deiner Nachrichten für alle löschen und %2$d weitere lokal ausblenden?</item>
-        <item quantity="other">%1$d deiner Nachrichten für alle löschen und %2$d weitere lokal ausblenden?</item>
+    <string name="batch_delete_scope_choice">Entferne diese Nachrichten nur von diesem Gerät oder lösche sie für alle in diesem Chat. Das Löschen für alle kann nicht rückgängig gemacht werden.</string>
+    <plurals name="batch_delete_local_only">
+        <item quantity="one">Dadurch wird %1$d Nachricht nur von diesem Gerät entfernt. Andere können sie weiterhin sehen.</item>
+        <item quantity="other">Dadurch werden %1$d Nachrichten nur von diesem Gerät entfernt. Andere können sie weiterhin sehen.</item>
     </plurals>
     <string name="batch_delete_complete">Ausgewählte Nachrichten entfernt</string>
     <string name="batch_delete_partial">Einige ausgewählte Nachrichten wurden entfernt; bei einigen ist der Vorgang fehlgeschlagen</string>

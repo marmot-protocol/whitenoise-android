@@ -83,13 +83,11 @@ internal fun MessageFullScreenView(
     status: MessageStatus,
     canReply: Boolean,
     canReact: Boolean,
-    canDeleteForMe: Boolean,
-    canDeleteForEveryone: Boolean,
+    canDelete: Boolean,
     onReply: () -> Unit,
     onReact: () -> Unit,
     onCopy: () -> Unit,
-    onDeleteForMe: () -> Unit,
-    onDeleteForEveryone: () -> Unit,
+    onDelete: () -> Unit,
     onDismiss: () -> Unit,
     bottomBar: @Composable () -> Unit,
 ) {
@@ -185,23 +183,26 @@ internal fun MessageFullScreenView(
                                     onCopy()
                                 },
                             )
-                            if (canDeleteForMe) {
+                            if (canDelete) {
+                                // Single Delete entry; scope is chosen on the
+                                // shared delete surface the caller opens.
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.delete_for_me)) },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                                    onClick = {
-                                        overflowOpen = false
-                                        onDeleteForMe()
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.delete),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
                                     },
-                                )
-                            }
-                            if (canDeleteForEveryone) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.delete_for_everyone)) },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
                                     onClick = {
                                         overflowOpen = false
-                                        onDeleteForEveryone()
+                                        onDelete()
                                     },
                                 )
                             }

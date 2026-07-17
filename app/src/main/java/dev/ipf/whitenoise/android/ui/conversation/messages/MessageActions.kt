@@ -97,8 +97,7 @@ internal fun MessageActionMenu(
     alignEnd: Boolean,
     canReply: Boolean,
     canReact: Boolean,
-    canDeleteForMe: Boolean,
-    canDeleteForEveryone: Boolean,
+    canDelete: Boolean,
     canEdit: Boolean,
     canForward: Boolean,
     canSelect: Boolean,
@@ -115,8 +114,7 @@ internal fun MessageActionMenu(
     onSelectText: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
-    onDeleteForMe: () -> Unit,
-    onDeleteForEveryone: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val density = LocalDensity.current
     // Position the popup purely from the captured window touch y, independent of
@@ -148,8 +146,7 @@ internal fun MessageActionMenu(
     //       Info always; +Select text when canSelectText; +Copy when canCopyText;
     //       +Reply when canReply; +Edit when canEdit;
     //       +Forward when canForward; +Select when canSelect;
-    //       +Delete for me when canDeleteForMe;
-    //       +Delete for everyone when canDeleteForEveryone
+    //       +Delete when canDelete (scope is chosen on the delete surface)
     //   - the outer Column's 8.dp padding (top + bottom) and its two
     //     spacedBy(8.dp) gaps between the three sections.
     // Keep this in sync with the menu Column below if its layout changes.
@@ -163,8 +160,7 @@ internal fun MessageActionMenu(
                     (if (canEdit) 1 else 0) +
                     (if (canForward) 1 else 0) +
                     (if (canSelect) 1 else 0) +
-                    (if (canDeleteForMe) 1 else 0) +
-                    (if (canDeleteForEveryone) 1 else 0)
+                    (if (canDelete) 1 else 0)
             val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
             val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
             val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
@@ -303,19 +299,14 @@ internal fun MessageActionMenu(
                         icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         onClick = onInfo,
                     )
-                    if (canDeleteForMe) {
+                    if (canDelete) {
+                        // One Delete entry regardless of role or ownership;
+                        // the delete surface it opens offers only the scopes
+                        // the capability model permits.
                         MessageActionButton(
-                            label = stringResource(R.string.delete_for_me),
+                            label = stringResource(R.string.delete),
                             icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onDeleteForMe,
-                            isDestructive = true,
-                        )
-                    }
-                    if (canDeleteForEveryone) {
-                        MessageActionButton(
-                            label = stringResource(R.string.delete_for_everyone),
-                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onDeleteForEveryone,
+                            onClick = onDelete,
                             isDestructive = true,
                         )
                     }
