@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -34,7 +33,7 @@ import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFillColor
 
 internal val AppFontScale.labelRes: Int
     @StringRes
@@ -110,12 +109,7 @@ internal fun FontSizePreviewBubble(
     text: String,
     mine: Boolean,
 ) {
-    val bubbleColor =
-        when {
-            isAmoledSurfaceTheme() -> Color.Black
-            mine -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        }
+    val bubbleColor = messageBubbleFillColor(invalidated = false, deleted = false, mine = mine)
     Box(Modifier.fillMaxWidth()) {
         Surface(
             modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),
