@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVideoAttachmentFile
@@ -235,17 +234,20 @@ class VideoAttachmentCacheStateTest {
     }
 
     @Test
-    fun videoMaterializationUsesSingleFlightForSameCacheFile() {
+    fun videoMaterializationUsesSharedSingleFlight() {
         val source = mediaVideoSource().readText()
-        val body = source.functionBody("materializeVideoAttachment")
 
-        assertTrue("video materialization should keep an in-flight map", "inFlightVideoMaterializations" in source)
-        assertTrue("same cache file callers should await the owner", "if (!owner) return shared.await()" in body)
-        assertTrue("the owner should survive first-caller UI cancellation", "withContext(NonCancellable)" in body)
-        assertTrue("the owner should publish the materialized file to waiters", "shared.complete(materialized)" in body)
         assertTrue(
-            "completed or failed materializations should not poison future retries",
-            "inFlightVideoMaterializations.remove(key)" in body,
+            "video materialization should use the shared single-flight utility",
+            Regex(
+                """private\s+val\s+videoMaterializations\s*=\s*SingleFlight<String,\s*java\.io\.File>\(\)""",
+            ).containsMatchIn(source),
+        )
+        assertTrue(
+            "the flight must begin before the materializer checks the cache fast path",
+            Regex(
+                """videoMaterializations\.run\(file\.absolutePath\)\s*\{\s*materializeVideoAttachmentOnce\(""",
+            ).containsMatchIn(source),
         )
     }
 
