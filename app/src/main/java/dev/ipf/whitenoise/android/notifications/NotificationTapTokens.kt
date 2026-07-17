@@ -41,7 +41,11 @@ class NotificationTapTokens(
         notificationKey: String,
         token: String?,
     ): Boolean {
-        val expected = preferences.getString(storageKey(notificationKey), null) ?: return false
+        val expected =
+            preferences
+                .getString(storageKey(notificationKey), null)
+                ?.takeIf(::isPlausibleToken)
+                ?: return false
         val candidate = token?.takeIf { isPlausibleToken(it) } ?: return false
         return MessageDigest.isEqual(
             expected.toByteArray(Charsets.UTF_8),
@@ -75,6 +79,7 @@ class NotificationTapTokens(
         private const val TOKEN_KEY_PREFIX = "tap_"
         private const val TOKEN_TIME_KEY_PREFIX = "tap_time_"
         private const val TOKEN_BYTES = 24
+        private const val TOKEN_ENCODED_LENGTH = 32
         internal const val MAX_STORED_TOKENS = 512
 
         private val secureRandom = SecureRandom()
@@ -88,7 +93,15 @@ class NotificationTapTokens(
 
         internal fun storageTimeKey(notificationKey: String): String = TOKEN_TIME_KEY_PREFIX + sha256Hex(notificationKey)
 
-        internal fun isPlausibleToken(token: String): Boolean = token.length >= 16
+        internal fun isPlausibleToken(token: String): Boolean =
+            token.length == TOKEN_ENCODED_LENGTH &&
+                token.all { char ->
+                    char in 'a'..'z' ||
+                        char in 'A'..'Z' ||
+                        char in '0'..'9' ||
+                        char == '-' ||
+                        char == '_'
+                }
 
         private fun isTokenStorageKey(key: String): Boolean = key.startsWith(TOKEN_KEY_PREFIX) && !key.startsWith(TOKEN_TIME_KEY_PREFIX)
 

@@ -71,6 +71,27 @@ class NotificationTapTokensTest {
         assertFalse("tap tokens must not use String.equals", "expected ==" in validation)
     }
 
+    @Test
+    fun tokenValidationRejectsUnexpectedSizeAndAlphabetBeforeComparison() {
+        val prefs = FakeSharedPreferences()
+        val tokens = NotificationTapTokens(prefs, randomBytes = ::fillBytes)
+        val token = tokens.tokenFor("invite-key")
+
+        assertEquals(32, token.length)
+        assertTrue(tokens.isValid("invite-key", token))
+        assertFalse(tokens.isValid("invite-key", token.dropLast(1)))
+        assertFalse(tokens.isValid("invite-key", token + "a"))
+        assertFalse(tokens.isValid("invite-key", "!" + token.drop(1)))
+        assertFalse(tokens.isValid("invite-key", "\u00e9".repeat(32)))
+        assertFalse(tokens.isValid("invite-key", "a".repeat(1_000_000)))
+
+        prefs
+            .edit()
+            .putString(NotificationTapTokens.storageKey("invite-key"), "a".repeat(1_000_000))
+            .apply()
+        assertFalse(tokens.isValid("invite-key", token))
+    }
+
     private fun fillBytes(bytes: ByteArray) {
         bytes.indices.forEach { bytes[it] = it.toByte() }
     }

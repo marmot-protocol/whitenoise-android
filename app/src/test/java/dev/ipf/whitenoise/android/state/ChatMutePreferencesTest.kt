@@ -11,6 +11,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -148,6 +151,45 @@ class ChatMutePreferencesTest {
         assertTrue("mode updates must be serialized", "synchronized(mutationLock)" in setMode)
         assertTrue("mode and muted projections must publish together", "_state.value = ChatNotificationState(immutableModes)" in setMode)
         assertFalse("there must not be a second mutable muted flow", "_mutedConversations" in source)
+    }
+
+    @Test
+    fun concurrentModeUpdatesRetainEveryStateAndPersistedKey() {
+        val prefs = ChatMutePreferences(context)
+        val writerCount = 32
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(8)
+        val expectedModes =
+            (0 until writerCount).associate { index ->
+                "account-a|group-$index" to
+                    if (index % 2 == 0) ChatNotifyMode.NONE else ChatNotifyMode.MENTIONS_ONLY
+            }
+        val futures =
+            (0 until writerCount).map { index ->
+                executor.submit {
+                    start.await()
+                    prefs.setMode(
+                        accountRef = "account-a",
+                        groupIdHex = "group-$index",
+                        mode = expectedModes.getValue("account-a|group-$index"),
+                    )
+                }
+            }
+
+        try {
+            start.countDown()
+            futures.forEach { it.get(5, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        val expectedMuted = expectedModes.filterValues { it == ChatNotifyMode.NONE }.keys
+        assertEquals(expectedModes, prefs.state.value.notificationModes)
+        assertEquals(expectedMuted, prefs.state.value.mutedConversations)
+
+        val reloaded = ChatMutePreferences(context)
+        assertEquals(expectedModes, reloaded.state.value.notificationModes)
+        assertEquals(expectedMuted, reloaded.state.value.mutedConversations)
     }
 
     private fun chatMutePreferencesSource(): File =
