@@ -12,6 +12,12 @@ enum class ChatNotifyMode {
     NONE,
 }
 
+data class ChatNotificationState(
+    val notificationModes: Map<String, ChatNotifyMode>,
+) {
+    val mutedConversations: Set<String> = ChatMutePreferences.mutedKeysOf(notificationModes)
+}
+
 /**
  * Per-account, per-conversation notification mode (#1179, #1252).
  * Android notification preference — not White Noise protocol data.
@@ -20,22 +26,16 @@ class ChatMutePreferences(
     context: Context,
     private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
-    private val _notificationModes = MutableStateFlow(readNotificationModes(preferences))
-    val notificationModes: StateFlow<Map<String, ChatNotifyMode>> = _notificationModes.asStateFlow()
-
-    // Back-compat projection for callers that only care about the muted/unmuted
-    // axis (chat-list badge, multi-select bulk mute) — the composite keys whose
-    // mode is NONE. Kept in sync with [_notificationModes] so those surfaces
-    // don't need to know about the tri-state model.
-    private val _mutedConversations = MutableStateFlow(mutedKeysOf(_notificationModes.value))
-    val mutedConversations: StateFlow<Set<String>> = _mutedConversations.asStateFlow()
+    private val mutationLock = Any()
+    private val _state = MutableStateFlow(ChatNotificationState(readNotificationModes(preferences)))
+    val state: StateFlow<ChatNotificationState> = _state.asStateFlow()
 
     fun mode(
         accountRef: String,
         groupIdHex: String,
     ): ChatNotifyMode {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
-        return _notificationModes.value[key] ?: ChatNotifyMode.ALL
+        return _state.value.notificationModes[key] ?: ChatNotifyMode.ALL
     }
 
     fun isMuted(
@@ -49,22 +49,25 @@ class ChatMutePreferences(
         mode: ChatNotifyMode,
     ) {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
-        val updated =
-            _notificationModes.value.toMutableMap().apply {
-                if (mode == ChatNotifyMode.ALL) remove(key) else put(key, mode)
-            }
-        if (updated == _notificationModes.value) return
-        _notificationModes.value = updated
-        _mutedConversations.value = mutedKeysOf(updated)
-        preferences
-            .edit()
-            .putStringSet(
-                KEY_MUTED_CONVERSATIONS,
-                updated.filterValues { it == ChatNotifyMode.NONE }.keys,
-            ).putStringSet(
-                KEY_MENTION_ONLY_CONVERSATIONS,
-                updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys,
-            ).apply()
+        synchronized(mutationLock) {
+            val current = _state.value.notificationModes
+            val updated =
+                current.toMutableMap().apply {
+                    if (mode == ChatNotifyMode.ALL) remove(key) else put(key, mode)
+                }
+            if (updated == current) return
+            val immutableModes = updated.toMap()
+            _state.value = ChatNotificationState(immutableModes)
+            preferences
+                .edit()
+                .putStringSet(
+                    KEY_MUTED_CONVERSATIONS,
+                    immutableModes.filterValues { it == ChatNotifyMode.NONE }.keys,
+                ).putStringSet(
+                    KEY_MENTION_ONLY_CONVERSATIONS,
+                    immutableModes.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys,
+                ).apply()
+        }
     }
 
     fun setMuted(

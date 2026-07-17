@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.util.Collections
 
 class NotificationTapTokensTest {
@@ -61,9 +63,45 @@ class NotificationTapTokensTest {
         assertEquals(NotificationTapTokens.MAX_STORED_TOKENS, prefs.tokenEntryCount())
     }
 
+    @Test
+    fun tokenValidationUsesConstantTimeByteComparison() {
+        val source = notificationTapTokensSource().readText()
+        val validation = source.functionBody("isValid")
+
+        assertTrue("tap tokens must use MessageDigest.isEqual", "MessageDigest.isEqual(" in validation)
+        assertFalse("tap tokens must not use String.equals", "expected ==" in validation)
+    }
+
+    @Test
+    fun tokenValidationRejectsUnexpectedSizeAndAlphabetBeforeComparison() {
+        val prefs = FakeSharedPreferences()
+        val tokens = NotificationTapTokens(prefs, randomBytes = ::fillBytes)
+        val token = tokens.tokenFor("invite-key")
+
+        assertEquals(32, token.length)
+        assertTrue(tokens.isValid("invite-key", token))
+        assertFalse(tokens.isValid("invite-key", token.dropLast(1)))
+        assertFalse(tokens.isValid("invite-key", token + "a"))
+        assertFalse(tokens.isValid("invite-key", "!" + token.drop(1)))
+        assertFalse(tokens.isValid("invite-key", "\u00e9".repeat(32)))
+        assertFalse(tokens.isValid("invite-key", "a".repeat(1_000_000)))
+
+        prefs
+            .edit()
+            .putString(NotificationTapTokens.storageKey("invite-key"), "a".repeat(1_000_000))
+            .apply()
+        assertFalse(tokens.isValid("invite-key", token))
+    }
+
     private fun fillBytes(bytes: ByteArray) {
         bytes.indices.forEach { bytes[it] = it.toByte() }
     }
+
+    private fun notificationTapTokensSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTapTokens.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTapTokens.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing NotificationTapTokens.kt")
 
     private fun FakeSharedPreferences.tokenEntryCount(): Int = all.keys.count { it.startsWith("tap_") && !it.startsWith("tap_time_") }
 
