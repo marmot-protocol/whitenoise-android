@@ -53,6 +53,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -71,6 +72,13 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private val videoMaterializations = SingleFlight<String, java.io.File>()
+
+private val videoPlaybackAudioAttributes =
+    androidx.media3.common.AudioAttributes
+        .Builder()
+        .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+        .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+        .build()
 
 /**
  * Single video tile in an album grid. Auto-materialises on first
@@ -927,6 +935,7 @@ private fun FullscreenVideoPlayer(
                 .Builder(context)
                 .build()
                 .apply {
+                    setAudioAttributes(videoPlaybackAudioAttributes, true)
                     addListener(
                         object : androidx.media3.common.Player.Listener {
                             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -940,11 +949,14 @@ private fun FullscreenVideoPlayer(
                         androidx.media3.common.MediaItem
                             .fromUri(android.net.Uri.fromFile(file)),
                     )
-                    prepare()
-                    playWhenReady = true
                 }
         }
     DisposableEffect(exo) { onDispose { exo.release() } }
+    LaunchedEffect(exo) {
+        VoicePlaybackController.pause()
+        exo.prepare()
+        exo.playWhenReady = true
+    }
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -1121,6 +1133,7 @@ internal fun VideoViewerPage(
                 .Builder(context)
                 .build()
                 .apply {
+                    setAudioAttributes(videoPlaybackAudioAttributes, true)
                     addListener(
                         object : androidx.media3.common.Player.Listener {
                             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -1153,14 +1166,22 @@ internal fun VideoViewerPage(
                         androidx.media3.common.MediaItem
                             .fromUri(android.net.Uri.fromFile(file)),
                     )
-                    prepare()
                 }
         }
     DisposableEffect(exo) { onDispose { exo.release() } }
-    // Pre-composed neighbour pages must NOT play audio — only the visible
-    // one autoplays. Pause when the page scrolls off-screen.
+    // Only the current page owns a decoder or audio focus. HorizontalPager
+    // pre-composes neighbours, so preparing in remember would hold multiple
+    // MediaCodec instances and could invalidate healthy cache entries when a
+    // neighbour fails decoder acquisition.
     LaunchedEffect(isCurrent, exo) {
-        if (isCurrent) exo.playWhenReady = true else exo.pause()
+        if (isCurrent) {
+            VoicePlaybackController.pause()
+            exo.prepare()
+            exo.playWhenReady = true
+        } else {
+            exo.playWhenReady = false
+            exo.stop()
+        }
     }
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),

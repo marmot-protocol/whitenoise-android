@@ -42,6 +42,7 @@ internal class VoicePlaybackRequestSerializer {
 object VoicePlaybackController {
     private const val TAG = "VoicePlaybackController"
     private const val TICK_INTERVAL_MS = 60L
+    private const val DUCK_VOLUME = 0.2f
 
     // Cap on cached per-clip durations. Each entry is a boxed Int keyed by an
     // absolute file path; without a bound the map held one entry per distinct
@@ -105,15 +106,10 @@ object VoicePlaybackController {
 
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
+    private var resumeOnAudioFocusGain = false
+    private var duckedForAudioFocusLoss = false
     private val focusListener =
-        AudioManager.OnAudioFocusChangeListener { change ->
-            when (change) {
-                AudioManager.AUDIOFOCUS_LOSS,
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-                -> pause()
-            }
-        }
+        AudioManager.OnAudioFocusChangeListener { change -> handleAudioFocusChange(change) }
 
     /** Call once from Application.onCreate so playback can request audio focus. */
     fun attach(context: Context) {
@@ -218,11 +214,13 @@ object VoicePlaybackController {
         file: File,
         ownerKey: String?,
     ): PlaybackStartResult {
+        if (resumeOnAudioFocusGain) return PlaybackStartResult.FocusDenied
+        clearAudioFocusInterruption(restoreVolume = true)
         if (currentKey == key && player != null) {
-            // Re-acquire focus before resuming: a transient focus loss
-            // auto-paused us (focusListener → pause()) and abandoned focus,
-            // so another app may now own it. Restarting without re-requesting
-            // would let two streams play at once or get our start() clobbered.
+            // User-paused playback abandons focus, so reacquire it before
+            // resuming. The transient-loss path retains focus and is resumed
+            // only by AUDIOFOCUS_GAIN; the guard above prevents a manual start
+            // while another transient owner still has focus.
             if (!requestFocus()) {
                 // Focus denied — stay paused rather than playing unfocused.
                 return PlaybackStartResult.FocusDenied
@@ -395,9 +393,98 @@ object VoicePlaybackController {
         focusRequest = null
     }
 
+    private fun handleAudioFocusChange(change: Int) {
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS -> pause()
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pauseForTransientAudioFocusLoss()
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> duckForTransientAudioFocusLoss()
+            AudioManager.AUDIOFOCUS_GAIN -> restoreAfterAudioFocusGain()
+        }
+    }
+
+    private fun pauseForTransientAudioFocusLoss() {
+        val mp = player ?: return
+        val wasPlaying =
+            runCatching { mp.isPlaying }.getOrElse { failure ->
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed during transient focus loss", failure)
+                return
+            }
+        if (!wasPlaying) return
+        val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
+        if (pauseFailure != null) {
+            releaseAfterPlayerControlFailure("MediaPlayer transient pause failed", pauseFailure)
+            return
+        }
+        resumeOnAudioFocusGain = true
+        _state.value =
+            _state.value.copy(
+                isPlaying = false,
+                positionMs = runCatching { mp.currentPosition }.getOrDefault(_state.value.positionMs),
+            )
+        stopTicker()
+    }
+
+    private fun duckForTransientAudioFocusLoss() {
+        val mp = player ?: return
+        val wasPlaying =
+            runCatching { mp.isPlaying }.getOrElse { failure ->
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed while ducking", failure)
+                return
+            }
+        if (!wasPlaying) return
+        if (runCatching { mp.setVolume(DUCK_VOLUME, DUCK_VOLUME) }.isSuccess) {
+            duckedForAudioFocusLoss = true
+        } else {
+            pauseForTransientAudioFocusLoss()
+        }
+    }
+
+    private fun restoreAfterAudioFocusGain() {
+        val mp = player
+        if (duckedForAudioFocusLoss) {
+            val restoreFailure = mp?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
+            if (restoreFailure != null) {
+                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed", restoreFailure)
+                return
+            }
+            duckedForAudioFocusLoss = false
+        }
+        if (!resumeOnAudioFocusGain) return
+        resumeOnAudioFocusGain = false
+        if (mp == null || !startCurrentPlayer(mp)) return
+        _state.value =
+            _state.value.copy(
+                isPlaying = true,
+                durationMs = runCatching { mp.duration }.getOrDefault(_state.value.durationMs),
+            )
+        startTicker()
+    }
+
+    private fun clearAudioFocusInterruption(restoreVolume: Boolean) {
+        if (restoreVolume && duckedForAudioFocusLoss) {
+            val restoreFailure = player?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
+            if (restoreFailure != null) {
+                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed", restoreFailure)
+                return
+            }
+        }
+        resumeOnAudioFocusGain = false
+        duckedForAudioFocusLoss = false
+    }
+
+    private fun releaseAfterPlayerControlFailure(
+        message: String,
+        failure: Throwable,
+    ) {
+        Log.w(TAG, message, failure)
+        releasePlayerInternal()
+        _state.value = PlaybackState()
+    }
+
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
         nextPlaybackGeneration()
+        clearAudioFocusInterruption(restoreVolume = true)
         val mp =
             player ?: run {
                 _state.value = _state.value.copy(isPlaying = false)
@@ -405,19 +492,28 @@ object VoicePlaybackController {
                 abandonFocus()
                 return
             }
-        if (runCatching { mp.isPlaying }.getOrDefault(false)) {
-            mp.pause()
-            _state.value =
-                _state.value.copy(
-                    isPlaying = false,
-                    positionMs = mp.currentPosition,
-                )
-            // Release focus while paused so other apps stop being ducked for
-            // the (potentially indefinite) pause. Resuming re-requests focus
-            // in playLocked(). Safe no-op if focus is not currently held.
-            abandonFocus()
+        val wasPlaying =
+            runCatching { mp.isPlaying }.getOrElse { failure ->
+                releaseAfterPlayerControlFailure("MediaPlayer state query failed while pausing", failure)
+                return
+            }
+        if (wasPlaying) {
+            val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
+            if (pauseFailure != null) {
+                releaseAfterPlayerControlFailure("MediaPlayer pause failed", pauseFailure)
+                return
+            }
         }
+        _state.value =
+            _state.value.copy(
+                isPlaying = false,
+                positionMs = runCatching { mp.currentPosition }.getOrDefault(_state.value.positionMs),
+            )
         stopTicker()
+        // Release focus while user-paused so other apps stop being ducked for
+        // the (potentially indefinite) pause. A transient system pause uses a
+        // separate path and deliberately retains focus for the paired gain.
+        abandonFocus()
     }
 
     /** Seek the active player to [positionMs] (clamped to duration). */
@@ -456,6 +552,7 @@ object VoicePlaybackController {
 
     private fun releasePlayerInternal() {
         stopTicker()
+        clearAudioFocusInterruption(restoreVolume = false)
         player?.let { mp ->
             runCatching { if (mp.isPlaying) mp.stop() }
             runCatching { mp.release() }
