@@ -18,12 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private data class EditHistoryRow(
@@ -47,7 +44,6 @@ private data class EditHistoryRow(
     val isOriginal: Boolean,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EditHistorySheet(
     original: String,
@@ -55,7 +51,6 @@ internal fun EditHistorySheet(
     editState: EditState,
     onDismissRequest: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // Newest first reads as "this is what's shown now ← earlier revisions ← original".
     val rows =
         remember(original, originalTimestamp, editState) {
@@ -83,10 +78,9 @@ internal fun EditHistorySheet(
                 )
             }
         }
-    ModalBottomSheet(
+    KeyboardPreservingBottomSheet(
+        paneTitle = stringResource(R.string.edit_history),
         onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
     ) {
         // The header is anchored above the scroll region so the title and
         // count chip remain visible while the user pages through a long edit

@@ -1,12 +1,18 @@
 package dev.ipf.whitenoise.android.ui.design
 
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -28,9 +34,9 @@ import androidx.compose.ui.window.PopupProperties
 // explicitly here, without re-focusing (which would collapse the IME again):
 //   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the popup is
 //      non-focusable, so a Back press would fall through to the IME/activity
-//      instead of closing the overlay. A host-window BackHandler (same pattern
-//      as QuickActionFabMenu) closes it on Back. It runs in the conversation
-//      window and does not touch IME focus.
+//      instead of closing the overlay. A host-window overlay-priority callback
+//      closes it before the IME's default-priority callback. Preview/test hosts
+//      without a platform dispatcher fall back to BackHandler.
 //   2. Outside-tap click-through — events outside a non-focusable popup are
 //      delivered to the windows beneath it, so a dismiss tap would also activate
 //      the underlying chat content (open a profile, a link, the media viewer,
@@ -86,29 +92,41 @@ internal fun KeyboardSafePopup(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     popupPositionProvider: PopupPositionProvider,
+    scrimModifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
     Box {
         if (!expanded) return@Box
-        BackHandler(enabled = true) { onDismissRequest() }
+        val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
+        DisposableEffect(backDispatcher) {
+            if (backDispatcher == null) return@DisposableEffect onDispose {}
+            val callback = OnBackInvokedCallback { currentOnDismissRequest() }
+            backDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+            onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
+        }
+        if (backDispatcher == null) {
+            BackHandler(enabled = true) { currentOnDismissRequest() }
+        }
         // Scrim popup: composed before the content popup so content renders on top.
         // Fills the window and swallows any tap as a pure dismissal.
         Popup(
             properties = keyboardSafePopupProperties,
-            onDismissRequest = onDismissRequest,
+            onDismissRequest = currentOnDismissRequest,
         ) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .then(scrimModifier)
                         .pointerInput(Unit) {
-                            detectTapGestures { onDismissRequest() }
+                            detectTapGestures { currentOnDismissRequest() }
                         },
             )
         }
         Popup(
             popupPositionProvider = popupPositionProvider,
-            onDismissRequest = onDismissRequest,
+            onDismissRequest = currentOnDismissRequest,
             properties = keyboardSafePopupProperties,
             content = content,
         )
