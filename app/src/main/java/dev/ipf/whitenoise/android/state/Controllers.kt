@@ -937,43 +937,58 @@ internal fun anchoredStreamDisplayPosition(
     return position.copy(recordedAt = parentRecordedAt, timelineOrder = resolvedOrder)
 }
 
+internal fun resolvedDurableStreamDisplayPosition(
+    candidate: StreamFinalDisplayPosition,
+    parentRecordedAt: ULong,
+    parentTimelineOrder: ULong,
+): StreamFinalDisplayPosition? =
+    candidate
+        .takeIf { it.recordedAt <= parentRecordedAt }
+        ?.let {
+            anchoredStreamDisplayPosition(
+                position = it,
+                parentRecordedAt = parentRecordedAt,
+                parentTimelineOrder = parentTimelineOrder,
+            )
+        }
+
 /**
- * Derive reload-stable ordering overrides for stream starts and finals from
+ * Derive reload-stable ordering candidates for stream starts and finals from
  * their durable relationship chain:
  * final `stream-start` -> kind-1200 start `parent` -> prompt.
  *
  * The page is indexed before any record is projected, so skewed stream records
  * may precede their prompt in the engine's raw timestamp order without making
- * this result iteration-order dependent. We intentionally do not infer a
- * prompt when either durable link is absent: nearest-message and receive-time
- * guesses break historical sync ordering.
+ * this result iteration-order dependent. The controller compares each child's
+ * raw timestamp with its parent's effective local position before applying a
+ * candidate. We intentionally do not infer a prompt when either durable link
+ * is absent: nearest-message and receive-time guesses break historical sync
+ * ordering.
  */
 internal fun durableStreamDisplayPositions(records: List<TimelineMessageRecordFfi>): Map<String, StreamFinalDisplayPosition> {
     val recordsById = records.associateBy(TimelineMessageRecordFfi::messageIdHex)
     val positions = linkedMapOf<String, StreamFinalDisplayPosition>()
-    val anchors = mutableMapOf<String, Pair<TimelineMessageRecordFfi, TimelineMessageRecordFfi>>()
+    val starts = mutableMapOf<String, TimelineMessageRecordFfi>()
 
     for (startRecord in records) {
         if (startRecord.kind != 1200uL || timelineTagValue(startRecord, "stream") == null) continue
         val parentId = timelineTagValue(startRecord, "parent") ?: continue
         val parentRecord = recordsById[parentId] ?: continue
         if (parentRecord.kind != 9uL || parentRecord.groupIdHex != startRecord.groupIdHex) continue
-        anchors[startRecord.messageIdHex] = startRecord to parentRecord
-        if (startRecord.timelineAt <= parentRecord.timelineAt) {
-            positions[startRecord.messageIdHex] =
-                StreamFinalDisplayPosition(
-                    recordedAt = parentRecord.timelineAt,
-                    timelineOrder = 1uL,
-                    afterMessageId = parentRecord.messageIdHex,
-                )
-        }
+        starts[startRecord.messageIdHex] = startRecord
+        positions[startRecord.messageIdHex] =
+            StreamFinalDisplayPosition(
+                recordedAt = startRecord.timelineAt,
+                timelineOrder = 1uL,
+                afterMessageId = parentRecord.messageIdHex,
+            )
     }
 
     for (finalRecord in records) {
         if (finalRecord.kind != 9uL) continue
         val streamId = timelineTagValue(finalRecord, "stream") ?: continue
         val startId = timelineTagValue(finalRecord, "stream-start") ?: continue
-        val (startRecord, parentRecord) = anchors[startId] ?: continue
+        val startRecord = starts[startId] ?: continue
         if (
             startRecord.groupIdHex != finalRecord.groupIdHex ||
             startRecord.sender != finalRecord.sender ||
@@ -981,11 +996,9 @@ internal fun durableStreamDisplayPositions(records: List<TimelineMessageRecordFf
         ) {
             continue
         }
-        val anchorTimelineAt = maxOf(startRecord.timelineAt, parentRecord.timelineAt)
-        if (finalRecord.timelineAt > anchorTimelineAt) continue
         positions[finalRecord.messageIdHex] =
             StreamFinalDisplayPosition(
-                recordedAt = anchorTimelineAt,
+                recordedAt = finalRecord.timelineAt,
                 timelineOrder = 1uL,
                 afterMessageId = startRecord.messageIdHex,
             )
@@ -3660,6 +3673,8 @@ class ConversationController(
     private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
+    private val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
+    private val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
     // Holding pen for media projection echoes that arrive while their
     // matching bridge is still mid-`sendMediaAttachments`. Shared via
@@ -6588,7 +6603,6 @@ class ConversationController(
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
-        val durableStreamPositions = durableStreamDisplayPositions(page.messages)
         if (replaceWindow) {
             timelineRecords.clear()
             timelineItemsById.clear()
@@ -6605,6 +6619,8 @@ class ConversationController(
             // don't accumulate for the controller's lifetime.
             localTimelineOrderOverrides.keys.retainAll(optimisticIds)
             localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
+            preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+            durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
         }
         page.messages.forEach { record ->
             val actionRecord =
@@ -6629,7 +6645,7 @@ class ConversationController(
                 }
             }
         }
-        applyDurableStreamPositions(durableStreamPositions)
+        applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         // Materialize local profile presentations for everyone this page
         // references (message authors, reply-preview authors, reaction authors)
         // and AWAIT it before the publish below kicks off the first composition.
@@ -6686,7 +6702,6 @@ class ConversationController(
             }.associateBy(TimelineMessageRecordFfi::messageIdHex)
                 .values
                 .toList()
-        val durableStreamPositions = durableStreamDisplayPositions(recordsForStreamPositions)
         val streamIds = mutableListOf<String>()
         val reactionTargets = linkedSetOf<String>()
         changes.forEach { change ->
@@ -6744,7 +6759,7 @@ class ConversationController(
                 }
             }
         }
-        applyDurableStreamPositions(durableStreamPositions)
+        applyDurableStreamPositions(durableStreamDisplayPositions(recordsForStreamPositions))
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions(reactionTargets)
@@ -7037,37 +7052,55 @@ class ConversationController(
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
+        durableStreamPositionOverrideIds.remove(projectedId)
+        preservedTimelinePositionOverrideIds.add(projectedId)
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
         localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
     }
 
     private fun applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
+        (durableStreamPositionOverrideIds - positions.keys).forEach(::clearDurableStreamPosition)
         positions.forEach { (messageId, position) ->
             // A live preview is the row the user is already reading. Its
             // position wins for this controller session; the durable link is
             // the reload/cold-projection fallback.
-            if (messageId in localTimelineTimestampOverrides) return@forEach
+            if (messageId in preservedTimelinePositionOverrideIds) return@forEach
             val projected = timelineRecords[messageId] ?: return@forEach
-            val itemId = projectedItemId(projected)
-            if (itemId !in timelineItemsById) return@forEach
+            val parentId = position.afterMessageId ?: return@forEach
+            val parent = timelineRecords[parentId] ?: return@forEach
+            val parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt
             val effectivePosition =
-                position.afterMessageId
-                    ?.let { parentId ->
-                        val parent = timelineRecords[parentId] ?: return@let position
-                        anchoredStreamDisplayPosition(
-                            position = position,
-                            parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt,
-                            parentTimelineOrder = localTimelineOrderOverrides[parentId] ?: 0uL,
-                        )
-                    } ?: position
+                resolvedDurableStreamDisplayPosition(
+                    candidate = position,
+                    parentRecordedAt = parentRecordedAt,
+                    parentTimelineOrder = localTimelineOrderOverrides[parentId] ?: 0uL,
+                ) ?: run {
+                    clearDurableStreamPosition(messageId)
+                    return@forEach
+                }
 
             localTimelineOrderOverrides[messageId] = effectivePosition.timelineOrder
             localTimelineTimestampOverrides[messageId] = effectivePosition.recordedAt
-            val actionRecord = TimelineProjector.toAppMessageRecord(projected)
-            timelineItemsById[itemId] = timelineMessageFromProjection(projected, actionRecord)
-            timelineOrder.remove(itemId)
-            insertTimelineItemId(itemId)
+            durableStreamPositionOverrideIds.add(messageId)
+            refreshProjectedTimelinePosition(messageId)
         }
+    }
+
+    private fun clearDurableStreamPosition(messageId: String) {
+        if (!durableStreamPositionOverrideIds.remove(messageId)) return
+        localTimelineOrderOverrides.remove(messageId)
+        localTimelineTimestampOverrides.remove(messageId)
+        refreshProjectedTimelinePosition(messageId)
+    }
+
+    private fun refreshProjectedTimelinePosition(messageId: String) {
+        val projected = timelineRecords[messageId] ?: return
+        val itemId = projectedItemId(projected)
+        if (itemId !in timelineItemsById) return
+        val actionRecord = TimelineProjector.toAppMessageRecord(projected)
+        timelineItemsById[itemId] = timelineMessageFromProjection(projected, actionRecord)
+        timelineOrder.remove(itemId)
+        insertTimelineItemId(itemId)
     }
 
     private fun preserveStreamFinalDisplayPosition(
@@ -7081,6 +7114,8 @@ class ConversationController(
             optimisticMessages[itemId]
                 ?: timelineItemsById[itemId]?.takeIf { itemId in displayedProjectedStreamItemIds }
         val position = streamFinalDisplayPosition(actionRecord, displayedStream) ?: return
+        durableStreamPositionOverrideIds.remove(projectedId)
+        preservedTimelinePositionOverrideIds.add(projectedId)
         localTimelineOrderOverrides[projectedId] = position.timelineOrder
         localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
@@ -7091,6 +7126,8 @@ class ConversationController(
         projectedMessageIds.remove(messageIdHex)
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
+        preservedTimelinePositionOverrideIds.remove(messageIdHex)
+        durableStreamPositionOverrideIds.remove(messageIdHex)
         readAnchoredAtSeconds.remove(messageIdHex)
         deletedMessageIds = deletedMessageIds - messageIdHex
         optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId == messageIdHex }

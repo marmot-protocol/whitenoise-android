@@ -68,7 +68,7 @@ class AgentStreamPreviewTest {
             assertEquals(listOf("prompt", "start", "final"), sorted.map { it.record.messageIdHex })
             assertEquals(
                 StreamFinalDisplayPosition(
-                    recordedAt = 101uL,
+                    recordedAt = 98uL,
                     timelineOrder = 1uL,
                     afterMessageId = "prompt",
                 ),
@@ -76,7 +76,7 @@ class AgentStreamPreviewTest {
             )
             assertEquals(
                 StreamFinalDisplayPosition(
-                    recordedAt = 101uL,
+                    recordedAt = 99uL,
                     timelineOrder = 1uL,
                     afterMessageId = "start",
                 ),
@@ -85,6 +85,71 @@ class AgentStreamPreviewTest {
             assertEquals(9uL, startPosition.timelineOrder)
             assertEquals(10uL, finalPosition.timelineOrder)
         }
+    }
+
+    @Test
+    fun durableStreamDisplayPositions_reanchorsAfterOptimisticPromptOverride() {
+        val prompt = timelineRecord(id = "prompt", recordedAt = 101uL)
+        val start =
+            timelineRecord(
+                id = "start",
+                recordedAt = 105uL,
+                kind = 1200uL,
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("stream", "reply")),
+                        MessageTagFfi(listOf("parent", "prompt")),
+                    ),
+            )
+        val final =
+            timelineRecord(
+                id = "final",
+                recordedAt = 104uL,
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("stream", "reply")),
+                        MessageTagFfi(listOf("stream-start", "start")),
+                    ),
+            )
+
+        val positions = durableStreamDisplayPositions(listOf(final, prompt, start))
+        val promptPosition = StreamFinalDisplayPosition(recordedAt = 110uL, timelineOrder = 8uL)
+        val startPosition =
+            positions["start"]
+                ?.let {
+                    resolvedDurableStreamDisplayPosition(
+                        candidate = it,
+                        parentRecordedAt = promptPosition.recordedAt,
+                        parentTimelineOrder = promptPosition.timelineOrder,
+                    )
+                }
+                ?: StreamFinalDisplayPosition(recordedAt = start.timelineAt, timelineOrder = 0uL)
+        val finalPosition =
+            positions["final"]
+                ?.let {
+                    resolvedDurableStreamDisplayPosition(
+                        candidate = it,
+                        parentRecordedAt = startPosition.recordedAt,
+                        parentTimelineOrder = startPosition.timelineOrder,
+                    )
+                }
+                ?: StreamFinalDisplayPosition(recordedAt = final.timelineAt, timelineOrder = 0uL)
+        val sorted =
+            listOf(
+                timelineMessage(prompt, promptPosition),
+                timelineMessage(start, startPosition),
+                timelineMessage(final, finalPosition),
+            ).sortedWith(::compareTimelineMessages)
+
+        assertEquals(listOf("prompt", "start", "final"), sorted.map { it.record.messageIdHex })
+        assertEquals(
+            StreamFinalDisplayPosition(recordedAt = 110uL, timelineOrder = 9uL, afterMessageId = "prompt"),
+            startPosition,
+        )
+        assertEquals(
+            StreamFinalDisplayPosition(recordedAt = 110uL, timelineOrder = 10uL, afterMessageId = "start"),
+            finalPosition,
+        )
     }
 
     @Test
@@ -126,7 +191,8 @@ class AgentStreamPreviewTest {
                 timelineMessage(final, finalPosition),
             ).sortedWith(::compareTimelineMessages)
 
-        assertNull(positions["start"])
+        assertTrue(positions.getValue("start").recordedAt > prompt.timelineAt)
+        assertEquals("prompt", positions.getValue("start").afterMessageId)
         assertEquals("start", positions.getValue("final").afterMessageId)
         assertEquals(listOf("prompt", "start", "final"), sorted.map { it.record.messageIdHex })
     }
