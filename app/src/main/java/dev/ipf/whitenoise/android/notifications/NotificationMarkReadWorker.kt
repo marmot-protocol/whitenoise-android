@@ -30,11 +30,15 @@ class NotificationMarkReadWorker(
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
                 ?: return Result.failure().also { retryStore.clear(retryKey) }
         if (!application.appState.notificationActionsAllowed) {
-            Log.w(TAG, "mark-read deferred by app lock group=${action.target.groupIdHex.take(8)}")
+            notificationWarning(TAG, "mark-read deferred by app lock") {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
             if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
                 return Result.retry()
             }
-            Log.w(TAG, "mark-read lock wait expired group=${action.target.groupIdHex.take(8)}")
+            notificationWarning(TAG, "mark-read lock wait expired") {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
             return Result.failure().also { retryStore.clear(retryKey) }
         }
         if (retryStore.operationFailureCount(retryKey) >= MAX_ATTEMPTS) {
@@ -68,7 +72,9 @@ class NotificationMarkReadWorker(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
-            Log.w(TAG, "mark-read worker failed group=${action.target.groupIdHex.take(8)}", throwable)
+            notificationWarning(TAG, "mark-read worker failed", throwable) {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
             markReadFailureResult(retryStore, retryKey)
         }
     }

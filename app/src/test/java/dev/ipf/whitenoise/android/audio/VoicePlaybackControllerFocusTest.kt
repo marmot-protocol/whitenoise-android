@@ -157,6 +157,54 @@ class VoicePlaybackControllerFocusTest {
     }
 
     @Test
+    fun userPlayAfterMissingTransientGainRequestsFocusAgain() {
+        val context = RuntimeEnvironment.getApplication()
+        val audioManager = context.getSystemService(AudioManager::class.java)
+        val shadowAudioManager = shadowOf(audioManager)
+        VoicePlaybackController.attach(context)
+        assertTrue(requestFocus())
+        val retainedRequest = shadowAudioManager.lastAudioFocusRequest
+        val mediaPlayer = TrackingMediaPlayer()
+        primeActivePlayer(mediaPlayer)
+
+        handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        val result =
+            runBlocking {
+                VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
+            }
+
+        assertEquals(VoicePlaybackController.PlaybackStartResult.Resumed, result)
+        assertTrue(mediaPlayer.playing)
+        assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
+        assertSame(retainedRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
+        assertTrue(shadowAudioManager.lastAudioFocusRequest !== retainedRequest)
+    }
+
+    @Test
+    fun userPlayAfterTransientLossStaysPausedWhenFreshFocusIsDenied() {
+        val context = RuntimeEnvironment.getApplication()
+        val audioManager = context.getSystemService(AudioManager::class.java)
+        val shadowAudioManager = shadowOf(audioManager)
+        VoicePlaybackController.attach(context)
+        assertTrue(requestFocus())
+        val mediaPlayer = TrackingMediaPlayer()
+        primeActivePlayer(mediaPlayer)
+
+        handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        shadowAudioManager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        val result =
+            runBlocking {
+                VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
+            }
+
+        assertEquals(VoicePlaybackController.PlaybackStartResult.FocusDenied, result)
+        assertFalse(mediaPlayer.playing)
+        assertFalse(VoicePlaybackController.state.value.isPlaying)
+        assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
+        assertNull(controllerField("focusRequest"))
+    }
+
+    @Test
     fun duckableLossLowersVolumeAndGainRestoresItWithoutRestarting() {
         val mediaPlayer = TrackingMediaPlayer()
         primeActivePlayer(mediaPlayer)

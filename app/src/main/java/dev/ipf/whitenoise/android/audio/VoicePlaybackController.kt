@@ -214,13 +214,15 @@ object VoicePlaybackController {
         file: File,
         ownerKey: String?,
     ): PlaybackStartResult {
-        if (resumeOnAudioFocusGain) return PlaybackStartResult.FocusDenied
+        // A user tap after transient loss must not wait forever for an OEM to
+        // deliver AUDIOFOCUS_GAIN. Drop the retained request so requestFocus()
+        // below performs a fresh arbitration and can still deny us cleanly.
+        if (resumeOnAudioFocusGain) abandonFocus()
         clearAudioFocusInterruption(restoreVolume = true)
         if (currentKey == key && player != null) {
             // User-paused playback abandons focus, so reacquire it before
-            // resuming. The transient-loss path retains focus and is resumed
-            // only by AUDIOFOCUS_GAIN; the guard above prevents a manual start
-            // while another transient owner still has focus.
+            // resuming. A user retry after transient loss also arrives here
+            // after dropping its retained request above.
             if (!requestFocus()) {
                 // Focus denied — stay paused rather than playing unfocused.
                 return PlaybackStartResult.FocusDenied

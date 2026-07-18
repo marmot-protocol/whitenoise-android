@@ -4,10 +4,11 @@ import androidx.annotation.VisibleForTesting
 import java.io.File
 import java.io.IOException
 
-/** Byte-bounded LRU janitor for decrypted voice/video files. */
+/** Byte-bounded LRU janitor for decrypted attachment files. */
 internal object AttachmentPlaintextCache {
     internal const val VOICE_MAX_DIRECTORY_BYTES: Long = 64L * 1024L * 1024L
     internal const val VIDEO_MAX_DIRECTORY_BYTES: Long = 128L * 1024L * 1024L
+    internal const val SHARED_MAX_DIRECTORY_BYTES: Long = 128L * 1024L * 1024L
 
     private val trimLock = Any()
     private val activePublicationPathCounts = mutableMapOf<String, Int>()
@@ -28,6 +29,14 @@ internal object AttachmentPlaintextCache {
         val maxBytes = maximumDirectoryBytes(directory) ?: return
         touch(finalFile)
         trimDirectoryToByteCap(directory, maxBytes, protectedFile = finalFile)
+    }
+
+    /** Releases publication protection and trims without exposing a race between the two operations. */
+    internal fun finishPublication(finalFile: File) {
+        synchronized(trimLock) {
+            unprotectPublicationFile(finalFile)
+            onPublished(finalFile)
+        }
     }
 
     fun touch(
@@ -61,6 +70,7 @@ internal object AttachmentPlaintextCache {
     fun trimKnownDirectories(cacheRoot: File) {
         trimDirectoryToByteCap(File(cacheRoot, MediaCacheDirs.VOICE), VOICE_MAX_DIRECTORY_BYTES)
         trimDirectoryToByteCap(File(cacheRoot, MediaCacheDirs.VIDEO), VIDEO_MAX_DIRECTORY_BYTES)
+        trimDirectoryToByteCap(File(cacheRoot, MediaCacheDirs.SHARED), SHARED_MAX_DIRECTORY_BYTES)
     }
 
     @VisibleForTesting
@@ -98,6 +108,7 @@ internal object AttachmentPlaintextCache {
         when (directory?.name) {
             MediaCacheDirs.VOICE -> VOICE_MAX_DIRECTORY_BYTES
             MediaCacheDirs.VIDEO -> VIDEO_MAX_DIRECTORY_BYTES
+            MediaCacheDirs.SHARED -> SHARED_MAX_DIRECTORY_BYTES
             else -> null
         }
 
