@@ -403,6 +403,18 @@ class MessageProjectorTest {
                 plaintext = "",
                 tags = listOf(MessageTagFfi(listOf("imeta", "m image/png", "filename image.png"))),
             )
+        val pendingMedia =
+            message(
+                id = "pending-media",
+                plaintext = "📎 image.png",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png"))),
+            )
+        val pendingCaptionedMedia =
+            message(
+                id = "pending-captioned-media",
+                plaintext = "caption",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png"))),
+            )
         val stream =
             message(
                 id = "stream",
@@ -414,8 +426,18 @@ class MessageProjectorTest {
         assertEquals("edited", MessageProjector.copyableText(text, editedText = "edited"))
         assertEquals("caption", MessageProjector.copyableText(captionedMedia))
         assertNull(MessageProjector.copyableText(captionlessMedia))
+        assertNull(MessageProjector.copyableText(pendingMedia))
+        assertEquals("caption", MessageProjector.copyableText(pendingCaptionedMedia))
         assertNull(MessageProjector.copyableText(stream))
         assertNull(MessageProjector.copyableText(reaction))
+
+        assertTrue(MessageProjector.canSpeak(text, editedText = "edited"))
+        assertTrue(MessageProjector.canSpeak(captionedMedia))
+        assertFalse(MessageProjector.canSpeak(captionlessMedia))
+        assertFalse(MessageProjector.canSpeak(pendingMedia))
+        assertTrue(MessageProjector.canSpeak(pendingCaptionedMedia))
+        assertFalse(MessageProjector.canSpeak(stream))
+        assertFalse(MessageProjector.canSpeak(reaction))
     }
 
     @Test
