@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,9 @@ internal fun Modifier.messageBubbleSelectionRow(
 ): Modifier =
     if (selectionMode) {
         background(messageBubbleSelectionRowTint(selected))
+            // The full-row tap target owns selection semantics; strip nested
+            // message actions so TalkBack cannot bypass batch selection (#1489).
+            .clearAndSetSemantics {}
     } else {
         this
     }
