@@ -281,10 +281,15 @@ internal fun messageBubbleLongPressPositionInWindow(
     localPosition: Offset,
 ): Offset = rowCoordinates.localToWindow(localPosition)
 
-internal fun ColumnScope.messageBubbleBodyModifier(hasReplyPreview: Boolean): Modifier =
+internal fun ColumnScope.messageBubbleBodyModifier(
+    hasReplyPreview: Boolean,
+    hasMedia: Boolean,
+): Modifier =
     Modifier
         .align(Alignment.Start)
-        .then(if (hasReplyPreview) Modifier.fillMaxWidth() else Modifier)
+        // Only the text-only reply frame contains the quote that widens this
+        // same bubble. Media replies render their quote outside the caption.
+        .then(if (hasReplyPreview && !hasMedia) Modifier.fillMaxWidth() else Modifier)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1497,7 +1502,11 @@ internal fun MessageBubble(
                         // End-aligning own messages left a short reply drifting to
                         // the right of a wide bubble (#439). The footer still places
                         // itself at the block's trailing edge internally.
-                        val bodyModifier = messageBubbleBodyModifier(hasReplyPreview = replyPreview != null)
+                        val bodyModifier =
+                            messageBubbleBodyModifier(
+                                hasReplyPreview = replyPreview != null,
+                                hasMedia = hasMedia,
+                            )
                         if (collapsedBody) {
                             BubbleCollapsedFooterLayout(
                                 readMore = readMoreFooter,
