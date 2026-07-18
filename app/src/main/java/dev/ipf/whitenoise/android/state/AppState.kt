@@ -4783,7 +4783,8 @@ class WhiteNoiseAppState(
             // in-memory caches on the main thread. The read accessors serve from
             // these caches so composition never crosses the binding. See #4, #49.
             val displayName =
-                marmotIo { runCatchingCancellable { marmot().displayName(accountIdHex) }.getOrNull() }
+                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }
+                    .getOrNull()
                     ?.let { ProfileSanitizer.displayName(it) }
             val presentation =
                 ProfilePresentation(
@@ -5040,9 +5041,9 @@ class WhiteNoiseAppState(
         if (senderIdHex.isBlank()) return null
         contactNicknameFor(update.accountRef, senderIdHex)?.let { return it }
         val resolvedName =
-            runCatchingCancellable {
-                marmotIo { runCatchingCancellable { marmot().displayName(senderIdHex) }.getOrNull() }
-            }.getOrNull()?.let { ProfileSanitizer.displayName(it) }
+            runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
+                .getOrNull()
+                ?.let { ProfileSanitizer.displayName(it) }
         return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
     }
 
@@ -5059,7 +5060,7 @@ class WhiteNoiseAppState(
             accountIdHex = { accountIdHex(it) },
             profileDisplayName = { profileDisplayName(it) },
             readDisplayName = { accountIdHex ->
-                marmotIo { runCatchingCancellable { marmot().displayName(accountIdHex) }.getOrNull() }
+                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
             },
             requestProfile = { requestProfile(it) },
         )
@@ -5546,9 +5547,10 @@ class WhiteNoiseAppState(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheEpoch.get()
-        val profile = marmotIo { runCatchingCancellable { marmot().userProfile(id) }.getOrNull() }
+        val profile = runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
         val displayName =
-            marmotIo { runCatchingCancellable { marmot().displayName(id) }.getOrNull() }
+            runCatchingCancellable { marmotIo { displayName(id) } }
+                .getOrNull()
                 ?.let { ProfileSanitizer.displayName(it) }
         val presentation =
             ProfilePresentation(

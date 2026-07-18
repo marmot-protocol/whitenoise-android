@@ -47,22 +47,35 @@ class CancellationHandlingTest {
         assertTrue("forwardText must use cancellation-safe isSuccess handling", "runCatchingCancellable {" in forwardText && ".isSuccess" in forwardText)
         assertFalse("forwardText must not use plain runCatching around sendText", Regex("""runCatching\s*\{[^}]*sendText""").containsMatchIn(forwardText))
 
+        val compactAppState =
+            appState
+                .replace(Regex("""\s+"""), " ")
+                .replace(Regex("""\s+\."""), ".")
+        listOf(
+            "runCatching { marmot().displayName(senderIdHex) }.getOrNull()",
+            "runCatching { marmot().displayName(accountIdHex) }.getOrNull()",
+            "runCatching { marmot().userProfile(id) }.getOrNull()",
+            "runCatching { marmot().displayName(id) }.getOrNull()",
+        ).forEach { unsafe ->
+            assertFalse("legacy inner fallback must stay migrated: $unsafe", unsafe in compactAppState)
+        }
+
         listOf(
             "runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())" to
                 "runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())",
             "runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()" to
                 "runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()",
-            "runCatching { marmot().displayName(senderIdHex) }.getOrNull()" to
-                "runCatchingCancellable { marmot().displayName(senderIdHex) }.getOrNull()",
-            "runCatching { marmot().displayName(accountIdHex) }.getOrNull()" to
-                "runCatchingCancellable { marmot().displayName(accountIdHex) }.getOrNull()",
-            "runCatching { marmot().userProfile(id) }.getOrNull()" to
-                "runCatchingCancellable { marmot().userProfile(id) }.getOrNull()",
-            "runCatching { marmot().displayName(id) }.getOrNull()" to
-                "runCatchingCancellable { marmot().displayName(id) }.getOrNull()",
+            "runCatching { marmotIo { displayName(senderIdHex) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo { displayName(senderIdHex) } }.getOrNull()",
+            "runCatching { marmotIo { displayName(accountIdHex) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()",
+            "runCatching { marmotIo { userProfile(id) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()",
+            "runCatching { marmotIo { displayName(id) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo { displayName(id) } }.getOrNull()",
         ).forEach { (unsafe, safe) ->
-            assertFalse("unsafe fallback must stay migrated: $unsafe", unsafe in appState)
-            assertTrue("missing cancellation-safe fallback: $safe", safe in appState)
+            assertFalse("unsafe fallback must stay migrated: $unsafe", unsafe in compactAppState)
+            assertTrue("missing cancellation-safe fallback: $safe", safe in compactAppState)
         }
 
         val controllers = controllersSource().readText()
@@ -100,17 +113,14 @@ class CancellationHandlingTest {
         rethrowIfCancellation(IllegalStateException("nope"))
     }
 
-    private fun controllersSource(): File =
+    private fun sourceFile(fileName: String): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/$fileName"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/$fileName"),
         ).firstOrNull(File::exists)
-            ?: error("Missing Controllers.kt source file")
+            ?: error("Missing $fileName source file")
 
-    private fun appStateSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-        ).firstOrNull(File::exists)
-            ?: error("Missing AppState.kt source file")
+    private fun controllersSource(): File = sourceFile("Controllers.kt")
+
+    private fun appStateSource(): File = sourceFile("AppState.kt")
 }
