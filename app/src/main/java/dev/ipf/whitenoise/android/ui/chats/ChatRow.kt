@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -55,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
+import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -318,7 +317,7 @@ internal fun ChatRow(
     }
 }
 
-internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
+internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = selectionRowIcon(selected)
 
 @Composable
 internal fun ChatRowTrailingContent(

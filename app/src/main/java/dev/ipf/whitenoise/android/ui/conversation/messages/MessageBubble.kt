@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -38,7 +37,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -80,7 +78,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -643,7 +640,8 @@ internal fun MessageBubble(
     }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val messageGroupMaxWidth = maxWidth * 0.95f
+        val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
+        val messageGroupMaxWidth = (maxWidth * 0.95f - selectionGutterWidth).coerceAtLeast(0.dp)
         val senderAvatarWidth = if (showSenderAvatar) 40.dp else 0.dp
         val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
 
@@ -663,9 +661,12 @@ internal fun MessageBubble(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .then(
+                    .messageBubbleSelectionRow(
+                        selectionMode = selectionMode,
+                        selected = selected,
+                    ).then(
                         // A deleted or selection-mode message has no actionable
-                        // reply gesture; taps are owned by the selection overlay.
+                        // reply gesture; taps are owned by the selection row.
                         if (deleted || readOnly || selectionMode || textSelectionMode) {
                             Modifier
                         } else {
@@ -766,7 +767,18 @@ internal fun MessageBubble(
                     // row's local origin when a message is partially off-screen.
                     .onGloballyPositioned { rowCoordinates[0] = it },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (selectionMode) {
+                MessageBubbleSelectionGutter(
+                    batchSelectable = batchSelectable,
+                    selected = selected,
+                )
+                // Arrangement.End would otherwise move the leading gutter next
+                // to an outgoing bubble. Consume the middle space so the gutter
+                // stays at the row's leading edge for both message directions.
+                if (mine) Spacer(Modifier.weight(1f))
+            }
             if (showSenderAvatar) {
                 Box(
                     modifier =
@@ -1929,31 +1941,14 @@ internal fun MessageBubble(
             }
         }
         if (selectionMode) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        } else {
-                            Color.Transparent
-                        },
-                    ).semantics { this.selected = selected }
-                    .clickable(enabled = batchSelectable, onClick = onToggleSelection),
-            ) {
-                if (selected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.selected),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier =
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 8.dp)
-                                .size(24.dp),
-                    )
-                }
-            }
+            // Keep the visual tint and indicator in layout, but retain the
+            // full-row input layer so nested avatar/media clickables cannot
+            // bypass selection mode.
+            MessageBubbleSelectionTapTarget(
+                selected = selected,
+                batchSelectable = batchSelectable,
+                onToggleSelection = onToggleSelection,
+            )
         }
     }
 }

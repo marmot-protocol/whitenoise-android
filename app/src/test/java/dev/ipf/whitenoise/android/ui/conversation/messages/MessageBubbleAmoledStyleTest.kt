@@ -211,5 +211,52 @@ class MessageBubbleAmoledStyleTest {
         }
     }
 
+    @Test
+    fun amoledSelectionTintIsVisiblyDistinctFromSurface() {
+        var tint = Color.Unspecified
+        var surface = Color.Unspecified
+        var primary = Color.Unspecified
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                tint = messageBubbleSelectionRowTint(selected = true)
+                surface = MaterialTheme.colorScheme.surface
+                primary = MaterialTheme.colorScheme.primary
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertNotEquals(Color.Transparent, tint)
+            assertNotEquals(surface, tint)
+            assertEquals(primary.copy(alpha = 0.32f), tint)
+        }
+    }
+
+    @Test
+    fun standardThemesUseReadableSelectionTintBehindContent() {
+        var lightTint = Color.Unspecified
+        var darkTint = Color.Unspecified
+        var lightPrimary = Color.Unspecified
+        var darkPrimary = Color.Unspecified
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false, amoled = false) {
+                lightTint = messageBubbleSelectionRowTint(selected = true)
+                lightPrimary = MaterialTheme.colorScheme.primary
+            }
+            WhiteNoiseTheme(darkTheme = true, amoled = false) {
+                darkTint = messageBubbleSelectionRowTint(selected = true)
+                darkPrimary = MaterialTheme.colorScheme.primary
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(lightPrimary.copy(alpha = 0.24f), lightTint)
+            assertEquals(darkPrimary.copy(alpha = 0.24f), darkTint)
+            assertNotEquals(Color.Transparent, lightTint)
+            assertNotEquals(Color.Transparent, darkTint)
+        }
+    }
+
     private fun borderColor(border: BorderStroke?): Color = (requireNotNull(border).brush as SolidColor).value
 }

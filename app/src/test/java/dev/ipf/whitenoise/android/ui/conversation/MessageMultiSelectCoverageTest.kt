@@ -67,15 +67,18 @@ class MessageMultiSelectCoverageTest {
     }
 
     @Test
-    fun bubbleSelectionOverlayInterceptsRowTaps() {
+    fun bubbleSelectionUsesLeadingGutterWithTintBehindContent() {
         val source = source("messages/MessageBubble.kt")
 
         assertTrue(source.contains("selectionMode: Boolean"))
         assertTrue(source.contains("batchSelectable: Boolean"))
         assertTrue(source.contains("selected: Boolean"))
         assertTrue(source.contains("onToggleSelection: () -> Unit"))
-        assertTrue(source.contains(".matchParentSize()"))
-        assertTrue(source.contains("Icons.Default.CheckCircle"))
+        assertTrue(source.contains("MessageBubbleSelectionGutter("))
+        assertTrue(source.contains("messageBubbleSelectionRow("))
+        assertTrue(source.contains("messageBubbleSelectionGutterWidth"))
+        assertTrue(source.contains("if (mine) Spacer(Modifier.weight(1f))"))
+        assertTrue(!source.contains(".matchParentSize()"))
         assertTrue(source.contains("canSelect = !readOnly && batchSelectable"))
     }
 
