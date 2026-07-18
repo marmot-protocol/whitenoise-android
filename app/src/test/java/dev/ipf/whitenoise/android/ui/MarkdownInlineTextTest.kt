@@ -182,6 +182,47 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun unicodeHttpHostsAreCanonicalizedForAnnotationsAndConfirmation() {
+        val unicodeUrl = "https://例え。テスト/path?q=1#section"
+        val canonicalUrl = "https://xn--r8jz45g.xn--zckzah/path?q=1#section"
+        val parsed = parsedOpenableMarkdownLink(unicodeUrl)
+
+        assertEquals(canonicalUrl, parsed?.destination)
+        assertEquals("https://xn--r8jz45g.xn--zckzah", parsed?.effectiveAuthority)
+        assertTrue(isOpenableMarkdownLink(unicodeUrl))
+        assertEquals("https://xn--r8jz45g.xn--zckzah", markdownLinkEffectiveAuthority(unicodeUrl))
+
+        val explicit =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Link(
+                        dest = unicodeUrl,
+                        title = null,
+                        children = listOf(MarkdownInlineFfi.Text("international domain")),
+                    ),
+                ),
+            )
+        val explicitLink = explicit.getLinkAnnotations(0, explicit.length).single()
+        assertEquals(CONFIRM_LINK_TAG_PREFIX + canonicalUrl, (explicitLink.item as LinkAnnotation.Clickable).tag)
+
+        val autolink = build(listOf(MarkdownInlineFfi.Autolink(unicodeUrl, MarkdownAutolinkKindFfi.URI)))
+        val autoLinkAnnotation = autolink.getLinkAnnotations(0, autolink.length).single()
+        assertEquals(canonicalUrl, (autoLinkAnnotation.item as LinkAnnotation.Url).url)
+    }
+
+    @Test
+    fun httpAuthorityCanonicalizationRejectsCredentialsAndInvalidPorts() {
+        assertFalse(isOpenableMarkdownLink("https://user@例え.テスト/path"))
+        assertFalse(isOpenableMarkdownLink("https://example.com:abc/path"))
+        assertFalse(isOpenableMarkdownLink("https://example.com:65536/path"))
+        assertFalse(isOpenableMarkdownLink("https://example.com:/path"))
+        assertEquals(
+            "https://[2001:db8::1]:8443/path",
+            parsedOpenableMarkdownLink("HTTPS://[2001:DB8::1]:8443/path")?.destination,
+        )
+    }
+
+    @Test
     fun nonHttpLinkRendersTextWithoutAnnotation() {
         val annotated =
             build(
