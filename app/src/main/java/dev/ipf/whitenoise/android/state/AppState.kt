@@ -3964,7 +3964,7 @@ class WhiteNoiseAppState(
                     when (recoveryLookup) {
                         NotificationReplyRecoveryLookup.NotStarted -> null
                         NotificationReplyRecoveryLookup.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.NonRetryableFailure
+                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                         is NotificationReplyRecoveryLookup.Ready -> recoveryLookup.snapshot
                     }
                 if (recoverySnapshot != null) {
@@ -3980,7 +3980,7 @@ class WhiteNoiseAppState(
                         NotificationReplyCommitProbe.Committed ->
                             return@withGroupCommitLock NotificationReplySendOutcome.AlreadyCommitted
                         NotificationReplyCommitProbe.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.NonRetryableFailure
+                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                         NotificationReplyCommitProbe.NotCommitted -> Unit
                     }
                 }

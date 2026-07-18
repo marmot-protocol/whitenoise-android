@@ -208,12 +208,13 @@ class NotificationReplyWorker(
             } else {
                 null
             }
-        if (
-            operationAttempt != null &&
-            shouldRetryAfterSendOutcome(outcome, operationAttempt, containsLegacyPlaintext)
-        ) {
-            return Result.retry()
-        }
+        val result =
+            resultAfterSendOutcome(
+                outcome = outcome,
+                operationFailureAttempt = operationAttempt ?: 0,
+                containsLegacyPlaintext = containsLegacyPlaintext,
+            )
+        if (result == Result.retry()) return result
         return finalizeReplyFailure(
             action,
             containsLegacyPlaintext,
@@ -378,11 +379,12 @@ class NotificationReplyWorker(
         internal fun resultAfterSendOutcome(
             outcome: NotificationReplySendOutcome,
             operationFailureAttempt: Int,
+            containsLegacyPlaintext: Boolean = false,
         ): Result =
             when {
                 outcome == NotificationReplySendOutcome.Sent ||
                     outcome == NotificationReplySendOutcome.AlreadyCommitted -> Result.success()
-                shouldRetryAfterSendOutcome(outcome, operationFailureAttempt) -> Result.retry()
+                shouldRetryAfterSendOutcome(outcome, operationFailureAttempt, containsLegacyPlaintext) -> Result.retry()
                 else -> Result.failure()
             }
 

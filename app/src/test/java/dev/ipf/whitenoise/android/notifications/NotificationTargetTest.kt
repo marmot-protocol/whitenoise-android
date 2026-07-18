@@ -603,6 +603,14 @@ class NotificationTargetTest {
             ListenableWorker.Result.failure(),
             NotificationReplyWorker.resultAfterSendOutcome(
                 NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+                containsLegacyPlaintext = true,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
                 operationFailureAttempt = 2,
             ),
         )
