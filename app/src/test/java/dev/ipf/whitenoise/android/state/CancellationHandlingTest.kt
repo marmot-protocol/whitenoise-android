@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -40,6 +41,38 @@ class CancellationHandlingTest {
     }
 
     @Test
+    fun issue1457FallbackSitesUseCancellationSafeWrappers() {
+        val appState = appStateSource().readText()
+        val forwardText = appState.functionBody("forwardText")
+        assertTrue("forwardText must use cancellation-safe isSuccess handling", "runCatchingCancellable {" in forwardText && ".isSuccess" in forwardText)
+        assertFalse("forwardText must not use plain runCatching around sendText", Regex("""runCatching\s*\{[^}]*sendText""").containsMatchIn(forwardText))
+
+        listOf(
+            "runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())" to
+                "runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())",
+            "runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()" to
+                "runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()",
+            "runCatching { marmot().displayName(senderIdHex) }.getOrNull()" to
+                "runCatchingCancellable { marmot().displayName(senderIdHex) }.getOrNull()",
+            "runCatching { marmot().displayName(accountIdHex) }.getOrNull()" to
+                "runCatchingCancellable { marmot().displayName(accountIdHex) }.getOrNull()",
+            "runCatching { marmot().userProfile(id) }.getOrNull()" to
+                "runCatchingCancellable { marmot().userProfile(id) }.getOrNull()",
+            "runCatching { marmot().displayName(id) }.getOrNull()" to
+                "runCatchingCancellable { marmot().displayName(id) }.getOrNull()",
+        ).forEach { (unsafe, safe) ->
+            assertFalse("unsafe fallback must stay migrated: $unsafe", unsafe in appState)
+            assertTrue("missing cancellation-safe fallback: $safe", safe in appState)
+        }
+
+        val controllers = controllersSource().readText()
+        val unsafeRelayHealth = "runCatching { appState.marmotIo { relayHealth() } }.getOrNull()"
+        val safeRelayHealth = "runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()"
+        assertFalse("relay-health fallback must stay migrated", unsafeRelayHealth in controllers)
+        assertTrue("relay-health fallback must propagate cancellation", safeRelayHealth in controllers)
+    }
+
+    @Test
     fun watchAgentTextStreamKeepsTheStreamLoopInsideCancellationSafeWrapper() {
         val body = controllersSource().readText().functionBody("watchAgentTextStream")
         val wrapperStart = body.indexOf("runCatchingCancellable {")
@@ -73,4 +106,11 @@ class CancellationHandlingTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull(File::exists)
             ?: error("Missing Controllers.kt source file")
+
+    private fun appStateSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        ).firstOrNull(File::exists)
+            ?: error("Missing AppState.kt source file")
 }
