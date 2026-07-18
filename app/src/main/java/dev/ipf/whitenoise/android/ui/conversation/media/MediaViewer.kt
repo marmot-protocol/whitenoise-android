@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,6 +69,11 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ViewerTransform
+import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
+import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
+import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
+import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
@@ -163,12 +169,13 @@ internal fun FullScreenMediaViewer(
     val saveFailedMessage = stringResource(R.string.media_save_failed)
     val pagerState =
         rememberPagerState(
-            initialPage = startIndex.coerceIn(0, pages.lastIndex),
+            initialPage = clampViewerPageIndex(startIndex, pages.size),
             pageCount = { pages.size },
         )
     // pagerState outlives a shrinking pages list (album reconcile): currentPage
     // isn't re-clamped to the new lastIndex for a frame, so clamp at the read.
-    val currentPage = pages[pagerState.currentPage.coerceIn(0, pages.lastIndex)]
+    val currentPageIndex = clampViewerPageIndex(pagerState.currentPage, pages.size)
+    val currentPage = pages[currentPageIndex]
     val currentReference = currentPage.reference
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
@@ -180,19 +187,62 @@ internal fun FullScreenMediaViewer(
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(pagerState.currentPage) {
-        scale = 1f
-        offset = Offset.Zero
+        val reset = resetViewerTransform()
+        scale = reset.scale
+        offset = reset.offset
     }
+
+    val currentRecordedAtLabel =
+        DateUtils.formatDateTime(
+            context,
+            currentPage.recordedAt.toLong() * 1000L,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
+        )
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
+        MediaViewerFrame(
+            pageIndex = currentPageIndex,
+            pageCount = pages.size,
+            senderLabel = appState.displayName(currentPage.sender),
+            recordedAtLabel = currentRecordedAtLabel,
+            onDismiss = onDismiss,
+            onSave = {
+                val ref = currentReference
+                val attachmentIndex = currentAttachmentIndex
+                val msgId = currentMessageIdHex
+                val owned = currentMine
+                scope.launch {
+                    val data =
+                        runCatching {
+                            attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                        }.getOrNull()
+                    val ok =
+                        data != null &&
+                            withContext(Dispatchers.IO) {
+                                if (MediaReferenceParser.isVideoMedia(ref)) {
+                                    saveVideoToGallery(context, data, ref.fileName, ref.mediaType)
+                                } else {
+                                    saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                }
+                            }
+                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                }
+            },
+            onShare = {
+                val ref = currentReference
+                val attachmentIndex = currentAttachmentIndex
+                val msgId = currentMessageIdHex
+                val owned = currentMine
+                scope.launch {
+                    runCatching {
+                        attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                    }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                }
+            },
+            snackbarHostState = snackbarHostState,
         ) {
             HorizontalPager(
                 state = pagerState,
@@ -200,9 +250,9 @@ internal fun FullScreenMediaViewer(
                 // Disable pager swipe while the visible page is zoomed in —
                 // otherwise the pan gesture and the pager's swipe both want
                 // the horizontal drag. At scale 1× the pager wins.
-                userScrollEnabled = scale <= 1f,
+                userScrollEnabled = viewerPagerScrollEnabled(scale),
             ) { page ->
-                val pageDescriptor = pages[page.coerceIn(0, pages.lastIndex)]
+                val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
                 if (MediaReferenceParser.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
@@ -226,112 +276,92 @@ internal fun FullScreenMediaViewer(
                     )
                 }
             }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
-                }
-                if (pages.size > 1) {
-                    Text(
-                        text = "${pagerState.currentPage + 1} / ${pages.size}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-                Row {
-                    IconButton(
-                        onClick = {
-                            val ref = currentReference
-                            val attachmentIndex = currentAttachmentIndex
-                            val msgId = currentMessageIdHex
-                            val owned = currentMine
-                            scope.launch {
-                                val data =
-                                    runCatching {
-                                        attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                                    }.getOrNull()
-                                val ok =
-                                    data != null &&
-                                        withContext(Dispatchers.IO) {
-                                            if (MediaReferenceParser.isVideoMedia(ref)) {
-                                                saveVideoToGallery(context, data, ref.fileName, ref.mediaType)
-                                            } else {
-                                                saveImageToGallery(context, data, ref.fileName, ref.mediaType)
-                                            }
-                                        }
-                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
-                            }
-                        },
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
-                    }
-                    IconButton(
-                        onClick = {
-                            val ref = currentReference
-                            val attachmentIndex = currentAttachmentIndex
-                            val msgId = currentMessageIdHex
-                            val owned = currentMine
-                            scope.launch {
-                                runCatching {
-                                    attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                                }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
-                            }
-                        },
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
-                    }
-                }
+        }
+    }
+}
+
+@Composable
+internal fun MediaViewerFrame(
+    pageIndex: Int,
+    pageCount: Int,
+    senderLabel: String,
+    recordedAtLabel: String,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+    onShare: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    body: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .background(Color.Black),
+    ) {
+        body()
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
             }
-            // Sender + send-time caption for the visible page, over a bottom
-            // scrim so it stays readable on bright photos. Reads the current
-            // page so it tracks swipes.
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
-                            ),
-                        ).navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
+            if (pageCount > 1) {
                 Text(
-                    text = appState.displayName(currentPage.sender),
+                    text = "${pageIndex + 1} / $pageCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text =
-                        DateUtils.formatDateTime(
-                            context,
-                            currentPage.recordedAt.toLong() * 1000L,
-                            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
-                        ),
-                    color = Color.White.copy(alpha = 0.85f),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
+            Row {
+                IconButton(onClick = onSave) {
+                    Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
+                }
+                IconButton(onClick = onShare) {
+                    Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                }
+            }
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                        ),
+                    ).navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(
+                text = senderLabel,
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = recordedAtLabel,
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelMedium,
             )
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+        )
     }
 }
 
@@ -416,8 +446,9 @@ internal fun ViewerPage(
             .fillMaxSize()
             .pointerInput(pageKey) {
                 detectTapGestures(onDoubleTap = {
-                    latestOnScaleChange(1f)
-                    latestOnOffsetChange(Offset.Zero)
+                    val reset = resetViewerTransform()
+                    latestOnScaleChange(reset.scale)
+                    latestOnOffsetChange(reset.offset)
                 })
             }.pointerInput(pageKey) {
                 awaitEachGesture {
@@ -435,33 +466,18 @@ internal fun ViewerPage(
                         if (!handleAsTransform) {
                             continue
                         }
-                        val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
-                        if (nextScale != currentScale) latestOnScaleChange(nextScale)
-                        if (nextScale > 1f) {
-                            val viewportW = size.width.toFloat()
-                            val viewportH = size.height.toFloat()
-                            val imageAspect = imageWidth.toFloat() / imageHeight.toFloat()
-                            val viewportAspect = viewportW / viewportH
-                            val baseWidth: Float
-                            val baseHeight: Float
-                            if (imageAspect > viewportAspect) {
-                                baseWidth = viewportW
-                                baseHeight = viewportW / imageAspect
-                            } else {
-                                baseHeight = viewportH
-                                baseWidth = viewportH * imageAspect
-                            }
-                            val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
-                            val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
-                            latestOnOffsetChange(
-                                Offset(
-                                    (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
-                                    (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
-                                ),
+                        val next =
+                            applyViewerTransformGesture(
+                                current = ViewerTransform(currentScale, currentOffset),
+                                zoomFactor = zoom,
+                                panDelta = pan,
+                                viewportWidth = size.width.toFloat(),
+                                viewportHeight = size.height.toFloat(),
+                                imageWidth = imageWidth,
+                                imageHeight = imageHeight,
                             )
-                        } else if (currentOffset != Offset.Zero) {
-                            latestOnOffsetChange(Offset.Zero)
-                        }
+                        if (next.scale != currentScale) latestOnScaleChange(next.scale)
+                        if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
                         event.changes.forEach { it.consume() }
                     } while (true)
                 }
