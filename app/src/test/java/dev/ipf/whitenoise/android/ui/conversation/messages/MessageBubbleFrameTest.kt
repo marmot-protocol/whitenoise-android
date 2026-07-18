@@ -2,8 +2,11 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
@@ -115,11 +118,42 @@ class MessageBubbleFrameTest {
         composeRule.onNodeWithText("Quoted message").assertIsDisplayed()
     }
 
+    @Test
+    fun replyFooterPinsToQuoteWidenedBubbleEnd() {
+        composeRule.setContent {
+            Column(Modifier.width(IntrinsicSize.Max).testTag(REPLY_BUBBLE_TAG)) {
+                Box(Modifier.width(220.dp).height(1.dp))
+                BubbleFooterLayout(
+                    footer = {
+                        Box(
+                            Modifier
+                                .width(58.dp)
+                                .height(12.dp)
+                                .testTag(REPLY_FOOTER_TAG),
+                        )
+                    },
+                    modifier = messageBubbleBodyModifier(hasReplyPreview = true),
+                    lastLineWidth = 24,
+                ) {
+                    Box(Modifier.width(24.dp).height(20.dp))
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val bubbleBounds = composeRule.onNodeWithTag(REPLY_BUBBLE_TAG).fetchSemanticsNode().boundsInRoot
+            val footerBounds = composeRule.onNodeWithTag(REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(bubbleBounds.right, footerBounds.right, 1f)
+        }
+    }
+
     private companion object {
         const val CAPTION_TAG = "custom-caption-bubble"
         const val PLAIN_TAG = "custom-plain-bubble"
         const val CUSTOM_BACKGROUND = 0xFF336699
         const val MENTION_ACCENT = 0xFF006780
         const val OPAQUE_WHITE = 0xFFFFFFFF
+        const val REPLY_BUBBLE_TAG = "reply-bubble"
+        const val REPLY_FOOTER_TAG = "reply-footer"
     }
 }

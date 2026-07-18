@@ -281,6 +281,11 @@ internal fun messageBubbleLongPressPositionInWindow(
     localPosition: Offset,
 ): Offset = rowCoordinates.localToWindow(localPosition)
 
+internal fun ColumnScope.messageBubbleBodyModifier(hasReplyPreview: Boolean): Modifier =
+    Modifier
+        .align(Alignment.Start)
+        .then(if (hasReplyPreview) Modifier.fillMaxWidth() else Modifier)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MessageBubble(
@@ -1492,7 +1497,7 @@ internal fun MessageBubble(
                         // End-aligning own messages left a short reply drifting to
                         // the right of a wide bubble (#439). The footer still places
                         // itself at the block's trailing edge internally.
-                        val bodyModifier = Modifier.align(Alignment.Start)
+                        val bodyModifier = messageBubbleBodyModifier(hasReplyPreview = replyPreview != null)
                         if (collapsedBody) {
                             BubbleCollapsedFooterLayout(
                                 readMore = readMoreFooter,
