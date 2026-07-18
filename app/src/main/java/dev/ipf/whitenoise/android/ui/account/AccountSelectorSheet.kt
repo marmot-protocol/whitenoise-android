@@ -147,7 +147,6 @@ internal data class AccountSelectorAccountState(
 internal data class AccountSelectorState(
     val accounts: List<AccountSelectorAccountState>,
     val refreshing: Boolean,
-    val showAddAccount: Boolean,
 )
 
 internal fun accountSelectorState(
@@ -167,7 +166,6 @@ internal fun accountSelectorState(
                 )
             },
         refreshing = refreshing,
-        showAddAccount = true,
     )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -257,15 +255,13 @@ internal fun AccountSelectorContent(
                 }
             }
         }
-        if (state.showAddAccount) {
-            FilledTonalButton(
-                onClick = onAddAccount,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.add_account))
-            }
+        FilledTonalButton(
+            onClick = onAddAccount,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.add_account))
         }
     }
 }
