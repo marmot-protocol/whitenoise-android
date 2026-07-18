@@ -779,6 +779,8 @@
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Selected</string>
     <string name="select">Select</string>
+    <!-- Format-only accessibility label: sender and message summary. -->
+    <string name="message_selection_row_content_description" translatable="false">%1$s, %2$s</string>
     <plurals name="batch_delete_title">
         <item quantity="one">Delete %1$d message?</item>
         <item quantity="other">Delete %1$d messages?</item>

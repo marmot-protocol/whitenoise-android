@@ -18,6 +18,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +61,13 @@ class MessageBubbleSelectionIndicatorCoverageTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val selectDescription by lazy { context.getString(R.string.select) }
     private val selectedDescription by lazy { context.getString(R.string.selected) }
+    private val rowContentDescription by lazy {
+        context.getString(
+            R.string.message_selection_row_content_description,
+            SENDER_NAME,
+            BUBBLE_BODY,
+        )
+    }
 
     @Test
     fun selectionIndicatorUsesOutlinedAndFilledIcons() {
@@ -98,6 +108,7 @@ class MessageBubbleSelectionIndicatorCoverageTest {
                     ) {
                         Box(
                             Modifier
+                                .fillMaxWidth()
                                 .semantics { contentDescription = NESTED_ACTION_DESCRIPTION }
                                 .clickable { },
                         ) {
@@ -107,19 +118,26 @@ class MessageBubbleSelectionIndicatorCoverageTest {
                     MessageBubbleSelectionTapTarget(
                         selected = selected.value,
                         batchSelectable = true,
+                        contentDescription =
+                            messageBubbleSelectionContentDescription(
+                                senderDisplayName = SENDER_NAME,
+                                messageSummary = BUBBLE_BODY,
+                            ),
                         onToggleSelection = { selected.value = !selected.value },
                     )
                 }
             }
         }
 
-        composeRule.onNode(hasClickAction()).assertIsNotSelected()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(rowContentDescription).assertIsNotSelected()
         composeRule.onNodeWithContentDescription(NESTED_ACTION_DESCRIPTION).assertDoesNotExist()
 
         selected.value = true
         composeRule.waitForIdle()
 
-        composeRule.onNode(hasClickAction()).assertIsSelected()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(rowContentDescription).assertIsSelected()
         composeRule.onNodeWithContentDescription(NESTED_ACTION_DESCRIPTION).assertDoesNotExist()
     }
 
@@ -127,6 +145,7 @@ class MessageBubbleSelectionIndicatorCoverageTest {
     fun selectionTapTargetWinsOverNestedBubbleClicks() {
         var rowToggles = 0
         var nestedClicks = 0
+        val nestedClickCenter = mutableStateOf<Offset?>(null)
         composeRule.setContent {
             MaterialTheme {
                 Box {
@@ -140,8 +159,10 @@ class MessageBubbleSelectionIndicatorCoverageTest {
                     ) {
                         Box(
                             Modifier
-                                .testTag(BUBBLE_BODY_TAG)
-                                .clickable { nestedClicks += 1 },
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coordinates ->
+                                    nestedClickCenter.value = coordinates.boundsInRoot().center
+                                }.clickable { nestedClicks += 1 },
                         ) {
                             Text(BUBBLE_BODY)
                         }
@@ -149,13 +170,22 @@ class MessageBubbleSelectionIndicatorCoverageTest {
                     MessageBubbleSelectionTapTarget(
                         selected = false,
                         batchSelectable = true,
+                        contentDescription =
+                            messageBubbleSelectionContentDescription(
+                                senderDisplayName = SENDER_NAME,
+                                messageSummary = BUBBLE_BODY,
+                            ),
                         onToggleSelection = { rowToggles += 1 },
                     )
                 }
             }
         }
 
-        composeRule.onRoot().performTouchInput { click(center) }
+        composeRule.waitForIdle()
+        val clickCenter =
+            nestedClickCenter.value
+                ?: error("Nested bubble click target was not laid out")
+        composeRule.onRoot().performTouchInput { click(clickCenter) }
 
         composeRule.runOnIdle {
             assertEquals(1, rowToggles)
@@ -335,6 +365,11 @@ class MessageBubbleSelectionIndicatorCoverageTest {
                     MessageBubbleSelectionTapTarget(
                         selected = selected.value,
                         batchSelectable = batchSelectable,
+                        contentDescription =
+                            messageBubbleSelectionContentDescription(
+                                senderDisplayName = SENDER_NAME,
+                                messageSummary = BUBBLE_BODY,
+                            ),
                         onToggleSelection = { selected.value = !selected.value },
                     )
                 }
@@ -346,6 +381,7 @@ class MessageBubbleSelectionIndicatorCoverageTest {
         const val SELECTION_GUTTER_TAG = "message-selection-gutter"
         const val SELECTION_ROW_TAG = "message-selection-row"
         const val BUBBLE_BODY_TAG = "message-bubble-body"
+        const val SENDER_NAME = "Alice"
         const val BUBBLE_BODY = "Hello from the transcript"
         const val TALL_BODY_LINE_ONE = "First line of a tall message row"
         const val TALL_BODY_LINE_TWO = "Second line keeps the row height well above the icon"

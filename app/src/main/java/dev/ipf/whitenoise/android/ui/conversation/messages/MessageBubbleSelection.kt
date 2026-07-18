@@ -13,16 +13,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 
 internal val messageBubbleSelectionGutterWidth = 40.dp
 
 internal fun messageBubbleSelectionIcon(selected: Boolean): ImageVector = selectionRowIcon(selected)
+
+@Composable
+internal fun messageBubbleSelectionContentDescription(
+    senderDisplayName: String,
+    messageSummary: String,
+): String =
+    stringResource(
+        R.string.message_selection_row_content_description,
+        senderDisplayName,
+        messageSummary,
+    )
 
 @Composable
 internal fun messageBubbleSelectionRowTint(selected: Boolean): Color {
@@ -58,6 +72,7 @@ internal fun Modifier.messageBubbleSelectionRow(
 internal fun BoxScope.MessageBubbleSelectionTapTarget(
     selected: Boolean,
     batchSelectable: Boolean,
+    contentDescription: String,
     onToggleSelection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -65,8 +80,10 @@ internal fun BoxScope.MessageBubbleSelectionTapTarget(
         modifier =
             modifier
                 .matchParentSize()
-                .semantics { this.selected = selected }
-                .clickable(enabled = batchSelectable, onClick = onToggleSelection),
+                .semantics {
+                    this.selected = selected
+                    this.contentDescription = contentDescription
+                }.clickable(enabled = batchSelectable, onClick = onToggleSelection),
     )
 }
 

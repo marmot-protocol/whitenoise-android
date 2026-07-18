@@ -1947,6 +1947,11 @@ internal fun MessageBubble(
             MessageBubbleSelectionTapTarget(
                 selected = selected,
                 batchSelectable = batchSelectable,
+                contentDescription =
+                    messageBubbleSelectionContentDescription(
+                        senderDisplayName = appState.displayName(record.sender),
+                        messageSummary = displayedBody,
+                    ),
                 onToggleSelection = onToggleSelection,
             )
         }
