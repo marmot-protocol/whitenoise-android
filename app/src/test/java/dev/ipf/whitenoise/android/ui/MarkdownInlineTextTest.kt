@@ -166,6 +166,22 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun linkConfirmationAuthorityCannotBeHiddenBehindUserInfoOrUnsafeCharacters() {
+        val paddedUserInfo = "https://${"accounts.google.com.".repeat(25)}@evil.example/login"
+
+        assertFalse(isOpenableMarkdownLink(paddedUserInfo))
+        assertFalse(isOpenableMarkdownLink("https://trusted.example/\u202Eevil.exe"))
+        assertEquals("https://evil.example:8443", markdownLinkEffectiveAuthority("HTTPS://EVIL.EXAMPLE:8443/login"))
+    }
+
+    @Test
+    fun httpLinksRequireAParsedHost() {
+        assertFalse(isOpenableMarkdownLink("https:///missing-host"))
+        assertFalse(isOpenableMarkdownLink("https:trusted.example/path"))
+        assertFalse(isOpenableMarkdownLink("https://user:password@example.com/path"))
+    }
+
+    @Test
     fun nonHttpLinkRendersTextWithoutAnnotation() {
         val annotated =
             build(

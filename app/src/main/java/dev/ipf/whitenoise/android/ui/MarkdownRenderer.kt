@@ -68,6 +68,7 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import java.net.URI
 import java.util.Locale
 
 /**
@@ -175,15 +176,22 @@ internal fun MarkdownMessageBody(
         AlertDialog(
             onDismissRequest = { pendingLinkUrl = null },
             title = { Text(stringResource(R.string.link_confirm_title)) },
-            // Show the full destination so a label spoofing a trusted URL can't
-            // hide where the tap actually goes.
             text = {
-                Text(
-                    markdownSafeDisplayText(url),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    markdownLinkEffectiveAuthority(url)?.let { authority ->
+                        Text(
+                            authority,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        markdownSafeDisplayText(url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -1373,14 +1381,31 @@ internal fun markdownListMarker(
  * deep-link into another app; `nostr:` routes in-app via
  * [NOSTR_PROFILE_LINK_TAG_PREFIX], never out.
  */
-private val openableMarkdownLinkSchemes =
-    setOf("http", "https", "mailto")
-
 internal fun isOpenableMarkdownLink(dest: String): Boolean {
     val trimmed = dest.trim()
-    val colon = trimmed.indexOf(':')
-    if (colon <= 0) return false
-    return trimmed.substring(0, colon).lowercase(Locale.ROOT) in openableMarkdownLinkSchemes
+    if (trimmed.isEmpty() || ProfileSanitizer.stripUnsafe(trimmed) != trimmed) return false
+    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return false
+    return when (uri.scheme?.lowercase(Locale.ROOT)) {
+        "http", "https" -> uri.rawUserInfo == null && !uri.host.isNullOrBlank()
+        "mailto" -> !uri.rawSchemeSpecificPart.isNullOrBlank()
+        else -> false
+    }
+}
+
+/** Security-relevant authority shown separately from the truncated full URL. */
+internal fun markdownLinkEffectiveAuthority(dest: String): String? {
+    val trimmed = dest.trim()
+    if (!isOpenableMarkdownLink(trimmed)) return null
+    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
+    val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return null
+    if (scheme !in setOf("http", "https")) return null
+    val host = uri.host?.lowercase(Locale.ROOT) ?: return null
+    val port =
+        uri.port
+            .takeIf { it >= 0 }
+            ?.let { ":$it" }
+            .orEmpty()
+    return "$scheme://$host$port"
 }
 
 /**

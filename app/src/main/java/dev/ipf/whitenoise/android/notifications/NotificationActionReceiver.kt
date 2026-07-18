@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import android.widget.Toast
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.R
@@ -37,18 +36,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         true
                     }
                 if (completed == null) {
-                    Log.w(
-                        "DMNotifyAction",
-                        "notification action timed out kind=${action.kind} group=${action.target.groupIdHex.take(8)}",
-                    )
+                    notificationWarning("DMNotifyAction", "notification action timed out kind=${action.kind}") {
+                        "group=${action.target.groupIdHex.take(8)}"
+                    }
                 }
             } catch (throwable: Throwable) {
-                Log.w(
-                    "DMNotifyAction",
-                    "notification action failed kind=${action.kind} group=${action.target.groupIdHex.take(8)} " +
-                        "message=${action.target.messageIdHex.orEmpty().take(8)}",
-                    throwable,
-                )
+                notificationWarning("DMNotifyAction", "notification action failed kind=${action.kind}", throwable) {
+                    "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
+                }
             } finally {
                 pending.finish()
                 scope.cancel()
@@ -67,10 +62,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 application.appState.notificationActionsAllowed
             }
         if (!notificationActionsAllowed) {
-            Log.w(
-                "DMNotifyAction",
-                "notification reply blocked by app lock group=${action.target.groupIdHex.take(8)}",
-            )
+            notificationWarning("DMNotifyAction", "notification reply blocked by app lock") {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
             return
         }
         val reply =
@@ -101,10 +95,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 NotificationMarkReadWorker.enqueue(appContext, action)
             }
         if (!enqueued) {
-            Log.w(
-                "DMNotifyAction",
-                "failed to persist notification mark-read group=${action.target.groupIdHex.take(8)}",
-            )
+            notificationWarning("DMNotifyAction", "failed to persist notification mark-read") {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
         }
     }
 }
