@@ -68,6 +68,8 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import java.net.IDN
+import java.net.URI
 import java.util.Locale
 
 /**
@@ -134,9 +136,10 @@ internal fun MarkdownMessageBody(
     // the user confirms it in the dialog below (#273).
     var pendingLinkUrl by remember { mutableStateOf<String?>(null) }
     // One listener for every link in the document; the tapped destination rides
-    // in on the annotation. Autolink URL annotations open directly (visible text
-    // == destination, not spoofable); confirm-link Clickable annotations surface
-    // the real URL first; nostr-profile Clickable annotations stay in-app.
+    // in on the annotation. Autolink URL annotations open directly because their
+    // visible text is the supplied destination; confirm-link Clickable annotations
+    // surface destinations hidden behind author-controlled labels first;
+    // nostr-profile Clickable annotations stay in-app.
     val linkListener =
         remember(context, onNostrProfileTap) {
             LinkInteractionListener { annotation ->
@@ -172,18 +175,26 @@ internal fun MarkdownMessageBody(
         )
     }
     pendingLinkUrl?.let { url ->
+        val parsedLink = remember(url) { parsedOpenableMarkdownLink(url) }
         AlertDialog(
             onDismissRequest = { pendingLinkUrl = null },
             title = { Text(stringResource(R.string.link_confirm_title)) },
-            // Show the full destination so a label spoofing a trusted URL can't
-            // hide where the tap actually goes.
             text = {
-                Text(
-                    markdownSafeDisplayText(url),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    parsedLink?.effectiveAuthority?.let { authority ->
+                        Text(
+                            authority,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        markdownSafeDisplayText(parsedLink?.destination ?: url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -395,12 +406,13 @@ internal fun markdownLinkDestinations(text: AnnotatedString): List<String> =
 
 internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
     when (annotation) {
-        is LinkAnnotation.Url -> annotation.url.takeIf(::isOpenableMarkdownLink)
+        is LinkAnnotation.Url -> parsedOpenableMarkdownLink(annotation.url)?.destination
         is LinkAnnotation.Clickable ->
             annotation.tag
                 .takeIf { it.startsWith(CONFIRM_LINK_TAG_PREFIX) }
                 ?.removePrefix(CONFIRM_LINK_TAG_PREFIX)
-                ?.takeIf(::isOpenableMarkdownLink)
+                ?.let(::parsedOpenableMarkdownLink)
+                ?.destination
         else -> null
     }
 
@@ -788,7 +800,8 @@ internal const val NOSTR_PROFILE_LINK_TAG_PREFIX = "nostr-profile:"
 // `[label](url)` links (and images) carry an attacker-chosen label over a
 // possibly-different destination, so their taps route through a confirmation
 // that surfaces the real URL before leaving the app (anti-phishing, #273).
-// Autolinks (visible text == destination) are not spoofable and open directly.
+// Autolinks show their supplied destination instead of an attacker-chosen label
+// and open directly.
 internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
 
 /**
@@ -888,8 +901,9 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     } else {
                         trimmed
                     }
-                if (isOpenableMarkdownLink(dest)) {
-                    withLink(LinkAnnotation.Url(dest, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
+                val parsedLink = parsedOpenableMarkdownLink(dest)
+                if (parsedLink != null) {
+                    withLink(LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
                         append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                     }
                 } else {
@@ -1062,13 +1076,14 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     // A label-less link (`[](url)` or an image with empty alt) would otherwise
     // produce a zero-length, untappable annotation — show the URL itself.
     val visible = children.ifEmpty { listOf(MarkdownInlineFfi.Text(normalizedDest)) }
-    if (isOpenableMarkdownLink(normalizedDest)) {
+    val parsedLink = parsedOpenableMarkdownLink(normalizedDest)
+    if (parsedLink != null) {
         // The label is attacker-chosen and may not match the destination, so
         // route the tap through a confirmation (Clickable + confirm tag) that
         // shows the real URL, rather than a direct-opening Url annotation. See #273.
         withLink(
             LinkAnnotation.Clickable(
-                CONFIRM_LINK_TAG_PREFIX + normalizedDest,
+                CONFIRM_LINK_TAG_PREFIX + parsedLink.destination,
                 TextLinkStyles(style = ctx.linkStyle),
                 ctx.linkListener,
             ),
@@ -1373,14 +1388,80 @@ internal fun markdownListMarker(
  * deep-link into another app; `nostr:` routes in-app via
  * [NOSTR_PROFILE_LINK_TAG_PREFIX], never out.
  */
-private val openableMarkdownLinkSchemes =
-    setOf("http", "https", "mailto")
+internal data class ParsedOpenableMarkdownLink(
+    val destination: String,
+    val effectiveAuthority: String?,
+)
 
-internal fun isOpenableMarkdownLink(dest: String): Boolean {
+/** Parses an allowed link and canonicalizes Unicode HTTP hosts to their ASCII form. */
+internal fun parsedOpenableMarkdownLink(dest: String): ParsedOpenableMarkdownLink? {
     val trimmed = dest.trim()
-    val colon = trimmed.indexOf(':')
-    if (colon <= 0) return false
-    return trimmed.substring(0, colon).lowercase(Locale.ROOT) in openableMarkdownLinkSchemes
+    if (trimmed.isEmpty() || ProfileSanitizer.stripUnsafe(trimmed) != trimmed) return null
+    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
+    return when (uri.scheme?.lowercase(Locale.ROOT)) {
+        "http", "https" -> parsedHttpMarkdownLink(uri)
+        "mailto" ->
+            uri.rawSchemeSpecificPart
+                ?.takeIf { it.isNotBlank() }
+                ?.let { ParsedOpenableMarkdownLink(trimmed, null) }
+        else -> null
+    }
+}
+
+internal fun isOpenableMarkdownLink(dest: String): Boolean = parsedOpenableMarkdownLink(dest) != null
+
+/** Security-relevant authority shown separately from the truncated full URL. */
+internal fun markdownLinkEffectiveAuthority(dest: String): String? = parsedOpenableMarkdownLink(dest)?.effectiveAuthority
+
+private fun parsedHttpMarkdownLink(uri: URI): ParsedOpenableMarkdownLink? {
+    val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return null
+    val rawAuthority = uri.rawAuthority ?: return null
+    if (rawAuthority.isBlank() || uri.rawUserInfo != null || '@' in rawAuthority) return null
+    val canonicalAuthority = canonicalHttpAuthority(rawAuthority, uri) ?: return null
+    val rawSchemeSpecificPart = uri.rawSchemeSpecificPart ?: return null
+    val authorityPrefix = "//$rawAuthority"
+    if (!rawSchemeSpecificPart.startsWith(authorityPrefix)) return null
+    val suffix = rawSchemeSpecificPart.removePrefix(authorityPrefix)
+    val fragment = uri.rawFragment?.let { "#$it" }.orEmpty()
+    val destination = "$scheme://$canonicalAuthority$suffix$fragment"
+    val canonicalUri = runCatching { URI(destination) }.getOrNull() ?: return null
+    if (canonicalUri.rawUserInfo != null || canonicalUri.host.isNullOrBlank()) return null
+    return ParsedOpenableMarkdownLink(
+        destination = destination,
+        effectiveAuthority = "$scheme://$canonicalAuthority",
+    )
+}
+
+private fun canonicalHttpAuthority(
+    rawAuthority: String,
+    uri: URI,
+): String? {
+    if (rawAuthority.startsWith('[')) {
+        val closingBracket = rawAuthority.indexOf(']')
+        if (closingBracket <= 1 || uri.host.isNullOrBlank()) return null
+        val host = rawAuthority.substring(0, closingBracket + 1).lowercase(Locale.ROOT)
+        val port = canonicalPortSuffix(rawAuthority.substring(closingBracket + 1)) ?: return null
+        return host + port
+    }
+    if (rawAuthority.count { it == ':' } > 1) return null
+    val portSeparator = rawAuthority.lastIndexOf(':')
+    val rawHost = if (portSeparator >= 0) rawAuthority.substring(0, portSeparator) else rawAuthority
+    val rawPort = if (portSeparator >= 0) rawAuthority.substring(portSeparator) else ""
+    val host =
+        runCatching { IDN.toASCII(rawHost, IDN.USE_STD3_ASCII_RULES) }
+            .getOrNull()
+            ?.lowercase(Locale.ROOT)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+    val port = canonicalPortSuffix(rawPort) ?: return null
+    return host + port
+}
+
+private fun canonicalPortSuffix(rawPort: String): String? {
+    if (rawPort.isEmpty()) return ""
+    if (!rawPort.startsWith(':')) return null
+    val port = rawPort.drop(1).toIntOrNull()?.takeIf { it in 0..65535 } ?: return null
+    return ":$port"
 }
 
 /**
@@ -1388,18 +1469,16 @@ internal fun isOpenableMarkdownLink(dest: String): Boolean {
  * `resolveActivity` pre-flight (package visibility makes it lie), just catch
  * `ActivityNotFoundException` as the authoritative "no handler" signal and
  * swallow it — a dead tap beats a crash. One ACTION_VIEW path serves every
- * allowed scheme (browser, mail, dialer, whitenoise deep links alike).
+ * allowed external scheme.
  */
 private fun openMarkdownLink(
     context: android.content.Context,
     url: String,
 ) {
-    // Annotations are built from trimmed destinations, but re-normalize here
-    // so the launch-time re-check and Uri.parse always agree — a padded URL
-    // must never pass the gate and then lose its scheme in Uri.parse.
-    val normalized = url.trim()
-    if (!isOpenableMarkdownLink(normalized)) return
-    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(normalized))
+    // Re-parse at launch so ACTION_VIEW receives the same canonical target the
+    // annotation and confirmation UI were built from.
+    val parsedLink = parsedOpenableMarkdownLink(url) ?: return
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(parsedLink.destination))
     try {
         context.startActivity(intent)
     } catch (_: android.content.ActivityNotFoundException) {

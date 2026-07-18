@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.nio.file.Files
 
 class AttachmentPlaintextCacheTest {
@@ -94,6 +95,7 @@ class AttachmentPlaintextCacheTest {
     fun publicationRejectsSingleEntryLargerThanDirectoryLimit() {
         val voiceFile = File(File(root, MediaCacheDirs.VOICE), "too-large.m4a")
         val videoFile = File(File(root, MediaCacheDirs.VIDEO), "too-large.mp4")
+        val sharedFile = File(File(root, MediaCacheDirs.SHARED), "too-large.bin")
 
         assertThrows(IOException::class.java) {
             AttachmentPlaintextCache.requireEntryWithinLimit(
@@ -107,6 +109,29 @@ class AttachmentPlaintextCacheTest {
                 AttachmentPlaintextCache.VIDEO_MAX_DIRECTORY_BYTES + 1L,
             )
         }
+        assertThrows(IOException::class.java) {
+            AttachmentPlaintextCache.requireEntryWithinLimit(
+                sharedFile,
+                AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES + 1L,
+            )
+        }
+    }
+
+    @Test
+    fun finishingPublicationAtomicallyReleasesItAndTrimsOlderEntries() {
+        val directory = File(root, MediaCacheDirs.SHARED).apply { mkdirs() }
+        val older = cacheFile(directory, "older.bin", 8, 1_000L)
+        val published =
+            File(directory, "published.bin").apply {
+                RandomAccessFile(this, "rw").use { it.setLength(AttachmentPlaintextCache.SHARED_MAX_DIRECTORY_BYTES) }
+                assertTrue(setLastModified(2_000L))
+            }
+        AttachmentPlaintextCache.protectPublicationFile(published)
+
+        AttachmentPlaintextCache.finishPublication(published)
+
+        assertFalse(older.exists())
+        assertTrue(published.exists())
     }
 
     private fun cacheFile(

@@ -87,7 +87,9 @@ class NotificationReplyWorker(
             if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
                 return Result.retry()
             }
-            Log.w(TAG, "reply lock wait expired group=${action.target.groupIdHex.take(8)}")
+            notificationWarning(TAG, "reply lock wait expired") {
+                "group=${action.target.groupIdHex.take(8)}"
+            }
             return Result.failure().also { retryStore.clear(retryKey) }
         }
         if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
@@ -192,11 +194,9 @@ class NotificationReplyWorker(
             }
         if (!persisted) return Result.retry()
         val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
-        Log.w(
-            TAG,
-            "reply failed ($reason) group=${action.target.groupIdHex.take(8)} " +
-                "attempts=${retryStore.operationFailureCount(retryKey)}",
-        )
+        notificationWarning(TAG, "reply failed ($reason) attempts=${retryStore.operationFailureCount(retryKey)}") {
+            "group=${action.target.groupIdHex.take(8)}"
+        }
         retryStore.clear(retryKey)
         return Result.failure()
     }
@@ -219,9 +219,6 @@ class NotificationReplyWorker(
         application: WhiteNoiseApplication,
         action: NotificationAction,
     ) {
-        val markReadFailureMessage =
-            "reply sent but mark-read failed group=${action.target.groupIdHex.take(8)} " +
-                "message=${action.target.messageIdHex.orEmpty().take(8)}"
         val result =
             try {
                 withContext(Dispatchers.Main.immediate) {
@@ -233,10 +230,16 @@ class NotificationReplyWorker(
                 }
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
-                Log.w(TAG, markReadFailureMessage, throwable)
+                notificationWarning(TAG, "reply sent but mark-read failed", throwable) {
+                    "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
+                }
                 null
             }
-        if (result == false) Log.w(TAG, markReadFailureMessage)
+        if (result == false) {
+            notificationWarning(TAG, "reply sent but mark-read failed") {
+                "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
+            }
+        }
     }
 
     private suspend fun dismissSentReplyNotification(

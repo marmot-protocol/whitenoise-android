@@ -96,9 +96,9 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
  * Doing that on the main dispatcher would jank the UI for the whole
  * write; the `Dispatchers.IO` jump moves it off the main thread.
  *
- * The temp file is owned by the cache cleanup pass triggered on screen
- * exit; we don't track it per-call because the handing-off intent may
- * need it alive for an unbounded duration after this function returns.
+ * Shared plaintext is trimmed oldest-first to a byte cap after every
+ * publication and by the age-based startup janitor. It is not deleted on
+ * screen exit because the external reader may still hold the FileProvider URI.
  */
 internal suspend fun openAttachmentExternally(
     context: android.content.Context,
@@ -112,7 +112,7 @@ internal suspend fun openAttachmentExternally(
                 val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                 val name = MediaPipeline.safeDisplayName(fileName)
                 val file = java.io.File.createTempFile("open_", "_$name", dir)
-                file.writeBytes(bytes)
+                writeSharedMediaFile(file, bytes)
                 fileProviderUri(context, file)
             }.getOrNull()
         } ?: return OpenAttachmentResult.Error
@@ -232,7 +232,7 @@ internal suspend fun shareImage(
                 // collisions and path traversal from a remote-supplied
                 // filename.
                 val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
-                file.outputStream().use { it.write(bytes) }
+                writeSharedMediaFile(file, bytes)
                 androidx.core.content.FileProvider.getUriForFile(
                     context,
                     "${context.packageName}.fileprovider",
@@ -252,6 +252,26 @@ internal suspend fun shareImage(
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             },
         )
+    }
+}
+
+@Throws(java.io.IOException::class)
+private fun writeSharedMediaFile(
+    file: java.io.File,
+    bytes: ByteArray,
+) {
+    var protected = false
+    try {
+        AttachmentPlaintextCache.requireEntryWithinLimit(file, bytes.size.toLong())
+        AttachmentPlaintextCache.protectPublicationFile(file)
+        protected = true
+        file.outputStream().use { it.write(bytes) }
+        AttachmentPlaintextCache.finishPublication(file)
+        protected = false
+    } catch (failure: Throwable) {
+        if (protected) AttachmentPlaintextCache.unprotectPublicationFile(file)
+        runCatching { file.delete() }
+        throw failure
     }
 }
 
