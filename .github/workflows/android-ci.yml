@@ -68,12 +68,16 @@ jobs:
       - name: Android lint
         run: ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug --no-daemon --stacktrace
 
-      # Coverage visibility only (phase 1): generate the Kover report and publish
-      # it as an artifact. No thresholds/gates — non-blocking, never fails the
-      # build. Flavor-specific DevDebug variants only: the aggregate kover tasks
-      # pull in the release variant, whose packaging trips the unsigned-release
-      # guard (no signing in CI), so the flavor-specific *DevDebug tasks scope
-      # coverage to what the unit tests exercise.
+      # Coverage gate (phase 2): fail CI when overall line coverage drops below the
+      # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
+      # kover tasks pull in release variants, whose packaging trips the unsigned-release
+      # guard (no signing in CI).
+      - name: Coverage gate (Kover)
+        run: ./gradlew :app:koverVerifyDevZapstoreDebug --no-daemon --stacktrace
+
+      # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
+      # an artifact. Non-blocking so report upload still runs when the gate above fails.
+      # Flavor-specific DevDebug variants only (see gate step).
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true

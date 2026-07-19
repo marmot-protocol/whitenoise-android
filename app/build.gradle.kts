@@ -578,6 +578,12 @@ kover {
                 )
             }
         }
+        verify {
+            // Coverage ratchet: raise this floor as coverage improves; never lower it silently.
+            rule {
+                minBound(34)
+            }
+        }
     }
 }
 
