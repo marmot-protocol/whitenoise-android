@@ -164,6 +164,7 @@ internal fun ProfileSheet(
     var hex by remember(npub) { mutableStateOf<String?>(null) }
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val contentScrollState = rememberScrollState()
     val groupTitleCopy = rememberGroupTitleCopy()
 
     LaunchedEffect(npub) {
@@ -299,7 +300,12 @@ internal fun ProfileSheet(
         properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical = 24.dp),
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    state = contentScrollState,
+                    enabled = contentScrollState.maxValue > 0,
+                ).padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

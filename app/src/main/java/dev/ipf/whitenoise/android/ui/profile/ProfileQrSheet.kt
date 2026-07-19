@@ -64,6 +64,7 @@ internal fun ProfileQrSheet(
     var showScanner by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val contentScrollState = rememberScrollState()
     val shareProfileTitle = stringResource(R.string.share_profile)
     val notWhiteNoiseProfileQrError = stringResource(R.string.error_not_white_noise_profile_qr)
 
@@ -73,7 +74,12 @@ internal fun ProfileQrSheet(
         containerColor = amoledSheetContainerColor(),
     ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    state = contentScrollState,
+                    enabled = contentScrollState.maxValue > 0,
+                ).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
