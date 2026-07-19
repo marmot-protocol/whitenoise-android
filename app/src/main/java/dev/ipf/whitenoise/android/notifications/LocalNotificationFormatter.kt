@@ -160,10 +160,13 @@ object LocalNotificationFormatter {
                 NotificationTriggerFfi.GROUP_INVITE -> inviteTitle(context)
             }
         val body =
-            when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
-            }
+            boundedNotificationMessageText(
+                when (update.trigger) {
+                    NotificationTriggerFfi.NEW_MESSAGE ->
+                        messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
+                    NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
+                },
+            )
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
             // so they accumulate into a single MessagingStyle card instead of N

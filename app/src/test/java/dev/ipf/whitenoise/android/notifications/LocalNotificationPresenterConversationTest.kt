@@ -305,6 +305,71 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun failedMessagingPostDropsCarriedHistoryAndRetriesOnce() {
+        presenter.ensureChannels()
+        val conversation = LocalNotificationFormatter.conversationDismissalKey("account-a", "group-a")
+        manager.notify(
+            conversation.tag,
+            conversation.id,
+            carriedMessagingNotification("poisoned history" to 2_000_000L),
+        )
+        var postAttempts = 0
+        val recoveringPresenter =
+            LocalNotificationPresenter(
+                context = context,
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    postAttempts += 1
+                    if (postAttempts == 1) throw RuntimeException("simulated Binder rejection")
+                    notificationManager.notify(tag, id, notification)
+                },
+            )
+
+        val posted =
+            runBlocking {
+                recoveringPresenter.show(
+                    update(isMention = false),
+                    previewTextOverride = "safe new line",
+                    shortNpub = { "npub1test" },
+                )
+            }
+
+        assertTrue(posted)
+        assertEquals(2, postAttempts)
+        val messages =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(manager.activeNotifications.single().notification)
+                ?.messages
+                ?.map { it.text.toString() }
+        assertEquals(listOf("safe new line"), messages)
+    }
+
+    @Test
+    fun failedPlainPostIsContainedAndReportedAsNotPosted() {
+        presenter.ensureChannels()
+        var postAttempts = 0
+        val failingPresenter =
+            LocalNotificationPresenter(
+                context = context,
+                notificationPoster = { _, _, _, _ ->
+                    postAttempts += 1
+                    throw RuntimeException("simulated Binder rejection")
+                },
+            )
+
+        val posted =
+            runBlocking {
+                failingPresenter.show(
+                    update(isMention = false, reactionEmoji = "thumbs-up"),
+                    shortNpub = { "npub1test" },
+                )
+            }
+
+        assertEquals(1, postAttempts)
+        assertTrue(!posted)
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
     fun monogramBackgroundMaintainsReadableContrastWithWhiteInitials() {
         val brightestHueSeed = "gk" // Java hash 3300 -> hue 60 (yellow).
 
@@ -332,6 +397,7 @@ class LocalNotificationPresenterConversationTest {
         isMention: Boolean,
         timestampMs: Long = 1234,
         messageIdHex: String = "message",
+        reactionEmoji: String? = null,
     ) = NotificationUpdateFfi(
         notificationKey = "key",
         conversationKey = "conversation",
@@ -346,7 +412,7 @@ class LocalNotificationPresenterConversationTest {
         sender = user(displayName = "Alice"),
         receiver = user(accountIdHex = "self", displayName = "Me"),
         previewText = "hi",
-        reactionEmoji = null,
+        reactionEmoji = reactionEmoji,
         reactedToPreview = null,
         timestampMs = timestampMs,
         isFromSelf = false,

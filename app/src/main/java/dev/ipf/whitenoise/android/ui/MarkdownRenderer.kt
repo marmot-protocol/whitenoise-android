@@ -234,10 +234,57 @@ internal fun markdownDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_
  */
 internal const val MARKDOWN_MAX_CONTAINER_SIBLINGS = 256
 
+/** Wide tables are unreadable in a chat bubble and expensive to lay out. */
+internal const val MARKDOWN_MAX_TABLE_COLUMNS = 12
+
+/** One table shares a single cell budget across its header and all body rows. */
+internal const val MARKDOWN_MAX_TABLE_CELLS = MARKDOWN_MAX_CONTAINER_SIBLINGS
+
 internal fun <T> markdownVisibleSiblings(items: List<T>): List<T> =
     if (items.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS) items else items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)
 
 internal fun markdownSiblingsElided(items: List<*>): Boolean = items.size > MARKDOWN_MAX_CONTAINER_SIBLINGS
+
+internal data class MarkdownTableRowWindow<T>(
+    val cells: List<T>,
+    val cellsElided: Boolean,
+)
+
+internal data class MarkdownTableWindow<T>(
+    val header: MarkdownTableRowWindow<T>,
+    val rows: List<MarkdownTableRowWindow<T>>,
+    val rowsElided: Boolean,
+)
+
+/** Applies one area budget to a table instead of independently capping both dimensions. */
+internal fun <T> markdownVisibleTable(
+    header: List<T>,
+    rows: List<List<T>>,
+): MarkdownTableWindow<T> {
+    var remainingCells = MARKDOWN_MAX_TABLE_CELLS
+
+    fun visibleRow(cells: List<T>): MarkdownTableRowWindow<T> {
+        val visibleCount = minOf(cells.size, MARKDOWN_MAX_TABLE_COLUMNS, remainingCells)
+        remainingCells -= visibleCount
+        return MarkdownTableRowWindow(
+            cells = cells.take(visibleCount),
+            cellsElided = visibleCount < cells.size,
+        )
+    }
+
+    val visibleHeader = visibleRow(header)
+    val visibleRows = ArrayList<MarkdownTableRowWindow<T>>()
+    val rowLimit = minOf(rows.size, MARKDOWN_MAX_CONTAINER_SIBLINGS)
+    for (index in 0 until rowLimit) {
+        if (remainingCells <= 0) break
+        visibleRows += visibleRow(rows[index])
+    }
+    return MarkdownTableWindow(
+        header = visibleHeader,
+        rows = visibleRows,
+        rowsElided = visibleRows.size < rows.size,
+    )
+}
 
 /**
  * Maximum inline-nesting depth. Inline nodes (emphasis, strong, strikethrough,
@@ -615,15 +662,14 @@ private fun MarkdownTableView(
     block: MarkdownBlockFfi.Table,
     ctx: MarkdownBodyContext,
 ) {
-    val visibleRows = markdownVisibleSiblings(block.rows)
-    val rowsElided = markdownSiblingsElided(block.rows)
+    val visibleTable = markdownVisibleTable(block.header, block.rows)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        MarkdownTableRowView(block.header, block.alignments, header = true, ctx)
+        MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx)
         HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
-        visibleRows.forEach { row ->
+        visibleTable.rows.forEach { row ->
             MarkdownTableRowView(row, block.alignments, header = false, ctx)
         }
-        if (rowsElided) {
+        if (visibleTable.rowsElided) {
             MarkdownElisionMarker()
         }
     }
@@ -631,15 +677,13 @@ private fun MarkdownTableView(
 
 @Composable
 private fun MarkdownTableRowView(
-    cells: List<MarkdownTableCellFfi>,
+    row: MarkdownTableRowWindow<MarkdownTableCellFfi>,
     alignments: List<MarkdownAlignmentFfi>,
     header: Boolean,
     ctx: MarkdownBodyContext,
 ) {
-    val visibleCells = markdownVisibleSiblings(cells)
-    val cellsElided = markdownSiblingsElided(cells)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        visibleCells.forEachIndexed { index, cell ->
+        row.cells.forEachIndexed { index, cell ->
             MarkdownBodyText(
                 text = rememberMarkdownInlineText(cell.inlines, ctx),
                 style =
@@ -655,7 +699,7 @@ private fun MarkdownTableRowView(
                 modifier = Modifier.weight(1f),
             )
         }
-        if (cellsElided) {
+        if (row.cellsElided) {
             MarkdownElisionMarker(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
@@ -751,9 +795,10 @@ private fun collectBlockMentionBech32s(
             is MarkdownBlockFfi.ListBlock ->
                 markdownVisibleSiblings(block.items).forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
             is MarkdownBlockFfi.Table -> {
-                markdownVisibleSiblings(block.header).forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
-                markdownVisibleSiblings(block.rows).forEach { row ->
-                    markdownVisibleSiblings(row).forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
+                val visibleTable = markdownVisibleTable(block.header, block.rows)
+                visibleTable.header.cells.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
+                visibleTable.rows.forEach { row ->
+                    row.cells.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
                 }
             }
             else -> Unit
@@ -1202,11 +1247,15 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
                 }
             }
         is MarkdownBlockFfi.Table -> {
-            markdownVisibleSiblings(block.header).forEach { cell ->
+            val visibleTable = markdownVisibleTable(block.header, block.rows)
+            visibleTable.header.cells.forEach { cell ->
+                if (length >= maxLength) return
                 appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
             }
-            markdownVisibleSiblings(block.rows).forEach { row ->
-                markdownVisibleSiblings(row).forEach { cell ->
+            visibleTable.rows.forEach { row ->
+                if (length >= maxLength) return
+                row.cells.forEach { cell ->
+                    if (length >= maxLength) return
                     appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
                 }
             }
@@ -1264,6 +1313,7 @@ private fun AnnotatedString.Builder.appendPreviewInlineSegment(
     maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
 ) {
+    if (length >= maxLength) return
     appendPreviewSegment(
         buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, maxLength, mentionDisplayName, depth = 0) },
         maxLength,

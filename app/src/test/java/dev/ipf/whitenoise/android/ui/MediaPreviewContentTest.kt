@@ -125,8 +125,10 @@ class MediaPreviewContentTest {
         )
         val send = composeRule.onNodeWithContentDescription(string(R.string.send))
         send.performClick()
+        composeRule.waitForIdle()
         send.assertIsNotEnabled()
-        composeRule.runOnIdle { onResult?.invoke(false) }
+        composeRule.runOnIdle { checkNotNull(onResult).invoke(false) }
+        composeRule.waitForIdle()
         send.assertIsEnabled()
     }
 

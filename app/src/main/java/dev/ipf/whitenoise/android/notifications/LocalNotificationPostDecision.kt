@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 
 internal const val MAX_NOTIFICATION_MESSAGE_HISTORY = 25
 internal const val CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP = MAX_NOTIFICATION_MESSAGE_HISTORY - 1
+internal const val MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS = 1_000
 internal const val CONVERSATION_SHORTCUT_PREFIX = "conversation-"
 
 internal data class NotificationPostDecision(
@@ -68,6 +69,13 @@ internal fun <T> capNotificationHistory(
     history: List<T>,
     historyCap: Int,
 ): List<T> = history.takeLast(historyCap.coerceAtLeast(0))
+
+internal fun boundedNotificationMessageText(text: CharSequence): String {
+    val value = text.toString()
+    if (value.codePointCount(0, value.length) <= MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS) return value
+    val endIndex = value.offsetByCodePoints(0, MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS)
+    return value.substring(0, endIndex)
+}
 
 internal fun conversationShortcutRemovalOrder(
     existingShortcutIds: Set<String>,

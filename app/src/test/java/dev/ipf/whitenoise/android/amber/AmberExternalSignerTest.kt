@@ -4,6 +4,8 @@ import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
@@ -14,6 +16,7 @@ import androidx.core.app.ActivityOptionsCompat
 import dev.ipf.marmotkit.MarmotKitException
 import org.junit.After
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,6 +43,16 @@ class AmberExternalSignerTest {
         launcher = CapturingLauncher()
         AmberActivityCoordinator.attach(launcher)
         Nip55.saveSignerPackage(context, SIGNER_PACKAGE)
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_VIEW, Uri.parse("${Nip55.SCHEME}:")).setPackage(SIGNER_PACKAGE),
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = SIGNER_PACKAGE
+                        name = "$SIGNER_PACKAGE.SignerActivity"
+                    }
+            },
+        )
         ShadowContentResolver.registerProviderInternal(AUTHORITY, RememberedRejectionProvider())
     }
 
@@ -80,6 +93,18 @@ class AmberExternalSignerTest {
         assertTrue("signer request did not finish", done.await(100, TimeUnit.MILLISECONDS))
         assertTrue(thrown.get() is MarmotKitException.ExternalSignerRejected)
         assertNull("remembered rejection must not launch a signer prompt", launcher.launched.get())
+    }
+
+    @Test
+    fun missingStoredSignerPackageIsClearedBeforeAnyOperation() {
+        Nip55.saveSignerPackage(context, "com.missing.signer")
+        val signer = AmberExternalSigner(context, accountPubkey = "account-pubkey", approvalTimeoutMs = 200)
+
+        assertThrows(MarmotKitException.ExternalSignerUnavailable::class.java) {
+            signer.nip44Encrypt("counterparty-pubkey", "plaintext")
+        }
+        assertNull(Nip55.savedSignerPackage(context))
+        assertNull(launcher.launched.get())
     }
 
     private class CapturingLauncher : ActivityResultLauncher<Intent>() {

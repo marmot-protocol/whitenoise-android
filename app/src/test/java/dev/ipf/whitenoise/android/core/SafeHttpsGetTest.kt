@@ -81,6 +81,49 @@ class SafeHttpsGetTest {
     }
 
     @Test
+    fun timeoutIsClampedToTheRemainingAbsoluteDeadline() {
+        val now = 1_000_000_000L
+
+        assertEquals(
+            250,
+            SafeHttpsGet.timeoutMillisWithinDeadline(
+                configuredTimeoutMillis = 5_000,
+                deadlineNanos = now + 250_000_000L,
+                nowNanos = now,
+            ),
+        )
+        assertEquals(
+            1,
+            SafeHttpsGet.timeoutMillisWithinDeadline(
+                configuredTimeoutMillis = 5_000,
+                deadlineNanos = now + 1L,
+                nowNanos = now,
+            ),
+        )
+        assertEquals(
+            null,
+            SafeHttpsGet.timeoutMillisWithinDeadline(
+                configuredTimeoutMillis = 5_000,
+                deadlineNanos = now,
+                nowNanos = now,
+            ),
+        )
+    }
+
+    @Test
+    fun responseHeaderReadIsBoundedAndDeadlineCheckedAfterItReturns() {
+        val source = safeHttpsGetSource().readText()
+        val responseRead = source.indexOf("val code = connection.responseCode")
+        val timeoutClamp =
+            source.lastIndexOf("timeoutMillisWithinDeadline(readTimeoutMillis, requestDeadlineNanos)", responseRead)
+        val deadlineRecheck = source.indexOf("if (deadlineExceeded(requestDeadlineNanos)) return null", responseRead)
+
+        assertTrue(timeoutClamp >= 0)
+        assertTrue(responseRead > timeoutClamp)
+        assertTrue(deadlineRecheck > responseRead)
+    }
+
+    @Test
     fun pinnedAddressLoopObservesRequestDeadlineBetweenConnectAttempts() {
         val source = safeHttpsGetSource().readText()
         val openPinnedConnection = source.kotlinFunctionBody("openPinnedConnection")

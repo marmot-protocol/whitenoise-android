@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -13,7 +14,6 @@ import java.security.ProviderException
 import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
@@ -178,7 +178,7 @@ internal class DiskByteCache(
             entry.file.setLastModified(System.currentTimeMillis())
             bytes
         } catch (error: IOException) {
-            if (error.isAuthenticationFailure()) {
+            if (error.isAuthenticationFailure() || error.isMalformedEnvelope()) {
                 evictPoisonedEntry(hashed, entry, generationAtLookup)
                 return null
             }
@@ -294,7 +294,12 @@ internal class DiskByteCache(
                 residentBytes -= existing.size
             }
             unresolvedEnvelopes.remove(hashed)
-            val size = file.length().toInt()
+            val fileLength = file.length()
+            if (fileLength <= 0L || fileLength > Int.MAX_VALUE) {
+                runCatching { file.delete() }
+                return
+            }
+            val size = fileLength.toInt()
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
             evicted += evictedEntryFiles()
@@ -788,8 +793,35 @@ internal class DiskByteCache(
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, keyProvider.getOrCreate(), GCMParameterSpec(TAG_BITS, payloadIv))
             cipher.updateAAD(payloadAad)
-            CipherInputStream(input, cipher).use { encrypted -> encrypted.readBytes() }
+            val ciphertext = input.readBoundedPayloadCiphertext()
+            if (ciphertext.size < GCM_TAG_BYTES) throw IOException("truncated encrypted cache payload")
+            cipher.doFinal(ciphertext).also { plaintext ->
+                if (plaintext.isEmpty()) throw IOException("empty decrypted cache payload")
+                if (plaintext.size.toLong() > entryByteLimit) throw IOException("decrypted cache payload exceeds entry limit")
+            }
         }
+
+    @Throws(IOException::class)
+    private fun InputStream.readBoundedPayloadCiphertext(): ByteArray {
+        val maxCiphertextBytes =
+            minOf(
+                entryByteLimit.coerceAtMost(Int.MAX_VALUE.toLong() - GCM_TAG_BYTES) + GCM_TAG_BYTES,
+                Int.MAX_VALUE.toLong(),
+            )
+        val output = ByteArrayOutputStream(minOf(maxCiphertextBytes, ENCRYPTION_CHUNK_BYTES.toLong()).toInt())
+        val buffer = ByteArray(ENCRYPTION_CHUNK_BYTES)
+        var total = 0L
+        while (true) {
+            val bytesUntilOverflow = maxCiphertextBytes - total + 1L
+            val read = read(buffer, 0, minOf(buffer.size.toLong(), bytesUntilOverflow).toInt())
+            if (read < 0) break
+            if (read == 0) continue
+            total += read
+            if (total > maxCiphertextBytes) throw IOException("encrypted cache payload exceeds entry limit")
+            output.write(buffer, 0, read)
+        }
+        return output.toByteArray()
+    }
 
     @Throws(IOException::class)
     private fun InputStream.readExactly(size: Int): ByteArray {
@@ -810,7 +842,11 @@ internal class DiskByteCache(
     private fun IOException.isMalformedEnvelope(): Boolean =
         message == "invalid cache envelope magic" ||
             message == "unsupported cache envelope version" ||
-            message == "truncated encrypted cache entry"
+            message == "truncated encrypted cache entry" ||
+            message == "truncated encrypted cache payload" ||
+            message == "empty decrypted cache payload" ||
+            message == "decrypted cache payload exceeds entry limit" ||
+            message == "encrypted cache payload exceeds entry limit"
 
     private fun evictPoisonedEntry(
         fileName: String,

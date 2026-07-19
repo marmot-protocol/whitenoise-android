@@ -80,6 +80,9 @@
             android:name=".amber.AmberSignerRelayActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <receiver
+            android:name=".amber.AmberSignerChoiceReceiver"
+            android:exported="false" />
         <service
             android:name=".notifications.NotificationStreamForegroundService"
             android:exported="false"

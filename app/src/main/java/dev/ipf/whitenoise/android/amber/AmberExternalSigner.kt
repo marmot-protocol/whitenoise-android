@@ -74,6 +74,10 @@ class AmberExternalSigner(
         val packageName =
             Nip55.savedSignerPackage(appContext)
                 ?: throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
+        if (!Nip55.isSignerPackageAvailable(appContext, packageName)) {
+            Nip55.clearSignerPackage(appContext)
+            throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
+        }
 
         // 1) ContentResolver: background, no prompt once "remember" was granted.
         val args =
@@ -125,6 +129,10 @@ class AmberExternalSigner(
                 )
         ) {
             is ActivityResultOutcome.Value -> {
+                trustedSignerPackageFailureReason(
+                    data?.getStringExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE),
+                    expectedPackageName,
+                )?.let { reason -> throw MarmotKitException.Runtime(reason) }
                 validateSignerPackageEcho(parsed.packageName, expectedPackageName)
                 validateSignerValue(op, parsed.value)
             }

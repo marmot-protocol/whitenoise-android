@@ -116,8 +116,30 @@ class MarkdownMessageBodyTest {
         )
 
         composeRule.onAllNodesWithText("row-0").assertCountEquals(1)
-        composeRule.onAllNodesWithText("row-${MARKDOWN_MAX_CONTAINER_SIBLINGS - 1}").assertCountEquals(1)
-        composeRule.onAllNodesWithText("row-$MARKDOWN_MAX_CONTAINER_SIBLINGS").assertCountEquals(0)
+        // The header and body share one area budget, so the one-cell header
+        // leaves room for 255 one-cell body rows.
+        composeRule.onAllNodesWithText("row-${MARKDOWN_MAX_TABLE_CELLS - 2}").assertCountEquals(1)
+        composeRule.onAllNodesWithText("row-${MARKDOWN_MAX_TABLE_CELLS - 1}").assertCountEquals(0)
+        composeRule.onAllNodesWithText("…").assertCountEquals(1)
+    }
+
+    @Test
+    fun messageBodyCapsWideTableRows() {
+        render(
+            listOf(
+                MarkdownBlockFfi.Table(
+                    alignments = List(MARKDOWN_MAX_TABLE_COLUMNS + 2) { MarkdownAlignmentFfi.NONE },
+                    header = listOf(tableCell("header")),
+                    rows =
+                        listOf(
+                            List(MARKDOWN_MAX_TABLE_COLUMNS + 2) { tableCell("column-$it") },
+                        ),
+                ),
+            ),
+        )
+
+        composeRule.onAllNodesWithText("column-${MARKDOWN_MAX_TABLE_COLUMNS - 1}").assertCountEquals(1)
+        composeRule.onAllNodesWithText("column-$MARKDOWN_MAX_TABLE_COLUMNS").assertCountEquals(0)
         composeRule.onAllNodesWithText("…").assertCountEquals(1)
     }
 }
