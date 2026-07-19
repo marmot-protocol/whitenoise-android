@@ -111,7 +111,10 @@ object SafeHttpsGet {
                     requestHeaders = headersForHop(requestHeaders, original = original, current = parsed),
                 ) ?: return null
             try {
+                connection.readTimeout =
+                    timeoutMillisWithinDeadline(readTimeoutMillis, requestDeadlineNanos) ?: return null
                 val code = connection.responseCode
+                if (deadlineExceeded(requestDeadlineNanos)) return null
                 when {
                     code in 300..399 -> {
                         if (hops >= maxRedirectHops) return null
@@ -180,8 +183,12 @@ object SafeHttpsGet {
     ): HttpURLConnection? {
         for (address in addresses) {
             if (deadlineExceeded(requestDeadlineNanos)) return null
+            val boundedConnectTimeout =
+                timeoutMillisWithinDeadline(connectTimeoutMillis, requestDeadlineNanos) ?: return null
+            val boundedReadTimeout =
+                timeoutMillisWithinDeadline(readTimeoutMillis, requestDeadlineNanos) ?: return null
             val connection =
-                pinnedConnection(parsed, address, connectTimeoutMillis, readTimeoutMillis, requestHeaders)
+                pinnedConnection(parsed, address, boundedConnectTimeout, boundedReadTimeout, requestHeaders)
                     ?: continue
             try {
                 connection.connect()
@@ -275,6 +282,17 @@ object SafeHttpsGet {
     }
 
     internal fun deadlineExceeded(deadlineNanos: Long): Boolean = System.nanoTime() - deadlineNanos >= 0
+
+    internal fun timeoutMillisWithinDeadline(
+        configuredTimeoutMillis: Int,
+        deadlineNanos: Long,
+        nowNanos: Long = System.nanoTime(),
+    ): Int? {
+        val remainingNanos = deadlineNanos - nowNanos
+        if (remainingNanos <= 0L) return null
+        val remainingMillis = TimeUnit.NANOSECONDS.toMillis(remainingNanos - 1L) + 1L
+        return minOf(configuredTimeoutMillis.coerceAtLeast(1).toLong(), remainingMillis, Int.MAX_VALUE.toLong()).toInt()
+    }
 
     /** [get] decoded as UTF-8, or null on any failure or oversize body. */
     fun getUtf8(

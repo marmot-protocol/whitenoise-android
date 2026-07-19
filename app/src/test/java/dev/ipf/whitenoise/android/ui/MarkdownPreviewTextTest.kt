@@ -431,6 +431,47 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun tableWindowCapsColumnsAndTotalArea() {
+        val table =
+            markdownVisibleTable(
+                header = List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { "header-$it" },
+                rows =
+                    List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { row ->
+                        List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { column -> "$row-$column" }
+                    },
+            )
+
+        val visibleCellCount = table.header.cells.size + table.rows.sumOf { it.cells.size }
+        assertEquals(MARKDOWN_MAX_TABLE_COLUMNS, table.header.cells.size)
+        assertTrue(table.header.cellsElided)
+        assertTrue(table.rows.all { it.cells.size <= MARKDOWN_MAX_TABLE_COLUMNS })
+        assertTrue(visibleCellCount <= MARKDOWN_MAX_TABLE_CELLS)
+        assertTrue(table.rowsElided)
+    }
+
+    @Test
+    fun tableMentionCollectorStopsAtSharedAreaCap() {
+        val npub = "npub1" + "z".repeat(58)
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Table(
+                            alignments = List(MARKDOWN_MAX_TABLE_COLUMNS) { MarkdownAlignmentFfi.NONE },
+                            header = List(MARKDOWN_MAX_TABLE_COLUMNS) { tableCell("") },
+                            rows =
+                                List(MARKDOWN_MAX_TABLE_CELLS / MARKDOWN_MAX_TABLE_COLUMNS) {
+                                    List(MARKDOWN_MAX_TABLE_COLUMNS) { tableCell("") }
+                                } + listOf(listOf(tableCellWithMention(npub))),
+                        ),
+                    ),
+            )
+
+        assertEquals(emptySet<String>(), markdownDocumentMentionBech32s(document))
+    }
+
+    @Test
     fun previewStopsAtTopLevelBreadthCapWhenBlocksDoNotSpendLength() {
         val annotated =
             build(

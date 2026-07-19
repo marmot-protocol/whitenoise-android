@@ -66,6 +66,15 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun messageNotificationBoundsRemotePreviewBody() {
+        val oversized = "a".repeat(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS + 500)
+
+        val content = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = oversized))
+
+        assertEquals(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS, content?.body?.length)
+    }
+
+    @Test
     fun directMessageIsNotMarkedAsGroupConversation() {
         val content =
             content(

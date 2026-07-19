@@ -136,6 +136,33 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun tamperedPayloadTagIsRejectedAndPoisonedEntryIsEvicted() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        cache.put("tampered", ByteArray(32) { it.toByte() })
+        val encrypted = File(dir, sha256Hex("tampered") + ".enc")
+        val bytes = encrypted.readBytes()
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+        encrypted.writeBytes(bytes)
+
+        assertNull(cache.get("tampered"))
+        assertFalse("payload authentication failure must evict the index row", cache.contains("tampered"))
+        assertFalse("payload authentication failure must delete the envelope", encrypted.exists())
+        assertEquals(0L, cache.residentBytes())
+    }
+
+    @Test
+    fun truncatedPayloadIsRejectedAndPoisonedEntryIsEvicted() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        cache.put("truncated", ByteArray(32) { it.toByte() })
+        val encrypted = File(dir, sha256Hex("truncated") + ".enc")
+        encrypted.writeBytes(encrypted.readBytes().copyOf(55))
+
+        assertNull(cache.get("truncated"))
+        assertFalse(cache.contains("truncated"))
+        assertFalse(encrypted.exists())
+    }
+
+    @Test
     fun legacyPlaintextEntries_areWipedInsteadOfMigrated() {
         val key = "legacy"
         val legacy = File(dir, sha256Hex(key) + ".bin").also { it.writeText("decrypted media") }

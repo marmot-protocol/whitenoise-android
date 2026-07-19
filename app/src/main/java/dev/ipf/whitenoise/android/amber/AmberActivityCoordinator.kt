@@ -161,6 +161,9 @@ object AmberActivityCoordinator {
                 }
             } finally {
                 pending.compareAndSet(slot, null)
+                // A timed-out or abandoned relay may never return to consume
+                // its chooser identity. Drop the process-local correlation now.
+                AmberSignerRelay.consumeHandledSignerPackage(requestId)
             }
         }
 }

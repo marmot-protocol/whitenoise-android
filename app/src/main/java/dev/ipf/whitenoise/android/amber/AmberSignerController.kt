@@ -54,7 +54,11 @@ class AmberSignerController(
                 )
         ) {
             is ActivityResultOutcome.PublicKey -> {
-                parsed.packageName?.let { Nip55.saveSignerPackage(appContext, it) }
+                val handledPackage = outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE)
+                trustedSignerPackageFailureReason(handledPackage, parsed.packageName)?.let { reason ->
+                    throw MarmotKitException.Runtime(reason)
+                }
+                Nip55.saveSignerPackage(appContext, checkNotNull(handledPackage))
                 parsed.pubkey
             }
             ActivityResultOutcome.Rejected -> throw MarmotKitException.ExternalSignerRejected()

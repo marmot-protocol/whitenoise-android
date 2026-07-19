@@ -142,7 +142,13 @@ class FreshSweepCoverageTest {
             "cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)" in presenter,
         )
         val postPath = presenter.section("if (messaging != null)", "notificationDebug {")
-        assertFalse("routine notification updates must not cancel before notify", "notificationManager.cancel(" in postPath)
+        val firstPostAttempt = postPath.indexOf("postNotificationSafely(")
+        val firstFailureCleanup = postPath.indexOf("notificationManager.cancel(")
+        assertTrue("messaging updates must attempt notify before any failure cleanup", firstPostAttempt >= 0)
+        assertTrue(
+            "routine notification updates must not cancel before notify",
+            firstFailureCleanup < 0 || firstFailureCleanup > firstPostAttempt,
+        )
     }
 
     @Test

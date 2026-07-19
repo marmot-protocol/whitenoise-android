@@ -4,6 +4,7 @@ import androidx.annotation.VisibleForTesting
 
 internal enum class ConversationCardOp {
     SHOW_NOTIFY,
+    DISMISS_CANCEL,
     MARK_REPLY_HANDLED,
     CANCEL_IF_SAME_GENERATION,
 }

@@ -43,12 +43,24 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 
+@SuppressLint("MissingPermission")
+private fun postLocalNotification(
+    manager: NotificationManagerCompat,
+    tag: String,
+    id: Int,
+    notification: Notification,
+) {
+    manager.notify(tag, id, notification)
+}
+
 class LocalNotificationPresenter(
     private val context: Context,
     private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
         ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
     },
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val notificationPoster: (NotificationManagerCompat, String, Int, Notification) -> Unit =
+        ::postLocalNotification,
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
     },
@@ -87,9 +99,9 @@ class LocalNotificationPresenter(
             val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
             val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
             val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-            manager.cancel(message.tag, message.id)
-            manager.cancel(reaction.tag, reaction.id)
-            manager.cancel(mention.tag, mention.id)
+            listOf(message, reaction, mention).forEach { key ->
+                cancelSynchronized(manager, key.tag, key.id)
+            }
             dismissInvitesForGroup(accountRef, groupIdHex)
             notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
             true
@@ -127,8 +139,25 @@ class LocalNotificationPresenter(
         val compat = NotificationManagerCompat.from(context)
         inviteNotifications.forEach {
             coroutineContext.ensureActive()
-            compat.cancel(it.tag, it.id)
-            it.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+            ConversationCardPostSynchronizer.withLock(
+                it.tag.orEmpty(),
+                it.id,
+                ConversationCardOp.DISMISS_CANCEL,
+            ) {
+                val live = activeNotification(manager, it.tag, it.id) ?: return@withLock
+                val extras = live.notification.extras ?: return@withLock
+                if (
+                    shouldDismissInvite(
+                        extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+                        extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+                        accountRef = accountRef,
+                        groupIdHex = groupIdHex,
+                    )
+                ) {
+                    compat.cancel(live.tag, live.id)
+                    live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+                }
+            }
         }
     }
 
@@ -157,16 +186,14 @@ class LocalNotificationPresenter(
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        val active = runCatching { activeNotificationsProvider(manager) }.getOrNull()?.toList().orEmpty()
         val compat = NotificationManagerCompat.from(context)
-        val postTimeByKey = active.associate { (it.tag to it.id) to it.postTime }
         listOf(
             LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
             LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
         ).forEach { key ->
-            val postTime = postTimeByKey[key.tag to key.id] ?: return@forEach
-            if (postTime <= sinceMs) compat.cancel(key.tag, key.id)
+            cancelSynchronizedNotNewerThan(manager, compat, key.tag, key.id, sinceMs)
         }
+        val active = runCatching { activeNotificationsProvider(manager) }.getOrNull()?.toList().orEmpty()
         active.forEach { sbn ->
             val extras = sbn.notification.extras ?: return@forEach
             val isInvite =
@@ -177,8 +204,28 @@ class LocalNotificationPresenter(
                     groupIdHex = groupIdHex,
                 )
             if (isInvite && sbn.postTime <= sinceMs) {
-                compat.cancel(sbn.tag, sbn.id)
-                sbn.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+                ConversationCardPostSynchronizer.withLock(
+                    sbn.tag.orEmpty(),
+                    sbn.id,
+                    ConversationCardOp.DISMISS_CANCEL,
+                ) {
+                    val live = activeNotification(manager, sbn.tag, sbn.id) ?: return@withLock
+                    val liveExtras = live.notification.extras ?: return@withLock
+                    if (
+                        live.postTime <= sinceMs &&
+                        shouldDismissInvite(
+                            extraAccountRef =
+                                liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+                            extraGroupIdHex =
+                                liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+                            accountRef = accountRef,
+                            groupIdHex = groupIdHex,
+                        )
+                    ) {
+                        compat.cancel(live.tag, live.id)
+                        live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+                    }
+                }
             }
         }
         return true
@@ -370,63 +417,170 @@ class LocalNotificationPresenter(
         }
 
         val notificationManager = NotificationManagerCompat.from(context)
-        withContext(Dispatchers.Default) {
-            val messaging = messagingPost
-            if (messaging != null) {
-                ConversationCardPostSynchronizer.withLock(
-                    notificationContent.notificationTag,
-                    notificationContent.notificationId,
-                    ConversationCardOp.SHOW_NOTIFY,
-                ) {
-                    val carried =
-                        if (redactContent) {
-                            null
-                        } else {
-                            existingMessagingStyle(
+        val posted =
+            withContext(Dispatchers.Default) {
+                val messaging = messagingPost
+                if (messaging != null) {
+                    ConversationCardPostSynchronizer.withLock(
+                        notificationContent.notificationTag,
+                        notificationContent.notificationId,
+                        ConversationCardOp.SHOW_NOTIFY,
+                    ) {
+                        val carried =
+                            if (redactContent) {
+                                null
+                            } else {
+                                existingMessagingStyle(
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                )?.messages
+                            }
+                        ConversationCardPostSynchronizer.awaitTestBarrier(
+                            ConversationCardOp.SHOW_NOTIFY,
+                            ConversationCardBarrier.AFTER_READ,
+                            notificationContent.notificationTag,
+                            notificationContent.notificationId,
+                        )
+                        val presentationTimestampMs = nowMillis()
+                        stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                        builder.setStyle(
+                            messagingStyle(
+                                notificationContent,
+                                messaging.conversationTitleOverride,
+                                decision.historyCap,
+                                carried,
+                                messaging.sender,
+                                presentationTimestampMs,
+                            ),
+                        )
+                        val notification = builder.build()
+                        ConversationCardPostSynchronizer.awaitTestBarrier(
+                            ConversationCardOp.SHOW_NOTIFY,
+                            ConversationCardBarrier.BEFORE_WRITE,
+                            notificationContent.notificationTag,
+                            notificationContent.notificationId,
+                        )
+                        val firstPostSucceeded =
+                            postNotificationSafely(
+                                notificationManager,
                                 notificationContent.notificationTag,
                                 notificationContent.notificationId,
-                            )?.messages
+                                notification,
+                            )
+                        if (firstPostSucceeded) {
+                            true
+                        } else {
+                            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                            if (carried.isNullOrEmpty()) {
+                                false
+                            } else {
+                                builder.setStyle(
+                                    messagingStyle(
+                                        notificationContent,
+                                        messaging.conversationTitleOverride,
+                                        decision.historyCap,
+                                        carriedHistory = null,
+                                        sender = messaging.sender,
+                                        newMessageTimestampMs = presentationTimestampMs,
+                                    ),
+                                )
+                                val cleanNotification = builder.build()
+                                val retrySucceeded =
+                                    postNotificationSafely(
+                                        notificationManager,
+                                        notificationContent.notificationTag,
+                                        notificationContent.notificationId,
+                                        cleanNotification,
+                                    )
+                                if (!retrySucceeded) {
+                                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                }
+                                retrySucceeded
+                            }
                         }
-                    ConversationCardPostSynchronizer.awaitTestBarrier(
-                        ConversationCardOp.SHOW_NOTIFY,
-                        ConversationCardBarrier.AFTER_READ,
+                    }
+                } else {
+                    ConversationCardPostSynchronizer.withLock(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
-                    )
-                    val presentationTimestampMs = nowMillis()
-                    stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                    builder.setStyle(
-                        messagingStyle(
-                            notificationContent,
-                            messaging.conversationTitleOverride,
-                            decision.historyCap,
-                            carried,
-                            messaging.sender,
-                            presentationTimestampMs,
-                        ),
-                    )
-                    val notification = builder.build()
-                    ConversationCardPostSynchronizer.awaitTestBarrier(
                         ConversationCardOp.SHOW_NOTIFY,
-                        ConversationCardBarrier.BEFORE_WRITE,
-                        notificationContent.notificationTag,
-                        notificationContent.notificationId,
-                    )
-                    notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
+                    ) {
+                        val presentationTimestampMs = nowMillis()
+                        stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                        val notification = builder.build()
+                        val succeeded =
+                            postNotificationSafely(
+                                notificationManager,
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                                notification,
+                            )
+                        if (!succeeded) {
+                            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                        }
+                        succeeded
+                    }
                 }
-            } else {
-                val presentationTimestampMs = nowMillis()
-                stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                val notification = builder.build()
-                notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
             }
-        }
+        if (!posted) return false
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
             "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
         }
         return true
     }
+
+    private fun postNotificationSafely(
+        manager: NotificationManagerCompat,
+        tag: String,
+        id: Int,
+        notification: Notification,
+    ): Boolean =
+        try {
+            notificationPoster(manager, tag, id, notification)
+            true
+        } catch (exception: RuntimeException) {
+            notificationDebug {
+                "post failed tag=${tag.take(16)} type=${exception.javaClass.simpleName}"
+            }
+            false
+        }
+
+    private fun cancelSynchronized(
+        manager: NotificationManagerCompat,
+        tag: String,
+        id: Int,
+    ) {
+        ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
+            manager.cancel(tag, id)
+        }
+    }
+
+    private fun cancelSynchronizedNotNewerThan(
+        manager: NotificationManager,
+        compat: NotificationManagerCompat,
+        tag: String,
+        id: Int,
+        sinceMs: Long,
+    ) {
+        ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
+            val live = activeNotification(manager, tag, id) ?: return@withLock
+            if (live.postTime <= sinceMs) compat.cancel(tag, id)
+        }
+    }
+
+    private fun activeNotification(
+        manager: NotificationManager,
+        tag: String?,
+        id: Int,
+    ): StatusBarNotification? =
+        try {
+            activeNotificationsProvider(manager).firstOrNull { it.tag == tag && it.id == id }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
 
     private fun ChannelImportance.toCompatPriority(): Int =
         when (this) {
@@ -584,7 +738,20 @@ class LocalNotificationPresenter(
         val style = NotificationCompat.MessagingStyle(self)
         carriedHistory
             ?.let { capNotificationHistory(it, historyCap) }
-            ?.forEach { style.addMessage(it) }
+            ?.forEach { message ->
+                style.addMessage(
+                    NotificationCompat.MessagingStyle
+                        .Message(
+                            boundedNotificationMessageText(message.text ?: ""),
+                            message.timestamp,
+                            message.person,
+                        ).also { bounded ->
+                            val mimeType = message.dataMimeType
+                            val dataUri = message.dataUri
+                            if (mimeType != null && dataUri != null) bounded.setData(mimeType, dataUri)
+                        },
+                )
+            }
         style.isGroupConversation = content.isGroupConversation
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.

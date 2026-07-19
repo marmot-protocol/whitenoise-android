@@ -13,8 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
  *
  * Each instance owns one request id for its lifetime so a late cancellation from
  * a prior, timed-out prompt still carries the old id and cannot satisfy the next
- * caller. Signer extras are forwarded unchanged; relay correlation uses a
- * separate app-private extra.
+ * caller. Signer extras are forwarded, then app-private correlation and the
+ * package Android actually resolved are stamped over any signer-supplied values.
  */
 class AmberSignerRelayActivity : ComponentActivity() {
     private lateinit var signerLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
@@ -38,8 +38,13 @@ class AmberSignerRelayActivity : ComponentActivity() {
             return
         }
 
+        val preparedIntent = AmberSignerRelay.prepareSignerLaunch(this, requestId!!, signerIntent)
+        if (preparedIntent == null) {
+            finishLaunchFailure()
+            return
+        }
         try {
-            signerLauncher.launch(signerIntent)
+            signerLauncher.launch(preparedIntent)
             signerLaunched = true
         } catch (_: Exception) {
             finishLaunchFailure()
@@ -54,10 +59,16 @@ class AmberSignerRelayActivity : ComponentActivity() {
     }
 
     private fun finishLaunchFailure() {
+        val handledSignerPackage = AmberSignerRelay.consumeHandledSignerPackage(requestId)
         val relayResult =
-            AmberSignerRelay.buildResultIntent(requestId, signerData = null).apply {
-                putExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, true)
-            }
+            AmberSignerRelay
+                .buildResultIntent(
+                    requestId,
+                    signerData = null,
+                    handledSignerPackage = handledSignerPackage,
+                ).apply {
+                    putExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, true)
+                }
         setResult(RESULT_CANCELED, relayResult)
         finish()
     }
@@ -66,7 +77,8 @@ class AmberSignerRelayActivity : ComponentActivity() {
         resultOk: Boolean,
         signerData: Intent?,
     ) {
-        val relayResult = AmberSignerRelay.buildResultIntent(requestId, signerData)
+        val handledSignerPackage = AmberSignerRelay.consumeHandledSignerPackage(requestId)
+        val relayResult = AmberSignerRelay.buildResultIntent(requestId, signerData, handledSignerPackage)
         setResult(if (resultOk) RESULT_OK else RESULT_CANCELED, relayResult)
         finish()
     }
