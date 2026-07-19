@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -54,6 +55,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -132,7 +134,139 @@ fun SettingsAccountHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+internal const val ACCOUNT_SELECTOR_CONTENT_TAG = "account-selector-content"
+
+internal data class AccountSelectorAccountState(
+    val label: String,
+    val accountIdHex: String,
+    val isReadOnly: Boolean,
+    val isSignedOut: Boolean,
+    val isActive: Boolean,
+)
+
+internal data class AccountSelectorState(
+    val accounts: List<AccountSelectorAccountState>,
+    val refreshing: Boolean,
+)
+
+internal fun accountSelectorState(
+    accounts: List<AccountSummaryFfi>,
+    activeAccountRef: String?,
+    refreshing: Boolean,
+): AccountSelectorState =
+    AccountSelectorState(
+        accounts =
+            accounts.map { account ->
+                AccountSelectorAccountState(
+                    label = account.label,
+                    accountIdHex = account.accountIdHex,
+                    isReadOnly = !account.localSigning && !account.externalSigning,
+                    isSignedOut = account.signedOut,
+                    isActive = account.label == activeAccountRef,
+                )
+            },
+        refreshing = refreshing,
+    )
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun AccountSelectorContent(
+    state: AccountSelectorState,
+    displayName: (String) -> String,
+    shortNpub: (String) -> String,
+    avatarUrl: (String) -> String?,
+    unreadCountForAccount: (String) -> ULong,
+    onSwitchAccount: (String) -> Unit,
+    onAddAccount: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().testTag(ACCOUNT_SELECTOR_CONTENT_TAG).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
+        if (state.refreshing) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                items(state.accounts, key = { it.label }) { account ->
+                    val unreadCount = unreadCountForAccount(account.label)
+                    ListItem(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                .clickable { onSwitchAccount(account.label) },
+                        colors =
+                            ListItemDefaults.colors(
+                                // Tonal highlight so the active account reads at a
+                                // glance, not only from the trailing check.
+                                containerColor =
+                                    if (account.isActive) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        Color.Transparent
+                                    },
+                            ),
+                        leadingContent = {
+                            Avatar(
+                                title = displayName(account.accountIdHex),
+                                seed = account.accountIdHex,
+                                size = 44.dp,
+                                pictureUrl = avatarUrl(account.accountIdHex),
+                            )
+                        },
+                        headlineContent = { Text(displayName(account.accountIdHex)) },
+                        supportingContent = {
+                            Text(
+                                shortNpub(account.accountIdHex),
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (unreadCount > 0uL) {
+                                    UnreadCountBadge(unreadCount)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (account.isReadOnly) {
+                                    Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (account.isSignedOut) {
+                                    Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (account.isActive) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.active),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                }
+                            }
+                        },
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+        FilledTonalButton(
+            onClick = onAddAccount,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.add_account))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AccountSelectorSheet(
     appState: WhiteNoiseAppState,
@@ -155,108 +289,36 @@ internal fun AccountSelectorSheet(
             refreshingAccounts = false
         }
     }
+    val state =
+        accountSelectorState(
+            accounts = appState.accounts,
+            activeAccountRef = appState.activeAccountRef,
+            refreshing = refreshingAccounts,
+        )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = amoledSheetContainerColor(),
     ) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
-            if (refreshingAccounts) {
-                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator()
+        AccountSelectorContent(
+            state = state,
+            displayName = appState::displayName,
+            shortNpub = appState::shortNpub,
+            avatarUrl = appState::avatarUrl,
+            unreadCountForAccount = appState::unreadCountForAccount,
+            onSwitchAccount = { accountLabel ->
+                // Run on the process-lifetime mutation scope, not this sheet's
+                // composition. setActiveAccount flips activeAccountRef partway
+                // through and keeps suspending; the nav reset then disposes the
+                // sheet before the switch cleanup finishes (#547).
+                appState.launchMutation {
+                    appState.setActiveAccount(accountLabel)
+                    onDismiss()
+                    // Land on the newly-active account's chat list instead of
+                    // leaving the user on Settings (#316).
+                    onAccountSwitched()
                 }
-            } else {
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                    items(appState.accounts, key = { it.label }) { account ->
-                        val unreadCount = appState.unreadCountForAccount(account.label)
-                        val isActiveAccount = account.label == appState.activeAccountRef
-                        ListItem(
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        // Run on the process-lifetime mutation scope, not this
-                                        // sheet's rememberCoroutineScope. setActiveAccount flips
-                                        // activeAccountRef partway through and keeps suspending
-                                        // (profile warm, notification refresh, push sync); the
-                                        // account-change nav reset in MainShell then disposes this
-                                        // sheet, which would cancel a sheet-scoped coroutine before
-                                        // the switch cleanup finishes (#547). onDismiss /
-                                        // onAccountSwitched only set parent composition state, so
-                                        // they are safe to run from the mutation scope.
-                                        appState.launchMutation {
-                                            appState.setActiveAccount(account.label)
-                                            onDismiss()
-                                            // Land on the newly-active account's chat list
-                                            // instead of leaving the user on Settings (#316).
-                                            onAccountSwitched()
-                                        }
-                                    },
-                            colors =
-                                ListItemDefaults.colors(
-                                    // Tonal highlight so the active account reads at a
-                                    // glance, not only from the trailing check.
-                                    containerColor =
-                                        if (isActiveAccount) {
-                                            MaterialTheme.colorScheme.secondaryContainer
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                ),
-                            leadingContent = {
-                                Avatar(
-                                    title = appState.displayName(account.accountIdHex),
-                                    seed = account.accountIdHex,
-                                    size = 44.dp,
-                                    pictureUrl = appState.avatarUrl(account.accountIdHex),
-                                )
-                            },
-                            headlineContent = { Text(appState.displayName(account.accountIdHex)) },
-                            supportingContent = {
-                                Text(
-                                    appState.shortNpub(account.accountIdHex),
-                                    fontFamily = FontFamily.Monospace,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            trailingContent = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (unreadCount > 0uL) {
-                                        UnreadCountBadge(unreadCount)
-                                        Spacer(Modifier.width(8.dp))
-                                    }
-                                    if (!account.localSigning && !account.externalSigning) {
-                                        Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
-                                        Spacer(Modifier.width(8.dp))
-                                    }
-                                    if (account.signedOut) {
-                                        Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
-                                        Spacer(Modifier.width(8.dp))
-                                    }
-                                    if (isActiveAccount) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = stringResource(R.string.active),
-                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        )
-                                    }
-                                }
-                            },
-                        )
-                        HorizontalDivider()
-                    }
-                }
-            }
-            FilledTonalButton(
-                onClick = onAddAccount,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.add_account))
-            }
-        }
+            },
+            onAddAccount = onAddAccount,
+        )
     }
 }
