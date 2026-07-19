@@ -243,6 +243,7 @@ class LocalNotificationPresenter(
         redactContent: Boolean = false,
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
+        isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
         val formattedContent =
@@ -298,6 +299,7 @@ class LocalNotificationPresenter(
                 notificationContent.notificationTag,
                 notificationContent.notificationId,
             )
+            if (!isPostStillAllowed()) return@withRegisteredShow false
             // A shortcut-backed message posts on its per-conversation channel (the
             // child of whichever parent it routed to — message OR mention), so
             // Android treats it as a conversation and the user's per-conversation
@@ -436,7 +438,9 @@ class LocalNotificationPresenter(
                             notificationContent.notificationId,
                             ConversationCardOp.SHOW_NOTIFY,
                         ) {
-                            if (!ConversationCardPostSynchronizer.isShowCurrent(showToken)) return@withLock false
+                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
+                                return@withLock false
+                            }
                             val carried =
                                 if (redactContent) {
                                     null
@@ -516,7 +520,9 @@ class LocalNotificationPresenter(
                             notificationContent.notificationId,
                             ConversationCardOp.SHOW_NOTIFY,
                         ) {
-                            if (!ConversationCardPostSynchronizer.isShowCurrent(showToken)) return@withLock false
+                            if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
+                                return@withLock false
+                            }
                             val presentationTimestampMs = nowMillis()
                             stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                             val notification = builder.build()

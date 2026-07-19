@@ -9,10 +9,14 @@ import android.net.Uri
 import android.os.Looper
 import android.service.chooser.ChooserResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -149,6 +153,7 @@ class AmberActivityCoordinatorTest {
     @Test
     fun chooserCallbackRecordsThePackageSelectedByAndroid() {
         val requestId = "chosen-signer"
+        AmberSignerRelay.registerHandledSignerRequest(requestId)
         AmberSignerChoiceReceiver().onReceive(
             context,
             Intent().apply {
@@ -163,6 +168,7 @@ class AmberActivityCoordinatorTest {
     @Test
     fun chooserResultRecordsThePackageSelectedByAndroidOnApi35AndLater() {
         val requestId = "chosen-signer-result"
+        AmberSignerRelay.registerHandledSignerRequest(requestId)
         val component = ComponentName("com.modern.signer", "SignerActivity")
         val chooserResult =
             ChooserResult::class.java
@@ -179,6 +185,30 @@ class AmberActivityCoordinatorTest {
 
         assertEquals("com.modern.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
     }
+
+    @Test
+    fun successfulSignerResultWaitsForTheChooserCallbackPackage() =
+        runBlocking {
+            val requestId = "fast-signer-before-chooser-callback"
+            AmberSignerRelay.registerHandledSignerRequest(requestId)
+            val handledPackage =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    AmberSignerRelay.awaitHandledSignerPackage(requestId, timeoutMs = 2_000)
+                }
+
+            assertFalse(handledPackage.isCompleted)
+            AmberSignerChoiceReceiver().onReceive(
+                context,
+                Intent().apply {
+                    putExtra(AmberSignerRelay.EXTRA_CHOOSER_REQUEST_ID, requestId)
+                    putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName("com.fast.signer", "SignerActivity"))
+                },
+            )
+
+            assertEquals("com.fast.signer", handledPackage.await())
+            assertEquals("com.fast.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+            assertNull(AmberSignerRelay.consumeHandledSignerPackage(requestId))
+        }
 
     @Test
     fun publicKeyLoginPersistsTheResolvedPackageNotOnlyTheSignerEcho() {

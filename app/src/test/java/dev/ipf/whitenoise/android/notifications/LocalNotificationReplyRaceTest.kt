@@ -10,9 +10,11 @@ import androidx.core.app.Person
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.state.NotificationPostEpoch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -329,6 +331,59 @@ class LocalNotificationReplyRaceTest {
             expectedMessageIdHex = "msg-b",
             requiredMessageTexts = listOf("new during window"),
         )
+    }
+
+    @Test
+    fun visibleConversationChangeAfterShowRegistrationPreventsThePost() {
+        val presenter = LocalNotificationPresenter(context)
+        val postEpoch = NotificationPostEpoch()
+        val capturedEpoch = postEpoch.capture()
+        val showRegistered = CountDownLatch(1)
+        val releaseShow = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val showResult = AtomicReference<Boolean>()
+        val showFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_REGISTER) {
+                        showRegistered.countDown()
+                        check(releaseShow.await(5, TimeUnit.SECONDS))
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(
+                            messageUpdate("msg-after-open", previewText = "do not resurrect", timestampMs = 2_000L),
+                            isPostStillAllowed = { postEpoch.isCurrent(capturedEpoch) },
+                            shortNpub = { "npub1test" },
+                        )
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+
+        assertTrue(showRegistered.await(5, TimeUnit.SECONDS))
+        postEpoch.advance()
+        postEpoch.advance()
+        releaseShow.countDown()
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        assertFalse(showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
     }
 
     @Test
