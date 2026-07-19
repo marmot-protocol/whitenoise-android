@@ -1846,7 +1846,7 @@ class WhiteNoiseAppState(
             var failures = 0
             for (groupIdHex in targets) {
                 val ok =
-                    runCatching {
+                    runCatchingCancellable {
                         withGroupCommitLock(account, groupIdHex) {
                             marmotIo { sendText(account, groupIdHex, trimmed) }
                         }
@@ -2785,7 +2785,7 @@ class WhiteNoiseAppState(
         clearContactPrivateDetailsForAccount(wipedRef)
         wipeDecryptedMediaFromDisk()
         clearHiddenMessagesForAccount(wipedRef)
-        val refreshedAccounts = runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())
+        val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
         accounts = refreshedAccounts
         refreshAccountUnreadCounts(refreshedAccounts)
         val next = refreshedAccounts.firstOrNull()?.label
@@ -2819,7 +2819,7 @@ class WhiteNoiseAppState(
 
     suspend fun accountRelayLists(): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
-        return runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()
+        return runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
     }
 
     suspend fun setAccountRelays(
@@ -3064,8 +3064,8 @@ class WhiteNoiseAppState(
     }
 
     suspend fun refreshSecurityPrivacySettings() {
-        relayTelemetrySettings = runCatching { marmotIo { relayTelemetrySettings() } }.getOrNull()
-        auditLogSettings = runCatching { marmotIo { auditLogSettings() } }.getOrNull()
+        relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
+        auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
     }
 
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
@@ -3933,7 +3933,7 @@ class WhiteNoiseAppState(
             if (account == null) {
                 null
             } else {
-                runCatching {
+                runCatchingCancellable {
                     marmotIo { notificationSettings(account) }
                 }.getOrNull()
             }
@@ -4296,7 +4296,7 @@ class WhiteNoiseAppState(
         config: PushServerConfig,
         token: String,
     ): Boolean {
-        val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return false
+        val settings = runCatchingCancellable { marmotIo { notificationSettings(account) } }.getOrNull() ?: return false
         if (account == activeAccountRef) localNotificationSettings = settings
         // Skip accounts with a queued sign-out disable so a stale enabled flag can't re-register them.
         if (account in pushTokenStore.pendingDisables()) return true
@@ -4325,7 +4325,7 @@ class WhiteNoiseAppState(
             // longer enabled, do NOT write the fingerprint back — otherwise
             // the cache restores a stale entry and the next enable
             // short-circuits without re-registering. Roll back instead.
-            val settingsAfter = runCatching { marmotIo { notificationSettings(account) } }.getOrNull()
+            val settingsAfter = runCatchingCancellable { marmotIo { notificationSettings(account) } }.getOrNull()
             when {
                 // Re-read failed: that's a transient error, not a disable —
                 // the upsert itself succeeded, so keep the registration. Skip
@@ -4586,7 +4586,7 @@ class WhiteNoiseAppState(
         return resolved
     }
 
-    suspend fun accountIdHex(reference: String): String? = runCatching { marmotIo { accountIdHex(reference) } }.getOrNull()
+    suspend fun accountIdHex(reference: String): String? = runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
         // Observe profile cache invalidations for Compose callers.
@@ -4600,7 +4600,7 @@ class WhiteNoiseAppState(
 
     suspend fun loadUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
         val profile =
-            runCatching {
+            runCatchingCancellable {
                 marmotIo { userProfile(accountIdHex) }
             }.getOrNull()
         if (profile == null) requestProfile(accountIdHex)
@@ -4773,7 +4773,7 @@ class WhiteNoiseAppState(
                         marmotIo {
                             val relays =
                                 activeAccountRef
-                                    ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
+                                    ?.let { runCatchingCancellable { accountNip65Relays(it) }.getOrNull() }
                                     ?.takeIf { it.isNotEmpty() }
                                     ?: MarmotClient.bootstrapRelays
                             refreshProfile(accountIdHex, relays)
@@ -4794,7 +4794,8 @@ class WhiteNoiseAppState(
             // in-memory caches on the main thread. The read accessors serve from
             // these caches so composition never crosses the binding. See #4, #49.
             val displayName =
-                marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }
+                    .getOrNull()
                     ?.let { ProfileSanitizer.displayName(it) }
             val presentation =
                 ProfilePresentation(
@@ -5007,7 +5008,7 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun Marmot.configurePrivacyRuntime() {
-        val installId = runCatching { telemetryInstallId() }.getOrNull().orEmpty()
+        val installId = runCatchingCancellable { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
             RelayTelemetryRuntimeConfigFfi(
                 otlpEndpoint = BuildConfig.WHITENOISE_OTLP_ENDPOINT.nonBlankOrNull(),
@@ -5051,9 +5052,9 @@ class WhiteNoiseAppState(
         if (senderIdHex.isBlank()) return null
         contactNicknameFor(update.accountRef, senderIdHex)?.let { return it }
         val resolvedName =
-            runCatching {
-                marmotIo { runCatching { marmot().displayName(senderIdHex) }.getOrNull() }
-            }.getOrNull()?.let { ProfileSanitizer.displayName(it) }
+            runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
+                .getOrNull()
+                ?.let { ProfileSanitizer.displayName(it) }
         return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
     }
 
@@ -5070,7 +5071,7 @@ class WhiteNoiseAppState(
             accountIdHex = { accountIdHex(it) },
             profileDisplayName = { profileDisplayName(it) },
             readDisplayName = { accountIdHex ->
-                marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
             },
             requestProfile = { requestProfile(it) },
         )
@@ -5090,14 +5091,14 @@ class WhiteNoiseAppState(
         update.messageIdHex?.let { messageId ->
             // A small recent tail; the just-arrived message is within it, and a
             // miss simply falls back to the generic notification body.
-            runCatching { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
+            runCatchingCancellable { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
                 .getOrNull()
                 ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
         }
 
     private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =
         update.messageIdHex?.let { messageId ->
-            runCatching {
+            runCatchingCancellable {
                 marmotIo {
                     timelineMessages(
                         update.accountRef,
@@ -5129,14 +5130,14 @@ class WhiteNoiseAppState(
             when {
                 GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
                 !senderName.isNullOrBlank() -> senderName
-                !actorHex.isNullOrBlank() -> runCatching { displayNameForAccount(update.accountRef, actorHex) }.getOrNull()
+                !actorHex.isNullOrBlank() -> runCatchingCancellable { displayNameForAccount(update.accountRef, actorHex) }.getOrNull()
                 else -> null
             } ?: appContext.getString(R.string.group_system_someone)
         val subjectHex = event.subject
         val subjectName =
             when {
                 GroupSystemEvents.isSelf(update.accountIdHex, subjectHex) -> appContext.getString(R.string.you)
-                !subjectHex.isNullOrBlank() -> runCatching { displayNameForAccount(update.accountRef, subjectHex) }.getOrNull()
+                !subjectHex.isNullOrBlank() -> runCatchingCancellable { displayNameForAccount(update.accountRef, subjectHex) }.getOrNull()
                 else -> null
             }
         return NotificationSystemText(
@@ -5219,7 +5220,7 @@ class WhiteNoiseAppState(
         // bidi/control chars) before trusting it as a notification title.
         update.groupName?.let { ProfileSanitizer.displayName(it) }?.let { return it }
         val members =
-            runCatching { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
+            runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
                 .getOrNull()
                 .orEmpty()
         if (members.isEmpty()) return null
@@ -5562,9 +5563,10 @@ class WhiteNoiseAppState(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheEpoch.get()
-        val profile = marmotIo { runCatching { marmot().userProfile(id) }.getOrNull() }
+        val profile = runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
         val displayName =
-            marmotIo { runCatching { marmot().displayName(id) }.getOrNull() }
+            runCatchingCancellable { marmotIo { displayName(id) } }
+                .getOrNull()
                 ?.let { ProfileSanitizer.displayName(it) }
         val presentation =
             ProfilePresentation(
