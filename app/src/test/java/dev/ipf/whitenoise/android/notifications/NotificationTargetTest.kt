@@ -614,6 +614,14 @@ class NotificationTargetTest {
                 operationFailureAttempt = 2,
             ),
         )
+        // Unpersisted attempt count (null) must fail closed, not retry unbounded.
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = null,
+            ),
+        )
     }
 
     @Test

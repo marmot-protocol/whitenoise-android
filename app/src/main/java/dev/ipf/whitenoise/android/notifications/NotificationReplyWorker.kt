@@ -211,7 +211,7 @@ class NotificationReplyWorker(
         val result =
             resultAfterSendOutcome(
                 outcome = outcome,
-                operationFailureAttempt = operationAttempt ?: 0,
+                operationFailureAttempt = operationAttempt,
                 containsLegacyPlaintext = containsLegacyPlaintext,
             )
         if (result == Result.retry()) return result
@@ -378,13 +378,19 @@ class NotificationReplyWorker(
 
         internal fun resultAfterSendOutcome(
             outcome: NotificationReplySendOutcome,
-            operationFailureAttempt: Int,
+            operationFailureAttempt: Int?,
             containsLegacyPlaintext: Boolean = false,
         ): Result =
             when {
                 outcome == NotificationReplySendOutcome.Sent ||
                     outcome == NotificationReplySendOutcome.AlreadyCommitted -> Result.success()
-                shouldRetryAfterSendOutcome(outcome, operationFailureAttempt, containsLegacyPlaintext) -> Result.retry()
+                // A retryable failure whose attempt count couldn't be persisted (null)
+                // fails closed: retrying without a durable count lets the bound never
+                // advance and WorkManager loop unbounded, matching the fail-closed guards
+                // in replyFailureResult / cryptoFailureResult.
+                operationFailureAttempt != null &&
+                    shouldRetryAfterSendOutcome(outcome, operationFailureAttempt, containsLegacyPlaintext) ->
+                    Result.retry()
                 else -> Result.failure()
             }
 
