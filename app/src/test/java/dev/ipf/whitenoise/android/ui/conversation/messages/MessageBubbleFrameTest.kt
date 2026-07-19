@@ -2,8 +2,11 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
@@ -21,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -115,11 +119,112 @@ class MessageBubbleFrameTest {
         composeRule.onNodeWithText("Quoted message").assertIsDisplayed()
     }
 
+    @Test
+    fun replyFooterPinsToQuoteWidenedBubbleEnd() {
+        composeRule.setContent {
+            Column(Modifier.width(IntrinsicSize.Max).testTag(REPLY_BUBBLE_TAG)) {
+                Box(Modifier.width(220.dp).height(1.dp))
+                BubbleFooterLayout(
+                    footer = {
+                        Box(
+                            Modifier
+                                .width(58.dp)
+                                .height(12.dp)
+                                .testTag(REPLY_FOOTER_TAG),
+                        )
+                    },
+                    modifier =
+                        messageBubbleBodyModifier(
+                            hasReplyPreview = true,
+                            hasMedia = false,
+                        ),
+                    lastLineWidth = 24,
+                ) {
+                    Box(Modifier.width(24.dp).height(20.dp))
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val bubbleBounds = composeRule.onNodeWithTag(REPLY_BUBBLE_TAG).fetchSemanticsNode().boundsInRoot
+            val footerBounds = composeRule.onNodeWithTag(REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(bubbleBounds.right, footerBounds.right, 1f)
+        }
+    }
+
+    @Test
+    fun mediaReplyCaptionKeepsWrapContentWidth() {
+        composeRule.setContent {
+            MaterialTheme {
+                Column(Modifier.width(220.dp).testTag(MEDIA_REPLY_COLUMN_TAG)) {
+                    MessageBubbleFrame(
+                        presentation = messageBubblePresentation(invalidated = false, deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        invalidated = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        modifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),
+                    ) {
+                        BubbleFooterLayout(
+                            footer = { Box(Modifier.width(58.dp).height(12.dp)) },
+                            modifier =
+                                messageBubbleBodyModifier(
+                                    hasReplyPreview = true,
+                                    hasMedia = true,
+                                ),
+                            lastLineWidth = 24,
+                        ) {
+                            Box(Modifier.width(24.dp).height(20.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val mediaColumnBounds = composeRule.onNodeWithTag(MEDIA_REPLY_COLUMN_TAG).fetchSemanticsNode().boundsInRoot
+            val captionBounds = composeRule.onNodeWithTag(MEDIA_REPLY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue(captionBounds.width < mediaColumnBounds.width)
+        }
+    }
+
+    @Test
+    fun nonReplyFooterKeepsNaturalWidth() {
+        composeRule.setContent {
+            Column(Modifier.width(220.dp).testTag(NON_REPLY_COLUMN_TAG)) {
+                BubbleFooterLayout(
+                    footer = { Box(Modifier.width(58.dp).height(12.dp)) },
+                    modifier =
+                        messageBubbleBodyModifier(
+                            hasReplyPreview = false,
+                            hasMedia = false,
+                        ).testTag(NON_REPLY_BODY_TAG),
+                    lastLineWidth = 24,
+                ) {
+                    Box(Modifier.width(24.dp).height(20.dp))
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val columnBounds = composeRule.onNodeWithTag(NON_REPLY_COLUMN_TAG).fetchSemanticsNode().boundsInRoot
+            val bodyBounds = composeRule.onNodeWithTag(NON_REPLY_BODY_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue(bodyBounds.width < columnBounds.width)
+        }
+    }
+
     private companion object {
         const val CAPTION_TAG = "custom-caption-bubble"
         const val PLAIN_TAG = "custom-plain-bubble"
         const val CUSTOM_BACKGROUND = 0xFF336699
         const val MENTION_ACCENT = 0xFF006780
         const val OPAQUE_WHITE = 0xFFFFFFFF
+        const val REPLY_BUBBLE_TAG = "reply-bubble"
+        const val REPLY_FOOTER_TAG = "reply-footer"
+        const val MEDIA_REPLY_COLUMN_TAG = "media-reply-column"
+        const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
+        const val NON_REPLY_COLUMN_TAG = "non-reply-column"
+        const val NON_REPLY_BODY_TAG = "non-reply-body"
     }
 }
