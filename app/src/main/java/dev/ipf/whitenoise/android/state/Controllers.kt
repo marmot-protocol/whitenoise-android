@@ -4619,7 +4619,7 @@ class ConversationController(
         throwable: Throwable,
     ) {
         if (!BuildConfig.DEBUG) return
-        val health = runCatching { appState.marmotIo { relayHealth() } }.getOrNull()
+        val health = runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()
         val healthSummary =
             health?.let {
                 "total=${it.totalRelays} connected=${it.connected} connecting=${it.connecting} " +
