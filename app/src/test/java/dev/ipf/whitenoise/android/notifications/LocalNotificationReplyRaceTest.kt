@@ -413,6 +413,62 @@ class LocalNotificationReplyRaceTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    @Test
+    fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
+        val conversation = conversationKey()
+        val presenter = LocalNotificationPresenter(context)
+        val showRegistered = CountDownLatch(1)
+        val allowShowToContinue = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val showResult = AtomicBoolean(true)
+        val showFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.AFTER_REGISTER &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        showRegistered.countDown()
+                        check(allowShowToContinue.await(5, TimeUnit.SECONDS))
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(
+                            messageUpdate("msg-a", previewText = "stale", timestampMs = 1_000L),
+                            shortNpub = { "npub1test" },
+                        )
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+        assertTrue(showRegistered.await(5, TimeUnit.SECONDS))
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+        allowShowToContinue.countDown()
+
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        assertTrue(!showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
     private fun assertActiveConversationCard(
         conversation: NotificationDismissalKey,
         expectedMessageIdHex: String,

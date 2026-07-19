@@ -288,246 +288,259 @@ class LocalNotificationPresenter(
             } else {
                 rawNotificationContent
             }
-        // A shortcut-backed message posts on its per-conversation channel (the
-        // child of whichever parent it routed to — message OR mention), so
-        // Android treats it as a conversation and the user's per-conversation
-        // sound/vibration applies. Locked/redacted posts and non-message cards
-        // stay on the parent channel and carry no shortcut.
-        val messagingShortcutId =
-            if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
-                conversationShortcutId(update.accountRef, update.groupIdHex)
-            } else {
-                null
-            }
-        val channelId =
-            if (messagingShortcutId != null) {
-                withContext(Dispatchers.Default) {
-                    ensureConversationChannel(decision.channelId, messagingShortcutId)
-                } ?: decision.channelId
-            } else {
-                decision.channelId
-            }
-        val builder =
-            NotificationCompat
-                .Builder(context, channelId)
-                .setSmallIcon(R.drawable.ic_stat_whitenoise)
-                .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
-                .setCategory(decision.category)
-                .setPriority(decision.importance.toCompatPriority())
-                .setShowWhen(true)
-                .setAutoCancel(true)
-                .setOnlyAlertOnce(false)
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setSilent(false)
-        // Name the recipient identity in the header when multi-account (#836).
-        if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
+        return ConversationCardPostSynchronizer.withRegisteredShow(
+            notificationContent.notificationTag,
+            notificationContent.notificationId,
+        ) { showToken ->
+            ConversationCardPostSynchronizer.awaitTestBarrier(
+                ConversationCardOp.SHOW_NOTIFY,
+                ConversationCardBarrier.AFTER_REGISTER,
+                notificationContent.notificationTag,
+                notificationContent.notificationId,
+            )
+            // A shortcut-backed message posts on its per-conversation channel (the
+            // child of whichever parent it routed to — message OR mention), so
+            // Android treats it as a conversation and the user's per-conversation
+            // sound/vibration applies. Locked/redacted posts and non-message cards
+            // stay on the parent channel and carry no shortcut.
+            val messagingShortcutId =
+                if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                    conversationShortcutId(update.accountRef, update.groupIdHex)
+                } else {
+                    null
+                }
+            val channelId =
+                if (messagingShortcutId != null) {
+                    withContext(Dispatchers.Default) {
+                        ensureConversationChannel(decision.channelId, messagingShortcutId)
+                    } ?: decision.channelId
+                } else {
+                    decision.channelId
+                }
+            val builder =
+                NotificationCompat
+                    .Builder(context, channelId)
+                    .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                    .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
+                    .setCategory(decision.category)
+                    .setPriority(decision.importance.toCompatPriority())
+                    .setShowWhen(true)
+                    .setAutoCancel(true)
+                    .setOnlyAlertOnce(false)
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setSilent(false)
+            // Name the recipient identity in the header when multi-account (#836).
+            if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
-        var messagingPost: MessagingPostContext? = null
-        when (val style = decision.style) {
-            // Reactions get their own self-contained card (own tag/id on the
-            // reactions channel, see LocalNotificationFormatter) so they're muted
-            // independently of messages. They aren't repliable, so no
-            // MessagingStyle / reply / mark-read — just a plain expandable card.
-            NotificationStyleChoice.Plain ->
-                builder
-                    .setContentTitle(notificationContent.title)
-                    .setContentText(notificationContent.body)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+            var messagingPost: MessagingPostContext? = null
+            when (val style = decision.style) {
+                // Reactions get their own self-contained card (own tag/id on the
+                // reactions channel, see LocalNotificationFormatter) so they're muted
+                // independently of messages. They aren't repliable, so no
+                // MessagingStyle / reply / mark-read — just a plain expandable card.
+                NotificationStyleChoice.Plain ->
+                    builder
+                        .setContentTitle(notificationContent.title)
+                        .setContentText(notificationContent.body)
+                        .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
 
-            // Messages stack into one per-conversation card; invites are
-            // one-off events, so keep them as a plain expandable notification.
-            NotificationStyleChoice.Messaging -> {
-                val (conversationAvatarBitmap, senderAvatarBitmap) =
-                    if (redactContent) {
-                        null to null
-                    } else {
-                        withContext(Dispatchers.Default) {
-                            coroutineScope {
-                                val conversationAvatar = async { resolveAvatarBitmap(conversationAvatarUrl) }
-                                val senderAvatar = async { resolveAvatarBitmap(senderAvatarUrl) }
-                                conversationAvatar.await() to senderAvatar.await()
+                // Messages stack into one per-conversation card; invites are
+                // one-off events, so keep them as a plain expandable notification.
+                NotificationStyleChoice.Messaging -> {
+                    val (conversationAvatarBitmap, senderAvatarBitmap) =
+                        if (redactContent) {
+                            null to null
+                        } else {
+                            withContext(Dispatchers.Default) {
+                                coroutineScope {
+                                    val conversationAvatar = async { resolveAvatarBitmap(conversationAvatarUrl) }
+                                    val senderAvatar = async { resolveAvatarBitmap(senderAvatarUrl) }
+                                    conversationAvatar.await() to senderAvatar.await()
+                                }
                             }
                         }
+                    val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
+                    if (!redactContent && messagingShortcutId != null) {
+                        val locusId = LocusIdCompat(messagingShortcutId)
+                        builder
+                            .setShortcutId(messagingShortcutId)
+                            .setLocusId(locusId)
+                            .addPerson(sender)
+                        withContext(Dispatchers.Default) {
+                            publishConversationShortcut(
+                                update,
+                                notificationContent,
+                                messagingShortcutId,
+                                locusId,
+                                conversationAvatarUrl,
+                                conversationAvatarBitmap,
+                                senderAvatarUrl,
+                                senderAvatarBitmap,
+                                sender,
+                            )
+                        }
                     }
-                val sender = notificationSenderPerson(notificationContent, senderAvatarBitmap)
-                if (!redactContent && messagingShortcutId != null) {
-                    val locusId = LocusIdCompat(messagingShortcutId)
-                    builder
-                        .setShortcutId(messagingShortcutId)
-                        .setLocusId(locusId)
-                        .addPerson(sender)
-                    withContext(Dispatchers.Default) {
-                        publishConversationShortcut(
-                            update,
-                            notificationContent,
-                            messagingShortcutId,
-                            locusId,
-                            conversationAvatarUrl,
-                            conversationAvatarBitmap,
-                            senderAvatarUrl,
-                            senderAvatarBitmap,
-                            sender,
+                    update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
+                        builder.addExtras(
+                            Bundle().apply {
+                                putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
+                            },
                         )
                     }
+                    if (redactContent) {
+                        builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
+                    }
+                    if (!redactContent) {
+                        NotificationActions
+                            .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
+                            ?.let { actionTarget ->
+                                decision.actions.forEach { action ->
+                                    when (action) {
+                                        NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
+                                        NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                                    }
+                                }
+                            }
+                    }
+                    messagingPost =
+                        MessagingPostContext(
+                            sender = sender,
+                            conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
+                        )
                 }
-                update.messageIdHex?.takeIf { it.isNotBlank() }?.let { messageIdHex ->
+
+                is NotificationStyleChoice.InviteWithExtras -> {
+                    builder
+                        .setContentTitle(notificationContent.title)
+                        .setContentText(notificationContent.body)
+                        .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                    // Stamp the invited-to account + group so accepting/declining or
+                    // opening that conversation can find and dismiss this card (its
+                    // tag is the opaque key).
                     builder.addExtras(
                         Bundle().apply {
-                            putString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX, messageIdHex)
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, style.accountRef)
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
                         },
                     )
                 }
-                if (redactContent) {
-                    builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
-                }
-                if (!redactContent) {
-                    NotificationActions
-                        .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
-                        ?.let { actionTarget ->
-                            decision.actions.forEach { action ->
-                                when (action) {
-                                    NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
-                                    NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
-                                }
-                            }
-                        }
-                }
-                messagingPost =
-                    MessagingPostContext(
-                        sender = sender,
-                        conversationTitleOverride = if (redactContent) null else conversationTitleOverride,
-                    )
             }
 
-            is NotificationStyleChoice.InviteWithExtras -> {
-                builder
-                    .setContentTitle(notificationContent.title)
-                    .setContentText(notificationContent.body)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                // Stamp the invited-to account + group so accepting/declining or
-                // opening that conversation can find and dismiss this card (its
-                // tag is the opaque key).
-                builder.addExtras(
-                    Bundle().apply {
-                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, style.accountRef)
-                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
-                    },
-                )
-            }
-        }
-
-        val notificationManager = NotificationManagerCompat.from(context)
-        val posted =
-            withContext(Dispatchers.Default) {
-                val messaging = messagingPost
-                if (messaging != null) {
-                    ConversationCardPostSynchronizer.withLock(
-                        notificationContent.notificationTag,
-                        notificationContent.notificationId,
-                        ConversationCardOp.SHOW_NOTIFY,
-                    ) {
-                        val carried =
-                            if (redactContent) {
-                                null
-                            } else {
-                                existingMessagingStyle(
-                                    notificationContent.notificationTag,
-                                    notificationContent.notificationId,
-                                )?.messages
-                            }
-                        ConversationCardPostSynchronizer.awaitTestBarrier(
-                            ConversationCardOp.SHOW_NOTIFY,
-                            ConversationCardBarrier.AFTER_READ,
+            val notificationManager = NotificationManagerCompat.from(context)
+            val posted =
+                withContext(Dispatchers.Default) {
+                    val messaging = messagingPost
+                    if (messaging != null) {
+                        ConversationCardPostSynchronizer.withLock(
                             notificationContent.notificationTag,
                             notificationContent.notificationId,
-                        )
-                        val presentationTimestampMs = nowMillis()
-                        stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                        builder.setStyle(
-                            messagingStyle(
-                                notificationContent,
-                                messaging.conversationTitleOverride,
-                                decision.historyCap,
-                                carried,
-                                messaging.sender,
-                                presentationTimestampMs,
-                            ),
-                        )
-                        val notification = builder.build()
-                        ConversationCardPostSynchronizer.awaitTestBarrier(
                             ConversationCardOp.SHOW_NOTIFY,
-                            ConversationCardBarrier.BEFORE_WRITE,
-                            notificationContent.notificationTag,
-                            notificationContent.notificationId,
-                        )
-                        val firstPostSucceeded =
-                            postNotificationSafely(
-                                notificationManager,
-                                notificationContent.notificationTag,
-                                notificationContent.notificationId,
-                                notification,
-                            )
-                        if (firstPostSucceeded) {
-                            true
-                        } else {
-                            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
-                            if (carried.isNullOrEmpty()) {
-                                false
-                            } else {
-                                builder.setStyle(
-                                    messagingStyle(
-                                        notificationContent,
-                                        messaging.conversationTitleOverride,
-                                        decision.historyCap,
-                                        carriedHistory = null,
-                                        sender = messaging.sender,
-                                        newMessageTimestampMs = presentationTimestampMs,
-                                    ),
-                                )
-                                val cleanNotification = builder.build()
-                                val retrySucceeded =
-                                    postNotificationSafely(
-                                        notificationManager,
+                        ) {
+                            if (!ConversationCardPostSynchronizer.isShowCurrent(showToken)) return@withLock false
+                            val carried =
+                                if (redactContent) {
+                                    null
+                                } else {
+                                    existingMessagingStyle(
                                         notificationContent.notificationTag,
                                         notificationContent.notificationId,
-                                        cleanNotification,
-                                    )
-                                if (!retrySucceeded) {
-                                    notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                    )?.messages
                                 }
-                                retrySucceeded
-                            }
-                        }
-                    }
-                } else {
-                    ConversationCardPostSynchronizer.withLock(
-                        notificationContent.notificationTag,
-                        notificationContent.notificationId,
-                        ConversationCardOp.SHOW_NOTIFY,
-                    ) {
-                        val presentationTimestampMs = nowMillis()
-                        stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                        val notification = builder.build()
-                        val succeeded =
-                            postNotificationSafely(
-                                notificationManager,
+                            ConversationCardPostSynchronizer.awaitTestBarrier(
+                                ConversationCardOp.SHOW_NOTIFY,
+                                ConversationCardBarrier.AFTER_READ,
                                 notificationContent.notificationTag,
                                 notificationContent.notificationId,
-                                notification,
                             )
-                        if (!succeeded) {
-                            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                            val presentationTimestampMs = nowMillis()
+                            stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                            builder.setStyle(
+                                messagingStyle(
+                                    notificationContent,
+                                    messaging.conversationTitleOverride,
+                                    decision.historyCap,
+                                    carried,
+                                    messaging.sender,
+                                    presentationTimestampMs,
+                                ),
+                            )
+                            val notification = builder.build()
+                            ConversationCardPostSynchronizer.awaitTestBarrier(
+                                ConversationCardOp.SHOW_NOTIFY,
+                                ConversationCardBarrier.BEFORE_WRITE,
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                            )
+                            val firstPostSucceeded =
+                                postNotificationSafely(
+                                    notificationManager,
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                    notification,
+                                )
+                            if (firstPostSucceeded) {
+                                true
+                            } else {
+                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                if (carried.isNullOrEmpty()) {
+                                    false
+                                } else {
+                                    builder.setStyle(
+                                        messagingStyle(
+                                            notificationContent,
+                                            messaging.conversationTitleOverride,
+                                            decision.historyCap,
+                                            carriedHistory = null,
+                                            sender = messaging.sender,
+                                            newMessageTimestampMs = presentationTimestampMs,
+                                        ),
+                                    )
+                                    val cleanNotification = builder.build()
+                                    val retrySucceeded =
+                                        postNotificationSafely(
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                            cleanNotification,
+                                        )
+                                    if (!retrySucceeded) {
+                                        notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                                    }
+                                    retrySucceeded
+                                }
+                            }
                         }
-                        succeeded
+                    } else {
+                        ConversationCardPostSynchronizer.withLock(
+                            notificationContent.notificationTag,
+                            notificationContent.notificationId,
+                            ConversationCardOp.SHOW_NOTIFY,
+                        ) {
+                            if (!ConversationCardPostSynchronizer.isShowCurrent(showToken)) return@withLock false
+                            val presentationTimestampMs = nowMillis()
+                            stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                            val notification = builder.build()
+                            val succeeded =
+                                postNotificationSafely(
+                                    notificationManager,
+                                    notificationContent.notificationTag,
+                                    notificationContent.notificationId,
+                                    notification,
+                                )
+                            if (!succeeded) {
+                                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+                            }
+                            succeeded
+                        }
                     }
                 }
+            if (!posted) return@withRegisteredShow false
+            notificationDebug {
+                // Never log the title/body — they carry sender / group names (PII).
+                "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
             }
-        if (!posted) return false
-        notificationDebug {
-            // Never log the title/body — they carry sender / group names (PII).
-            "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+            true
         }
-        return true
     }
 
     private fun postNotificationSafely(
@@ -552,6 +565,7 @@ class LocalNotificationPresenter(
         id: Int,
     ) {
         ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
+            ConversationCardPostSynchronizer.markDismissed(tag, id)
             manager.cancel(tag, id)
         }
     }

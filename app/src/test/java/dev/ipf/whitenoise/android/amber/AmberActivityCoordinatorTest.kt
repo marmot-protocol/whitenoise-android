@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Looper
+import android.service.chooser.ChooserResult
 import androidx.activity.result.contract.ActivityResultContracts
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -157,6 +158,26 @@ class AmberActivityCoordinatorTest {
         )
 
         assertEquals("com.chosen.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+    }
+
+    @Test
+    fun chooserResultRecordsThePackageSelectedByAndroidOnApi35AndLater() {
+        val requestId = "chosen-signer-result"
+        val component = ComponentName("com.modern.signer", "SignerActivity")
+        val chooserResult =
+            ChooserResult::class.java
+                .getDeclaredConstructor(Int::class.javaPrimitiveType, ComponentName::class.java, Boolean::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+                .newInstance(ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT, component, false)
+        AmberSignerChoiceReceiver().onReceive(
+            context,
+            Intent().apply {
+                putExtra(AmberSignerRelay.EXTRA_CHOOSER_REQUEST_ID, requestId)
+                putExtra(Intent.EXTRA_CHOOSER_RESULT, chooserResult)
+            },
+        )
+
+        assertEquals("com.modern.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
     }
 
     @Test
