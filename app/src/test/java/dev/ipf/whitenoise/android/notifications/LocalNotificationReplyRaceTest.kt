@@ -10,9 +10,11 @@ import androidx.core.app.Person
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.state.NotificationPostEpoch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -329,6 +331,197 @@ class LocalNotificationReplyRaceTest {
             expectedMessageIdHex = "msg-b",
             requiredMessageTexts = listOf("new during window"),
         )
+    }
+
+    @Test
+    fun visibleConversationChangeAfterShowRegistrationPreventsThePost() {
+        val presenter = LocalNotificationPresenter(context)
+        val postEpoch = NotificationPostEpoch()
+        val capturedEpoch = postEpoch.capture()
+        val showRegistered = CountDownLatch(1)
+        val releaseShow = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val showResult = AtomicReference<Boolean>()
+        val showFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_REGISTER) {
+                        showRegistered.countDown()
+                        check(releaseShow.await(5, TimeUnit.SECONDS))
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(
+                            messageUpdate("msg-after-open", previewText = "do not resurrect", timestampMs = 2_000L),
+                            isPostStillAllowed = { postEpoch.isCurrent(capturedEpoch) },
+                            shortNpub = { "npub1test" },
+                        )
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+
+        assertTrue(showRegistered.await(5, TimeUnit.SECONDS))
+        postEpoch.advance()
+        postEpoch.advance()
+        releaseShow.countDown()
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        assertFalse(showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun conversationDismissWaitsForInFlightPostThenCancelsIt() {
+        val conversation = conversationKey()
+        val presenter = LocalNotificationPresenter(context)
+        val showBeforeWrite = CountDownLatch(1)
+        val dismissAwaitingLock = CountDownLatch(1)
+        val allowShowWrite = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val dismissFinished = CountDownLatch(1)
+        val showFailure = AtomicReference<Throwable>()
+        val dismissFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.BEFORE_WRITE &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        showBeforeWrite.countDown()
+                        check(allowShowWrite.await(5, TimeUnit.SECONDS))
+                    }
+                }
+
+                override fun onAwaitingLock(
+                    op: ConversationCardOp,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.DISMISS_CANCEL &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        dismissAwaitingLock.countDown()
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                runBlocking {
+                    assertTrue(
+                        presenter.show(
+                            messageUpdate("msg-a", previewText = "new", timestampMs = 1_000L),
+                            shortNpub = { "npub1test" },
+                        ),
+                    )
+                }
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+        assertTrue(showBeforeWrite.await(5, TimeUnit.SECONDS))
+
+        Thread {
+            try {
+                assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+            } catch (throwable: Throwable) {
+                dismissFailure.set(throwable)
+            } finally {
+                dismissFinished.countDown()
+            }
+        }.start()
+        assertTrue(dismissAwaitingLock.await(5, TimeUnit.SECONDS))
+
+        allowShowWrite.countDown()
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(dismissFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        dismissFailure.get()?.let { throw it }
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    @Test
+    fun conversationDismissInvalidatesPostThatHasRegisteredButNotReachedTheLock() {
+        val conversation = conversationKey()
+        val presenter = LocalNotificationPresenter(context)
+        val showRegistered = CountDownLatch(1)
+        val allowShowToContinue = CountDownLatch(1)
+        val showFinished = CountDownLatch(1)
+        val showResult = AtomicBoolean(true)
+        val showFailure = AtomicReference<Throwable>()
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.SHOW_NOTIFY &&
+                        barrier == ConversationCardBarrier.AFTER_REGISTER &&
+                        notificationTag == conversation.tag &&
+                        notificationId == conversation.id
+                    ) {
+                        showRegistered.countDown()
+                        check(allowShowToContinue.await(5, TimeUnit.SECONDS))
+                    }
+                }
+            }
+
+        Thread {
+            try {
+                showResult.set(
+                    runBlocking {
+                        presenter.show(
+                            messageUpdate("msg-a", previewText = "stale", timestampMs = 1_000L),
+                            shortNpub = { "npub1test" },
+                        )
+                    },
+                )
+            } catch (throwable: Throwable) {
+                showFailure.set(throwable)
+            } finally {
+                showFinished.countDown()
+            }
+        }.start()
+        assertTrue(showRegistered.await(5, TimeUnit.SECONDS))
+
+        assertTrue(runBlocking { presenter.dismissConversationMessages(ACCOUNT, GROUP) })
+        allowShowToContinue.countDown()
+
+        assertTrue(showFinished.await(5, TimeUnit.SECONDS))
+        showFailure.get()?.let { throw it }
+        assertTrue(!showResult.get())
+        assertTrue(manager.activeNotifications.isEmpty())
     }
 
     private fun assertActiveConversationCard(

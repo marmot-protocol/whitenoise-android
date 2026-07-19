@@ -116,6 +116,16 @@ object Nip55 {
         return context.packageManager.queryIntentActivities(intent, 0).isNotEmpty()
     }
 
+    /** True when [packageName] still exposes a handler for the NIP-55 scheme. */
+    fun isSignerPackageAvailable(
+        context: Context,
+        packageName: String,
+    ): Boolean {
+        if (packageName.isBlank()) return false
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")).setPackage(packageName)
+        return context.packageManager.queryIntentActivities(intent, 0).isNotEmpty()
+    }
+
     fun savedSignerPackage(context: Context): String? = prefs(context).getString(PREFS_KEY_PACKAGE, null)?.takeIf { it.isNotEmpty() }
 
     fun saveSignerPackage(
@@ -314,4 +324,12 @@ internal fun signerPackageEchoMismatchReason(
 ): String? {
     if (packageName.isNullOrBlank()) return null
     return if (packageName == expectedPackageName) null else "signer package mismatch"
+}
+
+internal fun trustedSignerPackageFailureReason(
+    handledPackageName: String?,
+    echoedPackageName: String?,
+): String? {
+    val handled = handledPackageName?.takeIf { it.isNotBlank() } ?: return "missing handled signer package"
+    return signerPackageEchoMismatchReason(echoedPackageName, handled)
 }

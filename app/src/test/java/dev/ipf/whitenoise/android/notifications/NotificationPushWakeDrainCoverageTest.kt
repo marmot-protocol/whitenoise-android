@@ -78,8 +78,9 @@ class NotificationPushWakeDrainCoverageTest {
             assertTrue(
                 "the UI-independent notification subscription must use the tested pre-warm/post sequence",
                 "postAfterNotificationAvatarPreWarm(" in listener &&
+                    "val postEpoch = notificationPostEpoch.capture()" in listener &&
                     "preWarm = { preWarmNotificationAvatars(update) }" in listener &&
-                    "post = { avatars -> postNotificationUpdate(update, avatars) }" in listener,
+                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) }" in listener,
             )
         }
 

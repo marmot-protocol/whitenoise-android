@@ -1408,6 +1408,7 @@ class WhiteNoiseAppState(
     private val notificationJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
     private val notificationDrainSequence = AtomicLong(0)
+    private val notificationPostEpoch = NotificationPostEpoch()
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     // Coalesces per-account unread refreshes across a notification burst so a
@@ -1430,7 +1431,14 @@ class WhiteNoiseAppState(
     // alerts. Lifecycle transitions (foreground/background/task-removed) live
     // on the value type so the foreground gate and active-chat reset cannot
     // drift across the separate places that update them (issue #821).
+    @Volatile
     private var suppression = NotificationSuppression()
+
+    private fun updateNotificationSuppression(next: NotificationSuppression) {
+        if (next != suppression) notificationPostEpoch.advance()
+        suppression = next
+    }
+
     private val appInForeground: Boolean
         get() = suppression.inForeground
     private val activeConversationGroupIdHex: String?
@@ -1688,11 +1696,12 @@ class WhiteNoiseAppState(
 
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
         activeAccountRef = state.activeAccountRef
-        suppression =
+        updateNotificationSuppression(
             suppression.copy(
                 activeConversationAccountRef = state.activeConversationAccountRef,
                 activeConversationGroupIdHex = state.activeConversationGroupIdHex,
-            )
+            ),
+        )
         runtimeGeneration = state.runtimeGeneration
     }
 
@@ -3482,7 +3491,7 @@ class WhiteNoiseAppState(
         // Task removal is the destructive lifecycle edge that clears the open
         // chat entirely, via onTaskRemoved(), so a foreground-service-kept
         // process cannot keep silencing that chat after the UI is gone (#821).
-        suppression = if (foreground) suppression.onForeground() else suppression.onBackground()
+        updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             maybeShowAppLockForForeground()
@@ -3522,13 +3531,15 @@ class WhiteNoiseAppState(
      * open chat's suppression could persist after the UI is gone (issue #821).
      */
     fun onTaskRemoved() {
-        suppression = suppression.onTaskRemoved()
+        updateNotificationSuppression(suppression.onTaskRemoved())
     }
 
     private fun applyActiveConversationTransition(groupIdHex: String?) {
         // The chat screen always runs under the active account, so capture it
         // when opening; closing (null) clears both halves via the transition.
-        suppression = suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null)
+        updateNotificationSuppression(
+            suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null),
+        )
         if (groupIdHex != null) {
             synchronized(conversationStateLock) {
                 promoteConversationState(activeConversationAccountRef, groupIdHex)
@@ -5323,6 +5334,7 @@ class WhiteNoiseAppState(
     private suspend fun postNotificationUpdate(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
+        postEpoch: Long,
     ) {
         val activeConversation = activeConversationGroupIdHex
         val shouldPost = shouldPostNotification(update)
@@ -5404,6 +5416,9 @@ class WhiteNoiseAppState(
                 conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
                 senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
                 shortNpub = ::shortNpub,
+                isPostStillAllowed = {
+                    notificationPostEpoch.isCurrent(postEpoch) && shouldPostNotification(update)
+                },
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the
@@ -5434,9 +5449,10 @@ class WhiteNoiseAppState(
                             while (isActive) {
                                 val update = marmotIo { subscription.next() } ?: break
                                 backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                val postEpoch = notificationPostEpoch.capture()
                                 postAfterNotificationAvatarPreWarm(
                                     preWarm = { preWarmNotificationAvatars(update) },
-                                    post = { avatars -> postNotificationUpdate(update, avatars) },
+                                    post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
                                 )
                             }
                         } finally {

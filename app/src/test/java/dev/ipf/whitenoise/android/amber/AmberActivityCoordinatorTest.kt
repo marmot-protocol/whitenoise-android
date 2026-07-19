@@ -1,17 +1,28 @@
 package dev.ipf.whitenoise.android.amber
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
+import android.net.Uri
 import android.os.Looper
+import android.service.chooser.ChooserResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
@@ -26,6 +37,9 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AmberActivityCoordinatorTest {
+    private val context: Context
+        get() = RuntimeEnvironment.getApplication()
+
     private lateinit var coordinatorLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
     private val launched = AtomicReference<Intent>()
 
@@ -39,6 +53,7 @@ class AmberActivityCoordinatorTest {
     @After
     fun detachCoordinatorLauncher() {
         AmberActivityCoordinator.detach(coordinatorLauncher)
+        Nip55.clearSignerPackage(context)
     }
 
     private inner class CapturingLauncher : androidx.activity.result.ActivityResultLauncher<Intent>() {
@@ -101,16 +116,141 @@ class AmberActivityCoordinatorTest {
             Intent().apply {
                 putExtra(AmberSignerRelay.EXTRA_REQUEST_ID, "signer-controlled-id")
                 putExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, true)
+                putExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE, "com.spoofed.signer")
                 putExtra(Nip55.EXTRA_RESULT, "npub1result")
             }
 
-        val result = AmberSignerRelay.buildResultIntent(requestId, signerData)
+        val result =
+            AmberSignerRelay.buildResultIntent(
+                requestId,
+                signerData,
+                handledSignerPackage = "com.actual.signer",
+            )
         val nullDataResult = AmberSignerRelay.buildResultIntent(requestId, signerData = null)
 
         assertEquals(requestId, result.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
         assertFalse(result.getBooleanExtra(AmberSignerRelay.EXTRA_LAUNCH_FAILED, false))
+        assertEquals("com.actual.signer", result.getStringExtra(AmberSignerRelay.EXTRA_HANDLED_SIGNER_PACKAGE))
         assertEquals("npub1result", result.getStringExtra(Nip55.EXTRA_RESULT))
         assertEquals(requestId, nullDataResult.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+    }
+
+    @Test
+    fun soleResolvedSignerIsMadeExplicitAndRecordedAsHandled() {
+        val requestId = "single-signer"
+        val signerIntent = Nip55.buildGetPublicKeyIntent("", requestId)
+        registerSignerHandler(signerIntent, "com.example.signer", "com.example.signer.SignerActivity")
+
+        val prepared = AmberSignerRelay.prepareSignerLaunch(context, requestId, signerIntent)
+
+        assertEquals(
+            ComponentName("com.example.signer", "com.example.signer.SignerActivity"),
+            prepared?.component,
+        )
+        assertEquals("com.example.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+    }
+
+    @Test
+    fun chooserCallbackRecordsThePackageSelectedByAndroid() {
+        val requestId = "chosen-signer"
+        AmberSignerRelay.registerHandledSignerRequest(requestId)
+        AmberSignerChoiceReceiver().onReceive(
+            context,
+            Intent().apply {
+                putExtra(AmberSignerRelay.EXTRA_CHOOSER_REQUEST_ID, requestId)
+                putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName("com.chosen.signer", "SignerActivity"))
+            },
+        )
+
+        assertEquals("com.chosen.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+    }
+
+    @Test
+    fun chooserResultRecordsThePackageSelectedByAndroidOnApi35AndLater() {
+        val requestId = "chosen-signer-result"
+        AmberSignerRelay.registerHandledSignerRequest(requestId)
+        val component = ComponentName("com.modern.signer", "SignerActivity")
+        val chooserResult =
+            ChooserResult::class.java
+                .getDeclaredConstructor(Int::class.javaPrimitiveType, ComponentName::class.java, Boolean::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+                .newInstance(ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT, component, false)
+        AmberSignerChoiceReceiver().onReceive(
+            context,
+            Intent().apply {
+                putExtra(AmberSignerRelay.EXTRA_CHOOSER_REQUEST_ID, requestId)
+                putExtra(Intent.EXTRA_CHOOSER_RESULT, chooserResult)
+            },
+        )
+
+        assertEquals("com.modern.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+    }
+
+    @Test
+    fun successfulSignerResultWaitsForTheChooserCallbackPackage() =
+        runBlocking {
+            val requestId = "fast-signer-before-chooser-callback"
+            AmberSignerRelay.registerHandledSignerRequest(requestId)
+            val handledPackage =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    AmberSignerRelay.awaitHandledSignerPackage(requestId, timeoutMs = 2_000)
+                }
+
+            assertFalse(handledPackage.isCompleted)
+            AmberSignerChoiceReceiver().onReceive(
+                context,
+                Intent().apply {
+                    putExtra(AmberSignerRelay.EXTRA_CHOOSER_REQUEST_ID, requestId)
+                    putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName("com.fast.signer", "SignerActivity"))
+                },
+            )
+
+            assertEquals("com.fast.signer", handledPackage.await())
+            assertEquals("com.fast.signer", AmberSignerRelay.consumeHandledSignerPackage(requestId))
+            assertNull(AmberSignerRelay.consumeHandledSignerPackage(requestId))
+        }
+
+    @Test
+    fun publicKeyLoginPersistsTheResolvedPackageNotOnlyTheSignerEcho() {
+        val signerPackage = "com.example.signer"
+        val signerIntent = Nip55.buildGetPublicKeyIntent("", "probe")
+        registerSignerHandler(signerIntent, signerPackage, "$signerPackage.SignerActivity")
+        val result = AtomicReference<String>()
+        val failure = AtomicReference<Throwable>()
+        val done = CountDownLatch(1)
+        Thread {
+            try {
+                result.set(AmberSignerController(context, approvalTimeoutMs = 5_000).requestPublicKey())
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+
+        val relayLaunch = awaitRelayLaunch()
+        val requestId = checkNotNull(relayLaunch.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+        val launchedSignerIntent =
+            checkNotNull(relayLaunch.getParcelableExtra(AmberSignerRelay.EXTRA_SIGNER_INTENT, Intent::class.java))
+        assertNotNull(AmberSignerRelay.prepareSignerLaunch(context, requestId, launchedSignerIntent))
+        val handledPackage = AmberSignerRelay.consumeHandledSignerPackage(requestId)
+        AmberActivityCoordinator.deliverResult(
+            resultOk = true,
+            data =
+                AmberSignerRelay.buildResultIntent(
+                    requestId,
+                    Intent().apply {
+                        putExtra(Nip55.EXTRA_RESULT, "npub1resolved")
+                        putExtra(Nip55.EXTRA_PACKAGE, signerPackage)
+                    },
+                    handledSignerPackage = handledPackage,
+                ),
+        )
+
+        assertTrue(done.await(2, TimeUnit.SECONDS))
+        failure.get()?.let { throw it }
+        assertEquals("npub1resolved", result.get())
+        assertEquals(signerPackage, Nip55.savedSignerPackage(context))
     }
 
     @Test
@@ -362,5 +502,25 @@ class AmberActivityCoordinatorTest {
         outcome as AmberActivityCoordinator.Outcome.Completed
         assertTrue(outcome.resultOk)
         assertEquals(currentRequestId, outcome.data?.getStringExtra(AmberSignerRelay.EXTRA_REQUEST_ID))
+    }
+
+    private fun registerSignerHandler(
+        intent: Intent,
+        packageName: String,
+        className: String,
+    ) {
+        val resolveInfo =
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        this.packageName = packageName
+                        name = className
+                    }
+            }
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_VIEW, Uri.parse("${Nip55.SCHEME}:")),
+            resolveInfo,
+        )
+        shadowOf(context.packageManager).addResolveInfoForIntent(intent, resolveInfo)
     }
 }

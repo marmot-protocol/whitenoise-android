@@ -89,6 +89,17 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
+    fun messageBodyCapCountsUnicodeCodePointsWithoutSplittingSurrogatePairs() {
+        val emoji = "\uD83D\uDE00"
+        val oversized = emoji.repeat(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS + 1)
+
+        val bounded = boundedNotificationMessageText(oversized)
+
+        assertEquals(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS, bounded.codePointCount(0, bounded.length))
+        assertEquals(emoji, bounded.takeLast(emoji.length))
+    }
+
+    @Test
     fun conversationShortcutRemovalOrderRemovesLeastRecentlyUsedFirst() {
         val existing =
             setOf(

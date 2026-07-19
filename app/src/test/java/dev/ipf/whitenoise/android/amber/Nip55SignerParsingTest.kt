@@ -135,6 +135,17 @@ class Nip55SignerParsingTest {
     }
 
     @Test
+    fun trustedSignerPackageRequiresTheHandledPackageAndValidatesTheEcho() {
+        assertEquals("missing handled signer package", trustedSignerPackageFailureReason(null, "com.example.signer"))
+        assertEquals(null, trustedSignerPackageFailureReason("com.example.signer", null))
+        assertEquals(null, trustedSignerPackageFailureReason("com.example.signer", "com.example.signer"))
+        assertEquals(
+            "signer package mismatch",
+            trustedSignerPackageFailureReason("com.example.signer", "com.evil.signer"),
+        )
+    }
+
+    @Test
     fun nonOkResultIsRejectedForEveryOp() {
         SignerOp.entries.forEach { op ->
             val outcome =
