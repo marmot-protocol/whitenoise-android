@@ -614,7 +614,8 @@ internal fun ComposerBar(
     }
     var autoFocusConsumed by autoFocusConsumedState
     LaunchedEffect(draftKey, autoFocusOnEnter, autoFocusOnDraftRestore, editingMessageId) {
-        if ((autoFocusOnEnter || autoFocusOnDraftRestore) && !autoFocusConsumed && editingMessageId == null) {
+        val autoFocusRequested = autoFocusOnEnter || autoFocusOnDraftRestore
+        if (autoFocusRequested && !autoFocusConsumed && editingMessageId == null) {
             autoFocusConsumed = true
             runCatching { composerFocus.requestFocus() }
             keyboardController?.show()

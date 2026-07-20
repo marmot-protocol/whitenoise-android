@@ -6,6 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 internal const val COMPOSER_DRAFT_VERSION_PREFIX = "\u0001WN\u0001v1\u0001"
 
 private const val FIELD_SEPARATOR = '\u001E'
+private const val VERSIONED_DRAFT_FIELD_COUNT = 4
 
 /**
  * Restored composer draft: field value plus whether returning to the chat should
@@ -33,26 +34,36 @@ internal fun encodeComposerDraft(value: TextFieldValue): String {
     }
 }
 
-internal fun decodeComposerDraftStored(stored: String): ComposerDraftSnapshot {
+internal fun decodeComposerDraftStored(stored: String): ComposerDraftSnapshot =
     if (!stored.startsWith(COMPOSER_DRAFT_VERSION_PREFIX)) {
-        return legacyComposerDraftSnapshot(stored)
+        legacyComposerDraftSnapshot(stored)
+    } else {
+        decodeVersionedComposerDraft(stored)
     }
+
+private fun decodeVersionedComposerDraft(stored: String): ComposerDraftSnapshot {
     val body = stored.substring(COMPOSER_DRAFT_VERSION_PREFIX.length)
-    val fields = body.split(FIELD_SEPARATOR, limit = 4)
-    if (fields.size != 4) {
-        return malformedComposerDraftSnapshot(stored)
+    val fields = body.split(FIELD_SEPARATOR, limit = VERSIONED_DRAFT_FIELD_COUNT)
+    val selectionStart = fields.getOrNull(0)?.toIntOrNull()
+    val selectionEnd = fields.getOrNull(1)?.toIntOrNull()
+    val declaredLength = fields.getOrNull(2)?.toIntOrNull()
+    val text = fields.getOrNull(3)
+    return when {
+        fields.size != VERSIONED_DRAFT_FIELD_COUNT -> malformedComposerDraftSnapshot(stored)
+        selectionStart == null ||
+            selectionEnd == null ||
+            declaredLength == null -> malformedComposerDraftSnapshot(stored)
+        text == null || declaredLength != text.length -> malformedComposerDraftSnapshot(stored)
+        else ->
+            ComposerDraftSnapshot(
+                textFieldValue =
+                    TextFieldValue(
+                        text = text,
+                        selection = clampComposerDraftSelection(text, selectionStart, selectionEnd),
+                    ),
+                focusOnRestore = true,
+            )
     }
-    val selectionStart = fields[0].toIntOrNull() ?: return malformedComposerDraftSnapshot(stored)
-    val selectionEnd = fields[1].toIntOrNull() ?: return malformedComposerDraftSnapshot(stored)
-    val declaredLength = fields[2].toIntOrNull() ?: return malformedComposerDraftSnapshot(stored)
-    val text = fields[3]
-    if (declaredLength != text.length) {
-        return malformedComposerDraftSnapshot(stored)
-    }
-    return ComposerDraftSnapshot(
-        textFieldValue = TextFieldValue(text = text, selection = clampComposerDraftSelection(text, selectionStart, selectionEnd)),
-        focusOnRestore = true,
-    )
 }
 
 internal fun shouldFocusComposerOnDraftRestore(snapshot: ComposerDraftSnapshot?): Boolean =

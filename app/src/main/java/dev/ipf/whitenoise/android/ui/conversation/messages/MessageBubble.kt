@@ -1802,7 +1802,11 @@ internal fun MessageBubble(
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                            initialDraft = appState.draftSnapshotFor(groupIdHex)?.textFieldValue ?: TextFieldValue(""),
+                                            initialDraft =
+                                                appState
+                                                    .draftSnapshotFor(groupIdHex)
+                                                    ?.textFieldValue
+                                                    ?: TextFieldValue(""),
                                             onDraftChange = { appState.setDraft(groupIdHex, it) },
                                             draftKey = groupIdHex,
                                             textState = composerTextState,
