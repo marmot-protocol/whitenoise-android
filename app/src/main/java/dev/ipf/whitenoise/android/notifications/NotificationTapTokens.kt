@@ -11,30 +11,32 @@ class NotificationTapTokens(
     private val randomBytes: (ByteArray) -> Unit = secureRandom::nextBytes,
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
-    fun tokenFor(notificationKey: String): String {
-        val key = storageKey(notificationKey)
-        val timeKey = storageTimeKey(notificationKey)
-        preferences.getString(key, null)?.takeIf { isPlausibleToken(it) }?.let {
-            preferences.edit().putLong(timeKey, nowMillis()).apply()
+    fun tokenFor(notificationKey: String): String =
+        synchronized(tokenMutationLock) {
+            val key = storageKey(notificationKey)
+            val timeKey = storageTimeKey(notificationKey)
+            preferences.getString(key, null)?.takeIf { isPlausibleToken(it) }?.let {
+                preferences.edit().putLong(timeKey, nowMillis()).apply()
+                return@synchronized it
+            }
+            val token = newToken()
+            preferences
+                .edit()
+                .putString(key, token)
+                .putLong(timeKey, nowMillis())
+                .apply()
             pruneIfNeeded()
-            return it
+            token
         }
-        val token = newToken()
-        preferences
-            .edit()
-            .putString(key, token)
-            .putLong(timeKey, nowMillis())
-            .apply()
-        pruneIfNeeded()
-        return token
-    }
 
     fun remove(notificationKey: String) {
-        preferences
-            .edit()
-            .remove(storageKey(notificationKey))
-            .remove(storageTimeKey(notificationKey))
-            .apply()
+        synchronized(tokenMutationLock) {
+            preferences
+                .edit()
+                .remove(storageKey(notificationKey))
+                .remove(storageTimeKey(notificationKey))
+                .apply()
+        }
     }
 
     fun isValid(
@@ -83,6 +85,7 @@ class NotificationTapTokens(
         internal const val MAX_STORED_TOKENS = 512
 
         private val secureRandom = SecureRandom()
+        private val tokenMutationLock = Any()
 
         fun create(context: Context): NotificationTapTokens =
             NotificationTapTokens(
