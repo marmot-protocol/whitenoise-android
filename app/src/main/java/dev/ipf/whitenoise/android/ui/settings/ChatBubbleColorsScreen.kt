@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
 import java.util.Locale
 
@@ -225,6 +226,12 @@ private fun PreviewBubble(
             color = colorFromArgb(presentation.backgroundArgb),
             contentColor = colorFromArgb(presentation.contentArgb),
             shape = RoundedCornerShape(18.dp),
+            border =
+                messageBubbleBorder(
+                    highlighted = false,
+                    mine = mine,
+                    customArgb = presentation.borderOverrideArgb,
+                ),
         ) {
             Text(text, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
         }

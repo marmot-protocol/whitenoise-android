@@ -5,8 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -61,6 +63,61 @@ class MessageBubbleAmoledStyleTest {
             assertNotEquals(borderColor(sentBorder), borderColor(receivedBorder))
             assertEquals(expectedSentAccent, sentTimestamp)
             assertEquals(expectedReceivedAccent, receivedTimestamp)
+        }
+    }
+
+    @Test
+    fun amoledCustomColorOverridesDirectionalBubbleBorder() {
+        val customArgb = 0xFF336699L
+        var backgroundArgb = 0L
+        var contentArgb = 0L
+        var expectedContentArgb = 0L
+        var sentBorder: BorderStroke? = null
+        var receivedBorder: BorderStroke? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val presentation =
+                    messageBubblePresentation(
+                        invalidated = false,
+                        deleted = false,
+                        mine = true,
+                        customArgb = customArgb,
+                    )
+                val expectedContent =
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                        .toArgb()
+                        .toLong() and 0xFFFFFFFFL
+                val sent =
+                    messageBubbleBorder(
+                        highlighted = false,
+                        mine = true,
+                        customArgb = presentation.borderOverrideArgb,
+                    )
+                val received =
+                    messageBubbleBorder(
+                        highlighted = false,
+                        mine = false,
+                        customArgb = presentation.borderOverrideArgb,
+                    )
+
+                SideEffect {
+                    backgroundArgb = presentation.backgroundArgb
+                    contentArgb = presentation.contentArgb
+                    expectedContentArgb = expectedContent
+                    sentBorder = sent
+                    receivedBorder = received
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(OPAQUE_BLACK_ARGB, backgroundArgb)
+            assertEquals(expectedContentArgb, contentArgb)
+            assertEquals(2.dp, requireNotNull(sentBorder).width)
+            assertEquals(2.dp, requireNotNull(receivedBorder).width)
+            assertEquals(colorFromArgb(customArgb), borderColor(sentBorder))
+            assertEquals(colorFromArgb(customArgb), borderColor(receivedBorder))
         }
     }
 
