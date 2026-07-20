@@ -86,7 +86,7 @@ import kotlinx.coroutines.withContext
  * viewer / save / share paths don't spin while waiting for the projection
  * to reconcile. Falls back to the standard FFI download for everything else.
  */
-private suspend fun attachmentBytes(
+internal suspend fun attachmentBytes(
     controller: ConversationController,
     messageIdHex: String,
     attachmentIndex: Int,

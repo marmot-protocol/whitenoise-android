@@ -192,6 +192,54 @@ internal fun saveVideoToGallery(
     mediaType: String,
 ): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType) }
 
+/** Save a decrypted attachment to the public collection appropriate for its MIME type. */
+internal fun saveAttachmentToMediaStore(
+    context: Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean =
+    when {
+        mediaType.startsWith("image/", ignoreCase = true) ->
+            saveImageToGallery(context, bytes, fileName, mediaType)
+        mediaType.startsWith("video/", ignoreCase = true) ->
+            saveVideoToGallery(context, bytes, fileName, mediaType)
+        else -> saveFileToDownloads(context, bytes, fileName, mediaType)
+    }
+
+/** Persist an arbitrary attachment to Download/White Noise via MediaStore. */
+private fun saveFileToDownloads(
+    context: Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean {
+    val resolver = context.contentResolver
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+            put(android.provider.MediaStore.Downloads.MIME_TYPE, mediaType.ifBlank { "application/octet-stream" })
+            put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/White Noise")
+            put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+        }
+    val uri =
+        resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+    return try {
+        resolver.openOutputStream(uri).use { out ->
+            if (out == null) throw java.io.IOException("null output stream")
+            out.write(bytes)
+        }
+        values.clear()
+        values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        resolver.delete(uri, null, null)
+        false
+    }
+}
+
 private fun saveVideoToGallery(
     context: android.content.Context,
     source: java.io.InputStream,
