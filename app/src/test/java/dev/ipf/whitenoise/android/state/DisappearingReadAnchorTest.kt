@@ -8,13 +8,18 @@ import org.junit.Test
 
 class DisappearingReadAnchorTest {
     @Test
+    fun messageOrderPreservesFirstOccurrenceForOptimisticReconciliationDuplicates() {
+        assertTrue(firstMessageOrder(listOf("before", "duplicate", "duplicate", "after"))["duplicate"] == 1)
+    }
+
+    @Test
     fun ownSendNeverDefersSendTimeExpiry() {
         assertFalse(
             isDisappearingSendTimeExpiryDeferred(
                 record = message(direction = "sent", id = "s1", timelineAt = 100uL),
                 lastReadMessageId = null,
                 lastReadTimelineAt = null,
-                orderedMessageIds = listOf("s1"),
+                messageOrder = firstMessageOrder(listOf("s1")),
             ),
         )
     }
@@ -26,7 +31,7 @@ class DisappearingReadAnchorTest {
                 record = message(direction = "received", id = "r1", timelineAt = 100uL),
                 lastReadMessageId = null,
                 lastReadTimelineAt = null,
-                orderedMessageIds = listOf("r1"),
+                messageOrder = firstMessageOrder(listOf("r1")),
             ),
         )
     }
@@ -38,7 +43,7 @@ class DisappearingReadAnchorTest {
                 record = message(direction = "received", id = "r2", timelineAt = 200uL),
                 lastReadMessageId = "r1",
                 lastReadTimelineAt = 150uL,
-                orderedMessageIds = listOf("r1", "r2"),
+                messageOrder = firstMessageOrder(listOf("r1", "r2")),
             ),
         )
         assertFalse(
@@ -46,7 +51,7 @@ class DisappearingReadAnchorTest {
                 record = message(direction = "received", id = "r1", timelineAt = 100uL),
                 lastReadMessageId = "r1",
                 lastReadTimelineAt = 150uL,
-                orderedMessageIds = listOf("r1", "r2"),
+                messageOrder = firstMessageOrder(listOf("r1", "r2")),
             ),
         )
     }
@@ -58,7 +63,7 @@ class DisappearingReadAnchorTest {
                 record = message(direction = "received", id = "r2", timelineAt = 200uL),
                 lastReadMessageId = null,
                 lastReadTimelineAt = 150uL,
-                orderedMessageIds = listOf("r1", "r2"),
+                messageOrder = firstMessageOrder(listOf("r1", "r2")),
             ),
         )
     }

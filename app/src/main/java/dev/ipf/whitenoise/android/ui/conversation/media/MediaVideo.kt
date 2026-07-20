@@ -719,7 +719,7 @@ internal suspend fun materializeVideoAttachment(
     }
 }
 
-private suspend fun materializeVideoAttachment(
+internal suspend fun materializeVideoAttachment(
     context: android.content.Context,
     controller: ConversationController,
     messageIdHex: String,

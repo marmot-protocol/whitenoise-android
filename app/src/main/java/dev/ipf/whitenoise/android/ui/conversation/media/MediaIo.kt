@@ -183,6 +183,20 @@ internal fun saveVideoToGallery(
     bytes: ByteArray,
     fileName: String,
     mediaType: String,
+): Boolean = saveVideoToGallery(context, bytes.inputStream(), fileName, mediaType)
+
+internal fun saveVideoToGallery(
+    context: android.content.Context,
+    source: java.io.File,
+    fileName: String,
+    mediaType: String,
+): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType) }
+
+private fun saveVideoToGallery(
+    context: android.content.Context,
+    source: java.io.InputStream,
+    fileName: String,
+    mediaType: String,
 ): Boolean {
     val resolver = context.contentResolver
     val values =
@@ -198,7 +212,7 @@ internal fun saveVideoToGallery(
     return try {
         resolver.openOutputStream(uri).use { out ->
             if (out == null) throw java.io.IOException("null output stream")
-            out.write(bytes)
+            source.copyTo(out, DEFAULT_BUFFER_SIZE)
         }
         values.clear()
         values.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0)
@@ -207,6 +221,37 @@ internal fun saveVideoToGallery(
     } catch (_: Throwable) {
         resolver.delete(uri, null, null)
         false
+    }
+}
+
+/** Stream an already-materialized video into a share-safe FileProvider temp. */
+internal suspend fun shareVideo(
+    context: android.content.Context,
+    source: java.io.File,
+    fileName: String,
+    mediaType: String,
+) {
+    val uri =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+                val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+                writeSharedMediaFile(file, source)
+                fileProviderUri(context, file)
+            }.getOrNull()
+        } ?: return
+    runCatching {
+        val intent =
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = mediaType.ifBlank { "video/mp4" }
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        context.startActivity(
+            android.content.Intent.createChooser(intent, null).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
     }
 }
 
@@ -272,6 +317,34 @@ private fun writeSharedMediaFile(
         if (protected) AttachmentPlaintextCache.unprotectPublicationFile(file)
         runCatching { file.delete() }
         throw failure
+    }
+}
+
+@Throws(java.io.IOException::class)
+private fun writeSharedMediaFile(
+    file: java.io.File,
+    source: java.io.File,
+) {
+    var sourceProtected = false
+    var destinationProtected = false
+    try {
+        AttachmentPlaintextCache.protectPublicationFile(source)
+        sourceProtected = true
+        val sourceBytes = source.takeIf { it.isFile }?.length()?.takeIf { it > 0L } ?: throw java.io.IOException("missing video source")
+        AttachmentPlaintextCache.requireEntryWithinLimit(file, sourceBytes)
+        AttachmentPlaintextCache.protectPublicationFile(file)
+        destinationProtected = true
+        source.inputStream().use { input ->
+            file.outputStream().use { output -> input.copyTo(output, DEFAULT_BUFFER_SIZE) }
+        }
+        AttachmentPlaintextCache.finishPublication(file)
+        destinationProtected = false
+    } catch (failure: Throwable) {
+        if (destinationProtected) AttachmentPlaintextCache.unprotectPublicationFile(file)
+        runCatching { file.delete() }
+        throw failure
+    } finally {
+        if (sourceProtected) AttachmentPlaintextCache.unprotectPublicationFile(source)
     }
 }
 
