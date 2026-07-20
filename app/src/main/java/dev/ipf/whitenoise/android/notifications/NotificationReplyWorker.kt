@@ -112,15 +112,30 @@ class NotificationReplyWorker(
                         recoveryScope = notificationReplyRecoveryScope(action.target.accountRef, action.target.groupIdHex),
                     )
                 }
-            if (sendOutcome != NotificationReplySendOutcome.Failed) {
-                withContext(Dispatchers.IO) {
-                    completionStore.markCompleted(completionKey)
+            when (sendOutcome) {
+                NotificationReplySendOutcome.Sent,
+                NotificationReplySendOutcome.AlreadyCommitted,
+                -> {
+                    withContext(Dispatchers.IO) {
+                        completionStore.markCompleted(completionKey)
+                    }
+                    completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
                 }
-                completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
-            } else {
-                notificationReplyActionHandled(sent = false)
-                if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
-                replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
+
+                NotificationReplySendOutcome.RetryableFailure,
+                NotificationReplySendOutcome.NonRetryableFailure,
+                -> {
+                    notificationReplyActionHandled(sent = false)
+                    replySendFailureResult(
+                        action,
+                        sendOutcome,
+                        containsLegacyPlaintext,
+                        completionStore,
+                        completionKey,
+                        retryStore,
+                        retryKey,
+                    )
+                }
             }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -178,6 +193,44 @@ class NotificationReplyWorker(
         )
     }
 
+    private suspend fun replySendFailureResult(
+        action: NotificationAction,
+        outcome: NotificationReplySendOutcome,
+        containsLegacyPlaintext: Boolean,
+        completionStore: NotificationReplyCompletionStore,
+        completionKey: String,
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        val operationAttempt =
+            if (outcome == NotificationReplySendOutcome.RetryableFailure) {
+                retryStore.recordOperationFailureAttempt(retryKey)
+            } else {
+                null
+            }
+        val result =
+            resultAfterSendOutcome(
+                outcome = outcome,
+                operationFailureAttempt = operationAttempt,
+                containsLegacyPlaintext = containsLegacyPlaintext,
+            )
+        if (result == Result.retry()) return result
+        return finalizeReplyFailure(
+            action,
+            containsLegacyPlaintext,
+            completionStore,
+            completionKey,
+            retryStore,
+            retryKey,
+            failureReason =
+                if (outcome == NotificationReplySendOutcome.NonRetryableFailure) {
+                    "non-retryable send failure"
+                } else {
+                    null
+                },
+        )
+    }
+
     private suspend fun finalizeReplyFailure(
         action: NotificationAction,
         containsLegacyPlaintext: Boolean,
@@ -185,6 +238,7 @@ class NotificationReplyWorker(
         completionKey: String,
         retryStore: NotificationActionRetryStore,
         retryKey: String,
+        failureReason: String? = null,
     ): Result {
         // Only persist the abandon marker once we're actually giving up (off the
         // worker thread); if it can't be recorded, retry so recovery state isn't lost.
@@ -193,7 +247,7 @@ class NotificationReplyWorker(
                 completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Failure)
             }
         if (!persisted) return Result.retry()
-        val reason = if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
+        val reason = failureReason ?: if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
         notificationWarning(TAG, "reply failed ($reason) attempts=${retryStore.operationFailureCount(retryKey)}") {
             "group=${action.target.groupIdHex.take(8)}"
         }
@@ -313,6 +367,32 @@ class NotificationReplyWorker(
             runAttemptCount: Int,
             containsLegacyPlaintext: Boolean = false,
         ): Boolean = !containsLegacyPlaintext && runAttemptCount < MAX_SEND_ATTEMPTS - 1
+
+        internal fun shouldRetryAfterSendOutcome(
+            outcome: NotificationReplySendOutcome,
+            operationFailureAttempt: Int,
+            containsLegacyPlaintext: Boolean = false,
+        ): Boolean =
+            outcome == NotificationReplySendOutcome.RetryableFailure &&
+                shouldRetryAfterFailure(operationFailureAttempt, containsLegacyPlaintext)
+
+        internal fun resultAfterSendOutcome(
+            outcome: NotificationReplySendOutcome,
+            operationFailureAttempt: Int?,
+            containsLegacyPlaintext: Boolean = false,
+        ): Result =
+            when {
+                outcome == NotificationReplySendOutcome.Sent ||
+                    outcome == NotificationReplySendOutcome.AlreadyCommitted -> Result.success()
+                // A retryable failure whose attempt count couldn't be persisted (null)
+                // fails closed: retrying without a durable count lets the bound never
+                // advance and WorkManager loop unbounded, matching the fail-closed guards
+                // in replyFailureResult / cryptoFailureResult.
+                operationFailureAttempt != null &&
+                    shouldRetryAfterSendOutcome(outcome, operationFailureAttempt, containsLegacyPlaintext) ->
+                    Result.retry()
+                else -> Result.failure()
+            }
 
         internal fun shouldRetryAfterCryptoFailure(
             failure: Throwable,

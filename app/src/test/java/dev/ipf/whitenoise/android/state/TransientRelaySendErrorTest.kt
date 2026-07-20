@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -133,6 +136,22 @@ class TransientRelaySendErrorTest {
         assertFalse(isTransientRelaySendError(RuntimeException("groupIdHex=abc123")))
         assertFalse(isTransientRelaySendError(IllegalArgumentException("details=bad input")))
         assertFalse(isTransientRelaySendError(RuntimeException("unexpected boom")))
+    }
+
+    @Test
+    fun notificationReplyOutcomeTreatsConnectGapAsRetryable() {
+        assertEquals(
+            NotificationReplySendOutcome.RetryableFailure,
+            notificationReplySendFailureOutcome(RuntimeException("connect relay timed out")),
+        )
+    }
+
+    @Test
+    fun notificationReplyOutcomeTreatsUnknownGroupAsNonRetryable() {
+        assertEquals(
+            NotificationReplySendOutcome.NonRetryableFailure,
+            notificationReplySendFailureOutcome(MarmotKitException.UnknownGroup("abc123")),
+        )
     }
 
     @Test

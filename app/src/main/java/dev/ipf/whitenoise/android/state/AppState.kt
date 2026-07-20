@@ -348,6 +348,17 @@ internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): Profil
 
 private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
+/**
+ * Only proven connect-phase relay failures are safe to resend automatically.
+ * Other exceptions may be terminal or may occur after publication.
+ */
+internal fun notificationReplySendFailureOutcome(throwable: Throwable): NotificationReplySendOutcome =
+    if (isTransientRelaySendError(throwable)) {
+        NotificationReplySendOutcome.RetryableFailure
+    } else {
+        NotificationReplySendOutcome.NonRetryableFailure
+    }
+
 private fun missingKeyPackageFailureDetail(
     account: String,
     displayName: (String) -> String,
@@ -3948,10 +3959,12 @@ class WhiteNoiseAppState(
         completionKey: String,
         recoveryScope: String,
     ): NotificationReplySendOutcome {
-        val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.Failed
-        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.Failed
-        if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) return NotificationReplySendOutcome.Failed
-        val body = text.trim().takeIf { it.isNotEmpty() } ?: return NotificationReplySendOutcome.Failed
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
+        if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) {
+            return NotificationReplySendOutcome.NonRetryableFailure
+        }
+        val body = text.trim().takeIf { it.isNotEmpty() } ?: return NotificationReplySendOutcome.NonRetryableFailure
         return runCatchingCancellable {
             withGroupCommitLock(account, group) {
                 val recoveryLookup =
@@ -3962,7 +3975,7 @@ class WhiteNoiseAppState(
                     when (recoveryLookup) {
                         NotificationReplyRecoveryLookup.NotStarted -> null
                         NotificationReplyRecoveryLookup.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                         is NotificationReplyRecoveryLookup.Ready -> recoveryLookup.snapshot
                     }
                 if (recoverySnapshot != null) {
@@ -3978,7 +3991,7 @@ class WhiteNoiseAppState(
                         NotificationReplyCommitProbe.Committed ->
                             return@withGroupCommitLock NotificationReplySendOutcome.AlreadyCommitted
                         NotificationReplyCommitProbe.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                         NotificationReplyCommitProbe.NotCommitted -> Unit
                     }
                 }
@@ -3991,7 +4004,7 @@ class WhiteNoiseAppState(
                     withContext(Dispatchers.IO) {
                         completionStore.markStarted(completionKey, recoveryScope, recoveryBoundary)
                     }
-                if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                 while (!notificationReplySendWindowReady(persistedBoundary, System.currentTimeMillis())) {
                     currentCoroutineContext().ensureActive()
                     delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
@@ -4002,17 +4015,17 @@ class WhiteNoiseAppState(
                     summary.messageIds
                         .firstOrNull()
                         ?.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) }
-                        ?: return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                        ?: return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                 val committed =
                     withContext(Dispatchers.IO) {
                         completionStore.markCommittedMessage(completionKey, committedMessageId)
                     }
-                if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.Failed
+                if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                 NotificationReplySendOutcome.Sent
             }
         }.onFailure {
             appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
-        }.getOrDefault(NotificationReplySendOutcome.Failed)
+        }.getOrElse(::notificationReplySendFailureOutcome)
     }
 
     private suspend fun notificationReplyCommitState(
