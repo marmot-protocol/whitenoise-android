@@ -217,6 +217,7 @@ class MessageTextSelectionTest {
                     canSelect = false,
                     canCopyText = canCopyText,
                     canSelectText = canSelectText,
+                    canSave = false,
                     quickReactionEmojis = emptyList(),
                     onDismissRequest = {},
                     onReact = {},
@@ -227,6 +228,7 @@ class MessageTextSelectionTest {
                     onSelect = {},
                     onSelectText = onSelectText,
                     onCopyText = {},
+                    onSave = {},
                     onInfo = {},
                     onDelete = {},
                 )

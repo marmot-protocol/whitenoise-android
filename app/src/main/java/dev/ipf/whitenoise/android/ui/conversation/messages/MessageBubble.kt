@@ -51,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -120,6 +119,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeVideoAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
+import dev.ipf.whitenoise.android.ui.conversation.media.saveVideoToGallery
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
@@ -138,9 +141,11 @@ import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -300,6 +305,41 @@ internal fun ColumnScope.messageBubbleBodyModifier(
         // same bubble. Media replies render their quote outside the caption.
         .then(if (hasReplyPreview && !hasMedia) Modifier.fillMaxWidth() else Modifier)
 
+internal enum class MessageAttachmentSaveOutcome {
+    Complete,
+    Partial,
+    Failed,
+    ;
+
+    companion object {
+        fun from(
+            savedCount: Int,
+            totalCount: Int,
+        ): MessageAttachmentSaveOutcome =
+            when {
+                savedCount == totalCount -> Complete
+                savedCount > 0 -> Partial
+                else -> Failed
+            }
+    }
+}
+
+private fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
+    context: android.content.Context,
+    savedCount: Int,
+    totalCount: Int,
+) {
+    when (MessageAttachmentSaveOutcome.from(savedCount, totalCount)) {
+        MessageAttachmentSaveOutcome.Complete -> present(R.string.shared_media_saved)
+        MessageAttachmentSaveOutcome.Partial ->
+            present(
+                title = context.getString(R.string.shared_media_saved),
+                detail = context.getString(R.string.conversation_search_match_count, savedCount, totalCount),
+            )
+        MessageAttachmentSaveOutcome.Failed -> present(R.string.shared_media_save_failed, copyable = true)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MessageBubble(
@@ -385,7 +425,7 @@ internal fun MessageBubble(
                 )
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     // Window-space position of the long-press touch. The y component anchors
     // the action popover; the full point seeds partial text selection (#1370).
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
@@ -551,6 +591,7 @@ internal fun MessageBubble(
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     // A deleted message is inert: tear down any open action/reaction surface if
     // the message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
@@ -849,6 +890,64 @@ internal fun MessageBubble(
                         messageIdHex = record.messageIdHex,
                         perMessageMediaReferences = perMessageMediaReferences,
                     )
+
+                fun saveAttachments() {
+                    if (mediaReferences.isEmpty() || attachmentSaveInFlight) return
+                    onActionMenuOpenChange(false)
+                    attachmentSaveInFlight = true
+                    appState.launchMutation {
+                        try {
+                            var savedCount = 0
+                            mediaReferences.forEachIndexed { attachmentIndex, reference ->
+                                val saved =
+                                    runCatching {
+                                        if (MediaReferenceParser.isVideoMedia(reference)) {
+                                            val file =
+                                                materializeVideoAttachment(
+                                                    context = context,
+                                                    controller = controller,
+                                                    messageIdHex = record.messageIdHex,
+                                                    attachmentIndex = attachmentIndex,
+                                                    reference = reference,
+                                                    mine = mine,
+                                                )
+                                            withContext(Dispatchers.IO) {
+                                                saveVideoToGallery(
+                                                    context = context,
+                                                    source = file,
+                                                    fileName = reference.fileName,
+                                                    mediaType = reference.mediaType,
+                                                )
+                                            }
+                                        } else {
+                                            val bytes =
+                                                attachmentBytes(
+                                                    controller = controller,
+                                                    messageIdHex = record.messageIdHex,
+                                                    attachmentIndex = attachmentIndex,
+                                                    reference = reference,
+                                                    mine = mine,
+                                                )
+                                            withContext(Dispatchers.IO) {
+                                                saveAttachmentToMediaStore(
+                                                    context = context,
+                                                    bytes = bytes,
+                                                    fileName = reference.fileName,
+                                                    mediaType = reference.mediaType,
+                                                )
+                                            }
+                                        }
+                                    }.onFailure {
+                                        if (it is kotlinx.coroutines.CancellationException) throw it
+                                    }.getOrDefault(false)
+                                if (saved) savedCount += 1
+                            }
+                            appState.presentAttachmentSaveOutcome(context, savedCount, mediaReferences.size)
+                        } finally {
+                            attachmentSaveInFlight = false
+                        }
+                    }
+                }
                 // Split media into image refs (rendered as a bubble or
                 // 2-col grid) and file refs (a list of pills). Mixed
                 // albums render both: images on top, file pills below.
@@ -1717,6 +1816,7 @@ internal fun MessageBubble(
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
+                    canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -1737,6 +1837,7 @@ internal fun MessageBubble(
                         controller.editingMessageId = record.messageIdHex
                     },
                     onCopyText = ::copyMessageText,
+                    onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {

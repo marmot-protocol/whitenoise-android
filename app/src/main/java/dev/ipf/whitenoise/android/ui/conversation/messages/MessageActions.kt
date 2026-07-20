@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Info
@@ -103,6 +104,7 @@ internal fun MessageActionMenu(
     canSelect: Boolean,
     canCopyText: Boolean,
     canSelectText: Boolean,
+    canSave: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -113,6 +115,7 @@ internal fun MessageActionMenu(
     onSelect: () -> Unit,
     onSelectText: () -> Unit,
     onCopyText: () -> Unit,
+    onSave: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -160,6 +163,7 @@ internal fun MessageActionMenu(
                     (if (canEdit) 1 else 0) +
                     (if (canForward) 1 else 0) +
                     (if (canSelect) 1 else 0) +
+                    (if (canSave) 1 else 0) +
                     (if (canDelete) 1 else 0)
             val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
             val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
@@ -292,6 +296,19 @@ internal fun MessageActionMenu(
                             label = stringResource(R.string.forward),
                             icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onForward,
+                        )
+                    }
+                    if (canSave) {
+                        MessageActionButton(
+                            label = stringResource(R.string.shared_media_save),
+                            icon = {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = onSave,
                         )
                     }
                     MessageActionButton(
