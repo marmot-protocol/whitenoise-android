@@ -83,6 +83,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -1801,7 +1802,7 @@ internal fun MessageBubble(
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                            initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                            initialDraft = appState.draftSnapshotFor(groupIdHex)?.textFieldValue ?: TextFieldValue(""),
                                             onDraftChange = { appState.setDraft(groupIdHex, it) },
                                             draftKey = groupIdHex,
                                             textState = composerTextState,

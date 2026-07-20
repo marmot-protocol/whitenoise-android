@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -60,7 +61,7 @@ class ComposerBarScreenshotTest {
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
                         onSend = { _, _ -> },
-                        initialDraft = draft,
+                        initialDraft = TextFieldValue(draft),
                     )
                 }
             }

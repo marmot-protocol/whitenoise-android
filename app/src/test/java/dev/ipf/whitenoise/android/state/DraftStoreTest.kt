@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,8 +21,8 @@ class DraftStoreTest {
         // in any conversation. Drafts must be observed per (account, group) key
         // so only the affected row's read-set is invalidated.
         val s = store()
-        s.set("a", "g1", "one")
-        s.set("a", "g2", "two")
+        s.set("a", "g1", TextFieldValue("one"))
+        s.set("a", "g2", TextFieldValue("two"))
 
         // Capture the Compose state objects read when fetching g1's draft.
         val g1Reads = HashSet<Any>()
@@ -35,7 +37,7 @@ class DraftStoreTest {
         val g2Changed = HashSet<Any>()
         val handle = Snapshot.registerApplyObserver { changed, _ -> g2Changed.addAll(changed) }
         try {
-            Snapshot.withMutableSnapshot { s.set("a", "g2", "two-edited") }
+            Snapshot.withMutableSnapshot { s.set("a", "g2", TextFieldValue("two-edited")) }
         } finally {
             handle.dispose()
         }
@@ -80,7 +82,7 @@ class DraftStoreTest {
         val setChanges = HashSet<Any>()
         val setHandle = Snapshot.registerApplyObserver { changed, _ -> setChanges.addAll(changed) }
         try {
-            Snapshot.withMutableSnapshot { s.set("a", "observed", "typed") }
+            Snapshot.withMutableSnapshot { s.set("a", "observed", TextFieldValue("typed")) }
         } finally {
             setHandle.dispose()
         }
@@ -116,7 +118,7 @@ class DraftStoreTest {
         val s = store()
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
-            s.set(accountIdHex = "a", groupIdHex = "missing-$index", text = " ")
+            s.set(accountIdHex = "a", groupIdHex = "missing-$index", value = TextFieldValue(" "))
         }
 
         assertEquals(0, s.draftStateCountForTest())
@@ -125,7 +127,7 @@ class DraftStoreTest {
     @Test
     fun pruningReadMissesKeepsNonEmptyDraftStates() {
         val s = store()
-        s.set("a", "kept", "draft")
+        s.set("a", "kept", TextFieldValue("draft"))
 
         repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
             s.get(accountIdHex = "a", groupIdHex = "missing-$index")
@@ -137,31 +139,79 @@ class DraftStoreTest {
     @Test
     fun setThenGetRoundTrips() {
         val s = store()
-        s.set("a", "g", "hello")
+        s.set("a", "g", TextFieldValue("hello"))
         assertEquals("hello", s.get("a", "g"))
+    }
+
+    @Test
+    fun setPersistsExactCaretPosition() {
+        val s = store()
+        s.set("a", "g", TextFieldValue("hello world", TextRange(6, 11)))
+        val restored = s.getDraft("a", "g")!!
+        assertEquals(TextFieldValue("hello world", TextRange(6, 11)), restored.textFieldValue)
+        assertTrue(restored.focusOnRestore)
+    }
+
+    @Test
+    fun selectionOnlyChangePersistsToBackingStore() {
+        val backing = InMemoryDraftPersistence()
+        val s = DraftStore(backing)
+        val key = draftKey("a", "g")
+        s.set("a", "g", TextFieldValue("hello", TextRange(1)))
+        val firstEncoded = backing.snapshot()[key]
+        s.set("a", "g", TextFieldValue("hello", TextRange(4)))
+        val secondEncoded = backing.snapshot()[key]
+        assertTrue(firstEncoded != null && secondEncoded != null)
+        assertTrue(firstEncoded != secondEncoded)
+        assertEquals(TextFieldValue("hello", TextRange(4)), s.getDraft("a", "g")!!.textFieldValue)
+    }
+
+    @Test
+    fun hydratesLegacyRawStringDraftWithEndSelectionAndNoFocus() {
+        val backing =
+            InMemoryDraftPersistence().apply {
+                write(draftKey("a", "g"), "legacy draft")
+            }
+        val s = DraftStore(backing)
+        val restored = s.getDraft("a", "g")!!
+        assertEquals(TextFieldValue("legacy draft", TextRange("legacy draft".length)), restored.textFieldValue)
+        assertFalse(restored.focusOnRestore)
+    }
+
+    @Test
+    fun hydratesMalformedVersionedDraftSafely() {
+        val malformed = "${COMPOSER_DRAFT_VERSION_PREFIX}bad"
+        val backing =
+            InMemoryDraftPersistence().apply {
+                write(draftKey("a", "g"), malformed)
+            }
+        val s = DraftStore(backing)
+        val restored = s.getDraft("a", "g")!!
+        assertEquals(malformed, restored.textFieldValue.text)
+        assertFalse(restored.focusOnRestore)
     }
 
     @Test
     fun setEmptyClearsDraft() {
         val s = store()
-        s.set("a", "g", "hello")
-        s.set("a", "g", "")
+        s.set("a", "g", TextFieldValue("hello"))
+        s.set("a", "g", TextFieldValue(""))
         assertNull(s.get("a", "g"))
     }
 
     @Test
     fun setBlankClearsDraft() {
         val s = store()
-        s.set("a", "g", "hello")
-        s.set("a", "g", "   \n\t  ")
+        s.set("a", "g", TextFieldValue("hello"))
+        s.set("a", "g", TextFieldValue("   \n\t  "))
         assertNull(s.get("a", "g"))
     }
 
     @Test
     fun draftsAreIsolatedPerAccount() {
         val s = store()
-        s.set("acctA", "g", "from A")
-        s.set("acctB", "g", "from B")
+        s.set("acctA", "g", TextFieldValue("from A"))
+        s.set("acctB", "g", TextFieldValue("from B"))
         assertEquals("from A", s.get("acctA", "g"))
         assertEquals("from B", s.get("acctB", "g"))
     }
@@ -169,8 +219,8 @@ class DraftStoreTest {
     @Test
     fun draftsAreIsolatedPerGroup() {
         val s = store()
-        s.set("a", "g1", "in g1")
-        s.set("a", "g2", "in g2")
+        s.set("a", "g1", TextFieldValue("in g1"))
+        s.set("a", "g2", TextFieldValue("in g2"))
         assertEquals("in g1", s.get("a", "g1"))
         assertEquals("in g2", s.get("a", "g2"))
     }
@@ -178,8 +228,8 @@ class DraftStoreTest {
     @Test
     fun clearForAccountWipesOnlyThatAccount() {
         val s = store()
-        s.set("a", "g", "keep B not A")
-        s.set("b", "g", "keep B not A")
+        s.set("a", "g", TextFieldValue("keep B not A"))
+        s.set("b", "g", TextFieldValue("keep B not A"))
         s.clearAllForAccount("a")
         assertNull(s.get("a", "g"))
         assertEquals("keep B not A", s.get("b", "g"))
@@ -203,7 +253,7 @@ class DraftStoreTest {
                         map.remove(key)
                         if (!createdDuringClear) {
                             createdDuringClear = true
-                            s.set("a", "late", "late draft")
+                            s.set("a", "late", TextFieldValue("late draft"))
                         }
                     } else {
                         map[key] = value
@@ -211,7 +261,7 @@ class DraftStoreTest {
                 }
             }
         s = DraftStore(backing)
-        s.set("a", "g", "existing")
+        s.set("a", "g", TextFieldValue("existing"))
 
         s.clearAllForAccount("a")
 
@@ -234,8 +284,9 @@ class DraftStoreTest {
     fun persistenceLayerWritesWhenStored() {
         val backing = InMemoryDraftPersistence()
         val s = DraftStore(backing)
-        s.set("a", "g", "persisted")
-        assertEquals("persisted", backing.snapshot()[draftKey("a", "g")])
+        s.set("a", "g", TextFieldValue("persisted"))
+        val stored = backing.snapshot()[draftKey("a", "g")]!!
+        assertEquals("persisted", decodeComposerDraftStored(stored).textFieldValue.text)
     }
 
     @Test
@@ -243,7 +294,7 @@ class DraftStoreTest {
         val backing = InMemoryDraftPersistence()
         backing.write(draftKey("a", "g"), "existing")
         val s = DraftStore(backing)
-        s.set("a", "g", "")
+        s.set("a", "g", TextFieldValue(""))
         assertTrue(backing.snapshot().isEmpty())
     }
 

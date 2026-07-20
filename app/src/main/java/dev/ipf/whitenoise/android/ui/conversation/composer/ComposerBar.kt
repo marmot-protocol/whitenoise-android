@@ -279,8 +279,8 @@ private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
 @Composable
 internal fun rememberComposerTextState(
     draftKey: Any?,
-    initialDraft: String,
-): ComposerTextState = remember(draftKey) { ComposerTextState(TextFieldValue(initialDraft)) }
+    initialDraft: TextFieldValue = TextFieldValue(""),
+): ComposerTextState = remember(draftKey) { ComposerTextState(initialDraft) }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -290,8 +290,8 @@ internal fun ComposerBar(
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
-    initialDraft: String = "",
-    onDraftChange: (String) -> Unit = {},
+    initialDraft: TextFieldValue = TextFieldValue(""),
+    onDraftChange: (TextFieldValue) -> Unit = {},
     draftKey: Any? = null,
     onAfterSend: () -> Unit = {},
     onPickFromGallery: (() -> Unit)? = null,
@@ -318,6 +318,10 @@ internal fun ComposerBar(
     // tap. One-shot: a guard flag stops a revisit / recomposition from
     // re-opening the IME, and the flag is not persisted across process death.
     autoFocusOnEnter: Boolean = false,
+    // #1455: a versioned restored draft opens with the composer focused and the
+    // keyboard raised once. Legacy raw-string drafts keep end-of-text selection
+    // without auto-focus. One-shot like [autoFocusOnEnter].
+    autoFocusOnDraftRestore: Boolean = false,
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     // #589: the composer FocusRequester is hoisted from the conversation screen
     // so its resume lifecycle observer can restore focus after an app-switch.
@@ -382,9 +386,9 @@ internal fun ComposerBar(
         }
     }
     // #321: a just-created conversation opens directly with the composer ready.
-    // Request focus and raise the soft keyboard exactly once, gated by a
-    // plain-`remember` flag (NOT rememberSaveable) so it fires per composition
-    // and never re-fires on a revisit or after process death. Skipped while
+    // Request focus and raise the soft keyboard exactly once per draft key,
+    // gated by a non-saveable flag so a direct in-place conversation switch
+    // can focus the new draft without recomposition re-firing it. Skipped while
     // editing — the edit effect above already owns focus then.
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -605,9 +609,9 @@ internal fun ComposerBar(
         composerEmojiPickerOpen = false
         attachmentSheetState.dismiss()
     }
-    var autoFocusConsumed by remember { mutableStateOf(false) }
-    LaunchedEffect(autoFocusOnEnter, editingMessageId) {
-        if (autoFocusOnEnter && !autoFocusConsumed && editingMessageId == null) {
+    var autoFocusConsumed by remember(draftKey) { mutableStateOf(false) }
+    LaunchedEffect(draftKey, autoFocusOnEnter, autoFocusOnDraftRestore, editingMessageId) {
+        if ((autoFocusOnEnter || autoFocusOnDraftRestore) && !autoFocusConsumed && editingMessageId == null) {
             autoFocusConsumed = true
             runCatching { composerFocus.requestFocus() }
             keyboardController?.show()
@@ -648,7 +652,7 @@ internal fun ComposerBar(
                     // typed text is never wiped.
                     if (textFieldValue.text == sentText) {
                         textFieldValue = TextFieldValue("")
-                        onDraftChange("")
+                        onDraftChange(TextFieldValue(""))
                     }
                     onAfterSend()
                 }
@@ -658,7 +662,7 @@ internal fun ComposerBar(
 
     fun applyComposerFieldValue(value: TextFieldValue) {
         textFieldValue = value
-        if (editingMessageId == null) onDraftChange(value.text)
+        if (editingMessageId == null) onDraftChange(value)
     }
 
     fun deleteFromComposer() {
@@ -812,8 +816,7 @@ internal fun ComposerBar(
                     onPick = { candidate ->
                         val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
                         val updated = TextFieldValue(text = insertion.text, selection = TextRange(insertion.selection))
-                        textFieldValue = updated
-                        if (editingMessageId == null) onDraftChange(updated.text)
+                        applyComposerFieldValue(updated)
                         runCatching { composerFocus.requestFocus() }
                         composerEmojiPickerOpen = false
                         composerEmojiPickerRequested = false

@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
@@ -1502,18 +1503,21 @@ class WhiteNoiseAppState(
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
     /** Convenience: return the active account's draft for [groupIdHex], or null. */
-    fun draftFor(groupIdHex: String): String? {
+    fun draftFor(groupIdHex: String): String? = draftSnapshotFor(groupIdHex)?.textFieldValue?.text
+
+    /** Convenience: return the active account's restored composer draft for [groupIdHex]. */
+    fun draftSnapshotFor(groupIdHex: String): ComposerDraftSnapshot? {
         val account = activeAccount?.accountIdHex ?: return null
-        return draftStore.get(account, groupIdHex)
+        return draftStore.getDraft(account, groupIdHex)
     }
 
     /** Convenience: write the active account's draft for [groupIdHex]. Empty/blank clears. */
     fun setDraft(
         groupIdHex: String,
-        text: String,
+        value: TextFieldValue,
     ) {
         val account = activeAccount?.accountIdHex ?: return
-        draftStore.set(account, groupIdHex, text)
+        draftStore.set(account, groupIdHex, value)
     }
 
     fun marmot(): Marmot = requireNotNull(client) { "Marmot is not initialized" }.marmot
