@@ -118,6 +118,7 @@ internal fun SettingsScreen(
                 onOpenDiagnostics = onOpenDiagnostics,
             )
         SettingsDetail.Donate -> DonateScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         null ->
             SettingsHomeScreen(
                 appState = appState,
@@ -202,6 +203,10 @@ private fun SettingsHomeScreen(
                         stringResource(R.string.notifications),
                         stringResource(R.string.notifications_settings_subtitle),
                     ) { onOpenDetail(SettingsDetail.Notifications) }
+                    SettingsRow(
+                        stringResource(R.string.tts_settings_title),
+                        stringResource(R.string.tts_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.TextToSpeech) }
                     SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
                         onOpenDetail(SettingsDetail.SecurityPrivacy)
                     }

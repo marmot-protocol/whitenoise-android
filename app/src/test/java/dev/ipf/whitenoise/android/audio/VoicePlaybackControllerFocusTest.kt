@@ -25,8 +25,11 @@ class VoicePlaybackControllerFocusTest {
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
-        setControllerField("audioManager", null)
-        setControllerField("focusRequest", null)
+        setAudioFocusOwnerField("audioManager", null)
+        setAudioFocusOwnerField("focusRequest", null)
+        setAudioFocusOwnerField("currentOwner", null)
+        setAudioFocusOwnerField("onFocusChange", null)
+        setAudioFocusOwnerField("onSurrender", null)
     }
 
     @Test
@@ -57,12 +60,12 @@ class VoicePlaybackControllerFocusTest {
         shadowAudioManager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
 
         assertFalse(requestFocus())
-        assertNull(controllerField("focusRequest"))
+        assertNull(audioFocusOwnerField("focusRequest"))
 
         shadowAudioManager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
 
         assertTrue(requestFocus())
-        assertNotNull(controllerField("focusRequest"))
+        assertNotNull(audioFocusOwnerField("focusRequest"))
     }
 
     @Test
@@ -88,7 +91,7 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(startPreparedNewPlayer(mediaPlayer))
 
         assertTrue(mediaPlayer.released)
-        assertNull(controllerField("focusRequest"))
+        assertNull(audioFocusOwnerField("focusRequest"))
         assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
@@ -126,7 +129,7 @@ class VoicePlaybackControllerFocusTest {
         assertNull(controllerField("player"))
         assertNull(controllerField("currentKey"))
         assertNull(controllerField("currentOwnerKey"))
-        assertNull(controllerField("focusRequest"))
+        assertNull(audioFocusOwnerField("focusRequest"))
         assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
@@ -136,23 +139,23 @@ class VoicePlaybackControllerFocusTest {
         val context = RuntimeEnvironment.getApplication()
         VoicePlaybackController.attach(context)
         assertTrue(requestFocus())
-        val heldFocusRequest = controllerField("focusRequest")
+        val heldFocusRequest = audioFocusOwnerField("focusRequest")
         assertNotNull(heldFocusRequest)
         val mediaPlayer = TrackingMediaPlayer()
         primeActivePlayer(mediaPlayer)
 
-        handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        audioFocusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
 
         assertFalse(mediaPlayer.playing)
         assertFalse(VoicePlaybackController.state.value.isPlaying)
-        assertSame(heldFocusRequest, controllerField("focusRequest"))
+        assertSame(heldFocusRequest, audioFocusOwnerField("focusRequest"))
         assertTrue(controllerField("resumeOnAudioFocusGain") as Boolean)
 
-        handleAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        audioFocusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
 
         assertTrue(mediaPlayer.playing)
         assertTrue(VoicePlaybackController.state.value.isPlaying)
-        assertSame(heldFocusRequest, controllerField("focusRequest"))
+        assertSame(heldFocusRequest, audioFocusOwnerField("focusRequest"))
         assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
     }
 
@@ -201,7 +204,7 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(mediaPlayer.playing)
         assertFalse(VoicePlaybackController.state.value.isPlaying)
         assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
-        assertNull(controllerField("focusRequest"))
+        assertNull(audioFocusOwnerField("focusRequest"))
     }
 
     @Test
@@ -247,7 +250,7 @@ class VoicePlaybackControllerFocusTest {
 
         assertTrue(mediaPlayer.released)
         assertNull(controllerField("player"))
-        assertNull(controllerField("focusRequest"))
+        assertNull(audioFocusOwnerField("focusRequest"))
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
 
@@ -266,7 +269,7 @@ class VoicePlaybackControllerFocusTest {
 
             assertTrue(mediaPlayer.released)
             assertNull(controllerField("player"))
-            assertNull(controllerField("focusRequest"))
+            assertNull(audioFocusOwnerField("focusRequest"))
             assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
         }
     }
@@ -287,7 +290,7 @@ class VoicePlaybackControllerFocusTest {
 
             assertTrue(mediaPlayer.released)
             assertNull(controllerField("player"))
-            assertNull(controllerField("focusRequest"))
+            assertNull(audioFocusOwnerField("focusRequest"))
             assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
         }
     }
@@ -313,7 +316,7 @@ class VoicePlaybackControllerFocusTest {
 
             assertTrue(mediaPlayer.released)
             assertNull(controllerField("player"))
-            assertNull(controllerField("focusRequest"))
+            assertNull(audioFocusOwnerField("focusRequest"))
             assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
         }
     }
@@ -360,6 +363,23 @@ class VoicePlaybackControllerFocusTest {
         val field = VoicePlaybackController::class.java.getDeclaredField(name)
         field.isAccessible = true
         return field.get(VoicePlaybackController)
+    }
+
+    private fun audioFocusOwnerField(name: String): Any? {
+        val field = AudioFocusOwner::class.java.getDeclaredField(name)
+        field.isAccessible = true
+        return field.get(AudioFocusOwner)
+    }
+
+    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
+
+    private fun setAudioFocusOwnerField(
+        name: String,
+        value: Any?,
+    ) {
+        val field = AudioFocusOwner::class.java.getDeclaredField(name)
+        field.isAccessible = true
+        field.set(AudioFocusOwner, value)
     }
 
     @Suppress("UNCHECKED_CAST")

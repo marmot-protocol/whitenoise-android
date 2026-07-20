@@ -1072,4 +1072,17 @@
     <string name="invalid_hex_color">Gib eine Farbe wie #336699 ein.</string>
     <string name="apply_color">Farbe anwenden</string>
     <string name="reset_to_default">Auf Standard zurücksetzen</string>
+
+    <string name="tts_warning_title">Externe Sprachausgabe</string>
+    <string name="tts_warning_message">Die ausgewählte Sprachausgabe ist eine separate App, die entschlüsselten Nachrichtentext an die Server des Entwicklers senden kann. Für Sprache auf dem Gerät installieren Sie RHVoice oder eSpeak NG über F-Droid oder Zapstore und wählen es in den Einstellungen.</string>
+    <string name="tts_warning_proceed">Trotzdem sprechen</string>
+    <string name="tts_settings_title">Sprachausgabe</string>
+    <string name="tts_settings_subtitle">Nachrichten vorlesen und eine lokale Sprachausgabe wählen</string>
+    <string name="tts_settings_about_title">Über Sprachausgabe</string>
+    <string name="tts_settings_explainer_usable">„Sprechen“ liest Nachrichtentext mit Ihrer gewählten Sprachausgabe vor. Lokale Sprachausgaben verarbeiten Sprache auf diesem Gerät.</string>
+    <string name="tts_settings_explainer_discovering">Installierte Sprachausgaben auf diesem Gerät werden geprüft…</string>
+    <string name="tts_settings_explainer_no_engine">Keine nutzbare Sprachausgabe installiert. Installieren Sie RHVoice oder eSpeak NG über F-Droid oder Zapstore und wählen Sie es unten aus.</string>
+    <string name="tts_settings_engine_title">Sprachausgabe</string>
+    <string name="tts_settings_engine_local">Sprachausgabe auf dem Gerät</string>
+    <string name="tts_settings_engine_unknown">Kann Netzwerk-Sprache nutzen</string>
 </resources>

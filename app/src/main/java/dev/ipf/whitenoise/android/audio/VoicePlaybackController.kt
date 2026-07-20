@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -104,16 +103,23 @@ object VoicePlaybackController {
     // only one prepared player can ever reach start()/assignment.
     private val playSerializer = VoicePlaybackRequestSerializer()
 
-    private var audioManager: AudioManager? = null
-    private var focusRequest: AudioFocusRequest? = null
     private var resumeOnAudioFocusGain = false
     private var duckedForAudioFocusLoss = false
-    private val focusListener =
-        AudioManager.OnAudioFocusChangeListener { change -> handleAudioFocusChange(change) }
+    private val speechAudioAttributes: AudioAttributes =
+        AudioAttributes
+            .Builder()
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .build()
 
     /** Call once from Application.onCreate so playback can request audio focus. */
     fun attach(context: Context) {
-        audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
+        AudioFocusOwner.attach(context)
+    }
+
+    /** Stops playback when another audio owner takes focus. */
+    internal fun stopForAudioHandoff() {
+        stop()
     }
 
     private data class CompletionCallback(
@@ -366,33 +372,17 @@ object VoicePlaybackController {
                 onFailure()
             }.isSuccess
 
-    private fun requestFocus(): Boolean {
-        val am = audioManager ?: return true
-        // focusRequest is non-null only after AudioManager granted focus and is
-        // cleared when that request is abandoned. Reuse the held request so the
-        // same instance can be abandoned later instead of orphaning it.
-        if (focusRequest != null) return true
-        val attrs =
-            AudioAttributes
-                .Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .build()
-        val req =
-            AudioFocusRequest
-                .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(attrs)
-                .setOnAudioFocusChangeListener(focusListener)
-                .build()
-        val granted = am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (granted) focusRequest = req
-        return granted
-    }
+    private fun requestFocus(): Boolean =
+        AudioFocusOwner.acquireWithFocusChanges(
+            owner = AudioFocusOwner.Owner.Voice,
+            audioAttributes = speechAudioAttributes,
+            focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+            onFocusChange = ::handleAudioFocusChange,
+            onOwnerSurrender = ::stopForAudioHandoff,
+        )
 
     private fun abandonFocus() {
-        val am = audioManager ?: return
-        focusRequest?.let { am.abandonAudioFocusRequest(it) }
-        focusRequest = null
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Voice)
     }
 
     private fun handleAudioFocusChange(change: Int) {

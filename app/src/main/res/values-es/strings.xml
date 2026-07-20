@@ -1074,4 +1074,17 @@
     <string name="invalid_hex_color">Introduce un color como #336699.</string>
     <string name="apply_color">Aplicar color</string>
     <string name="reset_to_default">Restablecer valores</string>
+
+    <string name="tts_warning_title">Motor de texto a voz externo</string>
+    <string name="tts_warning_message">El motor de texto a voz seleccionado es una aplicación aparte que puede enviar el texto descifrado del mensaje a los servidores de su desarrollador. Para voz en el dispositivo, instala RHVoice o eSpeak NG desde F-Droid o Zapstore y elígelo en Ajustes.</string>
+    <string name="tts_warning_proceed">Hablar de todos modos</string>
+    <string name="tts_settings_title">Texto a voz</string>
+    <string name="tts_settings_subtitle">Leer mensajes en voz alta y elegir un motor local</string>
+    <string name="tts_settings_about_title">Acerca de la voz</string>
+    <string name="tts_settings_explainer_usable">Hablar lee el texto del mensaje en voz alta con el motor de texto a voz elegido. Los motores locales procesan la voz en este dispositivo.</string>
+    <string name="tts_settings_explainer_discovering">Comprobando los motores de texto a voz instalados en este dispositivo…</string>
+    <string name="tts_settings_explainer_no_engine">No hay un motor de texto a voz utilizable instalado. Instala RHVoice o eSpeak NG desde F-Droid o Zapstore y selecciónalo abajo.</string>
+    <string name="tts_settings_engine_title">Motor</string>
+    <string name="tts_settings_engine_local">Motor en el dispositivo</string>
+    <string name="tts_settings_engine_unknown">Puede usar voz en red</string>
 </resources>
