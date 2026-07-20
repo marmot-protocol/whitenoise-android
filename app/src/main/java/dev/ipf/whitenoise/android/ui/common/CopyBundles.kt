@@ -21,8 +21,6 @@ import dev.ipf.whitenoise.android.state.ConversationControllerCopy
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 @Composable
 internal fun rememberGroupTitleCopy(): GroupTitleCopy =
@@ -184,6 +182,23 @@ private fun rememberRelativeTimeNow(): Instant {
 
 internal fun relativeTimeRefreshDelayMillis(now: Instant): Long = (60_000L - (now.toEpochMilli() % 60_000L)).coerceAtLeast(1L)
 
+@Composable
+internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
+    val copy = rememberRelativeTimeCopy()
+    val locale = LocalConfiguration.current.locales[0]
+    val zone = ZoneId.systemDefault()
+    val currentTime = rememberRelativeTimeNow()
+    return remember(epochSeconds, copy, locale, currentTime) {
+        IdentityFormatter.messageBubbleTime(
+            epochSeconds = epochSeconds,
+            copy = copy,
+            locale = locale,
+            now = currentTime,
+            zone = zone,
+        )
+    }
+}
+
 // Clock time only (locale-aware short form, e.g. "3:28 PM" / "15:28"). The
 // transcript groups messages under day separators, so a bubble footer doesn't
 // need the date — just the time. The full date stays available in message
@@ -192,13 +207,6 @@ internal fun relativeTimeRefreshDelayMillis(now: Instant): Long = (60_000L - (no
 internal fun rememberedClockTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]
     return remember(epochSeconds, locale) {
-        if (epochSeconds == 0uL) {
-            ""
-        } else {
-            Instant
-                .ofEpochSecond(epochSeconds.toLong())
-                .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
-        }
+        IdentityFormatter.clockTime(epochSeconds, locale)
     }
 }

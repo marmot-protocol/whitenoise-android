@@ -150,6 +150,37 @@ object IdentityFormatter {
         }
     }
 
+    fun clockTime(
+        epochSeconds: ULong,
+        locale: Locale = Locale.getDefault(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        if (epochSeconds == 0uL) return ""
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        return runCatching {
+            Instant
+                .ofEpochSecond(seconds)
+                .atZone(zone)
+                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+        }.getOrDefault("")
+    }
+
+    fun messageBubbleTime(
+        epochSeconds: ULong,
+        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
+        locale: Locale = Locale.getDefault(),
+        now: Instant = Instant.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        if (epochSeconds == 0uL) return ""
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        return if (now.epochSecond - seconds < 3_600) {
+            relativeTime(epochSeconds, copy, locale, now, zone)
+        } else {
+            clockTime(epochSeconds, locale, zone)
+        }
+    }
+
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =
         noYearFormatters.computeIfAbsent(locale) { requestedLocale ->
             val localizedPattern =
