@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -123,6 +124,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.nextReadAnchor
+import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -2258,11 +2260,13 @@ internal fun ConversationScreen(
     // long-message reader's composer, so in-progress text never drifts between
     // them. Created at screen scope so both the bottom-bar composer and the
     // per-message reader can receive the same instance.
+    val restoredDraftSnapshot = appState.draftSnapshotFor(controller.group.groupIdHex)
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
-            initialDraft = appState.draftFor(controller.group.groupIdHex).orEmpty(),
+            initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
         )
+    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
     // attachment sheet — the composer itself stays interactive while it's open.
@@ -2611,7 +2615,7 @@ internal fun ConversationScreen(
                                     messageTextCopy = messageTextCopy,
                                     onCancelReply = { controller.replyingTo = null },
                                     onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                    initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                    initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
                                     onDraftChange = { appState.setDraft(groupIdHex, it) },
                                     draftKey = groupIdHex,
                                     textState = composerTextState,
@@ -2704,6 +2708,8 @@ internal fun ConversationScreen(
                                     mentionCandidates = mentionPicker.candidates,
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     autoFocusOnEnter = justCreated,
+                                    autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
+                                    autoFocusConsumedState = composerAutoFocusConsumed,
                                     enterKeyBehavior = appState.enterKeyBehavior,
                                     // #589: hoisted focus plumbing — the requester lets the
                                     // resume observer restore focus, and the callback keeps
