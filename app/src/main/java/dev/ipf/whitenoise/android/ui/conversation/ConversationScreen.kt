@@ -104,6 +104,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -2872,6 +2873,17 @@ internal fun ConversationScreen(
                                                         { controller.hideMessageForMe(item.record.messageIdHex) }
                                                     },
                                             )
+                                            return@Column
+                                        }
+                                        TimelineRowKind.AgentOperation -> {
+                                            remember(item.record) {
+                                                AgentOperationProjector.project(item.record)
+                                            }?.let { operation ->
+                                                AgentOperationRow(
+                                                    messageId = item.record.messageIdHex,
+                                                    operation = operation,
+                                                )
+                                            }
                                             return@Column
                                         }
                                         TimelineRowKind.DebugRow -> {

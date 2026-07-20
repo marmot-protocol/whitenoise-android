@@ -76,6 +76,20 @@ class MessageDebugStyleTest {
     }
 
     @Test
+    fun agentOperationUsesDedicatedRowRegardlessOfDebugMode() {
+        val record =
+            message(
+                id = "tool",
+                plaintext = """{"event_type":"tool_call","status":"started","text":"Searching"}""",
+                kind = 1202uL,
+            )
+
+        assertEquals(MessageDebugCategory.AgentChrome, MessageDebugClassifier.debugStyle(record).category)
+        assertEquals(TimelineRowKind.AgentOperation, timelineRowKind(record, streamingDebugEnabled = false))
+        assertEquals(TimelineRowKind.AgentOperation, timelineRowKind(record, streamingDebugEnabled = true))
+    }
+
+    @Test
     fun chatRowIsBubbleRegardlessOfDebug() {
         val record = message(id = "m1", plaintext = "hi", kind = 9uL)
 

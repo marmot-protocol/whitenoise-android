@@ -79,6 +79,7 @@ object MessageProjector {
     private val KindChat = 9uL
     private val KindEdit = 1009uL
     private val KindAgentStreamStart = 1200uL
+    private const val KindAgentOperation = 1202uL
     private val KindGroupSystem = 1210uL
 
     private const val EventRefTag = "e"
@@ -270,6 +271,8 @@ object MessageProjector {
     fun editTargetMessageId(message: AppMessageRecordFfi): String? = if (message.kind == KindEdit) tagValues(message, EventRefTag).firstOrNull() else null
 
     fun isStreamStart(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentStreamStart
+
+    fun isAgentOperation(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentOperation
 
     fun isStreamFinal(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat &&
