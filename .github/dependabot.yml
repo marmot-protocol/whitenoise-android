@@ -5,7 +5,7 @@
 # Compose BOM and Firebase BOM (which already pin their members transitively).
 #
 # Dependabot PRs are gated by the existing android-ci.yml workflow (compile +
-# unit tests + ktlint + Android lint) exactly like any other PR, so a breaking
+# unit tests + ktlint + detekt + Android lint) exactly like any other PR, so a breaking
 # minor/major bump cannot land green without passing CI.
 version: 2
 updates:

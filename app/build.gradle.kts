@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.kover)
 }
@@ -585,6 +586,22 @@ kover {
             }
         }
     }
+}
+
+detekt {
+    // Analyze app-owned Kotlin only. Generated UniFFI bindings and the vendored
+    // keyring stub are regenerated wholesale and must stay byte-stable.
+    source.setFrom(
+        "src/main/java/dev/ipf/whitenoise/android",
+        "src/test/java/dev/ipf/whitenoise/android",
+        "src/androidTest/java/dev/ipf/whitenoise/android",
+    )
+    // Start from detekt's defaults and keep project-specific changes in one
+    // checked-in file. The baseline freezes existing debt; new findings fail.
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/detekt-baseline.xml")
+    parallel = true
 }
 
 ktlint {

@@ -30,6 +30,8 @@ cameraX = "1.6.1"
 mlkitBarcode = "17.3.0"
 ktlint = "1.5.0"
 ktlintGradle = "14.2.0"
+# Detekt 2 supports this project's Kotlin 2.4 / AGP 9 built-in Kotlin stack.
+detekt = "2.0.0-alpha.5"
 firebaseBom = "34.16.0"
 googleServices = "4.5.0"
 playServicesBase = "18.10.0"
@@ -89,6 +91,7 @@ roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "robora
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

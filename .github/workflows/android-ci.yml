@@ -6,7 +6,7 @@ name: Android CI
 # google-services.json, so this never depends on release/Play/Zapstore
 # credentials.
 #
-# Scope: compile + unit tests + ktlint + Android lint. APK build artifacts are a
+# Scope: compile + unit tests + ktlint + detekt + Android lint. APK build artifacts are a
 # separate workflow (see issue #247).
 
 on:
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   validate:
-    name: Compile, test, ktlint, Android lint
+    name: Compile, test, ktlint, detekt, Android lint
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -64,6 +64,9 @@ jobs:
 
       - name: ktlint
         run: ./gradlew :app:ktlintCheck --no-daemon --stacktrace
+
+      - name: detekt
+        run: ./gradlew :app:detekt --no-daemon --stacktrace
 
       - name: Android lint
         run: ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug --no-daemon --stacktrace

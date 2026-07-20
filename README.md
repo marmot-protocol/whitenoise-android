@@ -58,9 +58,11 @@ Dev registers `whitenoise-dev://` deep links, staging registers `whitenoise-stag
 Every pull request to `master` (and every push to `master`) runs the
 `.github/workflows/android-ci.yml` validation workflow. It fails the build on
 Kotlin compile errors, unit-test failures, Compose screenshot regressions
-(Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations, or
-Android lint regressions. The workflow runs both the `zapstore` and `play` dev
-debug variants and requires no signing secrets or `google-services.json`.
+(Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations,
+new detekt findings, or Android lint regressions. Existing detekt findings are
+frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
+`zapstore` and `play` dev debug variants and requires no signing secrets or
+`google-services.json`.
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`
@@ -95,6 +97,7 @@ Run the same fast checks locally before pushing:
 ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest  # also: just test
 ./gradlew :app:verifyRoborazziDevZapstoreDebug :app:verifyRoborazziDevPlayDebug  # screenshot tests
 ./gradlew :app:ktlintCheck             # style/format check  (also: just lint)
+./gradlew :app:detekt                  # code-smell/complexity check
 ./gradlew :app:lintDevZapstoreDebug :app:lintDevPlayDebug   # Android lint
 ```
 
