@@ -10,9 +10,6 @@ class ConversationBackFocusTest {
     fun focusedComposerConsumesBackToDismissKeyboard() {
         assertTrue(
             shouldDismissComposerOnBack(
-                textSelectionActive = false,
-                selectionMode = false,
-                searchOpen = false,
                 composerFocused = true,
                 imeIsOpen = false,
             ),
@@ -23,48 +20,6 @@ class ConversationBackFocusTest {
     fun visibleImeConsumesBackWhenFocusEdgeLags() {
         assertTrue(
             shouldDismissComposerOnBack(
-                textSelectionActive = false,
-                selectionMode = false,
-                searchOpen = false,
-                composerFocused = false,
-                imeIsOpen = true,
-            ),
-        )
-    }
-
-    @Test
-    fun textSelectionKeepsExistingBackPriority() {
-        assertFalse(
-            shouldDismissComposerOnBack(
-                textSelectionActive = true,
-                selectionMode = false,
-                searchOpen = false,
-                composerFocused = true,
-                imeIsOpen = true,
-            ),
-        )
-    }
-
-    @Test
-    fun messageSelectionKeepsExistingBackPriority() {
-        assertFalse(
-            shouldDismissComposerOnBack(
-                textSelectionActive = false,
-                selectionMode = true,
-                searchOpen = false,
-                composerFocused = true,
-                imeIsOpen = true,
-            ),
-        )
-    }
-
-    @Test
-    fun searchKeepsExistingBackPriority() {
-        assertFalse(
-            shouldDismissComposerOnBack(
-                textSelectionActive = false,
-                selectionMode = false,
-                searchOpen = true,
                 composerFocused = false,
                 imeIsOpen = true,
             ),
@@ -75,9 +30,6 @@ class ConversationBackFocusTest {
     fun closedUnfocusedComposerLetsBackLeaveConversation() {
         assertFalse(
             shouldDismissComposerOnBack(
-                textSelectionActive = false,
-                selectionMode = false,
-                searchOpen = false,
                 composerFocused = false,
                 imeIsOpen = false,
             ),

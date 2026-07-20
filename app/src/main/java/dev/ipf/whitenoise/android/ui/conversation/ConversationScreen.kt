@@ -1806,9 +1806,6 @@ internal fun ConversationScreen(
             }
             searchOpen -> closeSearch()
             shouldDismissComposerOnBack(
-                textSelectionActive = textSelectionMessageId != null,
-                selectionMode = selectionMode,
-                searchOpen = searchOpen,
                 composerFocused = composerFocused,
                 imeIsOpen = imeIsOpen,
             ) -> {
