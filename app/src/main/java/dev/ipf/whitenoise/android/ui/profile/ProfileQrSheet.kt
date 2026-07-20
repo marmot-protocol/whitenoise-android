@@ -49,12 +49,15 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
+internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileQrSheet(
     appState: WhiteNoiseAppState,
     accountIdHex: String,
     onDismiss: () -> Unit,
+    showScan: Boolean = true,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -118,22 +121,24 @@ internal fun ProfileQrSheet(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.share))
                 }
-                Button(
-                    onClick = {
-                        scanError = null
-                        showScanner = true
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.scan))
+                if (showScan) {
+                    Button(
+                        onClick = {
+                            scanError = null
+                            showScanner = true
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.scan))
+                    }
                 }
             }
         }
     }
 
-    if (showScanner) {
+    if (showScan && showScanner) {
         QrScannerSheet(
             onDismiss = { showScanner = false },
             onScan = { raw ->
