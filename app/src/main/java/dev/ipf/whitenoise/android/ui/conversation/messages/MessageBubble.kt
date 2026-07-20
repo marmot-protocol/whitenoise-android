@@ -51,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -145,7 +144,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -420,7 +418,6 @@ internal fun MessageBubble(
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     // Window-space position of the long-press touch. The y component anchors
     // the action popover; the full point seeds partial text selection (#1370).
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
@@ -586,6 +583,7 @@ internal fun MessageBubble(
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var deleteForEveryoneInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
+    var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     // A deleted message is inert: tear down any open action/reaction surface if
     // the message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
@@ -886,55 +884,60 @@ internal fun MessageBubble(
                     )
 
                 fun saveAttachments() {
-                    if (mediaReferences.isEmpty()) return
+                    if (mediaReferences.isEmpty() || attachmentSaveInFlight) return
                     onActionMenuOpenChange(false)
-                    scope.launch {
-                        var savedCount = 0
-                        mediaReferences.forEachIndexed { attachmentIndex, reference ->
-                            val saved =
-                                runCatching {
-                                    if (MediaReferenceParser.isVideoMedia(reference)) {
-                                        val file =
-                                            materializeVideoAttachment(
-                                                context = context,
-                                                controller = controller,
-                                                messageIdHex = record.messageIdHex,
-                                                attachmentIndex = attachmentIndex,
-                                                reference = reference,
-                                                mine = mine,
-                                            )
-                                        withContext(Dispatchers.IO) {
-                                            saveVideoToGallery(
-                                                context = context,
-                                                source = file,
-                                                fileName = reference.fileName,
-                                                mediaType = reference.mediaType,
-                                            )
+                    attachmentSaveInFlight = true
+                    appState.launchMutation {
+                        try {
+                            var savedCount = 0
+                            mediaReferences.forEachIndexed { attachmentIndex, reference ->
+                                val saved =
+                                    runCatching {
+                                        if (MediaReferenceParser.isVideoMedia(reference)) {
+                                            val file =
+                                                materializeVideoAttachment(
+                                                    context = context,
+                                                    controller = controller,
+                                                    messageIdHex = record.messageIdHex,
+                                                    attachmentIndex = attachmentIndex,
+                                                    reference = reference,
+                                                    mine = mine,
+                                                )
+                                            withContext(Dispatchers.IO) {
+                                                saveVideoToGallery(
+                                                    context = context,
+                                                    source = file,
+                                                    fileName = reference.fileName,
+                                                    mediaType = reference.mediaType,
+                                                )
+                                            }
+                                        } else {
+                                            val bytes =
+                                                attachmentBytes(
+                                                    controller = controller,
+                                                    messageIdHex = record.messageIdHex,
+                                                    attachmentIndex = attachmentIndex,
+                                                    reference = reference,
+                                                    mine = mine,
+                                                )
+                                            withContext(Dispatchers.IO) {
+                                                saveAttachmentToMediaStore(
+                                                    context = context,
+                                                    bytes = bytes,
+                                                    fileName = reference.fileName,
+                                                    mediaType = reference.mediaType,
+                                                )
+                                            }
                                         }
-                                    } else {
-                                        val bytes =
-                                            attachmentBytes(
-                                                controller = controller,
-                                                messageIdHex = record.messageIdHex,
-                                                attachmentIndex = attachmentIndex,
-                                                reference = reference,
-                                                mine = mine,
-                                            )
-                                        withContext(Dispatchers.IO) {
-                                            saveAttachmentToMediaStore(
-                                                context = context,
-                                                bytes = bytes,
-                                                fileName = reference.fileName,
-                                                mediaType = reference.mediaType,
-                                            )
-                                        }
-                                    }
-                                }.onFailure {
-                                    if (it is kotlinx.coroutines.CancellationException) throw it
-                                }.getOrDefault(false)
-                            if (saved) savedCount += 1
+                                    }.onFailure {
+                                        if (it is kotlinx.coroutines.CancellationException) throw it
+                                    }.getOrDefault(false)
+                                if (saved) savedCount += 1
+                            }
+                            appState.presentAttachmentSaveOutcome(context, savedCount, mediaReferences.size)
+                        } finally {
+                            attachmentSaveInFlight = false
                         }
-                        appState.presentAttachmentSaveOutcome(context, savedCount, mediaReferences.size)
                     }
                 }
                 // Split media into image refs (rendered as a bubble or
@@ -1805,7 +1808,7 @@ internal fun MessageBubble(
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
-                    canSave = mediaReferences.isNotEmpty(),
+                    canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->

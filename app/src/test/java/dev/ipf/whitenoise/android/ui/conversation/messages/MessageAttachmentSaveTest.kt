@@ -42,11 +42,7 @@ class MessageAttachmentSaveTest {
 
     @Test
     fun videoSaveReusesTheMaterializedFile() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
-            ).first(File::exists).readText()
+        val source = messageBubbleSource()
         val saveBody = source.substringAfter("fun saveAttachments()").substringBefore("// Split media")
 
         assertTrue(
@@ -54,6 +50,20 @@ class MessageAttachmentSaveTest {
             "MediaReferenceParser.isVideoMedia(reference)" in saveBody &&
                 "materializeVideoAttachment(" in saveBody &&
                 "saveVideoToGallery(" in saveBody,
+        )
+    }
+
+    @Test
+    fun saveSurvivesNavigationAndRejectsConcurrentLaunches() {
+        val source = messageBubbleSource()
+        val saveBody = source.substringAfter("fun saveAttachments()").substringBefore("// Split media")
+
+        assertTrue(
+            "attachment saves must survive navigation and ignore a second invocation while active",
+            "if (mediaReferences.isEmpty() || attachmentSaveInFlight) return" in saveBody &&
+                "attachmentSaveInFlight = true" in saveBody &&
+                "appState.launchMutation" in saveBody &&
+                Regex("finally\\s*\\{\\s*attachmentSaveInFlight = false").containsMatchIn(saveBody),
         )
     }
 
@@ -112,4 +122,10 @@ class MessageAttachmentSaveTest {
     }
 
     private fun string(resId: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(resId)
+
+    private fun messageBubbleSource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
+        ).first(File::exists).readText()
 }
