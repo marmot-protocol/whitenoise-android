@@ -37,7 +37,7 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "scrim must consume outside taps instead of letting them click through",
-            "detectTapGestures { onDismissRequest() }" in body,
+            "detectTapGestures { currentOnDismissRequest() }" in body,
         )
         assertEquals(
             "scrim and content popups must share the same non-focusable properties",
@@ -47,13 +47,26 @@ class KeyboardSafePopupCoverageTest {
     }
 
     @Test
-    fun keyboardSafePopupBackHandlerDismissesWhileExpanded() {
+    fun keyboardSafePopupDismissesBeforeTheImeBackCallback() {
         val body = keyboardSafePopupSource().readText().functionBody("KeyboardSafePopup")
 
         assertTrue(
-            "Back must dismiss via host-window BackHandler while non-focusable",
-            "BackHandler(enabled = true) { onDismissRequest() }" in body,
+            "Back must use overlay priority so the sheet closes before the IME",
+            "OnBackInvokedDispatcher.PRIORITY_OVERLAY" in body,
         )
+        assertTrue(
+            "preview hosts without a platform dispatcher still need Back dismissal",
+            "BackHandler(enabled = true) { currentOnDismissRequest() }" in body,
+        )
+    }
+
+    @Test
+    fun keyboardSafePopupAcceptsCallerScrimStylingAndSemantics() {
+        val source = keyboardSafePopupSource().readText()
+        val body = source.functionBody("KeyboardSafePopup")
+
+        assertTrue("scrim customization must remain optional", "scrimModifier: Modifier = Modifier" in source)
+        assertTrue("the full-window dismissal scrim must apply caller decoration", ".then(scrimModifier)" in body)
     }
 
     @Test
