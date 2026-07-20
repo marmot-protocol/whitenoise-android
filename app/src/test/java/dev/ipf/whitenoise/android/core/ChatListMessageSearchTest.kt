@@ -179,43 +179,43 @@ class ChatListMessageSearchTest {
         assertEquals(needle, s.text.substring(s.highlightStart, s.highlightEnd))
     }
 
-    // ---- titleOrPreviewMatches (issue #290, blocking review #1) --------------
+    // ---- synchronousFieldsMatch (issue #290, blocking review #1) -------------
 
     @Test
     fun titleOrPreviewMatchesWhenTitleContainsNeedle() {
         // A row whose title already matches must be classified as title/preview
         // so the UI suppresses the body snippet + tap-to-message focus.
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Project Marmot", "no needle here", "marmot"))
+        assertTrue(ChatListMessageSearch.synchronousFieldsMatch("Project Marmot", "no needle here", "marmot"))
     }
 
     @Test
     fun titleOrPreviewMatchesWhenPreviewContainsNeedle() {
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Some chat", "see you at the cafe", "cafe"))
+        assertTrue(ChatListMessageSearch.synchronousFieldsMatch("Some chat", "see you at the cafe", "cafe"))
     }
 
     @Test
     fun titleOrPreviewDoesNotMatchWhenOnlyBodyWouldMatch() {
         // Neither title nor preview contains the needle: this is a body-only
         // match, so the UI keeps the snippet + focus.
-        assertFalse(ChatListMessageSearch.titleOrPreviewMatches("Some chat", "latest preview line", "marmot"))
+        assertFalse(ChatListMessageSearch.synchronousFieldsMatch("Some chat", "latest preview line", "marmot"))
     }
 
     @Test
     fun titleOrPreviewMatchIsCaseInsensitive() {
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Project MARMOT", "preview", "marmot"))
+        assertTrue(ChatListMessageSearch.synchronousFieldsMatch("Project MARMOT", "preview", "marmot"))
     }
 
     @Test
     fun titleOrPreviewUsesLocaleRootCaseFolding() =
         withDefaultLocale(Locale.forLanguageTag("tr")) {
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("INDIGO", "preview", "i"))
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "INDIGO", "i"))
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "preview", "i", description = "INDIGO"))
+            assertTrue(ChatListMessageSearch.synchronousFieldsMatch("INDIGO", "preview", "i"))
+            assertTrue(ChatListMessageSearch.synchronousFieldsMatch("title", "INDIGO", "i"))
+            assertTrue(ChatListMessageSearch.synchronousFieldsMatch("title", "preview", "i", description = "INDIGO"))
         }
 
     @Test
     fun titleOrPreviewBlankNeedleNeverMatches() {
-        assertFalse(ChatListMessageSearch.titleOrPreviewMatches("anything", "anything", ""))
+        assertFalse(ChatListMessageSearch.synchronousFieldsMatch("anything", "anything", ""))
     }
 
     // ---- description match (issue #388) -------------------------------------
@@ -227,7 +227,7 @@ class ChatListMessageSearchTest {
         // description should be classified as title/preview/description so the
         // UI suppresses the body snippet line (no older message to scroll to).
         assertTrue(
-            ChatListMessageSearch.titleOrPreviewMatches(
+            ChatListMessageSearch.synchronousFieldsMatch(
                 displayTitle = "Some chat",
                 previewText = "latest preview line",
                 ciNeedle = "weekend",
@@ -239,7 +239,7 @@ class ChatListMessageSearchTest {
     @Test
     fun descriptionMatchIsCaseInsensitive() {
         assertTrue(
-            ChatListMessageSearch.titleOrPreviewMatches(
+            ChatListMessageSearch.synchronousFieldsMatch(
                 displayTitle = "Some chat",
                 previewText = "preview",
                 ciNeedle = "research",
@@ -254,12 +254,35 @@ class ChatListMessageSearchTest {
         // existing call sites that don't pass the parameter keep their old
         // behaviour (no false positives just because description defaulted to "").
         assertFalse(
-            ChatListMessageSearch.titleOrPreviewMatches(
+            ChatListMessageSearch.synchronousFieldsMatch(
                 displayTitle = "Some chat",
                 previewText = "no needle here",
                 ciNeedle = "marmot",
             ),
         )
+    }
+
+    @Test
+    fun groupIdentifierMatchSuppressesCoexistingBodyMatch() {
+        val needle = "a1b2c3"
+        assertTrue(ChatListMessageSearch.bodyMatches("Older message mentions A1B2C3", needle))
+
+        listOf(
+            "mls group id" to Pair("A1B2C3D4", ""),
+            "nostr group id" to Pair("", "A1B2C3D4"),
+        ).forEach { (label, identifiers) ->
+            assertTrue(
+                label,
+                ChatListMessageSearch.synchronousFieldsMatch(
+                    displayTitle = "Some chat",
+                    previewText = "latest preview line",
+                    ciNeedle = needle,
+                    description = "",
+                    groupIdHex = identifiers.first,
+                    nostrGroupIdHex = identifiers.second,
+                ),
+            )
+        }
     }
 
     // ---- firstEligibleBodyMatch (issue #290, blocking review #2) -------------

@@ -596,13 +596,12 @@ internal fun ChatsScreen(
                             items(visibleItems, key = { it.id }) { item ->
                                 // Body-match snippet + tap-to-message focus are
                                 // for rows that matched ONLY on an older message
-                                // body. A row that also matches its title or
-                                // current preview keeps the normal single-line
-                                // layout and a normal conversation open, so drop
-                                // its body match here (issue #290 contract). The
-                                // title/preview test mirrors the synchronous
-                                // match in applyChatListSearchAndFilter so the
-                                // classification can't drift from the filter.
+                                // body. A row that also matches a synchronous
+                                // field keeps the normal single-line layout and
+                                // a normal conversation open, so drop its body
+                                // match here (issue #290 contract). The shared
+                                // predicate below is also used by
+                                // applyChatListSearchAndFilter, preventing drift.
                                 val rawBodyMatch = bodyMatches[item.id]
                                 val bodyMatch =
                                     remember(
@@ -614,11 +613,13 @@ internal fun ChatsScreen(
                                         rawBodyMatch,
                                     ) {
                                         rawBodyMatch?.takeUnless {
-                                            ChatListMessageSearch.titleOrPreviewMatches(
+                                            ChatListMessageSearch.synchronousFieldsMatch(
                                                 displayTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy),
                                                 previewText = item.projectedPreviewText(),
                                                 ciNeedle = ciSearchNeedle,
                                                 description = item.group.description,
+                                                groupIdHex = item.group.groupIdHex,
+                                                nostrGroupIdHex = item.group.nostrGroupIdHex,
                                             )
                                         }
                                     }

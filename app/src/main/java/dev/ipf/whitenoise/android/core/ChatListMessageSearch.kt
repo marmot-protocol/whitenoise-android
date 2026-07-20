@@ -52,29 +52,29 @@ object ChatListMessageSearch {
     }
 
     /**
-     * Whether a row's match is fully explained by its title, last-message
-     * preview, or group description (the synchronous match the chat-list
-     * filter already performs). When true, the body-match snippet line and
-     * tap-to-message focus must be suppressed: the issue/PR contract restricts
-     * the secondary snippet and scroll-to-message tap-through to rows that
-     * matched *only* on an older message body, so a chat surfacing on its
-     * title/preview/description keeps the normal single-line row and a normal
-     * conversation open. Tokenized identically to the title/preview/description
-     * match in `applyChatListSearchAndFilter` (lowercase + substring
-     * containment). `description` defaults to empty so existing callers that
-     * predate the description-search extension (#388) keep their behaviour.
+     * Whether a row's match is fully explained by one of its synchronously
+     * searchable fields. When true, the body-match snippet line and
+     * tap-to-message focus must be suppressed: those affordances are only for
+     * rows that matched on an older message body. This is also the shared
+     * predicate used by `applyChatListSearchAndFilter`, so adding another
+     * synchronous field cannot make filtering and body-match classification
+     * drift apart.
      */
-    fun titleOrPreviewMatches(
+    fun synchronousFieldsMatch(
         displayTitle: String,
         previewText: String,
         ciNeedle: String,
         description: String = "",
+        groupIdHex: String = "",
+        nostrGroupIdHex: String = "",
     ): Boolean =
         ciNeedle.isNotEmpty() &&
             (
                 displayTitle.lowercase(Locale.ROOT).contains(ciNeedle) ||
                     previewText.lowercase(Locale.ROOT).contains(ciNeedle) ||
-                    description.lowercase(Locale.ROOT).contains(ciNeedle)
+                    description.lowercase(Locale.ROOT).contains(ciNeedle) ||
+                    groupIdHex.lowercase(Locale.ROOT).contains(ciNeedle) ||
+                    nostrGroupIdHex.lowercase(Locale.ROOT).contains(ciNeedle)
             )
 
     /**

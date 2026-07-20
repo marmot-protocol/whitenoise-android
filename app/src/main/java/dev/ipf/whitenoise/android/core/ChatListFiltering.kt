@@ -66,6 +66,21 @@ internal fun applyChatListSearchAndFilter(
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
     bodyMatchGroupIds: Set<String> = emptySet(),
+): List<ChatListItem> =
+    applyChatListSearchAndFilter(
+        source = source,
+        rawQuery = rawQuery,
+        filter = filter,
+        displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
+        bodyMatchGroupIds = bodyMatchGroupIds,
+    )
+
+internal fun applyChatListSearchAndFilter(
+    source: List<ChatListItem>,
+    rawQuery: String,
+    filter: ChatListFilter,
+    displayTitle: (ChatListItem) -> String,
+    bodyMatchGroupIds: Set<String> = emptySet(),
 ): List<ChatListItem> {
     val byFilter =
         when (filter) {
@@ -81,22 +96,22 @@ internal fun applyChatListSearchAndFilter(
     if (needle.isEmpty()) return byFilter
     val ciNeedle = localeInvariantFold(needle)
     return byFilter.filter { item ->
-        // Match against the SAME title the user sees in the row, not the
-        // raw group.name. For DMs and other unnamed chats, group.name is
-        // blank and the visible title is projected from the other
-        // member's profile — without this projection the search misses
-        // direct messages by their displayed name.
-        val title = localeInvariantFold(chatListItemDisplayTitle(item, appState, titleCopy))
-        if (title.contains(ciNeedle)) return@filter true
-        val preview = localeInvariantFold(item.projectedPreviewText())
-        if (preview.contains(ciNeedle)) return@filter true
-        // Group description matches (issue #388): descriptions hold the
-        // context users put there to find a group later ("research workgroup",
-        // "family planning"), so they should surface the row even when the
-        // title and preview don't mention the needle. Same lowercase +
-        // substring containment as title/preview.
-        val description = localeInvariantFold(item.group.description)
-        if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
+        // Match the SAME synchronous fields used to suppress body-only row
+        // treatment below. In particular, displayTitle is the projected title
+        // the user sees (not raw group.name), and the raw group identifiers let
+        // pasted MLS/Nostr id prefixes surface the row (#1509).
+        if (
+            ChatListMessageSearch.synchronousFieldsMatch(
+                displayTitle = displayTitle(item),
+                previewText = item.projectedPreviewText(),
+                ciNeedle = ciNeedle,
+                description = item.group.description,
+                groupIdHex = item.group.groupIdHex,
+                nostrGroupIdHex = item.group.nostrGroupIdHex,
+            )
+        ) {
+            return@filter true
+        }
         // Message-body matches (issue #290): the async per-chat search
         // (ChatsController.searchMessageBodies) found the needle inside this
         // conversation's local timeline even though it isn't in the title or
