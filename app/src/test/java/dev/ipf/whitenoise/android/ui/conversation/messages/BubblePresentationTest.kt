@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,15 +48,15 @@ class BubblePresentationTest {
     }
 
     @Test
-    fun amoledDefaultsBlackButExplicitColorOptsOut() {
-        assertEquals(
-            OPAQUE_BLACK_ARGB,
-            resolveBubblePresentationArgb(false, false, true, true, null, tokens).backgroundArgb,
-        )
-        assertEquals(
-            0xFF336699,
-            resolveBubblePresentationArgb(false, false, true, true, 0xFF336699, tokens).backgroundArgb,
-        )
+    fun amoledCustomColorKeepsBlackBackgroundAndThemeContent() {
+        val defaultPresentation = resolveBubblePresentationArgb(false, false, true, true, null, tokens)
+        val customPresentation = resolveBubblePresentationArgb(false, false, true, true, 0xFF336699, tokens)
+
+        assertEquals(OPAQUE_BLACK_ARGB, defaultPresentation.backgroundArgb)
+        assertNull(defaultPresentation.borderOverrideArgb)
+        assertEquals(OPAQUE_BLACK_ARGB, customPresentation.backgroundArgb)
+        assertEquals(tokens.surfaceContentArgb, customPresentation.contentArgb)
+        assertEquals(0xFF336699, customPresentation.borderOverrideArgb)
     }
 
     @Test
@@ -63,6 +64,7 @@ class BubblePresentationTest {
         val presentation = resolveBubblePresentationArgb(false, false, false, false, 0xFF777777, tokens)
 
         assertTrue(contrastRatio(presentation.contentArgb, presentation.backgroundArgb) >= WCAG_AA_NORMAL_TEXT_CONTRAST)
+        assertNull(presentation.borderOverrideArgb)
     }
 
     @Test

@@ -10,6 +10,7 @@ internal data class BubblePresentation(
     val backgroundArgb: Long,
     val contentArgb: Long,
     val mentionAccentArgb: Long,
+    val borderOverrideArgb: Long? = null,
 )
 
 internal data class BubblePresentationTokens(
@@ -22,8 +23,8 @@ internal data class BubblePresentationTokens(
     val mentionAccentArgb: Long,
 )
 
-/** Keeps invalidation/tombstone semantics fixed while allowing an explicit
- * user color to opt ordinary bubbles out of the AMOLED black default. */
+/** Keeps invalidation/tombstone semantics fixed while routing ordinary AMOLED
+ * customization through the bubble border instead of its black fill. */
 internal fun resolveBubblePresentationArgb(
     invalidated: Boolean,
     deleted: Boolean,
@@ -36,13 +37,19 @@ internal fun resolveBubblePresentationArgb(
         invalidated -> BubblePresentation(tokens.errorBackgroundArgb, tokens.errorContentArgb, tokens.mentionAccentArgb)
         deleted && amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
         deleted -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
+        amoled ->
+            BubblePresentation(
+                backgroundArgb = OPAQUE_BLACK_ARGB,
+                contentArgb = tokens.surfaceContentArgb,
+                mentionAccentArgb = tokens.mentionAccentArgb,
+                borderOverrideArgb = customArgb,
+            )
         customArgb != null ->
             BubblePresentation(
                 backgroundArgb = customArgb,
                 contentArgb = readableTextArgb(customArgb) ?: tokens.surfaceContentArgb,
                 mentionAccentArgb = tokens.mentionAccentArgb,
             )
-        amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
         mine -> BubblePresentation(tokens.mineBackgroundArgb, tokens.mineContentArgb, tokens.mentionAccentArgb)
         else -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
     }

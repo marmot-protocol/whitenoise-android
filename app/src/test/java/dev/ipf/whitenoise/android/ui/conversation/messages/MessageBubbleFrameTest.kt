@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,7 +21,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,7 +42,7 @@ class MessageBubbleFrameTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun explicitAmoledColorReachesCaptionPlainAndReplyPathsWithoutChangingMentionAccent() {
+    fun customAmoledBorderKeepsBlackCaptionPlainAndReplyBubbleContent() {
         val captionContentArgb = AtomicInteger()
         val plainContentArgb = AtomicInteger()
         val presentation =
@@ -56,7 +57,7 @@ class MessageBubbleFrameTest {
                         errorBackgroundArgb = 0xFFFFDAD6,
                         errorContentArgb = 0xFF410002,
                         surfaceBackgroundArgb = 0xFFE1E3E4,
-                        surfaceContentArgb = 0xFF444748,
+                        surfaceContentArgb = OPAQUE_WHITE,
                         mineBackgroundArgb = 0xFFB5EFFF,
                         mineContentArgb = 0xFF001F28,
                         mentionAccentArgb = MENTION_ACCENT,
@@ -64,7 +65,7 @@ class MessageBubbleFrameTest {
             )
 
         composeRule.setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 Column {
                     MessageBubbleFrame(
                         presentation = presentation,
@@ -109,7 +110,8 @@ class MessageBubbleFrameTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(CUSTOM_BACKGROUND, presentation.backgroundArgb)
+        assertEquals(OPAQUE_BLACK_ARGB, presentation.backgroundArgb)
+        assertEquals(CUSTOM_BACKGROUND, presentation.borderOverrideArgb)
         assertEquals(MENTION_ACCENT, presentation.mentionAccentArgb)
         assertEquals(OPAQUE_WHITE.toInt(), captionContentArgb.get())
         assertEquals(OPAQUE_WHITE.toInt(), plainContentArgb.get())
