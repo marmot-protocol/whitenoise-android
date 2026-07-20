@@ -24,10 +24,11 @@ object IdentityFormatter {
     // allocating a fresh instance on every initials() call.
     private val graphemeBreaker = ThreadLocal.withInitial { BreakIterator.getCharacterInstance() }
 
-    // DateTimeFormatters are immutable and thread-safe; memoize the two locale-derived
-    // formatters used on the older-than-a-week timestamp rungs.
+    // DateTimeFormatters are immutable and thread-safe; memoize locale-derived
+    // formatters used on timestamp display paths.
     private val noYearFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val shortDateFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
+    private val shortTimeFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
 
     fun short(
         value: String,
@@ -161,7 +162,7 @@ object IdentityFormatter {
             Instant
                 .ofEpochSecond(seconds)
                 .atZone(zone)
-                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+                .format(shortTimeFormatter(locale))
         }.getOrDefault("")
     }
 
@@ -197,6 +198,11 @@ object IdentityFormatter {
     private fun shortDateFormatter(locale: Locale): DateTimeFormatter =
         shortDateFormatters.computeIfAbsent(locale) { requestedLocale ->
             DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(requestedLocale)
+        }
+
+    private fun shortTimeFormatter(locale: Locale): DateTimeFormatter =
+        shortTimeFormatters.computeIfAbsent(locale) { requestedLocale ->
+            DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(requestedLocale)
         }
 
     internal fun stripYearFromLocalizedDatePattern(pattern: String): String {

@@ -105,6 +105,7 @@ import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -1749,7 +1750,7 @@ internal fun MessageBubble(
                         senderSeed = record.sender,
                         senderAvatarUrl = appState.avatarUrl(record.sender),
                         body = displayedBody,
-                        timeText = rememberedMessageBubbleTime(record.recordedAt),
+                        timeText = rememberedClockTime(record.recordedAt),
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,
                         canReply = canUseExpandedComposer,
