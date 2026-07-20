@@ -120,7 +120,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeVideoAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
+import dev.ipf.whitenoise.android.ui.conversation.media.saveVideoToGallery
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
@@ -296,6 +298,41 @@ internal fun ColumnScope.messageBubbleBodyModifier(
         // Only the text-only reply frame contains the quote that widens this
         // same bubble. Media replies render their quote outside the caption.
         .then(if (hasReplyPreview && !hasMedia) Modifier.fillMaxWidth() else Modifier)
+
+internal enum class MessageAttachmentSaveOutcome {
+    Complete,
+    Partial,
+    Failed,
+    ;
+
+    companion object {
+        fun from(
+            savedCount: Int,
+            totalCount: Int,
+        ): MessageAttachmentSaveOutcome =
+            when {
+                savedCount == totalCount -> Complete
+                savedCount > 0 -> Partial
+                else -> Failed
+            }
+    }
+}
+
+private fun WhiteNoiseAppState.presentAttachmentSaveOutcome(
+    context: android.content.Context,
+    savedCount: Int,
+    totalCount: Int,
+) {
+    when (MessageAttachmentSaveOutcome.from(savedCount, totalCount)) {
+        MessageAttachmentSaveOutcome.Complete -> present(R.string.shared_media_saved)
+        MessageAttachmentSaveOutcome.Partial ->
+            present(
+                title = context.getString(R.string.shared_media_saved),
+                detail = context.getString(R.string.conversation_search_match_count, savedCount, totalCount),
+            )
+        MessageAttachmentSaveOutcome.Failed -> present(R.string.shared_media_save_failed, copyable = true)
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -852,35 +889,52 @@ internal fun MessageBubble(
                     if (mediaReferences.isEmpty()) return
                     onActionMenuOpenChange(false)
                     scope.launch {
-                        var allSaved = true
+                        var savedCount = 0
                         mediaReferences.forEachIndexed { attachmentIndex, reference ->
                             val saved =
                                 runCatching {
-                                    val bytes =
-                                        attachmentBytes(
-                                            controller = controller,
-                                            messageIdHex = record.messageIdHex,
-                                            attachmentIndex = attachmentIndex,
-                                            reference = reference,
-                                            mine = mine,
-                                        )
-                                    withContext(Dispatchers.IO) {
-                                        saveAttachmentToMediaStore(
-                                            context = context,
-                                            bytes = bytes,
-                                            fileName = reference.fileName,
-                                            mediaType = reference.mediaType,
-                                        )
+                                    if (MediaReferenceParser.isVideoMedia(reference)) {
+                                        val file =
+                                            materializeVideoAttachment(
+                                                context = context,
+                                                controller = controller,
+                                                messageIdHex = record.messageIdHex,
+                                                attachmentIndex = attachmentIndex,
+                                                reference = reference,
+                                                mine = mine,
+                                            )
+                                        withContext(Dispatchers.IO) {
+                                            saveVideoToGallery(
+                                                context = context,
+                                                source = file,
+                                                fileName = reference.fileName,
+                                                mediaType = reference.mediaType,
+                                            )
+                                        }
+                                    } else {
+                                        val bytes =
+                                            attachmentBytes(
+                                                controller = controller,
+                                                messageIdHex = record.messageIdHex,
+                                                attachmentIndex = attachmentIndex,
+                                                reference = reference,
+                                                mine = mine,
+                                            )
+                                        withContext(Dispatchers.IO) {
+                                            saveAttachmentToMediaStore(
+                                                context = context,
+                                                bytes = bytes,
+                                                fileName = reference.fileName,
+                                                mediaType = reference.mediaType,
+                                            )
+                                        }
                                     }
                                 }.onFailure {
                                     if (it is kotlinx.coroutines.CancellationException) throw it
                                 }.getOrDefault(false)
-                            allSaved = saved && allSaved
+                            if (saved) savedCount += 1
                         }
-                        appState.present(
-                            if (allSaved) R.string.shared_media_saved else R.string.shared_media_save_failed,
-                            copyable = !allSaved,
-                        )
+                        appState.presentAttachmentSaveOutcome(context, savedCount, mediaReferences.size)
                     }
                 }
                 // Split media into image refs (rendered as a bubble or

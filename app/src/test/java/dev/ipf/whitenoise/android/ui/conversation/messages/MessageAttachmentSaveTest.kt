@@ -9,11 +9,13 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,6 +38,39 @@ class MessageAttachmentSaveTest {
         renderActionMenu(canSave = false)
 
         composeRule.onNodeWithText(string(R.string.shared_media_save)).assertDoesNotExist()
+    }
+
+    @Test
+    fun videoSaveReusesTheMaterializedFile() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
+            ).first(File::exists).readText()
+        val saveBody = source.substringAfter("fun saveAttachments()").substringBefore("// Split media")
+
+        assertTrue(
+            "video saves must stream the materialized file instead of resolving another ByteArray",
+            "MediaReferenceParser.isVideoMedia(reference)" in saveBody &&
+                "materializeVideoAttachment(" in saveBody &&
+                "saveVideoToGallery(" in saveBody,
+        )
+    }
+
+    @Test
+    fun saveOutcomeDistinguishesCompletePartialAndFailedAlbums() {
+        assertEquals(
+            MessageAttachmentSaveOutcome.Complete,
+            MessageAttachmentSaveOutcome.from(savedCount = 2, totalCount = 2),
+        )
+        assertEquals(
+            MessageAttachmentSaveOutcome.Partial,
+            MessageAttachmentSaveOutcome.from(savedCount = 1, totalCount = 2),
+        )
+        assertEquals(
+            MessageAttachmentSaveOutcome.Failed,
+            MessageAttachmentSaveOutcome.from(savedCount = 0, totalCount = 2),
+        )
     }
 
     private fun renderActionMenu(
