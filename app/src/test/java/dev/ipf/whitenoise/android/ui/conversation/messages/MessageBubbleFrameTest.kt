@@ -45,24 +45,7 @@ class MessageBubbleFrameTest {
     fun customAmoledBorderKeepsBlackCaptionPlainAndReplyBubbleContent() {
         val captionContentArgb = AtomicInteger()
         val plainContentArgb = AtomicInteger()
-        val presentation =
-            resolveBubblePresentationArgb(
-                invalidated = false,
-                deleted = false,
-                amoled = true,
-                mine = false,
-                customArgb = CUSTOM_BACKGROUND,
-                tokens =
-                    BubblePresentationTokens(
-                        errorBackgroundArgb = 0xFFFFDAD6,
-                        errorContentArgb = 0xFF410002,
-                        surfaceBackgroundArgb = 0xFFE1E3E4,
-                        surfaceContentArgb = OPAQUE_WHITE,
-                        mineBackgroundArgb = 0xFFB5EFFF,
-                        mineContentArgb = 0xFF001F28,
-                        mentionAccentArgb = MENTION_ACCENT,
-                    ),
-            )
+        val presentation = customAmoledPresentation()
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
@@ -153,6 +136,25 @@ class MessageBubbleFrameTest {
             assertEquals(bubbleBounds.right, footerBounds.right, 1f)
         }
     }
+
+    private fun customAmoledPresentation() =
+        resolveBubblePresentationArgb(
+            invalidated = false,
+            deleted = false,
+            amoled = true,
+            mine = false,
+            customArgb = CUSTOM_BACKGROUND,
+            tokens =
+                BubblePresentationTokens(
+                    errorBackgroundArgb = 0xFFFFDAD6,
+                    errorContentArgb = 0xFF410002,
+                    surfaceBackgroundArgb = 0xFFE1E3E4,
+                    surfaceContentArgb = OPAQUE_WHITE,
+                    mineBackgroundArgb = 0xFFB5EFFF,
+                    mineContentArgb = 0xFF001F28,
+                    mentionAccentArgb = MENTION_ACCENT,
+                ),
+        )
 
     @Test
     fun mediaReplyCaptionKeepsWrapContentWidth() {
