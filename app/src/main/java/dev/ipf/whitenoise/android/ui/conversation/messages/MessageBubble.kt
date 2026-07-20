@@ -106,6 +106,7 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -1100,7 +1101,7 @@ internal fun MessageBubble(
                                 }
                                 if (footerOnVisualMedia) {
                                     MediaFooterOverlay(
-                                        timeText = rememberedClockTime(record.recordedAt),
+                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
                                         showStatus = mine,
                                         status = item.status,
                                     )
@@ -1208,7 +1209,7 @@ internal fun MessageBubble(
                                     )
                                 }
                                 MediaFooterOverlay(
-                                    timeText = rememberedClockTime(record.recordedAt),
+                                    timeText = rememberedMessageBubbleTime(record.recordedAt),
                                     showStatus = true,
                                     status = item.status,
                                 )
@@ -1286,7 +1287,7 @@ internal fun MessageBubble(
                     }
                 val inlineFooter: @Composable () -> Unit = {
                     MessageInlineFooter(
-                        timeText = rememberedClockTime(record.recordedAt),
+                        timeText = rememberedMessageBubbleTime(record.recordedAt),
                         color = timestampColor,
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,

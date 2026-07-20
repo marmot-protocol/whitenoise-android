@@ -34,6 +34,14 @@ class LongMessageFullScreenComposerCoverageTest {
                 .substringBefore("if (emojiPickerOpen")
 
         assertTrue(
+            "expanded long-message view must keep its absolute clock timestamp instead of the bubble-relative label",
+            "timeText = rememberedClockTime(record.recordedAt)" in fullScreenCall,
+        )
+        assertFalse(
+            "expanded long-message view must not use the relative bubble timestamp formatter",
+            "timeText = rememberedMessageBubbleTime(record.recordedAt)" in fullScreenCall,
+        )
+        assertTrue(
             "expanded long-message view must render the standard ComposerBar, not a separate ad-hoc input",
             "ComposerBar(" in fullScreenCall,
         )
