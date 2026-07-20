@@ -42,8 +42,7 @@ class MessageAttachmentSaveTest {
 
     @Test
     fun videoSaveReusesTheMaterializedFile() {
-        val source = messageBubbleSource()
-        val saveBody = source.substringAfter("fun saveAttachments()").substringBefore("// Split media")
+        val saveBody = saveAttachmentsBody()
 
         assertTrue(
             "video saves must stream the materialized file instead of resolving another ByteArray",
@@ -55,8 +54,7 @@ class MessageAttachmentSaveTest {
 
     @Test
     fun saveSurvivesNavigationAndRejectsConcurrentLaunches() {
-        val source = messageBubbleSource()
-        val saveBody = source.substringAfter("fun saveAttachments()").substringBefore("// Split media")
+        val saveBody = saveAttachmentsBody()
 
         assertTrue(
             "attachment saves must survive navigation and ignore a second invocation while active",
@@ -128,4 +126,15 @@ class MessageAttachmentSaveTest {
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
         ).first(File::exists).readText()
+
+    private fun saveAttachmentsBody(): String {
+        val source = messageBubbleSource()
+        val startMarker = "fun saveAttachments()"
+        val endMarker = "// Split media"
+        val startIndex = source.indexOf(startMarker)
+        assertTrue("saveAttachments delimiter is missing", startIndex >= 0)
+        val endIndex = source.indexOf(endMarker, startIndex + startMarker.length)
+        assertTrue("saveAttachments end delimiter is missing", endIndex > startIndex)
+        return source.substring(startIndex, endIndex)
+    }
 }
