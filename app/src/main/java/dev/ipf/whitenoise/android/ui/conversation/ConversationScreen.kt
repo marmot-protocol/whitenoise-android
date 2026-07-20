@@ -149,6 +149,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttac
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldDismissComposerOnBack
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
@@ -1795,7 +1796,7 @@ internal fun ConversationScreen(
     }
 
     // Back exits partial text selection, then batch selection, then search,
-    // before leaving the conversation.
+    // then dismisses the focused composer/IME before leaving the conversation.
     BackHandler {
         when {
             textSelectionMessageId != null -> clearTextSelection()
@@ -1804,6 +1805,19 @@ internal fun ConversationScreen(
                 selectedMessages.clear()
             }
             searchOpen -> closeSearch()
+            shouldDismissComposerOnBack(
+                textSelectionActive = textSelectionMessageId != null,
+                selectionMode = selectionMode,
+                searchOpen = searchOpen,
+                composerFocused = composerFocused,
+                imeIsOpen = imeIsOpen,
+            ) -> {
+                // OS Back can hide the IME while leaving the BasicTextField
+                // focused. Clear both synchronously so imePadding observes the
+                // closing inset animation instead of retaining an empty band.
+                focusManager.clearFocus(force = true)
+                keyboardController?.hide()
+            }
             else -> onBack()
         }
     }

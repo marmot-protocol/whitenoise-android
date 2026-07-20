@@ -121,3 +121,25 @@ internal fun shouldClearFocusOnResume(
     restoringComposerFocus: Boolean,
     searchOpen: Boolean,
 ): Boolean = !restoringComposerFocus && !searchOpen
+
+/**
+ * Whether Back should dismiss the conversation composer before navigating away.
+ *
+ * Android can hide the IME without clearing the focused [BasicTextField], which
+ * leaves this edge-to-edge screen's IME inset stuck at its previous height. The
+ * conversation therefore explicitly clears focus and hides the keyboard when
+ * either signal says the composer still owns the IME. Existing transient Back
+ * actions keep priority so text selection, message selection, and search behave
+ * exactly as before.
+ */
+internal fun shouldDismissComposerOnBack(
+    textSelectionActive: Boolean,
+    selectionMode: Boolean,
+    searchOpen: Boolean,
+    composerFocused: Boolean,
+    imeIsOpen: Boolean,
+): Boolean =
+    !textSelectionActive &&
+        !selectionMode &&
+        !searchOpen &&
+        (composerFocused || imeIsOpen)
