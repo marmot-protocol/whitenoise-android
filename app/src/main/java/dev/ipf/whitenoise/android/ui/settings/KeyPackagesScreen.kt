@@ -42,8 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +64,44 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+internal enum class KeyPackagesSection {
+    Publishing,
+    Published,
+    Empty,
+    PackageList,
+}
+
+internal data class KeyPackagesState(
+    val sections: List<KeyPackagesSection>,
+    val actionsEnabled: Boolean,
+    val packageActionsEnabled: Boolean,
+    val showLoadingIndicator: Boolean,
+    val packageCount: Int,
+)
+
+internal fun keyPackagesState(
+    hasActiveAccount: Boolean,
+    loaded: Boolean,
+    loading: Boolean,
+    working: Boolean,
+    packageCount: Int,
+): KeyPackagesState =
+    KeyPackagesState(
+        sections =
+            buildList {
+                add(KeyPackagesSection.Publishing)
+                add(KeyPackagesSection.Published)
+                if (loaded && packageCount == 0 && !loading) add(KeyPackagesSection.Empty)
+                if (packageCount > 0) add(KeyPackagesSection.PackageList)
+            },
+        actionsEnabled = hasActiveAccount && !loading && !working,
+        packageActionsEnabled = !working,
+        showLoadingIndicator = loading,
+        packageCount = packageCount,
+    )
+
+internal const val KEY_PACKAGES_CONTENT_TAG = "key-packages-content"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,107 +130,45 @@ internal fun KeyPackagesScreen(
         if (appState.activeAccountRef != null) reload()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.key_packages)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { scope.launch { reload(refreshFromNetwork = true) } },
-                        enabled = !loading && !working && appState.activeAccountRef != null,
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                    }
-                },
-            )
+    KeyPackagesContent(
+        state =
+            keyPackagesState(
+                hasActiveAccount = appState.activeAccountRef != null,
+                loaded = loaded,
+                loading = loading,
+                working = working,
+                packageCount = packages.size,
+            ),
+        packages = packages,
+        onBack = onBack,
+        onRefresh = { scope.launch { reload(refreshFromNetwork = true) } },
+        onRepublish = {
+            working = true
+            appState.launchMutation {
+                try {
+                    appState.republishKeyPackage()
+                    reload(refreshFromNetwork = true)
+                } finally {
+                    working = false
+                }
+            }
         },
-    ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                SectionCard(title = stringResource(R.string.publishing)) {
-                    Text(
-                        stringResource(R.string.key_package_publishing_help),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = {
-                                working = true
-                                appState.launchMutation {
-                                    try {
-                                        appState.republishKeyPackage()
-                                        reload(refreshFromNetwork = true)
-                                    } finally {
-                                        working = false
-                                    }
-                                }
-                            },
-                            enabled = !working && !loading && appState.activeAccountRef != null,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.republish))
-                        }
-                        Button(
-                            onClick = {
-                                working = true
-                                appState.launchMutation {
-                                    try {
-                                        appState.publishNewKeyPackage()
-                                        reload(refreshFromNetwork = true)
-                                    } finally {
-                                        working = false
-                                    }
-                                }
-                            },
-                            enabled = !working && !loading && appState.activeAccountRef != null,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.publish_new))
-                        }
-                    }
+        onPublishNew = {
+            working = true
+            appState.launchMutation {
+                try {
+                    appState.publishNewKeyPackage()
+                    reload(refreshFromNetwork = true)
+                } finally {
+                    working = false
                 }
             }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.published), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (loading) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-            if (loaded && packages.isEmpty() && !loading) {
-                item {
-                    SectionCard(title = stringResource(R.string.no_key_packages_found)) {
-                        Text(
-                            stringResource(R.string.no_key_packages_found_help),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            itemsIndexed(packages, key = { index, kp -> "${kp.eventIdHex}:$index" }) { _, kp ->
-                KeyPackageCard(
-                    kp = kp,
-                    busy = working,
-                    appState = appState,
-                    onDelete = { pendingDelete = kp },
-                )
-            }
-        }
-    }
+        },
+        onDelete = { pendingDelete = it },
+        onCopied = { label ->
+            appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
+        },
+    )
 
     pendingDelete?.let { kp ->
         AlertDialog(
@@ -200,9 +176,7 @@ internal fun KeyPackagesScreen(
             title = { Text(stringResource(R.string.delete_key_package_question)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.delete_key_package_help),
-                    )
+                    Text(stringResource(R.string.delete_key_package_help))
                     Text(
                         stringResource(R.string.event_value, IdentityFormatter.short(kp.eventIdHex)),
                         fontFamily = FontFamily.Monospace,
@@ -232,12 +206,128 @@ internal fun KeyPackagesScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun KeyPackagesContent(
+    state: KeyPackagesState,
+    packages: List<AccountKeyPackageFfi>,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onRepublish: () -> Unit,
+    onPublishNew: () -> Unit,
+    onDelete: (AccountKeyPackageFfi) -> Unit,
+    onCopied: (String) -> Unit,
+) {
+    Scaffold(
+        modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.key_packages)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onRefresh, enabled = state.actionsEnabled) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            state.sections.forEach { section ->
+                when (section) {
+                    KeyPackagesSection.Publishing -> {
+                        item {
+                            SectionCard(title = stringResource(R.string.publishing)) {
+                                Text(
+                                    stringResource(R.string.key_package_publishing_help),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onRepublish,
+                                        enabled = state.actionsEnabled,
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.republish))
+                                    }
+                                    Button(
+                                        onClick = onPublishNew,
+                                        enabled = state.actionsEnabled,
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.publish_new))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    KeyPackagesSection.Published -> {
+                        item {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.published),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                if (state.showLoadingIndicator) {
+                                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    KeyPackagesSection.Empty -> {
+                        item {
+                            SectionCard(title = stringResource(R.string.no_key_packages_found)) {
+                                Text(
+                                    stringResource(R.string.no_key_packages_found_help),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    KeyPackagesSection.PackageList -> {
+                        itemsIndexed(packages, key = { index, kp -> "${kp.eventIdHex}:$index" }) { _, kp ->
+                            KeyPackageCard(
+                                kp = kp,
+                                actionsEnabled = state.packageActionsEnabled,
+                                onDelete = { onDelete(kp) },
+                                onCopied = onCopied,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun KeyPackageCard(
     kp: AccountKeyPackageFfi,
-    busy: Boolean,
-    appState: WhiteNoiseAppState,
+    actionsEnabled: Boolean,
     onDelete: () -> Unit,
+    onCopied: (String) -> Unit,
 ) {
     val localLabel = stringResource(R.string.local)
     val relayLabel = stringResource(R.string.relay)
@@ -263,9 +353,7 @@ private fun KeyPackageCard(
                                 role = Role.Button,
                             ) {
                                 clipboard.setText(AnnotatedString(kp.keyPackageId))
-                                appState.presentText(
-                                    AppText.Resource(R.string.toast_copied_value, listOf(keyPackageLabelText)),
-                                )
+                                onCopied(keyPackageLabelText)
                             },
                     )
                     Text(
@@ -274,7 +362,7 @@ private fun KeyPackageCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                IconButton(onClick = onDelete, enabled = !busy) {
+                IconButton(onClick = onDelete, enabled = actionsEnabled) {
                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_key_package))
                 }
             }
@@ -287,13 +375,13 @@ private fun KeyPackageCard(
                 stringResource(R.string.event),
                 IdentityFormatter.short(kp.eventIdHex),
                 copyValue = kp.eventIdHex,
-                appState = appState,
+                onCopy = onCopied,
             )
             DiagnosticRow(
                 stringResource(R.string.ref),
                 IdentityFormatter.short(kp.keyPackageRefHex),
                 copyValue = kp.keyPackageRefHex,
-                appState = appState,
+                onCopy = onCopied,
             )
             DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
             if (kp.sourceRelays.isNotEmpty()) {

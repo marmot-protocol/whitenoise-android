@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -68,6 +69,65 @@ import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.launch
+
+internal enum class SettingsHomeSection {
+    Account,
+    AppPreferences,
+    Support,
+    AppUpdates,
+    BuildInfo,
+}
+
+internal enum class SettingsHomeRow {
+    Profile,
+    IdentityAndKeys,
+    Relays,
+    KeyPackages,
+    Appearance,
+    DataAndStorage,
+    Notifications,
+    TextToSpeech,
+    SecurityAndPrivacy,
+}
+
+internal data class SettingsHomeState(
+    val sections: List<SettingsHomeSection>,
+    val accountRows: List<SettingsHomeRow>,
+    val preferenceRows: List<SettingsHomeRow>,
+    val showAccountHeader: Boolean,
+)
+
+internal fun settingsHomeState(
+    hasActiveAccount: Boolean,
+    selfUpdateEnabled: Boolean,
+): SettingsHomeState =
+    SettingsHomeState(
+        sections =
+            buildList {
+                add(SettingsHomeSection.Account)
+                add(SettingsHomeSection.AppPreferences)
+                add(SettingsHomeSection.Support)
+                // Store-managed builds own updates; off-store redirects violate policy.
+                if (selfUpdateEnabled) add(SettingsHomeSection.AppUpdates)
+                add(SettingsHomeSection.BuildInfo)
+            },
+        accountRows =
+            listOf(
+                SettingsHomeRow.Profile,
+                SettingsHomeRow.IdentityAndKeys,
+                SettingsHomeRow.Relays,
+                SettingsHomeRow.KeyPackages,
+            ),
+        preferenceRows =
+            listOf(
+                SettingsHomeRow.Appearance,
+                SettingsHomeRow.DataAndStorage,
+                SettingsHomeRow.Notifications,
+                SettingsHomeRow.TextToSpeech,
+                SettingsHomeRow.SecurityAndPrivacy,
+            ),
+        showAccountHeader = hasActiveAccount,
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +201,15 @@ fun SettingsTopBar(onBackToChats: () -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal const val SETTINGS_HOME_CONTENT_TAG = "settings-home-content"
+
+internal data class SettingsHomeAccount(
+    val title: String,
+    val subtitle: String,
+    val seed: String,
+    val pictureUrl: String?,
+)
+
 @Composable
 private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
@@ -153,163 +221,45 @@ private fun SettingsHomeScreen(
     var showAddIdentity by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val activeAccount = appState.activeAccount
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
     }
 
-    Scaffold(
-        topBar = {
-            SettingsTopBar(onBackToChats = onBackToChats)
+    SettingsHomeContent(
+        state =
+            settingsHomeState(
+                hasActiveAccount = activeAccount != null,
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+            ),
+        account =
+            activeAccount?.let { account ->
+                SettingsHomeAccount(
+                    title = appState.displayName(account.accountIdHex),
+                    subtitle = appState.shortNpub(account.accountIdHex),
+                    seed = account.accountIdHex,
+                    pictureUrl = appState.avatarUrl(account.accountIdHex),
+                )
+            },
+        appUpdateInfo = appState.appUpdateInfo,
+        versionName = BuildConfig.VERSION_NAME,
+        mdkShortSha = BuildConfig.MDK_SHORT_SHA,
+        staging = booleanResource(R.bool.staging_build),
+        onBackToChats = onBackToChats,
+        onOpenAccountSelector = { showAccountSelector = true },
+        onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
+        onOpenDetail = onOpenDetail,
+        onAppUpdateAction = {
+            scope.launch {
+                // Await the check before acting so the first tap uses a fresh result.
+                if (appState.appUpdateInfo.latestVersion == null) {
+                    appState.refreshAppUpdate(force = true, notifyIfNewer = false)
+                }
+                appState.handleAppUpdateAction(context)
+            }
         },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg)) {
-            item {
-                SectionCard(title = stringResource(R.string.account)) {
-                    appState.activeAccount?.let { account ->
-                        SettingsAccountHeader(
-                            title = appState.displayName(account.accountIdHex),
-                            subtitle = appState.shortNpub(account.accountIdHex),
-                            seed = account.accountIdHex,
-                            pictureUrl = appState.avatarUrl(account.accountIdHex),
-                            onOpenAccountSelector = { showAccountSelector = true },
-                            onOpenQr = { qrAccountId = account.accountIdHex },
-                            onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
-                        )
-                    }
-                    SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }
-                    SettingsRow(
-                        stringResource(R.string.identity_and_keys),
-                        stringResource(R.string.identity_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Identity) }
-                    SettingsRow(stringResource(R.string.relays), stringResource(R.string.relays_settings_subtitle)) { onOpenDetail(SettingsDetail.Relays) }
-                    SettingsRow(
-                        stringResource(R.string.key_packages),
-                        stringResource(R.string.key_packages_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.KeyPackages) }
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.app_preferences)) {
-                    SettingsRow(
-                        stringResource(R.string.appearance),
-                        stringResource(R.string.appearance_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Appearance) }
-                    SettingsRow(
-                        stringResource(R.string.data_and_storage),
-                        stringResource(R.string.data_and_storage_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Data) }
-                    SettingsRow(
-                        stringResource(R.string.notifications),
-                        stringResource(R.string.notifications_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.Notifications) }
-                    SettingsRow(
-                        stringResource(R.string.tts_settings_title),
-                        stringResource(R.string.tts_settings_subtitle),
-                    ) { onOpenDetail(SettingsDetail.TextToSpeech) }
-                    SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
-                        onOpenDetail(SettingsDetail.SecurityPrivacy)
-                    }
-                }
-            }
-            item {
-                // Navigation row to the donation page, matching the other
-                // Settings sections' row -> detail-screen shape.
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
-                ) {
-                    ListItem(
-                        modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text(stringResource(R.string.support_the_project)) },
-                        supportingContent = {
-                            Text(
-                                stringResource(R.string.support_the_project_subtitle),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                    )
-                }
-            }
-            // No in-app update UI on store-managed builds (Google Play): the
-            // store owns updates, and off-store update redirects violate policy.
-            if (BuildConfig.SELF_UPDATE_ENABLED) {
-                item {
-                    SectionCard(title = stringResource(R.string.app_updates)) {
-                        AppUpdateSettingsRow(
-                            info = appState.appUpdateInfo,
-                            onClick = {
-                                // Await the check before acting, so a first tap in the
-                                // unknown state still routes on the fresh result.
-                                scope.launch {
-                                    if (appState.appUpdateInfo.latestVersion == null) {
-                                        appState.refreshAppUpdate(force = true, notifyIfNewer = false)
-                                    }
-                                    appState.handleAppUpdateAction(context)
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-            item {
-                // Version footer. Marketing string only — the integer
-                // `VERSION_CODE` is intentionally hidden from this
-                // surface to keep the line uncluttered; triage that
-                // needs the code can read it via `dumpsys package`,
-                // logcat, or the Diagnostics screen.
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text =
-                            stringResource(
-                                R.string.settings_version_label,
-                                BuildConfig.VERSION_NAME,
-                            ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text =
-                            stringResource(
-                                R.string.settings_mdk_version_label,
-                                BuildConfig.MDK_SHORT_SHA,
-                            ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    // Release-channel badge: `staging_build` is false in main
-                    // resources and overridden to true only in the staging
-                    // source set, so dev/production never render it.
-                    if (booleanResource(R.bool.staging_build)) {
-                        Surface(
-                            shape = PillShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_staging_badge),
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    )
 
     qrAccountId?.let { accountId ->
         ProfileQrSheet(
@@ -331,6 +281,175 @@ private fun SettingsHomeScreen(
     }
     if (showAddIdentity) {
         AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SettingsHomeContent(
+    state: SettingsHomeState,
+    account: SettingsHomeAccount?,
+    appUpdateInfo: AppUpdateInfo,
+    versionName: String,
+    mdkShortSha: String,
+    staging: Boolean,
+    onBackToChats: () -> Unit,
+    onOpenAccountSelector: () -> Unit,
+    onOpenQr: () -> Unit,
+    onOpenDetail: (SettingsDetail) -> Unit,
+    onAppUpdateAction: () -> Unit,
+) {
+    Scaffold(
+        modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
+        topBar = { SettingsTopBar(onBackToChats = onBackToChats) },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = Dimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+        ) {
+            state.sections.forEach { section ->
+                item {
+                    when (section) {
+                        SettingsHomeSection.Account -> {
+                            SectionCard(title = stringResource(R.string.account)) {
+                                if (state.showAccountHeader && account != null) {
+                                    SettingsAccountHeader(
+                                        title = account.title,
+                                        subtitle = account.subtitle,
+                                        seed = account.seed,
+                                        pictureUrl = account.pictureUrl,
+                                        onOpenAccountSelector = onOpenAccountSelector,
+                                        onOpenQr = onOpenQr,
+                                        onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
+                                    )
+                                }
+                                SettingsHomeRows(rows = state.accountRows, onOpenDetail = onOpenDetail)
+                            }
+                        }
+
+                        SettingsHomeSection.AppPreferences -> {
+                            SectionCard(title = stringResource(R.string.app_preferences)) {
+                                SettingsHomeRows(rows = state.preferenceRows, onOpenDetail = onOpenDetail)
+                            }
+                        }
+
+                        SettingsHomeSection.Support -> {
+                            // Match the other settings sections' row-to-detail navigation shape.
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+                            ) {
+                                ListItem(
+                                    modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    headlineContent = { Text(stringResource(R.string.support_the_project)) },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.support_the_project_subtitle),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+
+                        SettingsHomeSection.AppUpdates -> {
+                            SectionCard(title = stringResource(R.string.app_updates)) {
+                                AppUpdateSettingsRow(info = appUpdateInfo, onClick = onAppUpdateAction)
+                            }
+                        }
+
+                        SettingsHomeSection.BuildInfo -> {
+                            // Keep the footer uncluttered: version name and MDK revision only.
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.settings_version_label, versionName),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_mdk_version_label, mdkShortSha),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                if (staging) {
+                                    // Main resources keep this false; only staging overrides it.
+                                    Surface(
+                                        shape = PillShape,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_staging_badge),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsHomeRows(
+    rows: List<SettingsHomeRow>,
+    onOpenDetail: (SettingsDetail) -> Unit,
+) {
+    rows.forEach { row ->
+        val detail =
+            when (row) {
+                SettingsHomeRow.Profile -> SettingsDetail.Profile
+                SettingsHomeRow.IdentityAndKeys -> SettingsDetail.Identity
+                SettingsHomeRow.Relays -> SettingsDetail.Relays
+                SettingsHomeRow.KeyPackages -> SettingsDetail.KeyPackages
+                SettingsHomeRow.Appearance -> SettingsDetail.Appearance
+                SettingsHomeRow.DataAndStorage -> SettingsDetail.Data
+                SettingsHomeRow.Notifications -> SettingsDetail.Notifications
+                SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
+                SettingsHomeRow.SecurityAndPrivacy -> SettingsDetail.SecurityPrivacy
+            }
+        val title =
+            when (row) {
+                SettingsHomeRow.Profile -> stringResource(R.string.profile)
+                SettingsHomeRow.IdentityAndKeys -> stringResource(R.string.identity_and_keys)
+                SettingsHomeRow.Relays -> stringResource(R.string.relays)
+                SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages)
+                SettingsHomeRow.Appearance -> stringResource(R.string.appearance)
+                SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
+                SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
+                SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
+                SettingsHomeRow.SecurityAndPrivacy -> stringResource(R.string.security_and_privacy)
+            }
+        val subtitle =
+            when (row) {
+                SettingsHomeRow.Profile -> stringResource(R.string.profile_settings_subtitle)
+                SettingsHomeRow.IdentityAndKeys -> stringResource(R.string.identity_settings_subtitle)
+                SettingsHomeRow.Relays -> stringResource(R.string.relays_settings_subtitle)
+                SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages_settings_subtitle)
+                SettingsHomeRow.Appearance -> stringResource(R.string.appearance_settings_subtitle)
+                SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
+                SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
+                SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
+                SettingsHomeRow.SecurityAndPrivacy -> stringResource(R.string.security_privacy_settings_subtitle)
+            }
+        SettingsRow(title = title, subtitle = subtitle) { onOpenDetail(detail) }
     }
 }
 
