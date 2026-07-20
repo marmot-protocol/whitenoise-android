@@ -149,12 +149,13 @@ internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
     invalidated: Boolean = false,
+    customArgb: Long? = null,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         invalidated -> null
-        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
+        amoledAccent != null -> BorderStroke(2.dp, customArgb?.let(::colorFromArgb) ?: amoledAccent)
         else -> null
     }
 }
@@ -254,7 +255,13 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted, mine, invalidated),
+        border =
+            messageBubbleBorder(
+                highlighted = highlighted,
+                mine = mine,
+                invalidated = invalidated,
+                customArgb = presentation.borderOverrideArgb,
+            ),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
