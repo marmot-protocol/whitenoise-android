@@ -2377,6 +2377,19 @@ class WhiteNoiseAppState(
                         MarmotClient.bootstrapRelays,
                     )
                 }
+            // Mirror the cold-start restore barrier before exposing the main
+            // shell. loginExternalSigner creates and reconciles the account,
+            // but a fresh account's worker/relay runtime can still be replacing
+            // its setup-time signer as that call returns. Re-registering through
+            // the restore path performs one final reconciliation with a stable
+            // callback, so an immediate createGroup cannot race that transition
+            // and fail until the next process restart (issue #1551).
+            marmotIo {
+                registerExternalSigner(
+                    summary.label,
+                    amberSigner.buildSigner(pubkeyHex),
+                )
+            }
             refreshAccounts()
             setActiveAccount(summary.label)
             refreshLocalNotificationSettings()
