@@ -156,6 +156,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
+import dev.ipf.whitenoise.android.ui.conversation.media.documentPickTreatAsImage
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
@@ -1183,16 +1184,22 @@ internal fun ConversationScreen(
             var rejected = false
             var albumOverflowed = false
             for (uri in uris) {
+                val reportedMime = safeGetType(context.contentResolver, uri)
                 val resolvedMime =
-                    safeGetType(context.contentResolver, uri)
-                        .takeIf { it.isNotBlank() }
+                    reportedMime.takeIf { it.isNotBlank() }
                         ?: "application/octet-stream"
                 val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
                 if (remainingAlbumBudget <= 0L) {
                     albumOverflowed = true
                     break
                 }
-                if (resolvedMime.startsWith("image/", ignoreCase = true)) {
+                val sniffedImageMime =
+                    if (reportedMime.isBlank() || reportedMime.equals("application/octet-stream", ignoreCase = true)) {
+                        MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
+                    } else {
+                        null
+                    }
+                if (documentPickTreatAsImage(reportedMime, sniffedImageMime)) {
                     val image = readImageAttachment(uri, remainingAlbumBudget)
                     if (image.overflowed) {
                         albumOverflowed = true

@@ -537,6 +537,23 @@ internal fun safeGetType(
 internal inline fun coerceResolvedMime(getType: () -> String?): String = runCatching(getType).getOrNull().orEmpty()
 
 /**
+ * Whether a document-picker Uri should use the image attachment path (quality
+ * downscale / metadata strip) instead of raw document bytes. Trusts explicit
+ * image resolver types; for blank or octet-stream only, defers to a
+ * bounded [MediaPipeline.sniffImageMediaType] result (issue #1553).
+ */
+internal fun documentPickTreatAsImage(
+    reportedMime: String,
+    sniffedImageMime: String?,
+): Boolean {
+    if (reportedMime.startsWith("image/", ignoreCase = true)) return true
+    val untrustedMime =
+        reportedMime.isBlank() ||
+            reportedMime.equals("application/octet-stream", ignoreCase = true)
+    return untrustedMime && sniffedImageMime != null
+}
+
+/**
  * Predicate for image payloads delivered through Compose's receive-content path.
  *
  * Prefer the resolver's concrete MIME when available: it is per-Uri and catches

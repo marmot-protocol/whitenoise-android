@@ -509,6 +509,26 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun sniffImageMediaType_recognizesJpegPngWebpGifFromHeaders() {
+        val jpegHeader = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte())
+        assertEquals("image/jpeg", MediaPipeline.sniffImageMediaType(jpegHeader))
+        assertEquals("image/png", MediaPipeline.sniffImageMediaType(pngSignature + byteArrayOf(0x00)))
+        val webp =
+            "RIFF".encodeToByteArray() +
+                u32le(0) +
+                "WEBP".encodeToByteArray()
+        assertEquals("image/webp", MediaPipeline.sniffImageMediaType(webp))
+        assertEquals("image/gif", MediaPipeline.sniffImageMediaType("GIF89a".encodeToByteArray()))
+    }
+
+    @Test
+    fun sniffImageMediaType_returnsNullForNonImageBytes() {
+        assertEquals(null, MediaPipeline.sniffImageMediaType("%PDF-1.4".encodeToByteArray()))
+        assertEquals(null, MediaPipeline.sniffImageMediaType(byteArrayOf(0x00, 0x01, 0x02)))
+        assertEquals(null, MediaPipeline.sniffImageMediaType(ByteArray(0)))
+    }
+
+    @Test
     fun hasWebpAnimChunk_returnsFalseForOversizedChunkWithoutThrowing() {
         val craftedWebp =
             "RIFF".encodeToByteArray() +
