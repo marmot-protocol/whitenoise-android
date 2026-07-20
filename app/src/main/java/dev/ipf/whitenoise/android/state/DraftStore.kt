@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.IOException
@@ -13,7 +14,7 @@ import java.security.GeneralSecurityException
 
 /**
  * Persistence layer for unsent conversation drafts. The storage map is keyed
- * by `"<accountIdHex> <groupIdHex>"`; values are the raw draft text.
+ * by `"<accountIdHex> <groupIdHex>"`; values are versioned draft blobs.
  *
  * Split out from [DraftStore] so the in-memory cache can be unit-tested
  * without an Android `SharedPreferences` instance.
@@ -85,22 +86,30 @@ class DraftStore internal constructor(
     fun get(
         accountIdHex: String,
         groupIdHex: String,
-    ): String? = stateFor(key(accountIdHex, groupIdHex)).value
+    ): String? = getDraft(accountIdHex, groupIdHex)?.textFieldValue?.text
+
+    fun getDraft(
+        accountIdHex: String,
+        groupIdHex: String,
+    ): ComposerDraftSnapshot? {
+        val stored = stateFor(key(accountIdHex, groupIdHex)).value ?: return null
+        return decodeComposerDraftStored(stored)
+    }
 
     /**
      * Sets the draft. Empty or whitespace-only text clears the draft so we
-     * don't store noise.
+     * don't store noise. Selection-only updates are persisted too.
      */
     fun set(
         accountIdHex: String,
         groupIdHex: String,
-        text: String,
+        value: TextFieldValue,
     ) {
         val k = key(accountIdHex, groupIdHex)
         // Keep persistence writes inside the same lock as the cache mutation so
         // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
-            if (text.isBlank()) {
+            if (value.text.isBlank()) {
                 val state = drafts[k] ?: return@synchronized
                 if (state.value != null) {
                     state.value = null
@@ -110,10 +119,11 @@ class DraftStore internal constructor(
                 return@synchronized
             }
 
+            val encoded = encodeComposerDraft(value)
             val state = stateForLocked(k)
-            if (state.value != text) {
-                state.value = text
-                persistence.write(k, text)
+            if (state.value != encoded) {
+                state.value = encoded
+                persistence.write(k, encoded)
             }
             pruneEmptyDraftStatesLocked(retainedState = state)
         }
