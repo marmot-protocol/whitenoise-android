@@ -8,8 +8,59 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class NotificationTapTokensTest {
+    @Test
+    fun existingTokenDoesNotScanPreferencesForPruning() {
+        val prefs = FakeSharedPreferences()
+        val tokens = NotificationTapTokens(prefs, randomBytes = ::fillBytes)
+        val token = tokens.tokenFor("invite-key")
+        prefs.allReadCount.set(0)
+
+        assertEquals(token, tokens.tokenFor("invite-key"))
+
+        assertEquals(0, prefs.allReadCount.get())
+    }
+
+    @Test
+    fun concurrentFirstUseReturnsOneStoredToken() {
+        val prefs = FakeSharedPreferences()
+        val generated = AtomicInteger()
+        val tokens =
+            List(8) {
+                NotificationTapTokens(
+                    prefs,
+                    randomBytes = { bytes -> bytes.fill(generated.incrementAndGet().toByte()) },
+                )
+            }
+        val ready = CountDownLatch(tokens.size)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(tokens.size)
+        try {
+            val futures =
+                tokens.map { tokenStore ->
+                    executor.submit<String> {
+                        ready.countDown()
+                        start.await()
+                        tokenStore.tokenFor("new-conversation")
+                    }
+                }
+            assertTrue(ready.await(5, TimeUnit.SECONDS))
+            start.countDown()
+            val returned = futures.map { it.get(5, TimeUnit.SECONDS) }.toSet()
+
+            assertEquals(1, returned.size)
+            assertTrue(tokens.first().isValid("new-conversation", returned.single()))
+            assertEquals(1, generated.get())
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     @Test
     fun removeDeletesTokenAndTimestamp() {
         var now = 100L
@@ -107,6 +158,7 @@ class NotificationTapTokensTest {
 
     private class FakeSharedPreferences : SharedPreferences {
         private val values: MutableMap<String, Any?> = Collections.synchronizedMap(HashMap())
+        val allReadCount = AtomicInteger()
 
         override fun getString(
             key: String?,
@@ -115,7 +167,10 @@ class NotificationTapTokensTest {
 
         override fun edit(): SharedPreferences.Editor = FakeEditor()
 
-        override fun getAll(): MutableMap<String, *> = values
+        override fun getAll(): MutableMap<String, *> {
+            allReadCount.incrementAndGet()
+            return values
+        }
 
         override fun getLong(
             key: String?,

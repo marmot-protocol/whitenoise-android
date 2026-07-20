@@ -1621,17 +1621,22 @@ internal fun isDisappearingSendTimeExpiryDeferred(
     record: AppMessageRecordFfi,
     lastReadMessageId: String?,
     lastReadTimelineAt: ULong?,
-    orderedMessageIds: List<String>,
+    messageOrder: Map<String, Int>,
 ): Boolean {
     if (record.direction != "received") return false
     lastReadMessageId?.takeIf { it.isNotBlank() }?.let { anchorId ->
-        val anchorIdx = orderedMessageIds.indexOf(anchorId)
-        val msgIdx = orderedMessageIds.indexOf(record.messageIdHex)
-        if (anchorIdx >= 0 && msgIdx >= 0) return msgIdx > anchorIdx
+        val anchorIdx = messageOrder[anchorId]
+        val msgIdx = messageOrder[record.messageIdHex]
+        if (anchorIdx != null && msgIdx != null) return msgIdx > anchorIdx
     }
     if (lastReadTimelineAt != null) return record.recordedAt > lastReadTimelineAt
     return true
 }
+
+internal fun firstMessageOrder(messageIds: Iterable<String>): Map<String, Int> =
+    buildMap {
+        messageIds.forEachIndexed { index, messageId -> putIfAbsent(messageId, index) }
+    }
 
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
@@ -4031,13 +4036,13 @@ class ConversationController(
                 optimisticMessages.values.forEach { add(it.record) }
                 timelineOrder.mapNotNull { timelineItemsById[it]?.record }.forEach(::add)
             }
-        val orderedMessageIds = records.map { it.messageIdHex }
-        return records.map { localExpiryRow(it, orderedMessageIds) }
+        val messageOrder = firstMessageOrder(records.map { it.messageIdHex })
+        return records.map { localExpiryRow(it, messageOrder) }
     }
 
     private fun localExpiryRow(
         record: AppMessageRecordFfi,
-        orderedMessageIds: List<String>,
+        messageOrder: Map<String, Int>,
     ): DisappearingMessageSweep.LocalExpiryRow =
         DisappearingMessageSweep.LocalExpiryRow(
             timelineAtSeconds = record.recordedAt,
@@ -4047,7 +4052,7 @@ class ConversationController(
                     record = record,
                     lastReadMessageId = lastReadMessageId,
                     lastReadTimelineAt = persistedLastReadTimelineAt,
-                    orderedMessageIds = orderedMessageIds,
+                    messageOrder = messageOrder,
                 ),
         )
 
@@ -7292,11 +7297,13 @@ class ConversationController(
             } else {
                 val nowMillis = System.currentTimeMillis()
                 val nowSeconds = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong()
-                val orderedMessageIds =
-                    buildList {
-                        optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-                        projected.forEach { add(it.record.messageIdHex) }
-                    }
+                val messageOrder =
+                    firstMessageOrder(
+                        buildList {
+                            optimisticMessages.values.forEach { add(it.record.messageIdHex) }
+                            projected.forEach { add(it.record.messageIdHex) }
+                        },
+                    )
                 (optimisticMessages.values + projected).filter { message ->
                     val record = message.record
                     if (record.direction == "sent") {
@@ -7314,7 +7321,7 @@ class ConversationController(
                                         record = record,
                                         lastReadMessageId = lastReadMessageId,
                                         lastReadTimelineAt = persistedLastReadTimelineAt,
-                                        orderedMessageIds = orderedMessageIds,
+                                        messageOrder = messageOrder,
                                     ),
                             ),
                     )

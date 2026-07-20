@@ -215,19 +215,24 @@ internal fun FullScreenMediaViewer(
                 val msgId = currentMessageIdHex
                 val owned = currentMine
                 scope.launch {
-                    val data =
-                        runCatching {
-                            attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                        }.getOrNull()
                     val ok =
-                        data != null &&
-                            withContext(Dispatchers.IO) {
-                                if (MediaReferenceParser.isVideoMedia(ref)) {
-                                    saveVideoToGallery(context, data, ref.fileName, ref.mediaType)
-                                } else {
+                        if (MediaReferenceParser.isVideoMedia(ref)) {
+                            runCatching {
+                                val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
+                                withContext(Dispatchers.IO) {
+                                    saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
+                                }
+                            }.getOrDefault(false)
+                        } else {
+                            val data =
+                                runCatching {
+                                    attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                                }.getOrNull()
+                            data != null &&
+                                withContext(Dispatchers.IO) {
                                     saveImageToGallery(context, data, ref.fileName, ref.mediaType)
                                 }
-                            }
+                        }
                     snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
                 }
             },
@@ -237,9 +242,15 @@ internal fun FullScreenMediaViewer(
                 val msgId = currentMessageIdHex
                 val owned = currentMine
                 scope.launch {
-                    runCatching {
-                        attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
-                    }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                    if (MediaReferenceParser.isVideoMedia(ref)) {
+                        runCatching {
+                            materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
+                        }.getOrNull()?.let { shareVideo(context, it, ref.fileName, ref.mediaType) }
+                    } else {
+                        runCatching {
+                            attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                        }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                    }
                 }
             },
             snackbarHostState = snackbarHostState,

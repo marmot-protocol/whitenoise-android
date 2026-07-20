@@ -22,6 +22,15 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
 class AppSelfUpdateDownloaderTest {
+    @Test
+    fun defaultClientBoundsConnectionReadsAndOverallCall() {
+        val client = AppSelfUpdateDownloader.defaultHttpClient()
+
+        assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.CONNECT_TIMEOUT_SECONDS), client.connectTimeoutMillis.toLong())
+        assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.READ_TIMEOUT_SECONDS), client.readTimeoutMillis.toLong())
+        assertEquals(TimeUnit.MINUTES.toMillis(AppSelfUpdateDownloader.CALL_TIMEOUT_MINUTES), client.callTimeoutMillis.toLong())
+    }
+
     private lateinit var server: MockWebServer
     private lateinit var tempDir: File
     private lateinit var httpClient: OkHttpClient

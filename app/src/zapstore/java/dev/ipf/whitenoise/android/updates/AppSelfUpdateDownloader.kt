@@ -13,6 +13,7 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
 class AppSelfUpdateDownloader(
@@ -97,6 +98,9 @@ class AppSelfUpdateDownloader(
 
     companion object {
         internal const val MAX_APK_BYTES: Long = 256L * 1024L * 1024L
+        internal const val CONNECT_TIMEOUT_SECONDS = 30L
+        internal const val READ_TIMEOUT_SECONDS = 30L
+        internal const val CALL_TIMEOUT_MINUTES = 30L
 
         internal fun requireApkLengthWithinLimit(
             bytes: Long?,
@@ -141,11 +145,14 @@ class AppSelfUpdateDownloader(
                 }
             }
 
-        private fun defaultHttpClient(): OkHttpClient =
+        internal fun defaultHttpClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
                 .followSslRedirects(false)
                 .dns(ssrfSafeDns)
+                .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(CALL_TIMEOUT_MINUTES, TimeUnit.MINUTES)
                 .build()
     }
 }
