@@ -16,11 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -31,12 +28,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -44,17 +39,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -64,13 +56,13 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
-import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
+import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
+import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
@@ -211,7 +203,7 @@ private fun NewMessageScreen(
 
     val activeHex = appState.activeAccount?.accountIdHex
     val myNpub = activeHex?.let(appState::npub)
-    val myQrUri = myNpub?.let(::nostrNpubUri)
+    val myQrContent = myNpub?.let(::profileQrContentForNpub)
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
@@ -331,7 +323,7 @@ private fun NewMessageScreen(
                             icon = Icons.Default.QrCode,
                             title = showMyQrLabel,
                             onClick = { showMyQr = true },
-                            enabled = myQrUri != null,
+                            enabled = myQrContent != null,
                         )
                     }
                 }
@@ -460,91 +452,13 @@ private fun NewMessageScreen(
             },
         )
     }
-    if (showMyQr && myNpub != null && myQrUri != null) {
-        MyQrCodeSheet(
-            npub = myNpub,
-            qrUri = myQrUri,
+    if (showMyQr && activeHex != null && myQrContent != null) {
+        ProfileQrSheet(
+            appState = appState,
+            accountIdHex = activeHex,
             onDismiss = { showMyQr = false },
-            onCopy = { npub ->
-                clipboard.setText(AnnotatedString(npub))
-                appState.present(R.string.toast_copied_npub)
-            },
-            onShare = { uri ->
-                val sendIntent =
-                    Intent(Intent.ACTION_SEND)
-                        .setType("text/plain")
-                        .putExtra(Intent.EXTRA_TEXT, uri)
-                context.startActivity(Intent.createChooser(sendIntent, showMyQrLabel))
-            },
+            showScan = false,
         )
-    }
-}
-
-/**
- * New Message's self-QR intentionally emits the NIP-27 `nostr:npub…` form so
- * scanned self-QRs start chats in White Noise and third-party Nostr clients.
- * The existing profile QR sheet keeps using [ProfileLink.qrUri] because that
- * surface shares a Marmot profile link instead. Reuse [ProfileLink.parse] here
- * so the [WhiteNoiseAppState.npub] raw-hex fallback is never encoded as a QR.
- */
-internal fun nostrNpubUri(npub: String): String? = ProfileLink.parse(npub)?.let { "nostr:${it.npub}" }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MyQrCodeSheet(
-    npub: String,
-    qrUri: String,
-    onDismiss: () -> Unit,
-    onCopy: (String) -> Unit,
-    onShare: (String) -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = amoledSheetContainerColor(),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.show_my_qr_code),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
-                }
-            }
-            Text(
-                stringResource(R.string.show_my_qr_code_helper),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            QrCodeImage(
-                content = qrUri,
-                contentDescription = stringResource(R.string.my_qr_code),
-            )
-            TextButton(onClick = { onCopy(npub) }) {
-                Text(IdentityFormatter.short(npub, prefix = 16, suffix = 14))
-            }
-            Button(
-                onClick = { onShare(qrUri) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.share))
-            }
-        }
     }
 }
 
