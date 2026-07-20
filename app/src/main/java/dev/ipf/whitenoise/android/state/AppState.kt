@@ -49,6 +49,15 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.amber.AmberSignerController
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
+import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
+import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
+import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -1075,11 +1084,21 @@ class WhiteNoiseAppState(
     // null-client check and each construct a MarmotClient (TOCTOU). See #33.
     private val bootstrapMutex = Mutex()
     private val nativePushSyncMutex = Mutex()
+    private val ttsRefreshMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
+    internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
+    internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
+    internal val ttsEngineResolver = TtsEngineResolver(appContext)
+    var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
+        private set
+    val ttsDiscoveryComplete: Boolean
+        get() = ttsResolution != null
+    val ttsHasUsableEngine: Boolean
+        get() = ttsResolution?.hasUsableEngine == true
     private val pushTokenStore = PushTokenStore.create(appContext)
     private val amberSigner = AmberSignerController(appContext)
 
@@ -1476,6 +1495,7 @@ class WhiteNoiseAppState(
         // Wipe pre-encryption cache entries promptly after upgrade without doing
         // directory I/O in this main-thread constructor.
         mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+        mutationsScope.launch { refreshTtsAvailability() }
     }
 
     val activeAccount: AccountSummaryFfi?
@@ -3251,6 +3271,99 @@ class WhiteNoiseAppState(
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
     }
+
+    fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
+
+    fun resolvedTtsEnginePackage(): String? =
+        ttsEngineResolver.preferredEnginePackage(
+            engines = ttsEngineChoice().engines,
+            defaultPackage = ttsEngineChoice().defaultPackage,
+            selectedOverride = ttsEnginePreferences.selectedEngine(),
+        )
+
+    fun acknowledgeTtsTrustWarning(enginePackage: String) {
+        ttsWarningPreferences.acknowledge(enginePackage)
+    }
+
+    fun runtimeTrustForTtsSelectionWarning(enginePackage: String) =
+        runtimeTrustForSelectionWarning(
+            enginePackage = enginePackage,
+            adoptedHandle = ttsResolution?.handle,
+            selectedOverride = ttsEnginePreferences.selectedEngine(),
+        )
+
+    fun selectTtsEngine(enginePackage: String) {
+        mutationsScope.launch {
+            selectTtsEngineLocked(enginePackage)
+        }
+    }
+
+    private suspend fun selectTtsEngineLocked(enginePackage: String) {
+        ttsRefreshMutex.withLock {
+            val current =
+                TtsEngineSelectionSnapshot(
+                    resolution = ttsResolution,
+                    selectedOverride = ttsEnginePreferences.selectedEngine(),
+                )
+            val candidate = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage) }
+            when (val outcome = adoptTtsEngineSelection(current, candidate, enginePackage)) {
+                is TtsEngineSelectionResult.Adopted -> {
+                    ttsEnginePreferences.setSelectedEngine(outcome.selectedOverride)
+                    ttsResolution = outcome.resolution
+                    outcome.releasedHandles.forEach { handle -> runCatching { handle.release() } }
+                }
+                is TtsEngineSelectionResult.Retained -> {
+                    withContext(Dispatchers.IO) {
+                        candidate.handle?.let { handle -> runCatching { handle.release() } }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun refreshTtsAvailability() =
+        ttsRefreshMutex.withLock {
+            val previousHandle = ttsResolution?.handle
+            val candidateHandles = mutableListOf<TtsEngineHandle>()
+            var adoptedHandle: TtsEngineHandle? = null
+            var replacementPublished = false
+            try {
+                val bootstrap = resolveTtsOnDispatcher { ttsEngineResolver.resolve(enginePackage = null) }
+                bootstrap.handle?.let(candidateHandles::add)
+                val selectedOverride = ttsEnginePreferences.selectedEngine()
+                val preferredPackage =
+                    ttsEngineResolver.preferredEnginePackage(
+                        engines = bootstrap.engines,
+                        defaultPackage = bootstrap.defaultEnginePackage,
+                        selectedOverride = selectedOverride,
+                    )
+                val replacement =
+                    when {
+                        preferredPackage == null -> bootstrap.copy(handle = null)
+                        preferredPackage == bootstrap.handle?.enginePackage -> bootstrap
+                        else -> {
+                            val selected = resolveTtsOnDispatcher { ttsEngineResolver.resolve(preferredPackage) }
+                            selected.handle?.let(candidateHandles::add)
+                            if (selected.handle?.enginePackage == preferredPackage) {
+                                selected
+                            } else {
+                                bootstrap.copy(handle = null)
+                            }
+                        }
+                    }
+
+                adoptedHandle = replacement.handle
+                ttsResolution = replacement
+                replacementPublished = true
+            } finally {
+                candidateHandles
+                    .filter { it !== adoptedHandle }
+                    .forEach { handle -> runCatching { handle.release() } }
+                if (replacementPublished && previousHandle !== adoptedHandle) {
+                    runCatching { previousHandle?.release() }
+                }
+            }
+        }
 
     fun hiddenMessageIdsInGroup(
         accountRef: String?,

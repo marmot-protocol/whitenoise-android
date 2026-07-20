@@ -21,4 +21,5 @@ internal enum class SettingsDetail {
     Notifications,
     SecurityPrivacy,
     Donate,
+    TextToSpeech,
 }
