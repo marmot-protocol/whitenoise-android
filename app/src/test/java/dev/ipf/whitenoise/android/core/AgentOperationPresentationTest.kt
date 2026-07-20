@@ -42,7 +42,7 @@ class AgentOperationPresentationTest {
         assertEquals(true, presentation.ok)
         assertEquals(1250L, presentation.durationMs)
         assertTrue(presentation.canExpand)
-        assertTrue(presentation.argumentsJson.orEmpty().contains('\n'))
+        assertFalse(presentation.argumentsJson.orEmpty().contains('\n'))
         val arguments = JSONObject(presentation.argumentsJson.orEmpty())
         assertEquals("AgentOperation", arguments.getString("query"))
         assertEquals("test", arguments.getJSONArray("paths").getString(1))
@@ -70,6 +70,16 @@ class AgentOperationPresentationTest {
         assertEquals(null, presentation.ok)
         assertEquals(null, presentation.durationMs)
         assertTrue(presentation.canExpand)
+    }
+
+    @Test
+    fun argumentsArePrettyPrintedOnlyForExpandedDisplay() {
+        val compact = "{\"query\":\"AgentOperation\",\"paths\":[\"app/src\",\"test\"]}"
+
+        val formatted = formatAgentOperationArguments(compact)
+
+        assertTrue(formatted.contains('\n'))
+        assertEquals("AgentOperation", JSONObject(formatted).getString("query"))
     }
 
     @Test

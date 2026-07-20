@@ -23,6 +23,15 @@ data class AgentOperationPresentation(
         get() = preview != null || argumentsJson != null || ok != null || durationMs != null
 }
 
+internal fun formatAgentOperationArguments(argumentsJson: String): String =
+    runCatching {
+        when (argumentsJson.firstOrNull { !it.isWhitespace() }) {
+            '{' -> JSONObject(argumentsJson).toString(2)
+            '[' -> JSONArray(argumentsJson).toString(2)
+            else -> argumentsJson
+        }
+    }.getOrDefault(argumentsJson)
+
 object AgentOperationProjector {
     private const val OperationNameTag = "operation-name"
     private const val OperationStatusTag = "operation-status"
@@ -37,7 +46,9 @@ object AgentOperationProjector {
         val status = payload.stringOrNull("status") ?: record.tagValue(OperationStatusTag)
         val text = payload.stringOrNull("text") ?: record.plaintext.trim()
         val preview = payload.stringOrNull("preview")
-        val argumentsJson = payload?.optJSONObject("details")?.jsonValueOrNull("args")?.prettyJson()
+        // Keep the collapsed projection cheap. Indentation is deferred until
+        // the user expands the row instead of formatting every visible item.
+        val argumentsJson = payload?.optJSONObject("details")?.jsonValueOrNull("args")?.toString()
         val ok = payload?.jsonValueOrNull("ok") as? Boolean
         val durationMs = payload?.jsonValueOrNull("duration_ms")?.nonNegativeLongOrNull()
 
@@ -69,13 +80,6 @@ object AgentOperationProjector {
             ?.takeIf(String::isNotEmpty)
 
     private fun JSONObject.jsonValueOrNull(name: String): Any? = if (has(name) && !isNull(name)) opt(name) else null
-
-    private fun Any.prettyJson(): String =
-        when (this) {
-            is JSONObject -> toString(2)
-            is JSONArray -> toString(2)
-            else -> toString()
-        }
 
     private fun Any.nonNegativeLongOrNull(): Long? =
         when (this) {

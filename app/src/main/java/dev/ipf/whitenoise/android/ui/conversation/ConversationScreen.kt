@@ -2878,15 +2878,38 @@ internal fun ConversationScreen(
                                             return@Column
                                         }
                                         TimelineRowKind.AgentOperation -> {
-                                            remember(item.record) {
-                                                AgentOperationProjector.project(item.record)
-                                            }?.let { operation ->
-                                                AgentOperationRow(
-                                                    messageId = item.record.messageIdHex,
-                                                    operation = operation,
+                                            // Standard bubbles own deletion and
+                                            // convergence tombstones. Use the
+                                            // dedicated chip only for live rows.
+                                            val projectedDeleted = item.projected?.deleted == true
+                                            val optimisticallyDeleted =
+                                                MessageProjector.isDeleted(
+                                                    item.record.messageIdHex,
+                                                    controller.deletedMessageIds,
                                                 )
+                                            val invalidated = item.projected?.invalidationStatus != null
+                                            if (
+                                                shouldRenderDedicatedAgentOperationRow(
+                                                    projectedDeleted = projectedDeleted,
+                                                    optimisticallyDeleted = optimisticallyDeleted,
+                                                    invalidated = invalidated,
+                                                )
+                                            ) {
+                                                val operation =
+                                                    remember(item.record) {
+                                                        AgentOperationProjector.project(item.record)
+                                                    }
+                                                if (operation != null) {
+                                                    AgentOperationTimelineRow(
+                                                        item = item,
+                                                        operation = operation,
+                                                        controller = controller,
+                                                        appState = appState,
+                                                        readOnly = controller.group.pendingConfirmation,
+                                                    )
+                                                    return@Column
+                                                }
                                             }
-                                            return@Column
                                         }
                                         TimelineRowKind.DebugRow -> {
                                             MessageDebugRow(
