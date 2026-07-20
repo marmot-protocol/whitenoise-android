@@ -589,12 +589,15 @@ kover {
 }
 
 detekt {
-    // Analyze app-owned Kotlin only. Generated UniFFI bindings and the vendored
-    // keyring stub are regenerated wholesale and must stay byte-stable.
+    // Cover every app source set, including future flavors, while excluding the
+    // two generated/vendored files that are regenerated wholesale and must stay
+    // byte-stable. MarmotAndroid.kt is hand-written app code and remains covered.
     source.setFrom(
-        "src/main/java/dev/ipf/whitenoise/android",
-        "src/test/java/dev/ipf/whitenoise/android",
-        "src/androidTest/java/dev/ipf/whitenoise/android",
+        fileTree("src") {
+            include("**/*.kt")
+            exclude("main/java/dev/ipf/marmotkit/marmot_uniffi.kt")
+            exclude("main/java/io/crates/keyring/Keyring.kt")
+        },
     )
     // Start from detekt's defaults and keep project-specific changes in one
     // checked-in file. The baseline freezes existing debt; new findings fail.

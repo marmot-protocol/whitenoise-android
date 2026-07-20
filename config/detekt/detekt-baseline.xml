@@ -2,6 +2,7 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
+    <ID>ComplexCondition:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader.Companion$maximumBytes &lt;= 0L || maximumBytes &gt; MAX_APK_BYTES || downloaded &lt; 0L || nextChunkBytes &lt; 0L || downloaded &gt; maximumBytes || nextChunkBytes &gt; maximumBytes - downloaded</ID>
     <ID>ComplexCondition:AppState.kt:WhiteNoiseAppState$!skipEnrichmentForLock &amp;&amp; systemText == null &amp;&amp; LocalNotificationFormatter.needsPreviewTextResolution(update) &amp;&amp; previewTextOverride.isNullOrBlank()</ID>
     <ID>ComplexCondition:AvatarImageLoader.kt:AvatarImageLoader$cache.get(key) != null || isFailureFresh(key, nowMillis) || inFlight.containsKey(key) || preWarmQueuedGeneration.containsKey(key) || preWarmQueuedGeneration.size &gt;= PREWARM_MAX_QUEUED</ID>
     <ID>ComplexCondition:ComposerPills.kt:onPickFromGallery != null || onPickDocument != null || hasCameraCapture || hasLocationShare || hasUserShare || hasContactShare</ID>
@@ -25,11 +26,13 @@
     <ID>ComplexCondition:MessageTextSelection.kt:!moved &amp;&amp; selectedBoundsInWindow != null &amp;&amp; windowPosition != null &amp;&amp; !selectedBoundsInWindow.contains(windowPosition)</ID>
     <ID>ComplexCondition:Thumbhash.kt:Thumbhash$w &lt;= 0 || h &lt;= 0 || w &gt; MAX_EDGE_PX || h &gt; MAX_EDGE_PX</ID>
     <ID>ComplexCondition:VoicePlaybackControllerFocusTest.kt:VoicePlaybackControllerFocusTest.TrackingMediaPlayer$failVolumeChange || (failVolumeRestore &amp;&amp; leftVolume == 1f &amp;&amp; rightVolume == 1f)</ID>
+    <ID>CyclomaticComplexMethod:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$suspend fun downloadVerifiedApk: Result&lt;Unit&gt;</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun sendNotificationReply: NotificationReplySendOutcome</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun shouldInvokeDisappearingSecureDelete: Boolean</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:WhiteNoiseAppState$private suspend fun postNotificationUpdate</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:private fun canonicalRelayUrl: String?</ID>
     <ID>CyclomaticComplexMethod:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$private fun String.kotlinBlockFrom: String</ID>
+    <ID>CyclomaticComplexMethod:AudioFocusOwner.kt:AudioFocusOwner$private fun acquireLocked: AcquisitionResult</ID>
     <ID>CyclomaticComplexMethod:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
     <ID>CyclomaticComplexMethod:ChatBubbleColorsScreen.kt:@Composable internal fun TonalSwatchPicker</ID>
     <ID>CyclomaticComplexMethod:ChatRow.kt:@Composable internal fun ChatRow</ID>
@@ -107,8 +110,10 @@
     <ID>CyclomaticComplexMethod:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SettingsScreen</ID>
     <ID>CyclomaticComplexMethod:SignInScreen.kt:@Composable internal fun IdentityEntryForm</ID>
     <ID>CyclomaticComplexMethod:SourceBlockTestHelpers.kt:internal fun String.kotlinBlockFrom: String</ID>
+    <ID>CyclomaticComplexMethod:TextToSpeechScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TextToSpeechScreen</ID>
     <ID>CyclomaticComplexMethod:Thumbhash.kt:Thumbhash$internal fun decodeRgba: DecodedRgba?</ID>
     <ID>CyclomaticComplexMethod:Thumbhash.kt:Thumbhash$internal fun encodeFromRgba: ByteArray?</ID>
+    <ID>CyclomaticComplexMethod:TtsEngineResolver.kt:TtsEngineResolver$suspend fun resolve: TtsResolutionResult</ID>
     <ID>CyclomaticComplexMethod:VoicePlaybackController.kt:VoicePlaybackController$private suspend fun playLocked: PlaybackStartResult</ID>
     <ID>CyclomaticComplexMethod:VoiceRecorder.kt:@Composable internal fun MicHoldButton</ID>
     <ID>CyclomaticComplexMethod:WhiteNoiseApp.kt:@Composable fun WhiteNoiseApp</ID>
@@ -365,7 +370,9 @@
     <ID>FunctionNaming:StickyFormActionBar.kt:@Composable internal fun StickyFormActionBar</ID>
     <ID>FunctionNaming:StreamDebug.kt:@Composable internal fun MessageDebugRow</ID>
     <ID>FunctionNaming:StreamDebug.kt:@Composable internal fun StreamDebugEventRow</ID>
+    <ID>FunctionNaming:TextToSpeechScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TextToSpeechScreen</ID>
     <ID>FunctionNaming:Theme.kt:@Composable fun WhiteNoiseTheme</ID>
+    <ID>FunctionNaming:TtsTrustWarning.kt:@Composable fun TtsTrustWarningDialog</ID>
     <ID>FunctionNaming:UserShare.kt:@Composable internal fun UserMessageBubble</ID>
     <ID>FunctionNaming:VoiceRecorder.kt:@Composable internal fun LockHintAbove</ID>
     <ID>FunctionNaming:VoiceRecorder.kt:@Composable internal fun MicHoldButton</ID>
@@ -388,12 +395,14 @@
     <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_sortsFinalAfterLinkedPromptOnReload</ID>
     <ID>LongMethod:AmberActivityCoordinatorTest.kt:AmberActivityCoordinatorTest$@Test fun staleNip55RejectionAfterTimeoutDoesNotSatisfyNextRequest</ID>
     <ID>LongMethod:AppSelfUpdateDialog.kt:@Composable fun AppSelfUpdateDialog</ID>
+    <ID>LongMethod:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$suspend fun downloadVerifiedApk: Result&lt;Unit&gt;</ID>
     <ID>LongMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun sendNotificationReply: NotificationReplySendOutcome</ID>
     <ID>LongMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun shouldInvokeDisappearingSecureDelete: Boolean</ID>
     <ID>LongMethod:AppState.kt:WhiteNoiseAppState$private suspend fun postNotificationUpdate</ID>
     <ID>LongMethod:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$private fun String.kotlinBlockFrom: String</ID>
     <ID>LongMethod:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AppearanceScreen</ID>
     <ID>LongMethod:AttachmentSheet.kt:@Composable internal fun ComposerAttachmentSheetPane</ID>
+    <ID>LongMethod:AudioFocusOwner.kt:AudioFocusOwner$private fun acquireLocked: AcquisitionResult</ID>
     <ID>LongMethod:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
     <ID>LongMethod:AvatarViewer.kt:@Composable internal fun AvatarFullScreenViewer</ID>
     <ID>LongMethod:AvatarViewer.kt:@Composable internal fun AvatarViewerFrame</ID>
@@ -412,6 +421,7 @@
     <ID>LongMethod:Controllers.kt:ChatsController$private fun schedulePendingMediaKindResolves</ID>
     <ID>LongMethod:Controllers.kt:ChatsController$suspend fun bind</ID>
     <ID>LongMethod:Controllers.kt:ConversationController$private fun applyTimelineChanges: List&lt;String&gt;</ID>
+    <ID>LongMethod:Controllers.kt:ConversationController$private fun publishTimelineFromIndexesInternal</ID>
     <ID>LongMethod:Controllers.kt:ConversationController$private fun upsertProjectedRecord: AppMessageRecordFfi</ID>
     <ID>LongMethod:Controllers.kt:ConversationController$private suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>LongMethod:Controllers.kt:ConversationController$private suspend fun performMediaUpload</ID>
@@ -508,14 +518,17 @@
     <ID>LongMethod:SignInScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun SignInContent</ID>
     <ID>LongMethod:SourceBlockTestHelpers.kt:internal fun String.kotlinBlockFrom: String</ID>
     <ID>LongMethod:StreamDebug.kt:@Composable internal fun StreamDebugEventRow</ID>
+    <ID>LongMethod:TextToSpeechScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TextToSpeechScreen</ID>
     <ID>LongMethod:Thumbhash.kt:Thumbhash$internal fun decodeRgba: DecodedRgba?</ID>
     <ID>LongMethod:Thumbhash.kt:Thumbhash$internal fun encodeFromRgba: ByteArray?</ID>
+    <ID>LongMethod:TtsEngineResolver.kt:TtsEngineResolver$suspend fun resolve: TtsResolutionResult</ID>
     <ID>LongMethod:VideoAttachmentCacheStateTest.kt:VideoAttachmentCacheStateTest$@Test fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile</ID>
     <ID>LongMethod:VoiceAttachmentCacheStateTest.kt:VoiceAttachmentCacheStateTest$@Test fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile</ID>
     <ID>LongMethod:VoicePlaybackController.kt:VoicePlaybackController$private suspend fun playLocked: PlaybackStartResult</ID>
     <ID>LongMethod:VoiceRecorder.kt:@Composable internal fun MicHoldButton</ID>
     <ID>LongMethod:VoiceRecorder.kt:@Composable internal fun RecordingStripLeading</ID>
     <ID>LongMethod:WhiteNoiseApp.kt:@Composable fun WhiteNoiseApp</ID>
+    <ID>LongMethod:ZapstoreAssetEventsTest.kt:ZapstoreAssetEventsTest$@Test fun parseApkAssetTagsRejectsAmbiguousSingletonSecurityTags</ID>
     <ID>LoopWithTooManyJumpStatements:AudioWaveformExtractor.kt:AudioWaveformExtractor$for</ID>
     <ID>LoopWithTooManyJumpStatements:AvatarViewer.kt:do</ID>
     <ID>LoopWithTooManyJumpStatements:Controllers.kt:ChatsController$while</ID>
@@ -545,6 +558,13 @@
     <ID>MagicNumber:AppLockSettings.kt:AppLockDelay.FiveMinutes$5L</ID>
     <ID>MagicNumber:AppLockSettings.kt:AppLockDelay.FiveMinutes$60_000L</ID>
     <ID>MagicNumber:AppLockSettings.kt:AppLockDelay.OneMinute$60_000L</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$100</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$25</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$3</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$3L</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$5_000</ID>
+    <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$64</ID>
+    <ID>MagicNumber:AppSelfUpdateStorageTest.kt:AppSelfUpdateStorageTest$1_000L</ID>
     <ID>MagicNumber:AppState.kt:443</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$16</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$30u</ID>
@@ -774,6 +794,8 @@
     <ID>MagicNumber:SafeHttpsGet.kt:SafeHttpsGet$443</ID>
     <ID>MagicNumber:SafeHttpsGet.kt:SafeHttpsGet$80</ID>
     <ID>MagicNumber:SectionCard.kt:0.5f</ID>
+    <ID>MagicNumber:SecureHashTest.kt:SecureHashTest$31</ID>
+    <ID>MagicNumber:SecureHashTest.kt:SecureHashTest$32</ID>
     <ID>MagicNumber:StreamDebug.kt:0xFF2E7D32</ID>
     <ID>MagicNumber:StreamDebug.kt:0xFF607D8B</ID>
     <ID>MagicNumber:StreamDebug.kt:0xFF7B1FA2</ID>
@@ -803,6 +825,11 @@
     <ID>MagicNumber:VoiceRecorder.kt:10</ID>
     <ID>MagicNumber:VoiceRecordingController.kt:VoiceRecordingController$50L</ID>
     <ID>MagicNumber:WipeReport.kt:12</ID>
+    <ID>MagicNumber:ZapstoreApkAssetResolver.kt:ZapstoreApkAssetResolver$5</ID>
+    <ID>MagicNumber:ZapstoreAssetEvents.kt:64</ID>
+    <ID>MagicNumber:ZapstoreAssetEventsTest.kt:ZapstoreAssetEventsTest$12_345L</ID>
+    <ID>MagicNumber:ZapstoreAssetEventsTest.kt:ZapstoreAssetEventsTest$4_096L</ID>
+    <ID>MagicNumber:ZapstoreAssetEventsTest.kt:ZapstoreAssetEventsTest$64</ID>
     <ID>MagicNumber:ZapstoreReleaseClient.kt:ZapstoreReleaseClient$1000</ID>
     <ID>MagicNumber:ZapstoreReleaseClient.kt:ZapstoreReleaseClient.Companion$10</ID>
     <ID>MatchingDeclarationName:AnimatedAttachmentImage.kt:DecodedAttachmentPresentation</ID>
@@ -830,6 +857,9 @@
     <ID>MaxLineLength:AppFontScale.kt:AppFontScale.Companion$fun fromPreference: AppFontScale</ID>
     <ID>MaxLineLength:AppLockSettings.kt:AppLockDelay.Companion$fun fromPreference: AppLockDelay</ID>
     <ID>MaxLineLength:AppLockSettings.kt:BiometricManager.from(context.applicationContext).canAuthenticate(APP_LOCK_ALLOWED_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS</ID>
+    <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.MINUTES.toMillis(AppSelfUpdateDownloader.CALL_TIMEOUT_MINUTES), client.callTimeoutMillis.toLong())</ID>
+    <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.CONNECT_TIMEOUT_SECONDS), client.connectTimeoutMillis.toLong())</ID>
+    <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.READ_TIMEOUT_SECONDS), client.readTimeoutMillis.toLong())</ID>
     <ID>MaxLineLength:AppState.kt:ChatScreenshotPreferences$fun readAllowChatScreenshots: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$!actorHex.isNullOrBlank() -&gt; runCatchingCancellable { displayNameForAccount(update.accountRef, actorHex) }.getOrNull()</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$!subjectHex.isNullOrBlank() -&gt; runCatchingCancellable { displayNameForAccount(update.accountRef, subjectHex) }.getOrNull()</ID>
@@ -888,6 +918,7 @@
     <ID>MaxLineLength:AppearanceScreen.kt:LazyColumn</ID>
     <ID>MaxLineLength:AttachmentCachePublicationTest.kt:AttachmentCachePublicationTest$val unrelatedPermit = executor.submit&lt;AttachmentCachePublication.Permit?&gt; { AttachmentCachePublication.capturePermit(unrelatedKey) }</ID>
     <ID>MaxLineLength:AttachmentSheet.kt:internal</ID>
+    <ID>MaxLineLength:AudioFocusOwnerHandoffTest.kt:AudioFocusOwnerHandoffTest$private fun focusListener: AudioManager.OnAudioFocusChangeListener</ID>
     <ID>MaxLineLength:AudioWaveformExtractor.kt:AndroidAudioDecoderCodec$override fun outputChannelCount: Int</ID>
     <ID>MaxLineLength:AudioWaveformExtractor.kt:AndroidAudioDecoderResources$override fun createCodec: AudioDecoderCodec&lt;MediaFormat&gt;</ID>
     <ID>MaxLineLength:AudioWaveformExtractor.kt:AudioWaveformExtractor$activeCodec.queueInputBuffer(inIdx, 0, sampleSize, activeExtractor.sampleTime, endOfStream = false)</ID>
@@ -1229,6 +1260,7 @@
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$val inventory = MediaInventory.build(listOf(record(id = "m", body = link("https://cdn.example.com/cat.JPG?w=200"))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$val inventory = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/article?file=cat.jpg"))))</ID>
     <ID>MaxLineLength:MediaIo.kt:put(android.provider.MediaStore.Images.Media.MIME_TYPE, mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME })</ID>
+    <ID>MaxLineLength:MediaIo.kt:val sourceBytes = source.takeIf { it.isFile }?.length()?.takeIf { it &gt; 0L } ?: throw java.io.IOException("missing video source")</ID>
     <ID>MaxLineLength:MediaLibrary.kt:SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = false)</ID>
     <ID>MaxLineLength:MediaLibrary.kt:SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = true)</ID>
     <ID>MaxLineLength:MediaLibrary.kt:private</ID>
@@ -1260,6 +1292,7 @@
     <ID>MaxLineLength:MediaReferenceParserTest.kt:MediaReferenceParserTest$val safe = MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://attacker.example/blob")) { null }</ID>
     <ID>MaxLineLength:MediaVideo.kt:"manual materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex"</ID>
     <ID>MaxLineLength:MediaViewer.kt:Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)</ID>
+    <ID>MaxLineLength:MediaViewer.kt:val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)</ID>
     <ID>MaxLineLength:MediaVoice.kt:Log.w("MediaVoiceBubble", "materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)</ID>
     <ID>MaxLineLength:MediaVoice.kt:internal</ID>
     <ID>MaxLineLength:MentionComposer.kt:MentionComposer$fun candidatesByNpub: Map&lt;String, Candidate&gt;</ID>
@@ -1403,13 +1436,19 @@
     <ID>MaxLineLength:StickyDayRibbonTest.kt:StickyDayRibbonTest$assertEquals(false, shouldShowStickyDayRibbon(isScrollInProgress = false, canScrollContent = true, label = "Today"))</ID>
     <ID>MaxLineLength:StickyDayRibbonTest.kt:StickyDayRibbonTest$assertEquals(false, shouldShowStickyDayRibbon(isScrollInProgress = true, canScrollContent = false, label = "Today"))</ID>
     <ID>MaxLineLength:StickyDayRibbonTest.kt:StickyDayRibbonTest$assertEquals(true, shouldShowStickyDayRibbon(isScrollInProgress = true, canScrollContent = true, label = "Today"))</ID>
+    <ID>MaxLineLength:TextToSpeechScreen.kt:!appState.ttsDiscoveryComplete -&gt; stringResource(R.string.tts_settings_explainer_discovering)</ID>
     <ID>MaxLineLength:TimelineProjectorTest.kt:TimelineProjectorTest$assertEquals(TimelineReplyDisplay(sender = "alice", body = "Parent message"), TimelineProjector.replyPreview(record))</ID>
     <ID>MaxLineLength:TimelineProjectorTest.kt:TimelineProjectorTest$reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())</ID>
+    <ID>MaxLineLength:TtsEngineResolverTest.kt:TtsEngineResolverTest$val notInstalled = voice("offline-high", Locale.CANADA, quality = 500, features = setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))</ID>
+    <ID>MaxLineLength:TtsEngineSelection.kt:internal fun shouldReportNoTtsEngine: Boolean</ID>
+    <ID>MaxLineLength:TtsEngineSelectionTest.kt:TtsEngineSelectionTest$private fun discoveryResolution: TtsResolutionResult</ID>
+    <ID>MaxLineLength:TtsEngineSelectionTest.kt:TtsEngineSelectionTest$val resolution = discoveryResolution(TtsEngineHandle(tts, "com.google.android.tts", EngineTrust.Unknown))</ID>
     <ID>MaxLineLength:TtsPlaybackQueueTest.kt:TtsPlaybackQueueTest$private fun chunks: List&lt;TtsChunk&gt;</ID>
     <ID>MaxLineLength:VideoAttachmentCacheStateTest.kt:VideoAttachmentCacheStateTest$"""val frame\s*=\s*if \(needsPoster\) \{[\s\S]*?mmr\.getScaledFrameAtTime\([\s\S]*?\}\s*else\s*(?:\{\s*null\s*\}|null)"""</ID>
     <ID>MaxLineLength:VideoAttachmentCacheStateTest.kt:VideoAttachmentCacheStateTest$bubble.indexOf("val needsPoster = posterBitmap == null") in 0 until bubble.indexOf("withContext(Dispatchers.IO)")</ID>
     <ID>MaxLineLength:VideoPlaybackCoordinationCoverageTest.kt:VideoPlaybackCoordinationCoverageTest$assertTrue("the current page must prepare its player", "if (isCurrent)" in playbackEffect &amp;&amp; "exo.prepare()" in playbackEffect)</ID>
     <ID>MaxLineLength:VoicePlaybackAudioFocusPolicyCoverageTest.kt:VoicePlaybackAudioFocusPolicyCoverageTest$assertTrue("focus gain must restore interrupted playback", "AUDIOFOCUS_GAIN -&gt; restoreAfterAudioFocusGain()" in listener)</ID>
+    <ID>MaxLineLength:VoicePlaybackControllerFocusTest.kt:VoicePlaybackControllerFocusTest$private fun audioFocusListener: AudioManager.OnAudioFocusChangeListener</ID>
     <ID>MaxLineLength:WhiteNoiseApp.kt:message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n")</ID>
     <ID>MaxLineLength:WindowBackgroundThemeTest.kt:WindowBackgroundThemeTest$assertEquals(PreComposeDarkBackground, preComposeWindowBackgroundFor(AppThemeMode.Dark, systemDarkTheme = false))</ID>
     <ID>MaxLineLength:WindowBackgroundThemeTest.kt:WindowBackgroundThemeTest$assertEquals(PreComposeDarkBackground, preComposeWindowBackgroundFor(AppThemeMode.System, systemDarkTheme = true))</ID>
@@ -1420,6 +1459,7 @@
     <ID>MaxLineLength:WipeReportTest.kt:WipeReportTest$keyPackageFailures = listOf(RelayFailureFfi(eventIdHex = "cd".repeat(32), reason = "Authorization: Bearer secret-token"))</ID>
     <ID>MaxLineLength:ZapstoreAddressTest.kt:ZapstoreAddressTest$assertEquals("2026.6.20", ZapstoreAddress.versionFromReleaseDTag("org.parres.darkmatter@2026.6.20", "org.parres.darkmatter"))</ID>
     <ID>MaxLineLength:ZapstoreAddressTest.kt:ZapstoreAddressTest$assertNull(ZapstoreAddress.versionFromReleaseDTag("org.parres.darkmatter@2026.6.20-beta", "org.parres.darkmatter"))</ID>
+    <ID>MaxLineLength:ZapstoreApkAssetResolver.kt:ZapstoreApkAssetResolver$.</ID>
     <ID>MaxLineLength:ZapstoreEventsTest.kt:ZapstoreEventsTest$private fun signedEvent: NostrEvent</ID>
     <ID>MaxLineLength:ZapstoreReleaseClient.kt:ZapstoreReleaseClient$private suspend fun fetchAppReleaseEvents: List&lt;NostrEvent&gt;</ID>
     <ID>MaxLineLength:ZapstoreReleaseClient.kt:ZapstoreReleaseClient.&lt;no name provided&gt;$if (message.optString(1) == subscriptionId) finish(Result.success(events.toList()))</ID>
@@ -1479,6 +1519,7 @@
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$@Throws(IOException::class) fun publishWithPermit: Boolean</ID>
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$fun capturePermit: Permit?</ID>
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$private fun prepareParentForTempWrite: Boolean</ID>
+    <ID>ReturnCount:AudioFocusOwner.kt:AudioFocusOwner$private fun acquireLocked: AcquisitionResult</ID>
     <ID>ReturnCount:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
     <ID>ReturnCount:AvatarImageLoader.kt:AvatarImageLoader$private fun decode: android.graphics.Bitmap?</ID>
     <ID>ReturnCount:BIP340.kt:BIP340$fun verify: Boolean</ID>
@@ -1707,17 +1748,26 @@
     <ID>ReturnCount:TimelineProjector.kt:TimelineProjector$fun displayBody: String</ID>
     <ID>ReturnCount:TtsChunkerTest.kt:TtsChunkerTest$private fun String.hasOnlyPairedSurrogates: Boolean</ID>
     <ID>ReturnCount:TtsController.kt:TtsController$@Synchronized fun speak: Boolean</ID>
+    <ID>ReturnCount:TtsEngineResolver.kt:TtsEngineResolver$fun preferredEnginePackage: String?</ID>
+    <ID>ReturnCount:TtsEngineResolver.kt:TtsEngineResolver$private fun buildResolution: TtsResolutionResult</ID>
+    <ID>ReturnCount:TtsEngineResolver.kt:TtsEngineResolver$private fun configureResolvedEngine: Boolean</ID>
     <ID>ReturnCount:TtsPlaybackQueue.kt:TtsPlaybackQueue$private fun parseCurrentGenerationIndex: Int?</ID>
     <ID>ReturnCount:UserShare.kt:internal fun parseSharedUserFromText: SharedUser?</ID>
     <ID>ReturnCount:ViewerState.kt:internal fun applyAvatarDownwardDrag: AvatarDragDismissResult</ID>
     <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$fun pause</ID>
     <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$private fun duckForTransientAudioFocusLoss</ID>
     <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$private fun pauseForTransientAudioFocusLoss</ID>
-    <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$private fun requestFocus: Boolean</ID>
     <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$private fun restoreAfterAudioFocusGain</ID>
     <ID>ReturnCount:VoicePlaybackController.kt:VoicePlaybackController$private suspend fun playLocked: PlaybackStartResult</ID>
     <ID>ReturnCount:VoiceRecordingController.kt:VoiceRecordingController$fun start: Boolean</ID>
     <ID>ReturnCount:VoiceRecordingController.kt:VoiceRecordingController$private fun abortPendingRestart: Boolean</ID>
+    <ID>ReturnCount:ZapstoreApkAssetResolver.kt:ZapstoreApkAssetResolver$suspend fun resolveApkAsset: ZapstoreApkAsset?</ID>
+    <ID>ReturnCount:ZapstoreAppSelfUpdateFlow.kt:ZapstoreAppSelfUpdateFlow$override fun launchInstall: Boolean</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$fun assetEventIdsFromReleaseEvent: Set&lt;String&gt;?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$fun parseVerifiedApkAsset: ZapstoreApkAsset?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:ZapstoreAssetEvents$internal fun parseApkAssetTags: ZapstoreApkAsset?</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun NostrEvent.parseSizeTag: SizeTagValue</ID>
+    <ID>ReturnCount:ZapstoreAssetEvents.kt:private fun String.isTrustedHttpsUrl: Boolean</ID>
     <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreEvents$fun latestReleaseVersion: String?</ID>
     <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreEvents$fun versionFromReleaseEvent: String?</ID>
     <ID>ReturnCount:ZapstoreReleaseClient.kt:ZapstoreReleaseClient.&lt;no name provided&gt;$override fun onMessage</ID>
@@ -1737,12 +1787,14 @@
     <ID>ThrowsCount:MediaVideo.kt:@Composable internal fun MediaVideoBubble</ID>
     <ID>TooGenericExceptionCaught:AccountSelectorSheet.kt:error: Exception</ID>
     <ID>TooGenericExceptionCaught:AccountUnread.kt:error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$error: Exception</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppUpdateWorker.kt:AppUpdateWorker$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AttachmentDownloadGate.kt:AttachmentDownloadGate$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AudioFocusOwner.kt:AudioFocusOwner$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AudioWaveformExtractor.kt:AudioWaveformExtractor$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:BackgroundConnectionBootReceiver.kt:BackgroundConnectionBootReceiver$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:Cancellation.kt:throwable: Throwable</ID>
@@ -1770,6 +1822,7 @@
     <ID>TooGenericExceptionCaught:VoiceRecordingController.kt:VoiceRecordingController$t: Throwable</ID>
     <ID>TooGenericExceptionThrown:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$throw RuntimeException("simulated Binder rejection")</ID>
     <ID>TooGenericExceptionThrown:MediaPipelineVideoReadTest.kt:MediaPipelineVideoReadTest.ThrowingMetadataRetrieverShadow$throw RuntimeException("setDataSource failed")</ID>
+    <ID>TooManyFunctions:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest</ID>
     <ID>TooManyFunctions:AppState.kt:WhiteNoiseAppState</ID>
     <ID>TooManyFunctions:AppState.kt:dev.ipf.whitenoise.android.state.AppState.kt</ID>
     <ID>TooManyFunctions:AttachmentCachePublication.kt:AttachmentCachePublication</ID>
@@ -1811,13 +1864,16 @@
     <ID>TooManyFunctions:TtsPlaybackQueue.kt:TtsPlaybackQueue</ID>
     <ID>TooManyFunctions:VoicePlaybackController.kt:VoicePlaybackController</ID>
     <ID>TooManyFunctions:VoiceRecordingController.kt:VoiceRecordingController</ID>
+    <ID>TooManyFunctions:ZapstoreAssetEventsTest.kt:ZapstoreAssetEventsTest</ID>
     <ID>TopLevelPropertyNaming:EmojiPicker.kt:internal const val EmojiPickerSheetMaxHeightFraction = 0.86f</ID>
     <ID>TopLevelPropertyNaming:EmojiPicker.kt:private const val EmojiPickerSheetPartialDetentFraction = 0.48f</ID>
+    <ID>UnusedParameter:AppSelfUpdateFlows.kt:AppSelfUpdateFlows$appContext: Context</ID>
     <ID>UnusedParameter:ChatListReturnHeadSnapState.kt:state: ChatListReturnHeadSnapState</ID>
     <ID>UnusedParameter:GroupProjector.kt:GroupProjector$groupIdHex: String</ID>
     <ID>UnusedParameter:MediaImageBubbles.kt:onLongPress: () -&gt; Unit = {}</ID>
     <ID>UnusedParameter:MediaLibrary.kt:onJumpToMessage: (String) -&gt; Unit</ID>
     <ID>UnusedParameter:MediaPipelineVideoReadTest.kt:MediaPipelineVideoReadTest.ThrowingMetadataRetrieverShadow$path: String</ID>
     <ID>UnusedParameter:TimelineProjector.kt:TimelineProjector$plaintext: String</ID>
+    <ID>UnusedParameter:TtsEngineResolver.kt:TtsEngineResolver$activePackage: String</ID>
   </CurrentIssues>
 </SmellBaseline>
