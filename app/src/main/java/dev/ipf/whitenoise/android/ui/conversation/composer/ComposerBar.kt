@@ -322,6 +322,9 @@ internal fun ComposerBar(
     // keyboard raised once. Legacy raw-string drafts keep end-of-text selection
     // without auto-focus. One-shot like [autoFocusOnEnter].
     autoFocusOnDraftRestore: Boolean = false,
+    // Hoisted at conversation scope so search/selection bar swaps do not reset
+    // the one-shot guard when the composer is removed and re-added.
+    autoFocusConsumedState: MutableState<Boolean> = remember(draftKey) { mutableStateOf(false) },
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     // #589: the composer FocusRequester is hoisted from the conversation screen
     // so its resume lifecycle observer can restore focus after an app-switch.
@@ -609,7 +612,7 @@ internal fun ComposerBar(
         composerEmojiPickerOpen = false
         attachmentSheetState.dismiss()
     }
-    var autoFocusConsumed by remember(draftKey) { mutableStateOf(false) }
+    var autoFocusConsumed by autoFocusConsumedState
     LaunchedEffect(draftKey, autoFocusOnEnter, autoFocusOnDraftRestore, editingMessageId) {
         if ((autoFocusOnEnter || autoFocusOnDraftRestore) && !autoFocusConsumed && editingMessageId == null) {
             autoFocusConsumed = true

@@ -2259,6 +2259,7 @@ internal fun ConversationScreen(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
         )
+    val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
     // attachment sheet — the composer itself stays interactive while it's open.
@@ -2701,6 +2702,7 @@ internal fun ConversationScreen(
                                     mentionPickerEnabled = mentionPicker.enabled,
                                     autoFocusOnEnter = justCreated,
                                     autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
+                                    autoFocusConsumedState = composerAutoFocusConsumed,
                                     enterKeyBehavior = appState.enterKeyBehavior,
                                     // #589: hoisted focus plumbing — the requester lets the
                                     // resume observer restore focus, and the callback keeps
