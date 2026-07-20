@@ -66,6 +66,21 @@ internal fun applyChatListSearchAndFilter(
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
     bodyMatchGroupIds: Set<String> = emptySet(),
+): List<ChatListItem> =
+    applyChatListSearchAndFilter(
+        source = source,
+        rawQuery = rawQuery,
+        filter = filter,
+        displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
+        bodyMatchGroupIds = bodyMatchGroupIds,
+    )
+
+internal fun applyChatListSearchAndFilter(
+    source: List<ChatListItem>,
+    rawQuery: String,
+    filter: ChatListFilter,
+    displayTitle: (ChatListItem) -> String,
+    bodyMatchGroupIds: Set<String> = emptySet(),
 ): List<ChatListItem> {
     val byFilter =
         when (filter) {
@@ -86,7 +101,7 @@ internal fun applyChatListSearchAndFilter(
         // blank and the visible title is projected from the other
         // member's profile — without this projection the search misses
         // direct messages by their displayed name.
-        val title = localeInvariantFold(chatListItemDisplayTitle(item, appState, titleCopy))
+        val title = localeInvariantFold(displayTitle(item))
         if (title.contains(ciNeedle)) return@filter true
         val preview = localeInvariantFold(item.projectedPreviewText())
         if (preview.contains(ciNeedle)) return@filter true
@@ -97,6 +112,13 @@ internal fun applyChatListSearchAndFilter(
         // substring containment as title/preview.
         val description = localeInvariantFold(item.group.description)
         if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
+        // Raw group identifiers (issue #1509): pasted MLS or Nostr group-id
+        // prefixes should surface the row even when the visible title doesn't
+        // include them.
+        val groupId = localeInvariantFold(item.group.groupIdHex)
+        if (groupId.contains(ciNeedle)) return@filter true
+        val nostrGroupId = localeInvariantFold(item.group.nostrGroupIdHex)
+        if (nostrGroupId.contains(ciNeedle)) return@filter true
         // Message-body matches (issue #290): the async per-chat search
         // (ChatsController.searchMessageBodies) found the needle inside this
         // conversation's local timeline even though it isn't in the title or
