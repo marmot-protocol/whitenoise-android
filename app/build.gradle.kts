@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.kover)
 }
@@ -585,6 +586,25 @@ kover {
             }
         }
     }
+}
+
+detekt {
+    // Cover every app source set, including future flavors, while excluding the
+    // two generated/vendored files that are regenerated wholesale and must stay
+    // byte-stable. MarmotAndroid.kt is hand-written app code and remains covered.
+    source.setFrom(
+        fileTree("src") {
+            include("**/*.kt")
+            exclude("main/java/dev/ipf/marmotkit/marmot_uniffi.kt")
+            exclude("main/java/io/crates/keyring/Keyring.kt")
+        },
+    )
+    // Start from detekt's defaults and keep project-specific changes in one
+    // checked-in file. The baseline freezes existing debt; new findings fail.
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/detekt-baseline.xml")
+    parallel = true
 }
 
 ktlint {
