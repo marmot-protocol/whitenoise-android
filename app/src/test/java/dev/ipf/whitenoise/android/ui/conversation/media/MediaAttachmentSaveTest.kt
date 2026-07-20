@@ -1,0 +1,129 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.content.ContentProvider
+import android.content.ContentResolver
+import android.content.ContentValues
+import android.database.Cursor
+import android.net.Uri
+import android.provider.MediaStore
+import org.junit.After
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowContentResolver
+import java.io.File
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class MediaAttachmentSaveTest {
+    private lateinit var outputFile: File
+    private lateinit var provider: RecordingMediaProvider
+
+    @Before
+    fun setUp() {
+        outputFile = File.createTempFile("media-save", ".bin")
+        provider = RecordingMediaProvider(outputFile, context().contentResolver)
+        ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
+    }
+
+    @After
+    fun tearDown() {
+        ShadowContentResolver.reset()
+        outputFile.delete()
+    }
+
+    @Test
+    fun imageAttachmentSavesToPicturesCollection() {
+        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "photo.png", "IMAGE/PNG")
+
+        assertTrue(saved)
+        assertEquals(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+    }
+
+    @Test
+    fun videoAttachmentSavesToMoviesCollection() {
+        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "clip.mp4", "video/mp4")
+
+        assertTrue(saved)
+        assertEquals(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+    }
+
+    @Test
+    fun fileAttachmentSavesSanitizedBytesToDownloadsCollection() {
+        val saved = saveAttachmentToMediaStore(context(), PAYLOAD, "../report.pdf", "application/pdf")
+
+        assertTrue(saved)
+        assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+        assertEquals("report.pdf", provider.insertedValues?.getAsString(MediaStore.Downloads.DISPLAY_NAME))
+        assertEquals("application/pdf", provider.insertedValues?.getAsString(MediaStore.Downloads.MIME_TYPE))
+        assertEquals("Download/White Noise", provider.insertedValues?.getAsString(MediaStore.Downloads.RELATIVE_PATH))
+        assertEquals(1, provider.insertedValues?.getAsInteger(MediaStore.Downloads.IS_PENDING))
+        assertEquals(0, provider.updatedValues?.getAsInteger(MediaStore.Downloads.IS_PENDING))
+        assertArrayEquals(PAYLOAD, outputFile.readBytes())
+    }
+
+    private fun context() = RuntimeEnvironment.getApplication()
+
+    private class RecordingMediaProvider(
+        private val outputFile: File,
+        private val resolver: ContentResolver,
+    ) : ContentProvider() {
+        var insertedCollection: Uri? = null
+            private set
+        var insertedValues: ContentValues? = null
+            private set
+        var updatedValues: ContentValues? = null
+            private set
+
+        override fun onCreate(): Boolean = true
+
+        override fun getType(uri: Uri): String? = null
+
+        override fun query(
+            uri: Uri,
+            projection: Array<out String>?,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+            sortOrder: String?,
+        ): Cursor? = null
+
+        override fun insert(
+            uri: Uri,
+            values: ContentValues?,
+        ): Uri {
+            insertedCollection = uri
+            insertedValues = values?.let(::ContentValues)
+            val inserted = uri.buildUpon().appendPath("1").build()
+            shadowOf(resolver)
+                .registerOutputStreamSupplier(inserted) { outputFile.outputStream() }
+            return inserted
+        }
+
+        override fun delete(
+            uri: Uri,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+        ): Int = 1
+
+        override fun update(
+            uri: Uri,
+            values: ContentValues?,
+            selection: String?,
+            selectionArgs: Array<out String>?,
+        ): Int {
+            updatedValues = values?.let(::ContentValues)
+            return 1
+        }
+    }
+
+    private companion object {
+        val PAYLOAD = "attachment bytes".toByteArray()
+    }
+}

@@ -119,6 +119,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CustomizeReactionsDialog
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
@@ -137,9 +139,12 @@ import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -377,6 +382,7 @@ internal fun MessageBubble(
                 )
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Window-space position of the long-press touch. The y component anchors
     // the action popover; the full point seeds partial text selection (#1370).
@@ -841,6 +847,42 @@ internal fun MessageBubble(
                         messageIdHex = record.messageIdHex,
                         perMessageMediaReferences = perMessageMediaReferences,
                     )
+
+                fun saveAttachments() {
+                    if (mediaReferences.isEmpty()) return
+                    onActionMenuOpenChange(false)
+                    scope.launch {
+                        var allSaved = true
+                        mediaReferences.forEachIndexed { attachmentIndex, reference ->
+                            val saved =
+                                runCatching {
+                                    val bytes =
+                                        attachmentBytes(
+                                            controller = controller,
+                                            messageIdHex = record.messageIdHex,
+                                            attachmentIndex = attachmentIndex,
+                                            reference = reference,
+                                            mine = mine,
+                                        )
+                                    withContext(Dispatchers.IO) {
+                                        saveAttachmentToMediaStore(
+                                            context = context,
+                                            bytes = bytes,
+                                            fileName = reference.fileName,
+                                            mediaType = reference.mediaType,
+                                        )
+                                    }
+                                }.onFailure {
+                                    if (it is kotlinx.coroutines.CancellationException) throw it
+                                }.getOrDefault(false)
+                            allSaved = saved && allSaved
+                        }
+                        appState.present(
+                            if (allSaved) R.string.shared_media_saved else R.string.shared_media_save_failed,
+                            copyable = !allSaved,
+                        )
+                    }
+                }
                 // Split media into image refs (rendered as a bubble or
                 // 2-col grid) and file refs (a list of pills). Mixed
                 // albums render both: images on top, file pills below.
@@ -1709,6 +1751,7 @@ internal fun MessageBubble(
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
+                    canSave = mediaReferences.isNotEmpty(),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -1729,6 +1772,7 @@ internal fun MessageBubble(
                         controller.editingMessageId = record.messageIdHex
                     },
                     onCopyText = ::copyMessageText,
+                    onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {

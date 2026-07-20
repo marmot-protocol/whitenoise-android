@@ -90,8 +90,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
-import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
-import dev.ipf.whitenoise.android.ui.conversation.media.saveVideoToGallery
+import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.shortMediaTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -1003,29 +1002,12 @@ private fun FileLibraryRow(
                                     runCatching {
                                         val bytes = fetchBytes()
                                         withContext(Dispatchers.IO) {
-                                            when {
-                                                row.reference.mediaType.startsWith("image/", ignoreCase = true) ->
-                                                    saveImageToGallery(
-                                                        context,
-                                                        bytes,
-                                                        row.reference.fileName,
-                                                        row.reference.mediaType,
-                                                    )
-                                                row.reference.mediaType.startsWith("video/", ignoreCase = true) ->
-                                                    saveVideoToGallery(
-                                                        context,
-                                                        bytes,
-                                                        row.reference.fileName,
-                                                        row.reference.mediaType,
-                                                    )
-                                                else ->
-                                                    saveFileToDownloads(
-                                                        context,
-                                                        bytes,
-                                                        row.reference.fileName,
-                                                        row.reference.mediaType,
-                                                    )
-                                            }
+                                            saveAttachmentToMediaStore(
+                                                context,
+                                                bytes,
+                                                row.reference.fileName,
+                                                row.reference.mediaType,
+                                            )
                                         }
                                     }.getOrDefault(false)
                                 appState.present(
@@ -1223,44 +1205,4 @@ private fun monthLabel(key: Int): String {
         cal.getDisplayName(Calendar.MONTH, Calendar.LONG, java.util.Locale.getDefault())
             ?: (month + 1).toString()
     return "$monthName $year"
-}
-
-// Persist an arbitrary (non image/video) attachment to the public Downloads
-// collection via the Downloads MediaStore so it lands somewhere the user can
-// find it. Mirrors the image/video save flows' IS_PENDING dance. Returns false
-// on any failure so the caller can surface the existing save-failed toast.
-private fun saveFileToDownloads(
-    context: android.content.Context,
-    bytes: ByteArray,
-    fileName: String,
-    mediaType: String,
-): Boolean {
-    val resolver = context.contentResolver
-    val values =
-        android.content.ContentValues().apply {
-            put(
-                android.provider.MediaStore.Downloads.DISPLAY_NAME,
-                dev.ipf.whitenoise.android.media.MediaPipeline
-                    .safeDisplayName(fileName),
-            )
-            put(android.provider.MediaStore.Downloads.MIME_TYPE, mediaType.ifBlank { "application/octet-stream" })
-            put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/White Noise")
-            put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
-        }
-    val uri =
-        resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: return false
-    return try {
-        resolver.openOutputStream(uri).use { out ->
-            if (out == null) throw java.io.IOException("null output stream")
-            out.write(bytes)
-        }
-        values.clear()
-        values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-        resolver.update(uri, values, null, null)
-        true
-    } catch (_: Throwable) {
-        resolver.delete(uri, null, null)
-        false
-    }
 }
