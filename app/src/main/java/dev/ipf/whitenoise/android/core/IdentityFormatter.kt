@@ -24,10 +24,11 @@ object IdentityFormatter {
     // allocating a fresh instance on every initials() call.
     private val graphemeBreaker = ThreadLocal.withInitial { BreakIterator.getCharacterInstance() }
 
-    // DateTimeFormatters are immutable and thread-safe; memoize the two locale-derived
-    // formatters used on the older-than-a-week timestamp rungs.
+    // DateTimeFormatters are immutable and thread-safe; memoize locale-derived
+    // formatters used on timestamp display paths.
     private val noYearFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val shortDateFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
+    private val shortTimeFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
 
     fun short(
         value: String,
@@ -150,6 +151,37 @@ object IdentityFormatter {
         }
     }
 
+    fun clockTime(
+        epochSeconds: ULong,
+        locale: Locale = Locale.getDefault(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        if (epochSeconds == 0uL) return ""
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        return runCatching {
+            Instant
+                .ofEpochSecond(seconds)
+                .atZone(zone)
+                .format(shortTimeFormatter(locale))
+        }.getOrDefault("")
+    }
+
+    fun messageBubbleTime(
+        epochSeconds: ULong,
+        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
+        locale: Locale = Locale.getDefault(),
+        now: Instant = Instant.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        if (epochSeconds == 0uL) return ""
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        return if (now.epochSecond - seconds < 3_600) {
+            relativeTime(epochSeconds, copy, locale, now, zone)
+        } else {
+            clockTime(epochSeconds, locale, zone)
+        }
+    }
+
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =
         noYearFormatters.computeIfAbsent(locale) { requestedLocale ->
             val localizedPattern =
@@ -166,6 +198,11 @@ object IdentityFormatter {
     private fun shortDateFormatter(locale: Locale): DateTimeFormatter =
         shortDateFormatters.computeIfAbsent(locale) { requestedLocale ->
             DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(requestedLocale)
+        }
+
+    private fun shortTimeFormatter(locale: Locale): DateTimeFormatter =
+        shortTimeFormatters.computeIfAbsent(locale) { requestedLocale ->
+            DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(requestedLocale)
         }
 
     internal fun stripYearFromLocalizedDatePattern(pattern: String): String {

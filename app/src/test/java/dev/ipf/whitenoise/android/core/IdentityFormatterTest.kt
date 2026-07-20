@@ -301,4 +301,66 @@ class IdentityFormatterTest {
         assertEquals("M月d日", IdentityFormatter.stripYearFromLocalizedDatePattern("y年M月d日"))
         assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM 'de' y"))
     }
+
+    // ---- messageBubbleTime (bubble footer timestamps, #1513) ----------------
+
+    @Test
+    fun messageBubbleTimeEmptyForUnsetSentinel() {
+        assertEquals("", IdentityFormatter.messageBubbleTime(0uL))
+    }
+
+    @Test
+    fun messageBubbleTimeShowsNowWithinFirstMinute() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val thirtySecondsAgo = now.minusSeconds(30L)
+
+        assertEquals("now", IdentityFormatter.messageBubbleTime(thirtySecondsAgo.epochSecond.toULong(), now = now))
+    }
+
+    @Test
+    fun messageBubbleTimeTreatsSlightFutureSkewAsNow() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val skewedAhead = now.plusSeconds(5L)
+
+        assertEquals("now", IdentityFormatter.messageBubbleTime(skewedAhead.epochSecond.toULong(), now = now))
+    }
+
+    @Test
+    fun messageBubbleTimeShowsMinutesWithinFirstHour() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val fortyFiveMinutesAgo = now.minusSeconds(45 * 60L)
+
+        assertEquals("45m", IdentityFormatter.messageBubbleTime(fortyFiveMinutesAgo.epochSecond.toULong(), now = now))
+    }
+
+    @Test
+    fun messageBubbleTimeShowsAbsoluteClockAtOneHourBoundary() {
+        val zone = ZoneId.of("UTC")
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val oneHourAgo = now.minusSeconds(3_600L)
+        val expected =
+            DateTimeFormatter
+                .ofLocalizedTime(FormatStyle.SHORT)
+                .withLocale(Locale.US)
+                .format(oneHourAgo.atZone(zone))
+
+        assertEquals(
+            expected,
+            IdentityFormatter.messageBubbleTime(
+                oneHourAgo.epochSecond.toULong(),
+                RelativeTimeCopy.Default,
+                Locale.US,
+                now = now,
+                zone = zone,
+            ),
+        )
+    }
+
+    @Test
+    fun messageBubbleTimeUsesFutureLabelBeyondSkewTolerance() {
+        val now = Instant.parse("2025-06-30T15:00:00Z")
+        val farFuture = now.plusSeconds(3_600L)
+
+        assertEquals("future", IdentityFormatter.messageBubbleTime(farFuture.epochSecond.toULong(), now = now))
+    }
 }
