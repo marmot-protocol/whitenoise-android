@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import androidx.work.BackoffPolicy
+import androidx.work.ListenableWorker
 import androidx.work.workDataOf
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -544,6 +545,83 @@ class NotificationTargetTest {
         assertTrue(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 1))
         assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 2))
         assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 3))
+    }
+
+    @Test
+    fun replyWorkerRetriesOnlyRetryableSendFailures() {
+        assertTrue(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.NonRetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun replyWorkerMapsSendOutcomesToWorkResults() {
+        assertEquals(
+            ListenableWorker.Result.success(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.Sent,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.success(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.AlreadyCommitted,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.NonRetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.retry(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 0,
+                containsLegacyPlaintext = true,
+            ),
+        )
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = 2,
+            ),
+        )
+        // Unpersisted attempt count (null) must fail closed, not retry unbounded.
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.RetryableFailure,
+                operationFailureAttempt = null,
+            ),
+        )
     }
 
     @Test
