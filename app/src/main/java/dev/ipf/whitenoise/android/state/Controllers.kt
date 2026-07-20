@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.aggregateEdits
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
+import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import kotlinx.coroutines.CancellationException
@@ -6595,7 +6596,9 @@ class ConversationController(
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
         val refs = MediaReferenceParser.parseAllImetaTags(target.tags)
-        val mediaKind = replyMediaKindFromMime(refs.firstOrNull()?.mediaType)
+        val mediaKind =
+            typedReplyMediaFallback(mediaReferences[targetMessageId].orEmpty())?.kind
+                ?: replyMediaKindFromMime(refs.firstOrNull()?.mediaType)
         return TimelineReplyDisplay(
             sender = target.sender,
             body = MessageProjector.displayBody(target, copy),
