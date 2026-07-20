@@ -17,7 +17,7 @@ data class AgentOperationPresentation(
 ) {
     /** Keeps the tool name out of the payload's width budget in the collapsed row. */
     val collapsedText: String
-        get() = preview ?: text.ifBlank { name ?: eventType ?: "Tool call" }
+        get() = preview ?: text.ifBlank { name ?: eventType.orEmpty() }
 
     val canExpand: Boolean
         get() = preview != null || argumentsJson != null || ok != null || durationMs != null

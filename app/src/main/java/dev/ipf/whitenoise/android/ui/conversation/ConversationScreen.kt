@@ -2807,11 +2807,13 @@ internal fun ConversationScreen(
                                 renderedTimeline,
                                 key = { _, item -> item.id },
                                 // Pool layouts by category so Compose can reuse
-                                // the heavier MessageBubble slot across scroll
-                                // without recreating layout nodes for the
-                                // simpler centered group-system rows.
+                                // structurally similar rows across scroll.
                                 contentType = { _, item ->
-                                    if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
+                                    when {
+                                        MessageProjector.isGroupSystem(item.record) -> "groupSystem"
+                                        MessageProjector.isAgentOperation(item.record) -> "agentOperation"
+                                        else -> "message"
+                                    }
                                 },
                             ) { index, item ->
                                 Column(

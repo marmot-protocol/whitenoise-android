@@ -100,7 +100,6 @@ internal fun AgentOperationChip(
                 operation = operation,
                 expanded = expanded,
                 statusColor = statusColor,
-                toggleLabel = toggleLabel,
             )
             Text(
                 text = operation.collapsedText,
@@ -122,7 +121,6 @@ private fun AgentOperationHeader(
     operation: AgentOperationPresentation,
     expanded: Boolean,
     statusColor: Color,
-    toggleLabel: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -144,7 +142,7 @@ private fun AgentOperationHeader(
         if (operation.canExpand) {
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = toggleLabel,
+                contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
         }
