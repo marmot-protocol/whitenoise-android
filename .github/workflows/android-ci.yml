@@ -47,7 +47,7 @@ jobs:
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin --no-daemon --stacktrace
 
       - name: Unit tests
         run: ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest --no-daemon --stacktrace
