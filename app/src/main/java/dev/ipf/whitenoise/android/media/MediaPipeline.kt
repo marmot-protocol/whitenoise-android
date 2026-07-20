@@ -137,6 +137,39 @@ object MediaPipeline {
     /** Header bytes read to sniff an animated source — GIF sig + WebP ANIM chunk sit near the start. */
     private const val ANIMATED_SNIFF_MAX_BYTES: Int = 4096
 
+    /** Header bytes needed to recognize JPEG/PNG/WebP/GIF signatures. */
+    private const val IMAGE_SIGNATURE_SNIFF_MAX_BYTES: Int = 12
+
+    /**
+     * Recognize a supported outgoing image MIME from a bounded byte prefix.
+     * Reuses the same signature checks as [readOriginalImageForUpload]; returns
+     * null when the prefix is not JPEG/PNG/WebP/GIF.
+     */
+    fun sniffImageMediaType(header: ByteArray): String? = originalImageMediaType(header)
+
+    /**
+     * Bounded header sniff for document picks whose resolver MIME is blank or
+     * `application/octet-stream` — common when SAF/cloud providers omit type.
+     */
+    fun sniffImageMediaType(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): String? {
+        val header =
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    readPrefixBytes(stream, IMAGE_SIGNATURE_SNIFF_MAX_BYTES)
+                }
+            } catch (_: java.io.IOException) {
+                null
+            } catch (_: SecurityException) {
+                null
+            } catch (_: RuntimeException) {
+                null
+            } ?: return null
+        return sniffImageMediaType(header)
+    }
+
     /**
      * Replace whatever extension the source carried with `.jpg`, since the
      * payload is always recompressed to JPEG. Without this swap, the imeta
