@@ -24,11 +24,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.messages.consumePointerInputUntilReleased
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleLongPressPositionInWindow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -86,10 +89,30 @@ class MarkdownLinkCopyTest {
     fun longPressingPlainTextStillOpensParentActions() {
         val document = paragraphDocument(MarkdownInlineFfi.Text("plain message"))
 
-        assertEquals(
-            LongPressResult(copiedUrl = null, parentLongPresses = 1),
-            longPress(document, visibleText = "plain message"),
-        )
+        val result = longPress(document, visibleText = "plain message")
+        assertEquals(LongPressResult(copiedUrl = null, parentLongPresses = 1), result)
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun longPressingLinkCopiesWithoutOpeningAndSubsequentTapStillOpensLink() {
+        val destination = "https://example.com/long-press-copy-only"
+        val label = "link label"
+        val document =
+            paragraphDocument(
+                MarkdownInlineFfi.Link(
+                    dest = destination,
+                    title = null,
+                    children = listOf(MarkdownInlineFfi.Text(label)),
+                ),
+            )
+
+        val result = longPress(document, visibleText = label)
+        assertEquals(LongPressResult(copiedUrl = destination, parentLongPresses = 0), result)
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
 
     @Test
@@ -144,6 +167,7 @@ class MarkdownLinkCopyTest {
         partiallyClipped: Boolean = false,
     ): LongPressResult {
         var copiedUrl: String? = null
+        var copyInvocations = 0
         var parentLongPresses = 0
         var clippingVerified = false
 
@@ -186,6 +210,8 @@ class MarkdownLinkCopyTest {
                                         val link = windowPosition?.let { markdownLinkDestinationAt(linkLayouts.values, it) }
                                         if (link != null) {
                                             copiedUrl = link
+                                            copyInvocations++
+                                            consumePointerInputUntilReleased(down.id)
                                         } else {
                                             parentLongPresses++
                                         }
@@ -220,8 +246,16 @@ class MarkdownLinkCopyTest {
         if (partiallyClipped) {
             assertTrue("test row must have a clipped top edge", clippingVerified)
         }
+        if (copiedUrl != null) {
+            assertEquals("link copy must fire exactly once", 1, copyInvocations)
+        }
 
         return LongPressResult(copiedUrl, parentLongPresses)
+    }
+
+    private fun string(resId: Int): String {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        return context.getString(resId)
     }
 
     private fun autolinkDocument(url: String) = paragraphDocument(MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI))

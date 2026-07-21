@@ -785,6 +785,7 @@ internal fun MessageBubble(
                                         )
                                         if (linkDestination != null) {
                                             copyMarkdownLink(linkDestination)
+                                            consumePointerInputUntilReleased(down.id)
                                         } else {
                                             // Capture the press in window space before
                                             // opening so both the popover and text
