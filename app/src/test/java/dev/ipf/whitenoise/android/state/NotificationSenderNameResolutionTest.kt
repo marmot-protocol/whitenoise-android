@@ -36,4 +36,34 @@ class NotificationSenderNameResolutionTest {
             ),
         )
     }
+
+    @Test
+    fun authenticatedPayloadNameCanTemporarilyFillAColdProfileCache() {
+        assertEquals("Green Orca", notificationDisplayNameHint("  Green Orca  "))
+        assertEquals(
+            "Green Orca",
+            resolvedProfileDisplayName(
+                profileDisplayName = null,
+                notificationDisplayNameHint = "Green Orca",
+            ),
+        )
+    }
+
+    @Test
+    fun identityFallbacksNeverBecomeProfileHints() {
+        assertNull(notificationDisplayNameHint("npub1jc3ut4ehf7n0example"))
+        assertNull(notificationDisplayNameHint("npub1jc3ut...hsq6nt96"))
+        assertNull(notificationDisplayNameHint("a".repeat(64)))
+    }
+
+    @Test
+    fun authoritativeProfileNameWinsOverNotificationHint() {
+        assertEquals(
+            "Alice",
+            resolvedProfileDisplayName(
+                profileDisplayName = "Alice",
+                notificationDisplayNameHint = "Green Orca",
+            ),
+        )
+    }
 }

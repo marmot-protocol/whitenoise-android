@@ -175,6 +175,18 @@ internal fun notificationSenderNameOverride(
     ProfileSanitizer.displayName(contactNickname)
         ?: ProfileSanitizer.displayName(localProfileName)
 
+internal fun notificationDisplayNameHint(raw: String?): String? {
+    val displayName = ProfileSanitizer.displayName(raw)
+    return displayName?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+}
+
+internal fun resolvedProfileDisplayName(
+    profileDisplayName: String?,
+    notificationDisplayNameHint: String?,
+): String? =
+    ProfileSanitizer.displayName(profileDisplayName)
+        ?: notificationDisplayNameHint(notificationDisplayNameHint)
+
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
@@ -1340,6 +1352,13 @@ class WhiteNoiseAppState(
         ScopedCache<String, ProfilePresentation>(
             registry = accountScopedCaches,
             name = "profile-presentations",
+            maxEntries = MAX_PROFILE_PRESENTATION_CACHE_ENTRIES,
+            lock = profilePresentationLock,
+        )
+    private val notificationDisplayNameHints =
+        ScopedCache<String, String>(
+            registry = accountScopedCaches,
+            name = "notification-display-name-hints",
             maxEntries = MAX_PROFILE_PRESENTATION_CACHE_ENTRIES,
             lock = profilePresentationLock,
         )
@@ -4708,7 +4727,13 @@ class WhiteNoiseAppState(
     // from a LaunchedEffect (e.g. requestProfiles over the roster).
     fun chatMemberTitleCached(accountIdHex: String): String {
         profileRevision
-        val cachedName = synchronized(profilePresentationLock) { profilePresentations[accountIdHex]?.displayName }
+        val cachedName =
+            synchronized(profilePresentationLock) {
+                resolvedProfileDisplayName(
+                    profileDisplayName = profilePresentations[accountIdHex]?.displayName,
+                    notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
+                )
+            }
         return cachedName ?: shortNpub(accountIdHex)
     }
 
@@ -4717,7 +4742,11 @@ class WhiteNoiseAppState(
         return chatMemberTitleCached(accountIdHex)
     }
 
-    private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
+    private fun profileDisplayName(accountIdHex: String): String? =
+        resolvedProfileDisplayName(
+            profileDisplayName = profilePresentation(accountIdHex).displayName,
+            notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
+        )
 
     fun shortNpub(accountIdHex: String): String {
         val npub = npub(accountIdHex)
@@ -5209,6 +5238,26 @@ class WhiteNoiseAppState(
         // applying its final short-npub fallback. Returning the npub here masked
         // a usable payload name during cold profile-cache startup.
         return notificationSenderNameOverride(contactNickname, localProfileName)
+            ?: notificationDisplayNameHints[senderIdHex]
+    }
+
+    private fun applyNotificationDisplayNameHint(update: NotificationUpdateFfi) {
+        if (update.accountRef != activeAccountRef) return
+        val senderIdHex =
+            update.sender.accountIdHex
+                .trim()
+                .takeIf { it.isNotEmpty() }
+        val hint = notificationDisplayNameHint(update.sender.displayName)
+        if (senderIdHex == null || hint == null) return
+        val changed =
+            synchronized(profilePresentationLock) {
+                if (profilePresentations[senderIdHex]?.displayName != null) {
+                    false
+                } else {
+                    notificationDisplayNameHints.put(senderIdHex, hint) != hint
+                }
+            }
+        if (changed) profileRevision += 1
     }
 
     // The recipient (own) identity's display name for the notification subtext,
@@ -5603,6 +5652,7 @@ class WhiteNoiseAppState(
                             while (isActive) {
                                 val update = marmotIo { subscription.next() } ?: break
                                 backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                applyNotificationDisplayNameHint(update)
                                 val postEpoch = notificationPostEpoch.capture()
                                 postAfterNotificationAvatarPreWarm(
                                     preWarm = { preWarmNotificationAvatars(update) },
@@ -5749,6 +5799,7 @@ class WhiteNoiseAppState(
             synchronized(profilePresentationLock) {
                 profile?.let { userProfiles.put(accountIdHex, it) }
                 val changed = profilePresentations.put(accountIdHex, presentation) != presentation
+                if (presentation.displayName != null) notificationDisplayNameHints.remove(accountIdHex)
                 val shouldPreWarm =
                     presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)
                 changed to shouldPreWarm

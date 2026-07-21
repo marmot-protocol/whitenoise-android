@@ -1706,20 +1706,6 @@ internal fun cacheAppliedGroupMembers(
     appState.requestProfiles(members.map { it.memberIdHex })
 }
 
-/**
- * Preserve the first-paint ordering used by timeline hydration: finish the
- * bounded, off-main local profile reads before publishing a roster that will
- * immediately be projected into member names.
- */
-internal suspend fun <T> publishAfterProfileWarm(
-    accountIdHexes: Iterable<String>,
-    warm: suspend (Iterable<String>) -> Unit,
-    publish: () -> T,
-): T {
-    warm(accountIdHexes)
-    return publish()
-}
-
 internal data class AuthoritativeChatListMembers(
     val memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>>,
     val removedGroupIds: Set<String>,
@@ -3174,7 +3160,28 @@ class ChatsController(
                     memberFetchGate.withPermit {
                         if (!isActiveBindEpoch(epoch)) return@withPermit
                         val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-                        warmAndPublishFetchedMembers(groupIdHex, members, epoch, cacheEpoch)
+                        if (isActiveBindEpoch(epoch) && cacheEpoch == memberCacheEpoch) {
+                            members
+                                .map { it.memberIdHex }
+                                .filter { it.isNotBlank() }
+                                .forEach(appState::requestProfile)
+                            memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                            // A loaded roster that omits self is known removal
+                            // evidence (admin eviction / self-leave the engine
+                            // has already applied). Marking it makes an empty
+                            // self-only roster suppress the badge too, where the
+                            // snapshot path alone reads empty as ambiguous.
+                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                            if (activeAccountIdHex != null &&
+                                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                            ) {
+                                removedGroupIds = removedGroupIds + groupIdHex
+                            }
+                            // Coalesce: a burst of member-fetch completions on
+                            // account open/switch would otherwise drive N
+                            // un-debounced full recomputes. Defer into one.
+                            scheduleRecompute()
+                        }
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -3195,37 +3202,6 @@ class ChatsController(
                     }
                 }
             }
-        }
-    }
-
-    private suspend fun warmAndPublishFetchedMembers(
-        groupIdHex: String,
-        members: List<AppGroupMemberRecordFfi>,
-        epoch: Long,
-        cacheEpoch: Long,
-    ) {
-        if (!isActiveBindEpoch(epoch) || cacheEpoch != memberCacheEpoch) return
-        val memberIds = members.map { it.memberIdHex }.filter { it.isNotBlank() }
-        appState.requestProfiles(memberIds)
-        publishAfterProfileWarm(
-            accountIdHexes = memberIds,
-            warm = appState::warmProfilePresentationsBlocking,
-        ) {
-            // The warm suspends, so re-check the bind/cache epochs before
-            // publishing its roster.
-            if (!isActiveBindEpoch(epoch) || cacheEpoch != memberCacheEpoch) {
-                return@publishAfterProfileWarm
-            }
-            memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
-            // A loaded roster that omits self is known removal evidence
-            // (admin eviction / self-leave the engine has already applied).
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            if (activeAccountIdHex != null &&
-                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-            ) {
-                removedGroupIds = removedGroupIds + groupIdHex
-            }
-            scheduleRecompute()
         }
     }
 
@@ -7691,49 +7667,41 @@ class ConversationController(
         return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
     }
 
-    private suspend fun applyGroupDetails(
+    private fun applyGroupDetails(
         account: String,
         details: GroupDetailsFfi,
     ): AppliedGroupDetails {
         val previousRetention = group.disappearingMessageSecs
         val previousSelfMembership = group.selfMembership
         val applied = applyAuthoritativeGroupDetails(details)
-        val nextGroup =
+        group =
             reconcileTerminalSelfMembership(
                 update = applied.group,
                 previousSelfMembership = previousSelfMembership,
             )
-        val memberIds = applied.members.map { it.memberIdHex }.filter { it.isNotBlank() }
-        appState.requestProfiles(memberIds)
-        return publishAfterProfileWarm(
-            accountIdHexes = memberIds,
-            warm = appState::warmProfilePresentationsBlocking,
-        ) {
-            group = nextGroup
-            if (previousRetention != group.disappearingMessageSecs) {
-                publishTimelineFromIndexes()
-            }
-            // The reconciled group record carries the newest terminal self-membership
-            // observed by any snapshot. When it reports a non-member (evicted or
-            // voluntarily left), latch the self-left marker so the composer goes
-            // read-only and the roster line below drops self — no longer relying
-            // solely on the UseAfterEviction string-match round-trip.
-            if (group.selfMembership.isNonMember()) {
-                recordSelfLeft()
-            }
-            // Once a self-leave has been recorded locally, refuse to re-add self
-            // from a details round-trip that still predates the engine eviction —
-            // otherwise the full roster (self included) would restore the member
-            // count and re-enable the composer right after a leave (issue #787).
-            members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
-            membersLoaded = true
-            membersVerified = true
-            cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
-            AppliedGroupDetails(group = group, members = members)
+        if (previousRetention != group.disappearingMessageSecs) {
+            publishTimelineFromIndexes()
         }
+        // The reconciled group record carries the newest terminal self-membership
+        // observed by any snapshot. When it reports a non-member (evicted or
+        // voluntarily left), latch the self-left marker so the composer goes
+        // read-only and the roster line below drops self — no longer relying
+        // solely on the UseAfterEviction string-match round-trip.
+        if (group.selfMembership.isNonMember()) {
+            recordSelfLeft()
+        }
+        // Once a self-leave has been recorded locally, refuse to re-add self
+        // from a details round-trip that still predates the engine eviction —
+        // otherwise the full roster (self included) would restore the member
+        // count and re-enable the composer right after a leave (issue #787).
+        members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
+        membersLoaded = true
+        membersVerified = true
+        cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
+        return AppliedGroupDetails(group = group, members = members)
     }
 
-    private suspend fun applyMutationDetails(
+    private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
     ) {

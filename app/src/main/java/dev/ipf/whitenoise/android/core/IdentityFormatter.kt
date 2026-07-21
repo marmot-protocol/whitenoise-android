@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 object IdentityFormatter {
     private const val ELLIPSIS = "..."
+    private const val NOSTR_HEX_ID_LENGTH = 64
 
     // Immutable/reusable objects hoisted off the scroll-hot avatar/timestamp path
     // so each visible row does not re-allocate them (#1011).
@@ -40,6 +41,12 @@ object IdentityFormatter {
         // so 14-char inputs with the 8/4 defaults expanded to 15 chars.
         if (value.length <= prefix + suffix + ELLIPSIS.length) return value
         return "${value.take(prefix)}$ELLIPSIS${value.takeLast(suffix)}"
+    }
+
+    fun isNostrIdentityFallback(value: String): Boolean {
+        val normalized = value.trim().lowercase(Locale.ROOT)
+        return normalized.startsWith("npub1") ||
+            (normalized.length == NOSTR_HEX_ID_LENGTH && normalized.all { it.isDigit() || it in 'a'..'f' })
     }
 
     fun initials(name: String): String {
