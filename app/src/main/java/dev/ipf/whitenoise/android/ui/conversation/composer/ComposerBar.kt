@@ -70,14 +70,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
-import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
+import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -286,6 +287,7 @@ internal fun rememberComposerTextState(
 @Composable
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
+    replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
@@ -769,8 +771,11 @@ internal fun ComposerBar(
                     }
                 }
             } else if (replyingTo != null) {
-                val refs = remember(replyingTo.tags) { MediaReferenceParser.parseAllImetaTags(replyingTo.tags) }
-                val mediaKind = remember(refs) { replyMediaKindFromMime(refs.firstOrNull()?.mediaType) }
+                val mediaFallback = remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
+                val mediaKind =
+                    remember(mediaFallback, replyingTo.tags) {
+                        composerReplyMediaKind(mediaFallback, replyingTo.tags)
+                    }
                 val profileRevision = appState?.profileRevisionForCompose
                 val replyMentionDisplayName =
                     remember(appState, profileRevision) {
@@ -778,9 +783,18 @@ internal fun ComposerBar(
                             { bech32: String -> state.mentionDisplayName(bech32) }
                         }
                     }
-                val replyBody =
+                val projectedReplyBody =
                     remember(replyingTo, messageTextCopy) {
                         MessageProjector.displayBody(replyingTo, messageTextCopy)
+                    }
+                val replyBody =
+                    remember(replyingTo, projectedReplyBody, mediaFallback, messageTextCopy) {
+                        replyBodyWithTypedMediaFallback(
+                            plaintext = replyingTo.plaintext,
+                            projectedBody = projectedReplyBody,
+                            mediaFallback = mediaFallback,
+                            copy = messageTextCopy,
+                        )
                     }
                 ReplyPreviewCard(
                     senderTitle =

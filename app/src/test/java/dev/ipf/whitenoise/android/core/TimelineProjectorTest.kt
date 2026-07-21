@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
@@ -167,21 +169,105 @@ class TimelineProjectorTest {
         )
     }
 
+    @Test
+    fun replyPreviewUsesTypedAttachmentForDocumentIconAndFilename() {
+        val attachment = mediaAttachment(fileName = "archive.zip", mediaType = "application/zip")
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        mediaJson = """{"thumbnail_type":"video/mp4"}""",
+                        media = listOf(attachment),
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "archive.zip",
+                mediaKind = ReplyMediaKind.Document,
+            ),
+            TimelineProjector.replyPreview(record),
+        )
+        assertEquals(
+            MediaPreviewFallback(filename = "archive.zip", kind = ReplyMediaKind.Document),
+            typedReplyMediaFallback(listOf(attachment)),
+        )
+        assertEquals(
+            "archive.zip",
+            replyBodyWithTypedMediaFallback(
+                plaintext = "",
+                projectedBody = "File",
+                mediaFallback = typedReplyMediaFallback(listOf(attachment)),
+                copy = MessageTextCopy.Default,
+            ),
+        )
+        assertEquals(
+            "Release bundle",
+            replyBodyWithTypedMediaFallback(
+                plaintext = "Release bundle",
+                projectedBody = "Release bundle",
+                mediaFallback = typedReplyMediaFallback(listOf(attachment)),
+                copy = MessageTextCopy.Default,
+            ),
+        )
+    }
+
+    @Test
+    fun replyPreviewRetainsLegacyMediaKindWhenTypedAttachmentIsUnavailable() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        mediaJson = """{"media_type":"video/mp4"}""",
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "Video",
+                mediaKind = ReplyMediaKind.Video,
+            ),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
     private fun replyPreview(
         plaintext: String,
         kind: ULong = 9uL,
         sender: String = "alice",
         deleted: Boolean = false,
+        mediaJson: String? = null,
+        media: List<MediaAttachmentReferenceFfi> = emptyList(),
     ) = TimelineReplyPreviewFfi(
         messageIdHex = "parent",
         sender = sender,
         plaintext = plaintext,
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
-        mediaJson = null,
-        media = emptyList(),
+        mediaJson = mediaJson,
+        media = media,
         agentTextStreamJson = null,
         deleted = deleted,
+    )
+
+    private fun mediaAttachment(
+        fileName: String,
+        mediaType: String,
+    ) = MediaAttachmentReferenceFfi(
+        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/blob")),
+        ciphertextSha256 = "aa".repeat(32),
+        plaintextSha256 = "bb".repeat(32),
+        nonceHex = "cc".repeat(24),
+        fileName = fileName,
+        mediaType = mediaType,
+        version = "encrypted-media-v1",
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
     )
 
     private fun timelineRecord(
