@@ -12,7 +12,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
@@ -80,6 +82,18 @@ internal fun Modifier.dismissTextSelectionOnOutsideTap(
                 }
             }
         }
+}
+
+/**
+ * After a row-level link long-press wins, consume the rest of the pointer
+ * gesture through release so the child link annotation does not also open on up.
+ */
+internal suspend fun AwaitPointerEventScope.consumePointerInputUntilReleased(pointerId: PointerId) {
+    do {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: return
+        change.consume()
+    } while (change.pressed)
 }
 
 internal fun nearestNonWhitespaceOffset(
