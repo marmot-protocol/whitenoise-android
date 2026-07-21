@@ -71,19 +71,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
-import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
-import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -281,15 +276,6 @@ internal class ComposerTextState(
 // the real keyboard space on its first emoji-pane open instead of guessing
 // with the fallback height.
 private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
-
-internal fun composerReplyMediaKind(
-    mediaFallback: MediaPreviewFallback?,
-    tags: List<MessageTagFfi>,
-): ReplyMediaKind {
-    mediaFallback?.let { return it.kind }
-    val refs = MediaReferenceParser.parseAllImetaTags(tags)
-    return replyMediaKindFromMime(refs.firstOrNull()?.mediaType)
-}
 
 @Composable
 internal fun rememberComposerTextState(
