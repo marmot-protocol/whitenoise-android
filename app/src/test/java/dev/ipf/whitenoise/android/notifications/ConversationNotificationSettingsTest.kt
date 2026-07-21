@@ -135,7 +135,10 @@ class ConversationNotificationSettingsTest {
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val started = Shadows.shadowOf(app).nextStartedActivity
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcutId),
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.AGENT_ACTIVITY.id,
+                shortcutId,
+            ),
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
         )
     }

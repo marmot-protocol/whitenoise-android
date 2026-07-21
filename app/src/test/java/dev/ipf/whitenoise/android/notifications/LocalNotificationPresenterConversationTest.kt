@@ -275,7 +275,10 @@ class LocalNotificationPresenterConversationTest {
 
         val shortcutId = conversationShortcutId("account-a", "group-a")
         assertEquals(
-            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcutId!!),
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.AGENT_ACTIVITY.id,
+                shortcutId!!,
+            ),
             manager.activeNotifications
                 .single()
                 .notification.channelId,

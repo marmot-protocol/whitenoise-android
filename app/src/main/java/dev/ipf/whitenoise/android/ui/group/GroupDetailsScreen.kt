@@ -750,7 +750,18 @@ internal fun GroupDetailsScreen(
             ConversationNotificationChannels.relevantParents(isDm).forEach { parent ->
                 SettingsActionRow(
                     icon = Icons.Default.Settings,
-                    title = notificationChannelLabel(parent),
+                    title =
+                        stringResource(
+                            when (parent) {
+                                NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
+                                NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
+                                NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
+                                NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
+                                NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+                                NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
+                                NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
+                            },
+                        ),
                     value = stringResource(R.string.customize_sound_vibration),
                     onClick =
                         appState.activeAccountRef?.let { accountRef ->
@@ -1465,20 +1476,6 @@ private fun notificationModeLabel(mode: ChatNotifyMode): String =
             ChatNotifyMode.ALL -> R.string.notify_all_messages
             ChatNotifyMode.MENTIONS_ONLY -> R.string.notify_only_mentions
             ChatNotifyMode.NONE -> R.string.notify_nothing
-        },
-    )
-
-@Composable
-private fun notificationChannelLabel(spec: NotificationChannelSpec): String =
-    stringResource(
-        when (spec) {
-            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
-            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
-            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
-            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
-            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
-            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
-            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         },
     )
 
