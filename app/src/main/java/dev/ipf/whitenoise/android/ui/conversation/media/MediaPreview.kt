@@ -227,6 +227,7 @@ internal fun MediaPreviewScreen(
     uris: List<android.net.Uri>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
+    initialCaption: String,
     onDismiss: () -> Unit,
     onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveAt: (Int) -> Unit,
@@ -246,6 +247,7 @@ internal fun MediaPreviewScreen(
             mediaUris = uris,
             documentUris = documentUris,
             chatTitle = chatTitle,
+            initialCaption = initialCaption,
             onClose = onDismiss,
             onSend = onSend,
             onRemoveMediaAt = onRemoveAt,
@@ -261,6 +263,7 @@ internal fun MediaPreviewContent(
     mediaUris: List<android.net.Uri>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
+    initialCaption: String,
     onClose: () -> Unit,
     onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveMediaAt: (Int) -> Unit,
@@ -270,7 +273,7 @@ internal fun MediaPreviewContent(
 ) {
     val items = remember(mediaUris, documentUris) { stagedPreviewItems(mediaUris, documentUris) }
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
-    var caption by rememberSaveable { mutableStateOf("") }
+    var caption by rememberSaveable(initialCaption) { mutableStateOf(initialCaption) }
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }

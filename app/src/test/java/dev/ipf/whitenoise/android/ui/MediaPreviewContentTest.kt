@@ -20,6 +20,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,6 +52,8 @@ class MediaPreviewContentTest {
 
     private fun renderPreview(
         initialMedia: List<Uri>,
+        initialCaption: String = "",
+        onClose: () -> Unit = {},
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
     ) {
         composeRule.setContent {
@@ -59,7 +63,8 @@ class MediaPreviewContentTest {
                     mediaUris = media,
                     documentUris = emptyList(),
                     chatTitle = "Test chat",
-                    onClose = {},
+                    initialCaption = initialCaption,
+                    onClose = onClose,
                     onSend = onSend,
                     onRemoveMediaAt = { index ->
                         media = media.toMutableList().apply { if (index in indices) removeAt(index) }
@@ -114,6 +119,43 @@ class MediaPreviewContentTest {
         composeRule.onNodeWithContentDescription(string(R.string.send)).performClick()
         composeRule.waitForIdle()
         assertEquals("hello", sentCaption)
+    }
+
+    @Test
+    fun composerDraftSeedsTheCaptionAndRidesTheSend() {
+        var sentCaption: String? = null
+        renderPreview(
+            initialMedia = listOf(uri(1)),
+            initialCaption = "draft caption",
+            onSend = { caption, onResult ->
+                sentCaption = caption
+                onResult(true)
+            },
+        )
+
+        composeRule.onNodeWithText("draft caption").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.send)).performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("draft caption", sentCaption)
+    }
+
+    @Test
+    fun dismissingSeededCaptionDoesNotSendIt() {
+        var closed = false
+        var sentCaption: String? = null
+        renderPreview(
+            initialMedia = listOf(uri(1)),
+            initialCaption = "keep this draft",
+            onClose = { closed = true },
+            onSend = { caption, _ -> sentCaption = caption },
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
+        composeRule.waitForIdle()
+
+        assertTrue(closed)
+        assertNull(sentCaption)
     }
 
     @Test

@@ -656,10 +656,7 @@ internal fun ComposerBar(
                     // next message (Enter-to-send makes that common). Only clear
                     // if the field still holds exactly what we sent, so newly
                     // typed text is never wiped.
-                    if (textFieldValue.text == sentText) {
-                        textFieldValue = TextFieldValue("")
-                        onDraftChange(TextFieldValue(""))
-                    }
+                    textState.clearDraftIfUnchanged(sentText, onDraftChange)
                     onAfterSend()
                 }
             }

@@ -146,6 +146,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.clearDraftIfUnchanged
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
@@ -3237,13 +3238,19 @@ internal fun ConversationScreen(
         )
     }
 
-    if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+    val hasStagedAttachments = pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()
+    val stagedComposerDraft =
+        remember(hasStagedAttachments, chat.id) {
+            if (hasStagedAttachments) composerTextState.valueState.value else TextFieldValue("")
+        }
+    if (hasStagedAttachments) {
         val imageUris = pendingMediaUris
         val documentUris = pendingDocumentUris
         MediaPreviewScreen(
             uris = imageUris,
             documentUris = documentUris,
             chatTitle = controller.title(groupTitleCopy),
+            initialCaption = stagedComposerDraft.text,
             onDismiss = {
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
@@ -3254,6 +3261,9 @@ internal fun ConversationScreen(
                     documentUris,
                     caption,
                     onAccepted = {
+                        composerTextState.clearDraftIfUnchanged(stagedComposerDraft.text) { clearedDraft ->
+                            appState.setDraft(controller.group.groupIdHex, clearedDraft)
+                        }
                         pendingMediaUris = emptyList()
                         pendingDocumentUris = emptyList()
                         onResult(true)
