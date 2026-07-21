@@ -168,6 +168,30 @@ internal suspend fun resolveNotificationMentionDisplayName(
     return displayName
 }
 
+internal fun notificationSenderNameOverride(
+    contactNickname: String?,
+    localProfileName: String?,
+): String? =
+    ProfileSanitizer.displayName(contactNickname)
+        ?: ProfileSanitizer.displayName(localProfileName)
+
+internal fun notificationDisplayNameHint(raw: String?): String? {
+    val displayName = ProfileSanitizer.displayName(raw)
+    return displayName?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+}
+
+internal fun resolvedProfileDisplayName(
+    profileDisplayName: String?,
+    notificationDisplayNameHint: String?,
+): String? =
+    ProfileSanitizer.displayName(profileDisplayName)
+        ?: notificationDisplayNameHint(notificationDisplayNameHint)
+
+internal fun profileLookupRelays(
+    bootstrapRelays: List<String>,
+    activeAccountRelays: List<String>,
+): List<String> = (bootstrapRelays + activeAccountRelays).distinct()
+
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
@@ -1336,6 +1360,13 @@ class WhiteNoiseAppState(
             maxEntries = MAX_PROFILE_PRESENTATION_CACHE_ENTRIES,
             lock = profilePresentationLock,
         )
+    private val notificationDisplayNameHints =
+        ScopedCache<String, String>(
+            registry = accountScopedCaches,
+            name = "notification-display-name-hints",
+            maxEntries = MAX_PROFILE_PRESENTATION_CACHE_ENTRIES,
+            lock = profilePresentationLock,
+        )
 
     // Materialized profile metadata, populated off-main by [refreshProfile].
     // Read accessors serve from here so composition never crosses the FFI.
@@ -2377,6 +2408,19 @@ class WhiteNoiseAppState(
                         MarmotClient.bootstrapRelays,
                     )
                 }
+            // Mirror the cold-start restore barrier before exposing the main
+            // shell. loginExternalSigner creates and reconciles the account,
+            // but a fresh account's worker/relay runtime can still be replacing
+            // its setup-time signer as that call returns. Re-registering through
+            // the restore path performs one final reconciliation with a stable
+            // callback, so an immediate createGroup cannot race that transition
+            // and fail until the next process restart (issue #1551).
+            marmotIo {
+                registerExternalSigner(
+                    summary.label,
+                    amberSigner.buildSigner(pubkeyHex),
+                )
+            }
             refreshAccounts()
             setActiveAccount(summary.label)
             refreshLocalNotificationSettings()
@@ -4688,7 +4732,13 @@ class WhiteNoiseAppState(
     // from a LaunchedEffect (e.g. requestProfiles over the roster).
     fun chatMemberTitleCached(accountIdHex: String): String {
         profileRevision
-        val cachedName = synchronized(profilePresentationLock) { profilePresentations[accountIdHex]?.displayName }
+        val cachedName =
+            synchronized(profilePresentationLock) {
+                resolvedProfileDisplayName(
+                    profileDisplayName = profilePresentations[accountIdHex]?.displayName,
+                    notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
+                )
+            }
         return cachedName ?: shortNpub(accountIdHex)
     }
 
@@ -4697,7 +4747,11 @@ class WhiteNoiseAppState(
         return chatMemberTitleCached(accountIdHex)
     }
 
-    private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
+    private fun profileDisplayName(accountIdHex: String): String? =
+        resolvedProfileDisplayName(
+            profileDisplayName = profilePresentation(accountIdHex).displayName,
+            notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
+        )
 
     fun shortNpub(accountIdHex: String): String {
         val npub = npub(accountIdHex)
@@ -4901,11 +4955,15 @@ class WhiteNoiseAppState(
                 val result =
                     runCatching {
                         marmotIo {
-                            val relays =
+                            val activeAccountRelays =
                                 activeAccountRef
                                     ?.let { runCatchingCancellable { accountNip65Relays(it) }.getOrNull() }
-                                    ?.takeIf { it.isNotEmpty() }
-                                    ?: MarmotClient.bootstrapRelays
+                                    .orEmpty()
+                            val relays =
+                                profileLookupRelays(
+                                    bootstrapRelays = MarmotClient.bootstrapRelays,
+                                    activeAccountRelays = activeAccountRelays,
+                                )
                             refreshProfile(accountIdHex, relays)
                             userProfile(accountIdHex)
                         }
@@ -5180,12 +5238,35 @@ class WhiteNoiseAppState(
     private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        contactNicknameFor(update.accountRef, senderIdHex)?.let { return it }
-        val resolvedName =
+        val contactNickname = contactNicknameFor(update.accountRef, senderIdHex)
+        val localProfileName =
             runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
                 .getOrNull()
-                ?.let { ProfileSanitizer.displayName(it) }
-        return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
+        // Leave an unresolved local name null: LocalNotificationFormatter can
+        // then use the sender name carried by the notification payload before
+        // applying its final short-npub fallback. Returning the npub here masked
+        // a usable payload name during cold profile-cache startup.
+        return notificationSenderNameOverride(contactNickname, localProfileName)
+            ?: notificationDisplayNameHints[senderIdHex]
+    }
+
+    private fun applyNotificationDisplayNameHint(update: NotificationUpdateFfi) {
+        if (update.accountRef != activeAccountRef) return
+        val senderIdHex =
+            update.sender.accountIdHex
+                .trim()
+                .takeIf { it.isNotEmpty() }
+        val hint = notificationDisplayNameHint(update.sender.displayName)
+        if (senderIdHex == null || hint == null) return
+        val changed =
+            synchronized(profilePresentationLock) {
+                if (profilePresentations[senderIdHex]?.displayName != null) {
+                    false
+                } else {
+                    notificationDisplayNameHints.put(senderIdHex, hint) != hint
+                }
+            }
+        if (changed) profileRevision += 1
     }
 
     // The recipient (own) identity's display name for the notification subtext,
@@ -5580,6 +5661,7 @@ class WhiteNoiseAppState(
                             while (isActive) {
                                 val update = marmotIo { subscription.next() } ?: break
                                 backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                applyNotificationDisplayNameHint(update)
                                 val postEpoch = notificationPostEpoch.capture()
                                 postAfterNotificationAvatarPreWarm(
                                     preWarm = { preWarmNotificationAvatars(update) },
@@ -5726,6 +5808,7 @@ class WhiteNoiseAppState(
             synchronized(profilePresentationLock) {
                 profile?.let { userProfiles.put(accountIdHex, it) }
                 val changed = profilePresentations.put(accountIdHex, presentation) != presentation
+                if (presentation.displayName != null) notificationDisplayNameHints.remove(accountIdHex)
                 val shouldPreWarm =
                     presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)
                 changed to shouldPreWarm
