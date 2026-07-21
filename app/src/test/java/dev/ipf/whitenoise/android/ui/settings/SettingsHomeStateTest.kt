@@ -35,6 +35,7 @@ class SettingsHomeStateTest {
                 SettingsHomeRow.Appearance,
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
+                SettingsHomeRow.TextToSpeech,
                 SettingsHomeRow.SecurityAndPrivacy,
             ),
             state.preferenceRows,

@@ -72,9 +72,11 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -115,6 +117,35 @@ import kotlinx.coroutines.launch
  */
 private const val WIPE_ENGINE_FFI_AVAILABLE = true
 
+internal enum class IdentitySecretExportAction {
+    Request,
+    ToggleReveal,
+    Cancel,
+}
+
+internal data class IdentitySecretExportState(
+    val confirmationVisible: Boolean = false,
+    val revealed: Boolean = false,
+)
+
+internal fun identitySecretExportState(
+    state: IdentitySecretExportState,
+    action: IdentitySecretExportAction,
+): IdentitySecretExportState =
+    when (action) {
+        IdentitySecretExportAction.Request -> IdentitySecretExportState(confirmationVisible = true)
+        IdentitySecretExportAction.ToggleReveal ->
+            if (state.confirmationVisible) state.copy(revealed = !state.revealed) else state
+        IdentitySecretExportAction.Cancel -> IdentitySecretExportState()
+    }
+
+internal fun maskedIdentitySecret(
+    secret: String,
+    revealed: Boolean,
+): String = if (revealed) secret else "•".repeat(24)
+
+internal const val IDENTITY_SECRET_EXPORT_CONTENT_TAG = "identity-secret-export-content"
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun IdentityScreen(
@@ -132,6 +163,8 @@ internal fun IdentityScreen(
     var showWipeSheet by remember { mutableStateOf(false) }
     var showWipeConfirm by remember { mutableStateOf(false) }
     var showEncryptedBackupSheet by remember { mutableStateOf(false) }
+    var secretExportState by remember { mutableStateOf(IdentitySecretExportState()) }
+    var secretForExport by remember { mutableStateOf<String?>(null) }
     // Type-to-confirm input for the destructive wipe (#348). Reset whenever the
     // confirm dialog is dismissed so a previous match can't carry over into a
     // later open.
@@ -196,9 +229,11 @@ internal fun IdentityScreen(
                         )
                         OutlinedButton(
                             onClick = {
-                                scope.launch {
-                                    appState.exportActiveAccountNsec()?.let(::shareSecretKey)
-                                }
+                                secretExportState =
+                                    identitySecretExportState(
+                                        secretExportState,
+                                        IdentitySecretExportAction.Request,
+                                    )
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -263,6 +298,67 @@ internal fun IdentityScreen(
         EncryptedBackupSheet(
             appState = appState,
             onDismiss = { showEncryptedBackupSheet = false },
+        )
+    }
+
+    if (secretExportState.confirmationVisible) {
+        val secret = secretForExport.orEmpty()
+        AlertDialog(
+            onDismissRequest = {
+                secretForExport = null
+                secretExportState = identitySecretExportState(secretExportState, IdentitySecretExportAction.Cancel)
+            },
+            title = { Text(stringResource(R.string.share_secret_key)) },
+            text = {
+                IdentitySecretExportContent(
+                    state = secretExportState,
+                    secret = secret,
+                    onToggleReveal = {
+                        if (secretExportState.revealed) {
+                            secretForExport = null
+                            secretExportState =
+                                identitySecretExportState(
+                                    secretExportState,
+                                    IdentitySecretExportAction.ToggleReveal,
+                                )
+                        } else {
+                            scope.launch {
+                                val exported = appState.exportActiveAccountNsec() ?: return@launch
+                                secretForExport = exported
+                                secretExportState =
+                                    identitySecretExportState(
+                                        secretExportState,
+                                        IdentitySecretExportAction.ToggleReveal,
+                                    )
+                            }
+                        }
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val exported = secretForExport ?: appState.exportActiveAccountNsec() ?: return@launch
+                            secretForExport = null
+                            secretExportState = IdentitySecretExportState()
+                            shareSecretKey(exported)
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.share))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        secretForExport = null
+                        secretExportState = IdentitySecretExportState()
+                    },
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -427,6 +523,32 @@ internal fun IdentityScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+internal fun IdentitySecretExportContent(
+    state: IdentitySecretExportState,
+    secret: String,
+    onToggleReveal: () -> Unit,
+) {
+    val semanticLabel = stringResource(R.string.export_nsec)
+    Column(
+        modifier = Modifier.testTag(IDENTITY_SECRET_EXPORT_CONTENT_TAG),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.secret_key_backup_help),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = maskedIdentitySecret(secret, state.revealed),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.clearAndSetSemantics { contentDescription = semanticLabel },
+        )
+        OutlinedButton(onClick = onToggleReveal) {
+            Text(stringResource(if (state.revealed) R.string.hide else R.string.show))
+        }
     }
 }
 

@@ -93,6 +93,46 @@ class ConversationUnreadTest {
     // ---- countUnreadIncoming ------------------------------------------------
 
     @Test
+    fun reconciledEntryUnreadClearsInflatedProjectionWhenLoadedAnchorIsAtBottom() {
+        val timeline = listOf(received("r1"), received("r2"), received("r3"))
+
+        assertEquals(
+            0,
+            reconciledConversationEntryUnreadCount(
+                projectionUnread = 3,
+                timeline = timeline,
+                readAnchorMessageId = "r3",
+            ),
+        )
+    }
+
+    @Test
+    fun reconciledEntryUnreadUsesMessagesAfterLoadedReadAnchor() {
+        val timeline = listOf(received("r1"), received("r2"), received("r3"))
+
+        assertEquals(
+            2,
+            reconciledConversationEntryUnreadCount(
+                projectionUnread = 3,
+                timeline = timeline,
+                readAnchorMessageId = "r1",
+            ),
+        )
+    }
+
+    @Test
+    fun reconciledEntryUnreadPreservesBacklogLargerThanLoadedWindowWithoutAnchor() {
+        assertEquals(
+            50,
+            reconciledConversationEntryUnreadCount(
+                projectionUnread = 50,
+                timeline = listOf(received("r1"), received("r2")),
+                readAnchorMessageId = null,
+            ),
+        )
+    }
+
+    @Test
     fun unreadCount_nullAnchor_countsAllReceived() {
         val timeline = listOf(received("r1"), sent("s1"), received("r2"))
         assertEquals(2, countUnreadIncoming(timeline, readAnchorMessageId = null))

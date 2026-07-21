@@ -1511,6 +1511,30 @@ internal fun countUnreadIncoming(
     }
 }
 
+/**
+ * Reconcile the chat-list projection against the loaded timeline and its
+ * durable read watermark. A watermark present in the loaded window is stronger
+ * evidence than a stale projection; without one, preserve counts larger than
+ * the loaded window so pagination can still reveal the real boundary.
+ */
+internal fun reconciledConversationEntryUnreadCount(
+    projectionUnread: Int,
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): Int {
+    val projected = projectionUnread.coerceAtLeast(0)
+    if (projected == 0 || timeline.isEmpty()) return projected
+    val loadedReceived =
+        timeline.count { message ->
+            message.record.direction == "received" && !isDerivedStateKind(message.record.kind)
+        }
+    val anchorLoaded =
+        !readAnchorMessageId.isNullOrBlank() &&
+            timeline.any { it.record.messageIdHex == readAnchorMessageId }
+    if (!anchorLoaded && projected > loadedReceived) return projected
+    return minOf(projected, countUnreadIncoming(timeline, readAnchorMessageId))
+}
+
 /** Privacy-safe snapshot when entry projection unread would mis-anchor the timeline. */
 internal data class UnreadCountDivergenceReport(
     val projectionUnread: Int,

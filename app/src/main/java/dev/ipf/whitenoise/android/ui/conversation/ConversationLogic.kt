@@ -183,19 +183,27 @@ internal fun rememberConversationNearBottom(
  * Near-bottom gate for IME-open bottom chase. Until this conversation has
  * observed the IME closed, follows live [nearBottom] so a chat opened with the
  * keyboard already up can still chase once initial anchoring settles. After the
- * first closed-IME snapshot, holds that value while the IME is open so a
- * transient `canScrollForward=false` during viewport resize cannot treat a
- * history reader as "at bottom" (#1375).
+ * first composer-focus edge, holds that value while the IME is open so the
+ * pre-inset layout transient cannot treat a history reader as "at bottom"
+ * (#1375, #1574).
  */
 @Composable
 internal fun rememberImeOpenReanchorNearBottom(
     chatId: String,
     imeIsOpen: Boolean,
+    composerFocused: Boolean,
     nearBottom: Boolean,
 ): Boolean {
-    var nearBottomWhenImeClosed by remember(chatId) { mutableStateOf<Boolean?>(null) }
+    var nearBottomAtFocusEdge by remember(chatId) { mutableStateOf<Boolean?>(null) }
+    var wasComposerFocused by remember(chatId) { mutableStateOf(false) }
     SideEffect {
-        if (!imeIsOpen) nearBottomWhenImeClosed = nearBottom
+        if (composerFocused && !wasComposerFocused && !imeIsOpen) {
+            nearBottomAtFocusEdge = nearBottom
+        }
+        if (!composerFocused && !imeIsOpen) {
+            nearBottomAtFocusEdge = null
+        }
+        wasComposerFocused = composerFocused
     }
-    return if (imeIsOpen) nearBottomWhenImeClosed ?: nearBottom else nearBottom
+    return if (imeIsOpen) nearBottomAtFocusEdge ?: nearBottom else nearBottom
 }

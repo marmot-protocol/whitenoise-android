@@ -124,6 +124,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.nextReadAnchor
+import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -653,9 +654,6 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
-    val imeOpenReanchorNearBottom =
-        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, nearBottom)
-    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField; `composerFocused` mirrors the live focus
@@ -665,6 +663,9 @@ internal fun ConversationScreen(
     // doesn't carry the previous chat's keyboard state across.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
+    val imeOpenReanchorNearBottom =
+        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, composerFocused, nearBottom)
+    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
     // #589: used by the resume observer to clear focus and drop the keyboard
     // when the composer was NOT focused on pause (Case B), without poking the
@@ -1854,7 +1855,19 @@ internal fun ConversationScreen(
     // Capture the unread boundary at chat open. Stays fixed for the lifetime
     // of this composable (per chat.id) so the "N unread messages" divider
     // doesn't keep moving as the user scrolls and marks messages as read.
-    val entryUnreadCount = remember(chat.id) { chat.unreadCount.toInt().coerceAtLeast(0) }
+    val projectedEntryUnreadCount = chat.unreadCount.toInt().coerceAtLeast(0)
+    val entryUnreadCount =
+        remember(chat.id, controller.timeline.isNotEmpty()) {
+            if (controller.timeline.isEmpty()) {
+                projectedEntryUnreadCount
+            } else {
+                reconciledConversationEntryUnreadCount(
+                    projectionUnread = projectedEntryUnreadCount,
+                    timeline = controller.timeline,
+                    readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+                )
+            }
+        }
     var entryFirstUnreadMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var unreadDivergenceLogged by remember(chat.id) { mutableStateOf(false) }
     LaunchedEffect(chat.id, controller.timeline.size) {
@@ -1874,7 +1887,7 @@ internal fun ConversationScreen(
     LaunchedEffect(chat.id, initialTimelineAnchored, controller.timeline.size) {
         if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
         unreadCountDivergenceReport(
-            projectionUnread = entryUnreadCount,
+            projectionUnread = projectedEntryUnreadCount,
             timeline = controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )?.let { report ->
@@ -2067,7 +2080,7 @@ internal fun ConversationScreen(
                 // unfiltered controller timeline.
                 val unreadId =
                     controller
-                        .firstUnreadTimelineIndex(chat.unreadCount.toInt())
+                        .firstUnreadTimelineIndex(entryUnreadCount)
                         .takeIf { it >= 0 }
                         ?.let {
                             controller.timeline[it]
