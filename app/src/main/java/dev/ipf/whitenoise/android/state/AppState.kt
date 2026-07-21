@@ -168,6 +168,13 @@ internal suspend fun resolveNotificationMentionDisplayName(
     return displayName
 }
 
+internal fun notificationSenderNameOverride(
+    contactNickname: String?,
+    localProfileName: String?,
+): String? =
+    ProfileSanitizer.displayName(contactNickname)
+        ?: ProfileSanitizer.displayName(localProfileName)
+
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
@@ -5193,12 +5200,15 @@ class WhiteNoiseAppState(
     private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        contactNicknameFor(update.accountRef, senderIdHex)?.let { return it }
-        val resolvedName =
+        val contactNickname = contactNicknameFor(update.accountRef, senderIdHex)
+        val localProfileName =
             runCatchingCancellable { marmotIo { displayName(senderIdHex) } }
                 .getOrNull()
-                ?.let { ProfileSanitizer.displayName(it) }
-        return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
+        // Leave an unresolved local name null: LocalNotificationFormatter can
+        // then use the sender name carried by the notification payload before
+        // applying its final short-npub fallback. Returning the npub here masked
+        // a usable payload name during cold profile-cache startup.
+        return notificationSenderNameOverride(contactNickname, localProfileName)
     }
 
     // The recipient (own) identity's display name for the notification subtext,

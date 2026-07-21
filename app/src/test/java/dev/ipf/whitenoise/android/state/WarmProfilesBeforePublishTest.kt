@@ -113,5 +113,19 @@ class WarmProfilesBeforePublishTest {
             assertEquals("Alice", cache.read("alice"))
         }
 
+    @Test
+    fun memberRosterPublishAwaitsLocalProfileWarm() =
+        runBlocking {
+            val events = mutableListOf<String>()
+
+            publishAfterProfileWarm(
+                accountIdHexes = listOf("alice", "bob"),
+                warm = { ids -> events += "warm:${ids.joinToString()}" },
+                publish = { events += "publish" },
+            )
+
+            assertEquals(listOf("warm:alice, bob", "publish"), events)
+        }
+
     private fun name(id: String): String = id.replaceFirstChar(Char::uppercase)
 }
