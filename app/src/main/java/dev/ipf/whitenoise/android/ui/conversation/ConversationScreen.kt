@@ -121,9 +121,9 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
-import dev.ipf.whitenoise.android.state.nextReadAnchor
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -300,6 +300,19 @@ internal fun ConversationScreen(
                 copy = controllerCopy,
             )
         }
+    // Capture the unread boundary at chat open. Stays fixed for this controller
+    // so the divider doesn't move as messages are marked read, but resets when
+    // an account/runtime switch creates a new controller for the same group.
+    val projectedEntryUnreadCount = chat.unreadCount.toInt().coerceAtLeast(0)
+    val entryUnreadSnapshot =
+        rememberConversationEntryUnreadSnapshot(
+            controllerIdentity = controller,
+            projectionUnread = projectedEntryUnreadCount,
+            timeline = controller.timeline,
+            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+        )
+    val entryUnreadCount = entryUnreadSnapshot.count
+    val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
     val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
     // When the developer streaming-debug toggle flips, re-publish the timeline.
     // Turning it off drops the transient QUIC debug rows so they don't linger.
@@ -332,15 +345,16 @@ internal fun ConversationScreen(
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
-    // Re-open after back-to-list should land where the reader left off, unless
-    // this open path owns the anchor (search hit, just-created) or they left
-    // at/near the bottom — then the existing unread/newest anchor runs.
+    // Re-open after back-to-list should land where the reader left off only
+    // when fully read. Unread, search-hit, just-created, and notification opens
+    // let their dedicated unread/newest/focus anchor own the position.
     val scrollRestore =
         restoredScrollSnapshot?.takeIf {
             shouldRestoreConversationScrollSnapshot(
                 focusMessageId = focusMessageId,
                 justCreated = justCreated,
                 notificationOpenRequestId = notificationOpenRequestId,
+                entryUnreadCount = entryUnreadCount,
             )
         }
     val positionalScrollRestore =
@@ -348,10 +362,12 @@ internal fun ConversationScreen(
             it.anchorItemId.isNullOrBlank() && it.anchorMessageIdHex.isNullOrBlank()
         }
     val listState =
-        rememberLazyListState(
-            initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
-            initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
-        )
+        key(controller) {
+            rememberLazyListState(
+                initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
+                initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
+            )
+        }
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
     // non-focusable (#284), so long-pressing several bubbles would otherwise
@@ -384,15 +400,15 @@ internal fun ConversationScreen(
     var batchDeleteInFlight by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var initialTimelineAnchored by
-        remember(chat.id, notificationOpenRequestId) { mutableStateOf(false) }
+        remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
     // no follow fires. Keyed on id (not recordedAt) to survive same-second tails.
-    var lastFollowedLatestId by remember(chat.id) { mutableStateOf<String?>(null) }
-    var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
-    var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
-    var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    var lastFollowedLatestId by remember(controller) { mutableStateOf<String?>(null) }
+    var initialTimelineLoadStarted by remember(controller) { mutableStateOf(false) }
+    var highlightedMessageId by remember(controller) { mutableStateOf<String?>(null) }
+    var navigateReplyJob by remember(controller) { mutableStateOf<Job?>(null) }
     // UI-only row-height cache for exact centered scrolls. LazyColumn can only
     // measure a target after it has been composed; keeping the measured height
     // by message id lets future off-screen jumps animate straight to the exact
@@ -561,7 +577,7 @@ internal fun ConversationScreen(
     // stay valid. Anchored on id (not recordedAt) to survive same-second
     // collisions: send() stamps with nowSeconds(), so multiple messages can
     // share a recordedAt and a strict-`>` filter would under-count.
-    var readAnchorMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var readAnchorMessageId by remember(controller) { mutableStateOf(controller.lastReadMessageId) }
     val currentHighestVisibleTimelineIndex by remember(renderedSize, hasOlderHeader) {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
@@ -575,16 +591,22 @@ internal fun ConversationScreen(
                 .coerceAtMost(renderedSize - 1)
         }
     }
-    LaunchedEffect(currentHighestVisibleTimelineIndex) {
+    LaunchedEffect(controller, currentHighestVisibleTimelineIndex, controller.lastReadMessageId) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
         // Monotonic advance only — scroll-up keeps the existing anchor so the
         // read pointer never moves backwards. See [nextReadAnchor]. Resolve the
         // visible row against the filtered (rendered) list it indexes into, not
         // the unfiltered timeline.
-        readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)
+        readAnchorMessageId =
+            advanceConversationReadAnchor(
+                timeline = renderedTimeline,
+                currentUiAnchorId = readAnchorMessageId,
+                durableAnchorId = controller.lastReadMessageId,
+                candidateIndex = idx,
+            )
     }
-    DisposableEffect(chat.id) {
+    DisposableEffect(controller) {
         onDispose {
             val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
@@ -653,9 +675,6 @@ internal fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
-    val imeOpenReanchorNearBottom =
-        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, nearBottom)
-    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
     // composer's BasicTextField; `composerFocused` mirrors the live focus
@@ -665,6 +684,9 @@ internal fun ConversationScreen(
     // doesn't carry the previous chat's keyboard state across.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
+    val imeOpenReanchorNearBottom =
+        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, composerFocused, nearBottom)
+    val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
     // #589: used by the resume observer to clear focus and drop the keyboard
     // when the composer was NOT focused on pause (Case B), without poking the
@@ -1851,30 +1873,17 @@ internal fun ConversationScreen(
                 }
             }
     }
-    // Capture the unread boundary at chat open. Stays fixed for the lifetime
-    // of this composable (per chat.id) so the "N unread messages" divider
-    // doesn't keep moving as the user scrolls and marks messages as read.
-    val entryUnreadCount = remember(chat.id) { chat.unreadCount.toInt().coerceAtLeast(0) }
-    var entryFirstUnreadMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
-    var unreadDivergenceLogged by remember(chat.id) { mutableStateOf(false) }
-    LaunchedEffect(chat.id, controller.timeline.size) {
-        if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
-            val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
-            if (firstUnreadIndex >= 0) {
-                // Controller-side unread helpers already skip derived-state
-                // kinds, so this is always a kind-9 chat present in the
-                // filtered renderedTimeline.
-                entryFirstUnreadMessageId =
-                    controller.timeline[firstUnreadIndex]
-                        .record.messageIdHex
-                        .takeIf { it.isNotBlank() }
-            }
+    var entryUnreadDividerRetired by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(controller, initialTimelineAnchored, entryUnreadCount, unreadIncomingCount) {
+        if (initialTimelineAnchored && entryUnreadCount > 0 && unreadIncomingCount == 0) {
+            entryUnreadDividerRetired = true
         }
     }
-    LaunchedEffect(chat.id, initialTimelineAnchored, controller.timeline.size) {
+    var unreadDivergenceLogged by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(controller, initialTimelineAnchored, controller.timeline.size) {
         if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
         unreadCountDivergenceReport(
-            projectionUnread = entryUnreadCount,
+            projectionUnread = projectedEntryUnreadCount,
             timeline = controller.timeline,
             readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
         )?.let { report ->
@@ -1896,7 +1905,7 @@ internal fun ConversationScreen(
     // imeIsOpen edge), the chase still fires the moment the first-open anchor
     // settles — otherwise the anchor lands against the pre-IME viewport and the
     // newest message sits a few rows above the bottom until the keyboard closes.
-    LaunchedEffect(imeIsOpen, chat.id, initialTimelineAnchored) {
+    LaunchedEffect(controller, imeIsOpen, initialTimelineAnchored) {
         if (!imeIsOpen) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
         if (!initialTimelineAnchored || !imeOpenReanchorNearBottom || suppressForCustomInputSwap) return@LaunchedEffect
@@ -1925,10 +1934,11 @@ internal fun ConversationScreen(
     //   it was held on pause (or an edit/reply session is active); otherwise
     //   actively clear focus and hide the keyboard so it does not pop.
     //
-    // Keyed on chat.id so a conversation switch rebinds the observer; resolved
-    // through the existing Context.lifecycleOwner() idiom (no new Local import).
+    // Keyed on controller so chat and same-group account/runtime switches both
+    // rebind the observer; resolved through the existing Context.lifecycleOwner()
+    // idiom (no new Local import).
     val resumeLifecycleOwner = context.lifecycleOwner()
-    DisposableEffect(chat.id, resumeLifecycleOwner) {
+    DisposableEffect(controller, resumeLifecycleOwner) {
         if (resumeLifecycleOwner == null) {
             onDispose { }
         } else {
@@ -2024,7 +2034,7 @@ internal fun ConversationScreen(
     // Seeding rememberLazyListState alone is not enough: the list can clamp
     // while the window is still empty, and the first-open anchor would snap to
     // bottom before the reader's position is restored.
-    LaunchedEffect(chat.id, scrollRestore) {
+    LaunchedEffect(controller, scrollRestore) {
         val restore = scrollRestore ?: return@LaunchedEffect
         restore.anchorMessageIdHex
             ?.takeIf { it.isNotBlank() }
@@ -2053,7 +2063,7 @@ internal fun ConversationScreen(
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
-    LaunchedEffect(latestTimelineItemId, notificationOpenRequestId) {
+    LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
         if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
                 if (scrollRestore != null) {
@@ -2067,7 +2077,7 @@ internal fun ConversationScreen(
                 // unfiltered controller timeline.
                 val unreadId =
                     controller
-                        .firstUnreadTimelineIndex(chat.unreadCount.toInt())
+                        .firstUnreadTimelineIndex(entryUnreadCount)
                         .takeIf { it >= 0 }
                         ?.let {
                             controller.timeline[it]
@@ -2112,6 +2122,7 @@ internal fun ConversationScreen(
     // an earlier (non-last) message leaves this key unchanged, so a react while
     // reading history never hijacks the scroll position.
     LaunchedEffect(
+        controller,
         renderedTimeline
             .lastOrNull()
             ?.record
@@ -2142,7 +2153,7 @@ internal fun ConversationScreen(
     // between the search and the tap) just toasts and leaves the user at the
     // normal anchor. Local-only: loadUntilMessageAvailable paginates the
     // already-persisted store, never a relay fetch.
-    LaunchedEffect(chat.id, focusMessageId) {
+    LaunchedEffect(controller, focusMessageId) {
         val focus = focusMessageId ?: return@LaunchedEffect
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
@@ -2174,7 +2185,7 @@ internal fun ConversationScreen(
     // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
     // the pointer — scroll-up cannot regress the count. Settle-gated
     // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
-    LaunchedEffect(listState, chat.id) {
+    LaunchedEffect(listState, controller) {
         snapshotFlow {
             if (!initialTimelineAnchored || listState.isScrollInProgress) {
                 null
@@ -2840,7 +2851,15 @@ internal fun ConversationScreen(
                                     if (daySeparatorLabel != null) {
                                         DaySeparator(daySeparatorLabel)
                                     }
-                                    if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
+                                    if (
+                                        shouldShowConversationEntryUnreadDivider(
+                                            entryUnreadCount = entryUnreadCount,
+                                            liveUnreadCount = unreadIncomingCount,
+                                            dividerRetired = entryUnreadDividerRetired,
+                                            messageId = item.record.messageIdHex,
+                                            firstUnreadMessageId = entryFirstUnreadMessageId,
+                                        )
+                                    ) {
                                         UnreadMessagesDivider(count = entryUnreadCount)
                                     }
                                     // Synthetic `dbg:stream:` rows must never fall

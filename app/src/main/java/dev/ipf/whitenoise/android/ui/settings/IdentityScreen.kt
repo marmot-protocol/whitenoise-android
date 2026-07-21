@@ -58,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,9 +73,11 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -106,6 +109,7 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -114,6 +118,51 @@ import kotlinx.coroutines.launch
  * [dev.ipf.marmotkit.Marmot.signOutAndWipe] FFI.
  */
 private const val WIPE_ENGINE_FFI_AVAILABLE = true
+
+internal enum class IdentitySecretExportAction {
+    Request,
+    ToggleReveal,
+    Cancel,
+}
+
+internal data class IdentitySecretExportState(
+    val confirmationVisible: Boolean = false,
+    val revealed: Boolean = false,
+)
+
+internal fun identitySecretExportState(
+    state: IdentitySecretExportState,
+    action: IdentitySecretExportAction,
+): IdentitySecretExportState =
+    when (action) {
+        IdentitySecretExportAction.Request -> IdentitySecretExportState(confirmationVisible = true)
+        IdentitySecretExportAction.ToggleReveal ->
+            if (state.confirmationVisible) state.copy(revealed = !state.revealed) else state
+        IdentitySecretExportAction.Cancel -> IdentitySecretExportState()
+    }
+
+internal fun maskedIdentitySecret(
+    secret: String,
+    revealed: Boolean,
+): String = if (revealed) secret else "•".repeat(MASKED_IDENTITY_SECRET_LENGTH)
+
+internal const val IDENTITY_SECRET_EXPORT_CONTENT_TAG = "identity-secret-export-content"
+private const val MASKED_IDENTITY_SECRET_LENGTH = 24
+
+internal suspend fun exportIdentitySecretForSession(
+    sessionId: Long,
+    exporter: suspend () -> String?,
+    isSessionActive: (Long) -> Boolean,
+    onExported: (String) -> Unit,
+): Boolean {
+    val exported = exporter()
+    return if (exported != null && isSessionActive(sessionId)) {
+        onExported(exported)
+        true
+    } else {
+        false
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -132,11 +181,34 @@ internal fun IdentityScreen(
     var showWipeSheet by remember { mutableStateOf(false) }
     var showWipeConfirm by remember { mutableStateOf(false) }
     var showEncryptedBackupSheet by remember { mutableStateOf(false) }
+    var secretExportState by remember { mutableStateOf(IdentitySecretExportState()) }
+    var secretForExport by remember { mutableStateOf<String?>(null) }
+    var secretExportSessionId by remember { mutableLongStateOf(0L) }
+    var secretExportJob by remember { mutableStateOf<Job?>(null) }
+    var secretExportInProgress by remember { mutableStateOf(false) }
     // Type-to-confirm input for the destructive wipe (#348). Reset whenever the
     // confirm dialog is dismissed so a previous match can't carry over into a
     // later open.
     var wipeConfirmInput by remember { mutableStateOf("") }
     val shareSecretKeyTitle = stringResource(R.string.share_secret_key)
+
+    fun dismissSecretExport() {
+        secretExportSessionId++
+        secretExportJob?.cancel()
+        secretExportJob = null
+        secretExportInProgress = false
+        secretForExport = null
+        secretExportState = IdentitySecretExportState()
+    }
+
+    fun beginSecretExport() {
+        dismissSecretExport()
+        secretExportState =
+            identitySecretExportState(
+                IdentitySecretExportState(),
+                IdentitySecretExportAction.Request,
+            )
+    }
 
     fun shareSecretKey(text: String) {
         val sendIntent =
@@ -196,9 +268,7 @@ internal fun IdentityScreen(
                         )
                         OutlinedButton(
                             onClick = {
-                                scope.launch {
-                                    appState.exportActiveAccountNsec()?.let(::shareSecretKey)
-                                }
+                                beginSecretExport()
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -263,6 +333,108 @@ internal fun IdentityScreen(
         EncryptedBackupSheet(
             appState = appState,
             onDismiss = { showEncryptedBackupSheet = false },
+        )
+    }
+
+    if (secretExportState.confirmationVisible) {
+        val secret = secretForExport.orEmpty()
+        AlertDialog(
+            onDismissRequest = {
+                dismissSecretExport()
+            },
+            title = { Text(stringResource(R.string.share_secret_key)) },
+            text = {
+                IdentitySecretExportContent(
+                    state = secretExportState,
+                    secret = secret,
+                    onToggleReveal = {
+                        if (secretExportState.revealed) {
+                            secretForExport = null
+                            secretExportState =
+                                identitySecretExportState(
+                                    secretExportState,
+                                    IdentitySecretExportAction.ToggleReveal,
+                                )
+                        } else {
+                            if (secretExportInProgress) return@IdentitySecretExportContent
+                            val sessionId = secretExportSessionId
+                            secretExportInProgress = true
+                            secretExportJob =
+                                scope.launch {
+                                    try {
+                                        exportIdentitySecretForSession(
+                                            sessionId = sessionId,
+                                            exporter = { appState.exportActiveAccountNsec() },
+                                            isSessionActive = {
+                                                it == secretExportSessionId && secretExportState.confirmationVisible
+                                            },
+                                            onExported = { exported ->
+                                                secretForExport = exported
+                                                secretExportState = secretExportState.copy(revealed = true)
+                                            },
+                                        )
+                                    } finally {
+                                        if (sessionId == secretExportSessionId) {
+                                            secretExportInProgress = false
+                                            secretExportJob = null
+                                        }
+                                    }
+                                }
+                        }
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val cachedSecret = secretForExport
+                        if (cachedSecret != null) {
+                            dismissSecretExport()
+                            shareSecretKey(cachedSecret)
+                        } else if (!secretExportInProgress) {
+                            val sessionId = secretExportSessionId
+                            secretExportInProgress = true
+                            secretExportJob =
+                                scope.launch {
+                                    try {
+                                        exportIdentitySecretForSession(
+                                            sessionId = sessionId,
+                                            exporter = { appState.exportActiveAccountNsec() },
+                                            isSessionActive = {
+                                                it == secretExportSessionId && secretExportState.confirmationVisible
+                                            },
+                                            onExported = { exported ->
+                                                secretForExport = null
+                                                secretExportState = IdentitySecretExportState()
+                                                secretExportSessionId++
+                                                secretExportJob = null
+                                                secretExportInProgress = false
+                                                shareSecretKey(exported)
+                                            },
+                                        )
+                                    } finally {
+                                        if (sessionId == secretExportSessionId) {
+                                            secretExportInProgress = false
+                                            secretExportJob = null
+                                        }
+                                    }
+                                }
+                        }
+                    },
+                    enabled = !secretExportInProgress,
+                ) {
+                    Text(stringResource(R.string.share))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        dismissSecretExport()
+                    },
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -427,6 +599,33 @@ internal fun IdentityScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun IdentitySecretExportContent(
+    state: IdentitySecretExportState,
+    secret: String,
+    onToggleReveal: () -> Unit,
+) {
+    val semanticLabel = stringResource(R.string.export_nsec)
+    Column(
+        modifier = Modifier.testTag(IDENTITY_SECRET_EXPORT_CONTENT_TAG),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.secret_key_backup_help),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = maskedIdentitySecret(secret, state.revealed),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.clearAndSetSemantics { contentDescription = semanticLabel },
+        )
+        OutlinedButton(onClick = onToggleReveal) {
+            Text(stringResource(if (state.revealed) R.string.hide else R.string.show))
+        }
     }
 }
 

@@ -228,15 +228,42 @@ class AppStateSendLockCoverageTest {
     fun conversationReadAnchorUsesHoistedRenderedTimeline() {
         val source = conversationScreenSource().readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorEffectIndex = source.indexOf("LaunchedEffect(currentHighestVisibleTimelineIndex)")
-        val readAnchorEffect = source.substring(readAnchorEffectIndex, source.indexOf("DisposableEffect(chat.id)", readAnchorEffectIndex))
+        val readAnchorEffectIndex = source.indexOf("LaunchedEffect(controller, currentHighestVisibleTimelineIndex,")
+        val readAnchorEffect =
+            source.substring(
+                readAnchorEffectIndex,
+                source.indexOf("DisposableEffect(controller)", readAnchorEffectIndex),
+            )
 
         assertTrue(
-            "read-anchor effect must reuse the hoisted edit-filtered renderedTimeline instead of allocating a fresh filtered list on scroll",
+            "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorEffectIndex &&
-                "readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)" in readAnchorEffect &&
+                "advanceConversationReadAnchor(" in readAnchorEffect &&
+                "durableAnchorId = controller.lastReadMessageId" in readAnchorEffect &&
                 "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorEffect,
+        )
+    }
+
+    @Test
+    fun conversationAnchoringLifecycleFollowsController() {
+        val source = conversationScreenSource().readText()
+        val entrySnapshotIndex = source.indexOf("val entryUnreadSnapshot =")
+        val scrollRestoreIndex = source.indexOf("val scrollRestore =")
+
+        assertTrue(
+            "same-group account switches must reset anchoring state and cancel effects that capture the old controller",
+            "remember(controller, notificationOpenRequestId) { mutableStateOf(false) }" in source &&
+                "var lastFollowedLatestId by remember(controller)" in source &&
+                "LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId)" in source &&
+                "LaunchedEffect(listState, controller)" in source,
+        )
+        assertTrue(
+            "scroll restore must use the reconciled entry unread count rather than the raw projection",
+            entrySnapshotIndex >= 0 &&
+                entrySnapshotIndex < scrollRestoreIndex &&
+                "entryUnreadCount = entryUnreadCount" in
+                source.substring(scrollRestoreIndex, source.indexOf("val positionalScrollRestore", scrollRestoreIndex)),
         )
     }
 

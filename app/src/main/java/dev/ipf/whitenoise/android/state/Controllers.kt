@@ -1513,6 +1513,36 @@ internal fun countUnreadIncoming(
     }
 }
 
+/**
+ * Reconcile the chat-list projection against the loaded timeline and its
+ * durable read watermark. A watermark present in the loaded window is stronger
+ * evidence than a stale projection; without one, preserve counts larger than
+ * the loaded window so pagination can still reveal the real boundary.
+ */
+internal fun reconciledConversationEntryUnreadCount(
+    projectionUnread: Int,
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): Int {
+    val projected = projectionUnread.coerceAtLeast(0)
+    return if (projected == 0 || timeline.isEmpty()) {
+        projected
+    } else {
+        val loadedReceived =
+            timeline.count { message ->
+                message.record.direction == "received" && !isDerivedStateKind(message.record.kind)
+            }
+        val anchorLoaded =
+            !readAnchorMessageId.isNullOrBlank() &&
+                timeline.any { it.record.messageIdHex == readAnchorMessageId }
+        if (!anchorLoaded && projected > loadedReceived) {
+            projected
+        } else {
+            minOf(projected, countUnreadIncoming(timeline, readAnchorMessageId))
+        }
+    }
+}
+
 /** Privacy-safe snapshot when entry projection unread would mis-anchor the timeline. */
 internal data class UnreadCountDivergenceReport(
     val projectionUnread: Int,
@@ -1611,6 +1641,29 @@ internal fun nextReadAnchor(
     if (currentAnchorId == null) return candidateId
     val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
     return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
+}
+
+/**
+ * Advance the conversation's UI read anchor without losing the durable
+ * watermark when the screen is recreated. A restored history viewport can be
+ * older than the persisted anchor; treating its first visible row as a fresh
+ * anchor would move read state backwards and inflate the unread badge.
+ */
+internal fun advanceConversationReadAnchor(
+    timeline: List<TimelineMessage>,
+    currentUiAnchorId: String?,
+    durableAnchorId: String?,
+    candidateIndex: Int,
+): String? {
+    val baseline = currentUiAnchorId ?: durableAnchorId
+    if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
+        return baseline
+    }
+    return nextReadAnchor(
+        timeline = timeline,
+        currentAnchorId = baseline,
+        candidateIndex = candidateIndex,
+    )
 }
 
 /**

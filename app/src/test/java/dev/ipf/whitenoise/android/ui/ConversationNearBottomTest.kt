@@ -57,6 +57,7 @@ class ConversationNearBottomTest {
         listState: LazyListState,
         timelineSize: Int,
         imeIsOpen: Boolean,
+        composerFocused: Boolean,
         initialTimelineAnchored: Boolean,
         liveNearBottom: Boolean,
         chaseCount: IntArray,
@@ -65,6 +66,7 @@ class ConversationNearBottomTest {
             rememberImeOpenReanchorNearBottom(
                 chatId = "chat-under-test",
                 imeIsOpen = imeIsOpen,
+                composerFocused = composerFocused,
                 nearBottom = liveNearBottom,
             )
 
@@ -123,6 +125,7 @@ class ConversationNearBottomTest {
     @Test
     fun imeOpenGateRetainsHistoryStateThroughTransientLayoutRead() {
         val imeOpen = mutableStateOf(false)
+        val composerFocused = mutableStateOf(false)
         val nearBottom = mutableStateOf(false)
         val gateHolder = arrayOf<Boolean?>(null)
 
@@ -131,15 +134,25 @@ class ConversationNearBottomTest {
                 rememberImeOpenReanchorNearBottom(
                     chatId = "chat-under-test",
                     imeIsOpen = imeOpen.value,
+                    composerFocused = composerFocused.value,
                     nearBottom = nearBottom.value,
                 )
         }
         composeRule.waitForIdle()
 
         composeRule.runOnUiThread {
-            // IME resize can transiently make live near-bottom true on the same
-            // snapshot edge that reports the keyboard open.
+            composerFocused.value = true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            // The viewport can report a transient near-bottom layout before
+            // the IME inset edge becomes observable.
             nearBottom.value = true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
             imeOpen.value = true
         }
         composeRule.waitForIdle()
@@ -152,6 +165,7 @@ class ConversationNearBottomTest {
         val timelineSize = 50
         val listState = LazyListState()
         val imeOpen = mutableStateOf(false)
+        val composerFocused = mutableStateOf(false)
         val liveNearBottom = mutableStateOf(false)
         val chaseCount = intArrayOf(0)
 
@@ -160,6 +174,7 @@ class ConversationNearBottomTest {
                 listState = listState,
                 timelineSize = timelineSize,
                 imeIsOpen = imeOpen.value,
+                composerFocused = composerFocused.value,
                 initialTimelineAnchored = true,
                 liveNearBottom = liveNearBottom.value,
                 chaseCount = chaseCount,
@@ -178,9 +193,18 @@ class ConversationNearBottomTest {
         assertFalse(isNearBottom(listState, timelineSize, hasOlderHeader = true))
 
         composeRule.runOnUiThread {
+            composerFocused.value = true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
             // Explicitly model the live layout race without violating the
             // production invariant: all 50 timeline rows are still rendered.
             liveNearBottom.value = true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
             imeOpen.value = true
         }
         composeRule.waitForIdle()
@@ -192,6 +216,7 @@ class ConversationNearBottomTest {
     @Test
     fun imeOpenGateRetainsPreImeBottomState() {
         val imeOpen = mutableStateOf(false)
+        val composerFocused = mutableStateOf(false)
         val nearBottom = mutableStateOf(true)
         val gateHolder = arrayOf<Boolean?>(null)
 
@@ -200,8 +225,14 @@ class ConversationNearBottomTest {
                 rememberImeOpenReanchorNearBottom(
                     chatId = "chat-under-test",
                     imeIsOpen = imeOpen.value,
+                    composerFocused = composerFocused.value,
                     nearBottom = nearBottom.value,
                 )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            composerFocused.value = true
         }
         composeRule.waitForIdle()
 
@@ -218,6 +249,7 @@ class ConversationNearBottomTest {
     fun imeOpenGateResetsForChatOpenedWithKeyboardUp() {
         val chatId = mutableStateOf("first-chat")
         val imeOpen = mutableStateOf(false)
+        val composerFocused = mutableStateOf(false)
         val nearBottom = mutableStateOf(false)
         val gateHolder = arrayOf<Boolean?>(null)
 
@@ -226,14 +258,24 @@ class ConversationNearBottomTest {
                 rememberImeOpenReanchorNearBottom(
                     chatId = chatId.value,
                     imeIsOpen = imeOpen.value,
+                    composerFocused = composerFocused.value,
                     nearBottom = nearBottom.value,
                 )
         }
         composeRule.waitForIdle()
 
         composeRule.runOnUiThread {
-            nearBottom.value = true
+            // Latch the first chat as a history-reading session before the
+            // keyboard changes the viewport.
+            composerFocused.value = true
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread {
             imeOpen.value = true
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread {
+            nearBottom.value = true
         }
         composeRule.waitForIdle()
         assertFalse(gateHolder[0]!!)
