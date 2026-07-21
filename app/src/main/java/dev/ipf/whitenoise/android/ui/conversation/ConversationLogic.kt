@@ -10,6 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
+import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 
 /**
  * Whether the conversation top bar should render a members-count subtitle.
@@ -53,6 +56,46 @@ internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,
 ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+internal data class ConversationEntryUnreadSnapshot(
+    val count: Int,
+    val firstUnreadMessageId: String?,
+)
+
+/**
+ * Freezes the unread boundary on the first non-empty timeline for one
+ * controller. Controller identity is part of the key because the same group id
+ * can be open under multiple local accounts with different read watermarks.
+ */
+@Composable
+internal fun rememberConversationEntryUnreadSnapshot(
+    controllerIdentity: Any,
+    projectionUnread: Int,
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): ConversationEntryUnreadSnapshot =
+    remember(controllerIdentity, timeline.isNotEmpty()) {
+        val count =
+            if (timeline.isEmpty()) {
+                projectionUnread.coerceAtLeast(0)
+            } else {
+                reconciledConversationEntryUnreadCount(
+                    projectionUnread = projectionUnread,
+                    timeline = timeline,
+                    readAnchorMessageId = readAnchorMessageId,
+                )
+            }
+        val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
+        ConversationEntryUnreadSnapshot(
+            count = count,
+            firstUnreadMessageId =
+                timeline
+                    .getOrNull(firstUnreadIndex)
+                    ?.record
+                    ?.messageIdHex
+                    ?.takeIf { it.isNotBlank() },
+        )
+    }
 
 /**
  * Snapshot to persist when leaving a conversation. Returns null when the reader

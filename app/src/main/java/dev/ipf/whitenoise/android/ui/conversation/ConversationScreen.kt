@@ -124,7 +124,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.nextReadAnchor
-import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -1852,39 +1851,21 @@ internal fun ConversationScreen(
                 }
             }
     }
-    // Capture the unread boundary at chat open. Stays fixed for the lifetime
-    // of this composable (per chat.id) so the "N unread messages" divider
-    // doesn't keep moving as the user scrolls and marks messages as read.
+    // Capture the unread boundary at chat open. Stays fixed for this controller
+    // so the divider doesn't move as messages are marked read, but resets when
+    // an account/runtime switch creates a new controller for the same group.
     val projectedEntryUnreadCount = chat.unreadCount.toInt().coerceAtLeast(0)
-    val entryUnreadCount =
-        remember(chat.id, controller.timeline.isNotEmpty()) {
-            if (controller.timeline.isEmpty()) {
-                projectedEntryUnreadCount
-            } else {
-                reconciledConversationEntryUnreadCount(
-                    projectionUnread = projectedEntryUnreadCount,
-                    timeline = controller.timeline,
-                    readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
-                )
-            }
-        }
-    var entryFirstUnreadMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
-    var unreadDivergenceLogged by remember(chat.id) { mutableStateOf(false) }
-    LaunchedEffect(chat.id, controller.timeline.size) {
-        if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
-            val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
-            if (firstUnreadIndex >= 0) {
-                // Controller-side unread helpers already skip derived-state
-                // kinds, so this is always a kind-9 chat present in the
-                // filtered renderedTimeline.
-                entryFirstUnreadMessageId =
-                    controller.timeline[firstUnreadIndex]
-                        .record.messageIdHex
-                        .takeIf { it.isNotBlank() }
-            }
-        }
-    }
-    LaunchedEffect(chat.id, initialTimelineAnchored, controller.timeline.size) {
+    val entryUnreadSnapshot =
+        rememberConversationEntryUnreadSnapshot(
+            controllerIdentity = controller,
+            projectionUnread = projectedEntryUnreadCount,
+            timeline = controller.timeline,
+            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+        )
+    val entryUnreadCount = entryUnreadSnapshot.count
+    val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
+    var unreadDivergenceLogged by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(controller, initialTimelineAnchored, controller.timeline.size) {
         if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
         unreadCountDivergenceReport(
             projectionUnread = projectedEntryUnreadCount,
