@@ -75,6 +75,19 @@ class ConversationScrollRestoreTest {
                 focusMessageId = null,
                 justCreated = false,
                 notificationOpenRequestId = 0L,
+                entryUnreadCount = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun unreadReopenIgnoresSavedHistoryPosition() {
+        assertFalse(
+            shouldRestoreConversationScrollSnapshot(
+                focusMessageId = null,
+                justCreated = false,
+                notificationOpenRequestId = 0L,
+                entryUnreadCount = 26,
             ),
         )
     }
@@ -86,6 +99,7 @@ class ConversationScrollRestoreTest {
                 focusMessageId = null,
                 justCreated = false,
                 notificationOpenRequestId = 1L,
+                entryUnreadCount = 0,
             ),
         )
     }

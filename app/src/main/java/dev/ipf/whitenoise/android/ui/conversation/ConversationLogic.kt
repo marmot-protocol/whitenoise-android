@@ -10,6 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
+import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 
 /**
  * Whether the conversation top bar should render a members-count subtitle.
@@ -39,20 +42,75 @@ internal data class ConversationScrollSnapshot(
     val anchorMessageIdHex: String? = null,
 )
 
-/** Whether a saved history position may own this conversation open. */
+/** Whether saved history may own this open instead of the first-unread anchor. */
 internal fun shouldRestoreConversationScrollSnapshot(
     focusMessageId: String?,
     justCreated: Boolean,
     notificationOpenRequestId: Long,
+    entryUnreadCount: Int,
 ): Boolean =
     focusMessageId == null &&
         !justCreated &&
-        notificationOpenRequestId == 0L
+        notificationOpenRequestId == 0L &&
+        entryUnreadCount <= 0
 
 internal fun conversationScrollKey(
     accountRef: String?,
     groupIdHex: String,
 ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+internal data class ConversationEntryUnreadSnapshot(
+    val count: Int,
+    val firstUnreadMessageId: String?,
+)
+
+/** Keep the entry marker fixed while unread messages remain, then retire it. */
+internal fun shouldShowConversationEntryUnreadDivider(
+    entryUnreadCount: Int,
+    liveUnreadCount: Int,
+    dividerRetired: Boolean,
+    messageId: String,
+    firstUnreadMessageId: String?,
+): Boolean =
+    entryUnreadCount > 0 &&
+        liveUnreadCount > 0 &&
+        !dividerRetired &&
+        messageId == firstUnreadMessageId
+
+/**
+ * Freezes the unread boundary on the first non-empty timeline for one
+ * controller. Controller identity is part of the key because the same group id
+ * can be open under multiple local accounts with different read watermarks.
+ */
+@Composable
+internal fun rememberConversationEntryUnreadSnapshot(
+    controllerIdentity: Any,
+    projectionUnread: Int,
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): ConversationEntryUnreadSnapshot =
+    remember(controllerIdentity, timeline.isNotEmpty()) {
+        val count =
+            if (timeline.isEmpty()) {
+                projectionUnread.coerceAtLeast(0)
+            } else {
+                reconciledConversationEntryUnreadCount(
+                    projectionUnread = projectionUnread,
+                    timeline = timeline,
+                    readAnchorMessageId = readAnchorMessageId,
+                )
+            }
+        val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
+        ConversationEntryUnreadSnapshot(
+            count = count,
+            firstUnreadMessageId =
+                timeline
+                    .getOrNull(firstUnreadIndex)
+                    ?.record
+                    ?.messageIdHex
+                    ?.takeIf { it.isNotBlank() },
+        )
+    }
 
 /**
  * Snapshot to persist when leaving a conversation. Returns null when the reader
@@ -183,19 +241,27 @@ internal fun rememberConversationNearBottom(
  * Near-bottom gate for IME-open bottom chase. Until this conversation has
  * observed the IME closed, follows live [nearBottom] so a chat opened with the
  * keyboard already up can still chase once initial anchoring settles. After the
- * first closed-IME snapshot, holds that value while the IME is open so a
- * transient `canScrollForward=false` during viewport resize cannot treat a
- * history reader as "at bottom" (#1375).
+ * first composer-focus edge, holds that value while the IME is open so the
+ * pre-inset layout transient cannot treat a history reader as "at bottom"
+ * (#1375, #1574).
  */
 @Composable
 internal fun rememberImeOpenReanchorNearBottom(
     chatId: String,
     imeIsOpen: Boolean,
+    composerFocused: Boolean,
     nearBottom: Boolean,
 ): Boolean {
-    var nearBottomWhenImeClosed by remember(chatId) { mutableStateOf<Boolean?>(null) }
+    var nearBottomAtFocusEdge by remember(chatId) { mutableStateOf<Boolean?>(null) }
+    var wasComposerFocused by remember(chatId) { mutableStateOf(false) }
     SideEffect {
-        if (!imeIsOpen) nearBottomWhenImeClosed = nearBottom
+        if (composerFocused && !wasComposerFocused && !imeIsOpen) {
+            nearBottomAtFocusEdge = nearBottom
+        }
+        if (!composerFocused && !imeIsOpen) {
+            nearBottomAtFocusEdge = null
+        }
+        wasComposerFocused = composerFocused
     }
-    return if (imeIsOpen) nearBottomWhenImeClosed ?: nearBottom else nearBottom
+    return if (imeIsOpen) nearBottomAtFocusEdge ?: nearBottom else nearBottom
 }
