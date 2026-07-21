@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -51,6 +52,22 @@ private fun postLocalNotification(
     notification: Notification,
 ) {
     manager.notify(tag, id, notification)
+}
+
+internal fun preferredConversationShortcutTitle(
+    candidate: String,
+    existing: String?,
+): String {
+    val existingTitle = existing?.takeIf { it.isNotBlank() }
+    return if (
+        IdentityFormatter.isNostrIdentityFallback(candidate) &&
+        existingTitle != null &&
+        !IdentityFormatter.isNostrIdentityFallback(existingTitle)
+    ) {
+        existingTitle
+    } else {
+        candidate
+    }
 }
 
 class LocalNotificationPresenter(
@@ -813,7 +830,15 @@ class LocalNotificationPresenter(
         sender: Person,
     ) {
         runCatching {
-            val title = content.conversationTitle ?: content.title
+            val candidateTitle = content.conversationTitle ?: content.title
+            val existingTitle =
+                shortcutSnapshots[shortcutId]?.longLabel
+                    ?: ShortcutManagerCompat
+                        .getDynamicShortcuts(context)
+                        .firstOrNull { it.id == shortcutId }
+                        ?.longLabel
+                        ?.toString()
+            val title = preferredConversationShortcutTitle(candidateTitle, existingTitle)
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
