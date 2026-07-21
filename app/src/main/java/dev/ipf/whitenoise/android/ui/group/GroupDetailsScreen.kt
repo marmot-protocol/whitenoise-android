@@ -106,6 +106,8 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
@@ -745,21 +747,25 @@ internal fun GroupDetailsScreen(
                 value = notificationModeLabel(conversationNotifyMode),
                 onClick = { showNotificationModePicker = true },
             )
-            SettingsActionRow(
-                icon = Icons.Default.Settings,
-                title = stringResource(R.string.customize_sound_vibration),
-                onClick =
-                    appState.activeAccountRef?.let { accountRef ->
-                        {
-                            openConversationNotificationSettings(
-                                context = context,
-                                accountRef = accountRef,
-                                groupIdHex = controller.group.groupIdHex,
-                                isDm = isDm,
-                            )
-                        }
-                    },
-            )
+            ConversationNotificationChannels.relevantParents(isDm).forEach { parent ->
+                SettingsActionRow(
+                    icon = Icons.Default.Settings,
+                    title = notificationChannelLabel(parent),
+                    value = stringResource(R.string.customize_sound_vibration),
+                    onClick =
+                        appState.activeAccountRef?.let { accountRef ->
+                            {
+                                openConversationNotificationSettings(
+                                    context = context,
+                                    accountRef = accountRef,
+                                    groupIdHex = controller.group.groupIdHex,
+                                    isDm = isDm,
+                                    parent = parent,
+                                )
+                            }
+                        },
+                )
+            }
             SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
                 title = stringResource(R.string.chat_lock),
@@ -1459,6 +1465,20 @@ private fun notificationModeLabel(mode: ChatNotifyMode): String =
             ChatNotifyMode.ALL -> R.string.notify_all_messages
             ChatNotifyMode.MENTIONS_ONLY -> R.string.notify_only_mentions
             ChatNotifyMode.NONE -> R.string.notify_nothing
+        },
+    )
+
+@Composable
+private fun notificationChannelLabel(spec: NotificationChannelSpec): String =
+    stringResource(
+        when (spec) {
+            NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages
+            NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
+            NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
+            NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
+            NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         },
     )
 

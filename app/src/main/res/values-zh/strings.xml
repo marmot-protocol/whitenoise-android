@@ -483,6 +483,8 @@
     <string name="notification_channel_reactions_description">对你消息的回应</string>
     <string name="notification_channel_invites">邀请</string>
     <string name="notification_channel_invites_description">群组邀请和欢迎</string>
+    <string name="notification_channel_agent_activity">代理活动</string>
+    <string name="notification_channel_agent_activity_description">工具进度和代理状态更新</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新消息</string>
     <string name="notification_hidden_content">新通知</string>

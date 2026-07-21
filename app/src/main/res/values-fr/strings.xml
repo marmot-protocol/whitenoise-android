@@ -492,6 +492,8 @@
     <string name="notification_channel_reactions_description">Réactions à vos messages</string>
     <string name="notification_channel_invites">Invitations</string>
     <string name="notification_channel_invites_description">Invitations de groupe et bienvenues</string>
+    <string name="notification_channel_agent_activity">Activité de l’agent</string>
+    <string name="notification_channel_agent_activity_description">Progression des outils et mises à jour du statut de l’agent</string>
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
     <string name="notification_new_message">Nouveau message</string>
     <string name="notification_hidden_content">Nouvelle notification</string>

@@ -118,4 +118,25 @@ class ConversationNotificationSettingsTest {
         )
         assertNotEquals(NotificationChannelSpec.DIRECT_MESSAGES.id, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
     }
+
+    @Test
+    fun openCanTargetTheAgentActivityChannelForOneConversation() {
+        val app = RuntimeEnvironment.getApplication()
+        NotificationChannels.ensureChannels(app)
+
+        openConversationNotificationSettings(
+            app,
+            accountRef = "account-a",
+            groupIdHex = "group-a",
+            isDm = false,
+            parent = NotificationChannelSpec.AGENT_ACTIVITY,
+        )
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        val started = Shadows.shadowOf(app).nextStartedActivity
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcutId),
+            started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
+        )
+    }
 }

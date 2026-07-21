@@ -217,6 +217,7 @@ class LocalNotificationPolicyTest {
         notificationKey = "message:$accountRef:message",
         conversationKey = "conversation:$accountRef:$groupIdHex",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
         accountRef = accountRef,
         accountIdHex = accountRef,
         groupIdHex = groupIdHex,

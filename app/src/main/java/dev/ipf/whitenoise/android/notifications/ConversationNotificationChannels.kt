@@ -16,8 +16,8 @@ import android.content.Context
  * it Android silently falls back to the app-wide parent channel.
  *
  * A single conversation can receive traffic on more than one parent — ordinary
- * messages on its DM/group channel and mentions on the mentions channel — so a
- * conversation channel is created per relevant parent. The channel id is derived
+ * messages on its DM/group channel, mentions, reactions, invites, and agent
+ * activity — so a conversation channel is created per relevant parent. The channel id is derived
  * deterministically from (parent id, conversation shortcut id) so both the post
  * path and the settings deep link name the same channel.
  *
@@ -39,23 +39,25 @@ object ConversationNotificationChannels {
     ): String = "$parentChannelId:$CONVERSATION_CHANNEL_INFIX:$conversationShortcutId"
 
     /**
-     * The parent whose conversation channel the "Customize sound & vibration"
-     * deep link targets. A conversation spans its message parent plus mentions,
-     * but the message parent is where the bulk of a chat's traffic lands, so the
-     * sound the user sets there is what "this chat's sound" means to them. The
-     * mentions conversation channel still exists and stays customizable from the
-     * OS conversation list; we just don't point the single in-app row at it.
+     * The default parent for callers that want the conversation's ordinary
+     * message settings. Typed settings rows pass their parent explicitly.
      */
     fun primaryMessageParent(isDm: Boolean): NotificationChannelSpec =
         if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
 
     /**
-     * Parents a conversation can receive per-conversation messages on: its
-     * primary message parent and the mentions channel. Reactions and invites are
-     * not conversation notifications (plain style, no shortcut), so they stay on
-     * their parent channel and are intentionally excluded here.
+     * Every notification type that can be scoped to a conversation. Keeping this
+     * matrix complete lets each chat expose independent native sound, vibration,
+     * and importance controls for each type.
      */
-    fun relevantParents(isDm: Boolean): List<NotificationChannelSpec> = listOf(primaryMessageParent(isDm), NotificationChannelSpec.MENTIONS)
+    fun relevantParents(isDm: Boolean): List<NotificationChannelSpec> =
+        listOf(
+            primaryMessageParent(isDm),
+            NotificationChannelSpec.MENTIONS,
+            NotificationChannelSpec.REACTIONS,
+            NotificationChannelSpec.INVITES,
+            NotificationChannelSpec.AGENT_ACTIVITY,
+        )
 
     /** Creates the conversation channel for every parent this conversation can receive on. */
     fun ensureConversationChannels(

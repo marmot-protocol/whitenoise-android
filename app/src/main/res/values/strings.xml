@@ -641,6 +641,8 @@
     <string name="notification_channel_reactions_description">Reactions to your messages</string>
     <string name="notification_channel_invites">Invites</string>
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
+    <string name="notification_channel_agent_activity">Agent activity</string>
+    <string name="notification_channel_agent_activity_description">Tool progress and agent status updates</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
     <string name="notification_hidden_content">New notification</string>

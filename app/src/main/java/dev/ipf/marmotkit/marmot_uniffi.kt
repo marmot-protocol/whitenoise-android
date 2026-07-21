@@ -11413,6 +11413,7 @@ data class NotificationUpdateFfi (
     var `notificationKey`: kotlin.String, 
     var `conversationKey`: kotlin.String, 
     var `trigger`: NotificationTriggerFfi, 
+    var `trafficClass`: NotificationTrafficClassFfi, 
     var `accountRef`: kotlin.String, 
     var `accountIdHex`: kotlin.String, 
     var `groupIdHex`: kotlin.String, 
@@ -11441,6 +11442,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterTypeNotificationTriggerFfi.read(buf),
+            FfiConverterTypeNotificationTrafficClassFfi.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
@@ -11462,6 +11464,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.allocationSize(value.`notificationKey`) +
             FfiConverterString.allocationSize(value.`conversationKey`) +
             FfiConverterTypeNotificationTriggerFfi.allocationSize(value.`trigger`) +
+            FfiConverterTypeNotificationTrafficClassFfi.allocationSize(value.`trafficClass`) +
             FfiConverterString.allocationSize(value.`accountRef`) +
             FfiConverterString.allocationSize(value.`accountIdHex`) +
             FfiConverterString.allocationSize(value.`groupIdHex`) +
@@ -11482,6 +11485,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.write(value.`notificationKey`, buf)
             FfiConverterString.write(value.`conversationKey`, buf)
             FfiConverterTypeNotificationTriggerFfi.write(value.`trigger`, buf)
+            FfiConverterTypeNotificationTrafficClassFfi.write(value.`trafficClass`, buf)
             FfiConverterString.write(value.`accountRef`, buf)
             FfiConverterString.write(value.`accountIdHex`, buf)
             FfiConverterString.write(value.`groupIdHex`, buf)
@@ -15298,6 +15302,38 @@ public object FfiConverterTypeNotificationCollectionStatusFfi: FfiConverterRustB
     override fun allocationSize(value: NotificationCollectionStatusFfi) = 4UL
 
     override fun write(value: NotificationCollectionStatusFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class NotificationTrafficClassFfi {
+    
+    STANDARD,
+    AGENT_ACTIVITY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNotificationTrafficClassFfi: FfiConverterRustBuffer<NotificationTrafficClassFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        NotificationTrafficClassFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: NotificationTrafficClassFfi) = 4UL
+
+    override fun write(value: NotificationTrafficClassFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

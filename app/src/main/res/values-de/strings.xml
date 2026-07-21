@@ -492,6 +492,8 @@
     <string name="notification_channel_reactions_description">Reaktionen auf deine Nachrichten</string>
     <string name="notification_channel_invites">Einladungen</string>
     <string name="notification_channel_invites_description">Gruppeneinladungen und Willkommensnachrichten</string>
+    <string name="notification_channel_agent_activity">Agentenaktivität</string>
+    <string name="notification_channel_agent_activity_description">Werkzeugfortschritt und Aktualisierungen des Agentenstatus</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
     <string name="notification_new_message">Neue Nachricht</string>
     <string name="notification_hidden_content">Neue Benachrichtigung</string>

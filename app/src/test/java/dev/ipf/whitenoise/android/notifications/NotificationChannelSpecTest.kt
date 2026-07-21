@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -117,6 +118,20 @@ class NotificationChannelSpecTest {
     }
 
     @Test
+    fun agentActivityRoutesToTheLowImportanceAgentChannel() {
+        val spec =
+            NotificationChannelSpec.forUpdate(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                ),
+            )
+
+        assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, spec)
+        assertEquals(ChannelImportance.LOW, spec.importance)
+    }
+
+    @Test
     fun channelIdsAreTheFrozenStableContractWithTheOs() {
         // These IDs are a stable contract — changing one discards the user's
         // per-channel overrides, so it's only done deliberately (re-keying to
@@ -126,6 +141,7 @@ class NotificationChannelSpecTest {
         assertEquals("mentions", NotificationChannelSpec.MENTIONS.id)
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
+        assertEquals("agent_activity_v1", NotificationChannelSpec.AGENT_ACTIVITY.id)
         assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
     }
 
@@ -134,11 +150,13 @@ class NotificationChannelSpecTest {
         isDm: Boolean = false,
         reactionEmoji: String? = null,
         isMention: Boolean = false,
+        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = trigger,
+        trafficClass = trafficClass,
         accountRef = "account",
         accountIdHex = "account",
         groupIdHex = "group",

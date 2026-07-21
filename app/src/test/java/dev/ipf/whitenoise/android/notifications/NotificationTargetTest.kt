@@ -742,6 +742,7 @@ class NotificationTargetTest {
             notificationKey = "key-1",
             conversationKey = "conv-1",
             trigger = trigger,
+            trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
             accountRef = accountRef,
             accountIdHex = "acctid-a",
             groupIdHex = groupIdHex,

@@ -15,6 +15,7 @@ import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -236,6 +237,49 @@ class LocalNotificationPresenterConversationTest {
             notification.channelId,
         )
         assertEquals(shortcutId, notification.shortcutId)
+    }
+
+    @Test
+    fun reactionPostsOnTheReactionChannelForItsConversation() {
+        presenter.ensureChannels()
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, reactionEmoji = "👍"),
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.REACTIONS.id, shortcutId!!),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun agentActivityPostsOnTheSilentAgentChannelForItsConversation() {
+        presenter.ensureChannels()
+
+        runBlocking {
+            presenter.show(
+                update(
+                    isMention = false,
+                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                ),
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.AGENT_ACTIVITY.id, shortcutId!!),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
     }
 
     @Test
@@ -584,10 +628,12 @@ class LocalNotificationPresenterConversationTest {
         timestampMs: Long = 1234,
         messageIdHex: String = "message",
         reactionEmoji: String? = null,
+        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = NotificationUpdateFfi(
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trafficClass = trafficClass,
         accountRef = "account-a",
         accountIdHex = "account-a",
         groupIdHex = "group-a",
