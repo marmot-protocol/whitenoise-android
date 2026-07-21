@@ -73,6 +73,18 @@ class AgentOperationPresentationTest {
     }
 
     @Test
+    fun textOnlyOperationRemainsExpandable() {
+        val presentation =
+            AgentOperationProjector.project(
+                agentOperation("A long tool summary without structured details"),
+            )
+
+        assertNotNull(presentation)
+        assertEquals("A long tool summary without structured details", presentation!!.collapsedText)
+        assertTrue(presentation.canExpand)
+    }
+
+    @Test
     fun argumentsArePrettyPrintedOnlyForExpandedDisplay() {
         val compact = "{\"query\":\"AgentOperation\",\"paths\":[\"app/src\",\"test\"]}"
 

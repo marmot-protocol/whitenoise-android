@@ -20,7 +20,7 @@ data class AgentOperationPresentation(
         get() = preview ?: text.ifBlank { name ?: eventType.orEmpty() }
 
     val canExpand: Boolean
-        get() = preview != null || argumentsJson != null || ok != null || durationMs != null
+        get() = text.isNotBlank() || preview != null || argumentsJson != null || ok != null || durationMs != null
 }
 
 internal fun formatAgentOperationArguments(argumentsJson: String): String =
