@@ -28,6 +28,27 @@ class NotificationSenderNameResolutionTest {
     }
 
     @Test
+    fun blankContactNameFallsBackToProfileName() {
+        assertEquals(
+            "Alice",
+            notificationSenderNameOverride(
+                contactNickname = "   ",
+                localProfileName = "Alice",
+            ),
+        )
+    }
+
+    @Test
+    fun blankNamesResolveToNull() {
+        assertNull(
+            notificationSenderNameOverride(
+                contactNickname = "   ",
+                localProfileName = "\t\n",
+            ),
+        )
+    }
+
+    @Test
     fun unresolvedLocalNameLeavesPayloadAndFormatterFallbackAvailable() {
         assertNull(
             notificationSenderNameOverride(
