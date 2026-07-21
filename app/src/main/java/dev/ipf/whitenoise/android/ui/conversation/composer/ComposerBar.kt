@@ -779,11 +779,13 @@ internal fun ComposerBar(
                             { bech32: String -> state.mentionDisplayName(bech32) }
                         }
                     }
+                val projectedReplyBody =
+                    remember(replyingTo, messageTextCopy) {
+                        MessageProjector.displayBody(replyingTo, messageTextCopy)
+                    }
                 val replyBody =
-                    remember(replyingTo, mediaFallback, messageTextCopy) {
-                        MessageProjector.displayBody(replyingTo, messageTextCopy).ifBlank {
-                            mediaFallback?.text(messageTextCopy).orEmpty()
-                        }
+                    remember(projectedReplyBody, mediaFallback, messageTextCopy) {
+                        projectedReplyBody.ifBlank { mediaFallback?.text(messageTextCopy).orEmpty() }
                     }
                 ReplyPreviewCard(
                     senderTitle =
