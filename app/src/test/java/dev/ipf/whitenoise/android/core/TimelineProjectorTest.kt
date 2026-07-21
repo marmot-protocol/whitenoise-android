@@ -194,6 +194,45 @@ class TimelineProjectorTest {
             MediaPreviewFallback(filename = "archive.zip", kind = ReplyMediaKind.Document),
             typedReplyMediaFallback(listOf(attachment)),
         )
+        assertEquals(
+            "archive.zip",
+            replyBodyWithTypedMediaFallback(
+                plaintext = "",
+                projectedBody = "File",
+                mediaFallback = typedReplyMediaFallback(listOf(attachment)),
+                copy = MessageTextCopy.Default,
+            ),
+        )
+        assertEquals(
+            "Release bundle",
+            replyBodyWithTypedMediaFallback(
+                plaintext = "Release bundle",
+                projectedBody = "Release bundle",
+                mediaFallback = typedReplyMediaFallback(listOf(attachment)),
+                copy = MessageTextCopy.Default,
+            ),
+        )
+    }
+
+    @Test
+    fun replyPreviewRetainsLegacyMediaKindWhenTypedAttachmentIsUnavailable() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        mediaJson = """{"media_type":"video/mp4"}""",
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "Video",
+                mediaKind = ReplyMediaKind.Video,
+            ),
+            TimelineProjector.replyPreview(record),
+        )
     }
 
     private fun replyPreview(

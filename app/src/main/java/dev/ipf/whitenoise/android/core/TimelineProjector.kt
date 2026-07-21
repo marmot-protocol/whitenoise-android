@@ -31,6 +31,18 @@ fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPrev
         )
     }
 
+fun replyBodyWithTypedMediaFallback(
+    plaintext: String,
+    projectedBody: String,
+    mediaFallback: MediaPreviewFallback?,
+    copy: MessageTextCopy,
+): String =
+    if (plaintext.isBlank() && mediaFallback != null) {
+        mediaFallback.text(copy)
+    } else {
+        projectedBody
+    }
+
 // Heuristic on the FFI's reply preview mediaJson (opaque JSON; just looks
 // for the MIME tree prefix). Cheap and good enough for "what icon to show".
 fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
@@ -88,7 +100,7 @@ object TimelineProjector {
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy, mediaFallback),
-            mediaKind = mediaFallback?.kind ?: ReplyMediaKind.None,
+            mediaKind = mediaFallback?.kind ?: replyMediaKindFromJson(preview.mediaJson),
         )
     }
 
