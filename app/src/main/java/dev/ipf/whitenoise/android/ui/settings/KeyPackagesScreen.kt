@@ -208,6 +208,7 @@ internal fun KeyPackagesScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun KeyPackagesContent(
     state: KeyPackagesState,
     packages: List<AccountKeyPackageFfi>,

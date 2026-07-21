@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
@@ -211,6 +213,7 @@ internal data class SettingsHomeAccount(
 )
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
@@ -286,6 +289,7 @@ private fun SettingsHomeScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun SettingsHomeContent(
     state: SettingsHomeState,
     account: SettingsHomeAccount?,
@@ -408,6 +412,7 @@ internal fun SettingsHomeContent(
 }
 
 @Composable
+@Suppress("FunctionNaming", "CyclomaticComplexMethod")
 private fun SettingsHomeRows(
     rows: List<SettingsHomeRow>,
     onOpenDetail: (SettingsDetail) -> Unit,

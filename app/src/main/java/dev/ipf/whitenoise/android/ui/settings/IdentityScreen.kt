@@ -142,9 +142,10 @@ internal fun identitySecretExportState(
 internal fun maskedIdentitySecret(
     secret: String,
     revealed: Boolean,
-): String = if (revealed) secret else "•".repeat(24)
+): String = if (revealed) secret else "•".repeat(MASKED_IDENTITY_SECRET_LENGTH)
 
 internal const val IDENTITY_SECRET_EXPORT_CONTENT_TAG = "identity-secret-export-content"
+private const val MASKED_IDENTITY_SECRET_LENGTH = 24
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -527,6 +528,7 @@ internal fun IdentityScreen(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun IdentitySecretExportContent(
     state: IdentitySecretExportState,
     secret: String,

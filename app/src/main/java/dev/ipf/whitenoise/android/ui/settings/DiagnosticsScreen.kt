@@ -267,6 +267,7 @@ internal fun DiagnosticsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod", "MaxLineLength")
 internal fun DiagnosticsContent(
     state: DiagnosticsState,
     entries: List<DiagnosticLogEntry>,
@@ -419,6 +420,7 @@ private fun diagnosticValueLabel(key: DiagnosticValueKey): String =
     )
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun DiagnosticRow(
     label: String,
     value: String,

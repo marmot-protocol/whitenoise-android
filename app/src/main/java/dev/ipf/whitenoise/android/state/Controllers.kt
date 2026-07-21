@@ -1523,16 +1523,22 @@ internal fun reconciledConversationEntryUnreadCount(
     readAnchorMessageId: String?,
 ): Int {
     val projected = projectionUnread.coerceAtLeast(0)
-    if (projected == 0 || timeline.isEmpty()) return projected
-    val loadedReceived =
-        timeline.count { message ->
-            message.record.direction == "received" && !isDerivedStateKind(message.record.kind)
+    return if (projected == 0 || timeline.isEmpty()) {
+        projected
+    } else {
+        val loadedReceived =
+            timeline.count { message ->
+                message.record.direction == "received" && !isDerivedStateKind(message.record.kind)
+            }
+        val anchorLoaded =
+            !readAnchorMessageId.isNullOrBlank() &&
+                timeline.any { it.record.messageIdHex == readAnchorMessageId }
+        if (!anchorLoaded && projected > loadedReceived) {
+            projected
+        } else {
+            minOf(projected, countUnreadIncoming(timeline, readAnchorMessageId))
         }
-    val anchorLoaded =
-        !readAnchorMessageId.isNullOrBlank() &&
-            timeline.any { it.record.messageIdHex == readAnchorMessageId }
-    if (!anchorLoaded && projected > loadedReceived) return projected
-    return minOf(projected, countUnreadIncoming(timeline, readAnchorMessageId))
+    }
 }
 
 /** Privacy-safe snapshot when entry projection unread would mis-anchor the timeline. */
