@@ -1907,6 +1907,10 @@ internal fun MessageBubble(
                                     if (!readOnly) {
                                         ComposerBar(
                                             replyingTo = controller.replyingTo,
+                                            replyingToMedia =
+                                                controller.replyingTo
+                                                    ?.let { controller.mediaReferences[it.messageIdHex] }
+                                                    .orEmpty(),
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 
@@ -21,6 +22,26 @@ fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
         else -> ReplyMediaKind.Document
     }
 }
+
+fun typedReplyMediaFallback(media: List<MediaAttachmentReferenceFfi>): MediaPreviewFallback? =
+    media.firstOrNull()?.let { attachment ->
+        MediaPreviewFallback(
+            filename = attachment.fileName.trim().takeIf { it.isNotEmpty() },
+            kind = replyMediaKindFromMime(attachment.mediaType),
+        )
+    }
+
+fun replyBodyWithTypedMediaFallback(
+    plaintext: String,
+    projectedBody: String,
+    mediaFallback: MediaPreviewFallback?,
+    copy: MessageTextCopy,
+): String =
+    if (plaintext.isBlank() && mediaFallback != null) {
+        mediaFallback.text(copy)
+    } else {
+        projectedBody
+    }
 
 // Heuristic on the FFI's reply preview mediaJson (opaque JSON; just looks
 // for the MIME tree prefix). Cheap and good enough for "what icon to show".
@@ -75,10 +96,11 @@ object TimelineProjector {
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
         val preview = record.replyPreview ?: return null
+        val mediaFallback = typedReplyMediaFallback(preview.media)
         return TimelineReplyDisplay(
             sender = preview.sender,
-            body = preview.displayBody(copy),
-            mediaKind = replyMediaKindFromJson(preview.mediaJson),
+            body = preview.displayBody(copy, mediaFallback),
+            mediaKind = mediaFallback?.kind ?: replyMediaKindFromJson(preview.mediaJson),
         )
     }
 
@@ -106,7 +128,10 @@ object TimelineProjector {
                     .thenBy { it.emoji },
             )
 
-    private fun TimelineReplyPreviewFfi.displayBody(copy: MessageTextCopy): String {
+    private fun TimelineReplyPreviewFfi.displayBody(
+        copy: MessageTextCopy,
+        mediaFallback: MediaPreviewFallback?,
+    ): String {
         if (deleted) return copy.deleted
         return projectedBody(
             plaintext = plaintext,
@@ -114,6 +139,7 @@ object TimelineProjector {
             mediaJson = mediaJson,
             agentTextStreamJson = agentTextStreamJson,
             fallback = { MessageProjector.displayBody(toAppMessageRecord(), copy) },
+            mediaFallback = mediaFallback,
             copy = copy,
         )
     }
@@ -138,11 +164,13 @@ object TimelineProjector {
         mediaJson: String?,
         agentTextStreamJson: String?,
         fallback: () -> String,
+        mediaFallback: MediaPreviewFallback? = null,
         copy: MessageTextCopy,
     ): String {
         val body = fallback()
         if (body.isNotBlank()) return body
         return when {
+            mediaFallback != null -> mediaFallback.text(copy)
             mediaJson != null -> copy.mediaLabel(replyMediaKindFromJson(mediaJson))
             agentTextStreamJson != null -> copy.streamFinished
             kind == 1200uL -> copy.agentStreamStarted
