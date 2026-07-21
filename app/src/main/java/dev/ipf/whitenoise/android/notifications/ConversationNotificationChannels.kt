@@ -64,10 +64,11 @@ object ConversationNotificationChannels {
         context: Context,
         conversationShortcutId: String,
         isDm: Boolean,
+        conversationTitle: String? = null,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         relevantParents(isDm).forEach { parent ->
-            ensureConversationChannel(manager, parent.id, conversationShortcutId)
+            ensureConversationChannel(manager, parent.id, conversationShortcutId, conversationTitle)
         }
     }
 
@@ -80,25 +81,47 @@ object ConversationNotificationChannels {
         context: Context,
         parentChannelId: String,
         conversationShortcutId: String,
+        conversationTitle: String? = null,
     ): String? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
-        return ensureConversationChannel(manager, parentChannelId, conversationShortcutId)
+        return ensureConversationChannel(manager, parentChannelId, conversationShortcutId, conversationTitle)
     }
 
     private fun ensureConversationChannel(
         manager: NotificationManager,
         parentChannelId: String,
         conversationShortcutId: String,
+        conversationTitle: String?,
     ): String? {
         val conversationChannelId = conversationChannelId(parentChannelId, conversationShortcutId)
-        // Already published: Android freezes channel settings after creation, so
-        // recreating would wipe the user's per-conversation sound/vibration
-        // overrides. Leave it alone.
-        if (manager.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
         val parent = manager.getNotificationChannel(parentChannelId) ?: return null
-        manager.createNotificationChannel(conversationChannel(parent, conversationChannelId, conversationShortcutId))
+        val displayName = conversationChannelDisplayName(parent.name, conversationTitle)
+        val existing = manager.getNotificationChannel(conversationChannelId)
+        if (existing != null) {
+            // Android permits an app to refresh a channel's user-visible name
+            // while retaining every user-controlled alerting override. This
+            // upgrades channels created before profile/group metadata resolved.
+            if (existing.name.toString() != displayName.toString()) {
+                existing.name = displayName
+                manager.createNotificationChannel(existing)
+            }
+            return conversationChannelId
+        }
+        manager.createNotificationChannel(
+            conversationChannel(parent, conversationChannelId, conversationShortcutId, displayName),
+        )
         return conversationChannelId
     }
+
+    internal fun conversationChannelDisplayName(
+        parentName: CharSequence,
+        conversationTitle: String?,
+    ): CharSequence =
+        conversationTitle
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { "$it · $parentName" }
+            ?: parentName
 
     // Clone the parent's importance and alerting defaults onto the conversation
     // channel at creation time; the user can then diverge per conversation from
@@ -107,8 +130,9 @@ object ConversationNotificationChannels {
         parent: NotificationChannel,
         conversationChannelId: String,
         conversationShortcutId: String,
+        displayName: CharSequence,
     ): NotificationChannel =
-        NotificationChannel(conversationChannelId, parent.name, parent.importance).apply {
+        NotificationChannel(conversationChannelId, displayName, parent.importance).apply {
             setConversationId(parent.id, conversationShortcutId)
             group = parent.group
             description = parent.description

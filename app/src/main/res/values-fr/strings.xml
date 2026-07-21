@@ -1015,6 +1015,7 @@
     <string name="chat_lock">Verrouillage de la discussion</string>
     <string name="collapse_long_messages">Réduire les longs messages</string>
     <string name="notify">Notifier</string>
+    <string name="sounds_and_notifications">Sons et notifications</string>
     <string name="notify_all_messages">Tous les messages</string>
     <string name="notify_only_mentions">Mentions uniquement</string>
     <string name="notify_nothing">Rien</string>

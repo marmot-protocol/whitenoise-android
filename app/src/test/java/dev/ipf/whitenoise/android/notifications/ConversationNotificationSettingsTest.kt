@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.provider.Settings
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -108,7 +111,13 @@ class ConversationNotificationSettingsTest {
         val app = RuntimeEnvironment.getApplication()
         NotificationChannels.ensureChannels(app)
 
-        openConversationNotificationSettings(app, accountRef = "account-a", groupIdHex = "group-a", isDm = true)
+        openConversationNotificationSettings(
+            app,
+            accountRef = "account-a",
+            groupIdHex = "group-a",
+            isDm = true,
+            conversationTitle = "Green Orca",
+        )
 
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val started = Shadows.shadowOf(app).nextStartedActivity
@@ -117,6 +126,17 @@ class ConversationNotificationSettingsTest {
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
         )
         assertNotEquals(NotificationChannelSpec.DIRECT_MESSAGES.id, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+        assertEquals(
+            "Green Orca · Direct messages",
+            app
+                .getSystemService(NotificationManager::class.java)
+                .getNotificationChannel(started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+                .name
+                .toString(),
+        )
+        val shortcut = ShortcutManagerCompat.getDynamicShortcuts(app).single { it.id == shortcutId }
+        assertEquals("Green Orca", shortcut.longLabel.toString())
+        assertNotNull(conversationSettingsShortcut(app, shortcutId, "Green Orca", avatarUrl = null).icon)
     }
 
     @Test
@@ -141,5 +161,57 @@ class ConversationNotificationSettingsTest {
             ),
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
         )
+    }
+
+    @Test
+    fun settingsShortcutRefreshPreservesAnExistingConversationIntent() {
+        val existingIntent = Intent("dev.ipf.whitenoise.TEST_DIRECT_CHAT")
+        val existing =
+            ShortcutInfoCompat
+                .Builder(context, "conversation-existing")
+                .setShortLabel("npub1old")
+                .setLongLabel("npub1old")
+                .setIntent(existingIntent)
+                .setLongLived(true)
+                .build()
+
+        val refreshed =
+            conversationSettingsShortcut(
+                context = context,
+                shortcutId = "conversation-existing",
+                title = "Green Orca",
+                avatarUrl = null,
+                existing = existing,
+            )
+
+        assertEquals("Green Orca", refreshed.longLabel.toString())
+        assertEquals(existingIntent.action, refreshed.intents.single().action)
+    }
+
+    @Test
+    fun openingSettingsDoesNotDowngradeAResolvedChannelNameToNpub() {
+        val app = RuntimeEnvironment.getApplication()
+        NotificationChannels.ensureChannels(app)
+        val shortcutId = conversationShortcutId("account-resolved", "group-resolved")!!
+        ShortcutManagerCompat.pushDynamicShortcut(
+            app,
+            conversationSettingsShortcut(app, shortcutId, "Green Orca", avatarUrl = null),
+        )
+
+        openConversationNotificationSettings(
+            context = app,
+            accountRef = "account-resolved",
+            groupIdHex = "group-resolved",
+            isDm = true,
+            conversationTitle = "npub1jc3ut...hsq6nt96",
+        )
+
+        val channelId =
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.DIRECT_MESSAGES.id,
+                shortcutId,
+            )
+        val channel = app.getSystemService(NotificationManager::class.java).getNotificationChannel(channelId)
+        assertEquals("Green Orca · Direct messages", channel.name.toString())
     }
 }

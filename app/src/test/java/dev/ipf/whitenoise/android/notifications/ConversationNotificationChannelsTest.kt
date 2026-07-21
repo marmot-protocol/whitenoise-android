@@ -112,6 +112,48 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
+    fun conversationChannelNameIncludesConversationAndNotificationType() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-named"
+
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_dm",
+                conversationShortcutId = shortcut,
+                conversationTitle = "Green Orca",
+            )
+
+        assertEquals("Green Orca · Direct messages", manager.getNotificationChannel(convId!!).name.toString())
+    }
+
+    @Test
+    fun ensureUpdatesAnExistingGenericChannelNameWithoutChangingItsSettings() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-renamed"
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context,
+                "messages_dm",
+                shortcut,
+            )!!
+        val existing = manager.getNotificationChannel(convId)
+        existing.enableVibration(false)
+        manager.createNotificationChannel(existing)
+
+        ConversationNotificationChannels.ensureConversationChannel(
+            context = context,
+            parentChannelId = "messages_dm",
+            conversationShortcutId = shortcut,
+            conversationTitle = "Green Orca",
+        )
+
+        val updated = manager.getNotificationChannel(convId)
+        assertEquals("Green Orca · Direct messages", updated.name.toString())
+        assertEquals(false, updated.shouldVibrate())
+    }
+
+    @Test
     fun ensureIsIdempotentAndReturnsTheSameChannelId() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-idempotent"

@@ -994,6 +994,7 @@
     <string name="chat_lock">聊天锁定</string>
     <string name="collapse_long_messages">折叠长消息</string>
     <string name="notify">通知方式</string>
+    <string name="sounds_and_notifications">声音和通知</string>
     <string name="notify_all_messages">所有消息</string>
     <string name="notify_only_mentions">仅提及</string>
     <string name="notify_nothing">无</string>

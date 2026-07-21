@@ -1053,6 +1053,7 @@
     <string name="chat_lock">Блокировка чата</string>
     <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
     <string name="notify">Уведомлять</string>
+    <string name="sounds_and_notifications">Звуки и уведомления</string>
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
     <string name="notify_nothing">Ничего</string>

@@ -1015,6 +1015,7 @@
     <string name="chat_lock">Bloqueo del chat</string>
     <string name="collapse_long_messages">Contraer mensajes largos</string>
     <string name="notify">Notificar</string>
+    <string name="sounds_and_notifications">Sonidos y notificaciones</string>
     <string name="notify_all_messages">Todos los mensajes</string>
     <string name="notify_only_mentions">Solo menciones</string>
     <string name="notify_nothing">Nada</string>

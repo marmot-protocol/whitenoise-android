@@ -1013,6 +1013,7 @@
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="collapse_long_messages">Uzun mesajları daralt</string>
     <string name="notify">Bildirimler</string>
+    <string name="sounds_and_notifications">Sesler ve bildirimler</string>
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
     <string name="notify_nothing">Hiçbiri</string>
