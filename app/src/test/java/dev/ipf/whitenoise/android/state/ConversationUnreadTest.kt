@@ -93,6 +93,37 @@ class ConversationUnreadTest {
     // ---- countUnreadIncoming ------------------------------------------------
 
     @Test
+    fun restoredOlderViewportCannotRegressDurableReadAnchor() {
+        val timeline = (1..58).map { received("r$it") }
+
+        val anchor =
+            advanceConversationReadAnchor(
+                timeline = timeline,
+                currentUiAnchorId = null,
+                durableAnchorId = "r38",
+                candidateIndex = 19,
+            )
+
+        assertEquals("r38", anchor)
+        assertEquals(20, countUnreadIncoming(timeline, anchor))
+    }
+
+    @Test
+    fun restoredWindowBeforeDurableAnchorKeepsOffWindowWatermark() {
+        val timeline = (1..30).map { received("r$it") }
+
+        assertEquals(
+            "r80",
+            advanceConversationReadAnchor(
+                timeline = timeline,
+                currentUiAnchorId = null,
+                durableAnchorId = "r80",
+                candidateIndex = 19,
+            ),
+        )
+    }
+
+    @Test
     fun reconciledEntryUnreadClearsInflatedProjectionWhenLoadedAnchorIsAtBottom() {
         val timeline = listOf(received("r1"), received("r2"), received("r3"))
 

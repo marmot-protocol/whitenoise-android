@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.ConversationEntryUnreadSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationEntryUnreadSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.shouldShowConversationEntryUnreadDivider
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -20,6 +21,34 @@ import org.robolectric.annotation.Config
 class ConversationEntryUnreadSnapshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun fullyReadConversationHidesEntryUnreadDivider() {
+        assertEquals(
+            false,
+            shouldShowConversationEntryUnreadDivider(
+                entryUnreadCount = 20,
+                liveUnreadCount = 0,
+                dividerRetired = false,
+                messageId = "first-unread",
+                firstUnreadMessageId = "first-unread",
+            ),
+        )
+    }
+
+    @Test
+    fun retiredEntryDividerDoesNotReappearForNewMessages() {
+        assertEquals(
+            false,
+            shouldShowConversationEntryUnreadDivider(
+                entryUnreadCount = 20,
+                liveUnreadCount = 1,
+                dividerRetired = true,
+                messageId = "first-unread",
+                firstUnreadMessageId = "first-unread",
+            ),
+        )
+    }
 
     @Test
     fun controllerSwitchRecomputesUnreadSnapshotWhenBothTimelinesAreNonEmpty() {

@@ -1642,6 +1642,29 @@ internal fun nextReadAnchor(
 }
 
 /**
+ * Advance the conversation's UI read anchor without losing the durable
+ * watermark when the screen is recreated. A restored history viewport can be
+ * older than the persisted anchor; treating its first visible row as a fresh
+ * anchor would move read state backwards and inflate the unread badge.
+ */
+internal fun advanceConversationReadAnchor(
+    timeline: List<TimelineMessage>,
+    currentUiAnchorId: String?,
+    durableAnchorId: String?,
+    candidateIndex: Int,
+): String? {
+    val baseline = currentUiAnchorId ?: durableAnchorId
+    if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
+        return baseline
+    }
+    return nextReadAnchor(
+        timeline = timeline,
+        currentAnchorId = baseline,
+        candidateIndex = candidateIndex,
+    )
+}
+
+/**
  * Whether send-time disappearing expiry should stay suspended for [record]
  * until the user scrolls past it (#797). Own sends always use send-time or a
  * display anchor; received rows after the persisted read watermark stay

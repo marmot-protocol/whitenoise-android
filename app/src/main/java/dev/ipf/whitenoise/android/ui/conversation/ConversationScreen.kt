@@ -121,9 +121,9 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
-import dev.ipf.whitenoise.android.state.nextReadAnchor
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -561,7 +561,7 @@ internal fun ConversationScreen(
     // stay valid. Anchored on id (not recordedAt) to survive same-second
     // collisions: send() stamps with nowSeconds(), so multiple messages can
     // share a recordedAt and a strict-`>` filter would under-count.
-    var readAnchorMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var readAnchorMessageId by remember(controller) { mutableStateOf(controller.lastReadMessageId) }
     val currentHighestVisibleTimelineIndex by remember(renderedSize, hasOlderHeader) {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
@@ -575,14 +575,20 @@ internal fun ConversationScreen(
                 .coerceAtMost(renderedSize - 1)
         }
     }
-    LaunchedEffect(currentHighestVisibleTimelineIndex) {
+    LaunchedEffect(currentHighestVisibleTimelineIndex, controller.lastReadMessageId) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
         // Monotonic advance only — scroll-up keeps the existing anchor so the
         // read pointer never moves backwards. See [nextReadAnchor]. Resolve the
         // visible row against the filtered (rendered) list it indexes into, not
         // the unfiltered timeline.
-        readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)
+        readAnchorMessageId =
+            advanceConversationReadAnchor(
+                timeline = renderedTimeline,
+                currentUiAnchorId = readAnchorMessageId,
+                durableAnchorId = controller.lastReadMessageId,
+                candidateIndex = idx,
+            )
     }
     DisposableEffect(chat.id) {
         onDispose {
@@ -1864,6 +1870,12 @@ internal fun ConversationScreen(
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
+    var entryUnreadDividerRetired by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(controller, initialTimelineAnchored, entryUnreadCount, unreadIncomingCount) {
+        if (initialTimelineAnchored && entryUnreadCount > 0 && unreadIncomingCount == 0) {
+            entryUnreadDividerRetired = true
+        }
+    }
     var unreadDivergenceLogged by remember(controller) { mutableStateOf(false) }
     LaunchedEffect(controller, initialTimelineAnchored, controller.timeline.size) {
         if (!initialTimelineAnchored || unreadDivergenceLogged || controller.timeline.isEmpty()) return@LaunchedEffect
@@ -2830,7 +2842,15 @@ internal fun ConversationScreen(
                                     if (daySeparatorLabel != null) {
                                         DaySeparator(daySeparatorLabel)
                                     }
-                                    if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
+                                    if (
+                                        shouldShowConversationEntryUnreadDivider(
+                                            entryUnreadCount = entryUnreadCount,
+                                            liveUnreadCount = unreadIncomingCount,
+                                            dividerRetired = entryUnreadDividerRetired,
+                                            messageId = item.record.messageIdHex,
+                                            firstUnreadMessageId = entryFirstUnreadMessageId,
+                                        )
+                                    ) {
                                         UnreadMessagesDivider(count = entryUnreadCount)
                                     }
                                     // Synthetic `dbg:stream:` rows must never fall

@@ -62,6 +62,19 @@ internal data class ConversationEntryUnreadSnapshot(
     val firstUnreadMessageId: String?,
 )
 
+/** Keep the entry marker fixed while unread messages remain, then retire it. */
+internal fun shouldShowConversationEntryUnreadDivider(
+    entryUnreadCount: Int,
+    liveUnreadCount: Int,
+    dividerRetired: Boolean,
+    messageId: String,
+    firstUnreadMessageId: String?,
+): Boolean =
+    entryUnreadCount > 0 &&
+        liveUnreadCount > 0 &&
+        !dividerRetired &&
+        messageId == firstUnreadMessageId
+
 /**
  * Freezes the unread boundary on the first non-empty timeline for one
  * controller. Controller identity is part of the key because the same group id
