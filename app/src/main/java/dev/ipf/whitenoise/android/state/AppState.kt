@@ -187,6 +187,11 @@ internal fun resolvedProfileDisplayName(
     ProfileSanitizer.displayName(profileDisplayName)
         ?: notificationDisplayNameHint(notificationDisplayNameHint)
 
+internal fun profileLookupRelays(
+    bootstrapRelays: List<String>,
+    activeAccountRelays: List<String>,
+): List<String> = (bootstrapRelays + activeAccountRelays).distinct()
+
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
@@ -4950,11 +4955,15 @@ class WhiteNoiseAppState(
                 val result =
                     runCatching {
                         marmotIo {
-                            val relays =
+                            val activeAccountRelays =
                                 activeAccountRef
                                     ?.let { runCatchingCancellable { accountNip65Relays(it) }.getOrNull() }
-                                    ?.takeIf { it.isNotEmpty() }
-                                    ?: MarmotClient.bootstrapRelays
+                                    .orEmpty()
+                            val relays =
+                                profileLookupRelays(
+                                    bootstrapRelays = MarmotClient.bootstrapRelays,
+                                    activeAccountRelays = activeAccountRelays,
+                                )
                             refreshProfile(accountIdHex, relays)
                             userProfile(accountIdHex)
                         }
