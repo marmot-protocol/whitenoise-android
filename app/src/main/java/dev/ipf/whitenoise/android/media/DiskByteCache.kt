@@ -862,7 +862,13 @@ internal class DiskByteCache(
         }
     }
 
+    // contains() runs inside composition for every media tile, so repeated
+    // lookups of the same key must not re-allocate a digest and re-hash on
+    // the main thread during fast scrolls. Access-ordered and bounded.
+    private val fileNameMemo = LinkedHashMap<String, String>(16, 0.75f, true)
+
     private fun fileNameFor(key: String): String {
+        synchronized(fileNameMemo) { fileNameMemo[key] }?.let { return it }
         val md = MessageDigest.getInstance("SHA-256")
         val digest = md.digest(key.toByteArray(Charsets.UTF_8))
         val sb = StringBuilder(digest.size * 2)
@@ -871,7 +877,16 @@ internal class DiskByteCache(
             sb.append(HEX[b.toInt() and 0x0F])
         }
         sb.append(SUFFIX)
-        return sb.toString()
+        val fileName = sb.toString()
+        synchronized(fileNameMemo) {
+            fileNameMemo[key] = fileName
+            if (fileNameMemo.size > FILE_NAME_MEMO_MAX_KEYS) {
+                val eldest = fileNameMemo.keys.iterator()
+                eldest.next()
+                eldest.remove()
+            }
+        }
+        return fileName
     }
 
     private data class AuthenticatedMetadata(
@@ -917,6 +932,7 @@ internal class DiskByteCache(
         const val MIN_ENVELOPE_BYTES = FIXED_ENVELOPE_HEADER_BYTES + ENVELOPE_CRYPTO_OVERHEAD_BYTES + 1L
         const val ENCRYPTION_CHUNK_BYTES = 8 * 1024
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
+        const val FILE_NAME_MEMO_MAX_KEYS = 512
         val ENVELOPE_MAGIC = byteArrayOf('W'.code.toByte(), 'N'.code.toByte(), 'D'.code.toByte(), 'C'.code.toByte())
         val METADATA_AAD_DOMAIN = "WN-DC-META".toByteArray(Charsets.UTF_8)
         val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)
