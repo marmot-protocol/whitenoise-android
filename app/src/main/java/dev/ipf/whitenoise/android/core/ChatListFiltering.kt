@@ -73,6 +73,10 @@ internal fun applyChatListSearchAndFilter(
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
     bodyMatchGroupIds: Set<String> = emptySet(),
+    // Non-null when a custom folder chip is selected: the manual-membership
+    // chat ids (lowercased) that folder contains. System folders keep riding
+    // the legacy enum branches above.
+    customFolderChatIds: Set<String>? = null,
 ): List<ChatListItem> {
     val byFilter =
         when (filter) {
@@ -84,10 +88,16 @@ internal fun applyChatListSearchAndFilter(
             // not raw headcount, so it isn't wrongly hidden here.
             ChatListFilter.Groups -> source.filter { !GroupProjector.isDm(it.memberCount, it.group.name) }
         }
+    val byFolder =
+        if (customFolderChatIds == null) {
+            byFilter
+        } else {
+            byFilter.filter { it.group.groupIdHex.lowercase() in customFolderChatIds }
+        }
     val needle = rawQuery.trim()
-    if (needle.isEmpty()) return byFilter
+    if (needle.isEmpty()) return byFolder
     val ciNeedle = localeInvariantFold(needle)
-    return byFilter.filter { item ->
+    return byFolder.filter { item ->
         // Match against the SAME title the user sees in the row, not the
         // raw group.name. For DMs and other unnamed chats, group.name is
         // blank and the visible title is projected from the other

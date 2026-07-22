@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -152,7 +153,30 @@ internal fun ChatsScreen(
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
-    var filter by remember { mutableStateOf(ChatListFilter.All) }
+    // Folder-backed filtering (#1460): null = All. System folders keep the
+    // legacy enum branches; a custom folder filters by manual membership.
+    var selectedFolderId by remember { mutableStateOf<String?>(null) }
+    val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+    val accountFolders =
+        remember(folderStoreState, appState.activeAccountRef) {
+            appState.activeAccountRef?.let { appState.chatFolderPreferences.foldersFor(it) }.orEmpty()
+        }
+    val selectedFolder = accountFolders.firstOrNull { it.id == selectedFolderId }
+    val filter =
+        when (selectedFolder?.systemKind) {
+            SystemFolderKind.UNREAD -> ChatListFilter.Unread
+            SystemFolderKind.ARCHIVED -> ChatListFilter.Archived
+            SystemFolderKind.GROUPS -> ChatListFilter.Groups
+            null -> ChatListFilter.All
+        }
+    val customFolderChatIds =
+        remember(selectedFolder, folderStoreState, appState.activeAccountRef) {
+            selectedFolder
+                ?.takeIf { !it.isSystem }
+                ?.let { folder ->
+                    appState.activeAccountRef?.let { appState.chatFolderPreferences.membershipFor(it, folder.id) }
+                }
+        }
     // The Archived filter is a view switch, not a row predicate: it swaps the
     // source list to archived chats (replacing the old dedicated Archived row).
     val showArchived = filter == ChatListFilter.Archived
@@ -286,7 +310,7 @@ internal fun ChatsScreen(
     val visibleItems =
         // Keyed on the trimmed query: leading/trailing-space edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
-        remember(sourceList, trimmedQuery, filter, groupTitleCopy, profileRev, bodyMatches) {
+        remember(sourceList, trimmedQuery, filter, customFolderChatIds, groupTitleCopy, profileRev, bodyMatches) {
             applyChatListSearchAndFilter(
                 sourceList,
                 trimmedQuery,
@@ -294,6 +318,7 @@ internal fun ChatsScreen(
                 appState,
                 groupTitleCopy,
                 bodyMatchGroupIds = bodyMatches.keys,
+                customFolderChatIds = customFolderChatIds,
             )
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
@@ -434,10 +459,31 @@ internal fun ChatsScreen(
         remember(controller.items) {
             controller.items.count { it.hasUnread }
         }
+    val folderChipModels =
+        remember(
+            accountFolders,
+            controller.items,
+            controller.archivedItems,
+            folderStoreState,
+            appState.activeAccountRef,
+        ) {
+            chatFolderChipModels(
+                folders = accountFolders,
+                activeItems = controller.items,
+                archivedItems = controller.archivedItems,
+                membershipOf = { folderId ->
+                    appState.activeAccountRef
+                        ?.let { appState.chatFolderPreferences.membershipFor(it, folderId) }
+                        .orEmpty()
+                },
+            )
+        }
     // Leave the archived view if its last chat is unarchived — the chip is then
     // hidden, so don't strand the selection on it.
     LaunchedEffect(controller.archivedItems.isEmpty(), filter) {
-        if (filter == ChatListFilter.Archived && controller.archivedItems.isEmpty()) filter = ChatListFilter.All
+        if (selectedFolderId != null && folderChipModels.none { it.folderId == selectedFolderId }) {
+            selectedFolderId = null
+        }
     }
 
     if (showNewChatFlow) {
@@ -565,11 +611,9 @@ internal fun ChatsScreen(
             // an empty-state swap without flicker.
             if (controller.items.isNotEmpty() || controller.archivedItems.isNotEmpty()) {
                 ChatListFilterChips(
-                    filter = filter,
-                    onChange = { filter = it },
-                    activeUnreadCount = activeUnreadCount,
-                    hasArchived = controller.archivedItems.isNotEmpty(),
-                    archivedUnreadCount = archivedUnreadCount,
+                    chips = folderChipModels,
+                    selectedFolderId = selectedFolderId,
+                    onSelect = { selectedFolderId = it },
                 )
             }
             // Pasted-identifier resolution result (#344). Sits above the list so

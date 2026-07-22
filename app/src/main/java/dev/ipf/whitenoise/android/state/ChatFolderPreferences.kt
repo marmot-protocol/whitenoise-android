@@ -45,6 +45,7 @@ data class ChatFolderAccountState(
  * on an account's first read, so ordering and hide-when-empty become uniform
  * across system and custom folders with no user-visible behavior change.
  */
+@Suppress("TooManyFunctions")
 class ChatFolderPreferences(
     context: Context,
     private val preferences: SharedPreferences =
@@ -73,8 +74,9 @@ class ChatFolderPreferences(
         name: String,
         description: String = "",
     ): ChatFolder? {
-        val account = normalizedAccount(accountRef) ?: return null
-        val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return null
+        val account = normalizedAccount(accountRef)
+        val trimmedName = name.trim().takeIf { it.isNotEmpty() }
+        if (account == null || trimmedName == null) return null
         return synchronized(mutationLock) {
             val current = loadAccount(account)
             val folder =
@@ -152,8 +154,9 @@ class ChatFolderPreferences(
         chatId: String,
         included: Boolean,
     ): Boolean {
-        val account = normalizedAccount(accountRef) ?: return false
-        val chat = chatId.trim().lowercase().takeIf { it.isNotEmpty() } ?: return false
+        val account = normalizedAccount(accountRef)
+        val chat = chatId.trim().lowercase().takeIf { it.isNotEmpty() }
+        if (account == null || chat == null) return false
         return synchronized(mutationLock) {
             val current = loadAccount(account)
             if (current.folders.none { it.id == folderId }) return@synchronized false
@@ -170,16 +173,17 @@ class ChatFolderPreferences(
         folderId: String,
     ): ChatFolderRule? {
         val account = normalizedAccount(accountRef) ?: return null
-        val raw = preferences.getString(ruleKey(account, folderId), null) ?: return null
-        return runCatching {
-            val json = JSONObject(raw)
-            val pubkeys = json.optJSONArray(RULE_MEMBERS).toStringSet()
-            ChatFolderRule(
-                includeMemberPubkeys = pubkeys,
-                unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
-                includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, true),
-            )
-        }.getOrNull()
+        val raw = preferences.getString(ruleKey(account, folderId), null)
+        return raw?.let {
+            runCatching {
+                val json = JSONObject(it)
+                ChatFolderRule(
+                    includeMemberPubkeys = json.optJSONArray(RULE_MEMBERS).toStringSet(),
+                    unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
+                    includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, true),
+                )
+            }.getOrNull()
+        }
     }
 
     fun setFolderRule(
@@ -188,8 +192,8 @@ class ChatFolderPreferences(
         rule: ChatFolderRule?,
     ): Boolean {
         val account = normalizedAccount(accountRef) ?: return false
-        synchronized(mutationLock) {
-            if (loadAccount(account).folders.none { it.id == folderId }) return false
+        return synchronized(mutationLock) {
+            if (loadAccount(account).folders.none { it.id == folderId }) return@synchronized false
             val edit = preferences.edit()
             if (rule == null) {
                 edit.remove(ruleKey(account, folderId))
@@ -202,23 +206,23 @@ class ChatFolderPreferences(
                 edit.putString(ruleKey(account, folderId), json.toString())
             }
             edit.apply()
+            true
         }
-        return true
     }
 
     /** Sign-out/wipe hook: drops every folder key the account owns. */
     fun clearAllForAccount(accountRef: String): Boolean {
         val account = normalizedAccount(accountRef) ?: return false
-        synchronized(mutationLock) {
+        return synchronized(mutationLock) {
             val prefix = accountKeyPrefix(account)
             val keys = preferences.all.keys.filter { it.startsWith(prefix) }
-            if (keys.isEmpty() && account !in _state.value) return false
+            if (keys.isEmpty() && account !in _state.value) return@synchronized false
             val edit = preferences.edit()
             keys.forEach { edit.remove(it) }
             edit.apply()
             _state.value = _state.value - account
+            true
         }
-        return true
     }
 
     private fun updateFolder(
@@ -349,10 +353,16 @@ class ChatFolderPreferences(
 
         internal fun systemFolders(): List<ChatFolder> =
             listOf(
-                ChatFolder(SYSTEM_FOLDER_UNREAD_ID, "", "", 0, isSystem = true, systemKind = SystemFolderKind.UNREAD),
-                ChatFolder(SYSTEM_FOLDER_ARCHIVED_ID, "", "", 1, isSystem = true, systemKind = SystemFolderKind.ARCHIVED),
-                ChatFolder(SYSTEM_FOLDER_GROUPS_ID, "", "", 2, isSystem = true, systemKind = SystemFolderKind.GROUPS),
+                systemFolder(SYSTEM_FOLDER_UNREAD_ID, 0, SystemFolderKind.UNREAD),
+                systemFolder(SYSTEM_FOLDER_ARCHIVED_ID, 1, SystemFolderKind.ARCHIVED),
+                systemFolder(SYSTEM_FOLDER_GROUPS_ID, 2, SystemFolderKind.GROUPS),
             )
+
+        private fun systemFolder(
+            id: String,
+            order: Int,
+            kind: SystemFolderKind,
+        ): ChatFolder = ChatFolder(id, name = "", description = "", order = order, isSystem = true, systemKind = kind)
 
         private fun accountKeyPrefix(account: String): String = "cf:$account:"
 

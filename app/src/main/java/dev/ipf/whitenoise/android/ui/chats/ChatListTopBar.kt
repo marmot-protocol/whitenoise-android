@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,13 +45,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ChatListFilter
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
-import dev.ipf.whitenoise.android.ui.settings.labelRes
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.flow.filter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -288,55 +285,54 @@ internal fun ConversationSearchNavBar(
 
 @Composable
 internal fun ChatListFilterChips(
-    filter: ChatListFilter,
-    onChange: (ChatListFilter) -> Unit,
-    activeUnreadCount: Int,
-    hasArchived: Boolean,
-    archivedUnreadCount: Int,
+    chips: List<ChatFolderChipModel>,
+    selectedFolderId: String?,
+    onSelect: (String?) -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ChatListFilterChip(filter, ChatListFilter.All, R.string.chat_list_filter_all, onChange)
-        ChatListFilterChip(
-            filter,
-            ChatListFilter.Unread,
-            R.string.chat_list_filter_unread,
-            onChange,
-            trailingCount = activeUnreadCount,
+        // `All` is the permanent reset state, not a real folder: always
+        // visible, never orderable, selected when nothing else is.
+        ChatFolderChip(
+            selected = selectedFolderId == null,
+            label = stringResource(R.string.chat_list_filter_all),
+            onClick = { onSelect(null) },
         )
-        ChatListFilterChip(filter, ChatListFilter.Groups, R.string.chat_list_filter_groups, onChange)
-        if (hasArchived || filter == ChatListFilter.Archived) {
-            ChatListFilterChip(
-                filter,
-                ChatListFilter.Archived,
-                R.string.archived,
-                onChange,
-                trailingCount = archivedUnreadCount,
+        chips.forEach { chip ->
+            ChatFolderChip(
+                selected = selectedFolderId == chip.folderId,
+                label =
+                    when (chip.systemKind) {
+                        SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
+                        SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
+                        SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
+                        null -> chip.customLabel
+                    },
+                onClick = { onSelect(chip.folderId) },
+                trailingCount = chip.trailingCount,
             )
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
-private fun ChatListFilterChip(
-    current: ChatListFilter,
-    value: ChatListFilter,
-    @StringRes labelRes: Int,
-    onChange: (ChatListFilter) -> Unit,
-    enabled: Boolean = true,
+private fun ChatFolderChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
     trailingCount: Int = 0,
 ) {
-    val selected = current == value
     FilterChip(
         selected = selected,
-        onClick = { onChange(value) },
-        enabled = enabled,
-        label = { Text(stringResource(labelRes)) },
+        onClick = onClick,
+        label = { Text(label) },
         trailingIcon =
             if (trailingCount > 0) {
                 {
@@ -348,14 +344,5 @@ private fun ChatListFilterChip(
             } else {
                 null
             },
-        shape = RoundedCornerShape(percent = 50),
-        border = null,
-        colors =
-            FilterChipDefaults.filterChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
     )
 }
