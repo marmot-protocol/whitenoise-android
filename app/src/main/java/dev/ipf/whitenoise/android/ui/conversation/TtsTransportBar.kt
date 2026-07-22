@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
  * all of them, so the controls must too. Sentence-granular progress only —
  * no scrub gesture, since the framework offers no utterance-internal seek.
  */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun TtsTransportBar(
     appState: WhiteNoiseAppState,

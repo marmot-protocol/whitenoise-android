@@ -84,9 +84,9 @@ internal class TtsPlaybackQueue(
      * resume() re-enqueues everything from the current index anyway.
      */
     fun append(moreChunks: List<TtsChunk>): Boolean {
-        if (moreChunks.isEmpty()) return false
         val current = _state.value
-        if (current !is TtsState.Speaking && current !is TtsState.Paused) return false
+        val active = current is TtsState.Speaking || current is TtsState.Paused
+        if (moreChunks.isEmpty() || !active) return false
         val base = chunks.size
         val reindexed = moreChunks.mapIndexed { offset, chunk -> chunk.copy(index = base + offset) }
         chunks = chunks + reindexed

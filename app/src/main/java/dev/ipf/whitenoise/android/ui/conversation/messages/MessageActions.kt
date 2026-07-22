@@ -298,7 +298,13 @@ internal fun MessageActionMenu(
                     if (canSpeak) {
                         MessageActionButton(
                             label = stringResource(R.string.speak_aloud),
-                            icon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            icon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
                             onClick = onSpeak,
                         )
                     }

@@ -23,32 +23,34 @@ internal class TtsAudioFocusOwner(
         onOwnerSurrender: () -> Unit,
     ): Boolean {
         val manager = audioManager ?: return false
-        focusRequest?.let { return true }
-        val attributes =
-            AudioAttributes
-                .Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .build()
-        val request =
-            AudioFocusRequest
-                .Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(attributes)
-                .setOnAudioFocusChangeListener { change ->
-                    when (change) {
-                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-                        -> onFocusLoss()
-                        AudioManager.AUDIOFOCUS_LOSS -> {
-                            focusRequest = null
-                            onOwnerSurrender()
+        if (focusRequest == null) {
+            val attributes =
+                AudioAttributes
+                    .Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .build()
+            val request =
+                AudioFocusRequest
+                    .Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(attributes)
+                    .setOnAudioFocusChangeListener { change ->
+                        when (change) {
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                            -> onFocusLoss()
+                            AudioManager.AUDIOFOCUS_LOSS -> {
+                                focusRequest = null
+                                onOwnerSurrender()
+                            }
+                            else -> Unit
                         }
-                        else -> Unit
-                    }
-                }.build()
-        val granted = manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (granted) focusRequest = request
-        return granted
+                    }.build()
+            if (manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                focusRequest = request
+            }
+        }
+        return focusRequest != null
     }
 
     override fun release() {

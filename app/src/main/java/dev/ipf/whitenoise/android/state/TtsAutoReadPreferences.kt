@@ -49,9 +49,9 @@ class TtsAutoReadPreferences(
             accountRef: String,
             groupIdHex: String,
         ): String? {
-            val account = accountRef.trim().takeIf { it.isNotEmpty() } ?: return null
-            val group = groupIdHex.trim().lowercase().takeIf { it.isNotEmpty() } ?: return null
-            return "$account|$group"
+            val account = accountRef.trim()
+            val group = groupIdHex.trim().lowercase()
+            return if (account.isEmpty() || group.isEmpty()) null else "$account|$group"
         }
     }
 }

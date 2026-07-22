@@ -105,10 +105,8 @@ class TtsController internal constructor(
         text: String,
         locale: Locale,
     ): Boolean {
-        if (engine == null) return false
-        val chunks = chunkText(text, locale)
-        if (chunks.isEmpty()) return false
-        return queue.append(chunks)
+        val chunks = if (engine == null) emptyList() else chunkText(text, locale)
+        return chunks.isNotEmpty() && queue.append(chunks)
     }
 
     /**

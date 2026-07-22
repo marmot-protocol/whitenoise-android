@@ -2495,7 +2495,8 @@ internal fun ConversationScreen(
                                                 }
                                             }
                                             TooltipBox(
-                                                positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                                positionProvider =
+                                                    TooltipDefaults.rememberRichTooltipPositionProvider(),
                                                 tooltip = { RichTooltip { Text(timerTooltipText) } },
                                                 state = timerTooltipState,
                                                 content = subtitleRow,
@@ -2559,7 +2560,9 @@ internal fun ConversationScreen(
                                         enabled = !controller.mutationInFlight,
                                         onClick = {
                                             menuOpen = false
-                                            appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                                            appState.launchMutation {
+                                                controller.setArchived(!controller.group.archived)
+                                            }
                                         },
                                     )
                                     if (controller.isSelfMember) {
@@ -2583,7 +2586,8 @@ internal fun ConversationScreen(
                                                 // the old leaveGroup() toast dead end.
                                                 appState.launchMutation {
                                                     when (val leaveAction = controller.leaveAction()) {
-                                                        LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
+                                                        LeaveAction.SoleAdminMustTransfer ->
+                                                            showTransferAdminFirst = true
                                                         LeaveAction.SoleMemberDeletesGroup,
                                                         LeaveAction.Standard,
                                                         -> pendingTopBarLeaveAction = leaveAction
