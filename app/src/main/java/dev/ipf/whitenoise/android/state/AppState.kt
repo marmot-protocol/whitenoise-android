@@ -1239,7 +1239,17 @@ class WhiteNoiseAppState(
     var appUnlockPromptRequestId by mutableStateOf(0)
         private set
 
-    private var lastAppUnlockAtMillis = AppLockPreferences.readLastUnlockedAtMillis(appContext)
+    // Lazily read on first app-lock evaluation: the previous eager constructor
+    // read paid a main-thread Keystore + Tink init at every cold start, even
+    // with app-lock disabled. Enabled users get an off-main pre-warm from init.
+    private var lastAppUnlockAtMillisBacking: Long? = null
+    private var lastAppUnlockAtMillis: Long
+        get() =
+            lastAppUnlockAtMillisBacking
+                ?: AppLockPreferences.readLastUnlockedAtMillis(appContext).also { lastAppUnlockAtMillisBacking = it }
+        set(value) {
+            lastAppUnlockAtMillisBacking = value
+        }
 
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
@@ -1527,6 +1537,15 @@ class WhiteNoiseAppState(
         // Wipe pre-encryption cache entries promptly after upgrade without doing
         // directory I/O in this main-thread constructor.
         mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+        if (requireAppUnlock) {
+            // Pre-warm the Keystore-backed unlock timestamp off-main so the
+            // first foreground lock evaluation is a cache hit. Assigned on
+            // Main, and only if an unlock hasn't already stamped a newer value.
+            mutationsScope.launch {
+                val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+                if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+            }
+        }
         mutationsScope.launch { refreshTtsAvailability() }
     }
 
