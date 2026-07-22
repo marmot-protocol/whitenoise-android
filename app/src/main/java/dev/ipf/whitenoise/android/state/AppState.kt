@@ -3717,9 +3717,7 @@ class WhiteNoiseAppState(
             return
         }
         hasActiveNetworkSnapshot = true
-        if (networkTypes != null) {
-            activeNetworkTypesSnapshot = networkTypes
-        }
+        activeNetworkTypesSnapshot = networkTypes ?: emptySet()
         if (shouldReconnectNotificationsOnNetworkRestore(wasOnline, isOnline = true)) {
             scheduleNotificationReconnectOnNetworkRestore()
         }

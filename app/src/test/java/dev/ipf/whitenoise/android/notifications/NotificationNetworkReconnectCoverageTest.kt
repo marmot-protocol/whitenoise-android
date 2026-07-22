@@ -44,6 +44,16 @@ class NotificationNetworkReconnectCoverageTest {
     }
 
     @Test
+    fun networkAvailableWithoutCapabilitiesClearsStaleTransportTypes() {
+        val networkSnapshot = appStateSource().readText().functionBody("noteActiveNetworkSnapshot")
+
+        assertTrue(
+            "onAvailable must conservatively block auto-download until the new network capabilities arrive",
+            "activeNetworkTypesSnapshot = networkTypes ?: emptySet()" in networkSnapshot,
+        )
+    }
+
+    @Test
     fun offlineToOnlineRecoveryPostsMissedNotificationWithoutPushWakeMarker() =
         runTest {
             val passiveReceiver = PassiveNotificationBroadcastFake(this)
