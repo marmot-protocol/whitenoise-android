@@ -246,13 +246,11 @@ internal fun IdentityScreen(
                             label = stringResource(R.string.public_key),
                             value = active.accountIdHex,
                             clipboard = clipboard,
-                            appState = appState,
                         )
                         CopyableValueRow(
                             label = "npub",
                             value = appState.npub(active.accountIdHex),
                             clipboard = clipboard,
-                            appState = appState,
                         )
                         DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))
                         DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))
@@ -770,7 +768,6 @@ private fun EncryptedBackupSheet(
                                 }
                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                                 .setPrimaryClip(clip)
-                            appState.present(R.string.toast_encrypted_backup_copied)
                         },
                         modifier = Modifier.weight(1f),
                     ) {

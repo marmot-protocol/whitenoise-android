@@ -179,7 +179,7 @@ internal fun SettingsScreen(
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
             )
-        SettingsDetail.Donate -> DonateScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         null ->
             SettingsHomeScreen(

@@ -399,7 +399,6 @@
     <string name="hide">隱藏</string>
     <string name="toast_encrypted_backup_created">已建立加密備份</string>
     <string name="toast_couldnt_create_encrypted_backup">無法建立加密備份</string>
-    <string name="toast_encrypted_backup_copied">已複製加密備份</string>
     <string name="copy">複製</string>
     <string name="account_relay_lists">帳戶中繼列表</string>
     <string name="no_relays">尚未設定中繼站</string>
@@ -576,9 +575,7 @@
     <string name="toast_no_audit_logs_to_delete">沒有可刪除的稽核日誌</string>
     <string name="toast_chat_created">聊天已建立</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
-    <string name="toast_copied_npub">已複製 npub</string>
     <string name="toast_signed_out">登出</string>
-    <string name="toast_copied_value">已複製 %1$s</string>
     <string name="group_title_invite_from">來自 %1$s 的邀請</string>
     <string name="group_title_people_count">%1$d 人群組</string>
     <string name="just_you">只有你</string>

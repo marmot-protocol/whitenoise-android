@@ -387,7 +387,6 @@ internal fun ProfileSheet(
                     label = "npub",
                     value = npub,
                     clipboard = clipboard,
-                    appState = appState,
                 )
                 SectionCard(title = stringResource(R.string.about)) {
                     Text(

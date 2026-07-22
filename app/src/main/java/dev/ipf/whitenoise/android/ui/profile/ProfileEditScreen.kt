@@ -291,7 +291,6 @@ internal fun ProfileEditScreen(
                                         role = Role.Button,
                                     ) {
                                         clipboard.setText(AnnotatedString(appState.npub(active.accountIdHex)))
-                                        appState.present(R.string.toast_copied_npub)
                                     },
                         )
                         // Surface an invalid stored picture URL right on the

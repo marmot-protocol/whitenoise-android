@@ -673,13 +673,11 @@ internal fun MessageBubble(
 
     fun copyMessageText() {
         clipboard.setText(AnnotatedString(displayedBody))
-        appState.present(R.string.copied)
         onActionMenuOpenChange(false)
     }
 
     fun copyMarkdownLink(url: String) {
         clipboard.setText(AnnotatedString(url))
-        appState.present(R.string.copied)
         onActionMenuOpenChange(false)
     }
 
@@ -1991,7 +1989,6 @@ internal fun MessageBubble(
                         onDismissRequest = { infoSheetOpen = false },
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))
-                            appState.present(R.string.copied)
                         },
                     )
                 }

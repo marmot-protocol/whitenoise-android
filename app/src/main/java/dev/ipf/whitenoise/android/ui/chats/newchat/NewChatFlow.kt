@@ -344,7 +344,6 @@ private fun NewMessageScreen(
                             },
                             onCopy = { detail ->
                                 clipboard.setText(AnnotatedString(detail))
-                                appState.present(R.string.copied)
                             },
                         )
                     }

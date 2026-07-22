@@ -405,7 +405,6 @@
     <string name="hide">Masquer</string>
     <string name="toast_encrypted_backup_created">Sauvegarde chiffrée créée</string>
     <string name="toast_couldnt_create_encrypted_backup">Impossible de créer la sauvegarde chiffrée</string>
-    <string name="toast_encrypted_backup_copied">Sauvegarde chiffrée copiée</string>
     <string name="copy">Copier</string>
     <string name="account_relay_lists">Listes de relais de compte</string>
     <string name="no_relays">Aucun relais configuré</string>
@@ -582,9 +581,7 @@
     <string name="toast_no_audit_logs_to_delete">Aucun journal d’audit à supprimer</string>
     <string name="toast_chat_created">Chat créé</string>
     <string name="toast_notification_permission_denied">Autorisation de notification refusée</string>
-    <string name="toast_copied_npub">npub copié</string>
     <string name="toast_signed_out">Déconnexion</string>
-    <string name="toast_copied_value">%1$s copié</string>
     <string name="group_title_invite_from">Invitation de %1$s</string>
     <string name="group_title_people_count">Groupe de %1$d personnes</string>
     <string name="just_you">Juste vous</string>
