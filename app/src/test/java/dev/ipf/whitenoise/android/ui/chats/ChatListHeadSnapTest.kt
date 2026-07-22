@@ -6,13 +6,12 @@ import org.junit.Test
 
 class ChatListHeadSnapTest {
     @Test
-    fun clippedHeadReorderSnapsAtItemZeroWithOffset() {
+    fun headReorderSnapsWhenReaderWasAtTopWithClippedOffset() {
         assertTrue(
-            shouldSnapChatListForClippedHeadReorder(
+            shouldSnapChatListForHeadReorder(
                 previousHeadId = "a",
                 currentHeadId = "b",
-                firstVisibleItemIndex = 0,
-                firstVisibleItemScrollOffset = 12,
+                preReorderFirstVisibleItemIndex = 0,
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
@@ -20,13 +19,15 @@ class ChatListHeadSnapTest {
     }
 
     @Test
-    fun clippedHeadReorderDoesNotSnapWhenReaderScrolledDeeper() {
-        assertFalse(
-            shouldSnapChatListForClippedHeadReorder(
+    fun headReorderSnapsWhenReaderWasFlushAtTop() {
+        // Flush-at-top is not "scrolled deeper": at the exact top the reader
+        // is watching the head, and a key-anchored reorder renders the new
+        // head above the viewport where it would otherwise stay invisible.
+        assertTrue(
+            shouldSnapChatListForHeadReorder(
                 previousHeadId = "a",
                 currentHeadId = "b",
-                firstVisibleItemIndex = 4,
-                firstVisibleItemScrollOffset = 0,
+                preReorderFirstVisibleItemIndex = 0,
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
@@ -34,13 +35,12 @@ class ChatListHeadSnapTest {
     }
 
     @Test
-    fun clippedHeadReorderDoesNotSnapWhenHeadFlushAtTop() {
+    fun headReorderDoesNotSnapWhenReaderWasScrolledDeeperBeforeReorder() {
         assertFalse(
-            shouldSnapChatListForClippedHeadReorder(
+            shouldSnapChatListForHeadReorder(
                 previousHeadId = "a",
                 currentHeadId = "b",
-                firstVisibleItemIndex = 0,
-                firstVisibleItemScrollOffset = 0,
+                preReorderFirstVisibleItemIndex = 4,
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
@@ -48,13 +48,54 @@ class ChatListHeadSnapTest {
     }
 
     @Test
-    fun clippedHeadReorderDoesNotSnapWhileUserIsScrolling() {
-        assertFalse(
-            shouldSnapChatListForClippedHeadReorder(
+    fun headReorderDecidesOnPreReorderStateNotTheReanchoredSnapshot() {
+        // The key-anchored reorder scenario: pre-reorder the reader sat at
+        // index 0 / offset 0; post-reorder the list reads index 1 / offset 0
+        // because LazyColumn kept the old head's row pinned by key. The
+        // decision must use the pre-reorder index (0 → snap), not the
+        // re-anchored one (1 → would never snap).
+        val preReorderIndex = 0
+        val postReorderIndex = 1
+        assertTrue(
+            shouldSnapChatListForHeadReorder(
                 previousHeadId = "a",
                 currentHeadId = "b",
-                firstVisibleItemIndex = 0,
-                firstVisibleItemScrollOffset = 24,
+                preReorderFirstVisibleItemIndex = preReorderIndex,
+                isScrollInProgress = false,
+                isActiveList = true,
+            ),
+        )
+        assertFalse(
+            shouldSnapChatListForHeadReorder(
+                previousHeadId = "a",
+                currentHeadId = "b",
+                preReorderFirstVisibleItemIndex = postReorderIndex,
+                isScrollInProgress = false,
+                isActiveList = true,
+            ),
+        )
+    }
+
+    @Test
+    fun headReorderDoesNotSnapWithoutAHeadChange() {
+        assertFalse(
+            shouldSnapChatListForHeadReorder(
+                previousHeadId = "a",
+                currentHeadId = "a",
+                preReorderFirstVisibleItemIndex = 0,
+                isScrollInProgress = false,
+                isActiveList = true,
+            ),
+        )
+    }
+
+    @Test
+    fun headReorderDoesNotSnapWhileUserIsScrolling() {
+        assertFalse(
+            shouldSnapChatListForHeadReorder(
+                previousHeadId = "a",
+                currentHeadId = "b",
+                preReorderFirstVisibleItemIndex = 0,
                 isScrollInProgress = true,
                 isActiveList = true,
             ),
@@ -62,13 +103,12 @@ class ChatListHeadSnapTest {
     }
 
     @Test
-    fun clippedHeadReorderDoesNotSnapOnArchivedList() {
+    fun headReorderDoesNotSnapOnArchivedList() {
         assertFalse(
-            shouldSnapChatListForClippedHeadReorder(
+            shouldSnapChatListForHeadReorder(
                 previousHeadId = "a",
                 currentHeadId = "b",
-                firstVisibleItemIndex = 0,
-                firstVisibleItemScrollOffset = 24,
+                preReorderFirstVisibleItemIndex = 0,
                 isScrollInProgress = false,
                 isActiveList = false,
             ),

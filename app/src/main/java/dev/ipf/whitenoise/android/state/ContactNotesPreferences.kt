@@ -58,6 +58,8 @@ internal object ContactNotesPreferences {
         if (keys.isEmpty()) return false
         val edit = preferences.edit()
         keys.forEach { edit.remove(it) }
+        // commit(), not apply(): a wipe must not leave contact data on disk if
+        // the process dies before an async write lands. Callers hop to IO.
         return edit.commit()
     }
 

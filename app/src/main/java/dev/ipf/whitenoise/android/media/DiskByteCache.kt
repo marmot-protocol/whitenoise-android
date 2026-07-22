@@ -69,6 +69,7 @@ internal class DiskByteCache(
         }
     },
     private val afterTempFileCreated: () -> Unit = {},
+    private val afterFileNameHashed: () -> Unit = {},
     private val afterEncryptedWrite: () -> Unit = {},
     private val afterPutEpochCaptured: () -> Unit = {},
     private val beforeStaleFilesDeleted: () -> Unit = {},
@@ -430,6 +431,13 @@ internal class DiskByteCache(
         // Bump first so any put scheduled against the prior generation is
         // rejected even if it grabs this lock right after the wipe. See #154.
         generation++
+        // The memo retains raw cache-key strings, which can carry account and
+        // blob identifiers — drop them with the rest of the account's data.
+        // The epoch bump rejects re-inserts from lookups mid-hash right now.
+        synchronized(fileNameMemo) {
+            fileNameMemoEpoch++
+            fileNameMemo.clear()
+        }
         // Hold the lock for the whole wipe. Deleting outside it (an earlier
         // #99 attempt) let a concurrent put() recreate a `.enc` that the orphan
         // sweep then removed — a race. clear() runs on sign-out/account-switch,
@@ -862,7 +870,23 @@ internal class DiskByteCache(
         }
     }
 
+    // contains() runs inside composition for every media tile, so repeated
+    // lookups of the same key must not re-allocate a digest and re-hash on
+    // the main thread during fast scrolls. Access-ordered and bounded. The
+    // epoch (guarded by the memo's monitor) makes clear() authoritative: a
+    // lookup that was hashing while clear() ran must not re-insert its key,
+    // or account/blob identifiers would stay reachable after a wipe.
+    private val fileNameMemo = LinkedHashMap<String, String>(16, 0.75f, true)
+    private var fileNameMemoEpoch = 0L
+
+    internal fun memoizedFileNameKeyCount(): Int = synchronized(fileNameMemo) { fileNameMemo.size }
+
     private fun fileNameFor(key: String): String {
+        val epochAtLookup =
+            synchronized(fileNameMemo) {
+                fileNameMemo[key]?.let { return it }
+                fileNameMemoEpoch
+            }
         val md = MessageDigest.getInstance("SHA-256")
         val digest = md.digest(key.toByteArray(Charsets.UTF_8))
         val sb = StringBuilder(digest.size * 2)
@@ -871,7 +895,19 @@ internal class DiskByteCache(
             sb.append(HEX[b.toInt() and 0x0F])
         }
         sb.append(SUFFIX)
-        return sb.toString()
+        val fileName = sb.toString()
+        afterFileNameHashed()
+        synchronized(fileNameMemo) {
+            if (fileNameMemoEpoch == epochAtLookup) {
+                fileNameMemo[key] = fileName
+                if (fileNameMemo.size > FILE_NAME_MEMO_MAX_KEYS) {
+                    val eldest = fileNameMemo.keys.iterator()
+                    eldest.next()
+                    eldest.remove()
+                }
+            }
+        }
+        return fileName
     }
 
     private data class AuthenticatedMetadata(
@@ -917,6 +953,7 @@ internal class DiskByteCache(
         const val MIN_ENVELOPE_BYTES = FIXED_ENVELOPE_HEADER_BYTES + ENVELOPE_CRYPTO_OVERHEAD_BYTES + 1L
         const val ENCRYPTION_CHUNK_BYTES = 8 * 1024
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
+        const val FILE_NAME_MEMO_MAX_KEYS = 512
         val ENVELOPE_MAGIC = byteArrayOf('W'.code.toByte(), 'N'.code.toByte(), 'D'.code.toByte(), 'C'.code.toByte())
         val METADATA_AAD_DOMAIN = "WN-DC-META".toByteArray(Charsets.UTF_8)
         val PAYLOAD_AAD_DOMAIN = "WN-DC-PAY".toByteArray(Charsets.UTF_8)

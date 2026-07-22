@@ -523,6 +523,29 @@ class MessageProjectorTest {
         receivedAt = at.toULong(),
     )
 
+    @Test
+    fun sharedTallyStageOrdersByCountThenMineThenEmoji() {
+        val tallies =
+            reactionTalliesFromEmojiSenders(
+                listOf(
+                    "c" to listOf("s1"),
+                    "b" to listOf("ME"),
+                    "a" to listOf("s1", "s2"),
+                    "d" to emptyList(),
+                ),
+                myAccountId = "me",
+            )
+
+        assertEquals(
+            listOf(
+                ReactionTally(emoji = "a", count = 2, mine = false),
+                ReactionTally(emoji = "b", count = 1, mine = true),
+                ReactionTally(emoji = "c", count = 1, mine = false),
+            ),
+            tallies,
+        )
+    }
+
     private fun eventTag(target: String) = MessageProjector.eventTag(target)
 
     private fun quoteTag(target: String) = MessageProjector.quoteTag(target)

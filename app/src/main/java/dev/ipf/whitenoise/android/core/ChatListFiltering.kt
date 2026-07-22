@@ -59,6 +59,13 @@ internal enum class ChatListFilter { All, Unread, Groups, Archived }
 
 internal fun localeInvariantFold(value: String): String = value.lowercase(Locale.ROOT)
 
+// At least as long as the truncated id prefix shown in group details, so a
+// copied prefix matches while short hex-looking words ("cafe") stay plain text.
+internal const val GROUP_ID_SEARCH_MIN_LENGTH = 8
+
+internal fun looksLikeGroupIdNeedle(ciNeedle: String): Boolean =
+    ciNeedle.length >= GROUP_ID_SEARCH_MIN_LENGTH && ciNeedle.all { it in '0'..'9' || it in 'a'..'f' }
+
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
@@ -97,6 +104,19 @@ internal fun applyChatListSearchAndFilter(
         // substring containment as title/preview.
         val description = localeInvariantFold(item.group.description)
         if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
+        // Group-id matches (issue #1509): both ids are shown as copyable
+        // values on the group details screen, so pasting one back into search
+        // must surface the group. Only a hex-shaped needle of plausible
+        // length is compared against the ids — ordinary words must not
+        // surface unrelated groups through their 64-char hex ids.
+        if (looksLikeGroupIdNeedle(ciNeedle) &&
+            (
+                localeInvariantFold(item.group.groupIdHex).contains(ciNeedle) ||
+                    localeInvariantFold(item.group.nostrGroupIdHex).contains(ciNeedle)
+            )
+        ) {
+            return@filter true
+        }
         // Message-body matches (issue #290): the async per-chat search
         // (ChatsController.searchMessageBodies) found the needle inside this
         // conversation's local timeline even though it isn't in the title or

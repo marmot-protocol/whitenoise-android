@@ -170,7 +170,7 @@ object GroupProjector {
         equivalentTarget: (other: String) -> Boolean,
     ): Boolean {
         if (targetIdHex.isBlank()) return false
-        if (!isDm(memberCount = members.size, name = name)) return false
+        if (!isDm(memberCount = uniqueMemberCount(members), name = name)) return false
         if (!members.any { isActiveAccountMember(it, activeAccountIdHex) }) return false
         val other = otherMemberAccount(members, activeAccountIdHex)?.takeIf { it.isNotBlank() } ?: return false
         return other.equals(targetIdHex, ignoreCase = true) || equivalentTarget(other)
@@ -211,6 +211,26 @@ object GroupProjector {
             .count()
 
     /**
+     * Number of distinct members, compared case-insensitively — the member
+     * mirror of [uniqueAdminCount]. A roster snapshot can carry the same
+     * identity twice with hex-casing drift; a raw `members.size` then counts a
+     * 2-member DM as 3 and misclassifies it as a group (title, avatar, and
+     * Start-DM routing all key off this count). Members with no id at all are
+     * counted individually rather than collapsed.
+     */
+    fun uniqueMemberCount(members: List<AppGroupMemberRecordFfi>): Int {
+        val identities = HashSet<String>()
+        var anonymous = 0
+        members.forEach { member ->
+            val id =
+                member.memberIdHex.takeIf { it.isNotBlank() }
+                    ?: member.account?.takeIf { it.isNotBlank() }
+            if (id == null) anonymous++ else identities.add(id.lowercase())
+        }
+        return identities.size + anonymous
+    }
+
+    /**
      * True iff [member] is the currently active account on this device.
      *
      * Distinct from [AppGroupMemberRecordFfi.local], which Marmot sets to true
@@ -242,7 +262,9 @@ object GroupProjector {
     fun isSelfSoleMember(
         members: List<AppGroupMemberRecordFfi>,
         activeAccountIdHex: String?,
-    ): Boolean = members.size == 1 && isActiveAccountMember(members[0], activeAccountIdHex)
+    ): Boolean =
+        uniqueMemberCount(members) == 1 &&
+            members.any { isActiveAccountMember(it, activeAccountIdHex) }
 
     /**
      * Whether Leave/Delete should dissolve the group with a local wipe instead
