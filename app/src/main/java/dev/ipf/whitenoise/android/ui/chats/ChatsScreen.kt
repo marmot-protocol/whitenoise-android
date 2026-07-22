@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -283,10 +284,12 @@ internal fun ChatsScreen(
         }
     }
     val visibleItems =
-        remember(sourceList, searchQuery, filter, groupTitleCopy, profileRev, bodyMatches) {
+        // Keyed on the trimmed query: leading/trailing-space edits change
+        // nothing the filter can see, so they must not re-run the O(n) pass.
+        remember(sourceList, trimmedQuery, filter, groupTitleCopy, profileRev, bodyMatches) {
             applyChatListSearchAndFilter(
                 sourceList,
-                searchQuery,
+                trimmedQuery,
                 filter,
                 appState,
                 groupTitleCopy,
@@ -367,7 +370,6 @@ internal fun ChatsScreen(
     // Keyed on `showArchived` so the tracked head resets alongside
     // `chatListState` on a view swap.
     val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
-    var lastActiveHeadId by remember(showArchived) { mutableStateOf(activeHeadId) }
     LaunchedEffect(conversationReturnHeadId, activeHeadId, showArchived) {
         val headAtConversationOpen = conversationReturnHeadId ?: return@LaunchedEffect
         snapshotFlow {
@@ -389,25 +391,48 @@ internal fun ChatsScreen(
         }
         onConversationReturnHeadHandled()
     }
-    LaunchedEffect(activeHeadId) {
-        val previous = lastActiveHeadId
-        lastActiveHeadId = activeHeadId
-        if (
-            shouldSnapChatListForClippedHeadReorder(
-                previousHeadId = previous,
-                currentHeadId = activeHeadId,
+    val liveActiveHeadId by rememberUpdatedState(activeHeadId)
+    LaunchedEffect(showArchived) {
+        // Pair consecutive snapshots: by the time a head change is observable,
+        // LazyColumn has already re-anchored to the old head's row by key, so
+        // the reader's true position is the one from the PREVIOUS emission.
+        data class HeadScrollSnapshot(
+            val headId: String?,
+            val firstVisibleItemIndex: Int,
+            val isScrollInProgress: Boolean,
+        )
+
+        var previous: HeadScrollSnapshot? = null
+        snapshotFlow {
+            HeadScrollSnapshot(
+                headId = liveActiveHeadId,
                 firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
-                firstVisibleItemScrollOffset = chatListState.firstVisibleItemScrollOffset,
                 isScrollInProgress = chatListState.isScrollInProgress,
-                isActiveList = !showArchived,
             )
-        ) {
-            chatListState.scrollToItem(0)
+        }.collect { current ->
+            val before = previous
+            previous = current
+            if (
+                before != null &&
+                shouldSnapChatListForHeadReorder(
+                    previousHeadId = before.headId,
+                    currentHeadId = current.headId,
+                    preReorderFirstVisibleItemIndex = before.firstVisibleItemIndex,
+                    isScrollInProgress = before.isScrollInProgress || current.isScrollInProgress,
+                    isActiveList = !showArchived,
+                )
+            ) {
+                chatListState.scrollToItem(0)
+            }
         }
     }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
+        }
+    val activeUnreadCount =
+        remember(controller.items) {
+            controller.items.count { it.hasUnread }
         }
     // Leave the archived view if its last chat is unarchived — the chip is then
     // hidden, so don't strand the selection on it.
@@ -542,7 +567,7 @@ internal fun ChatsScreen(
                 ChatListFilterChips(
                     filter = filter,
                     onChange = { filter = it },
-                    activeUnreadCount = controller.items.count { it.hasUnread },
+                    activeUnreadCount = activeUnreadCount,
                     hasArchived = controller.archivedItems.isNotEmpty(),
                     archivedUnreadCount = archivedUnreadCount,
                 )
