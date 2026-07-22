@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
+import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -318,9 +319,16 @@ internal fun MainShell(
         appState.publishShareShortcuts(chatsController.forwardTargets())
     }
 
+    LaunchedEffect(appState.appLockScreenVisible) {
+        if (appState.appLockScreenVisible) {
+            sharePickerRequest = null
+        }
+    }
+
     LaunchedEffect(
         inboundShareRequest,
         appState.phase,
+        appState.appLockScreenVisible,
         appState.activeAccountRef,
         appState.accounts,
         chatsController,
@@ -329,7 +337,7 @@ internal fun MainShell(
         chatsController.items,
     ) {
         val request = inboundShareRequest ?: return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready) return@LaunchedEffect
+        if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
         if (appState.accounts.isEmpty()) return@LaunchedEffect
         val accountRef = appState.activeAccountRef ?: return@LaunchedEffect
         val chatListReady =
@@ -446,17 +454,19 @@ internal fun MainShell(
     }
 
     // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
-    sharePickerRequest?.let { request ->
-        ShareChatPickerSheet(
-            appState = appState,
-            payload = request.payload,
-            onDismiss = { sharePickerRequest = null },
-            onStage = { groupIds ->
-                val allChats = chatsController.items + chatsController.archivedItems
-                stageShareToChats(request, groupIds, allChats)
-                sharePickerRequest = null
-            },
-        )
+    if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+        sharePickerRequest?.let { request ->
+            ShareChatPickerSheet(
+                appState = appState,
+                payload = request.payload,
+                onDismiss = { sharePickerRequest = null },
+                onStage = { groupIds ->
+                    val allChats = chatsController.items + chatsController.archivedItems
+                    stageShareToChats(request, groupIds, allChats)
+                    sharePickerRequest = null
+                },
+            )
+        }
     }
 
     // The shell-level profile sheet covers every non-conversation entry point

@@ -277,6 +277,9 @@
         <item quantity="other">%1$d 个附件</item>
     </plurals>
     <string name="toast_share_staged_other_chats">还在另外 %1$d 个聊天中暂存</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="other">无法添加 %1$d 个附件。每次最多可发送 10 个。</item>
+    </plurals>
     <string name="delete">删除</string>
     <string name="delete_for_me">仅为我删除</string>
     <string name="delete_for_everyone">为所有人删除</string>

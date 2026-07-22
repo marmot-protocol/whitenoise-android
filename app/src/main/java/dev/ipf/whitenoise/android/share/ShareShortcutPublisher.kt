@@ -7,8 +7,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
-import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_PREFIX
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.conversationShortcutIsRich
+import dev.ipf.whitenoise.android.notifications.isConversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
 import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -75,20 +76,25 @@ class ShareShortcutPublisher(
     private val maxShortcutCount: () -> Int = {
         ShortcutManagerCompat.getMaxShortcutCountPerActivity(context).coerceAtLeast(0)
     },
-    private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+    private val setDynamicShortcuts: (List<ShortcutInfoCompat>) -> Unit = { shortcuts ->
+        ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
     },
-    private val removeShortcuts: (List<String>) -> Unit = { ids ->
-        ShortcutManagerCompat.removeDynamicShortcuts(context, ids)
+    private val existingShortcuts: () -> List<ShortcutInfoCompat> = {
+        ShortcutManagerCompat.getShortcuts(
+            context,
+            ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or ShortcutManagerCompat.FLAG_MATCH_CACHED,
+        )
     },
-    private val existingShortcutIds: () -> Set<String> = {
-        ShortcutManagerCompat
-            .getDynamicShortcuts(context)
-            .map { it.id }
-            .filter { it.startsWith(CONVERSATION_SHORTCUT_PREFIX) }
-            .toSet()
+    private val removeLongLivedShortcuts: (List<String>) -> Unit = { ids ->
+        ShortcutManagerCompat.removeLongLivedShortcuts(context, ids)
     },
 ) {
+    /**
+     * Publish recent-chat Direct Share targets for the active account only.
+     * Preserves rich notification shortcuts (person + locus) instead of
+     * downgrading them, and applies the ranked list in one [setDynamicShortcuts]
+     * call so recency is not reversed by per-item pushes.
+     */
     fun publish(
         accountRef: String,
         chats: List<ChatListItem>,
@@ -96,28 +102,41 @@ class ShareShortcutPublisher(
     ) {
         if (accountRef.isBlank()) return
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
-        if (maxShortcuts <= 0) return
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
         val targets = selectShareShortcutTargets(accountRef, chats, limit, displayTitle)
+        val existing = existingShortcuts()
+        val existingById = existing.associateBy { it.id }
         val desiredIds =
             targets
-                .mapNotNull { conversationShortcutId(accountRef, it.groupIdHex) }
+                .mapNotNull { target -> conversationShortcutId(accountRef, target.groupIdHex) }
                 .toSet()
-        val existing = existingShortcutIds()
-        val stale = existing - desiredIds
-        if (stale.isNotEmpty()) {
-            removeShortcuts(stale.toList())
+        val staleLongLivedIds =
+            existing
+                .map { it.id }
+                .filter(::isConversationShortcutId)
+                .filterNot(desiredIds::contains)
+                .distinct()
+        if (staleLongLivedIds.isNotEmpty()) {
+            removeLongLivedShortcuts(staleLongLivedIds)
         }
-        targets.forEach { target ->
-            val shortcutId = conversationShortcutId(accountRef, target.groupIdHex) ?: return@forEach
-            val existingTitle =
-                ShortcutManagerCompat
-                    .getDynamicShortcuts(context)
-                    .firstOrNull { it.id == shortcutId }
-                    ?.longLabel
-                    ?.toString()
-            val shortcut = buildShareShortcut(context, target, existingTitle) ?: return@forEach
-            shortcutPublisher(shortcut)
-        }
+        val shortcuts =
+            if (targets.isEmpty()) {
+                emptyList()
+            } else {
+                targets.mapNotNull { target ->
+                    val shortcutId = conversationShortcutId(accountRef, target.groupIdHex) ?: return@mapNotNull null
+                    val existing = existingById[shortcutId]
+                    if (existing != null && conversationShortcutIsRich(existing)) {
+                        existing
+                    } else {
+                        buildShareShortcut(
+                            context,
+                            target,
+                            existing?.longLabel?.toString(),
+                        )
+                    }
+                }
+            }
+        setDynamicShortcuts(shortcuts)
     }
 }

@@ -360,6 +360,10 @@
         <item quantity="other">%1$d attachments</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Also staged in %1$d other chats</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="one">%1$d attachment couldn\'t be added. You can send up to 10 at a time.</item>
+        <item quantity="other">%1$d attachments couldn\'t be added. You can send up to 10 at a time.</item>
+    </plurals>
     <string name="delete">Delete</string>
     <string name="delete_for_me">Delete for me</string>
     <string name="delete_for_everyone">Delete for everyone</string>

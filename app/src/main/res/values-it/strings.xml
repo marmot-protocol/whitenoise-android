@@ -285,6 +285,10 @@
         <item quantity="other">%1$d allegati</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Preparato anche in altre %1$d chat</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="one">Impossibile aggiungere %1$d allegato. Puoi inviarne fino a 10 alla volta.</item>
+        <item quantity="other">Impossibile aggiungere %1$d allegati. Puoi inviarne fino a 10 alla volta.</item>
+    </plurals>
     <string name="delete">Elimina</string>
     <string name="delete_for_me">Elimina per me</string>
     <string name="delete_for_everyone">Elimina per tutti</string>

@@ -74,12 +74,16 @@ class ChatListProfileReturnSnapCoverageTest {
     @Test
     fun profileSnapshotClearsOnDismissAndUnrelatedNavigation() {
         val mainShell = mainShellSource().readText()
+        val profileSheetBlock =
+            mainShell.requiredSection(
+                start = "// The shell-level profile sheet",
+                end = "\n\n    if (selectedChat != null) {",
+            )
 
         val onDismissBlock =
-            mainShell.requiredSection(
+            profileSheetBlock.requiredSection(
                 start = "onDismiss = {",
                 end = "\n                },",
-                occurrence = 0,
             )
         assertTrue(
             "profile dismiss must clear the list-bound snapshot",

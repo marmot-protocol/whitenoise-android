@@ -12,18 +12,25 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.IconCompat
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
+import dev.ipf.whitenoise.android.state.ChatListItem
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -43,6 +50,7 @@ class LocalNotificationPresenterConversationTest {
         get() = context.getSystemService(NotificationManager::class.java)
 
     private var publishedShortcut: ShortcutInfoCompat? = null
+    private var publishedShortcutCount = 0
     private lateinit var presenter: LocalNotificationPresenter
 
     @Before
@@ -50,11 +58,13 @@ class LocalNotificationPresenterConversationTest {
         manager.cancelAll()
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
         publishedShortcut = null
+        publishedShortcutCount = 0
         presenter =
             LocalNotificationPresenter(
                 context = context,
                 shortcutPublisher = { shortcut ->
                     publishedShortcut = shortcut
+                    publishedShortcutCount += 1
                     ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
                 },
             )
@@ -76,11 +86,114 @@ class LocalNotificationPresenterConversationTest {
         ShortcutManagerCompat.pushDynamicShortcut(context, shareShortcut)
         presenter.ensureChannels()
         runBlocking {
-            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = true,
+                shortNpub = { "npub1test" },
+            )
         }
         assertTrue(
             checkNotNull(publishedShortcut).categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true,
         )
+    }
+
+    @Test
+    fun backgroundAccountShortcutOmitsDirectShareCategory() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = false,
+                shortNpub = { "npub1test" },
+            )
+        }
+        val shortcut = checkNotNull(publishedShortcut)
+        assertTrue(conversationShortcutIsRich(shortcut))
+        assertFalse(shortcut.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+    }
+
+    @Test
+    fun becomingActiveRepublishesShortcutWithDirectShareCategory() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = false,
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        assertEquals(2, publishedShortcutCount)
+        assertTrue(
+            checkNotNull(publishedShortcut).categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true,
+        )
+    }
+
+    @Test
+    fun clearingAccountShortcutsInvalidatesSnapshotForIdenticalRepublish() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+        presenter.clearConversationShortcuts()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        assertEquals(2, publishedShortcutCount)
+    }
+
+    @Test
+    fun shareShortcutPublisherPreservesRichNotificationShortcut() {
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                directShareEligible = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+        val rich = checkNotNull(publishedShortcut)
+        var synced: ShortcutInfoCompat? = null
+        val publisher =
+            dev.ipf.whitenoise.android.share.ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 4 },
+                setDynamicShortcuts = { shortcuts -> synced = shortcuts.single() },
+                existingShortcuts = { listOf(rich) },
+                removeLongLivedShortcuts = { },
+            )
+        publisher.publish(
+            accountRef = "account-a",
+            chats =
+                listOf(
+                    chatListItem("group-a", "General"),
+                ),
+            displayTitle = { it.group.name },
+        )
+        assertSame(rich, synced)
+        assertTrue(conversationShortcutIsRich(checkNotNull(synced)))
+        assertTrue(synced.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
     }
 
     @Test
@@ -417,6 +530,54 @@ class LocalNotificationPresenterConversationTest {
             .setStyle(style)
             .build()
     }
+
+    private fun chatListItem(
+        groupId: String,
+        name: String,
+    ): ChatListItem =
+        ChatListItem(
+            group =
+                AppGroupRecordFfi(
+                    selfMembership = SelfMembershipFfi.MEMBER,
+                    groupIdHex = groupId,
+                    endpoint = "endpoint-$groupId",
+                    name = name,
+                    description = "",
+                    admins = emptyList(),
+                    relays = emptyList(),
+                    nostrGroupIdHex = "nostr-$groupId",
+                    avatarUrl = null,
+                    avatarDim = null,
+                    avatarThumbhash = null,
+                    imageHashHex = null,
+                    encryptedMedia = encryptedMedia(),
+                    archived = false,
+                    pendingConfirmation = false,
+                    welcomerAccountIdHex = null,
+                    viaWelcomeMessageIdHex = null,
+                    disappearingMessageSecs = 0uL,
+                ),
+            latest = null,
+            otherMemberAccount = null,
+            memberCount = 1,
+            memberSnapshot = null,
+        )
+
+    private fun encryptedMedia() =
+        AppGroupEncryptedMediaComponentFfi(
+            componentId = 0x8008u,
+            component = "marmot.group.encrypted-media.v1",
+            required = true,
+            mediaFormat = "encrypted-media-v1",
+            allowedLocatorKinds = listOf("blossom-v1"),
+            defaultBlobEndpoints =
+                listOf(
+                    AppBlobEndpointFfi(
+                        locatorKind = "blossom-v1",
+                        baseUrl = "https://blossom.primal.net",
+                    ),
+                ),
+        )
 
     private fun update(
         isMention: Boolean,

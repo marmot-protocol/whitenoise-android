@@ -50,4 +50,50 @@ class ComposerTextStateShareRevisionTest {
             )
         }
     }
+
+    @Test
+    fun inboundShareRevisionWaitsForEditCompletionBeforeRehydratingComposerText() {
+        var persistedDraft by mutableStateOf(TextFieldValue("existing", TextRange(8)))
+        var externalShareRevision by mutableIntStateOf(0)
+        var editingMessageId by mutableStateOf<String?>("msg-edit-1")
+        lateinit var composerState: ComposerTextState
+
+        composeRule.setContent {
+            val appliedShareRevision =
+                rememberComposerShareRevision(
+                    externalRevision = externalShareRevision,
+                    editingMessageId = editingMessageId,
+                )
+            composerState =
+                rememberComposerTextState(
+                    draftKey = "group-1",
+                    initialDraft = persistedDraft,
+                    externalRevision = appliedShareRevision,
+                )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            persistedDraft = TextFieldValue("shared inbound", TextRange(15))
+            externalShareRevision += 1
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertEquals("msg-edit-1", editingMessageId)
+            assertEquals(
+                TextFieldValue("existing", TextRange(8)),
+                composerState.valueState.value,
+            )
+            editingMessageId = null
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                TextFieldValue("shared inbound", TextRange(15)),
+                composerState.valueState.value,
+            )
+        }
+    }
 }

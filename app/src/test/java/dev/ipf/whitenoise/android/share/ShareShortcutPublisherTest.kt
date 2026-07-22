@@ -4,8 +4,6 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
-import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.state.ChatListItem
 import org.junit.Assert.assertEquals
@@ -21,7 +19,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class ShareShortcutPublisherTest {
     private val titleCopy =
-        GroupTitleCopy(
+        dev.ipf.whitenoise.android.core.GroupTitleCopy(
             inviteFromFormat = "Invite from %1\$s",
             groupOfPeopleFormat = "Group of %1\$d people",
             unknownTitle = "Unknown",
@@ -42,7 +40,11 @@ class ShareShortcutPublisherTest {
             )
         val expectedId = conversationShortcutId("acct", "group-1")
         assertEquals(expectedId, shortcut?.id)
-        assertTrue(shortcut?.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true)
+        assertTrue(
+            shortcut?.categories?.contains(
+                dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY,
+            ) == true,
+        )
         assertNull(shortcut?.intent?.getStringExtra("dev.ipf.whitenoise.android.extra.DIRECT_SHARE_GROUP_ID"))
     }
 
@@ -77,16 +79,16 @@ class ShareShortcutPublisherTest {
     }
 
     @Test
-    fun publish_respectsPlatformMaxAndKeepsMostRecentFirst() {
+    fun publish_usesSetDynamicShortcutsInRankOrder() {
         val context = RuntimeEnvironment.getApplication()
         val publishedIds = mutableListOf<String>()
         val publisher =
             ShareShortcutPublisher(
                 context = context,
                 maxShortcutCount = { 2 },
-                shortcutPublisher = { shortcut -> publishedIds += shortcut.id },
-                removeShortcuts = { },
-                existingShortcutIds = { emptySet() },
+                setDynamicShortcuts = { shortcuts -> publishedIds += shortcuts.map { it.id } },
+                existingShortcuts = { emptyList() },
+                removeLongLivedShortcuts = { },
             )
         val chats =
             listOf(
@@ -102,6 +104,29 @@ class ShareShortcutPublisherTest {
         assertEquals(2, publishedIds.size)
         assertEquals(conversationShortcutId("acct", "g1"), publishedIds[0])
         assertEquals(conversationShortcutId("acct", "g2"), publishedIds[1])
+    }
+
+    @Test
+    fun publish_removesStaleLongLivedConversationShortcuts() {
+        val context = RuntimeEnvironment.getApplication()
+        val stale =
+            buildShareShortcut(
+                context,
+                ShareShortcutTarget(accountRef = "other-account", groupIdHex = "stale", title = "Stale"),
+            )!!
+        var removed = emptyList<String>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 1 },
+                setDynamicShortcuts = { },
+                existingShortcuts = { listOf(stale) },
+                removeLongLivedShortcuts = { removed = it },
+            )
+
+        publisher.publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        assertEquals(listOf(stale.id), removed)
     }
 }
 

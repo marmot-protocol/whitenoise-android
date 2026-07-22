@@ -95,6 +95,12 @@ class LocalNotificationPresenter(
         NotificationChannels.ensureChannels(context)
     }
 
+    fun clearConversationShortcuts() {
+        clearAllConversationShortcuts(context)
+        shortcutSnapshots.clear()
+        shortcutLastUsed.clear()
+    }
+
     fun canPostNotifications(): Boolean =
         ContextCompat.checkSelfPermission(
             context,
@@ -258,6 +264,7 @@ class LocalNotificationPresenter(
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         recipientAccountSubtext: String? = null,
         redactContent: Boolean = false,
+        directShareEligible: Boolean = false,
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
         isPostStillAllowed: () -> Boolean = { true },
@@ -396,6 +403,7 @@ class LocalNotificationPresenter(
                                 senderAvatarUrl,
                                 senderAvatarBitmap,
                                 sender,
+                                directShareEligible = directShareEligible,
                             )
                         }
                     }
@@ -875,6 +883,7 @@ class LocalNotificationPresenter(
         senderAvatarUrl: String?,
         senderAvatarBitmap: android.graphics.Bitmap?,
         sender: Person,
+        directShareEligible: Boolean,
     ) {
         runCatching {
             val candidateTitle = content.conversationTitle ?: content.title
@@ -898,6 +907,7 @@ class LocalNotificationPresenter(
                     avatarApplied = conversationAvatarBitmap != null,
                     senderAvatarUrl = senderAvatarUrl,
                     senderAvatarApplied = senderAvatarBitmap != null,
+                    directShareEligible = directShareEligible,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
@@ -914,6 +924,7 @@ class LocalNotificationPresenter(
                     locusId = locusId,
                     sender = sender,
                     conversationAvatarBitmap = conversationAvatarBitmap,
+                    directShareEligible = directShareEligible,
                 )
             shortcutPublisher(shortcut)
             shortcutSnapshots[shortcutId] = snapshot
@@ -941,23 +952,28 @@ class LocalNotificationPresenter(
         locusId: LocusIdCompat,
         sender: Person,
         conversationAvatarBitmap: android.graphics.Bitmap?,
-    ): ShortcutInfoCompat =
-        ShortcutInfoCompat
-            .Builder(context, shortcutId)
-            .setShortLabel(snapshot.shortLabel)
-            .setLongLabel(snapshot.longLabel)
-            .setIcon(
-                notificationConversationIcon(
-                    title = snapshot.longLabel,
-                    seed = snapshot.shortcutId,
-                    avatarBitmap = conversationAvatarBitmap,
-                ),
-            ).setIntent(intent)
-            .setLocusId(locusId)
-            .setPerson(sender)
-            .setLongLived(true)
-            .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
-            .build()
+        directShareEligible: Boolean,
+    ): ShortcutInfoCompat {
+        val builder =
+            ShortcutInfoCompat
+                .Builder(context, shortcutId)
+                .setShortLabel(snapshot.shortLabel)
+                .setLongLabel(snapshot.longLabel)
+                .setIcon(
+                    notificationConversationIcon(
+                        title = snapshot.longLabel,
+                        seed = snapshot.shortcutId,
+                        avatarBitmap = conversationAvatarBitmap,
+                    ),
+                ).setIntent(intent)
+                .setLocusId(locusId)
+                .setPerson(sender)
+                .setLongLived(true)
+        if (directShareEligible) {
+            builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
+        }
+        return builder.build()
+    }
 
     private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
         if (url.isNullOrBlank()) return null
@@ -1096,6 +1112,7 @@ private data class ConversationShortcutSnapshot(
     val avatarApplied: Boolean,
     val senderAvatarUrl: String?,
     val senderAvatarApplied: Boolean,
+    val directShareEligible: Boolean,
 )
 
 /**

@@ -96,11 +96,12 @@ import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
+import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
+import dev.ipf.whitenoise.android.share.SHARE_STREAM_MAX_ITEMS
 import dev.ipf.whitenoise.android.share.ShareInboundStager
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
-import dev.ipf.whitenoise.android.share.ShareStreamStaging
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
@@ -1906,9 +1907,20 @@ class WhiteNoiseAppState(
         shareInboundStager.stageToChats(appContext, accountIdHex, targetGroupIds, payload)
     }
 
-    fun consumeInboundShareStreams(groupIdHex: String): ShareStreamStaging? {
+    fun consumeInboundShareStreamsCapped(
+        groupIdHex: String,
+        existingMediaCount: Int,
+        existingDocumentCount: Int,
+        maxItems: Int = SHARE_STREAM_MAX_ITEMS,
+    ): CappedShareStreamStaging? {
         val accountIdHex = activeAccount?.accountIdHex ?: return null
-        return shareStaging.consume(accountIdHex, groupIdHex)
+        return shareStaging.consumeCapped(
+            accountIdHex = accountIdHex,
+            groupIdHex = groupIdHex,
+            existingMediaCount = existingMediaCount,
+            existingDocumentCount = existingDocumentCount,
+            maxItems = maxItems,
+        )
     }
 
     fun publishShareShortcuts(chats: List<ChatListItem>) {
@@ -2643,6 +2655,7 @@ class WhiteNoiseAppState(
         if (label != activeAccountRef) {
             clearInMemoryMediaCaches()
             clearCrossAccountCaches()
+            clearConversationShortcutSurfaces()
         }
         val target = accounts.firstOrNull { it.label == label }
         if (target?.signedOut == true) {
@@ -2800,6 +2813,10 @@ class WhiteNoiseAppState(
         }
     }
 
+    private fun clearConversationShortcutSurfaces() {
+        localNotificationPresenter.clearConversationShortcuts()
+    }
+
     /**
      * Drop every registered account-scoped cache so account A's data isn't
      * reachable after switching to B. New caches participate by construction;
@@ -2846,6 +2863,7 @@ class WhiteNoiseAppState(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
+        clearConversationShortcutSurfaces()
         // The account is signed out engine-side once this returns; no code
         // below may issue further account-scoped FFI calls for signedOutRef.
         val engineOutcome =
@@ -2911,6 +2929,7 @@ class WhiteNoiseAppState(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
+        clearConversationShortcutSurfaces()
         val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
         val wipeResult =
             nativePushSyncMutex.withSerializedNativePushWipe {
@@ -5704,6 +5723,7 @@ class WhiteNoiseAppState(
                         )
                     },
                 redactContent = redactNotificationContent,
+                directShareEligible = !redactNotificationContent && update.accountRef == activeAccountRef,
                 conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
                 senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
                 shortNpub = ::shortNpub,
