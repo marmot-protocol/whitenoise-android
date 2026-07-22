@@ -2384,7 +2384,7 @@ internal fun ConversationScreen(
                                             membersLoaded = controller.membersLoaded,
                                             openedAsDmHint = openedAsDmHint,
                                             groupName = controller.group.name,
-                                            memberCount = controller.members.size,
+                                            memberCount = controller.memberCount,
                                         )
                                     ) {
                                         controller.subtitle(
@@ -2766,7 +2766,7 @@ internal fun ConversationScreen(
                             isSelfMember = controller.isSelfMember,
                             isSelfAdmin = controller.isSelfAdmin,
                             membersLoaded = controller.membersLoaded,
-                            memberCount = controller.members.size,
+                            memberCount = controller.memberCount,
                         )
                     ) {
                         EmptyGroupConversation(
@@ -2830,15 +2830,7 @@ internal fun ConversationScreen(
                                     }
                                 },
                             ) { index, item ->
-                                Column(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .onSizeChanged { size ->
-                                            if (size.height > 0 && timelineItemHeightsPx[item.record.messageIdHex] != size.height) {
-                                                timelineItemHeightsPx[item.record.messageIdHex] = size.height
-                                            }
-                                        },
-                                ) {
+                                Column(Modifier.fillMaxWidth()) {
                                     // Rendered inside the slot, not as its own item, so
                                     // the anchor index math stays intact.
                                     val older = renderedTimeline.getOrNull(index - 1)
@@ -2864,145 +2856,160 @@ internal fun ConversationScreen(
                                     ) {
                                         UnreadMessagesDivider(count = entryUnreadCount)
                                     }
-                                    // Synthetic `dbg:stream:` rows must never fall
-                                    // through to normal message rendering — not even in
-                                    // the window between the toggle flipping off and the
-                                    // republish that drops them. Draw the debug row only
-                                    // when enabled; otherwise suppress the row entirely.
-                                    if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                                        if (appState.streamingDebugEnabled) {
-                                            StreamDebugEventRow(record = item.record)
-                                        }
-                                        return@Column
-                                    }
-                                    // One decision point for which row a record renders
-                                    // as. Group-system (kind 1210) rows are derived state
-                                    // facts, not chat: they render the centered one-line
-                                    // summary, never a raw-JSON bubble — and that summary
-                                    // stays the default even in developer mode, with the
-                                    // MLS dump reachable per-row behind a tap (#857). The
-                                    // debug-row path covers the other non-user-visible
-                                    // signaling kinds only when streaming debug is on, so
-                                    // the timeline is byte-identical to today when off.
-                                    when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
-                                        TimelineRowKind.GroupSystem -> {
-                                            GroupSystemRow(
-                                                record = item.record,
-                                                appState = appState,
-                                                groupSystem = item.projected?.groupSystem,
-                                                onDeleteForMe =
-                                                    if (controller.group.pendingConfirmation) {
-                                                        null
-                                                    } else {
-                                                        { controller.hideMessageForMe(item.record.messageIdHex) }
-                                                    },
-                                            )
+                                    // Measured below the day/unread separators, so centered
+                                    // scroll targets get the bubble's own height, not a
+                                    // separator-inflated one.
+                                    Column(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .onSizeChanged { size ->
+                                                if (size.height > 0 && timelineItemHeightsPx[item.record.messageIdHex] != size.height) {
+                                                    timelineItemHeightsPx[item.record.messageIdHex] = size.height
+                                                }
+                                            },
+                                    ) {
+                                        // Synthetic `dbg:stream:` rows must never fall
+                                        // through to normal message rendering — not even in
+                                        // the window between the toggle flipping off and the
+                                        // republish that drops them. Draw the debug row only
+                                        // when enabled; otherwise suppress the row entirely.
+                                        if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+                                            if (appState.streamingDebugEnabled) {
+                                                StreamDebugEventRow(record = item.record)
+                                            }
                                             return@Column
                                         }
-                                        TimelineRowKind.AgentOperation -> {
-                                            // Standard bubbles own deletion and
-                                            // convergence tombstones. Use the
-                                            // dedicated chip only for live rows.
-                                            val projectedDeleted = item.projected?.deleted == true
-                                            val optimisticallyDeleted =
-                                                MessageProjector.isDeleted(
-                                                    item.record.messageIdHex,
-                                                    controller.deletedMessageIds,
+                                        // One decision point for which row a record renders
+                                        // as. Group-system (kind 1210) rows are derived state
+                                        // facts, not chat: they render the centered one-line
+                                        // summary, never a raw-JSON bubble — and that summary
+                                        // stays the default even in developer mode, with the
+                                        // MLS dump reachable per-row behind a tap (#857). The
+                                        // debug-row path covers the other non-user-visible
+                                        // signaling kinds only when streaming debug is on, so
+                                        // the timeline is byte-identical to today when off.
+                                        when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
+                                            TimelineRowKind.GroupSystem -> {
+                                                GroupSystemRow(
+                                                    record = item.record,
+                                                    appState = appState,
+                                                    groupSystem = item.projected?.groupSystem,
+                                                    onDeleteForMe =
+                                                        if (controller.group.pendingConfirmation) {
+                                                            null
+                                                        } else {
+                                                            { controller.hideMessageForMe(item.record.messageIdHex) }
+                                                        },
                                                 )
-                                            val invalidated = item.projected?.invalidationStatus != null
-                                            if (
-                                                shouldRenderDedicatedAgentOperationRow(
-                                                    projectedDeleted = projectedDeleted,
-                                                    optimisticallyDeleted = optimisticallyDeleted,
-                                                    invalidated = invalidated,
-                                                )
-                                            ) {
-                                                val operation =
-                                                    remember(item.record) {
-                                                        AgentOperationProjector.project(item.record)
-                                                    }
-                                                if (operation != null) {
-                                                    AgentOperationTimelineRow(
-                                                        item = item,
-                                                        operation = operation,
-                                                        controller = controller,
-                                                        appState = appState,
-                                                        readOnly = controller.group.pendingConfirmation,
+                                                return@Column
+                                            }
+                                            TimelineRowKind.AgentOperation -> {
+                                                // Standard bubbles own deletion and
+                                                // convergence tombstones. Use the
+                                                // dedicated chip only for live rows.
+                                                val projectedDeleted = item.projected?.deleted == true
+                                                val optimisticallyDeleted =
+                                                    MessageProjector.isDeleted(
+                                                        item.record.messageIdHex,
+                                                        controller.deletedMessageIds,
                                                     )
-                                                    return@Column
+                                                val invalidated = item.projected?.invalidationStatus != null
+                                                if (
+                                                    shouldRenderDedicatedAgentOperationRow(
+                                                        projectedDeleted = projectedDeleted,
+                                                        optimisticallyDeleted = optimisticallyDeleted,
+                                                        invalidated = invalidated,
+                                                    )
+                                                ) {
+                                                    val operation =
+                                                        remember(item.record) {
+                                                            AgentOperationProjector.project(item.record)
+                                                        }
+                                                    if (operation != null) {
+                                                        AgentOperationTimelineRow(
+                                                            item = item,
+                                                            operation = operation,
+                                                            controller = controller,
+                                                            appState = appState,
+                                                            readOnly = controller.group.pendingConfirmation,
+                                                        )
+                                                        return@Column
+                                                    }
                                                 }
                                             }
+                                            TimelineRowKind.DebugRow -> {
+                                                MessageDebugRow(
+                                                    style = MessageDebugClassifier.debugStyle(item.record),
+                                                    record = item.record,
+                                                )
+                                                return@Column
+                                            }
+                                            TimelineRowKind.Bubble -> Unit
                                         }
-                                        TimelineRowKind.DebugRow -> {
-                                            MessageDebugRow(
-                                                style = MessageDebugClassifier.debugStyle(item.record),
-                                                record = item.record,
-                                            )
-                                            return@Column
-                                        }
-                                        TimelineRowKind.Bubble -> Unit
+                                        MessageBubble(
+                                            item = item,
+                                            controller = controller,
+                                            appState = appState,
+                                            composerTextState = composerTextState,
+                                            highlighted = item.record.messageIdHex == highlightedMessageId,
+                                            selectionMode = selectionMode,
+                                            textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
+                                            onTextSelectionModeChange = { enabled ->
+                                                val messageId = item.record.messageIdHex
+                                                if (enabled) {
+                                                    openActionMenuId = null
+                                                    textSelectionMessageId = messageId
+                                                    textSelectionBubbleBounds = null
+                                                } else if (textSelectionMessageId == messageId) {
+                                                    clearTextSelection()
+                                                }
+                                            },
+                                            onTextSelectionBoundsChange = { bounds ->
+                                                if (textSelectionMessageId == item.record.messageIdHex) {
+                                                    textSelectionBubbleBounds = bounds
+                                                }
+                                            },
+                                            batchSelectable = item.record.messageIdHex in selectableMessages,
+                                            selected = selectedMessages.containsKey(item.record.messageIdHex),
+                                            onToggleSelection = {
+                                                val messageId = item.record.messageIdHex
+                                                if (selectedMessages.containsKey(messageId)) {
+                                                    selectedMessages.remove(messageId)
+                                                } else {
+                                                    selectableMessages[messageId]?.let {
+                                                        selectedMessages[messageId] = it
+                                                    }
+                                                }
+                                            },
+                                            quickReactionEmojis = quickReactionEmojis,
+                                            isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
+                                            onActionMenuOpenChange = { open ->
+                                                if (open) clearTextSelection()
+                                                openActionMenuId = if (open) item.record.messageIdHex else null
+                                            },
+                                            // Lambdas, not method references: the Compose
+                                            // compiler memoizes lambdas but allocates a fresh
+                                            // function reference per recomposition, which made
+                                            // every visible bubble recompose on any timeline
+                                            // change. See #110.
+                                            onReactionEmojiPicked = { recordReactionEmoji(it) },
+                                            onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                            onQuickReactionsReset = { resetQuickReactionEmojis() },
+                                            onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                            composerGate = composerGate,
+                                            inviteMutationInFlight = controller.mutationInFlight,
+                                            onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
+                                            onDeclineInvite = {
+                                                appState.launchMutation {
+                                                    if (controller.declineInvite()) onBack()
+                                                }
+                                            },
+                                            mentionCandidates = mentionPicker.candidates,
+                                            mentionPickerEnabled = mentionPicker.enabled,
+                                            collapseLongMessages = collapseLongMessages,
+                                            readOnly = controller.group.pendingConfirmation,
+                                        )
                                     }
-                                    MessageBubble(
-                                        item = item,
-                                        controller = controller,
-                                        appState = appState,
-                                        composerTextState = composerTextState,
-                                        highlighted = item.record.messageIdHex == highlightedMessageId,
-                                        selectionMode = selectionMode,
-                                        textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
-                                        onTextSelectionModeChange = { enabled ->
-                                            val messageId = item.record.messageIdHex
-                                            if (enabled) {
-                                                openActionMenuId = null
-                                                textSelectionMessageId = messageId
-                                                textSelectionBubbleBounds = null
-                                            } else if (textSelectionMessageId == messageId) {
-                                                clearTextSelection()
-                                            }
-                                        },
-                                        onTextSelectionBoundsChange = { bounds ->
-                                            if (textSelectionMessageId == item.record.messageIdHex) {
-                                                textSelectionBubbleBounds = bounds
-                                            }
-                                        },
-                                        batchSelectable = item.record.messageIdHex in selectableMessages,
-                                        selected = selectedMessages.containsKey(item.record.messageIdHex),
-                                        onToggleSelection = {
-                                            val messageId = item.record.messageIdHex
-                                            if (selectedMessages.containsKey(messageId)) {
-                                                selectedMessages.remove(messageId)
-                                            } else {
-                                                selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
-                                            }
-                                        },
-                                        quickReactionEmojis = quickReactionEmojis,
-                                        isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
-                                        onActionMenuOpenChange = { open ->
-                                            if (open) clearTextSelection()
-                                            openActionMenuId = if (open) item.record.messageIdHex else null
-                                        },
-                                        // Lambdas, not method references: the Compose
-                                        // compiler memoizes lambdas but allocates a fresh
-                                        // function reference per recomposition, which made
-                                        // every visible bubble recompose on any timeline
-                                        // change. See #110.
-                                        onReactionEmojiPicked = { recordReactionEmoji(it) },
-                                        onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                        onQuickReactionsReset = { resetQuickReactionEmojis() },
-                                        onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                        composerGate = composerGate,
-                                        inviteMutationInFlight = controller.mutationInFlight,
-                                        onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
-                                        onDeclineInvite = {
-                                            appState.launchMutation {
-                                                if (controller.declineInvite()) onBack()
-                                            }
-                                        },
-                                        mentionCandidates = mentionPicker.candidates,
-                                        mentionPickerEnabled = mentionPicker.enabled,
-                                        collapseLongMessages = collapseLongMessages,
-                                        readOnly = controller.group.pendingConfirmation,
-                                    )
                                 }
                             }
                             // Kept minimal (matches the top-spacer) so the last
