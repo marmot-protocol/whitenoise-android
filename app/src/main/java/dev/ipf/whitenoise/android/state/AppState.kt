@@ -1239,14 +1239,15 @@ class WhiteNoiseAppState(
     var appUnlockPromptRequestId by mutableStateOf(0)
         private set
 
-    // Lazily read on first app-lock evaluation: the previous eager constructor
-    // read paid a main-thread Keystore + Tink init at every cold start, even
-    // with app-lock disabled. Enabled users get an off-main pre-warm from init.
+    // Populated by the off-main pre-warm (or the first unlock/background
+    // write); the getter NEVER reads the Keystore-backed store itself — a
+    // first foreground that beats the pre-warm would otherwise pay the
+    // Tink/Keystore init on Main (or block on its lock), the exact cold-start
+    // cost this replaced. Until the value lands, 0L errs toward showing the
+    // lock prompt — the safe direction for a privacy feature.
     private var lastAppUnlockAtMillisBacking: Long? = null
     private var lastAppUnlockAtMillis: Long
-        get() =
-            lastAppUnlockAtMillisBacking
-                ?: AppLockPreferences.readLastUnlockedAtMillis(appContext).also { lastAppUnlockAtMillisBacking = it }
+        get() = lastAppUnlockAtMillisBacking ?: 0L
         set(value) {
             lastAppUnlockAtMillisBacking = value
         }
