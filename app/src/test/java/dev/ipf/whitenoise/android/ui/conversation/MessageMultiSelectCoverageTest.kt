@@ -43,8 +43,9 @@ class MessageMultiSelectCoverageTest {
 
         assertTrue(
             source.contains(
-                "val selectedActionItems = remember(selectedSelections) { " +
-                    "selectedSelections.map(BatchMessageSelection::action) }",
+                "val selectedActionItems = remember(selectedSelections, appState.profileRevisionForCompose) { " +
+                    "selectedSelections.map { selection -> " +
+                    "selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId)) } }",
             ),
         )
         assertTrue(

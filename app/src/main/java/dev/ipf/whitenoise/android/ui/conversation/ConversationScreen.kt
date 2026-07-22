@@ -503,17 +503,12 @@ internal fun ConversationScreen(
                     )
                 }.associateBy { it.action.messageId }
         }
-    val selectableMessages =
-        remember(selectableMessageProjections, appState.profileRevisionForCompose) {
-            selectableMessageProjections.mapValues { (_, selection) ->
-                selection.copy(
-                    action =
-                        selection.action.copy(
-                            senderDisplayName = appState.displayName(selection.action.senderId),
-                        ),
-                )
-            }
-        }
+    // Display names are deliberately NOT resolved here: this map spans the
+    // whole loaded timeline and profileRevisionForCompose bumps on any profile
+    // resolution anywhere, so an eager per-entry displayName() re-ran an O(n)
+    // pass (plus the downstream invalid-ids pass and reconcile effect) on
+    // every bump. Names are only shown for the selected few — resolved below.
+    val selectableMessages = selectableMessageProjections
     val invalidVisibleMessageIds =
         remember(renderedTimeline, selectableMessages) {
             renderedTimeline
@@ -558,8 +553,10 @@ internal fun ConversationScreen(
             derivedStateOf { orderedBatchSelections(selectedMessages.values) }
         }
     val selectedActionItems =
-        remember(selectedSelections) {
-            selectedSelections.map(BatchMessageSelection::action)
+        remember(selectedSelections, appState.profileRevisionForCompose) {
+            selectedSelections.map { selection ->
+                selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
+            }
         }
     val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }
     val selectedForwardBodies = remember(selectedActionItems) { batchForwardBodies(selectedActionItems) }
@@ -3302,10 +3299,15 @@ internal fun ConversationScreen(
     if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
         val imageUris = pendingMediaUris
         val documentUris = pendingDocumentUris
+        // The typed composer draft seeds the caption, and an accepted send
+        // consumes it exactly like a text send would — guarded so text typed
+        // after staging is never wiped. Dismissing leaves the draft alone.
+        val seededDraftText = composerTextState.valueState.value.text
         MediaPreviewScreen(
             uris = imageUris,
             documentUris = documentUris,
             chatTitle = controller.title(groupTitleCopy),
+            initialCaption = seededDraftText,
             onDismiss = {
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
@@ -3318,6 +3320,10 @@ internal fun ConversationScreen(
                     onAccepted = {
                         pendingMediaUris = emptyList()
                         pendingDocumentUris = emptyList()
+                        if (composerTextState.valueState.value.text == seededDraftText) {
+                            composerTextState.valueState.value = TextFieldValue("")
+                            appState.setDraft(controller.group.groupIdHex, TextFieldValue(""))
+                        }
                         onResult(true)
                     },
                     onRejected = { onResult(false) },
