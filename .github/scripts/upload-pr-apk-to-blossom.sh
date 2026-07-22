@@ -81,6 +81,7 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
     case "$error_lower" in
       *'connection reset by peer'* | *'connection refused'* | \
       *'connection timed out'* | *'network is unreachable'* | \
+      *'dialing to the given tcp address timed out'* | \
       *'no route to host'* | *'temporary failure in name resolution'* | \
       *'server misbehaving'* | *'tls handshake timeout'* | \
       *'i/o timeout'* | *'context deadline exceeded'* | \
