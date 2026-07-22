@@ -274,7 +274,6 @@ internal fun GroupDetailsScreen(
         }
     val clipboard = LocalClipboardManager.current
     val readOnlyInvite = controller.group.pendingConfirmation
-    val inviteLabelText = stringResource(R.string.invite)
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
 
@@ -950,9 +949,6 @@ internal fun GroupDetailsScreen(
                         AssistChip(
                             onClick = {
                                 clipboard.setText(AnnotatedString(invite))
-                                appState.presentText(
-                                    AppText.Resource(R.string.toast_copied_value, listOf(inviteLabelText)),
-                                )
                             },
                             label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
                             leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
@@ -973,13 +969,11 @@ internal fun GroupDetailsScreen(
                     label = stringResource(R.string.group_id),
                     value = controller.group.groupIdHex,
                     clipboard = clipboard,
-                    appState = appState,
                 )
                 DiagnosticRow(
                     stringResource(R.string.nostr_group),
                     IdentityFormatter.short(controller.group.nostrGroupIdHex),
                     copyValue = controller.group.nostrGroupIdHex,
-                    appState = appState,
                 )
                 DiagnosticRow(
                     stringResource(R.string.relays),
@@ -1014,7 +1008,6 @@ internal fun GroupDetailsScreen(
                                     stringResource(R.string.group_id),
                                     IdentityFormatter.short(state.groupIdHex),
                                     copyValue = state.groupIdHex,
-                                    appState = appState,
                                 )
                                 DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
                                 DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
@@ -1602,7 +1595,6 @@ private fun PushDeliveryDebugSection(
                         stringResource(R.string.push_debug_last_token_list_update),
                         updatedAtText,
                         copyValue = updatedAtText,
-                        appState = appState,
                     )
                 }
 
@@ -1661,7 +1653,6 @@ private fun PushTokenDebugRows(
         stringResource(R.string.push_debug_member),
         IdentityFormatter.short(token.memberIdHex),
         copyValue = token.memberIdHex,
-        appState = appState,
     )
     DiagnosticRow(stringResource(R.string.push_debug_leaf_index), token.leafIndex.toString())
     DiagnosticRow(stringResource(R.string.push_debug_platform), token.platform.name)
@@ -1669,13 +1660,11 @@ private fun PushTokenDebugRows(
         stringResource(R.string.push_debug_token_fingerprint),
         IdentityFormatter.short(token.tokenFingerprint),
         copyValue = token.tokenFingerprint,
-        appState = appState,
     )
     DiagnosticRow(
         stringResource(R.string.push_debug_push_server_pubkey),
         IdentityFormatter.short(token.serverPubkeyHex),
         copyValue = token.serverPubkeyHex,
-        appState = appState,
     )
     DiagnosticRow(stringResource(R.string.push_debug_relay_hint), yesNo(token.hasRelayHint))
     DiagnosticRow(stringResource(R.string.push_debug_active_leaf), yesNo(token.activeLeaf))
@@ -1686,7 +1675,6 @@ private fun PushTokenDebugRows(
         stringResource(R.string.push_debug_updated_at),
         updatedAtText,
         copyValue = updatedAtText,
-        appState = appState,
     )
 }
 

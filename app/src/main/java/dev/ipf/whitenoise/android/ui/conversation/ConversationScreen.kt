@@ -2314,7 +2314,6 @@ internal fun ConversationScreen(
                     onCopy = {
                         if (selectedCopyText.isNotBlank()) {
                             clipboard.setText(AnnotatedString(selectedCopyText))
-                            appState.present(R.string.copied)
                             selectedMessages.clear()
                         }
                     },

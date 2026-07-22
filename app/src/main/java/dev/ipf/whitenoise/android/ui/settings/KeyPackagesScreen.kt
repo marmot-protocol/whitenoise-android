@@ -54,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
@@ -165,9 +164,6 @@ internal fun KeyPackagesScreen(
             }
         },
         onDelete = { pendingDelete = it },
-        onCopied = { label ->
-            appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
-        },
     )
 
     pendingDelete?.let { kp ->
@@ -217,7 +213,6 @@ internal fun KeyPackagesContent(
     onRepublish: () -> Unit,
     onPublishNew: () -> Unit,
     onDelete: (AccountKeyPackageFfi) -> Unit,
-    onCopied: (String) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
@@ -313,7 +308,6 @@ internal fun KeyPackagesContent(
                                 kp = kp,
                                 actionsEnabled = state.packageActionsEnabled,
                                 onDelete = { onDelete(kp) },
-                                onCopied = onCopied,
                             )
                         }
                     }
@@ -328,14 +322,12 @@ private fun KeyPackageCard(
     kp: AccountKeyPackageFfi,
     actionsEnabled: Boolean,
     onDelete: () -> Unit,
-    onCopied: (String) -> Unit,
 ) {
     val localLabel = stringResource(R.string.local)
     val relayLabel = stringResource(R.string.relay)
     val unknownLabel = stringResource(R.string.unknown)
     val clipboard = LocalClipboardManager.current
     val copyKeyPackageLabel = stringResource(R.string.copy)
-    val keyPackageLabelText = stringResource(R.string.key_package)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
@@ -354,7 +346,6 @@ private fun KeyPackageCard(
                                 role = Role.Button,
                             ) {
                                 clipboard.setText(AnnotatedString(kp.keyPackageId))
-                                onCopied(keyPackageLabelText)
                             },
                     )
                     Text(
@@ -376,13 +367,11 @@ private fun KeyPackageCard(
                 stringResource(R.string.event),
                 IdentityFormatter.short(kp.eventIdHex),
                 copyValue = kp.eventIdHex,
-                onCopy = onCopied,
             )
             DiagnosticRow(
                 stringResource(R.string.ref),
                 IdentityFormatter.short(kp.keyPackageRefHex),
                 copyValue = kp.keyPackageRefHex,
-                onCopy = onCopied,
             )
             DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
             if (kp.sourceRelays.isNotEmpty()) {

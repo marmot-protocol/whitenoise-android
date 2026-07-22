@@ -45,7 +45,6 @@ class KeyPackagesScreenScreenshotTest {
                         onRepublish = {},
                         onPublishNew = {},
                         onDelete = {},
-                        onCopied = {},
                     )
                 }
             }

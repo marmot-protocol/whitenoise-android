@@ -405,7 +405,6 @@
     <string name="hide">Ausblenden</string>
     <string name="toast_encrypted_backup_created">Verschlüsseltes Backup erstellt</string>
     <string name="toast_couldnt_create_encrypted_backup">Verschlüsseltes Backup konnte nicht erstellt werden</string>
-    <string name="toast_encrypted_backup_copied">Verschlüsseltes Backup kopiert</string>
     <string name="copy">Kopieren</string>
     <string name="account_relay_lists">Account-Relay-Listen</string>
     <string name="no_relays">Keine Relays konfiguriert</string>
@@ -582,9 +581,7 @@
     <string name="toast_no_audit_logs_to_delete">Keine Prüfprotokolle zum Löschen vorhanden</string>
     <string name="toast_chat_created">Chat erstellt</string>
     <string name="toast_notification_permission_denied">Benachrichtigungsberechtigung verweigert</string>
-    <string name="toast_copied_npub">npub kopiert</string>
     <string name="toast_signed_out">Abmelden</string>
-    <string name="toast_copied_value">%1$s kopiert</string>
     <string name="group_title_invite_from">Einladung von %1$s</string>
     <string name="group_title_people_count">Gruppe mit %1$d Personen</string>
     <string name="just_you">Nur du</string>

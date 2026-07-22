@@ -405,7 +405,6 @@
     <string name="hide">Nascondi</string>
     <string name="toast_encrypted_backup_created">Backup cifrato creato</string>
     <string name="toast_couldnt_create_encrypted_backup">Impossibile creare il backup cifrato</string>
-    <string name="toast_encrypted_backup_copied">Backup cifrato copiato</string>
     <string name="copy">Copia</string>
     <string name="account_relay_lists">Elenchi di inoltro degli account</string>
     <string name="no_relays">Nessun relay configurato</string>
@@ -582,9 +581,7 @@
     <string name="toast_no_audit_logs_to_delete">Nessun log di audit da eliminare</string>
     <string name="toast_chat_created">Chat creata</string>
     <string name="toast_notification_permission_denied">Autorizzazione di notifica negata</string>
-    <string name="toast_copied_npub">npub copiato</string>
     <string name="toast_signed_out">Esci</string>
-    <string name="toast_copied_value">%1$s copiato</string>
     <string name="group_title_invite_from">Invito da %1$s</string>
     <string name="group_title_people_count">Gruppo di %1$d persone</string>
     <string name="just_you">Solo tu</string>

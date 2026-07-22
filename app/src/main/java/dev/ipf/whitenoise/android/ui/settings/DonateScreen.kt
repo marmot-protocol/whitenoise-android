@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
 import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
@@ -61,10 +60,7 @@ private data class DonationMethod(
 // selector (mutually-exclusive choice), its QR inline above a tap-to-copy row.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DonateScreen(
-    appState: WhiteNoiseAppState,
-    onBack: () -> Unit,
-) {
+internal fun DonateScreen(onBack: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     var selected by rememberSaveable { mutableStateOf(0) }
     val methods =
@@ -145,7 +141,6 @@ internal fun DonateScreen(
                             label = method.addressLabel,
                             value = method.value,
                             clipboard = clipboard,
-                            appState = appState,
                             displayValue = IdentityFormatter.short(method.value, prefix = 18, suffix = 12),
                         )
                     }

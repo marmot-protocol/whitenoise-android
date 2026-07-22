@@ -419,7 +419,6 @@
     <string name="hide">Скрыть</string>
     <string name="toast_encrypted_backup_created">Зашифрованная копия создана</string>
     <string name="toast_couldnt_create_encrypted_backup">Не удалось создать зашифрованную копию</string>
-    <string name="toast_encrypted_backup_copied">Зашифрованная копия скопирована</string>
     <string name="copy">Копировать</string>
     <string name="account_relay_lists">Списки ретрансляции учетных записей</string>
     <string name="no_relays">Реле не настроены</string>
@@ -596,9 +595,7 @@
     <string name="toast_no_audit_logs_to_delete">Нет журналов аудита для удаления</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
-    <string name="toast_copied_npub">npub скопирован</string>
     <string name="toast_signed_out">Выйти</string>
-    <string name="toast_copied_value">%1$s скопировано</string>
     <string name="group_title_invite_from">Приглашение от %1$s</string>
     <string name="group_title_people_count">Группа из %1$d участников</string>
     <string name="just_you">Только вы</string>

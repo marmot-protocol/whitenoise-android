@@ -97,7 +97,6 @@ internal fun ProfileQrSheet(
                 onClick = {
                     clipboard.setText(AnnotatedString(npub))
                     copied = true
-                    appState.present(R.string.toast_copied_npub)
                 },
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)

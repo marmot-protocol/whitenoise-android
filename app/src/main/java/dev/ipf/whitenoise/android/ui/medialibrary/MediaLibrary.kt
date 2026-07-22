@@ -1073,7 +1073,6 @@ private fun UrlLibraryTab(
             },
             onCopy = {
                 clipboard.setText(AnnotatedString(entry.url))
-                appState.present(R.string.copied)
             },
         )
     }

@@ -52,7 +52,6 @@ import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
@@ -425,13 +424,10 @@ internal fun DiagnosticRow(
     label: String,
     value: String,
     copyValue: String? = null,
-    appState: WhiteNoiseAppState? = null,
-    onCopy: ((String) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
-    // Opt-in tap-to-copy: callers provide the full value plus either an
-    // appState-backed confirmation or a custom confirmation callback.
-    val copyable = !copyValue.isNullOrEmpty() && (appState != null || onCopy != null)
+    // Opt-in tap-to-copy: callers provide the full value to copy.
+    val copyable = !copyValue.isNullOrEmpty()
     val copyLabel = stringResource(R.string.copy)
     val rowModifier =
         if (copyable) {
@@ -442,11 +438,6 @@ internal fun DiagnosticRow(
                     role = Role.Button,
                 ) {
                     clipboard.setText(AnnotatedString(copyValue.orEmpty()))
-                    if (onCopy != null) {
-                        onCopy(label)
-                    } else {
-                        appState?.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
-                    }
                 }
         } else {
             Modifier.fillMaxWidth()
