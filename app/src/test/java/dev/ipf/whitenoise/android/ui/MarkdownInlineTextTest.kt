@@ -202,6 +202,13 @@ class MarkdownInlineTextTest {
         assertTrue(shouldConfirmMarkdownLink("report.pdf", "https://files.example/report.pdf"))
         // Homoglyph/IDN-shaped labels cannot be compared in ASCII — confirm.
         assertTrue(shouldConfirmMarkdownLink("\u0430\u0440\u0440\u04cf\u0435.com", "https://evil.example"))
+        // An invisible character inside a host-shaped label hides it from the
+        // token scan while rendering identically — must fail CLOSED.
+        assertTrue(shouldConfirmMarkdownLink("bank\u200B.example", "https://evil.example"))
+        assertTrue(shouldConfirmMarkdownLink("bank\u200B.example", "https://bank.example"))
+        // IPv6-shaped labels are incomparable against a hostname — confirm.
+        assertTrue(shouldConfirmMarkdownLink("2001:db8::1", "https://evil.example"))
+        assertTrue(shouldConfirmMarkdownLink("[::1] local", "https://evil.example"))
         // Non-http destinations keep confirming.
         assertTrue(shouldConfirmMarkdownLink("support", "mailto:evil@evil.example"))
     }

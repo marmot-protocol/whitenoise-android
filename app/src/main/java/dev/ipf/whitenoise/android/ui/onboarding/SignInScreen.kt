@@ -331,11 +331,20 @@ internal fun IdentityEntryForm(
             onScan = { raw ->
                 showScanner = false
                 val scanned = IdentityEntryInput.scannedValue(raw)
-                if (scanned == null) {
-                    onErrorChange(R.string.identity_entry_error_invalid_key)
-                } else {
-                    // Fill only; the user reviews and taps sign in / import.
-                    onIdentityChange(scanned)
+                val secretRejected =
+                    secretKeyOnly &&
+                        scanned != null &&
+                        IdentityEntryInput.classify(scanned) != IdentityEntryInput.Kind.SecretKey
+                when {
+                    scanned == null -> onErrorChange(R.string.identity_entry_error_invalid_key)
+                    // A secret-only field must reject a public identifier at
+                    // scan time: filled into a masked field, an npub reads as
+                    // an accepted key until submit fails much later.
+                    secretRejected -> onErrorChange(R.string.sign_in_error_public_key)
+                    else -> {
+                        // Fill only; the user reviews and taps sign in / import.
+                        onIdentityChange(scanned)
+                    }
                 }
             },
         )

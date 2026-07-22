@@ -1156,6 +1156,12 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
 // labels with no URL-like content at all skip the dialog.
 private val LABEL_HOST_TOKEN = Regex("(?i)\\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}\\b")
 private val LABEL_IPV4_TOKEN = Regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b")
+
+// IPv6 shapes: full form (three-plus hex groups), "::" compressions, and
+// bracketed literals. Not parsed for comparison — presence alone confirms;
+// a code-snippet false positive only costs one dialog, the safe direction.
+private val LABEL_IPV6_TOKEN =
+    Regex("(?i)(?:\\b[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){2,}\\b|[0-9a-f]{0,4}::[0-9a-f:]*[0-9a-f]|\\[[0-9a-f:.]+\\])")
 private val DOT_LIKE_CHARS = charArrayOf('.', '。', '．', '｡')
 private const val ASCII_MAX_CODE = 0x7F
 
@@ -1178,15 +1184,27 @@ internal fun shouldConfirmMarkdownLink(
             ?.lowercase(Locale.ROOT)
             ?.removePrefix("www.")
             ?: return true
+    // Compare what the USER SEES, not the raw tokens: rendering strips bidi
+    // and invisible default-ignorable characters, so the scan must run on the
+    // same sanitized text — otherwise a zero-width character inside
+    // "bank.example" hides the host from the regex while the rendered label
+    // still reads as the host (fail-open). A label whose sanitized form
+    // differs from the raw text was carrying exactly such characters inside
+    // a link label: treat it as spoof-shaped outright.
+    val visibleLabel = ProfileSanitizer.stripUnsafe(labelText)
+    val carriedInvisibleChars = visibleLabel != labelText
     // A non-ASCII label containing any dot-like character can be a homoglyph
     // host (IDN lookalike) the ASCII token scan below cannot compare — those
-    // always keep the dialog.
+    // always keep the dialog. IPv6-shaped labels are likewise incomparable
+    // against a hostname and keep it too.
     val idnShapedLabel =
-        labelText.any { it.code > ASCII_MAX_CODE } && labelText.any { it in DOT_LIKE_CHARS }
+        visibleLabel.any { it.code > ASCII_MAX_CODE } && visibleLabel.any { it in DOT_LIKE_CHARS }
     val labelHosts =
-        (LABEL_HOST_TOKEN.findAll(labelText) + LABEL_IPV4_TOKEN.findAll(labelText))
+        (LABEL_HOST_TOKEN.findAll(visibleLabel) + LABEL_IPV4_TOKEN.findAll(visibleLabel))
             .map { it.value.lowercase(Locale.ROOT).removePrefix("www.") }
-    return idnShapedLabel ||
+    return carriedInvisibleChars ||
+        idnShapedLabel ||
+        LABEL_IPV6_TOKEN.containsMatchIn(visibleLabel) ||
         labelHosts.any { host -> host != destHost && !destHost.endsWith(".$host") }
 }
 

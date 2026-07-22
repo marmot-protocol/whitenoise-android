@@ -3163,6 +3163,11 @@ class WhiteNoiseAppState(
 
     fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
+        // Short-circuit BEFORE shouldShowAppLock: its lastUnlockedAtMillis
+        // argument evaluates the lazy Keystore-backed read, so without this
+        // guard app-lock-disabled users would still pay it on first
+        // foreground — the exact cost the lazy read exists to avoid.
+        if (!requireAppUnlock || !appLockCredentialAvailable) return
         if (
             shouldShowAppLock(
                 requireUnlock = requireAppUnlock,

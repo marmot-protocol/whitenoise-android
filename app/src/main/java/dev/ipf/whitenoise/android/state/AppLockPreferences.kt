@@ -30,7 +30,13 @@ internal object AppLockPreferences {
 
     fun readLastUnlockedAtMillis(context: Context): Long =
         runCatching { openSecure(context.applicationContext).getLong(LAST_UNLOCKED_AT_KEY, 0L) }
-            .getOrDefault(0L)
+            .getOrElse {
+                // A cached instance whose Keystore entry was invalidated stays
+                // broken for the whole process — drop it so the next call
+                // recreates (and recovers the corrupt file if needed).
+                cachedSecure = null
+                0L
+            }
 
     fun writeLastUnlockedAtMillis(
         context: Context,
@@ -41,7 +47,7 @@ internal object AppLockPreferences {
                 .edit()
                 .putLong(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L))
                 .apply()
-        }
+        }.onFailure { cachedSecure = null }
     }
 
     private fun openSecure(context: Context): SharedPreferences {
