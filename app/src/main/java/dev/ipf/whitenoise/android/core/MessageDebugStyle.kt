@@ -42,12 +42,14 @@ data class MessageDebugStyle(
  * Which row a timeline record renders as. Group-system state-change rows
  * ([GroupSystem]) always render as their one-line summary — even in developer
  * mode the raw MLS dump is tucked behind a per-row tap, never the default
- * (#857). [DebugRow] is reserved for the other non-user-visible signaling
- * kinds (reactions, deletes, agent-stream-start, unknown) when streaming debug
- * is on; [Bubble] is the ordinary chat bubble.
+ * (#857). [AgentOperation] always renders as an expandable tool-call chip.
+ * [DebugRow] is reserved for the other non-user-visible signaling kinds
+ * (reactions, deletes, agent-stream-start, unknown) when streaming debug is on;
+ * [Bubble] is the ordinary chat bubble.
  */
 enum class TimelineRowKind {
     GroupSystem,
+    AgentOperation,
     DebugRow,
     Bubble,
 }
@@ -55,9 +57,8 @@ enum class TimelineRowKind {
 /**
  * Pure rendering decision for a non-synthetic timeline record, factored out of
  * the conversation Compose loop so the "group-system stays a one-line summary
- * even with debug on" invariant (#857) is unit-testable. Group-system is
- * checked before the debug-row path so its summary is the default; the MLS dump
- * is reachable per-row behind a tap instead.
+ * even with debug on" invariant (#857) is unit-testable. Dedicated group-system
+ * and agent-operation rows are checked before the debug-row path.
  */
 fun timelineRowKind(
     record: AppMessageRecordFfi,
@@ -65,6 +66,7 @@ fun timelineRowKind(
 ): TimelineRowKind =
     when {
         MessageProjector.isGroupSystem(record) -> TimelineRowKind.GroupSystem
+        MessageProjector.isAgentOperation(record) -> TimelineRowKind.AgentOperation
         streamingDebugEnabled && !MessageDebugClassifier.debugStyle(record).isUserVisibleBubble ->
             TimelineRowKind.DebugRow
         else -> TimelineRowKind.Bubble
@@ -94,6 +96,7 @@ object MessageDebugClassifier {
             MessageProjector.isStreamFinal(record) -> MessageDebugCategory.UserVisible
             MessageProjector.isChatKind(record.kind) -> MessageDebugCategory.UserVisible
             MessageProjector.isStreamStart(record) -> MessageDebugCategory.StreamSignaling
+            MessageProjector.isAgentOperation(record) -> MessageDebugCategory.AgentChrome
             MessageProjector.isGroupSystem(record) -> MessageDebugCategory.GroupSystem
             MessageProjector.isReaction(record) -> MessageDebugCategory.Control
             MessageProjector.isDelete(record) -> MessageDebugCategory.Control
@@ -106,6 +109,7 @@ object MessageDebugClassifier {
             MessageProjector.isStreamFinal(record) -> "agent-stream-final"
             MessageProjector.isChatKind(record.kind) -> "chat"
             MessageProjector.isStreamStart(record) -> "agent-stream-start"
+            MessageProjector.isAgentOperation(record) -> "agent-operation"
             MessageProjector.isGroupSystem(record) -> "group-system"
             MessageProjector.isReaction(record) -> "reaction"
             MessageProjector.isDelete(record) -> "delete"

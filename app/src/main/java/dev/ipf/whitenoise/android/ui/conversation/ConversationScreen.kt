@@ -104,6 +104,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -2820,11 +2821,13 @@ internal fun ConversationScreen(
                                 renderedTimeline,
                                 key = { _, item -> item.id },
                                 // Pool layouts by category so Compose can reuse
-                                // the heavier MessageBubble slot across scroll
-                                // without recreating layout nodes for the
-                                // simpler centered group-system rows.
+                                // structurally similar rows across scroll.
                                 contentType = { _, item ->
-                                    if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
+                                    when {
+                                        MessageProjector.isGroupSystem(item.record) -> "groupSystem"
+                                        MessageProjector.isAgentOperation(item.record) -> "agentOperation"
+                                        else -> "message"
+                                    }
                                 },
                             ) { index, item ->
                                 Column(
@@ -2895,6 +2898,40 @@ internal fun ConversationScreen(
                                                     },
                                             )
                                             return@Column
+                                        }
+                                        TimelineRowKind.AgentOperation -> {
+                                            // Standard bubbles own deletion and
+                                            // convergence tombstones. Use the
+                                            // dedicated chip only for live rows.
+                                            val projectedDeleted = item.projected?.deleted == true
+                                            val optimisticallyDeleted =
+                                                MessageProjector.isDeleted(
+                                                    item.record.messageIdHex,
+                                                    controller.deletedMessageIds,
+                                                )
+                                            val invalidated = item.projected?.invalidationStatus != null
+                                            if (
+                                                shouldRenderDedicatedAgentOperationRow(
+                                                    projectedDeleted = projectedDeleted,
+                                                    optimisticallyDeleted = optimisticallyDeleted,
+                                                    invalidated = invalidated,
+                                                )
+                                            ) {
+                                                val operation =
+                                                    remember(item.record) {
+                                                        AgentOperationProjector.project(item.record)
+                                                    }
+                                                if (operation != null) {
+                                                    AgentOperationTimelineRow(
+                                                        item = item,
+                                                        operation = operation,
+                                                        controller = controller,
+                                                        appState = appState,
+                                                        readOnly = controller.group.pendingConfirmation,
+                                                    )
+                                                    return@Column
+                                                }
+                                            }
                                         }
                                         TimelineRowKind.DebugRow -> {
                                             MessageDebugRow(
