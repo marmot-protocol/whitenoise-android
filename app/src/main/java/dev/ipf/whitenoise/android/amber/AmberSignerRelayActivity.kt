@@ -26,8 +26,6 @@ class AmberSignerRelayActivity : ComponentActivity() {
     private var requestId: String? = null
     private var signerLaunched = false
     private var finishingSignerResult = false
-    private var pendingResultOk = false
-    private var pendingSignerData: Intent? = null
     private val resultScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,10 +38,12 @@ class AmberSignerRelayActivity : ComponentActivity() {
             }
 
         if (savedInstanceState?.getBoolean(KEY_SIGNER_RESULT_PENDING) == true) {
-            finishWithSignerResult(
-                savedInstanceState.getBoolean(KEY_SIGNER_RESULT_OK),
-                savedInstanceState.getParcelable(KEY_SIGNER_RESULT_DATA, Intent::class.java),
-            )
+            // The signer result Intent is deliberately not persisted across
+            // recreation: for decrypt operations it carries message plaintext,
+            // and saved instance state outlives this translucent relay inside
+            // system_server. A result that raced recreation degrades to a
+            // cancel — callers already handle signer cancellation/timeout.
+            finishWithSignerResult(resultOk = false, signerData = null)
             return
         }
 
@@ -75,8 +75,6 @@ class AmberSignerRelayActivity : ComponentActivity() {
         }
         if (finishingSignerResult) {
             outState.putBoolean(KEY_SIGNER_RESULT_PENDING, true)
-            outState.putBoolean(KEY_SIGNER_RESULT_OK, pendingResultOk)
-            pendingSignerData?.let { outState.putParcelable(KEY_SIGNER_RESULT_DATA, it) }
         }
     }
 
@@ -106,8 +104,6 @@ class AmberSignerRelayActivity : ComponentActivity() {
     ) {
         if (finishingSignerResult) return
         finishingSignerResult = true
-        pendingResultOk = resultOk
-        pendingSignerData = signerData
         if (!resultOk) {
             completeSignerResult(resultOk, signerData, AmberSignerRelay.consumeHandledSignerPackage(requestId))
             return
@@ -133,8 +129,6 @@ class AmberSignerRelayActivity : ComponentActivity() {
     companion object {
         private const val KEY_SIGNER_LAUNCHED = "signer_launched"
         private const val KEY_SIGNER_RESULT_PENDING = "signer_result_pending"
-        private const val KEY_SIGNER_RESULT_OK = "signer_result_ok"
-        private const val KEY_SIGNER_RESULT_DATA = "signer_result_data"
         private const val CHOOSER_SELECTION_TIMEOUT_MS = 2_000L
     }
 }

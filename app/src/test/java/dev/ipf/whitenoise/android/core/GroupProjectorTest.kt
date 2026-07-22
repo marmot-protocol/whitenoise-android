@@ -808,6 +808,65 @@ class GroupProjectorTest {
         )
     }
 
+    @Test
+    fun uniqueMemberCountCollapsesHexCasingDrift() {
+        val members =
+            listOf(
+                member("ABCDEF", account = null),
+                member("abcdef", account = null),
+                member("123456", account = null),
+            )
+
+        assertEquals(2, GroupProjector.uniqueMemberCount(members))
+    }
+
+    @Test
+    fun uniqueMemberCountFallsBackToAccountAndKeepsAnonymousMembersDistinct() {
+        val members =
+            listOf(
+                member("", account = "npub-a"),
+                member("", account = "NPUB-A"),
+                member("", account = null),
+                member("", account = null),
+            )
+
+        assertEquals(3, GroupProjector.uniqueMemberCount(members))
+    }
+
+    @Test
+    fun duplicatedRosterStillClassifiesAsImplicitDm() {
+        // The exact drift uniqueAdminCount guards against: one identity listed
+        // twice with different hex casing must not turn a DM into a group.
+        val members =
+            listOf(
+                member("ALICE00", account = null),
+                member("alice00", account = null),
+                member("bob0000", account = null),
+            )
+
+        assertTrue(
+            GroupProjector.isImplicitDmWith(
+                members = members,
+                name = "",
+                activeAccountIdHex = "alice00",
+                targetIdHex = "bob0000",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun duplicatedSelfRosterStillCountsAsSoleMember() {
+        val members =
+            listOf(
+                member("ALICE00", account = null),
+                member("alice00", account = null),
+            )
+
+        assertTrue(GroupProjector.isSelfSoleMember(members, activeAccountIdHex = "alice00"))
+        assertFalse(GroupProjector.isSelfSoleMember(members, activeAccountIdHex = "bob0000"))
+    }
+
     private fun member(
         memberId: String,
         account: String?,

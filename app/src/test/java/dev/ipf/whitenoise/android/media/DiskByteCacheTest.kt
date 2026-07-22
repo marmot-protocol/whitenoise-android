@@ -38,6 +38,42 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun memoizedFileNamesAreDroppedByClear() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        cache.contains("account-a:blob-1")
+        assertEquals(1, cache.memoizedFileNameKeyCount())
+
+        cache.clear()
+
+        assertEquals(0, cache.memoizedFileNameKeyCount())
+    }
+
+    @Test
+    fun clearDuringHashingCannotResurrectMemoizedKeys() {
+        // Deterministic interleaving: the lookup misses, hashes the key, and a
+        // clear() lands before the memo insert — the stale key must be
+        // rejected, not re-inserted after the wipe.
+        var cache: DiskByteCache? = null
+        var clearOnceMidHash = true
+        cache =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 1024,
+                afterFileNameHashed = {
+                    if (clearOnceMidHash) {
+                        clearOnceMidHash = false
+                        cache!!.clear()
+                    }
+                },
+            )
+
+        cache.contains("old-account:blob-1")
+
+        assertEquals(0, cache.memoizedFileNameKeyCount())
+    }
+
+    @Test
     fun emptyCache_getReturnsNull() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         assertNull(cache.get("absent"))
