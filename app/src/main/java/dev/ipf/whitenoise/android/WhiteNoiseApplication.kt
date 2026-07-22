@@ -5,11 +5,21 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class WhiteNoiseApplication : Application() {
     val appState: WhiteNoiseAppState by lazy {
         WhiteNoiseAppState(this)
     }
+
+    /**
+     * Process-lifetime scope for short fire-and-forget work that must survive
+     * a component's teardown — e.g. a stopping service recording durable
+     * state. Owning it here keeps such work off unowned per-call scopes.
+     */
+    val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()

@@ -204,7 +204,10 @@ class NotificationStreamForegroundService : Service() {
     }
 
     private fun recordPendingPushWakeCatchUpAfterStop() {
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        // The service is stopping, so serviceScope can be cancelled before the
+        // write lands; the application-owned scope survives the teardown.
+        val application = application as? WhiteNoiseApplication ?: return
+        application.applicationScope.launch {
             recordPendingPushWakeCatchUp(applicationContext)
         }
     }

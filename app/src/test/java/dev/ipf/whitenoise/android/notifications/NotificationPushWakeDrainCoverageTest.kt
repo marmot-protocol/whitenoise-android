@@ -96,10 +96,11 @@ class NotificationPushWakeDrainCoverageTest {
                 "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
         )
         assertTrue(
-            "rejected push-wake starts must persist the marker off-main without gating stopSelf on disk fsync",
-            "CoroutineScope(SupervisorJob() + Dispatchers.Default).launch" in recordAfterStop &&
+            "rejected push-wake starts must persist the marker off-main on an owned scope, not gating stopSelf",
+            "applicationScope.launch" in recordAfterStop &&
                 "recordPendingPushWakeCatchUp(applicationContext)" in recordAfterStop &&
-                "stopSelf(startId)" !in recordAfterStop,
+                "stopSelf(startId)" !in recordAfterStop &&
+                "CoroutineScope(" !in recordAfterStop,
         )
     }
 
