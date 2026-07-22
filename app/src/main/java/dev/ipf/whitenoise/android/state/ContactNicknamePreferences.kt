@@ -60,10 +60,9 @@ internal object ContactNicknamePreferences {
         if (keys.isEmpty()) return false
         val edit = preferences.edit()
         keys.forEach { edit.remove(it) }
-        // apply(), not commit(): this runs on the main thread during sign-out /
-        // wipe, and best-effort cleanup doesn't need a synchronous disk write.
-        edit.apply()
-        return true
+        // commit(), not apply(): a wipe must not leave contact data on disk if
+        // the process dies before an async write lands. Callers hop to IO.
+        return edit.commit()
     }
 
     private fun normalizedAccountRef(accountRef: String?): String? =

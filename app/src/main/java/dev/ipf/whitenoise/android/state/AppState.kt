@@ -2719,11 +2719,19 @@ class WhiteNoiseAppState(
         }
     }
 
-    private fun clearContactPrivateDetailsForAccount(accountRef: String) {
-        if (ContactNicknamePreferences.clearAllForAccount(preferences, accountRef)) {
+    // Durable (commit-backed) but off the main thread: the writes must land
+    // before sign-out/wipe completes, and the blocking flush must not stall
+    // the UI. The revision bump stays on the caller's (main) context.
+    private suspend fun clearContactPrivateDetailsForAccount(accountRef: String) {
+        val nicknamesCleared =
+            withContext(Dispatchers.IO) {
+                val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, accountRef)
+                ContactNotesPreferences.clearAllForAccount(preferences, accountRef)
+                cleared
+            }
+        if (nicknamesCleared) {
             contactNicknameRevision += 1
         }
-        ContactNotesPreferences.clearAllForAccount(preferences, accountRef)
     }
 
     /**

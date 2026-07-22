@@ -430,6 +430,9 @@ internal class DiskByteCache(
         // Bump first so any put scheduled against the prior generation is
         // rejected even if it grabs this lock right after the wipe. See #154.
         generation++
+        // The memo retains raw cache-key strings, which can carry account and
+        // blob identifiers — drop them with the rest of the account's data.
+        synchronized(fileNameMemo) { fileNameMemo.clear() }
         // Hold the lock for the whole wipe. Deleting outside it (an earlier
         // #99 attempt) let a concurrent put() recreate a `.enc` that the orphan
         // sweep then removed — a race. clear() runs on sign-out/account-switch,
