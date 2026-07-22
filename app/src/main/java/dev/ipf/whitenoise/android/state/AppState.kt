@@ -107,6 +107,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateRepository
 import dev.ipf.whitenoise.android.updates.shouldPostAppUpdateNotification
 import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -523,26 +524,92 @@ internal fun shouldReconnectNotificationsOnNetworkRestore(
     isOnline: Boolean,
 ): Boolean = !wasOnline && isOnline
 
+/**
+ * Offline -> online notification recovery without a push-wake marker.
+ * [subscribeNotifications] is a passive broadcast with no replay, so account
+ * catch-up must run only after a receiver is listening.
+ */
+internal suspend fun runNotificationReconnectOnNetworkRestore(
+    ensureNotificationReceiverActive: suspend () -> Boolean,
+    catchUpAccounts: suspend () -> Unit,
+) {
+    if (ensureNotificationReceiverActive()) {
+        catchUpAccounts()
+    }
+}
+
 internal class NotificationJobSlot {
     private val lock = Any()
     private var job: Job? = null
+    private var pendingHandoff: Job? = null
 
-    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true }
+    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true || pendingHandoff?.isActive == true }
 
     // Called while holding [lock]; [start] must only enqueue work and return promptly.
     fun startIfInactive(start: () -> Job) {
         synchronized(lock) {
-            if (job?.isActive == true) return
+            if (job?.isActive == true || pendingHandoff?.isActive == true) return
             job = start()
         }
     }
 
     suspend fun cancelAndJoin() {
-        val previous =
+        val jobs =
             synchronized(lock) {
-                job.also { job = null }
+                listOfNotNull(job, pendingHandoff).distinct().also {
+                    job = null
+                    pendingHandoff = null
+                }
             }
-        previous?.cancelAndJoin()
+        withContext(NonCancellable) {
+            jobs.forEach { it.cancel() }
+            jobs.forEach { it.join() }
+        }
+    }
+
+    /**
+     * Start a replacement listener and keep the previous job until [start] signals
+     * readiness (for example after [subscribeNotifications] succeeds). [start]
+     * must only enqueue work and return promptly because the slot lock prevents
+     * concurrent teardown from missing the replacement before it is registered.
+     */
+    suspend fun handoff(start: (ready: CompletableDeferred<Unit>) -> Job) {
+        val ready = CompletableDeferred<Unit>()
+        val (newJob, previousPending) =
+            synchronized(lock) {
+                val replacement = start(ready)
+                replacement to pendingHandoff.also { pendingHandoff = replacement }
+            }
+        newJob.invokeOnCompletion { cause ->
+            ready.completeExceptionally(cause ?: CancellationException("replacement listener ended before ready"))
+        }
+        var readySucceeded = false
+        try {
+            withContext(NonCancellable) { previousPending?.cancelAndJoin() }
+            ready.await()
+            readySucceeded = true
+        } finally {
+            if (!readySucceeded) {
+                synchronized(lock) {
+                    if (pendingHandoff === newJob) pendingHandoff = null
+                }
+                withContext(NonCancellable) { newJob.cancelAndJoin() }
+            }
+        }
+        val (promoted, previous) =
+            synchronized(lock) {
+                if (pendingHandoff === newJob) {
+                    pendingHandoff = null
+                    true to job.also { job = newJob }
+                } else {
+                    false to null
+                }
+            }
+        if (!promoted) {
+            withContext(NonCancellable) { newJob.cancelAndJoin() }
+            throw CancellationException("notification listener handoff was cancelled")
+        }
+        withContext(NonCancellable) { previous?.cancelAndJoin() }
     }
 }
 
@@ -1476,6 +1543,10 @@ class WhiteNoiseAppState(
     private val notificationJob = NotificationJobSlot()
     private val notificationReconnectJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
+
+    @Volatile
+    private var networkNotificationRecoverySuppressed = false
+
     private val notificationDrainSequence = AtomicLong(0)
     private val notificationPostEpoch = NotificationPostEpoch()
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -1779,7 +1850,11 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
-        val restartNotifications = notificationJob.isActive()
+        networkNotificationRecoverySuppressed = true
+        val restartNotifications =
+            notificationJob.isActive() ||
+                notificationReconnectJob.isActive() ||
+                pushWakeCatchUpDrainJob.isActive()
         val chatsControllerForTeardown = chatsController
         val conversationControllersForTeardown = conversationControllersForAccountTeardown()
         applyDestructiveWipeRuntimeState(prepareDestructiveAccountWipeRuntimeState(destructiveWipeRuntimeState()))
@@ -1803,10 +1878,13 @@ class WhiteNoiseAppState(
         reloadMediaAutoDownloadMatrix()
         configurePrivacyRuntime()
         refreshLocalNotificationSettings()
+        networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
     }
 
     private suspend fun stopNotificationListenerForAccountTeardown() {
+        notificationReconnectJob.cancelAndJoin()
+        pushWakeCatchUpDrainJob.cancelAndJoin()
         notificationJob.cancelAndJoin()
         unreadRefreshScheduler.cancelAndClear()
     }
@@ -2262,6 +2340,20 @@ class WhiteNoiseAppState(
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
         drainPendingPushWakeCatchUpIfNeeded()
+    }
+
+    private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
+        if (client == null) {
+            bootstrap()
+            if (client == null) return false
+        }
+        localNotificationPresenter.ensureChannels()
+        refreshLocalNotificationPermission()
+        handoffNotificationListener()
+        if (accounts.isEmpty()) refreshAccounts()
+        refreshLocalNotificationSettings()
+        drainPendingNativePushRegistrationSyncIfNeeded()
+        return true
     }
 
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
@@ -2921,6 +3013,7 @@ class WhiteNoiseAppState(
         next?.let { label ->
             refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         }
+        networkNotificationRecoverySuppressed = false
         if (restartNotifications) startNotificationListener()
         refreshLocalNotificationSettings()
         return outcome
@@ -3634,16 +3727,30 @@ class WhiteNoiseAppState(
     }
 
     private fun scheduleNotificationReconnectOnNetworkRestore() {
+        if (networkNotificationRecoverySuppressed) return
         notificationReconnectJob.startIfInactive {
-            notificationScope.launch {
-                notificationJob.cancelAndJoin()
-                ensureNotificationRuntimeStarted()
+            val reconnectJob =
+                notificationScope.launch {
+                    runNotificationReconnectOnNetworkRestore(
+                        ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
+                        catchUpAccounts = {
+                            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                            if (catchUpAccountsBestEffort()) {
+                                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
+                            }
+                        },
+                    )
+                }
+            reconnectJob.invokeOnCompletion { cause ->
+                if (cause == null) schedulePendingPushWakeCatchUpDrain()
             }
+            reconnectJob
         }
     }
 
     private fun schedulePendingPushWakeCatchUpDrain() {
-        if (!pushTokenStore.pushWakeCatchUpPending()) return
+        if (networkNotificationRecoverySuppressed || !pushTokenStore.pushWakeCatchUpPending()) return
+        if (notificationReconnectJob.isActive()) return
         pushWakeCatchUpDrainJob.startIfInactive {
             notificationScope.launch { ensureNotificationRuntimeStarted() }
         }
@@ -5720,49 +5827,57 @@ class WhiteNoiseAppState(
     }
 
     private fun startNotificationListener() {
-        notificationJob.startIfInactive {
-            notificationScope.launch {
-                // Restart the subscription on any failure (or clean end-of-stream)
-                // with exponential backoff, so a transient relay/binding error
-                // doesn't permanently silence notifications. Backoff resets after
-                // each received update; cancellation propagates and stops the loop.
-                // See #56.
-                var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                while (isActive) {
-                    try {
-                        val subscription = marmotIo { subscribeNotifications() }
-                        try {
-                            while (isActive) {
-                                val update = marmotIo { subscription.next() } ?: break
-                                backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                                applyNotificationDisplayNameHint(update)
-                                val postEpoch = notificationPostEpoch.capture()
-                                postAfterNotificationAvatarPreWarm(
-                                    preWarm = { preWarmNotificationAvatars(update) },
-                                    post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
-                                )
-                            }
-                        } finally {
-                            runCatching {
-                                withContext(NonCancellable + Dispatchers.IO) {
-                                    subscription.close()
-                                }
-                            }
-                        }
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (throwable: Throwable) {
-                        appStateDebug(throwable) {
-                            "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
-                        }
-                    }
-                    if (!isActive) break
-                    delay(backoffMillis)
-                    backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
-                }
-            }
+        notificationJob.startIfInactive { launchNotificationListenerLoop() }
+    }
+
+    private suspend fun handoffNotificationListener() {
+        notificationJob.handoff { ready ->
+            launchNotificationListenerLoop(signalReady = ready)
         }
     }
+
+    private fun launchNotificationListenerLoop(signalReady: CompletableDeferred<Unit>? = null): Job =
+        notificationScope.launch {
+            // Restart the subscription on any failure (or clean end-of-stream)
+            // with exponential backoff, so a transient relay/binding error
+            // doesn't permanently silence notifications. Backoff resets after
+            // each received update; cancellation propagates and stops the loop.
+            // See #56.
+            var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+            while (isActive) {
+                try {
+                    val subscription = marmotIo { subscribeNotifications() }
+                    signalReady?.complete(Unit)
+                    try {
+                        while (isActive) {
+                            val update = marmotIo { subscription.next() } ?: break
+                            backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                            applyNotificationDisplayNameHint(update)
+                            val postEpoch = notificationPostEpoch.capture()
+                            postAfterNotificationAvatarPreWarm(
+                                preWarm = { preWarmNotificationAvatars(update) },
+                                post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
+                            )
+                        }
+                    } finally {
+                        runCatching {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                subscription.close()
+                            }
+                        }
+                    }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (throwable: Throwable) {
+                    appStateDebug(throwable) {
+                        "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
+                    }
+                }
+                if (!isActive) break
+                delay(backoffMillis)
+                backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+            }
+        }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
         backgroundConnectionEnabled = enabled

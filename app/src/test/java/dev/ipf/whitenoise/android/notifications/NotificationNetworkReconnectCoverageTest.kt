@@ -1,7 +1,15 @@
 package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.state.NotificationJobSlot
+import dev.ipf.whitenoise.android.state.runNotificationReconnectOnNetworkRestore
 import dev.ipf.whitenoise.android.state.shouldReconnectNotificationsOnNetworkRestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,11 +44,51 @@ class NotificationNetworkReconnectCoverageTest {
     }
 
     @Test
+    fun offlineToOnlineRecoveryPostsMissedNotificationWithoutPushWakeMarker() =
+        runTest {
+            val passiveReceiver = PassiveNotificationBroadcastFake(this)
+            passiveReceiver.startInitialListener()
+
+            try {
+                runNotificationReconnectOnNetworkRestore(
+                    ensureNotificationReceiverActive = { passiveReceiver.handoffForReconnect() },
+                    catchUpAccounts = { passiveReceiver.emitRelayBacklog("offline-window-message") },
+                )
+
+                assertEquals(
+                    "relay backlog must be posted only after the receiver is active",
+                    listOf("offline-window-message"),
+                    passiveReceiver.postedNotifications,
+                )
+                assertTrue(
+                    "catch-up must not run before the replacement receiver is listening",
+                    passiveReceiver.catchUpStartedAfterReceiver,
+                )
+            } finally {
+                passiveReceiver.close()
+            }
+        }
+
+    @Test
+    fun offlineToOnlineRecoverySkipsCatchUpWhenReceiverCannotBeEstablished() =
+        runTest {
+            var catchUpRan = false
+
+            runNotificationReconnectOnNetworkRestore(
+                ensureNotificationReceiverActive = { false },
+                catchUpAccounts = { catchUpRan = true },
+            )
+
+            assertFalse("catch-up must not run without a confirmed receiver", catchUpRan)
+        }
+
+    @Test
     fun offlineToOnlineTransitionReconnectsNotificationRuntimeWithoutPushWakeMarker() {
         val appState = appStateSource().readText()
         val networkListener = appState.functionBody("registerActiveNetworkListener")
         val networkSnapshot = appState.functionBody("noteActiveNetworkSnapshot")
         val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
+        val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
 
         assertTrue(
             "connectivity callbacks must funnel through the shared snapshot helper",
@@ -52,17 +100,67 @@ class NotificationNetworkReconnectCoverageTest {
                 "scheduleNotificationReconnectOnNetworkRestore()" in networkSnapshot,
         )
         assertTrue(
-            "notification reconnect must interrupt the active subscription/retry loop",
-            "notificationJob.cancelAndJoin()" in reconnect,
+            "notification reconnect must hand off the listener without a cancel-first gap",
+            "handoffNotificationListener()" in receiver &&
+                "notificationJob.cancelAndJoin()" !in receiver,
         )
         assertTrue(
-            "notification reconnect must bootstrap runtime without push-wake gating",
-            "ensureNotificationRuntimeStarted()" in reconnect &&
+            "notification reconnect must establish receiver before catch-up without push-wake gating",
+            "ensureNotificationReceiverForNetworkReconnect" in reconnect &&
+                "catchUpAccountsBestEffort()" in reconnect &&
+                reconnect.indexOf("ensureNotificationReceiverForNetworkReconnect") <
+                reconnect.indexOf("catchUpAccountsBestEffort()") &&
                 "pushWakeCatchUpPending()" !in reconnect,
+        )
+        assertTrue(
+            "bootstrap failure must not imply a receiver is ready for reconnect catch-up",
+            "if (client == null) return false" in receiver,
         )
         assertTrue(
             "reconnect requests must be coalesced while in flight",
             "notificationReconnectJob.startIfInactive" in reconnect,
+        )
+    }
+
+    @Test
+    fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
+        val appState = appStateSource().readText()
+        val prepare = appState.functionBody("prepareForDestructiveAccountWipe")
+        val restore = appState.functionBody("restoreAfterFailedDestructiveAccountWipe")
+        val teardown = appState.functionBody("stopNotificationListenerForAccountTeardown")
+        val wipe = appState.functionBody("signOutAndWipeActiveAccount")
+        val reconnect = appState.functionBody("scheduleNotificationReconnectOnNetworkRestore")
+        val pendingPushDrain = appState.functionBody("schedulePendingPushWakeCatchUpDrain")
+
+        assertTrue(
+            "failed-wipe recovery must remember every notification runtime owner",
+            "notificationJob.isActive()" in prepare &&
+                "notificationReconnectJob.isActive()" in prepare &&
+                "pushWakeCatchUpDrainJob.isActive()" in prepare,
+        )
+        assertTrue(
+            "teardown must cancel producers before they can reinstall the notification listener",
+            teardown.indexOf("notificationReconnectJob.cancelAndJoin()") in 0 until
+                teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") &&
+                teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") <
+                teardown.indexOf("notificationJob.cancelAndJoin()"),
+        )
+        assertTrue(
+            "teardown must suppress connectivity callbacks before its first suspension",
+            prepare.indexOf("networkNotificationRecoverySuppressed = true") in 0 until
+                prepare.indexOf("closeLiveSubscriptionsForAccountTeardown"),
+        )
+        assertTrue(
+            "connectivity callbacks must not reinstall notification work during account teardown",
+            "if (networkNotificationRecoverySuppressed) return" in reconnect &&
+                "if (networkNotificationRecoverySuppressed ||" in pendingPushDrain,
+        )
+        assertTrue(
+            "failed and successful wipes must release reconnect suppression before listener restart",
+            restore.indexOf("networkNotificationRecoverySuppressed = false") in 0 until
+                restore.indexOf("startNotificationListener()") &&
+                wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") in 0 until
+                wipe.lastIndexOf("startNotificationListener()"),
         )
     }
 
@@ -72,4 +170,58 @@ class NotificationNetworkReconnectCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /**
+     * Models [subscribeNotifications] at the pinned MDK revision: passive broadcast
+     * with no replay — events emitted while no subscriber is attached are lost.
+     */
+    private class PassiveNotificationBroadcastFake(
+        private val scope: CoroutineScope,
+    ) {
+        private val slot = NotificationJobSlot()
+        private var subscriberCount = 0
+        val postedNotifications = mutableListOf<String>()
+        var catchUpStartedAfterReceiver = false
+            private set
+
+        fun startInitialListener() {
+            slot.startIfInactive {
+                scope.launch {
+                    subscriberCount += 1
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        subscriberCount -= 1
+                    }
+                }
+            }
+        }
+
+        suspend fun handoffForReconnect(): Boolean {
+            slot.handoff { ready ->
+                scope.launch {
+                    delay(1)
+                    subscriberCount += 1
+                    ready.complete(Unit)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        subscriberCount -= 1
+                    }
+                }
+            }
+            return true
+        }
+
+        fun emitRelayBacklog(message: String) {
+            catchUpStartedAfterReceiver = subscriberCount > 0
+            if (subscriberCount > 0) {
+                postedNotifications += message
+            }
+        }
+
+        suspend fun close() {
+            slot.cancelAndJoin()
+        }
+    }
 }
