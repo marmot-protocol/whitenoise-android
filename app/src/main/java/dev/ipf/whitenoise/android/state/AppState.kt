@@ -3162,23 +3162,55 @@ class WhiteNoiseAppState(
         appUnlockError = message
     }
 
+    // True while a foreground lock decision waits for the off-main unlock
+    // timestamp: the lock scrim shows (UI secured) but the biometric prompt
+    // is deferred until the REAL value decides — a 0L placeholder would read
+    // the grace period as expired and over-prompt on cold starts within it.
+    var appUnlockEvaluationPending by mutableStateOf(false)
+        private set
+
     fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
-        // Short-circuit BEFORE shouldShowAppLock: its lastUnlockedAtMillis
-        // argument evaluates the lazy Keystore-backed read, so without this
-        // guard app-lock-disabled users would still pay it on first
-        // foreground — the exact cost the lazy read exists to avoid.
+        // Short-circuit BEFORE any timestamp read so app-lock-disabled users
+        // never pay for it on foreground transitions.
         if (!requireAppUnlock || !appLockCredentialAvailable) return
-        if (
+        val knownLastUnlock = lastAppUnlockAtMillisBacking
+        if (knownLastUnlock == null) {
+            deferAppLockDecisionUntilTimestampLoads(nowMillis)
+        } else if (
             shouldShowAppLock(
                 requireUnlock = requireAppUnlock,
                 credentialAvailable = appLockCredentialAvailable,
-                lastUnlockedAtMillis = lastAppUnlockAtMillis,
+                lastUnlockedAtMillis = knownLastUnlock,
                 nowMillis = nowMillis,
                 delay = appLockDelay,
             )
         ) {
             requestAppUnlock()
+        }
+    }
+
+    private fun deferAppLockDecisionUntilTimestampLoads(nowMillis: Long) {
+        if (appUnlockEvaluationPending) return
+        appUnlockEvaluationPending = true
+        appLockScreenVisible = true
+        mutationsScope.launch {
+            val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+            if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
+            appUnlockEvaluationPending = false
+            if (
+                shouldShowAppLock(
+                    requireUnlock = requireAppUnlock,
+                    credentialAvailable = appLockCredentialAvailable,
+                    lastUnlockedAtMillis = lastAppUnlockAtMillis,
+                    nowMillis = nowMillis,
+                    delay = appLockDelay,
+                )
+            ) {
+                requestAppUnlock()
+            } else {
+                appLockScreenVisible = false
+            }
         }
     }
 
