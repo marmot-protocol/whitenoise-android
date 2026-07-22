@@ -80,7 +80,13 @@ class NotificationReplyWorker(
         }
         when (completionStore.abandonedOutcome(completionKey)) {
             NotificationReplyAbandonedOutcome.Success -> return Result.success().also { retryStore.clear(retryKey) }
-            NotificationReplyAbandonedOutcome.Failure -> return Result.failure().also { retryStore.clear(retryKey) }
+            NotificationReplyAbandonedOutcome.Failure -> {
+                // Crash recovery: the abandon marker persisted but the process
+                // died before the failure was surfaced. Re-surface it here so
+                // the replay doesn't swallow the user's only failure signal.
+                surfaceReplyFailure(action)
+                return Result.failure().also { retryStore.clear(retryKey) }
+            }
             null -> Unit
         }
         if (!application.appState.notificationActionsAllowed) {
@@ -272,12 +278,19 @@ class NotificationReplyWorker(
         withContext(NonCancellable) {
             val failureNotice = applicationContext.getString(R.string.toast_send_failed)
             runCatching {
-                LocalNotificationPresenter(applicationContext).markDirectReplyFailed(
-                    notificationTag = action.notificationTag,
-                    notificationId = action.notificationId,
-                    repliedMessageIdHex = action.target.messageIdHex,
-                    failureNotice = failureNotice,
-                )
+                val presenter = LocalNotificationPresenter(applicationContext)
+                // Same bounded retry as the success-path re-post: the system
+                // applies the direct-reply lifetime extension a beat after the
+                // reply broadcast, so a fast terminal failure can look before
+                // the card is in the active set and must try again.
+                retryReplyCardRestore {
+                    presenter.markDirectReplyFailed(
+                        notificationTag = action.notificationTag,
+                        notificationId = action.notificationId,
+                        repliedMessageIdHex = action.target.messageIdHex,
+                        failureNotice = failureNotice,
+                    )
+                }
             }
             runCatching {
                 withContext(Dispatchers.Main.immediate) {

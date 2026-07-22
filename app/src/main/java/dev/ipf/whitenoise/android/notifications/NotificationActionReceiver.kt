@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -103,6 +104,26 @@ class NotificationActionReceiver : BroadcastReceiver() {
 }
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
+
+/**
+ * Bounded retry for restoring a replied conversation card, mirroring the
+ * success path's re-post loop: the system applies the direct-reply lifetime
+ * extension a beat after the reply broadcast, so the first look can miss the
+ * card. Returns true as soon as [restore] succeeds, false once the attempts
+ * are exhausted (card gone or replaced — the caller's toast is then the only
+ * signal).
+ */
+internal suspend fun retryReplyCardRestore(
+    attempts: Int = REPLY_DISMISS_RETRIES,
+    retryDelayMs: Long = REPLY_DISMISS_RETRY_DELAY_MS,
+    restore: () -> Boolean,
+): Boolean {
+    repeat(attempts) { attempt ->
+        if (restore()) return true
+        if (attempt < attempts - 1) delay(retryDelayMs)
+    }
+    return false
+}
 
 internal fun notificationReplyDismissBudgetMs(
     retries: Int = REPLY_DISMISS_RETRIES,
