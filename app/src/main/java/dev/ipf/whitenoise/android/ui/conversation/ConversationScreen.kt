@@ -409,7 +409,7 @@ internal fun ConversationScreen(
     // Auto-read (#1483): once the timeline is anchored, read the unread
     // backlog aloud, oldest first, bounded — an inflated unread count must
     // not narrate ancient history. Names are announced on speaker changes.
-    LaunchedEffect(chat.id, initialTimelineAnchored) {
+    LaunchedEffect(controller, chat.id, initialTimelineAnchored) {
         if (!initialTimelineAnchored) return@LaunchedEffect
         if (!appState.ttsHasUsableEngine) return@LaunchedEffect
         val groupIdHex = controller.group.groupIdHex
@@ -428,12 +428,14 @@ internal fun ConversationScreen(
                 )
             }
         if (entries.isEmpty()) return@LaunchedEffect
-        appState.speakAloud(ttsAutoReadScript(entries), Locale.getDefault())
+        appState.speakAloudAutoRead(groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
     }
     // Live continuation: a speakable message arriving while speech is active
     // appends to the queue; while speech sits idle it stays quiet, so
     // auto-read never becomes an always-on announcer for an open chat.
-    LaunchedEffect(chat.id) {
+    // Keyed on the controller too: an account switch swaps it under the
+    // same chat id, and the stale collector must not keep appending.
+    LaunchedEffect(controller, chat.id) {
         var seededLastId = false
         snapshotFlow {
             controller.timeline
@@ -447,7 +449,10 @@ internal fun ConversationScreen(
                     seededLastId = true
                     return@collect
                 }
-                if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@collect
+                // Only the conversation that owns the active auto-read
+                // session may extend it: manual speech and other chats'
+                // sessions must never be appended to by this chat's arrivals.
+                if (appState.ttsAutoReadSessionGroupIdHex != controller.group.groupIdHex) return@collect
                 val ttsState = appState.ttsController.state.value
                 if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
                 val record = controller.timeline.lastOrNull()?.record ?: return@collect

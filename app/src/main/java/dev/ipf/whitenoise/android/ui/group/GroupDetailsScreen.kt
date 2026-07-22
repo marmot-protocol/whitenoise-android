@@ -415,7 +415,7 @@ internal fun GroupDetailsScreen(
     var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     val autoReadKeys by appState.ttsAutoReadPreferences.enabledKeys.collectAsState()
     val autoReadEnabled =
-        remember(autoReadKeys, controller.group.groupIdHex) {
+        remember(autoReadKeys, appState.activeAccountRef, controller.group.groupIdHex) {
             appState.isConversationAutoRead(controller.group.groupIdHex)
         }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }

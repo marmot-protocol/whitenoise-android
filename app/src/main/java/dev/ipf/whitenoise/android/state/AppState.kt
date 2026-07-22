@@ -1138,13 +1138,32 @@ class WhiteNoiseAppState(
     var ttsNowPlayingPreview by mutableStateOf<String?>(null)
         private set
 
+    // The conversation that owns the current auto-read session, or null when
+    // speech is manual or idle. Live continuation appends only for the owner:
+    // a manual Speak aloud replaces the queue and ends the session, and
+    // another chat's speech must never be extended by this one's arrivals.
+    var ttsAutoReadSessionGroupIdHex by mutableStateOf<String?>(null)
+        private set
+
     /** Starts read-aloud and remembers a truncated preview for the transport bar. */
     fun speakAloud(
         text: String,
         locale: java.util.Locale,
     ): Boolean {
+        ttsAutoReadSessionGroupIdHex = null
         val started = ttsController.speak(text, locale)
         if (started) ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
+        return started
+    }
+
+    /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
+    fun speakAloudAutoRead(
+        groupIdHex: String,
+        text: String,
+        locale: java.util.Locale,
+    ): Boolean {
+        val started = speakAloud(text, locale)
+        if (started) ttsAutoReadSessionGroupIdHex = groupIdHex
         return started
     }
 
@@ -1172,6 +1191,7 @@ class WhiteNoiseAppState(
     fun stopSpeaking() {
         ttsController.stop()
         ttsNowPlayingPreview = null
+        ttsAutoReadSessionGroupIdHex = null
     }
 
     fun setTtsRateOverride(rate: Float?) {
