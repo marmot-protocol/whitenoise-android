@@ -9,6 +9,38 @@ data class ReactionTally(
     val mine: Boolean,
 )
 
+/**
+ * Shared final stage for reaction tallies, single-sourced so the ordering and
+ * mine/count semantics cannot drift between the raw-record path
+ * ([MessageProjector.reactionTallies]) and the engine-summary path
+ * ([TimelineProjector.reactionTallies]): emoji groups with senders become
+ * tallies sorted by count desc, own reaction first among equals, then emoji
+ * for stability.
+ */
+internal fun reactionTalliesFromEmojiSenders(
+    emojiSenders: List<Pair<String, Collection<String>>>,
+    myAccountId: String?,
+): List<ReactionTally> =
+    emojiSenders
+        .mapNotNull { (emoji, senders) ->
+            if (senders.isEmpty()) {
+                null
+            } else {
+                ReactionTally(
+                    emoji = emoji,
+                    count = senders.size,
+                    // Case-insensitive: hex account-id casing can drift between
+                    // the active account and reaction senders, and a mismatch
+                    // would render your own reaction as not-mine.
+                    mine = myAccountId != null && senders.any { it.equals(myAccountId, ignoreCase = true) },
+                )
+            }
+        }.sortedWith(
+            compareByDescending<ReactionTally> { it.count }
+                .thenByDescending { it.mine }
+                .thenBy { it.emoji },
+        )
+
 data class MessageTextCopy(
     val reactedFormat: String,
     val reactionFallback: String,
@@ -183,23 +215,10 @@ object MessageProjector {
             sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.add(reaction.sender)
         }
 
-        return sendersByEmoji
-            .mapNotNull { (emoji, senders) ->
-                if (senders.isEmpty()) {
-                    null
-                } else {
-                    ReactionTally(
-                        emoji = displayEmojiByNormalized.getValue(emoji),
-                        count = senders.size,
-                        // Case-insensitive: see TimelineProjector.reactionTallies.
-                        mine = myAccountId != null && senders.contains(myAccountId.lowercase()),
-                    )
-                }
-            }.sortedWith(
-                compareByDescending<ReactionTally> { it.count }
-                    .thenByDescending { it.mine }
-                    .thenBy { it.emoji },
-            )
+        return reactionTalliesFromEmojiSenders(
+            sendersByEmoji.map { (emoji, senders) -> displayEmojiByNormalized.getValue(emoji) to senders },
+            myAccountId,
+        )
     }
 
     internal fun normalizeReactionEmoji(emoji: String): String =

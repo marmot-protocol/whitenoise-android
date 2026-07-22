@@ -108,25 +108,10 @@ object TimelineProjector {
         record: TimelineMessageRecordFfi,
         myAccountId: String?,
     ): List<ReactionTally> =
-        record.reactions.byEmoji
-            .mapNotNull { summary ->
-                if (summary.senders.isEmpty()) {
-                    null
-                } else {
-                    ReactionTally(
-                        emoji = summary.emoji,
-                        count = summary.senders.size,
-                        // Case-insensitive: hex account-id casing can drift
-                        // between the active account and reaction senders, and
-                        // a mismatch would render your own reaction as not-mine.
-                        mine = myAccountId != null && summary.senders.any { it.equals(myAccountId, ignoreCase = true) },
-                    )
-                }
-            }.sortedWith(
-                compareByDescending<ReactionTally> { it.count }
-                    .thenByDescending { it.mine }
-                    .thenBy { it.emoji },
-            )
+        reactionTalliesFromEmojiSenders(
+            record.reactions.byEmoji.map { it.emoji to it.senders },
+            myAccountId,
+        )
 
     private fun TimelineReplyPreviewFfi.displayBody(
         copy: MessageTextCopy,
