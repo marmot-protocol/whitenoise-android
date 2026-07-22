@@ -7,6 +7,8 @@ import java.util.Locale
 internal interface TtsSpeechEngine {
     fun setLanguage(locale: Locale): Int
 
+    fun setSpeechRate(rate: Float)
+
     fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,
@@ -40,13 +42,19 @@ class TtsController internal constructor(
     private val chunkText: (String, Locale) -> List<TtsChunk> = { text, locale ->
         TtsChunker.chunk(text, locale)
     },
+    // Re-read per utterance so a rate change lands at the next sentence
+    // boundary — quieter than re-queueing the current sentence.
+    private val speechRate: () -> Float = { 1.0f },
 ) {
     private var engine: TtsSpeechEngine? = null
     private val queue =
         TtsPlaybackQueue(
             stopEngine = { engine?.stop() },
             enqueue = { chunk, utteranceId ->
-                engine?.speak(chunk.text, utteranceId) ?: TextToSpeech.ERROR
+                engine?.let {
+                    it.setSpeechRate(speechRate())
+                    it.speak(chunk.text, utteranceId)
+                } ?: TextToSpeech.ERROR
             },
             onTerminal = audioFocus::release,
         )
@@ -89,6 +97,16 @@ class TtsController internal constructor(
         }
         queue.start(chunks)
         return state.value !is TtsState.Error
+    }
+
+    /**
+     * Called when the global speech rate changes so an in-flight queue picks
+     * the new rate up at the next sentence boundary (the engine pre-buffers
+     * remaining utterances, so without this the change would never land).
+     */
+    @Synchronized
+    fun onSpeechRateChanged() {
+        queue.refreshPendingChunksAtNextBoundary()
     }
 
     @Synchronized

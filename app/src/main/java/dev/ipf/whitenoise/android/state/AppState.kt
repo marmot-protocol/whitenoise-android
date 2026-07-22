@@ -50,6 +50,9 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.amber.AmberSignerController
+import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
+import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
+import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineChoice
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
@@ -1118,8 +1121,33 @@ class WhiteNoiseAppState(
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
     internal val ttsEngineResolver = TtsEngineResolver(appContext)
+    internal val ttsRatePreferences = TtsRatePreferences(appContext)
+
+    // Process-wide read-aloud playback: survives navigation between chats and
+    // back to the chat list, matching VoicePlaybackController's lifetime.
+    val ttsController: TtsController =
+        TtsController(
+            audioFocus = TtsAudioFocusOwner(appContext),
+            speechRate = { ttsRatePreferences.resolvedRate() },
+        )
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
+
+    fun setTtsRateOverride(rate: Float?) {
+        ttsRatePreferences.setRateOverride(rate)
+        ttsController.onSpeechRateChanged()
+    }
+
+    private fun publishTtsResolution(resolution: TtsResolutionResult?) {
+        ttsResolution = resolution
+        val handle = resolution?.handle
+        if (handle != null) {
+            ttsController.attachEngine(AndroidTtsSpeechEngine(handle.textToSpeech))
+        } else {
+            ttsController.detachEngine()
+        }
+    }
+
     val ttsDiscoveryComplete: Boolean
         get() = ttsResolution != null
     val ttsHasUsableEngine: Boolean
@@ -3392,7 +3420,7 @@ class WhiteNoiseAppState(
             when (val outcome = adoptTtsEngineSelection(current, candidate, enginePackage)) {
                 is TtsEngineSelectionResult.Adopted -> {
                     ttsEnginePreferences.setSelectedEngine(outcome.selectedOverride)
-                    ttsResolution = outcome.resolution
+                    publishTtsResolution(outcome.resolution)
                     outcome.releasedHandles.forEach { handle -> runCatching { handle.release() } }
                 }
                 is TtsEngineSelectionResult.Retained -> {
@@ -3436,7 +3464,7 @@ class WhiteNoiseAppState(
                     }
 
                 adoptedHandle = replacement.handle
-                ttsResolution = replacement
+                publishTtsResolution(replacement)
                 replacementPublished = true
             } finally {
                 candidateHandles

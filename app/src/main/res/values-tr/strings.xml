@@ -1080,6 +1080,8 @@
     <string name="tts_settings_explainer_discovering">Bu cihazdaki yüklü metin okuma motorları denetleniyor…</string>
     <string name="tts_settings_explainer_no_engine">Kullanılabilir bir metin okuma motoru yüklü değil. F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve aşağıdan seçin.</string>
     <string name="tts_settings_engine_title">Motor</string>
+    <string name="tts_settings_rate_title">Konuşma hızı</string>
+    <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>
 </resources>

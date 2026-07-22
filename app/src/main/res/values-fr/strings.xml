@@ -1082,6 +1082,8 @@
     <string name="tts_settings_explainer_discovering">Vérification des moteurs de synthèse vocale installés sur cet appareil…</string>
     <string name="tts_settings_explainer_no_engine">Aucun moteur de synthèse vocale utilisable n\'est installé. Installez RHVoice ou eSpeak NG depuis F-Droid ou Zapstore, puis sélectionnez-le ci-dessous.</string>
     <string name="tts_settings_engine_title">Moteur</string>
+    <string name="tts_settings_rate_title">Débit de parole</string>
+    <string name="tts_settings_rate_system">Système (suivre le réglage de l\'appareil)</string>
     <string name="tts_settings_engine_local">Moteur sur l\'appareil</string>
     <string name="tts_settings_engine_unknown">Peut utiliser la voix en réseau</string>
 </resources>

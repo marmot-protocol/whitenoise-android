@@ -1112,6 +1112,8 @@
     <string name="tts_settings_explainer_discovering">Checking installed text-to-speech engines on this device…</string>
     <string name="tts_settings_explainer_no_engine">No usable text-to-speech engine is installed. Install RHVoice or eSpeak NG from F-Droid or Zapstore, then select it below.</string>
     <string name="tts_settings_engine_title">Engine</string>
+    <string name="tts_settings_rate_title">Speech rate</string>
+    <string name="tts_settings_rate_system">System (follow device setting)</string>
     <string name="tts_settings_engine_local">On-device engine</string>
     <string name="tts_settings_engine_unknown">May use network speech</string>
 </resources>

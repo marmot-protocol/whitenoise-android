@@ -1064,6 +1064,8 @@
     <string name="tts_settings_explainer_discovering">正在檢查此裝置上已安裝的文字轉語音引擎…</string>
     <string name="tts_settings_explainer_no_engine">未安裝可用的文字轉語音引擎。請從 F-Droid 或 Zapstore 安裝 RHVoice 或 eSpeak NG，然後在下方選擇。</string>
     <string name="tts_settings_engine_title">引擎</string>
+    <string name="tts_settings_rate_title">語速</string>
+    <string name="tts_settings_rate_system">系統（跟隨裝置設定）</string>
     <string name="tts_settings_engine_local">本機引擎</string>
     <string name="tts_settings_engine_unknown">可能使用網路語音</string>
 </resources>

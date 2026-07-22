@@ -51,10 +51,22 @@ internal class TtsPlaybackQueue(
     private var chunks: List<TtsChunk> = emptyList()
     private var currentIndex = 0
     private var generation = 0L
+    private var refreshAtNextBoundary = false
+
+    /**
+     * Applies changed enqueue-time parameters (speech rate) at the next chunk
+     * boundary. The engine pre-buffers every remaining utterance at enqueue
+     * time, so without a re-queue a mid-playback change would never land;
+     * re-queueing only at the boundary keeps the current sentence unbroken.
+     */
+    fun refreshPendingChunksAtNextBoundary() {
+        if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
+    }
 
     fun start(chunks: List<TtsChunk>) {
         stopEngine()
         generation += 1
+        refreshAtNextBoundary = false
         this.chunks = chunks
         currentIndex = 0
         if (chunks.isEmpty()) {
@@ -127,6 +139,10 @@ internal class TtsPlaybackQueue(
         } else {
             currentIndex = next
             _state.value = TtsState.Speaking(currentIndex, chunks.size)
+            if (refreshAtNextBoundary) {
+                refreshAtNextBoundary = false
+                requeueFrom(next)
+            }
         }
     }
 
@@ -163,6 +179,7 @@ internal class TtsPlaybackQueue(
     private fun requeueFrom(index: Int) {
         stopEngine()
         generation += 1
+        refreshAtNextBoundary = false
         currentIndex = index
         enqueueFromCurrentIndex()
     }
