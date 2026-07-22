@@ -5443,7 +5443,7 @@ class WhiteNoiseAppState(
             pendingInviteAccount = null,
             groupIdHex = update.groupIdHex,
             otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex),
-            memberCount = members.size,
+            memberCount = GroupProjector.uniqueMemberCount(members),
             memberTitle = { displayNameForAccount(update.accountRef, it) },
             copy = notificationGroupTitleCopy(),
         )

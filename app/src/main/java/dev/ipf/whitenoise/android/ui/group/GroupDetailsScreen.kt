@@ -588,7 +588,7 @@ internal fun GroupDetailsScreen(
     ) { padding ->
         val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
-        val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
+        val isDm = GroupProjector.isDm(controller.memberCount, controller.group.name)
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
         val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
         val notificationModes = chatNotificationState.notificationModes
@@ -614,7 +614,7 @@ internal fun GroupDetailsScreen(
                             membersFormat = stringResource(R.string.members_count),
                         )
                     } else {
-                        stringResource(R.string.group_details_subtitle, controller.members.size)
+                        stringResource(R.string.group_details_subtitle, controller.memberCount)
                     },
                 description = controller.group.description,
                 // Show the DM peer's avatar + initials seed here — the same
@@ -810,7 +810,7 @@ internal fun GroupDetailsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SectionHeader(
-                    stringResource(R.string.members_count, controller.members.size),
+                    stringResource(R.string.members_count, controller.memberCount),
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(

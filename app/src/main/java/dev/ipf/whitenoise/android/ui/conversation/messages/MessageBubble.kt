@@ -570,7 +570,7 @@ internal fun MessageBubble(
         }
     val showSenderAvatar =
         GroupProjector.shouldShowTranscriptSenderAvatar(
-            memberCount = controller.members.size,
+            memberCount = controller.memberCount,
             mine = mine,
         )
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same

@@ -310,7 +310,7 @@ internal fun chatListItemFromProjection(
         )
     val otherMember =
         members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
-    val memberCount = members?.size ?: 0
+    val memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0
     return ChatListItem(
         group = displayGroup,
         latest =
@@ -650,7 +650,7 @@ private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi
 data class GroupMemberSnapshot(
     val members: List<AppGroupMemberRecordFfi>,
 ) {
-    val memberCount: Int = members.size
+    val memberCount: Int = GroupProjector.uniqueMemberCount(members)
 
     fun otherMemberAccount(activeAccountIdHex: String?): String? = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
 
@@ -2751,7 +2751,7 @@ class ChatsController(
         var demotedBeforeLeave = false
         return runCatchingCancellable {
             val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-            val memberCount = members.size
+            val memberCount = GroupProjector.uniqueMemberCount(members)
             // #811: when the live roster is just you there is no one to
             // coordinate an MLS commit with, so a normal leave would fail (and
             // the sole-admin transfer block must not apply either). Dissolve the
@@ -2912,7 +2912,8 @@ class ChatsController(
                 .getOrNull()
                 ?: return null
         if (GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)) return null
-        if (!GroupProjector.isSoleAdminWithOtherMembers(group, activeAccountIdHex, members.size)) return null
+        val uniqueMemberCount = GroupProjector.uniqueMemberCount(members)
+        if (!GroupProjector.isSoleAdminWithOtherMembers(group, activeAccountIdHex, uniqueMemberCount)) return null
         return members.filter { GroupProjector.canTransferAdminTo(group, it, activeAccountIdHex) }.ifEmpty { null }
     }
 
@@ -3822,7 +3823,7 @@ class ConversationController(
         return GroupProjector.displayTitle(
             group = group,
             otherMemberAccount = other,
-            memberCount = members.size,
+            memberCount = memberCount,
             memberTitle = { appState.chatMemberTitle(it) },
             copy = copy,
         )
@@ -3845,7 +3846,7 @@ class ConversationController(
         get() {
             val me = conversationAccountIdHex
             val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.avatarAccount(group, other, members.size)
+            return GroupProjector.avatarAccount(group, other, memberCount)
         }
 
     /**
@@ -3856,11 +3857,16 @@ class ConversationController(
     val avatarUrl: String?
         get() = group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) }
 
+    // Deduped case-insensitively, mirroring the projector's classification —
+    // a hex-casing-drifted duplicate must not inflate the visible headcount.
+    val memberCount: Int
+        get() = GroupProjector.uniqueMemberCount(members)
+
     // A nameless two-member conversation, classified the same way the chat list
     // and notifications do. The header title is already the counterparty's name,
     // so the "2 members" subtitle is redundant noise here.
     val isDm: Boolean
-        get() = GroupProjector.isDm(members.size, group.name)
+        get() = GroupProjector.isDm(memberCount, group.name)
 
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
@@ -3870,7 +3876,7 @@ class ConversationController(
         oneMember: String,
         membersFormat: String,
     ): String {
-        val count = members.size
+        val count = memberCount
         return when (count) {
             0 -> justYou
             1 -> oneMember
@@ -3890,7 +3896,7 @@ class ConversationController(
      * unverified roster.
      */
     val isDirectConversation: Boolean
-        get() = GroupProjector.isDm(members.size, group.name)
+        get() = GroupProjector.isDm(memberCount, group.name)
 
     /**
      * The authoritative deletion capability for [message], shared by the
@@ -3921,7 +3927,7 @@ class ConversationController(
         get() = membersVerified && isSelfMember
 
     val canLeaveGroup: Boolean
-        get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, members.size)
+        get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)
 
     /**
      * Leave-dialog routing from a live roster read. The cached [members] list can
@@ -3931,15 +3937,15 @@ class ConversationController(
      */
     suspend fun leaveAction(): LeaveAction {
         val account = conversationAccountRef
-        val memberCount =
+        val liveMemberCount =
             if (account != null) {
                 runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
                     .getOrNull()
-                    ?.size
+                    ?.let(GroupProjector::uniqueMemberCount)
             } else {
                 null
-            } ?: members.size
-        return GroupProjector.leaveAction(group, conversationAccountIdHex, memberCount)
+            } ?: memberCount
+        return GroupProjector.leaveAction(group, conversationAccountIdHex, liveMemberCount)
     }
 
     /**
@@ -3950,12 +3956,12 @@ class ConversationController(
      * paths (issue #417).
      */
     val isSoleAdminWithOtherMembers: Boolean
-        get() = GroupProjector.isSoleAdminWithOtherMembers(group, conversationAccountIdHex, members.size)
+        get() = GroupProjector.isSoleAdminWithOtherMembers(group, conversationAccountIdHex, memberCount)
 
     /** Members eligible to receive a transferred admin role from the active account. */
     fun transferAdminCandidates(): List<AppGroupMemberRecordFfi> = members.filter { GroupProjector.canTransferAdminTo(group, it, conversationAccountIdHex) }
 
-    fun revokeWouldDepleteAdmins(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.revokeWouldDepleteAdmins(group, member, members.size)
+    fun revokeWouldDepleteAdmins(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.revokeWouldDepleteAdmins(group, member, memberCount)
 
     fun canTransferAdminTo(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.canTransferAdminTo(group, member, conversationAccountIdHex)
 
@@ -5938,13 +5944,13 @@ class ConversationController(
             val liveMembers =
                 runCatchingCancellable { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
                     .getOrNull()
-            val memberCount = liveMembers?.size ?: members.size
+            val liveMemberCount = liveMembers?.let(GroupProjector::uniqueMemberCount) ?: memberCount
             val soleMember =
                 GroupProjector.shouldDissolveAsSoleMember(
                     liveMembers,
                     activeAccountIdHex,
                 )
-            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
+            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, liveMemberCount)) {
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
             }
@@ -5954,7 +5960,7 @@ class ConversationController(
                     if (soleMember) {
                         appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
-                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
                             withContext(NonCancellable) {
                                 val demoteResult =
                                     appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
