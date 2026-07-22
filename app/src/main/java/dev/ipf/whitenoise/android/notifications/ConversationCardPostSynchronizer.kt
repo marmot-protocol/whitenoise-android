@@ -6,6 +6,7 @@ internal enum class ConversationCardOp {
     SHOW_NOTIFY,
     DISMISS_CANCEL,
     MARK_REPLY_HANDLED,
+    MARK_REPLY_FAILED,
     CANCEL_IF_SAME_GENERATION,
 }
 
