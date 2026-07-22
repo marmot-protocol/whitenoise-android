@@ -104,6 +104,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
@@ -201,6 +204,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
@@ -402,6 +406,56 @@ internal fun ConversationScreen(
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
+    // Auto-read (#1483): once the timeline is anchored, read the unread
+    // backlog aloud, oldest first, bounded — an inflated unread count must
+    // not narrate ancient history. Names are announced on speaker changes.
+    LaunchedEffect(chat.id, initialTimelineAnchored) {
+        if (!initialTimelineAnchored) return@LaunchedEffect
+        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
+        val groupIdHex = controller.group.groupIdHex
+        if (!appState.isConversationAutoRead(groupIdHex)) return@LaunchedEffect
+        if (entryUnreadCount <= 0) return@LaunchedEffect
+        val start = controller.firstUnreadTimelineIndex(entryUnreadCount)
+        if (start < 0) return@LaunchedEffect
+        val entries =
+            controller.timeline.drop(start).mapNotNull { message ->
+                val record = message.record
+                val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
+                TtsSpeakableEntry(
+                    senderKey = record.sender,
+                    senderDisplayName = appState.displayName(record.sender),
+                    text = text,
+                )
+            }
+        if (entries.isEmpty()) return@LaunchedEffect
+        appState.speakAloud(ttsAutoReadScript(entries), Locale.getDefault())
+    }
+    // Live continuation: a speakable message arriving while speech is active
+    // appends to the queue; while speech sits idle it stays quiet, so
+    // auto-read never becomes an always-on announcer for an open chat.
+    LaunchedEffect(chat.id) {
+        var seededLastId = false
+        snapshotFlow {
+            controller.timeline
+                .lastOrNull()
+                ?.record
+                ?.messageIdHex
+        }.distinctUntilChanged()
+            .collect { lastId ->
+                if (lastId == null) return@collect
+                if (!seededLastId) {
+                    seededLastId = true
+                    return@collect
+                }
+                if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@collect
+                val ttsState = appState.ttsController.state.value
+                if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
+                val record = controller.timeline.lastOrNull()?.record ?: return@collect
+                if (record.messageIdHex != lastId) return@collect
+                val text = MessageProjector.copyableText(record, null) ?: return@collect
+                appState.appendSpeech("${appState.displayName(record.sender)}: $text", Locale.getDefault())
+            }
+    }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and

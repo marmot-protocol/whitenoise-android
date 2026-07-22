@@ -99,6 +99,18 @@ class TtsController internal constructor(
         return state.value !is TtsState.Error
     }
 
+    /** Appends more sentences to an active read-aloud session (auto-read). */
+    @Synchronized
+    fun appendSpeech(
+        text: String,
+        locale: Locale,
+    ): Boolean {
+        if (engine == null) return false
+        val chunks = chunkText(text, locale)
+        if (chunks.isEmpty()) return false
+        return queue.append(chunks)
+    }
+
     /**
      * Called when the global speech rate changes so an in-flight queue picks
      * the new rate up at the next sentence boundary (the engine pre-buffers

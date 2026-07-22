@@ -1072,6 +1072,8 @@
     <string name="tts_bar_skip_next">下一句</string>
     <string name="tts_bar_stop">停止朗读</string>
     <string name="tts_bar_error">无法朗读</string>
+    <string name="tts_auto_read_title">朗读消息</string>
+    <string name="tts_auto_read_subtitle">打开此聊天时朗读未读消息</string>
     <string name="tts_settings_rate_system">系统（跟随设备设置）</string>
     <string name="tts_settings_engine_local">本机引擎</string>
     <string name="tts_settings_engine_unknown">可能使用网络语音</string>

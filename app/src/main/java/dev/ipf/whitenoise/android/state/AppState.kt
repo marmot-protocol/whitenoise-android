@@ -1148,6 +1148,27 @@ class WhiteNoiseAppState(
         return started
     }
 
+    internal val ttsAutoReadPreferences = TtsAutoReadPreferences(appContext)
+
+    fun isConversationAutoRead(groupIdHex: String): Boolean {
+        val accountRef = activeAccountRef ?: return false
+        return ttsAutoReadPreferences.isEnabled(accountRef, groupIdHex)
+    }
+
+    fun setConversationAutoRead(
+        groupIdHex: String,
+        enabled: Boolean,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        ttsAutoReadPreferences.setEnabled(accountRef, groupIdHex, enabled)
+    }
+
+    /** Live continuation for auto-read: extends an active read-aloud queue. */
+    fun appendSpeech(
+        text: String,
+        locale: java.util.Locale,
+    ): Boolean = ttsController.appendSpeech(text, locale)
+
     fun stopSpeaking() {
         ttsController.stop()
         ttsNowPlayingPreview = null

@@ -1090,6 +1090,8 @@
     <string name="tts_bar_skip_next">Frase successiva</string>
     <string name="tts_bar_stop">Interrompi lettura</string>
     <string name="tts_bar_error">Impossibile leggere ad alta voce</string>
+    <string name="tts_auto_read_title">Leggi i messaggi ad alta voce</string>
+    <string name="tts_auto_read_subtitle">Leggi i messaggi non letti all\'apertura di questa chat</string>
     <string name="tts_settings_rate_system">Sistema (segui l\'impostazione del dispositivo)</string>
     <string name="tts_settings_engine_local">Motore sul dispositivo</string>
     <string name="tts_settings_engine_unknown">Può usare la voce in rete</string>

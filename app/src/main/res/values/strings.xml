@@ -1120,6 +1120,8 @@
     <string name="tts_bar_skip_next">Next sentence</string>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_error">Couldn\'t read aloud</string>
+    <string name="tts_auto_read_title">Read messages aloud</string>
+    <string name="tts_auto_read_subtitle">Read the unread backlog when this chat opens</string>
     <string name="tts_settings_rate_system">System (follow device setting)</string>
     <string name="tts_settings_engine_local">On-device engine</string>
     <string name="tts_settings_engine_unknown">May use network speech</string>

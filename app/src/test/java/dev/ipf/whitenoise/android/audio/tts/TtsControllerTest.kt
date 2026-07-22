@@ -166,6 +166,33 @@ class TtsControllerTest {
         assertEquals(TtsState.Speaking(chunkIndex = 1, chunkCount = 2), controller.state.value)
     }
 
+    @Test
+    fun appendExtendsAnActiveQueueAndSpeaksTheNewSentences() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        controller.speak("First. Second.", Locale.US)
+
+        assertTrue(controller.appendSpeech("Third.", Locale.US))
+
+        assertEquals(TtsState.Speaking(chunkIndex = 0, chunkCount = 3), controller.state.value)
+        assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.map { it.text })
+        engine.complete(0)
+        engine.complete(1)
+        engine.complete(2)
+        assertEquals(TtsState.Idle(chunkIndex = 3, chunkCount = 3), controller.state.value)
+    }
+
+    @Test
+    fun appendNeverResurrectsAnIdleSession() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+
+        assertFalse(controller.appendSpeech("Orphan.", Locale.US))
+        assertTrue(engine.spoken.isEmpty())
+    }
+
     private fun controller(focus: FakeTtsAudioFocus): TtsController =
         TtsController(
             audioFocus = focus,

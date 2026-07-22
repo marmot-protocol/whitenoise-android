@@ -1088,6 +1088,8 @@
     <string name="tts_bar_skip_next">Sonraki cümle</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
     <string name="tts_bar_error">Sesli okunamadı</string>
+    <string name="tts_auto_read_title">Mesajları sesli oku</string>
+    <string name="tts_auto_read_subtitle">Bu sohbet açıldığında okunmamış mesajları sesli oku</string>
     <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>

@@ -1124,6 +1124,8 @@
     <string name="tts_bar_skip_next">Следующее предложение</string>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_error">Не удалось прочитать вслух</string>
+    <string name="tts_auto_read_title">Читать сообщения вслух</string>
+    <string name="tts_auto_read_subtitle">Читать непрочитанные сообщения при открытии этого чата</string>
     <string name="tts_settings_rate_system">Системная (по настройке устройства)</string>
     <string name="tts_settings_engine_local">Движок на устройстве</string>
     <string name="tts_settings_engine_unknown">Может использовать сеть</string>

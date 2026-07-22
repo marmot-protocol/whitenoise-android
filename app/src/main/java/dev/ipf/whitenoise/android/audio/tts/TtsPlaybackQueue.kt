@@ -76,6 +76,36 @@ internal class TtsPlaybackQueue(
         enqueueFromCurrentIndex()
     }
 
+    /**
+     * Extends an active queue with more sentences (auto-read live
+     * continuation). No-op when idle or errored — appending must never
+     * resurrect a finished session. While speaking, the new chunks enqueue
+     * immediately behind the engine's pending utterances; while paused,
+     * resume() re-enqueues everything from the current index anyway.
+     */
+    fun append(moreChunks: List<TtsChunk>): Boolean {
+        if (moreChunks.isEmpty()) return false
+        val current = _state.value
+        if (current !is TtsState.Speaking && current !is TtsState.Paused) return false
+        val base = chunks.size
+        val reindexed = moreChunks.mapIndexed { offset, chunk -> chunk.copy(index = base + offset) }
+        chunks = chunks + reindexed
+        if (current is TtsState.Speaking) {
+            _state.value = TtsState.Speaking(currentIndex, chunks.size)
+            for (chunk in reindexed) {
+                val utteranceId = utteranceId(generation, chunk.index)
+                val result = enqueue(chunk, utteranceId)
+                if (result != TextToSpeech.SUCCESS) {
+                    onError(utteranceId, result)
+                    break
+                }
+            }
+        } else {
+            _state.value = TtsState.Paused(currentIndex, chunks.size)
+        }
+        return true
+    }
+
     fun failBeforePlayback(
         error: TtsError,
         chunkCount: Int,
