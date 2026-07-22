@@ -1138,19 +1138,29 @@ class WhiteNoiseAppState(
     var ttsNowPlayingPreview by mutableStateOf<String?>(null)
         private set
 
-    // The conversation that owns the current auto-read session, or null when
-    // speech is manual or idle. Live continuation appends only for the owner:
-    // a manual Speak aloud replaces the queue and ends the session, and
-    // another chat's speech must never be extended by this one's arrivals.
-    var ttsAutoReadSessionGroupIdHex by mutableStateOf<String?>(null)
-        private set
+    // The (account, conversation) pair that owns the current auto-read
+    // session, or null when speech is manual or idle. Live continuation
+    // appends only for the owner: a manual Speak aloud replaces the queue and
+    // ends the session; another chat's — or another ACCOUNT'S view of the
+    // same group — must never extend it.
+    private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
+
+    fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
+        val key = ttsAutoReadSessionKey ?: return false
+        return key == ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex)
+    }
+
+    private fun ttsAutoReadSessionKeyFor(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String? = accountRef?.let { "$it|${groupIdHex.lowercase()}" }
 
     /** Starts read-aloud and remembers a truncated preview for the transport bar. */
     fun speakAloud(
         text: String,
         locale: java.util.Locale,
     ): Boolean {
-        ttsAutoReadSessionGroupIdHex = null
+        ttsAutoReadSessionKey = null
         val started = ttsController.speak(text, locale)
         if (started) ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
         return started
@@ -1162,8 +1172,9 @@ class WhiteNoiseAppState(
         text: String,
         locale: java.util.Locale,
     ): Boolean {
+        val owner = ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex) ?: return false
         val started = speakAloud(text, locale)
-        if (started) ttsAutoReadSessionGroupIdHex = groupIdHex
+        if (started) ttsAutoReadSessionKey = owner
         return started
     }
 
@@ -1191,7 +1202,7 @@ class WhiteNoiseAppState(
     fun stopSpeaking() {
         ttsController.stop()
         ttsNowPlayingPreview = null
-        ttsAutoReadSessionGroupIdHex = null
+        ttsAutoReadSessionKey = null
     }
 
     fun setTtsRateOverride(rate: Float?) {
@@ -3794,6 +3805,9 @@ class WhiteNoiseAppState(
             dismissVisibleConversationNotifications()
         } else {
             recordAppLockBackgrounded()
+            // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
+            // spoken private messages must not continue after an app switch.
+            stopSpeaking()
         }
         if (foreground) {
             refreshLocalNotificationPermission()

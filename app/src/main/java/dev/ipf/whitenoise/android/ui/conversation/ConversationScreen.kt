@@ -452,7 +452,7 @@ internal fun ConversationScreen(
                 // Only the conversation that owns the active auto-read
                 // session may extend it: manual speech and other chats'
                 // sessions must never be appended to by this chat's arrivals.
-                if (appState.ttsAutoReadSessionGroupIdHex != controller.group.groupIdHex) return@collect
+                if (!appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@collect
                 val ttsState = appState.ttsController.state.value
                 if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
                 val record = controller.timeline.lastOrNull()?.record ?: return@collect
