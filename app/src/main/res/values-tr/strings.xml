@@ -405,7 +405,6 @@
     <string name="hide">Gizle</string>
     <string name="toast_encrypted_backup_created">Şifreli yedek oluşturuldu</string>
     <string name="toast_couldnt_create_encrypted_backup">Şifreli yedek oluşturulamadı</string>
-    <string name="toast_encrypted_backup_copied">Şifreli yedek kopyalandı</string>
     <string name="copy">Kopyala</string>
     <string name="account_relay_lists">Hesap Aktarma Listeleri</string>
     <string name="no_relays">Yapılandırılmış röle yok</string>
@@ -582,9 +581,7 @@
     <string name="toast_no_audit_logs_to_delete">Silinecek denetim günlüğü yok</string>
     <string name="toast_chat_created">Sohbet oluşturuldu</string>
     <string name="toast_notification_permission_denied">Bildirim izni reddedildi</string>
-    <string name="toast_copied_npub">npub kopyalandı</string>
     <string name="toast_signed_out">Çıkış yap</string>
-    <string name="toast_copied_value">%1$s kopyalandı</string>
     <string name="group_title_invite_from">%1$s tarafından davet</string>
     <string name="group_title_people_count">%1$d kişilik grup</string>
     <string name="just_you">Sadece sen</string>

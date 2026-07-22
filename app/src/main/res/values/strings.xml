@@ -554,7 +554,6 @@
     <string name="hide">Hide</string>
     <string name="toast_encrypted_backup_created">Encrypted backup created</string>
     <string name="toast_couldnt_create_encrypted_backup">Couldn\'t create encrypted backup</string>
-    <string name="toast_encrypted_backup_copied">Encrypted backup copied</string>
     <string name="copy">Copy</string>
     <string name="account_relay_lists">Account Relay Lists</string>
     <string name="no_relays">No relays</string>
@@ -734,9 +733,7 @@
     <string name="toast_no_audit_logs_to_delete">No audit logs to delete</string>
     <string name="toast_chat_created">Chat created</string>
     <string name="toast_notification_permission_denied">Notification permission denied</string>
-    <string name="toast_copied_npub">Copied npub</string>
     <string name="toast_signed_out">Signed out</string>
-    <string name="toast_copied_value">Copied %1$s</string>
     <string name="group_title_invite_from">Invite from %1$s</string>
     <string name="group_title_people_count">Group of %1$d people</string>
     <string name="just_you">Just you</string>
