@@ -753,6 +753,53 @@ class LocalNotificationPresenter(
             }.getOrDefault(false)
         }
 
+    /**
+     * Re-post the (tag, id) conversation card after a direct reply failed
+     * terminally, clearing the direct-reply lifetime extension the same way
+     * [markDirectReplyHandled] does — but stamping [failureNotice] into the
+     * RemoteInput history instead of the reply text, so the card reads as
+     * not-sent while keeping its original actions (the user can tap Reply and
+     * retype). Skipped when the live card is a newer generation than the
+     * replied message: that newer post already cleared the extension, and a
+     * failure line rendered over newer messages would mislabel them.
+     */
+    @SuppressLint("MissingPermission")
+    fun markDirectReplyFailed(
+        notificationTag: String,
+        notificationId: Int,
+        repliedMessageIdHex: String?,
+        failureNotice: String,
+    ): Boolean =
+        ConversationCardPostSynchronizer.withLock(
+            notificationTag,
+            notificationId,
+            ConversationCardOp.MARK_REPLY_FAILED,
+        ) {
+            val active =
+                runCatching {
+                    context
+                        .getSystemService(NotificationManager::class.java)
+                        ?.activeNotifications
+                        ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+                }.getOrNull() ?: return@withLock false
+            val liveCardMessageIdHex = conversationCardMessageIdHex(active.notification)
+            if (!shouldCancelRepliedConversationCard(repliedMessageIdHex, liveCardMessageIdHex)) {
+                return@withLock false
+            }
+            runCatching {
+                val resolved =
+                    NotificationCompat
+                        .Builder(context, active.notification)
+                        .setRemoteInputHistory(arrayOf(failureNotice))
+                        .setSilent(true)
+                        .setOnlyAlertOnce(true)
+                        .build()
+                NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+                notificationDebug { "reply-failed re-post tag=${notificationTag.take(16)} id=$notificationId" }
+                true
+            }.getOrDefault(false)
+        }
+
     // Accumulate every message from a conversation into one card. Android keys a
     // notification by (tag, id); reusing the per-conversation tag updates the
     // existing card, and MessagingStyle appends the new line to the previous

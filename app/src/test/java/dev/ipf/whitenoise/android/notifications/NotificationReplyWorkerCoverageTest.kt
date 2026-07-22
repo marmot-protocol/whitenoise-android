@@ -8,6 +8,32 @@ import org.junit.Test
 
 class NotificationReplyWorkerCoverageTest {
     @Test
+    fun failedCardRestoreSucceedsOnceTheLifetimeExtendedCardAppears() =
+        runTest {
+            var attempts = 0
+
+            val restored = retryReplyCardRestore { ++attempts >= 3 }
+
+            assertTrue(restored)
+            assertEquals(3, attempts)
+        }
+
+    @Test
+    fun failedCardRestoreGivesUpAfterBoundedAttempts() =
+        runTest {
+            var attempts = 0
+
+            val restored =
+                retryReplyCardRestore {
+                    attempts++
+                    false
+                }
+
+            assertFalse(restored)
+            assertEquals(REPLY_DISMISS_RETRIES, attempts)
+        }
+
+    @Test
     fun committedMessageIdIsDurableProofWithoutTimelineLookup() =
         runTest {
             var pageLoads = 0
