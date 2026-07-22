@@ -1123,22 +1123,95 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     val visible = children.ifEmpty { listOf(MarkdownInlineFfi.Text(normalizedDest)) }
     val parsedLink = parsedOpenableMarkdownLink(normalizedDest)
     if (parsedLink != null) {
-        // The label is attacker-chosen and may not match the destination, so
-        // route the tap through a confirmation (Clickable + confirm tag) that
-        // shows the real URL, rather than a direct-opening Url annotation. See #273.
-        withLink(
-            LinkAnnotation.Clickable(
-                CONFIRM_LINK_TAG_PREFIX + parsedLink.destination,
-                TextLinkStyles(style = ctx.linkStyle),
-                ctx.linkListener,
-            ),
-        ) {
-            appendMarkdownInlines(visible, ctx, depth)
+        // The label is attacker-chosen, but only a URL-shaped label can
+        // misrepresent where the tap goes (issue #273's example). Plain-word
+        // labels open directly like autolinks; a label carrying host-shaped
+        // text that doesn't match the destination routes through the
+        // confirmation dialog that shows the real URL.
+        if (shouldConfirmMarkdownLink(markdownInlinePlainText(visible), parsedLink.destination)) {
+            withLink(
+                LinkAnnotation.Clickable(
+                    CONFIRM_LINK_TAG_PREFIX + parsedLink.destination,
+                    TextLinkStyles(style = ctx.linkStyle),
+                    ctx.linkListener,
+                ),
+            ) {
+                appendMarkdownInlines(visible, ctx, depth)
+            }
+        } else {
+            withLink(
+                LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener),
+            ) {
+                appendMarkdownInlines(visible, ctx, depth)
+            }
         }
     } else {
         appendMarkdownInlines(visible, ctx, depth)
     }
 }
+
+// Domain-shaped token inside a link label: two or more dot-separated parts
+// with an alphabetic final part of ≥2 chars, or an IPv4 literal. Deliberately
+// loose — a dotted label that merely looks like a host still confirms; only
+// labels with no URL-like content at all skip the dialog.
+private val LABEL_HOST_TOKEN = Regex("(?i)\\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}\\b")
+private val LABEL_IPV4_TOKEN = Regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b")
+private val DOT_LIKE_CHARS = charArrayOf('.', '。', '．', '｡')
+private const val ASCII_MAX_CODE = 0x7F
+
+/**
+ * Whether a labeled markdown link must route through the destination
+ * confirmation dialog (#273): true when the visible [labelText] carries
+ * host-shaped content that does not match [destination]'s host. A label with
+ * no URL-like content has no destination to misrepresent, so confirming it
+ * buys nothing. Non-http(s) destinations (mailto) keep confirming — an
+ * address-shaped label can misrepresent those too, and they're rare.
+ */
+internal fun shouldConfirmMarkdownLink(
+    labelText: String,
+    destination: String,
+): Boolean {
+    val destHost =
+        runCatching { URI(destination) }
+            .getOrNull()
+            ?.host
+            ?.lowercase(Locale.ROOT)
+            ?.removePrefix("www.")
+            ?: return true
+    // A non-ASCII label containing any dot-like character can be a homoglyph
+    // host (IDN lookalike) the ASCII token scan below cannot compare — those
+    // always keep the dialog.
+    val idnShapedLabel =
+        labelText.any { it.code > ASCII_MAX_CODE } && labelText.any { it in DOT_LIKE_CHARS }
+    val labelHosts =
+        (LABEL_HOST_TOKEN.findAll(labelText) + LABEL_IPV4_TOKEN.findAll(labelText))
+            .map { it.value.lowercase(Locale.ROOT).removePrefix("www.") }
+    return idnShapedLabel ||
+        labelHosts.any { host -> host != destHost && !destHost.endsWith(".$host") }
+}
+
+/** Flattened visible text of an inline run, for label-vs-destination checks. */
+internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
+    buildString {
+        fun walk(nodes: List<MarkdownInlineFfi>) {
+            nodes.forEach { inline ->
+                when (inline) {
+                    is MarkdownInlineFfi.Text -> append(inline.content)
+                    is MarkdownInlineFfi.Code -> append(inline.content)
+                    is MarkdownInlineFfi.Math -> append(inline.content)
+                    is MarkdownInlineFfi.Autolink -> append(inline.url)
+                    is MarkdownInlineFfi.Emph -> walk(inline.children)
+                    is MarkdownInlineFfi.Strong -> walk(inline.children)
+                    is MarkdownInlineFfi.Strikethrough -> walk(inline.children)
+                    is MarkdownInlineFfi.Link -> walk(inline.children)
+                    is MarkdownInlineFfi.Image -> walk(inline.alt)
+                    MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
+                    is MarkdownInlineFfi.NostrMention, is MarkdownInlineFfi.NostrUri -> Unit
+                }
+            }
+        }
+        walk(inlines)
+    }
 
 /**
  * Chat-list previews cap the flattened string here: the row is one ellipsized
