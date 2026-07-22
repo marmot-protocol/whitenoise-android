@@ -198,10 +198,11 @@ internal fun SignInContent(
                     onIdentityChange = onIdentityChange,
                     onErrorChange = onErrorChange,
                     onSubmit = submit,
-                    // Login is nsec-only: no QR scan (the scanner yields
-                    // npub / profile-link payloads), and the field is always
-                    // masked and labelled as a secret key.
-                    allowScan = false,
+                    // Secret-key entry with the same scanner the add-account
+                    // sheet uses: a scanned nsec/ncryptsec fills the field
+                    // exactly like a paste (the user still confirms before
+                    // import), and the field stays masked either way.
+                    allowScan = true,
                     secretKeyOnly = true,
                 )
                 Spacer(Modifier.height(24.dp))

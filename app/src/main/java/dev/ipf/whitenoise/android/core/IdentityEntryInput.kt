@@ -14,15 +14,24 @@ object IdentityEntryInput {
 
     private const val BECH32_KEY_LENGTH = 63
     private const val NOSTR_URI_PREFIX = "nostr:"
+    private const val NCRYPTSEC_PREFIX = "ncryptsec1"
 
     // bech32 alphabet: lowercase a-z + 0-9 minus 'b' 'i' 'o' '1' (same class
     // ProfileLink uses for npub bodies).
     private val BECH32_BODY = Regex("^[ac-hj-np-z02-9]{58}$")
 
+    // NIP-49 encrypted keys are variable-length (version byte, KDF params,
+    // ciphertext), so unlike nsec/npub there is no fixed 63-char shape —
+    // bound loosely and let the engine be the authority on submit.
+    private val NCRYPTSEC_BODY = Regex("^[ac-hj-np-z02-9]{50,300}$")
+
     fun classify(raw: String): Kind {
         val trimmed = raw.trim()
         return when {
             isBech32Key(trimmed, "nsec1") -> Kind.SecretKey
+            // An encrypted secret is still a secret: mask it, allow it into
+            // the field, and route it like any other secret-key entry.
+            isNcryptsecKey(trimmed) -> Kind.SecretKey
             isBech32Key(trimmed, "npub1") -> Kind.PublicKey
             else -> Kind.Invalid
         }
@@ -69,4 +78,8 @@ object IdentityEntryInput {
         value.length == BECH32_KEY_LENGTH &&
             value.startsWith(prefix) &&
             BECH32_BODY.matches(value.substring(prefix.length))
+
+    private fun isNcryptsecKey(value: String): Boolean =
+        value.startsWith(NCRYPTSEC_PREFIX) &&
+            NCRYPTSEC_BODY.matches(value.substring(NCRYPTSEC_PREFIX.length))
 }
