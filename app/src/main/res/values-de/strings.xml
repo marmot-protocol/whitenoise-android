@@ -1081,6 +1081,13 @@
     <string name="tts_settings_explainer_no_engine">Keine nutzbare Sprachausgabe installiert. Installieren Sie RHVoice oder eSpeak NG über F-Droid oder Zapstore und wählen Sie es unten aus.</string>
     <string name="tts_settings_engine_title">Sprachausgabe</string>
     <string name="tts_settings_rate_title">Sprechgeschwindigkeit</string>
+    <string name="speak_aloud">Vorlesen</string>
+    <string name="tts_bar_pause">Vorlesen pausieren</string>
+    <string name="tts_bar_play">Vorlesen fortsetzen</string>
+    <string name="tts_bar_skip_previous">Vorheriger Satz</string>
+    <string name="tts_bar_skip_next">Nächster Satz</string>
+    <string name="tts_bar_stop">Vorlesen beenden</string>
+    <string name="tts_bar_error">Vorlesen fehlgeschlagen</string>
     <string name="tts_settings_rate_system">System (Geräteeinstellung folgen)</string>
     <string name="tts_settings_engine_local">Sprachausgabe auf dem Gerät</string>
     <string name="tts_settings_engine_unknown">Kann Netzwerk-Sprache nutzen</string>

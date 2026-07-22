@@ -1014,6 +1014,8 @@ internal fun networkDisplayNameFallback(
 
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
+private const val TTS_PREVIEW_MAX_LENGTH = 120
+
 class WhiteNoiseAppState(
     context: Context,
 ) {
@@ -1132,6 +1134,24 @@ class WhiteNoiseAppState(
         )
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
+
+    var ttsNowPlayingPreview by mutableStateOf<String?>(null)
+        private set
+
+    /** Starts read-aloud and remembers a truncated preview for the transport bar. */
+    fun speakAloud(
+        text: String,
+        locale: java.util.Locale,
+    ): Boolean {
+        val started = ttsController.speak(text, locale)
+        if (started) ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
+        return started
+    }
+
+    fun stopSpeaking() {
+        ttsController.stop()
+        ttsNowPlayingPreview = null
+    }
 
     fun setTtsRateOverride(rate: Float?) {
         ttsRatePreferences.setRateOverride(rate)

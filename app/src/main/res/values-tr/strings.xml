@@ -1081,6 +1081,13 @@
     <string name="tts_settings_explainer_no_engine">Kullanılabilir bir metin okuma motoru yüklü değil. F-Droid veya Zapstore\'dan RHVoice veya eSpeak NG yükleyin ve aşağıdan seçin.</string>
     <string name="tts_settings_engine_title">Motor</string>
     <string name="tts_settings_rate_title">Konuşma hızı</string>
+    <string name="speak_aloud">Sesli oku</string>
+    <string name="tts_bar_pause">Okumayı duraklat</string>
+    <string name="tts_bar_play">Okumaya devam et</string>
+    <string name="tts_bar_skip_previous">Önceki cümle</string>
+    <string name="tts_bar_skip_next">Sonraki cümle</string>
+    <string name="tts_bar_stop">Okumayı durdur</string>
+    <string name="tts_bar_error">Sesli okunamadı</string>
     <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>

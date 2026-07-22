@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -103,6 +104,7 @@ internal fun MessageActionMenu(
     canForward: Boolean,
     canSelect: Boolean,
     canCopyText: Boolean,
+    canSpeak: Boolean,
     canSelectText: Boolean,
     canSave: Boolean,
     quickReactionEmojis: List<String>,
@@ -115,6 +117,7 @@ internal fun MessageActionMenu(
     onSelect: () -> Unit,
     onSelectText: () -> Unit,
     onCopyText: () -> Unit,
+    onSpeak: () -> Unit,
     onSave: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
@@ -159,6 +162,7 @@ internal fun MessageActionMenu(
                 1 +
                     (if (canSelectText) 1 else 0) +
                     (if (canCopyText) 1 else 0) +
+                    (if (canSpeak) 1 else 0) +
                     (if (canReply) 1 else 0) +
                     (if (canEdit) 1 else 0) +
                     (if (canForward) 1 else 0) +
@@ -289,6 +293,13 @@ internal fun MessageActionMenu(
                             label = stringResource(R.string.copy_text),
                             icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onCopyText,
+                        )
+                    }
+                    if (canSpeak) {
+                        MessageActionButton(
+                            label = stringResource(R.string.speak_aloud),
+                            icon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onSpeak,
                         )
                     }
                     if (canForward) {

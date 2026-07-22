@@ -2306,241 +2306,246 @@ internal fun ConversationScreen(
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            if (selectionMode) {
-                MessageSelectionBar(
-                    count = selectedActionItems.size,
-                    canCopy = selectedCopyText.isNotBlank(),
-                    canForward = selectedForwardBodies.isNotEmpty(),
-                    onClose = { selectedMessages.clear() },
-                    onCopy = {
-                        if (selectedCopyText.isNotBlank()) {
-                            clipboard.setText(AnnotatedString(selectedCopyText))
-                            selectedMessages.clear()
-                        }
-                    },
-                    onForward = {
-                        if (selectedForwardBodies.isNotEmpty()) batchForwardSheetOpen = true
-                    },
-                    onDelete = { showBatchDeleteConfirm = true },
-                )
-            } else if (searchOpen) {
-                ConversationSearchTopBar(
-                    query = searchQuery,
-                    onQueryChange = {
-                        searchQuery = it
-                        // Re-anchor the cursor to the new query's match set on
-                        // the next derivation; clearing the pin makes it land
-                        // on the first match again.
-                        searchPinnedMatchId = null
-                    },
-                    onClear = {
-                        searchQuery = ""
-                        searchPinnedMatchId = null
-                    },
-                    onClose = { closeSearch() },
-                    onSearchAction = { navigateToSearchMatch(forward = true) },
-                    focusRequester = searchFocusRequester,
-                )
-            } else {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier =
-                                Modifier
-                                    // Fill the title slot so the whole strip between
-                                    // the back arrow and the overflow menu opens
-                                    // details, not just the avatar/name. Those two
-                                    // live in their own slots and keep their taps.
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { showDetails = true }
-                                    .semantics { contentDescription = openDetailsDescription },
-                        ) {
-                            Avatar(
-                                title = controller.title(groupTitleCopy),
-                                // For a 1:1 DM the seed must match the peer-derived
-                                // avatar so the initials fallback stays stable, just
-                                // like the chat-list row (#837).
-                                seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                                size = 36.dp,
-                                pictureUrl = controller.avatarUrl,
-                            )
-                            Column {
-                                Text(
-                                    controller.title(groupTitleCopy),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+            Column {
+                if (selectionMode) {
+                    MessageSelectionBar(
+                        count = selectedActionItems.size,
+                        canCopy = selectedCopyText.isNotBlank(),
+                        canForward = selectedForwardBodies.isNotEmpty(),
+                        onClose = { selectedMessages.clear() },
+                        onCopy = {
+                            if (selectedCopyText.isNotBlank()) {
+                                clipboard.setText(AnnotatedString(selectedCopyText))
+                                selectedMessages.clear()
+                            }
+                        },
+                        onForward = {
+                            if (selectedForwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                        },
+                        onDelete = { showBatchDeleteConfirm = true },
+                    )
+                } else if (searchOpen) {
+                    ConversationSearchTopBar(
+                        query = searchQuery,
+                        onQueryChange = {
+                            searchQuery = it
+                            // Re-anchor the cursor to the new query's match set on
+                            // the next derivation; clearing the pin makes it land
+                            // on the first match again.
+                            searchPinnedMatchId = null
+                        },
+                        onClear = {
+                            searchQuery = ""
+                            searchPinnedMatchId = null
+                        },
+                        onClose = { closeSearch() },
+                        onSearchAction = { navigateToSearchMatch(forward = true) },
+                        focusRequester = searchFocusRequester,
+                    )
+                } else {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier =
+                                    Modifier
+                                        // Fill the title slot so the whole strip between
+                                        // the back arrow and the overflow menu opens
+                                        // details, not just the avatar/name. Those two
+                                        // live in their own slots and keep their taps.
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { showDetails = true }
+                                        .semantics { contentDescription = openDetailsDescription },
+                            ) {
+                                Avatar(
+                                    title = controller.title(groupTitleCopy),
+                                    // For a 1:1 DM the seed must match the peer-derived
+                                    // avatar so the initials fallback stays stable, just
+                                    // like the chat-list row (#837).
+                                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
+                                    size = 36.dp,
+                                    pictureUrl = controller.avatarUrl,
                                 )
-                                // Subtitle line: members count (groups) and the
-                                // disappearing-timer indicator inline on ONE row,
-                                // not stacked. The one-time tooltip anchors to the
-                                // whole line when the timer is on.
-                                val membersSubtitle =
-                                    if (
-                                        shouldShowConversationMembersSubtitle(
-                                            membersLoaded = controller.membersLoaded,
-                                            openedAsDmHint = openedAsDmHint,
-                                            groupName = controller.group.name,
-                                            memberCount = controller.memberCount,
-                                        )
-                                    ) {
-                                        controller.subtitle(
-                                            justYou = stringResource(R.string.just_you),
-                                            oneMember = stringResource(R.string.one_member),
-                                            membersFormat = stringResource(R.string.members_count),
-                                        )
-                                    } else {
-                                        null
-                                    }
-                                val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
-                                val showTimer = disappearingSecs > 0L
-                                if (membersSubtitle != null || showTimer) {
-                                    val labelStyle = MaterialTheme.typography.labelSmall
-                                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    val subtitleRow: @Composable () -> Unit = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                Column {
+                                    Text(
+                                        controller.title(groupTitleCopy),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    // Subtitle line: members count (groups) and the
+                                    // disappearing-timer indicator inline on ONE row,
+                                    // not stacked. The one-time tooltip anchors to the
+                                    // whole line when the timer is on.
+                                    val membersSubtitle =
+                                        if (
+                                            shouldShowConversationMembersSubtitle(
+                                                membersLoaded = controller.membersLoaded,
+                                                openedAsDmHint = openedAsDmHint,
+                                                groupName = controller.group.name,
+                                                memberCount = controller.memberCount,
+                                            )
                                         ) {
-                                            if (membersSubtitle != null) {
-                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
-                                            }
-                                            if (showTimer) {
+                                            controller.subtitle(
+                                                justYou = stringResource(R.string.just_you),
+                                                oneMember = stringResource(R.string.one_member),
+                                                membersFormat = stringResource(R.string.members_count),
+                                            )
+                                        } else {
+                                            null
+                                        }
+                                    val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
+                                    val showTimer = disappearingSecs > 0L
+                                    if (membersSubtitle != null || showTimer) {
+                                        val labelStyle = MaterialTheme.typography.labelSmall
+                                        val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        val subtitleRow: @Composable () -> Unit = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            ) {
                                                 if (membersSubtitle != null) {
-                                                    Text("·", style = labelStyle, color = labelColor)
+                                                    Text(membersSubtitle, style = labelStyle, color = labelColor)
                                                 }
-                                                Icon(
-                                                    Icons.Default.Schedule,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(13.dp),
-                                                    tint = labelColor,
-                                                )
-                                                Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
+                                                if (showTimer) {
+                                                    if (membersSubtitle != null) {
+                                                        Text("·", style = labelStyle, color = labelColor)
+                                                    }
+                                                    Icon(
+                                                        Icons.Default.Schedule,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(13.dp),
+                                                        tint = labelColor,
+                                                    )
+                                                    Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
+                                                }
                                             }
                                         }
-                                    }
-                                    if (showTimer) {
-                                        val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                        val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                        // Snapshot the one-time decision so marking the flag
-                                        // (which we do first, to persist before a quick exit
-                                        // can re-arm it) doesn't recompose this branch away and
-                                        // cancel the still-suspended show().
-                                        val showTooltipOnce =
-                                            remember(controller.group.groupIdHex) {
-                                                !appState.disappearingTooltipShown
+                                        if (showTimer) {
+                                            val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                            val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                            // Snapshot the one-time decision so marking the flag
+                                            // (which we do first, to persist before a quick exit
+                                            // can re-arm it) doesn't recompose this branch away and
+                                            // cancel the still-suspended show().
+                                            val showTooltipOnce =
+                                                remember(controller.group.groupIdHex) {
+                                                    !appState.disappearingTooltipShown
+                                                }
+                                            if (showTooltipOnce) {
+                                                LaunchedEffect(controller.group.groupIdHex) {
+                                                    appState.markDisappearingTooltipShown()
+                                                    timerTooltipState.show()
+                                                }
                                             }
-                                        if (showTooltipOnce) {
-                                            LaunchedEffect(controller.group.groupIdHex) {
-                                                appState.markDisappearingTooltipShown()
-                                                timerTooltipState.show()
-                                            }
+                                            TooltipBox(
+                                                positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                                tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                                state = timerTooltipState,
+                                                content = subtitleRow,
+                                            )
+                                        } else {
+                                            subtitleRow()
                                         }
-                                        TooltipBox(
-                                            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                            tooltip = { RichTooltip { Text(timerTooltipText) } },
-                                            state = timerTooltipState,
-                                            content = subtitleRow,
-                                        )
-                                    } else {
-                                        subtitleRow()
                                     }
                                 }
                             }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
-                        }
-                        KeyboardPreservingDropdownMenu(
-                            expanded = menuOpen,
-                            onDismissRequest = { menuOpen = false },
-                            shape = RoundedCornerShape(20.dp),
-                            // Inset the panel from the right screen edge instead
-                            // of letting it sit flush against it.
-                            offset = DpOffset(x = (-8).dp, y = 0.dp),
-                            modifier = Modifier.widthIn(min = 232.dp),
-                        ) {
-                            // Iconless, roomier rows: each entry reads as a
-                            // full-width tappable line of body-large text rather
-                            // than a compact icon+label cell.
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(R.string.conversation_search_open),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                contentPadding = conversationMenuItemPadding,
-                                onClick = {
-                                    menuOpen = false
-                                    // Snapshot the current scroll position before the
-                                    // search auto-scroll effect can move the list, so
-                                    // closing search can restore it (#292).
-                                    preSearchScrollAnchor =
-                                        listState.firstVisibleItemIndex to
-                                        listState.firstVisibleItemScrollOffset
-                                    searchOpen = true
-                                },
-                            )
-                            if (!controller.group.pendingConfirmation) {
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
+                            }
+                            KeyboardPreservingDropdownMenu(
+                                expanded = menuOpen,
+                                onDismissRequest = { menuOpen = false },
+                                shape = RoundedCornerShape(20.dp),
+                                // Inset the panel from the right screen edge instead
+                                // of letting it sit flush against it.
+                                offset = DpOffset(x = (-8).dp, y = 0.dp),
+                                modifier = Modifier.widthIn(min = 232.dp),
+                            ) {
+                                // Iconless, roomier rows: each entry reads as a
+                                // full-width tappable line of body-large text rather
+                                // than a compact icon+label cell.
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive),
+                                            stringResource(R.string.conversation_search_open),
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
                                     },
                                     contentPadding = conversationMenuItemPadding,
-                                    enabled = !controller.mutationInFlight,
                                     onClick = {
                                         menuOpen = false
-                                        appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                                        // Snapshot the current scroll position before the
+                                        // search auto-scroll effect can move the list, so
+                                        // closing search can restore it (#292).
+                                        preSearchScrollAnchor =
+                                            listState.firstVisibleItemIndex to
+                                            listState.firstVisibleItemScrollOffset
+                                        searchOpen = true
                                     },
                                 )
-                                if (controller.isSelfMember) {
+                                if (!controller.group.pendingConfirmation) {
                                     DropdownMenuItem(
                                         text = {
                                             Text(
-                                                stringResource(R.string.leave),
+                                                stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive),
                                                 style = MaterialTheme.typography.bodyLarge,
                                             )
                                         },
                                         contentPadding = conversationMenuItemPadding,
-                                        // Gate on membersLoaded: the sole-admin routing
-                                        // below reads the roster, and an empty (unloaded)
-                                        // roster would misroute to a plain leave.
-                                        enabled = !controller.mutationInFlight && controller.membersLoaded,
+                                        enabled = !controller.mutationInFlight,
                                         onClick = {
                                             menuOpen = false
-                                            // A sole admin with other members can't
-                                            // leave until they transfer admin; route
-                                            // them to the transfer flow instead of
-                                            // the old leaveGroup() toast dead end.
-                                            appState.launchMutation {
-                                                when (val leaveAction = controller.leaveAction()) {
-                                                    LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
-                                                    LeaveAction.SoleMemberDeletesGroup,
-                                                    LeaveAction.Standard,
-                                                    -> pendingTopBarLeaveAction = leaveAction
-                                                }
-                                            }
+                                            appState.launchMutation { controller.setArchived(!controller.group.archived) }
                                         },
                                     )
+                                    if (controller.isSelfMember) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    stringResource(R.string.leave),
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                )
+                                            },
+                                            contentPadding = conversationMenuItemPadding,
+                                            // Gate on membersLoaded: the sole-admin routing
+                                            // below reads the roster, and an empty (unloaded)
+                                            // roster would misroute to a plain leave.
+                                            enabled = !controller.mutationInFlight && controller.membersLoaded,
+                                            onClick = {
+                                                menuOpen = false
+                                                // A sole admin with other members can't
+                                                // leave until they transfer admin; route
+                                                // them to the transfer flow instead of
+                                                // the old leaveGroup() toast dead end.
+                                                appState.launchMutation {
+                                                    when (val leaveAction = controller.leaveAction()) {
+                                                        LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
+                                                        LeaveAction.SoleMemberDeletesGroup,
+                                                        LeaveAction.Standard,
+                                                        -> pendingTopBarLeaveAction = leaveAction
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
+                // Read-aloud transport renders beneath whichever bar is
+                // active and survives selection, search, and navigation.
+                TtsTransportBar(appState)
             }
         },
         bottomBar = {
