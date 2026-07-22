@@ -2,14 +2,18 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +94,7 @@ class NotificationReplyWorker(
             notificationWarning(TAG, "reply lock wait expired") {
                 "group=${action.target.groupIdHex.take(8)}"
             }
+            surfaceReplyFailure(action)
             return Result.failure().also { retryStore.clear(retryKey) }
         }
         if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
@@ -252,7 +257,34 @@ class NotificationReplyWorker(
             "group=${action.target.groupIdHex.take(8)}"
         }
         retryStore.clear(retryKey)
+        surfaceReplyFailure(action)
         return Result.failure()
+    }
+
+    /**
+     * A terminal reply failure was previously invisible: the shade clears the
+     * RemoteInput field on send, so the reply read as sent while the card sat
+     * lifetime-extended on un-sent text. Mirror the enqueue-failure toast and
+     * restore the card to a repliable state stamped with the failure notice.
+     * Best-effort on both fronts — the abandon marker is already durable.
+     */
+    private suspend fun surfaceReplyFailure(action: NotificationAction) {
+        withContext(NonCancellable) {
+            val failureNotice = applicationContext.getString(R.string.toast_send_failed)
+            runCatching {
+                LocalNotificationPresenter(applicationContext).markDirectReplyFailed(
+                    notificationTag = action.notificationTag,
+                    notificationId = action.notificationId,
+                    repliedMessageIdHex = action.target.messageIdHex,
+                    failureNotice = failureNotice,
+                )
+            }
+            runCatching {
+                withContext(Dispatchers.Main.immediate) {
+                    Toast.makeText(applicationContext, failureNotice, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun cryptoFailureResult(
@@ -410,7 +442,15 @@ class NotificationReplyWorker(
             encryptedReply: EncryptedNotificationReply,
         ) = OneTimeWorkRequestBuilder<NotificationReplyWorker>()
             .setId(requestId)
-            .setInputData(notificationReplyInputData(action, encryptedReply))
+            // An unconstrained request runs immediately while offline, burns
+            // MAX_SEND_ATTEMPTS against guaranteed failures in ~90s, and the
+            // reply is dropped. Defer the send until connectivity exists.
+            .setConstraints(
+                Constraints
+                    .Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build(),
+            ).setInputData(notificationReplyInputData(action, encryptedReply))
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
                 REPLY_BACKOFF_DELAY_SECONDS,
