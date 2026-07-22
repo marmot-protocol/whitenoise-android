@@ -1115,6 +1115,7 @@ class WhiteNoiseAppState(
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
+    internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
     internal val ttsEngineResolver = TtsEngineResolver(appContext)
@@ -2753,6 +2754,9 @@ class WhiteNoiseAppState(
             withContext(Dispatchers.IO) {
                 val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, normalized)
                 ContactNotesPreferences.clearAllForAccount(preferences, normalized)
+                // Folder state is account-private UI organization; it must not
+                // survive the account it belongs to.
+                chatFolderPreferences.clearAllForAccount(normalized)
                 cleared
             }
         if (nicknamesCleared) {
