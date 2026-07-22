@@ -16,6 +16,9 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
+import dev.ipf.whitenoise.android.share.ShareShortcutTarget
+import dev.ipf.whitenoise.android.share.buildShareShortcut
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -56,6 +59,28 @@ class LocalNotificationPresenterConversationTest {
                 },
             )
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    @Test
+    fun conversationShortcutRepublishPreservesDirectShareCategory() {
+        val shareShortcut =
+            buildShareShortcut(
+                context = context,
+                target =
+                    ShareShortcutTarget(
+                        accountRef = "account-a",
+                        groupIdHex = "group-a",
+                        title = "General",
+                    ),
+            )!!
+        ShortcutManagerCompat.pushDynamicShortcut(context, shareShortcut)
+        presenter.ensureChannels()
+        runBlocking {
+            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+        }
+        assertTrue(
+            checkNotNull(publishedShortcut).categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true,
+        )
     }
 
     @Test

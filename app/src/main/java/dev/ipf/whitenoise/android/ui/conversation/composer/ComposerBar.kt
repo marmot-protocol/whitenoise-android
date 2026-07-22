@@ -260,7 +260,9 @@ internal fun repairComposerMentionEdit(
  * Hoisted composer text state (#1206). Sharing one instance across the main
  * composer and the long-message reader's composer keeps their in-progress text
  * and edit-restore state from drifting — both `ComposerBar`s delegate their
- * `textFieldValue`/`preEditFieldValue` to the same backing [MutableState].
+ * `textFieldValue`/`preEditFieldValue` to the same backing [MutableState]. An
+ * explicit external revision can rehydrate that state after another entry
+ * point, such as Android system share, updates the persisted draft.
  */
 @Stable
 internal class ComposerTextState(
@@ -281,7 +283,8 @@ private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
 internal fun rememberComposerTextState(
     draftKey: Any?,
     initialDraft: TextFieldValue = TextFieldValue(""),
-): ComposerTextState = remember(draftKey) { ComposerTextState(initialDraft) }
+    externalRevision: Int = 0,
+): ComposerTextState = remember(draftKey, externalRevision) { ComposerTextState(initialDraft) }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

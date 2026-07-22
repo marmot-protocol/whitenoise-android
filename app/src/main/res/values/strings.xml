@@ -346,6 +346,20 @@
     <string name="toast_forwarded_to_chats">Forwarded to %1$s chats</string>
     <string name="toast_forwarded_partial">Forwarded to %1$s chats; some failed</string>
     <string name="toast_forward_failed">Couldn\'t forward message</string>
+    <string name="share_to">Share to</string>
+    <string name="share_search_chats">Search chats</string>
+    <string name="share_no_chats">No chats to share to.</string>
+    <string name="share_no_matches">No chats match your search.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d attachments</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">Share to %1$d chat</item>
+        <item quantity="other">Share to %1$d chats</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">%1$d attachment</item>
+        <item quantity="other">%1$d attachments</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">Also staged in %1$d other chats</string>
     <string name="delete">Delete</string>
     <string name="delete_for_me">Delete for me</string>
     <string name="delete_for_everyone">Delete for everyone</string>

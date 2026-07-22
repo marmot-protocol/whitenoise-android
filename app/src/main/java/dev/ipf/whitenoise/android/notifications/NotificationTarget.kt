@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.whitenoise.android.share.ShareRequest
 
 /** What a tapped notification should open. */
 enum class NotificationTargetKind { MESSAGE, INVITE }
@@ -76,11 +77,13 @@ fun resolveNotificationNav(
     return NotificationNavStep.MissingConversation
 }
 
-/** The activity's pending inbound-intent routing: a tapped-notification target
- *  and/or a White Noise profile deep link awaiting consumption by the UI. */
+/** The activity's pending inbound-intent routing: a tapped-notification target,
+ *  a system-share request, and/or a White Noise profile deep link awaiting
+ *  consumption by the UI. */
 data class InboundIntentRouting(
     val notificationTarget: NotificationTarget?,
     val profilePayload: String?,
+    val shareRequest: ShareRequest? = null,
 )
 
 /**
@@ -95,12 +98,14 @@ data class InboundIntentRouting(
  */
 fun routeInboundIntent(
     parsedTarget: NotificationTarget?,
+    shareRequest: ShareRequest?,
     dataString: String?,
     current: InboundIntentRouting,
 ): InboundIntentRouting =
     when {
-        parsedTarget != null -> InboundIntentRouting(parsedTarget, null)
-        dataString != null -> InboundIntentRouting(null, dataString)
+        parsedTarget != null -> InboundIntentRouting(parsedTarget, null, null)
+        shareRequest != null -> InboundIntentRouting(null, null, shareRequest)
+        dataString != null -> InboundIntentRouting(null, dataString, null)
         else -> current
     }
 

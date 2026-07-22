@@ -285,6 +285,24 @@
     <string name="toast_forwarded_to_chats">Переслано в %1$s чатов</string>
     <string name="toast_forwarded_partial">Переслано в %1$s чатов; некоторые не удалось</string>
     <string name="toast_forward_failed">Не удалось переслать сообщение</string>
+    <string name="share_to">Поделиться в</string>
+    <string name="share_search_chats">Поиск чатов</string>
+    <string name="share_no_chats">Нет чатов для отправки.</string>
+    <string name="share_no_matches">Нет чатов, соответствующих поиску.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d вложений</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">Поделиться в %1$d чате</item>
+        <item quantity="few">Поделиться в %1$d чатах</item>
+        <item quantity="many">Поделиться в %1$d чатах</item>
+        <item quantity="other">Поделиться в %1$d чатах</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">%1$d вложение</item>
+        <item quantity="few">%1$d вложения</item>
+        <item quantity="many">%1$d вложений</item>
+        <item quantity="other">%1$d вложений</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">Также подготовлено ещё в %1$d чатах</string>
     <string name="delete">Удалить</string>
     <string name="delete_for_me">Удалить у меня</string>
     <string name="delete_for_everyone">Удалить для всех</string>

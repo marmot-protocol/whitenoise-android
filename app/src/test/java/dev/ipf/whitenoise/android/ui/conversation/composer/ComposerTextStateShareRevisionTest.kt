@@ -1,0 +1,53 @@
+package dev.ipf.whitenoise.android.ui.conversation.composer
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class ComposerTextStateShareRevisionTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun externalShareRevisionRehydratesMountedComposerFromMergedDraft() {
+        var persistedDraft by mutableStateOf(TextFieldValue("existing", TextRange(8)))
+        var externalShareRevision by mutableIntStateOf(0)
+        lateinit var composerState: ComposerTextState
+
+        composeRule.setContent {
+            composerState =
+                rememberComposerTextState(
+                    draftKey = "group-1",
+                    initialDraft = persistedDraft,
+                    externalRevision = externalShareRevision,
+                )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            composerState.valueState.value = TextFieldValue("existing", TextRange(3))
+            persistedDraft = TextFieldValue("existing\nshared", TextRange(15))
+            externalShareRevision += 1
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                TextFieldValue("existing\nshared", TextRange(15)),
+                composerState.valueState.value,
+            )
+        }
+    }
+}

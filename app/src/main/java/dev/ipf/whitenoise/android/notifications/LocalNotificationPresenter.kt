@@ -905,29 +905,16 @@ class LocalNotificationPresenter(
                 return
             }
             pruneConversationShortcutsBeforePublish(shortcutId)
-            val intent =
-                Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    NotificationNavigation.fromUpdate(update)?.let { target ->
-                        NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
-                    }
-                }
+            val intent = conversationShortcutOpenIntent(update, content)
             val shortcut =
-                ShortcutInfoCompat
-                    .Builder(context, shortcutId)
-                    .setShortLabel(snapshot.shortLabel)
-                    .setLongLabel(snapshot.longLabel)
-                    .setIcon(
-                        notificationConversationIcon(
-                            title = snapshot.longLabel,
-                            seed = snapshot.shortcutId,
-                            avatarBitmap = conversationAvatarBitmap,
-                        ),
-                    ).setIntent(intent)
-                    .setLocusId(locusId)
-                    .setPerson(sender)
-                    .setLongLived(true)
-                    .build()
+                conversationShortcutInfo(
+                    shortcutId = shortcutId,
+                    snapshot = snapshot,
+                    intent = intent,
+                    locusId = locusId,
+                    sender = sender,
+                    conversationAvatarBitmap = conversationAvatarBitmap,
+                )
             shortcutPublisher(shortcut)
             shortcutSnapshots[shortcutId] = snapshot
             ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
@@ -935,6 +922,42 @@ class LocalNotificationPresenter(
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
         }
     }
+
+    private fun conversationShortcutOpenIntent(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+    ): Intent =
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            NotificationNavigation.fromUpdate(update)?.let { target ->
+                NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
+            }
+        }
+
+    private fun conversationShortcutInfo(
+        shortcutId: String,
+        snapshot: ConversationShortcutSnapshot,
+        intent: Intent,
+        locusId: LocusIdCompat,
+        sender: Person,
+        conversationAvatarBitmap: android.graphics.Bitmap?,
+    ): ShortcutInfoCompat =
+        ShortcutInfoCompat
+            .Builder(context, shortcutId)
+            .setShortLabel(snapshot.shortLabel)
+            .setLongLabel(snapshot.longLabel)
+            .setIcon(
+                notificationConversationIcon(
+                    title = snapshot.longLabel,
+                    seed = snapshot.shortcutId,
+                    avatarBitmap = conversationAvatarBitmap,
+                ),
+            ).setIntent(intent)
+            .setLocusId(locusId)
+            .setPerson(sender)
+            .setLongLived(true)
+            .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
+            .build()
 
     private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
         if (url.isNullOrBlank()) return null

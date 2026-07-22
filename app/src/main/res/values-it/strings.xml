@@ -271,6 +271,20 @@
     <string name="toast_forwarded_to_chats">Inoltrato a %1$s chat</string>
     <string name="toast_forwarded_partial">Inoltrato a %1$s chat; alcune non sono riuscite</string>
     <string name="toast_forward_failed">Impossibile inoltrare il messaggio</string>
+    <string name="share_to">Condividi in</string>
+    <string name="share_search_chats">Cerca chat</string>
+    <string name="share_no_chats">Nessuna chat in cui condividere.</string>
+    <string name="share_no_matches">Nessuna chat corrisponde alla ricerca.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d allegati</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">Condividi in %1$d chat</item>
+        <item quantity="other">Condividi in %1$d chat</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">1 allegato</item>
+        <item quantity="other">%1$d allegati</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">Preparato anche in altre %1$d chat</string>
     <string name="delete">Elimina</string>
     <string name="delete_for_me">Elimina per me</string>
     <string name="delete_for_everyone">Elimina per tutti</string>

@@ -23,7 +23,7 @@ import javax.crypto.spec.SecretKeySpec
 class NotificationTargetTest {
     // ---- routeInboundIntent -------------------------------------------------
 
-    private val noPending = InboundIntentRouting(notificationTarget = null, profilePayload = null)
+    private val noPending = InboundIntentRouting(notificationTarget = null, profilePayload = null, shareRequest = null)
 
     @Test
     fun routeInboundIntent_notificationTargetWinsAndClearsProfileLink() {
@@ -31,8 +31,9 @@ class NotificationTargetTest {
         val routed =
             routeInboundIntent(
                 parsedTarget = target,
+                shareRequest = null,
                 dataString = "whitenoise://profile/npub1abc",
-                current = InboundIntentRouting(null, "whitenoise://profile/old"),
+                current = InboundIntentRouting(null, "whitenoise://profile/old", null),
             )
         assertEquals(target, routed.notificationTarget)
         assertNull(routed.profilePayload)
@@ -43,6 +44,7 @@ class NotificationTargetTest {
         val routed =
             routeInboundIntent(
                 parsedTarget = null,
+                shareRequest = null,
                 dataString = "whitenoise://profile/npub1abc",
                 current = noPending,
             )
@@ -54,16 +56,16 @@ class NotificationTargetTest {
     fun routeInboundIntent_datalessNonNotificationIntentPreservesPendingDeepLink() {
         // Regression for #67: a bare relaunch intent (no data, not a
         // notification) must not silently discard a queued profile deep link.
-        val pending = InboundIntentRouting(null, "whitenoise://profile/npub1pending")
-        val routed = routeInboundIntent(parsedTarget = null, dataString = null, current = pending)
+        val pending = InboundIntentRouting(null, "whitenoise://profile/npub1pending", null)
+        val routed = routeInboundIntent(parsedTarget = null, shareRequest = null, dataString = null, current = pending)
         assertEquals(pending, routed)
     }
 
     @Test
     fun routeInboundIntent_datalessIntentPreservesPendingNotificationTarget() {
         val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
-        val pending = InboundIntentRouting(target, null)
-        val routed = routeInboundIntent(parsedTarget = null, dataString = null, current = pending)
+        val pending = InboundIntentRouting(target, null, null)
+        val routed = routeInboundIntent(parsedTarget = null, shareRequest = null, dataString = null, current = pending)
         assertEquals(pending, routed)
     }
 

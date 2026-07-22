@@ -753,6 +753,17 @@ internal fun ConversationScreen(
     var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
+    LaunchedEffect(chat.id, appState.inboundShareRevision) {
+        val staged = appState.consumeInboundShareStreams(chat.group.groupIdHex) ?: return@LaunchedEffect
+        if (staged.mediaUris.isNotEmpty()) {
+            pendingMediaUris =
+                (pendingMediaUris + staged.mediaUris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+        }
+        if (staged.documentUris.isNotEmpty()) {
+            pendingDocumentUris =
+                (pendingDocumentUris + staged.documentUris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+        }
+    }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
@@ -2277,6 +2288,7 @@ internal fun ConversationScreen(
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+            externalRevision = appState.inboundShareRevision,
         )
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 

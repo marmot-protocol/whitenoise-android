@@ -265,6 +265,18 @@
     <string name="toast_forwarded_to_chats">已转发至 %1$s 个聊天</string>
     <string name="toast_forwarded_partial">已转发至 %1$s 个聊天；部分失败</string>
     <string name="toast_forward_failed">无法转发消息</string>
+    <string name="share_to">分享到</string>
+    <string name="share_search_chats">搜索聊天</string>
+    <string name="share_no_chats">没有可分享的聊天。</string>
+    <string name="share_no_matches">没有匹配的聊天。</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d 个附件</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="other">分享到 %1$d 个聊天</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="other">%1$d 个附件</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">还在另外 %1$d 个聊天中暂存</string>
     <string name="delete">删除</string>
     <string name="delete_for_me">仅为我删除</string>
     <string name="delete_for_everyone">为所有人删除</string>

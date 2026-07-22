@@ -271,6 +271,20 @@
     <string name="toast_forwarded_to_chats">%1$s sohbete iletildi</string>
     <string name="toast_forwarded_partial">%1$s sohbete iletildi; bazıları başarısız oldu</string>
     <string name="toast_forward_failed">Mesaj iletilemedi</string>
+    <string name="share_to">Şuraya paylaş</string>
+    <string name="share_search_chats">Sohbet ara</string>
+    <string name="share_no_chats">Paylaşılacak sohbet yok.</string>
+    <string name="share_no_matches">Aramanızla eşleşen sohbet yok.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d ek</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">%1$d sohbete paylaş</item>
+        <item quantity="other">%1$d sohbete paylaş</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">1 ek</item>
+        <item quantity="other">%1$d ek</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">%1$d diğer sohbette de hazırlandı</string>
     <string name="delete">Sil</string>
     <string name="delete_for_me">Benim için sil</string>
     <string name="delete_for_everyone">Herkes için sil</string>

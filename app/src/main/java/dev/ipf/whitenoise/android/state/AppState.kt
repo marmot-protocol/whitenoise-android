@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
@@ -95,6 +96,12 @@ import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
+import dev.ipf.whitenoise.android.share.ShareInboundStager
+import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
+import dev.ipf.whitenoise.android.share.ShareStagingStore
+import dev.ipf.whitenoise.android.share.ShareStreamStaging
+import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -1451,6 +1458,18 @@ class WhiteNoiseAppState(
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val draftStore: DraftStore = DraftStore.forContext(appContext)
+    val shareStaging: ShareStagingStore = ShareStagingStore()
+
+    /** Changes when content is staged so an already-open chat consumes repeat shares. */
+    val inboundShareRevision: Int
+        get() = shareStaging.revision
+    private val shareInboundStager =
+        ShareInboundStager(
+            draftStore = draftStore,
+            shareStaging = shareStaging,
+            resolveMime = { context, uri -> shareResolveMime(context, uri) },
+        )
+    private val shareShortcutPublisher = ShareShortcutPublisher(appContext)
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
@@ -1878,6 +1897,27 @@ class WhiteNoiseAppState(
      * stream hasn't bound) — the forward picker then shows its empty state.
      */
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
+
+    fun stageInboundShare(
+        targetGroupIds: List<String>,
+        payload: SharePayload,
+    ) {
+        val accountIdHex = activeAccount?.accountIdHex ?: return
+        shareInboundStager.stageToChats(appContext, accountIdHex, targetGroupIds, payload)
+    }
+
+    fun consumeInboundShareStreams(groupIdHex: String): ShareStreamStaging? {
+        val accountIdHex = activeAccount?.accountIdHex ?: return null
+        return shareStaging.consume(accountIdHex, groupIdHex)
+    }
+
+    fun publishShareShortcuts(chats: List<ChatListItem>) {
+        val accountRef = activeAccountRef ?: return
+        val titleCopy = notificationGroupTitleCopy()
+        shareShortcutPublisher.publish(accountRef, chats) { item ->
+            chatListItemDisplayTitle(item, this, titleCopy)
+        }
+    }
 
     /**
      * Forward [text] into each of [targetGroupIds] as a fresh send.
