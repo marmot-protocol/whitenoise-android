@@ -517,6 +517,12 @@ internal suspend fun dismissConversationNotificationsOnOpen(
     }
 }
 
+/** Whether connectivity restoration should restart the UI-independent notification runtime. */
+internal fun shouldReconnectNotificationsOnNetworkRestore(
+    wasOnline: Boolean,
+    isOnline: Boolean,
+): Boolean = !wasOnline && isOnline
+
 internal class NotificationJobSlot {
     private val lock = Any()
     private var job: Job? = null
@@ -1468,6 +1474,7 @@ class WhiteNoiseAppState(
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private val notificationJob = NotificationJobSlot()
+    private val notificationReconnectJob = NotificationJobSlot()
     private val pushWakeCatchUpDrainJob = NotificationJobSlot()
     private val notificationDrainSequence = AtomicLong(0)
     private val notificationPostEpoch = NotificationPostEpoch()
@@ -3581,22 +3588,21 @@ class WhiteNoiseAppState(
                         // Capabilities arrive in the onCapabilitiesChanged that
                         // follows; until then only the yes/no bit is known and
                         // the empty type set conservatively blocks auto-download.
-                        hasActiveNetworkSnapshot = true
-                        schedulePendingPushWakeCatchUpDrain()
+                        noteActiveNetworkSnapshot(isOnline = true)
                     }
 
                     override fun onCapabilitiesChanged(
                         network: android.net.Network,
                         networkCapabilities: android.net.NetworkCapabilities,
                     ) {
-                        hasActiveNetworkSnapshot = true
-                        activeNetworkTypesSnapshot = networkTypesFor(networkCapabilities)
-                        schedulePendingPushWakeCatchUpDrain()
+                        noteActiveNetworkSnapshot(
+                            isOnline = true,
+                            networkTypes = networkTypesFor(networkCapabilities),
+                        )
                     }
 
                     override fun onLost(network: android.net.Network) {
-                        hasActiveNetworkSnapshot = false
-                        activeNetworkTypesSnapshot = emptySet()
+                        noteActiveNetworkSnapshot(isOnline = false)
                     }
                 },
             )
@@ -3604,6 +3610,35 @@ class WhiteNoiseAppState(
             // Too many callbacks / SecurityException: keep the seeded snapshot
             // rather than crash; it just won't track later connectivity changes.
             appStateDebug(it) { "default network callback registration failed: ${it.readableMessage()}" }
+        }
+    }
+
+    private fun noteActiveNetworkSnapshot(
+        isOnline: Boolean,
+        networkTypes: Set<MediaAutoDownloadNetwork>? = null,
+    ) {
+        val wasOnline = hasActiveNetworkSnapshot
+        if (!isOnline) {
+            hasActiveNetworkSnapshot = false
+            activeNetworkTypesSnapshot = emptySet()
+            return
+        }
+        hasActiveNetworkSnapshot = true
+        if (networkTypes != null) {
+            activeNetworkTypesSnapshot = networkTypes
+        }
+        if (shouldReconnectNotificationsOnNetworkRestore(wasOnline, isOnline = true)) {
+            scheduleNotificationReconnectOnNetworkRestore()
+        }
+        schedulePendingPushWakeCatchUpDrain()
+    }
+
+    private fun scheduleNotificationReconnectOnNetworkRestore() {
+        notificationReconnectJob.startIfInactive {
+            notificationScope.launch {
+                notificationJob.cancelAndJoin()
+                ensureNotificationRuntimeStarted()
+            }
         }
     }
 
