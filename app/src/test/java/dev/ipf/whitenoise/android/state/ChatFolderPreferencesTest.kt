@@ -67,6 +67,19 @@ class ChatFolderPreferencesTest {
     }
 
     @Test
+    fun deletingAFolderPurgesItsMembershipAndRuleKeysFromDisk() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val folder = store.createFolder("acct-a", "Work")!!
+        store.setChatInFolder("acct-a", folder.id, "g1", included = true)
+        store.setFolderRule("acct-a", folder.id, ChatFolderRule(setOf("aa"), unreadOnly = false, includeMuted = true))
+
+        assertTrue(store.deleteFolder("acct-a", folder.id))
+
+        val raw = context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+        assertTrue(raw.all.keys.none { it.contains(folder.id) })
+    }
+
+    @Test
     fun systemFoldersCannotBeDeletedOrLoseTheirKind() {
         val system = store.foldersFor("acct-a").first()
 

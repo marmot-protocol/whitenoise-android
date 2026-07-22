@@ -115,7 +115,14 @@ class ChatFolderPreferences(
             val current = loadAccount(account)
             val folder = current.folders.firstOrNull { it.id == folderId } ?: return@synchronized false
             if (folder.isSystem) return@synchronized false
-            preferences.edit().remove(ruleKey(account, folderId)).apply()
+            // Purge the folder's own keys directly: persistFolders only visits
+            // memberships still present in the map, so a deleted folder's
+            // membership key would otherwise stay on disk forever.
+            preferences
+                .edit()
+                .remove(ruleKey(account, folderId))
+                .remove(membershipKey(account, folderId))
+                .apply()
             persistFolders(
                 account,
                 ChatFolderAccountState(

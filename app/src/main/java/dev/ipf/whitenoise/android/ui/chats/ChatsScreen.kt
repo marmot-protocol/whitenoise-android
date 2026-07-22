@@ -478,9 +478,12 @@ internal fun ChatsScreen(
                 },
             )
         }
-    // Leave the archived view if its last chat is unarchived — the chip is then
-    // hidden, so don't strand the selection on it.
-    LaunchedEffect(controller.archivedItems.isEmpty(), filter) {
+    // Clear the selection whenever its chip disappears — the last archived
+    // chat unarchived, the last unread read, a custom folder emptied. Keyed on
+    // the chip list itself (structural equality), so ANY membership change
+    // re-evaluates; the old archived/filter keys missed unread and custom
+    // folders emptying and stranded the list on an invisible filter.
+    LaunchedEffect(folderChipModels, selectedFolderId) {
         if (selectedFolderId != null && folderChipModels.none { it.folderId == selectedFolderId }) {
             selectedFolderId = null
         }
