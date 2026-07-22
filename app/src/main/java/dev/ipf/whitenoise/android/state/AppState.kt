@@ -2459,6 +2459,7 @@ class WhiteNoiseAppState(
     suspend fun refreshAccounts() {
         val refreshedAccounts = marmotIo { listAccounts() }
         accounts = refreshedAccounts
+        releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
         refreshAccountUnreadCounts(refreshedAccounts)
     }
 
@@ -2719,14 +2720,39 @@ class WhiteNoiseAppState(
         }
     }
 
+    // Guards the window where a sign-out/wipe clears an account's contact
+    // details on IO while the account can still read as active on Main: the
+    // setters reject writes for guarded refs instead of racing the clear and
+    // resurrecting data on disk. A ref is released only once a fresh account
+    // list shows it signed in again (a failed sign-out, or a later re-login).
+    private val contactClearGuard = Any()
+    private val contactRefsBeingCleared = mutableSetOf<String>()
+
+    private fun isContactRefBeingCleared(accountRef: String): Boolean =
+        synchronized(contactClearGuard) {
+            contactRefsBeingCleared.any { it.equals(accountRef.trim(), ignoreCase = true) }
+        }
+
+    private fun releaseContactClearGuardForSignedInAccounts(refreshed: List<AccountSummaryFfi>) {
+        synchronized(contactClearGuard) {
+            if (contactRefsBeingCleared.isEmpty()) return
+            contactRefsBeingCleared.removeAll { ref ->
+                refreshed.any { it.label.trim().equals(ref, ignoreCase = true) }
+            }
+        }
+    }
+
     // Durable (commit-backed) but off the main thread: the writes must land
     // before sign-out/wipe completes, and the blocking flush must not stall
     // the UI. The revision bump stays on the caller's (main) context.
     private suspend fun clearContactPrivateDetailsForAccount(accountRef: String) {
+        val normalized = accountRef.trim()
+        if (normalized.isEmpty()) return
+        synchronized(contactClearGuard) { contactRefsBeingCleared.add(normalized) }
         val nicknamesCleared =
             withContext(Dispatchers.IO) {
-                val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, accountRef)
-                ContactNotesPreferences.clearAllForAccount(preferences, accountRef)
+                val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, normalized)
+                ContactNotesPreferences.clearAllForAccount(preferences, normalized)
                 cleared
             }
         if (nicknamesCleared) {
@@ -2874,6 +2900,7 @@ class WhiteNoiseAppState(
         clearHiddenMessagesForAccount(wipedRef)
         val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
         accounts = refreshedAccounts
+        releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
         refreshAccountUnreadCounts(refreshedAccounts)
         val next = refreshedAccounts.firstOrNull()?.label
         activeAccountRef = next
@@ -4693,6 +4720,9 @@ class WhiteNoiseAppState(
         nickname: String,
     ) {
         val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return
+        // Reject instead of racing an in-flight sign-out clear: a write landing
+        // after the clearing commit would resurrect the account's contact data.
+        if (isContactRefBeingCleared(account)) return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
         }
@@ -4708,6 +4738,7 @@ class WhiteNoiseAppState(
         notes: String,
     ) {
         val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return
+        if (isContactRefBeingCleared(account)) return
         ContactNotesPreferences.writeNotes(preferences, account, accountIdHex, notes)
     }
 

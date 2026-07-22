@@ -69,6 +69,7 @@ internal class DiskByteCache(
         }
     },
     private val afterTempFileCreated: () -> Unit = {},
+    private val afterFileNameHashed: () -> Unit = {},
     private val afterEncryptedWrite: () -> Unit = {},
     private val afterPutEpochCaptured: () -> Unit = {},
     private val beforeStaleFilesDeleted: () -> Unit = {},
@@ -432,7 +433,11 @@ internal class DiskByteCache(
         generation++
         // The memo retains raw cache-key strings, which can carry account and
         // blob identifiers — drop them with the rest of the account's data.
-        synchronized(fileNameMemo) { fileNameMemo.clear() }
+        // The epoch bump rejects re-inserts from lookups mid-hash right now.
+        synchronized(fileNameMemo) {
+            fileNameMemoEpoch++
+            fileNameMemo.clear()
+        }
         // Hold the lock for the whole wipe. Deleting outside it (an earlier
         // #99 attempt) let a concurrent put() recreate a `.enc` that the orphan
         // sweep then removed — a race. clear() runs on sign-out/account-switch,
@@ -867,11 +872,21 @@ internal class DiskByteCache(
 
     // contains() runs inside composition for every media tile, so repeated
     // lookups of the same key must not re-allocate a digest and re-hash on
-    // the main thread during fast scrolls. Access-ordered and bounded.
+    // the main thread during fast scrolls. Access-ordered and bounded. The
+    // epoch (guarded by the memo's monitor) makes clear() authoritative: a
+    // lookup that was hashing while clear() ran must not re-insert its key,
+    // or account/blob identifiers would stay reachable after a wipe.
     private val fileNameMemo = LinkedHashMap<String, String>(16, 0.75f, true)
+    private var fileNameMemoEpoch = 0L
+
+    internal fun memoizedFileNameKeyCount(): Int = synchronized(fileNameMemo) { fileNameMemo.size }
 
     private fun fileNameFor(key: String): String {
-        synchronized(fileNameMemo) { fileNameMemo[key] }?.let { return it }
+        val epochAtLookup =
+            synchronized(fileNameMemo) {
+                fileNameMemo[key]?.let { return it }
+                fileNameMemoEpoch
+            }
         val md = MessageDigest.getInstance("SHA-256")
         val digest = md.digest(key.toByteArray(Charsets.UTF_8))
         val sb = StringBuilder(digest.size * 2)
@@ -881,12 +896,15 @@ internal class DiskByteCache(
         }
         sb.append(SUFFIX)
         val fileName = sb.toString()
+        afterFileNameHashed()
         synchronized(fileNameMemo) {
-            fileNameMemo[key] = fileName
-            if (fileNameMemo.size > FILE_NAME_MEMO_MAX_KEYS) {
-                val eldest = fileNameMemo.keys.iterator()
-                eldest.next()
-                eldest.remove()
+            if (fileNameMemoEpoch == epochAtLookup) {
+                fileNameMemo[key] = fileName
+                if (fileNameMemo.size > FILE_NAME_MEMO_MAX_KEYS) {
+                    val eldest = fileNameMemo.keys.iterator()
+                    eldest.next()
+                    eldest.remove()
+                }
             }
         }
         return fileName
