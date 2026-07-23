@@ -233,6 +233,7 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    initialCaption: String = "",
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -246,6 +247,7 @@ internal fun MediaPreviewScreen(
             mediaUris = uris,
             documentUris = documentUris,
             chatTitle = chatTitle,
+            initialCaption = initialCaption,
             onClose = onDismiss,
             onSend = onSend,
             onRemoveMediaAt = onRemoveAt,
@@ -267,10 +269,13 @@ internal fun MediaPreviewContent(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    initialCaption: String = "",
 ) {
     val items = remember(mediaUris, documentUris) { stagedPreviewItems(mediaUris, documentUris) }
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
-    var caption by rememberSaveable { mutableStateOf("") }
+    // Seeded from the composer draft so text typed before attaching carries
+    // into the caption instead of silently waiting behind the send.
+    var caption by rememberSaveable { mutableStateOf(initialCaption) }
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }

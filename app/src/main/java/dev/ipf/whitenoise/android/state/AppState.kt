@@ -1239,7 +1239,18 @@ class WhiteNoiseAppState(
     var appUnlockPromptRequestId by mutableStateOf(0)
         private set
 
-    private var lastAppUnlockAtMillis = AppLockPreferences.readLastUnlockedAtMillis(appContext)
+    // Populated by the off-main pre-warm (or the first unlock/background
+    // write); the getter NEVER reads the Keystore-backed store itself — a
+    // first foreground that beats the pre-warm would otherwise pay the
+    // Tink/Keystore init on Main (or block on its lock), the exact cold-start
+    // cost this replaced. Until the value lands, 0L errs toward showing the
+    // lock prompt — the safe direction for a privacy feature.
+    private var lastAppUnlockAtMillisBacking: Long? = null
+    private var lastAppUnlockAtMillis: Long
+        get() = lastAppUnlockAtMillisBacking ?: 0L
+        set(value) {
+            lastAppUnlockAtMillisBacking = value
+        }
 
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
@@ -1527,6 +1538,15 @@ class WhiteNoiseAppState(
         // Wipe pre-encryption cache entries promptly after upgrade without doing
         // directory I/O in this main-thread constructor.
         mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+        if (requireAppUnlock) {
+            // Pre-warm the Keystore-backed unlock timestamp off-main so the
+            // first foreground lock evaluation is a cache hit. Assigned on
+            // Main, and only if an unlock hasn't already stamped a newer value.
+            mutationsScope.launch {
+                val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+                if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+            }
+        }
         mutationsScope.launch { refreshTtsAvailability() }
     }
 
@@ -3142,18 +3162,59 @@ class WhiteNoiseAppState(
         appUnlockError = message
     }
 
+    // True while a foreground lock decision waits for the off-main unlock
+    // timestamp: the lock scrim shows (UI secured) but the biometric prompt
+    // is deferred until the REAL value decides — a 0L placeholder would read
+    // the grace period as expired and over-prompt on cold starts within it.
+    var appUnlockEvaluationPending by mutableStateOf(false)
+        private set
+
     fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
         refreshAppLockCredentialAvailability()
-        if (
+        // Short-circuit BEFORE any timestamp read so app-lock-disabled users
+        // never pay for it on foreground transitions.
+        if (!requireAppUnlock || !appLockCredentialAvailable) return
+        val knownLastUnlock = lastAppUnlockAtMillisBacking
+        if (knownLastUnlock == null) {
+            deferAppLockDecisionUntilTimestampLoads(nowMillis)
+        } else if (
             shouldShowAppLock(
                 requireUnlock = requireAppUnlock,
                 credentialAvailable = appLockCredentialAvailable,
-                lastUnlockedAtMillis = lastAppUnlockAtMillis,
+                lastUnlockedAtMillis = knownLastUnlock,
                 nowMillis = nowMillis,
                 delay = appLockDelay,
             )
         ) {
             requestAppUnlock()
+        }
+    }
+
+    private fun deferAppLockDecisionUntilTimestampLoads(nowMillis: Long) {
+        if (appUnlockEvaluationPending) return
+        appUnlockEvaluationPending = true
+        appLockScreenVisible = true
+        mutationsScope.launch {
+            val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+            if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
+            appUnlockEvaluationPending = false
+            // Re-read the clock AFTER the IO hop: deciding with the entry
+            // time could dismiss the lock even though the grace period
+            // expired while the secure store was loading.
+            val decisionNowMillis = maxOf(nowMillis, System.currentTimeMillis())
+            if (
+                shouldShowAppLock(
+                    requireUnlock = requireAppUnlock,
+                    credentialAvailable = appLockCredentialAvailable,
+                    lastUnlockedAtMillis = lastAppUnlockAtMillis,
+                    nowMillis = decisionNowMillis,
+                    delay = appLockDelay,
+                )
+            ) {
+                requestAppUnlock()
+            } else {
+                appLockScreenVisible = false
+            }
         }
     }
 

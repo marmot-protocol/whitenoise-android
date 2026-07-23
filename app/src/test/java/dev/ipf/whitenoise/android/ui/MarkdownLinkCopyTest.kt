@@ -97,7 +97,10 @@ class MarkdownLinkCopyTest {
     @Test
     fun longPressingLinkCopiesWithoutOpeningAndSubsequentTapStillOpensLink() {
         val destination = "https://example.com/long-press-copy-only"
-        val label = "link label"
+        // Host-shaped label that mismatches the destination, so the tap after
+        // the long-press still routes through the confirmation dialog (#1477
+        // narrowed the dialog to exactly this spoofable shape).
+        val label = "other.example"
         val document =
             paragraphDocument(
                 MarkdownInlineFfi.Link(
@@ -116,14 +119,14 @@ class MarkdownLinkCopyTest {
     }
 
     @Test
-    fun tappingExplicitLinkStillOpensConfirmationDialog() {
+    fun tappingSpoofableLabeledLinkStillOpensConfirmationDialog() {
         val destination = "https://example.com/tap-target"
         val document =
             paragraphDocument(
                 MarkdownInlineFfi.Link(
                     dest = destination,
                     title = null,
-                    children = listOf(MarkdownInlineFfi.Text("tap label")),
+                    children = listOf(MarkdownInlineFfi.Text("your-bank.example")),
                 ),
             )
 
@@ -136,7 +139,7 @@ class MarkdownLinkCopyTest {
             }
         }
 
-        composeRule.onNodeWithText("tap label").performClick()
+        composeRule.onNodeWithText("your-bank.example").performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
 

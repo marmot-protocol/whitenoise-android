@@ -19,30 +19,59 @@ internal object AppLockPreferences {
     private const val SECURE_FILE = "whitenoise.app_lock.secure"
     private const val LAST_UNLOCKED_AT_KEY = "last_unlocked_at_millis"
 
-    fun readLastUnlockedAtMillis(context: Context): Long =
-        runCatching { openSecure(context.applicationContext).getLong(LAST_UNLOCKED_AT_KEY, 0L) }
-            .getOrDefault(0L)
+    // One instance for the process: every create() pays a Keystore access plus
+    // a Tink keyset init and a synchronous prefs-file read, and the call sites
+    // run on the main thread (cold start, every unlock, every backgrounding).
+    // Concurrent instances over the same file are also a known instability of
+    // the library.
+    @Volatile
+    private var cachedSecure: SharedPreferences? = null
+    private val cacheLock = Any()
+
+    fun readLastUnlockedAtMillis(context: Context): Long {
+        // One immediate retry after invalidating the cache: a Keystore entry
+        // invalidated mid-process recreates through the corruption-recovery
+        // path right away instead of failing every call until the next one.
+        repeat(2) {
+            runCatching {
+                return openSecure(context.applicationContext).getLong(LAST_UNLOCKED_AT_KEY, 0L)
+            }.onFailure { cachedSecure = null }
+        }
+        return 0L
+    }
 
     fun writeLastUnlockedAtMillis(
         context: Context,
         value: Long,
     ) {
-        runCatching {
-            openSecure(context.applicationContext)
-                .edit()
-                .putLong(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L))
-                .apply()
+        repeat(2) {
+            runCatching {
+                openSecure(context.applicationContext)
+                    .edit()
+                    .putLong(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L))
+                    .apply()
+                return
+            }.onFailure { cachedSecure = null }
         }
     }
 
-    private fun openSecure(context: Context): SharedPreferences =
-        try {
-            create(context)
-        } catch (error: GeneralSecurityException) {
-            recreateAfterCorruption(context)
-        } catch (error: IOException) {
-            recreateAfterCorruption(context)
+    private fun openSecure(context: Context): SharedPreferences {
+        cachedSecure?.let { return it }
+        return synchronized(cacheLock) {
+            cachedSecure ?: run {
+                val created =
+                    try {
+                        create(context)
+                    } catch (error: GeneralSecurityException) {
+                        recreateAfterCorruption(context)
+                    } catch (error: IOException) {
+                        recreateAfterCorruption(context)
+                    }
+                cachedSecure = created
+                created
+            }
         }
+    }
 
     private fun recreateAfterCorruption(context: Context): SharedPreferences {
         context.deleteSharedPreferences(SECURE_FILE)

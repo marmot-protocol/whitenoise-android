@@ -114,8 +114,14 @@ fun WhiteNoiseApp(
             onProfilePayloadHandled(payload)
         }
     }
-    LaunchedEffect(appState.appLockScreenVisible, appState.appUnlockPromptRequestId) {
-        if (appState.appLockScreenVisible) onRequestAppUnlock()
+    LaunchedEffect(
+        appState.appLockScreenVisible,
+        appState.appUnlockPromptRequestId,
+        appState.appUnlockEvaluationPending,
+    ) {
+        // While the unlock-timestamp evaluation is pending, the scrim secures
+        // the UI but the biometric sheet waits for the real decision.
+        if (appState.appLockScreenVisible && !appState.appUnlockEvaluationPending) onRequestAppUnlock()
     }
 
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the

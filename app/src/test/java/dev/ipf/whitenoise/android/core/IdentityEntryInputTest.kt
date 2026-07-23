@@ -51,6 +51,21 @@ class IdentityEntryInputTest {
     }
 
     @Test
+    fun classifiesNcryptsecAsAnEncryptedSecret() {
+        val sampleNcryptsec = "ncryptsec1" + "q".repeat(80)
+        assertEquals(IdentityEntryInput.Kind.EncryptedSecretKey, IdentityEntryInput.classify(sampleNcryptsec))
+        assertEquals(sampleNcryptsec, IdentityEntryInput.scannedValue("nostr:$sampleNcryptsec"))
+        assertEquals(sampleNcryptsec, IdentityEntryInput.scannedValue("  $sampleNcryptsec  "))
+    }
+
+    @Test
+    fun rejectsMalformedNcryptsecShapes() {
+        assertEquals(IdentityEntryInput.Kind.Invalid, IdentityEntryInput.classify("ncryptsec1short"))
+        assertEquals(IdentityEntryInput.Kind.Invalid, IdentityEntryInput.classify("ncryptsec1" + "B".repeat(80)))
+        assertEquals(IdentityEntryInput.Kind.Invalid, IdentityEntryInput.classify("ncryptsec1" + "q".repeat(400)))
+    }
+
+    @Test
     fun pastesRecognizedKeysNormalizedAndOtherTextAsIs() {
         assertEquals(sampleNsec, IdentityEntryInput.pasteValue("nostr:$sampleNsec"))
         assertEquals(sampleNpub, IdentityEntryInput.pasteValue("whitenoise://profile/$sampleNpub"))

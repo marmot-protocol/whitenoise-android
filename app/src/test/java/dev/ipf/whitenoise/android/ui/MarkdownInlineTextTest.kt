@@ -148,13 +148,69 @@ class MarkdownInlineTextTest {
                 ),
             )
         assertEquals("example", annotated.text)
-        // An explicit [label](url) link routes the tap through a confirmation
-        // (Clickable + confirm tag) that surfaces the real destination, since
-        // the label is attacker-chosen and may not match the URL (#273).
+        // A plain-word label spoofs nothing (#1477): it opens directly like an
+        // autolink instead of paying the #273 confirmation dialog.
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://example.com/page", (link.item as LinkAnnotation.Clickable).tag)
+        assertEquals("https://example.com/page", (link.item as LinkAnnotation.Url).url)
         assertEquals(0, link.start)
         assertEquals(7, link.end)
+    }
+
+    @Test
+    fun hostShapedLabelMismatchingTheDestinationRoutesThroughConfirmation() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Link(
+                        dest = "https://evil.example/phish",
+                        title = null,
+                        children = listOf(MarkdownInlineFfi.Text("https://your-bank.example/login")),
+                    ),
+                ),
+            )
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        val confirm = link.item as LinkAnnotation.Clickable
+        assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://evil.example/phish", confirm.tag)
+    }
+
+    @Test
+    fun truthfulUrlLabelOpensDirectly() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Link(
+                        dest = "https://myblog.example/post",
+                        title = null,
+                        children = listOf(MarkdownInlineFfi.Text("myblog.example")),
+                    ),
+                ),
+            )
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals("https://myblog.example/post", (link.item as LinkAnnotation.Url).url)
+    }
+
+    @Test
+    fun spoofPredicateCoversTheLabelShapes() {
+        // Plain words and non-host punctuation skip the dialog.
+        assertFalse(shouldConfirmMarkdownLink("my blog", "https://myblog.example"))
+        assertFalse(shouldConfirmMarkdownLink("see e.g. the docs, v1.2.3", "https://docs.example"))
+        // Host-shaped labels must match the destination host (subdomains ok).
+        assertFalse(shouldConfirmMarkdownLink("bank.example", "https://login.bank.example/2fa"))
+        assertTrue(shouldConfirmMarkdownLink("bank.example", "https://evil-bank.example/2fa"))
+        assertTrue(shouldConfirmMarkdownLink("192.168.1.1", "https://evil.example"))
+        // Dotted-but-not-a-real-host labels err toward confirming.
+        assertTrue(shouldConfirmMarkdownLink("report.pdf", "https://files.example/report.pdf"))
+        // Homoglyph/IDN-shaped labels cannot be compared in ASCII — confirm.
+        assertTrue(shouldConfirmMarkdownLink("\u0430\u0440\u0440\u04cf\u0435.com", "https://evil.example"))
+        // An invisible character inside a host-shaped label hides it from the
+        // token scan while rendering identically — must fail CLOSED.
+        assertTrue(shouldConfirmMarkdownLink("bank\u200B.example", "https://evil.example"))
+        assertTrue(shouldConfirmMarkdownLink("bank\u200B.example", "https://bank.example"))
+        // IPv6-shaped labels are incomparable against a hostname — confirm.
+        assertTrue(shouldConfirmMarkdownLink("2001:db8::1", "https://evil.example"))
+        assertTrue(shouldConfirmMarkdownLink("[::1] local", "https://evil.example"))
+        // Non-http destinations keep confirming.
+        assertTrue(shouldConfirmMarkdownLink("support", "mailto:evil@evil.example"))
     }
 
     @Test
@@ -202,8 +258,10 @@ class MarkdownInlineTextTest {
                     ),
                 ),
             )
+        // "international domain" is a plain-word label (#1477), so it opens
+        // directly — the canonicalized destination still rides the annotation.
         val explicitLink = explicit.getLinkAnnotations(0, explicit.length).single()
-        assertEquals(CONFIRM_LINK_TAG_PREFIX + canonicalUrl, (explicitLink.item as LinkAnnotation.Clickable).tag)
+        assertEquals(canonicalUrl, (explicitLink.item as LinkAnnotation.Url).url)
 
         val autolink = build(listOf(MarkdownInlineFfi.Autolink(unicodeUrl, MarkdownAutolinkKindFfi.URI)))
         val autoLinkAnnotation = autolink.getLinkAnnotations(0, autolink.length).single()
@@ -368,8 +426,10 @@ class MarkdownInlineTextTest {
                 ),
             )
         assertEquals("padded", annotated.text)
+        // "padded" is a plain-word label (#1477) so it opens directly; the
+        // annotation must still carry the TRIMMED destination.
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://example.com", (link.item as LinkAnnotation.Clickable).tag)
+        assertEquals("https://example.com", (link.item as LinkAnnotation.Url).url)
 
         // A padded javascript: destination stays completely inert.
         val inert =

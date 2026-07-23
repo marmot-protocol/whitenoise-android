@@ -284,6 +284,7 @@ internal fun FullScreenMediaViewer(
                         onScaleChange = { if (page == pagerState.currentPage) scale = it },
                         onOffsetChange = { if (page == pagerState.currentPage) offset = it },
                         mine = pageDescriptor.mine,
+                        isCurrent = page == pagerState.currentPage,
                     )
                 }
             }
@@ -387,6 +388,7 @@ internal fun ViewerPage(
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Offset) -> Unit,
     mine: Boolean,
+    isCurrent: Boolean,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -419,7 +421,12 @@ internal fun ViewerPage(
             is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicHeight
             null -> 0
         }
-    LaunchedEffect(pageKey, viewerReloadToken) {
+    LaunchedEffect(pageKey, viewerReloadToken, isCurrent) {
+        // Mirror the video page's gating: neighbour pages composed during a
+        // swipe must not each run a viewer-resolution decode (with its ~4×
+        // transient) concurrently with the current page's. A page decodes
+        // once it becomes current; an already-decoded bitmap is kept.
+        if (!isCurrent || presentation != null) return@LaunchedEffect
         viewerFailed = false
         try {
             val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
