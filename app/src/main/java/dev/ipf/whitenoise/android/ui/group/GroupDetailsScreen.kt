@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Call
@@ -412,6 +413,11 @@ internal fun GroupDetailsScreen(
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
     var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    val autoReadKeys by appState.ttsAutoReadPreferences.enabledKeys.collectAsState()
+    val autoReadEnabled =
+        remember(autoReadKeys, appState.activeAccountRef, controller.group.groupIdHex) {
+            appState.isConversationAutoRead(controller.group.groupIdHex)
+        }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
 
@@ -720,6 +726,17 @@ internal fun GroupDetailsScreen(
                     appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                 },
             )
+            if (appState.ttsHasUsableEngine) {
+                GroupSwitchActionRow(
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    title = stringResource(R.string.tts_auto_read_title),
+                    subtitle = stringResource(R.string.tts_auto_read_subtitle),
+                    checked = autoReadEnabled,
+                    onCheckedChange = {
+                        appState.setConversationAutoRead(controller.group.groupIdHex, it)
+                    },
+                )
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             SectionHeader(stringResource(R.string.notifications))
             SettingsActionRow(
