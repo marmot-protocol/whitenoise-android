@@ -334,7 +334,7 @@ internal fun IdentityEntryForm(
                 val secretRejected =
                     secretKeyOnly &&
                         scanned != null &&
-                        IdentityEntryInput.classify(scanned) != IdentityEntryInput.Kind.SecretKey
+                        IdentityEntryInput.classify(scanned) == IdentityEntryInput.Kind.PublicKey
                 when {
                     scanned == null -> onErrorChange(R.string.identity_entry_error_invalid_key)
                     // A secret-only field must reject a public identifier at

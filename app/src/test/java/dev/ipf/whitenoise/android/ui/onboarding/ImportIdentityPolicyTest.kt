@@ -33,6 +33,9 @@ class ImportIdentityPolicyTest {
     fun rawHexPublicKeyBlockedFromDirectImport() {
         assertEquals(IdentityEntryInput.Kind.Invalid, IdentityEntryInput.classify(sampleHexPubkey))
         assertFalse(permitsDirectIdentityImport(sampleHexPubkey))
+        // Encrypted backups are recognized input but never direct-importable:
+        // the engine's login accepts plaintext keys only.
+        assertFalse(permitsDirectIdentityImport("ncryptsec1" + "q".repeat(80)))
     }
 
     @Test

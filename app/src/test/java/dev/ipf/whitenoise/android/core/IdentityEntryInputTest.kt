@@ -51,9 +51,9 @@ class IdentityEntryInputTest {
     }
 
     @Test
-    fun classifiesNcryptsecAsSecretKey() {
+    fun classifiesNcryptsecAsAnEncryptedSecret() {
         val sampleNcryptsec = "ncryptsec1" + "q".repeat(80)
-        assertEquals(IdentityEntryInput.Kind.SecretKey, IdentityEntryInput.classify(sampleNcryptsec))
+        assertEquals(IdentityEntryInput.Kind.EncryptedSecretKey, IdentityEntryInput.classify(sampleNcryptsec))
         assertEquals(sampleNcryptsec, IdentityEntryInput.scannedValue("nostr:$sampleNcryptsec"))
         assertEquals(sampleNcryptsec, IdentityEntryInput.scannedValue("  $sampleNcryptsec  "))
     }

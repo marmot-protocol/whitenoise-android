@@ -10,7 +10,7 @@ package dev.ipf.whitenoise.android.core
  * normalized before they land in a password-masked field.
  */
 object IdentityEntryInput {
-    enum class Kind { SecretKey, PublicKey, Invalid }
+    enum class Kind { SecretKey, EncryptedSecretKey, PublicKey, Invalid }
 
     private const val BECH32_KEY_LENGTH = 63
     private const val NOSTR_URI_PREFIX = "nostr:"
@@ -29,9 +29,10 @@ object IdentityEntryInput {
         val trimmed = raw.trim()
         return when {
             isBech32Key(trimmed, "nsec1") -> Kind.SecretKey
-            // An encrypted secret is still a secret: mask it, allow it into
-            // the field, and route it like any other secret-key entry.
-            isNcryptsecKey(trimmed) -> Kind.SecretKey
+            // An encrypted secret is still secret-shaped for masking and
+            // field entry, but distinct from a raw nsec: the engine's login
+            // and the direct-import gate accept plaintext keys only.
+            isNcryptsecKey(trimmed) -> Kind.EncryptedSecretKey
             isBech32Key(trimmed, "npub1") -> Kind.PublicKey
             else -> Kind.Invalid
         }
