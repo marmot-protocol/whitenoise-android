@@ -470,6 +470,68 @@ internal fun ConversationScreen(
                 appState.appendSpeech("${appState.displayName(record.sender)}: $text", Locale.getDefault())
             }
     }
+    // Auto-read return-from-background: a message arriving while the app is
+    // backgrounded with this chat open is caught by neither path above —
+    // backgrounding stops speech (ending the session the live collector
+    // gates on) and the backlog pass fires once per open. Record the newest
+    // visible id on pause; on resume, read forward from it. Arrivals still
+    // syncing in at resume stay uncovered until the next pause — the anchor
+    // only moves on a real pause, never on composition.
+    var autoReadPausedNewestId by remember(controller, chat.id) { mutableStateOf<String?>(null) }
+    var autoReadResumeGeneration by remember(controller, chat.id) { mutableStateOf(0) }
+    val autoReadLifecycleOwner = LocalContext.current.lifecycleOwner()
+    DisposableEffect(controller, chat.id, autoReadLifecycleOwner) {
+        if (autoReadLifecycleOwner == null) {
+            onDispose { }
+        } else {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_PAUSE ->
+                            autoReadPausedNewestId =
+                                controller.timeline
+                                    .lastOrNull()
+                                    ?.record
+                                    ?.messageIdHex
+                        Lifecycle.Event.ON_RESUME ->
+                            if (autoReadPausedNewestId != null) autoReadResumeGeneration += 1
+                        else -> Unit
+                    }
+                }
+            autoReadLifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { autoReadLifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+    LaunchedEffect(controller, chat.id, autoReadResumeGeneration) {
+        if (autoReadResumeGeneration == 0) return@LaunchedEffect
+        val anchor = autoReadPausedNewestId ?: return@LaunchedEffect
+        autoReadPausedNewestId = null
+        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
+        val groupIdHex = controller.group.groupIdHex
+        if (!appState.isConversationAutoRead(groupIdHex)) return@LaunchedEffect
+        // An already-active session keeps priority — its live collector will
+        // carry any new arrivals; this pass only wakes a stopped reader.
+        val ttsState = appState.ttsController.state.value
+        if (ttsState is TtsState.Speaking || ttsState is TtsState.Paused) return@LaunchedEffect
+        val timeline = controller.timeline
+        val anchorIndex = timeline.indexOfLast { it.record.messageIdHex == anchor }
+        if (anchorIndex < 0) return@LaunchedEffect
+        val entries =
+            timeline
+                .drop(anchorIndex + 1)
+                .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
+                .mapNotNull { message ->
+                    val record = message.record
+                    val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
+                    TtsSpeakableEntry(
+                        senderKey = record.sender,
+                        senderDisplayName = appState.displayName(record.sender),
+                        text = text,
+                    )
+                }
+        if (entries.isEmpty()) return@LaunchedEffect
+        appState.speakAloudAutoRead(groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
+    }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
     // older-page load trims the newest rows, so the previous id is gone and
