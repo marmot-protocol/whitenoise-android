@@ -39,6 +39,39 @@ class ChatListConnectivityBannerTest {
     }
 
     @Test
+    fun networkLossInvalidatesTheCachedRelaySignal() {
+        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = true))
+        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = false))
+        // A network event while online (capabilities change) keeps whatever
+        // the last health sample established.
+        assertEquals(true, relaysConnectedOnNetworkChange(isOnline = true, cached = true))
+        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = true, cached = false))
+    }
+
+    @Test
+    fun quickNetworkBounceMustEarnTheFlashWithAFreshHealthSample() {
+        // Steady connected, no chrome.
+        var relays = true
+        var displayed = ConnectivityBannerState.Hidden
+        // Network lost: the cached relay signal is invalidated with it.
+        relays = relaysConnectedOnNetworkChange(isOnline = false, cached = relays)
+        displayed =
+            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = false, relaysConnected = relays))
+        assertEquals(ConnectivityBannerState.Offline, displayed)
+        // Network restored before any relay-health poll ran: no premature
+        // success flash off the stale cache — the banner keeps working.
+        relays = relaysConnectedOnNetworkChange(isOnline = true, cached = relays)
+        displayed =
+            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = true, relaysConnected = relays))
+        assertEquals(ConnectivityBannerState.Connecting, displayed)
+        // A fresh post-restore sample proves a relay is back: flash once.
+        relays = relaysConnectedFromHealth(connectedRelays = 1, totalRelays = 4)
+        displayed =
+            connectivityBannerNext(displayed, connectivityBannerTarget(hasNetwork = true, relaysConnected = relays))
+        assertEquals(ConnectivityBannerState.JustConnected, displayed)
+    }
+
+    @Test
     fun reachingConnectedFromAProblemStateFlashesOnce() {
         assertEquals(
             ConnectivityBannerState.JustConnected,

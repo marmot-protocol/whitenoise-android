@@ -57,6 +57,17 @@ internal fun relaysConnectedFromHealth(
 ): Boolean = totalRelays == 0 || connectedRelays > 0
 
 /**
+ * Degrades the cached relay signal on a network change: losing the network
+ * invalidates it (relays cannot be connected without one), and a restore keeps
+ * it false until a fresh [relaysConnectedFromHealth] sample proves recovery —
+ * otherwise a quick offline/online bounce would flash success off stale state.
+ */
+internal fun relaysConnectedOnNetworkChange(
+    isOnline: Boolean,
+    cached: Boolean,
+): Boolean = isOnline && cached
+
+/**
  * Shapes the raw target into the displayed state: reaching connected FROM a
  * visible problem state flashes JustConnected (the caller times its dismissal);
  * connected while already hidden stays hidden — no steady-state chrome.

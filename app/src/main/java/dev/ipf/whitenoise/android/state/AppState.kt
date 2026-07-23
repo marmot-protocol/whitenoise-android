@@ -107,6 +107,7 @@ import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -4019,7 +4020,14 @@ class WhiteNoiseAppState(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
-        updateConnectivitySignals(hasNetwork = isOnline)
+        updateConnectivitySignals(
+            hasNetwork = isOnline,
+            relaysConnected =
+                relaysConnectedOnNetworkChange(
+                    isOnline = isOnline,
+                    cached = _connectivitySignals.value.relaysConnected,
+                ),
+        )
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
