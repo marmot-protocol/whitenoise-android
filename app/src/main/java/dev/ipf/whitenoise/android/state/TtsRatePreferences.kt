@@ -22,7 +22,7 @@ class TtsRatePreferences(
     val rateOverride: StateFlow<Float?> = _rateOverride.asStateFlow()
 
     fun setRateOverride(rate: Float?) {
-        val normalized = rate?.takeIf { it > 0f }
+        val normalized = rate?.takeIf { it > 0f }?.let(::nearestPreset)
         if (normalized == _rateOverride.value) return
         _rateOverride.value = normalized
         val edit = preferences.edit()
@@ -46,12 +46,20 @@ class TtsRatePreferences(
             ?.takeIf { it > 0f }
             ?: DEFAULT_RATE
 
+    // Stored values snap to the preset grid on read AND write: the settings
+    // rows are the only selection UI, and an off-grid float (migration,
+    // manual edit) would otherwise leave no row selected.
     private fun readStoredOverride(): Float? =
         try {
-            preferences.getFloat(KEY_RATE_OVERRIDE, MISSING_RATE).takeIf { it > 0f }
+            preferences
+                .getFloat(KEY_RATE_OVERRIDE, MISSING_RATE)
+                .takeIf { it > 0f }
+                ?.let(::nearestPreset)
         } catch (_: ClassCastException) {
             null
         }
+
+    private fun nearestPreset(rate: Float): Float = PRESET_RATES.minBy { preset -> kotlin.math.abs(preset - rate) }
 
     companion object {
         // Presets instead of a free slider: TextToSpeech.setSpeechRate only

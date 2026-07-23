@@ -104,6 +104,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
@@ -418,15 +419,21 @@ internal fun ConversationScreen(
         val start = controller.firstUnreadTimelineIndex(entryUnreadCount)
         if (start < 0) return@LaunchedEffect
         val entries =
-            controller.timeline.drop(start).mapNotNull { message ->
-                val record = message.record
-                val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
-                TtsSpeakableEntry(
-                    senderKey = record.sender,
-                    senderDisplayName = appState.displayName(record.sender),
-                    text = text,
-                )
-            }
+            controller.timeline
+                .drop(start)
+                // Bound BEFORE mapping so the cost scales with the speak cap,
+                // not the unread count; 2x slack absorbs filtered-out entries
+                // (reactions, system events) without walking a huge backlog.
+                .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
+                .mapNotNull { message ->
+                    val record = message.record
+                    val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
+                    TtsSpeakableEntry(
+                        senderKey = record.sender,
+                        senderDisplayName = appState.displayName(record.sender),
+                        text = text,
+                    )
+                }
         if (entries.isEmpty()) return@LaunchedEffect
         appState.speakAloudAutoRead(groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
     }

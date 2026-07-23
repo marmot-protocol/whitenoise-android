@@ -1160,9 +1160,14 @@ class WhiteNoiseAppState(
         text: String,
         locale: java.util.Locale,
     ): Boolean {
-        ttsAutoReadSessionKey = null
         val started = ttsController.speak(text, locale)
-        if (started) ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
+        if (started) {
+            // Only a speak that actually replaced the queue may end the
+            // previous auto-read session: a failed start (blank text, no
+            // engine) leaves the old queue playing and still owned.
+            ttsAutoReadSessionKey = null
+            ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
+        }
         return started
     }
 
@@ -1210,9 +1215,16 @@ class WhiteNoiseAppState(
         ttsController.onSpeechRateChanged()
     }
 
+    private var attachedTtsHandle: TtsEngineHandle? = null
+
     private fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
+        // A refresh that kept the same engine handle must not re-attach:
+        // attachEngine treats every attach as a replacement and stops any
+        // in-flight speech. Only a genuinely new (or dropped) handle swaps.
+        if (handle === attachedTtsHandle) return
+        attachedTtsHandle = handle
         if (handle != null) {
             ttsController.attachEngine(AndroidTtsSpeechEngine(handle.textToSpeech))
         } else {

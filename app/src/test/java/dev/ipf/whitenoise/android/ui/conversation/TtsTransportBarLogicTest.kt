@@ -13,6 +13,26 @@ class TtsTransportBarLogicTest {
     }
 
     @Test
+    fun rateLabelsFormatWithTheActiveLocale() {
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            assertEquals(
+                "0,75\u00d7",
+                dev.ipf.whitenoise.android.ui.settings
+                    .ttsRateLabel(0.75f),
+            )
+            assertEquals(
+                "1\u00d7",
+                dev.ipf.whitenoise.android.ui.settings
+                    .ttsRateLabel(1.0f),
+            )
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
+
+    @Test
     fun chunkPositionReadsEveryStateVariant() {
         assertEquals(3, ttsChunkIndex(TtsState.Speaking(chunkIndex = 3, chunkCount = 8)))
         assertEquals(8, ttsChunkCount(TtsState.Paused(chunkIndex = 3, chunkCount = 8)))

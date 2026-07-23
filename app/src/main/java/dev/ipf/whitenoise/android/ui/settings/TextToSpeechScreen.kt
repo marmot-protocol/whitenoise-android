@@ -178,8 +178,20 @@ internal fun TextToSpeechScreen(
     }
 }
 
-/** Matches the voice-note speed pill's rendering so both read as one system. */
+/**
+ * Matches the voice-note speed pill's rendering so both read as one system.
+ * Non-integer rates format with the active locale's decimal separator
+ * (0,75\u00d7 in de/fr), integers stay bare (1\u00d7).
+ */
 internal fun ttsRateLabel(rate: Float): String {
     val whole = rate.toInt()
-    return if (rate == whole.toFloat()) "$whole\u00d7" else "$rate\u00d7"
+    val number =
+        if (rate == whole.toFloat()) {
+            whole.toString()
+        } else {
+            java.text.NumberFormat
+                .getNumberInstance()
+                .format(rate.toDouble())
+        }
+    return "$number\u00d7"
 }
