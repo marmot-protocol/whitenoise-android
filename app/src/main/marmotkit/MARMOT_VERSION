@@ -1,5 +1,5 @@
 source=marmot-protocol/mdk
-mdk-sha=1c57734d44a67f71cd638d45ac4a4828d7e0e647
-mdk-short-sha=1c57734
-mdk-branch=feature/notification-agent-traffic
+mdk-sha=40df95c928595c6596539cc366916069ae6581c5
+mdk-short-sha=40df95c9
+mdk-branch=master
 features=otlp-export

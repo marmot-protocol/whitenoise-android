@@ -31,6 +31,7 @@ class DiagnosticFormatterTest {
                             kind = 9uL,
                             tags = emptyList(),
                             recordedAt = 1_779_926_400uL,
+                            receivedAt = 1_779_926_400uL,
                         ),
                 ),
             )

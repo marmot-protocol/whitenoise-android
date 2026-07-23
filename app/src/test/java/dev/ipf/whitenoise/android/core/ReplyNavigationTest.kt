@@ -264,6 +264,7 @@ class ReplyNavigationTest {
                     media = emptyList(),
                     agentTextStreamJson = null,
                     deleted = false,
+                    invalidationStatus = null,
                 )
             },
         mediaJson = null,

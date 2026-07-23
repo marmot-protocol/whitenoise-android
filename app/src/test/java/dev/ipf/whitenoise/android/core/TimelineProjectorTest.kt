@@ -28,6 +28,7 @@ class TimelineProjectorTest {
                         media = emptyList(),
                         agentTextStreamJson = null,
                         deleted = false,
+                        invalidationStatus = null,
                     ),
                 reactions =
                     TimelineReactionSummaryFfi(
@@ -252,6 +253,7 @@ class TimelineProjectorTest {
         media = media,
         agentTextStreamJson = null,
         deleted = deleted,
+        invalidationStatus = null,
     )
 
     private fun mediaAttachment(
