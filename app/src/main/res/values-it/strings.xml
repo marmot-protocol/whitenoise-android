@@ -1114,8 +1114,8 @@
     <string name="connectivity_offline">Nessuna connessione: attiva il Wi-Fi o i dati mobili</string>
     <string name="connectivity_connecting">Connessione…</string>
     <string name="connectivity_connected">Connesso</string>
-    <string name="amber_signin_waiting_request">Approva la richiesta di identità nel firmatario (passaggio 1 di 2)…</string>
-    <string name="amber_signin_waiting_proof">Firma la prova di identità nel firmatario (passaggio 2 di 2)…</string>
+    <string name="amber_signin_waiting_request">Approva la richiesta di identità nel tuo signer (passaggio 1 di 2)…</string>
+    <string name="amber_signin_waiting_proof">Firma la prova di identità nel tuo signer (passaggio 2 di 2)…</string>
     <string name="tts_settings_engine_local">Motore sul dispositivo</string>
     <string name="tts_settings_engine_unknown">Può usare la voce in rete</string>
 </resources>
