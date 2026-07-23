@@ -154,6 +154,27 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
+    fun ensureWithoutTitleDoesNotDowngradeAnExistingConversationName() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-name-preserved"
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_dm",
+                conversationShortcutId = shortcut,
+                conversationTitle = "Green Orca",
+            )!!
+
+        ConversationNotificationChannels.ensureConversationChannel(
+            context = context,
+            parentChannelId = "messages_dm",
+            conversationShortcutId = shortcut,
+        )
+
+        assertEquals("Green Orca · Direct messages", manager.getNotificationChannel(convId).name.toString())
+    }
+
+    @Test
     fun ensureIsIdempotentAndReturnsTheSameChannelId() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-idempotent"

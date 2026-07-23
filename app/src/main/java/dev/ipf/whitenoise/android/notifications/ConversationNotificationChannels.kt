@@ -101,7 +101,12 @@ object ConversationNotificationChannels {
             // Android permits an app to refresh a channel's user-visible name
             // while retaining every user-controlled alerting override. This
             // upgrades channels created before profile/group metadata resolved.
-            if (existing.name.toString() != displayName.toString()) {
+            // A title-less notification post must not undo that upgrade after
+            // a process restart.
+            if (
+                !conversationTitle.isNullOrBlank() &&
+                existing.name.toString() != displayName.toString()
+            ) {
                 existing.name = displayName
                 manager.createNotificationChannel(existing)
             }
