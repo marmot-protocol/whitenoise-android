@@ -138,6 +138,61 @@ class TtsControllerTest {
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })
     }
 
+    @Test
+    fun speechRateIsReReadAtEverySentenceBoundary() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        var rate = 1.0f
+        val controller =
+            TtsController(
+                audioFocus = focus,
+                chunkText = { text, locale -> TtsChunker.chunk(text, locale, maxChunkLength = 4_000) },
+                speechRate = { rate },
+            )
+        controller.attachEngine(engine)
+
+        assertTrue(controller.speak("First sentence. Second sentence.", Locale.US))
+        rate = 1.5f
+        controller.onSpeechRateChanged()
+
+        // The current sentence keeps its rate; nothing is re-queued yet.
+        assertEquals(1.0f, engine.appliedRates.last())
+
+        engine.complete(0)
+
+        // At the boundary the remaining chunks re-queue with the new rate.
+        assertEquals(1.5f, engine.appliedRates.last())
+        assertEquals("Second sentence.", engine.spoken.last().text)
+        assertEquals(TtsState.Speaking(chunkIndex = 1, chunkCount = 2), controller.state.value)
+    }
+
+    @Test
+    fun appendExtendsAnActiveQueueAndSpeaksTheNewSentences() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        controller.speak("First. Second.", Locale.US)
+
+        assertTrue(controller.appendSpeech("Third.", Locale.US))
+
+        assertEquals(TtsState.Speaking(chunkIndex = 0, chunkCount = 3), controller.state.value)
+        assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.map { it.text })
+        engine.complete(0)
+        engine.complete(1)
+        engine.complete(2)
+        assertEquals(TtsState.Idle(chunkIndex = 3, chunkCount = 3), controller.state.value)
+    }
+
+    @Test
+    fun appendNeverResurrectsAnIdleSession() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+
+        assertFalse(controller.appendSpeech("Orphan.", Locale.US))
+        assertTrue(engine.spoken.isEmpty())
+    }
+
     private fun controller(focus: FakeTtsAudioFocus): TtsController =
         TtsController(
             audioFocus = focus,
@@ -163,6 +218,12 @@ class TtsControllerTest {
         override fun setLanguage(locale: Locale): Int {
             this.locale = locale
             return languageResult
+        }
+
+        val appliedRates = mutableListOf<Float>()
+
+        override fun setSpeechRate(rate: Float) {
+            appliedRates += rate
         }
 
         override fun setCallbacks(

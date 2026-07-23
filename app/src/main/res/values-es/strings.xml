@@ -1082,6 +1082,17 @@
     <string name="tts_settings_explainer_discovering">Comprobando los motores de texto a voz instalados en este dispositivo…</string>
     <string name="tts_settings_explainer_no_engine">No hay un motor de texto a voz utilizable instalado. Instala RHVoice o eSpeak NG desde F-Droid o Zapstore y selecciónalo abajo.</string>
     <string name="tts_settings_engine_title">Motor</string>
+    <string name="tts_settings_rate_title">Velocidad de voz</string>
+    <string name="speak_aloud">Leer en voz alta</string>
+    <string name="tts_bar_pause">Pausar lectura</string>
+    <string name="tts_bar_play">Reanudar lectura</string>
+    <string name="tts_bar_skip_previous">Frase anterior</string>
+    <string name="tts_bar_skip_next">Frase siguiente</string>
+    <string name="tts_bar_stop">Detener lectura</string>
+    <string name="tts_bar_error">No se pudo leer en voz alta</string>
+    <string name="tts_auto_read_title">Leer mensajes en voz alta</string>
+    <string name="tts_auto_read_subtitle">Leer los mensajes no leídos al abrir este chat</string>
+    <string name="tts_settings_rate_system">Sistema (seguir el ajuste del dispositivo)</string>
     <string name="tts_settings_engine_local">Motor en el dispositivo</string>
     <string name="tts_settings_engine_unknown">Puede usar voz en red</string>
 </resources>

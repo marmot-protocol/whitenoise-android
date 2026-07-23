@@ -10,6 +10,10 @@ internal class AndroidTtsSpeechEngine(
 ) : TtsSpeechEngine {
     override fun setLanguage(locale: Locale): Int = textToSpeech.setLanguage(locale)
 
+    override fun setSpeechRate(rate: Float) {
+        textToSpeech.setSpeechRate(rate)
+    }
+
     override fun setCallbacks(
         onDone: (String?) -> Unit,
         onError: (String?, Int) -> Unit,

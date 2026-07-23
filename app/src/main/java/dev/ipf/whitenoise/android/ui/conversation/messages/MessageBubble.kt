@@ -1814,6 +1814,9 @@ internal fun MessageBubble(
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
+                    // Speak covers exactly what Copy exposes; hidden entirely
+                    // on devices with no usable engine (explained in Settings).
+                    canSpeak = displayedBody.isNotBlank() && appState.ttsHasUsableEngine,
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1836,6 +1839,10 @@ internal fun MessageBubble(
                         controller.editingMessageId = record.messageIdHex
                     },
                     onCopyText = ::copyMessageText,
+                    onSpeak = {
+                        onActionMenuOpenChange(false)
+                        appState.speakAloud(displayedBody, java.util.Locale.getDefault())
+                    },
                     onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,

@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
+import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 
@@ -43,6 +44,7 @@ internal fun TextToSpeechScreen(
     onBack: () -> Unit,
 ) {
     val selectedOverride by appState.ttsEnginePreferences.selectedEnginePackage.collectAsState()
+    val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
     val engineChoice = appState.ttsEngineChoice()
     val ttsResolution = appState.ttsResolution
     val reportNoEngine = shouldReportNoTtsEngine(ttsResolution)
@@ -104,6 +106,25 @@ internal fun TextToSpeechScreen(
                     )
                 }
             }
+            item {
+                // Presets, not a slider: the framework only validates rate > 0
+                // and engines disagree past the ends, so a bounded set with a
+                // System entry (follow the OS accessibility rate) is safer.
+                SectionCard(title = stringResource(R.string.tts_settings_rate_title)) {
+                    SelectableSettingsRow(
+                        title = stringResource(R.string.tts_settings_rate_system),
+                        selected = rateOverride == null,
+                        onClick = { appState.setTtsRateOverride(null) },
+                    )
+                    TtsRatePreferences.PRESET_RATES.forEach { rate ->
+                        SelectableSettingsRow(
+                            title = ttsRateLabel(rate),
+                            selected = rateOverride == rate,
+                            onClick = { appState.setTtsRateOverride(rate) },
+                        )
+                    }
+                }
+            }
             if (showEngineChooser && engineChoice.engines.isNotEmpty()) {
                 item {
                     SectionCard(title = stringResource(R.string.tts_settings_engine_title)) {
@@ -155,4 +176,22 @@ internal fun TextToSpeechScreen(
             },
         )
     }
+}
+
+/**
+ * Matches the voice-note speed pill's rendering so both read as one system.
+ * Non-integer rates format with the active locale's decimal separator
+ * (0,75\u00d7 in de/fr), integers stay bare (1\u00d7).
+ */
+internal fun ttsRateLabel(rate: Float): String {
+    val whole = rate.toInt()
+    val number =
+        if (rate == whole.toFloat()) {
+            whole.toString()
+        } else {
+            java.text.NumberFormat
+                .getNumberInstance()
+                .format(rate.toDouble())
+        }
+    return "$number\u00d7"
 }

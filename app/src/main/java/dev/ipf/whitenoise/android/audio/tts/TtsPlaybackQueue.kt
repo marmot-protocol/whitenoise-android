@@ -51,10 +51,22 @@ internal class TtsPlaybackQueue(
     private var chunks: List<TtsChunk> = emptyList()
     private var currentIndex = 0
     private var generation = 0L
+    private var refreshAtNextBoundary = false
+
+    /**
+     * Applies changed enqueue-time parameters (speech rate) at the next chunk
+     * boundary. The engine pre-buffers every remaining utterance at enqueue
+     * time, so without a re-queue a mid-playback change would never land;
+     * re-queueing only at the boundary keeps the current sentence unbroken.
+     */
+    fun refreshPendingChunksAtNextBoundary() {
+        if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
+    }
 
     fun start(chunks: List<TtsChunk>) {
         stopEngine()
         generation += 1
+        refreshAtNextBoundary = false
         this.chunks = chunks
         currentIndex = 0
         if (chunks.isEmpty()) {
@@ -62,6 +74,36 @@ internal class TtsPlaybackQueue(
             return
         }
         enqueueFromCurrentIndex()
+    }
+
+    /**
+     * Extends an active queue with more sentences (auto-read live
+     * continuation). No-op when idle or errored — appending must never
+     * resurrect a finished session. While speaking, the new chunks enqueue
+     * immediately behind the engine's pending utterances; while paused,
+     * resume() re-enqueues everything from the current index anyway.
+     */
+    fun append(moreChunks: List<TtsChunk>): Boolean {
+        val current = _state.value
+        val active = current is TtsState.Speaking || current is TtsState.Paused
+        if (moreChunks.isEmpty() || !active) return false
+        val base = chunks.size
+        val reindexed = moreChunks.mapIndexed { offset, chunk -> chunk.copy(index = base + offset) }
+        chunks = chunks + reindexed
+        if (current is TtsState.Speaking) {
+            _state.value = TtsState.Speaking(currentIndex, chunks.size)
+            for (chunk in reindexed) {
+                val utteranceId = utteranceId(generation, chunk.index)
+                val result = enqueue(chunk, utteranceId)
+                if (result != TextToSpeech.SUCCESS) {
+                    onError(utteranceId, result)
+                    break
+                }
+            }
+        } else {
+            _state.value = TtsState.Paused(currentIndex, chunks.size)
+        }
+        return true
     }
 
     fun failBeforePlayback(
@@ -127,6 +169,10 @@ internal class TtsPlaybackQueue(
         } else {
             currentIndex = next
             _state.value = TtsState.Speaking(currentIndex, chunks.size)
+            if (refreshAtNextBoundary) {
+                refreshAtNextBoundary = false
+                requeueFrom(next)
+            }
         }
     }
 
@@ -163,6 +209,7 @@ internal class TtsPlaybackQueue(
     private fun requeueFrom(index: Int) {
         stopEngine()
         generation += 1
+        refreshAtNextBoundary = false
         currentIndex = index
         enqueueFromCurrentIndex()
     }
