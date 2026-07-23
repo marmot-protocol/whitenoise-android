@@ -3198,12 +3198,16 @@ class WhiteNoiseAppState(
             val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
             if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
             appUnlockEvaluationPending = false
+            // Re-read the clock AFTER the IO hop: deciding with the entry
+            // time could dismiss the lock even though the grace period
+            // expired while the secure store was loading.
+            val decisionNowMillis = maxOf(nowMillis, System.currentTimeMillis())
             if (
                 shouldShowAppLock(
                     requireUnlock = requireAppUnlock,
                     credentialAvailable = appLockCredentialAvailable,
                     lastUnlockedAtMillis = lastAppUnlockAtMillis,
-                    nowMillis = nowMillis,
+                    nowMillis = decisionNowMillis,
                     delay = appLockDelay,
                 )
             ) {
