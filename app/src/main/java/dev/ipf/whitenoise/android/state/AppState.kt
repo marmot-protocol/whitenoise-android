@@ -3547,8 +3547,20 @@ class WhiteNoiseAppState(
                         }
                     }
 
-                adoptedHandle = replacement.handle
-                publishTtsResolution(replacement)
+                // Same engine package resolved again: keep the ATTACHED
+                // handle, so an availability refresh (settings ON_RESUME,
+                // foreground) never swaps engines under in-flight speech.
+                // resolve() always mints a new handle, so identity alone
+                // can't provide this — the freshly resolved duplicate is
+                // released with the other unadopted candidates below.
+                val published =
+                    if (previousHandle != null && previousHandle.enginePackage == replacement.handle?.enginePackage) {
+                        replacement.copy(handle = previousHandle)
+                    } else {
+                        replacement
+                    }
+                adoptedHandle = published.handle
+                publishTtsResolution(published)
                 replacementPublished = true
             } finally {
                 candidateHandles
