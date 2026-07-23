@@ -279,7 +279,7 @@ class Nip55SignerParsingTest {
     }
 
     @Test
-    fun defaultPermissionsMirrorTheFlutterReferenceList() {
+    fun defaultPermissionsCoverEverySignedSurfaceIncludingTheIdentityProof() {
         val permissions = JSONArray(Nip55.defaultPermissionsJson())
 
         val signEventKinds = mutableListOf<Int>()
@@ -292,8 +292,10 @@ class Nip55SignerParsingTest {
             }
         }
 
+        // 450 (identity proof) rides the remembered-permission path too, so
+        // re-login and signer re-registration stop prompting once approved.
         assertEquals(
-            listOf(30443, 443, 444, 445, 1059, 10002, 10050, 10051),
+            listOf(450, 30443, 443, 444, 445, 1059, 10002, 10050, 10051),
             signEventKinds,
         )
         assertEquals(listOf("nip44_encrypt", "nip44_decrypt"), bareTypes)

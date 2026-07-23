@@ -1111,6 +1111,11 @@
     <string name="tts_auto_read_title">Lire les messages à voix haute</string>
     <string name="tts_auto_read_subtitle">Lire les messages non lus à l\'ouverture de cette discussion</string>
     <string name="tts_settings_rate_system">Système (suivre le réglage de l\'appareil)</string>
+    <string name="connectivity_offline">Pas d\'internet — activez le Wi-Fi ou les données mobiles</string>
+    <string name="connectivity_connecting">Connexion…</string>
+    <string name="connectivity_connected">Connecté</string>
+    <string name="amber_signin_waiting_request">Approuvez la demande d\'identité dans votre signataire (étape 1 sur 2)…</string>
+    <string name="amber_signin_waiting_proof">Signez la preuve d\'identité dans votre signataire (étape 2 sur 2)…</string>
     <string name="tts_settings_engine_local">Moteur sur l\'appareil</string>
     <string name="tts_settings_engine_unknown">Peut utiliser la voix en réseau</string>
 </resources>

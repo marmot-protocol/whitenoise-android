@@ -11,17 +11,17 @@ class ChatsScreenSelectionActionsCoverageTest {
         val selectionBar =
             source.requiredSection(
                 start = "ChatListSelectionBar(",
-                end = "\n                )\n            } else {",
+                end = "\n                    )\n                } else {",
             )
         val markReadHandler =
             selectionBar.requiredSection(
                 start = "onMarkRead = {",
-                end = "\n                    onMuteToggle = {",
+                end = "\n                        onMuteToggle = {",
             )
         val muteHandler =
             selectionBar.requiredSection(
                 start = "onMuteToggle = {",
-                end = "\n                    onSelectAll = {",
+                end = "\n                        onSelectAll = {",
             )
 
         assertTrue(
