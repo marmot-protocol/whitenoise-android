@@ -72,6 +72,33 @@ class ChatListConnectivityBannerTest {
     }
 
     @Test
+    fun offlineStartupClampsTheOptimisticRelayDefault() {
+        // The signals flow seeds relaysConnected optimistically; a device that
+        // starts offline must clamp it with the seed's hasNetwork=false write
+        // so the first onAvailable cannot flash success without evidence.
+        val seeded = relaysConnectedOnNetworkChange(isOnline = false, cached = true)
+        assertEquals(false, seeded)
+        assertEquals(
+            ConnectivityBannerState.Offline,
+            connectivityBannerTarget(hasNetwork = false, relaysConnected = seeded),
+        )
+        val restored = relaysConnectedOnNetworkChange(isOnline = true, cached = seeded)
+        assertEquals(
+            ConnectivityBannerState.Connecting,
+            connectivityBannerTarget(hasNetwork = true, relaysConnected = restored),
+        )
+    }
+
+    @Test
+    fun offlinePollReportingConnectedRelaysCannotResurrectTheSignal() {
+        // Pool counts read while offline are stale by definition: even a
+        // snapshot claiming live relays stays clamped to false.
+        val stalePoll = relaysConnectedFromHealth(connectedRelays = 3, totalRelays = 4)
+        assertEquals(true, stalePoll)
+        assertEquals(false, relaysConnectedOnNetworkChange(isOnline = false, cached = stalePoll))
+    }
+
+    @Test
     fun reachingConnectedFromAProblemStateFlashesOnce() {
         assertEquals(
             ConnectivityBannerState.JustConnected,

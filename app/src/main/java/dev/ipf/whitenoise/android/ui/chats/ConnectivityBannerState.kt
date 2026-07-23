@@ -57,10 +57,12 @@ internal fun relaysConnectedFromHealth(
 ): Boolean = totalRelays == 0 || connectedRelays > 0
 
 /**
- * Degrades the cached relay signal on a network change: losing the network
- * invalidates it (relays cannot be connected without one), and a restore keeps
- * it false until a fresh [relaysConnectedFromHealth] sample proves recovery —
- * otherwise a quick offline/online bounce would flash success off stale state.
+ * The clamp applied to every relay-signal write: no active network means no
+ * connected relays, whatever an optimistic default or a stale health snapshot
+ * claims. A restore therefore keeps the signal false until a fresh
+ * [relaysConnectedFromHealth] sample proves recovery — a quick offline/online
+ * bounce, an offline startup seed, or a poll racing the transition can never
+ * flash success off stale state.
  */
 internal fun relaysConnectedOnNetworkChange(
     isOnline: Boolean,

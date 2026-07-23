@@ -3926,27 +3926,47 @@ class WhiteNoiseAppState(
     private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
     val connectivitySignals: StateFlow<ConnectivitySignals> = _connectivitySignals.asStateFlow()
 
+    // Bumped on every hasNetwork transition (callback or seed-observed) so a
+    // relay-health snapshot that was in flight across the transition can be
+    // recognized and discarded in [refreshRelayConnectivity].
+    private val connectivityNetworkGeneration = AtomicLong(0)
+
     private fun updateConnectivitySignals(
         hasNetwork: Boolean? = null,
         relaysConnected: Boolean? = null,
     ) {
         _connectivitySignals.update { current ->
+            val nextHasNetwork = hasNetwork ?: current.hasNetwork
             current.copy(
-                hasNetwork = hasNetwork ?: current.hasNetwork,
-                relaysConnected = relaysConnected ?: current.relaysConnected,
+                hasNetwork = nextHasNetwork,
+                // Structural invariant: no active network means no connected
+                // relays, whatever an optimistic seed default or a stale
+                // health snapshot claims. Every writer goes through this clamp.
+                relaysConnected =
+                    relaysConnectedOnNetworkChange(
+                        isOnline = nextHasNetwork,
+                        cached = relaysConnected ?: current.relaysConnected,
+                    ),
             )
         }
     }
 
     /**
      * Refresh [connectivitySignals] from the engine's relay-health snapshot.
-     * No-op while backgrounded; a failed read keeps the previous value rather
-     * than flashing a guess. Optimistic seed plus keep-on-failure means the
-     * banner only reports a problem a real snapshot has confirmed.
+     * No-op while backgrounded or offline; a failed read keeps the previous
+     * value rather than flashing a guess, and a snapshot that straddled a
+     * network transition is discarded via [connectivityNetworkGeneration].
+     * The banner only changes state on evidence from the current network.
      */
     suspend fun refreshRelayConnectivity() {
-        if (!appInForeground) return
-        val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull() ?: return
+        // Offline needs no sample: the write clamp already pinned the signal
+        // false, and pool counts read while offline are stale by definition.
+        if (!appInForeground || !_connectivitySignals.value.hasNetwork) return
+        val generation = connectivityNetworkGeneration.get()
+        val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
+        // A snapshot that straddled a network transition describes the wrong
+        // network; drop it — the next poll is ≤2s out.
+        if (health == null || connectivityNetworkGeneration.get() != generation) return
         updateConnectivitySignals(
             relaysConnected =
                 relaysConnectedFromHealth(
@@ -4020,14 +4040,8 @@ class WhiteNoiseAppState(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
-        updateConnectivitySignals(
-            hasNetwork = isOnline,
-            relaysConnected =
-                relaysConnectedOnNetworkChange(
-                    isOnline = isOnline,
-                    cached = _connectivitySignals.value.relaysConnected,
-                ),
-        )
+        if (wasOnline != isOnline) connectivityNetworkGeneration.incrementAndGet()
+        updateConnectivitySignals(hasNetwork = isOnline)
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
