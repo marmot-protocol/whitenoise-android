@@ -40,6 +40,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
@@ -555,6 +556,15 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
     }
 }
 
+/**
+ * Cancellation cause used when a handoff retires a still-healthy listener: the
+ * retired loop drains its subscription's buffered updates before closing, so
+ * updates already forwarded by the engine broadcast are posted rather than
+ * destroyed. Plain cancellation (teardown, wipe) must NOT drain — a wipe sets
+ * reconnect suppression precisely so no notification work runs.
+ */
+internal class NotificationHandoffRetirement : CancellationException("notification listener retired by handoff")
+
 internal class NotificationJobSlot {
     private val lock = Any()
     private var job: Job? = null
@@ -626,7 +636,12 @@ internal class NotificationJobSlot {
             withContext(NonCancellable) { newJob.cancelAndJoin() }
             throw CancellationException("notification listener handoff was cancelled")
         }
-        withContext(NonCancellable) { previous?.cancelAndJoin() }
+        withContext(NonCancellable) {
+            previous?.let {
+                it.cancel(NotificationHandoffRetirement())
+                it.join()
+            }
+        }
     }
 }
 
@@ -6210,6 +6225,15 @@ class WhiteNoiseAppState(
                                 post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
                             )
                         }
+                    } catch (cancel: CancellationException) {
+                        // A handoff retirement means updates already buffered on
+                        // this subscription would be destroyed unread — the
+                        // replacement's subscription started later and cannot
+                        // replay them. Post what is already queued before closing.
+                        if (cancel is NotificationHandoffRetirement || cancel.cause is NotificationHandoffRetirement) {
+                            drainRetiredNotificationSubscription(subscription)
+                        }
+                        throw cancel
                     } finally {
                         runCatching {
                             withContext(NonCancellable + Dispatchers.IO) {
@@ -6229,6 +6253,36 @@ class WhiteNoiseAppState(
                 backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
             }
         }
+
+    /**
+     * Best-effort drain of a retired listener's subscription. Runs
+     * non-cancellable — the caller is already cancelled — and posts through the
+     * normal pipeline so epoch and settings gates still apply. Overlap with the
+     * replacement's stream can post the same update twice; the per-conversation
+     * tag makes that a card replace, not a duplicate card.
+     */
+    private suspend fun drainRetiredNotificationSubscription(subscription: NotificationsSubscription) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            val drained = mutableListOf<NotificationUpdateFfi>()
+            runCatching {
+                withTimeoutOrNull(NOTIFICATION_HANDOFF_DRAIN_BUDGET_MILLIS) {
+                    while (true) {
+                        drained += subscription.next() ?: break
+                    }
+                }
+            }
+            drained.forEach { update ->
+                runCatching {
+                    applyNotificationDisplayNameHint(update)
+                    val postEpoch = notificationPostEpoch.capture()
+                    postAfterNotificationAvatarPreWarm(
+                        preWarm = { preWarmNotificationAvatars(update) },
+                        post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
+                    )
+                }
+            }
+        }
+    }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
         backgroundConnectionEnabled = enabled
@@ -6429,6 +6483,11 @@ class WhiteNoiseAppState(
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
+
+        // Buffered updates return from next() immediately, so a retired
+        // subscription's drain spends nearly all of this budget on the final
+        // empty wait; it runs once per handoff.
+        private const val NOTIFICATION_HANDOFF_DRAIN_BUDGET_MILLIS = 250L
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }

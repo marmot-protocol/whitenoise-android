@@ -6,6 +6,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,6 +15,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+
+private const val TEST_TIMEOUT_MILLIS = 5_000L
 
 class NotificationJobSlotTest {
     @Test
@@ -83,6 +86,62 @@ class NotificationJobSlotTest {
             } finally {
                 handoffJob.cancelAndJoin()
                 slot.cancelAndJoin()
+            }
+        }
+
+    // Bare Jobs + invokeOnCompletion observe the cancellation cause without a
+    // coroutine body — the existing tests' pattern. Wrapped in withTimeout so a
+    // logic regression fails fast instead of hanging the whole unit-test task.
+    @Test
+    fun handoffRetiresThePreviousJobWithTheRetirementCause() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT_MILLIS) {
+                val slot = NotificationJobSlot()
+                val previousCause = CompletableDeferred<Throwable?>()
+                val previous = Job().also { it.invokeOnCompletion { cause -> previousCause.complete(cause) } }
+                slot.startIfInactive { previous }
+
+                val replacementReady = CompletableDeferred<Unit>()
+                lateinit var replacement: Job
+                val handoffJob =
+                    launch {
+                        slot.handoff { ready ->
+                            Job().also {
+                                replacement = it
+                                replacementReady.complete(Unit)
+                                ready.complete(Unit)
+                            }
+                        }
+                    }
+
+                replacementReady.await()
+                val cause = previousCause.await()
+                assertTrue(
+                    "a handoff must retire the previous listener with the retirement cause " +
+                        "so it drains its buffered updates: got $cause",
+                    cause is NotificationHandoffRetirement,
+                )
+                replacement.cancel()
+                handoffJob.cancelAndJoin()
+                slot.cancelAndJoin()
+            }
+        }
+
+    @Test
+    fun plainCancelDoesNotUseTheRetirementCause() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT_MILLIS) {
+                val slot = NotificationJobSlot()
+                val cancelCause = CompletableDeferred<Throwable?>()
+                val job = Job().also { it.invokeOnCompletion { cause -> cancelCause.complete(cause) } }
+                slot.startIfInactive { job }
+
+                slot.cancelAndJoin()
+                val cause = cancelCause.await()
+                assertFalse(
+                    "teardown cancellation must stay plain so wipes never trigger a drain: got $cause",
+                    cause is NotificationHandoffRetirement,
+                )
             }
         }
 
