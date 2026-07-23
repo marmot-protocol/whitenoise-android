@@ -64,7 +64,7 @@ class NotificationPushWakeDrainCoverageTest {
     fun coldPushWakePreWarmsAvatarsBeforePostingTheFirstNotification() =
         runBlocking {
             val calls = mutableListOf<String>()
-            val listener = appStateFunctionBody("startNotificationListener")
+            val listener = appStateFunctionBody("launchNotificationListenerLoop")
 
             postAfterNotificationAvatarPreWarm(
                 preWarm = {
@@ -109,6 +109,7 @@ class NotificationPushWakeDrainCoverageTest {
         val appState = appStateSource().readText()
         val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
         val clearObserved = appStateFunctionBody("clearPendingPushWakeCatchUpIfObserved")
+        val reconnect = appStateFunctionBody("scheduleNotificationReconnectOnNetworkRestore")
         val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
 
         assertTrue(
@@ -121,10 +122,16 @@ class NotificationPushWakeDrainCoverageTest {
             "clearPendingPushWakeCatchUp(pendingGeneration)" in clearObserved,
         )
         assertTrue(
-            "connectivity callbacks must coalesce repeated pending-drain requests",
-            "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
+            "connectivity callbacks must defer push-wake drain while reconnect owns receiver readiness",
+            "notificationReconnectJob.isActive()" in schedule &&
+                "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
                 "notificationScope.launch" in schedule &&
                 "ensureNotificationRuntimeStarted()" in schedule,
+        )
+        assertTrue(
+            "reconnect completion must retry a pending marker when its catch-up did not clear it",
+            "invokeOnCompletion" in reconnect &&
+                "schedulePendingPushWakeCatchUpDrain()" in reconnect,
         )
         assertTrue(
             "foreground catch-up must use the same generation clear helper as runtime-start drains",
