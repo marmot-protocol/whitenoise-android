@@ -546,6 +546,60 @@ class MessageProjectorTest {
         )
     }
 
+    @Test
+    fun albumMediaLabelDescribesTheRepresentativeAttachmentNotAFlattenedScan() {
+        // First tag is malformed (only an `m` field): the renderer skips it,
+        // so the label must come from the first VALID attachment — not mix
+        // the malformed tag's media type with the valid tag's filename.
+        val malformedVideoTag = MessageTagFfi(listOf("imeta", "m video/mp4"))
+        val validImageTag =
+            MessageTagFfi(
+                listOf(
+                    "imeta",
+                    "m image/jpeg",
+                    "filename photo.jpg",
+                    "ciphertext_sha256 " + "a".repeat(64),
+                    "plaintext_sha256 " + "b".repeat(64),
+                    "nonce " + "c".repeat(24),
+                    "locator blossom-v1 https://blossom.example.com/abc",
+                    "v encrypted-media-v1",
+                ),
+            )
+        val message =
+            message(
+                id = "album",
+                sender = "sender",
+                plaintext = "",
+                kind = 9uL,
+                tags = listOf(malformedVideoTag, validImageTag),
+            )
+
+        assertEquals(ReplyMediaKind.Photo, MessageProjector.mediaKind(message))
+        assertEquals("photo.jpg", MessageProjector.mediaPreviewFallback(message)?.filename)
+    }
+
+    @Test
+    fun unparseableAlbumFallsBackToTheFirstTagOnlyNeverAcrossTags() {
+        // Neither tag validates; the first tag has a type but no filename and
+        // the second has a filename. The label must come from the first tag
+        // alone — not stitch the second tag's filename onto the first's type.
+        val message =
+            message(
+                id = "broken",
+                sender = "sender",
+                plaintext = "",
+                kind = 9uL,
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("imeta", "m video/mp4")),
+                        MessageTagFfi(listOf("imeta", "m application/pdf", "filename report.pdf")),
+                    ),
+            )
+
+        assertEquals(ReplyMediaKind.Video, MessageProjector.mediaKind(message))
+        assertEquals(null, MessageProjector.mediaPreviewFallback(message)?.filename)
+    }
+
     private fun eventTag(target: String) = MessageProjector.eventTag(target)
 
     private fun quoteTag(target: String) = MessageProjector.quoteTag(target)

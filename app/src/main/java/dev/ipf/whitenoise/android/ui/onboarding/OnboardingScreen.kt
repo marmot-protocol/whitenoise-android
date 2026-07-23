@@ -143,6 +143,9 @@ internal fun importIdentityErrorRes(identity: String): Int =
         IdentityEntryInput.Kind.Invalid -> R.string.identity_entry_error_invalid_key
         IdentityEntryInput.Kind.PublicKey -> R.string.sign_in_error_public_key
         IdentityEntryInput.Kind.SecretKey -> R.string.identity_entry_error_import_failed
+        // Recognized but not yet importable: the engine's login accepts
+        // plaintext keys only, so an encrypted backup reads as import-failed.
+        IdentityEntryInput.Kind.EncryptedSecretKey -> R.string.identity_entry_error_import_failed
     }
 
 @Composable

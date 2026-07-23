@@ -198,10 +198,11 @@ internal fun SignInContent(
                     onIdentityChange = onIdentityChange,
                     onErrorChange = onErrorChange,
                     onSubmit = submit,
-                    // Login is nsec-only: no QR scan (the scanner yields
-                    // npub / profile-link payloads), and the field is always
-                    // masked and labelled as a secret key.
-                    allowScan = false,
+                    // Secret-key entry with the same scanner the add-account
+                    // sheet uses: a scanned nsec/ncryptsec fills the field
+                    // exactly like a paste (the user still confirms before
+                    // import), and the field stays masked either way.
+                    allowScan = true,
                     secretKeyOnly = true,
                 )
                 Spacer(Modifier.height(24.dp))
@@ -330,11 +331,20 @@ internal fun IdentityEntryForm(
             onScan = { raw ->
                 showScanner = false
                 val scanned = IdentityEntryInput.scannedValue(raw)
-                if (scanned == null) {
-                    onErrorChange(R.string.identity_entry_error_invalid_key)
-                } else {
-                    // Fill only; the user reviews and taps sign in / import.
-                    onIdentityChange(scanned)
+                val secretRejected =
+                    secretKeyOnly &&
+                        scanned != null &&
+                        IdentityEntryInput.classify(scanned) == IdentityEntryInput.Kind.PublicKey
+                when {
+                    scanned == null -> onErrorChange(R.string.identity_entry_error_invalid_key)
+                    // A secret-only field must reject a public identifier at
+                    // scan time: filled into a masked field, an npub reads as
+                    // an accepted key until submit fails much later.
+                    secretRejected -> onErrorChange(R.string.sign_in_error_public_key)
+                    else -> {
+                        // Fill only; the user reviews and taps sign in / import.
+                        onIdentityChange(scanned)
+                    }
                 }
             },
         )

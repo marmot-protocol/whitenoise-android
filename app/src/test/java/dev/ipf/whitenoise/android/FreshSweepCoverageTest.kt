@@ -25,11 +25,27 @@ class FreshSweepCoverageTest {
         assertTrue("copy text must be projected once per timeline change", "MessageProjector.copyableText" in projectionsBlock)
         assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
         assertFalse("profile changes must not rebuild text projections", "appState.profileRevisionForCompose" in projectionsBlock)
-        assertTrue("selectable messages must be memoized", "val selectableMessages =\n        remember(" in selectableBlock)
-        assertTrue("profile changes must refresh sender names", "appState.profileRevisionForCompose" in selectableBlock)
+        // The whole-timeline selectable map must never key on the profile
+        // revision: that re-ran an O(n) rebuild on every profile resolution
+        // anywhere. Names are resolved only for the selected few, downstream.
+        assertFalse(
+            "profile changes must not rebuild the selectable map",
+            "appState.profileRevisionForCompose" in selectableBlock,
+        )
         assertFalse("profile changes must not re-project copy text", "MessageProjector.copyableText" in selectableBlock)
         assertFalse("profile changes must not re-project forward text", "MessageProjector.forwardableText" in selectableBlock)
         assertTrue("invalid ids must be memoized", "remember(renderedTimeline, selectableMessages)" in block)
+
+        val actionItemsStart = source.indexOf("val selectedActionItems =")
+        assertTrue("selected action items block must exist", actionItemsStart >= 0)
+        val actionItemsEnd = source.indexOf("val selectedCopyText", actionItemsStart)
+        val actionItemsBlock = source.substring(actionItemsStart, actionItemsEnd)
+        assertTrue(
+            "profile changes must refresh names for the selected set",
+            "appState.profileRevisionForCompose" in actionItemsBlock,
+        )
+        assertTrue("names resolve lazily on the selected set", "appState.displayName(" in actionItemsBlock)
+        assertFalse("selection must not re-project copy text", "MessageProjector.copyableText" in actionItemsBlock)
     }
 
     @Test

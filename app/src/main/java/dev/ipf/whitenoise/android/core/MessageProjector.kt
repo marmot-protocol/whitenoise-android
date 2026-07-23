@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.whitenoise.android.media.MediaReferenceParser
 
 data class ReactionTally(
     val emoji: String,
@@ -438,20 +439,57 @@ object MessageProjector {
 
     fun mediaPreviewFallback(message: AppMessageRecordFfi): MediaPreviewFallback? =
         if (isMedia(message)) {
-            MediaPreviewFallback(
-                filename = imetaField(message, "filename"),
-                kind = mediaKind(message),
-            )
+            // The representative attachment comes from the same per-tag parse
+            // the renderer uses; when no tag validates, fields are read from
+            // the FIRST imeta tag only. Either way a single tag defines the
+            // label — a flattened scan could mix `m` from one album tag with
+            // `filename` from another and describe an attachment that isn't
+            // the one rendered.
+            val representative = MediaReferenceParser.parseImetaTag(message.tags)
+            if (representative != null) {
+                MediaPreviewFallback(
+                    filename = representative.fileName.trim().takeIf { it.isNotEmpty() },
+                    kind = replyMediaKindFromMime(representative.mediaType),
+                )
+            } else {
+                MediaPreviewFallback(
+                    filename = firstImetaTagField(message, "filename"),
+                    kind = replyMediaKindFromMime(firstImetaTagField(message, "m")),
+                )
+            }
         } else {
             null
         }
 
     // Coarse media classification for a captionless record, so a surface that
     // shows a type-aware label (e.g. a notification body) can say "sent a
-    // picture" rather than a generic placeholder. Reads the NIP-92 `m <mime>`
-    // imeta field. Returns None for non-media messages.
+    // picture" rather than a generic placeholder. Classified from the same
+    // single tag [mediaPreviewFallback] reads. None for non-media messages.
     fun mediaKind(message: AppMessageRecordFfi): ReplyMediaKind =
-        if (isMedia(message)) replyMediaKindFromMime(imetaField(message, "m")) else ReplyMediaKind.None
+        if (isMedia(message)) {
+            replyMediaKindFromMime(
+                MediaReferenceParser.parseImetaTag(message.tags)?.mediaType
+                    ?: firstImetaTagField(message, "m"),
+            )
+        } else {
+            ReplyMediaKind.None
+        }
+
+    private fun firstImetaTagField(
+        message: AppMessageRecordFfi,
+        fieldName: String,
+    ): String? {
+        val prefix = "$fieldName "
+        return message.tags
+            .firstOrNull { it.values.firstOrNull() == ImetaTag }
+            ?.values
+            ?.drop(1)
+            ?.firstNotNullOfOrNull { value ->
+                value
+                    .removePrefix(prefix)
+                    .takeIf { value.startsWith(prefix) && it.isNotBlank() }
+            }
+    }
 
     private fun firstEventRef(message: AppMessageRecordFfi): String? = tagValue(message, EventRefTag)
 
@@ -472,22 +510,6 @@ object MessageProjector {
         message.tags
             .filter { it.values.firstOrNull() == name }
             .mapNotNull { it.values.getOrNull(1)?.takeIf { value -> value.isNotBlank() } }
-
-    private fun imetaField(
-        message: AppMessageRecordFfi,
-        fieldName: String,
-    ): String? {
-        val prefix = "$fieldName "
-        return message.tags
-            .asSequence()
-            .filter { it.values.firstOrNull() == ImetaTag }
-            .flatMap { it.values.drop(1).asSequence() }
-            .firstNotNullOfOrNull { value ->
-                value
-                    .removePrefix(prefix)
-                    .takeIf { value.startsWith(prefix) && it.isNotBlank() }
-            }
-    }
 
     private data class ReactionRecord(
         val targetMessageId: String,
