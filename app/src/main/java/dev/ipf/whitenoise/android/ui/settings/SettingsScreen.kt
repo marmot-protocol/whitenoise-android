@@ -21,10 +21,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -56,7 +58,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.SupportContact
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
@@ -137,6 +142,7 @@ internal fun SettingsScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenSupportChat: (ChatListItem) -> Unit,
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
@@ -186,6 +192,7 @@ internal fun SettingsScreen(
                 appState = appState,
                 onBackToChats = onBackToChats,
                 onOpenDetail = { onDetailChange(it) },
+                onOpenSupportChat = onOpenSupportChat,
             )
     }
 }
@@ -218,6 +225,7 @@ private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
+    onOpenSupportChat: (ChatListItem) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
@@ -228,6 +236,38 @@ private fun SettingsHomeScreen(
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
+    }
+
+    // Chat with support: reopen the existing direct chat with the canonical
+    // support identity, or start one through the ordinary direct-chat path —
+    // no special protocol path, no hard-coded group id.
+    var supportChatInFlight by remember { mutableStateOf(false) }
+
+    fun startSupportChat() {
+        if (supportChatInFlight) return
+        appState.existingDirectChat(SupportContact.NPUB)?.let {
+            onOpenSupportChat(it)
+            return
+        }
+        supportChatInFlight = true
+        appState.launchMutation {
+            try {
+                runCatching { appState.createProfileChatGroup(SupportContact.NPUB) }
+                    .onSuccess { groupIdHex ->
+                        val item = appState.awaitChatListItem(groupIdHex)
+                        if (item != null) {
+                            onOpenSupportChat(item)
+                        } else {
+                            appState.present(R.string.chat_with_support_failed)
+                        }
+                    }.onFailure { error ->
+                        rethrowIfCancellation(error)
+                        appState.present(R.string.chat_with_support_failed)
+                    }
+            } finally {
+                supportChatInFlight = false
+            }
+        }
     }
 
     SettingsHomeContent(
@@ -253,6 +293,8 @@ private fun SettingsHomeScreen(
         onOpenAccountSelector = { showAccountSelector = true },
         onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
         onOpenDetail = onOpenDetail,
+        supportChatInFlight = supportChatInFlight,
+        onChatWithSupport = ::startSupportChat,
         onAppUpdateAction = {
             scope.launch {
                 // Await the check before acting so the first tap uses a fresh result.
@@ -287,7 +329,7 @@ private fun SettingsHomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun SettingsHomeContent(
@@ -302,6 +344,8 @@ internal fun SettingsHomeContent(
     onOpenQr: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
+    supportChatInFlight: Boolean = false,
+    onChatWithSupport: () -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
@@ -343,6 +387,27 @@ internal fun SettingsHomeContent(
                                 modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
                                 colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
                             ) {
+                                ListItem(
+                                    modifier =
+                                        Modifier.clickable(enabled = !supportChatInFlight) { onChatWithSupport() },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    headlineContent = { Text(stringResource(R.string.chat_with_support)) },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.chat_with_support_subtitle),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    trailingContent =
+                                        if (supportChatInFlight) {
+                                            // Expressive loader, matching the sign-in screen's
+                                            // loading state rather than a plain ring.
+                                            { LoadingIndicator(modifier = Modifier.size(20.dp)) }
+                                        } else {
+                                            null
+                                        },
+                                )
                                 ListItem(
                                     modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),

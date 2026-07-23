@@ -577,6 +577,14 @@ internal fun MainShell(
                     // the breadcrumb the user walked in on (#412).
                     sectionName = MainSection.Diagnostics.name
                 },
+                onOpenSupportChat = { item ->
+                    // Land in the conversation itself, not the chat list; no
+                    // list scroll state exists to snapshot from Settings.
+                    selectedChatOpenedAsDmHint = false
+                    selectedChat = item
+                    sectionName = MainSection.Chats.name
+                    settingsDetailName = null
+                },
                 detail = settingsDetail,
                 onDetailChange = { settingsDetailName = it?.name },
             )

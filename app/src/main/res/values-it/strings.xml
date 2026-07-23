@@ -613,6 +613,9 @@
     <string name="settings_version_label">Versione %1$s</string>
     <string name="support_the_project">Sostieni il progetto</string>
     <string name="support_the_project_subtitle">White Noise è gratuito e open source. Le donazioni aiutano a mantenerlo tale.</string>
+    <string name="chat_with_support">Chatta con l\'assistenza</string>
+    <string name="chat_with_support_subtitle">Scrivi direttamente al team</string>
+    <string name="chat_with_support_failed">Impossibile avviare la chat con l\'assistenza. Controlla la connessione e riprova.</string>
     <string name="donate_lightning_address">Indirizzo Lightning</string>
     <string name="donate_bitcoin_silent_payment">Pagamento silenzioso Bitcoin</string>
     <string name="donate_method_lightning">Lightning</string>

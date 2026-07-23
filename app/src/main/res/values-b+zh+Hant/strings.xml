@@ -604,6 +604,9 @@
     <string name="settings_version_label">版本 %1$s</string>
     <string name="support_the_project">支持專案</string>
     <string name="support_the_project_subtitle">White Noise 免費且開源。捐款有助於維持這一點。</string>
+    <string name="chat_with_support">與支援團隊聊天</string>
+    <string name="chat_with_support_subtitle">直接傳訊息給團隊</string>
+    <string name="chat_with_support_failed">無法開始支援聊天，請檢查網路後重試。</string>
     <string name="donate_lightning_address">Lightning 位址</string>
     <string name="donate_bitcoin_silent_payment">Bitcoin 靜默付款</string>
     <string name="donate_method_lightning">Lightning</string>
