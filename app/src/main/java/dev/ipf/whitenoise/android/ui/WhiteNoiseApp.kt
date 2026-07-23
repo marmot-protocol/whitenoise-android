@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
@@ -46,6 +47,8 @@ fun WhiteNoiseApp(
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundShareRequest: ShareRequest? = null,
+    onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
     onRequestAppUnlock: () -> Unit = {},
@@ -147,6 +150,8 @@ fun WhiteNoiseApp(
                                 appState = appState,
                                 inboundNotificationTarget = inboundNotificationTarget,
                                 onNotificationTargetHandled = onNotificationTargetHandled,
+                                inboundShareRequest = inboundShareRequest,
+                                onShareRequestHandled = onShareRequestHandled,
                                 inboundAppUpdateTap = inboundAppUpdateTap,
                                 onAppUpdateTapHandled = onAppUpdateTapHandled,
                             )
