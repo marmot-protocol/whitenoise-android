@@ -106,6 +106,7 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
+import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -3911,13 +3912,14 @@ class WhiteNoiseAppState(
     /**
      * Reactive mirror of the two signals the chat-list connectivity banner
      * consumes: device network presence (state 1 of the banner) and whether
-     * the live notification subscription currently has an open stream (the
-     * v1 "actually connected to relays" approximation until a per-relay
-     * liveness projection exists engine-side).
+     * the engine's relay pool reports at least one connected relay. The pool
+     * counts come from [refreshRelayConnectivity] polls — the notification
+     * subscription cannot stand in for connectivity because it rides an
+     * in-process event bus and stays open with every relay down.
      */
     data class ConnectivitySignals(
         val hasNetwork: Boolean = false,
-        val liveStreamConnected: Boolean = false,
+        val relaysConnected: Boolean = true,
     )
 
     private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
@@ -3925,14 +3927,32 @@ class WhiteNoiseAppState(
 
     private fun updateConnectivitySignals(
         hasNetwork: Boolean? = null,
-        liveStreamConnected: Boolean? = null,
+        relaysConnected: Boolean? = null,
     ) {
         _connectivitySignals.update { current ->
             current.copy(
                 hasNetwork = hasNetwork ?: current.hasNetwork,
-                liveStreamConnected = liveStreamConnected ?: current.liveStreamConnected,
+                relaysConnected = relaysConnected ?: current.relaysConnected,
             )
         }
+    }
+
+    /**
+     * Refresh [connectivitySignals] from the engine's relay-health snapshot.
+     * No-op while backgrounded; a failed read keeps the previous value rather
+     * than flashing a guess. Optimistic seed plus keep-on-failure means the
+     * banner only reports a problem a real snapshot has confirmed.
+     */
+    suspend fun refreshRelayConnectivity() {
+        if (!appInForeground) return
+        val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull() ?: return
+        updateConnectivitySignals(
+            relaysConnected =
+                relaysConnectedFromHealth(
+                    connectedRelays = health.connected.toInt(),
+                    totalRelays = health.totalRelays.toInt(),
+                ),
+        )
     }
 
     /**

@@ -38,13 +38,23 @@ internal enum class ConnectivityBannerState { Hidden, Offline, Connecting, JustC
 /** Raw target from the two signals, before flash/debounce shaping. */
 internal fun connectivityBannerTarget(
     hasNetwork: Boolean,
-    liveStreamConnected: Boolean,
+    relaysConnected: Boolean,
 ): ConnectivityBannerState =
     when {
         !hasNetwork -> ConnectivityBannerState.Offline
-        !liveStreamConnected -> ConnectivityBannerState.Connecting
+        !relaysConnected -> ConnectivityBannerState.Connecting
         else -> ConnectivityBannerState.Hidden
     }
+
+/**
+ * Maps a relay-health snapshot to the banner's connectivity signal. Zero
+ * configured relays means there is nothing to connect to — signed-out or a
+ * bare runtime — so the banner has nothing to complain about.
+ */
+internal fun relaysConnectedFromHealth(
+    connectedRelays: Int,
+    totalRelays: Int,
+): Boolean = totalRelays == 0 || connectedRelays > 0
 
 /**
  * Shapes the raw target into the displayed state: reaching connected FROM a
@@ -70,6 +80,10 @@ internal const val CONNECTIVITY_BANNER_DEBOUNCE_MILLIS = 500L
 // How long the success flash stays before the bar returns to normal.
 internal const val CONNECTIVITY_BANNER_FLASH_MILLIS = 1_500L
 
+// Relay health is a polled snapshot (the bindings expose no push stream for
+// pool state), refreshed on this cadence while the banner can render.
+internal const val CONNECTIVITY_RELAY_POLL_MILLIS = 2_000L
+
 /**
  * Slim transient strip under the chat-list top bar: an actionable offline
  * message, an informational connecting line, and a brief connected flash —
@@ -84,8 +98,14 @@ internal fun ChatListConnectivityBanner(
 ) {
     var displayed by remember { mutableStateOf(ConnectivityBannerState.Hidden) }
     LaunchedEffect(appState) {
+        while (true) {
+            appState.refreshRelayConnectivity()
+            delay(CONNECTIVITY_RELAY_POLL_MILLIS)
+        }
+    }
+    LaunchedEffect(appState) {
         appState.connectivitySignals.collectLatest { signals ->
-            val target = connectivityBannerTarget(signals.hasNetwork, signals.liveStreamConnected)
+            val target = connectivityBannerTarget(signals.hasNetwork, signals.relaysConnected)
             // collectLatest cancels this block when the signals change, so a
             // flap shorter than the debounce never becomes visible state.
             if (target != ConnectivityBannerState.Hidden && displayed == ConnectivityBannerState.Hidden) {

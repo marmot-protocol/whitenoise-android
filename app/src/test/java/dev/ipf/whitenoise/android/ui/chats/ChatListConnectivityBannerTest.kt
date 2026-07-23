@@ -8,22 +8,34 @@ class ChatListConnectivityBannerTest {
     fun targetsMapTheTwoSignals() {
         assertEquals(
             ConnectivityBannerState.Offline,
-            connectivityBannerTarget(hasNetwork = false, liveStreamConnected = false),
+            connectivityBannerTarget(hasNetwork = false, relaysConnected = false),
         )
-        // Network reported gone while a socket lingers still reads offline —
-        // the actionable state wins.
+        // Network reported gone while relays still count as connected reads
+        // offline — the actionable state wins.
         assertEquals(
             ConnectivityBannerState.Offline,
-            connectivityBannerTarget(hasNetwork = false, liveStreamConnected = true),
+            connectivityBannerTarget(hasNetwork = false, relaysConnected = true),
         )
+        // Device network up but zero relays reachable is the relay-outage
+        // case: the banner must say connecting, not hide.
         assertEquals(
             ConnectivityBannerState.Connecting,
-            connectivityBannerTarget(hasNetwork = true, liveStreamConnected = false),
+            connectivityBannerTarget(hasNetwork = true, relaysConnected = false),
         )
         assertEquals(
             ConnectivityBannerState.Hidden,
-            connectivityBannerTarget(hasNetwork = true, liveStreamConnected = true),
+            connectivityBannerTarget(hasNetwork = true, relaysConnected = true),
         )
+    }
+
+    @Test
+    fun relayHealthMapsToConnectivityByConnectedCount() {
+        assertEquals(false, relaysConnectedFromHealth(connectedRelays = 0, totalRelays = 4))
+        assertEquals(true, relaysConnectedFromHealth(connectedRelays = 1, totalRelays = 4))
+        assertEquals(true, relaysConnectedFromHealth(connectedRelays = 4, totalRelays = 4))
+        // No configured relays (signed out, bare runtime): nothing to connect
+        // to, so nothing to complain about.
+        assertEquals(true, relaysConnectedFromHealth(connectedRelays = 0, totalRelays = 0))
     }
 
     @Test
