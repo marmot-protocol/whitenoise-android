@@ -19,7 +19,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
+import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
+import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -34,6 +38,7 @@ import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
+import dev.ipf.whitenoise.android.ui.share.ShareChatPickerSheet
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
@@ -49,6 +54,8 @@ internal fun MainShell(
     appState: WhiteNoiseAppState,
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundShareRequest: ShareRequest? = null,
+    onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
@@ -96,6 +103,7 @@ internal fun MainShell(
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
+    var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -271,6 +279,82 @@ internal fun MainShell(
         onAppUpdateTapHandled(tap)
     }
 
+    val openChatForShare: (List<ChatListItem>, String) -> Unit = { allChats, groupIdHex ->
+        allChats
+            .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            ?.let { item ->
+                sectionName = MainSection.Chats.name
+                settingsDetailName = null
+                chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                selectedChatOpenContext = ConversationOpenContext()
+                selectedChatJustCreated = false
+                selectedChatOpenedAsDmHint = false
+                selectedChat = item
+            }
+    }
+
+    val stageShareToChats:
+        (ShareRequest, List<String>, List<ChatListItem>) -> Unit =
+        stageShare@{ request, groupIds, allChats ->
+            if (groupIds.isEmpty()) return@stageShare
+            appState.stageInboundShare(groupIds, request.payload)
+            openChatForShare(allChats, groupIds.first())
+            val otherCount = groupIds.size - 1
+            if (otherCount > 0) {
+                appState.presentText(AppText.Resource(R.string.toast_share_staged_other_chats, listOf(otherCount)))
+            }
+        }
+
+    LaunchedEffect(
+        chatsController,
+        chatsController.boundAccountRef,
+        chatsController.isLoading,
+        chatsController.items,
+        appState.activeAccountRef,
+    ) {
+        val chatListReady =
+            chatsController.boundAccountRef == appState.activeAccountRef &&
+                !chatsController.isLoading
+        if (!chatListReady) return@LaunchedEffect
+        appState.publishShareShortcuts(chatsController.forwardTargets())
+    }
+
+    LaunchedEffect(appState.appLockScreenVisible) {
+        if (appState.appLockScreenVisible) {
+            sharePickerRequest = null
+        }
+    }
+
+    LaunchedEffect(
+        inboundShareRequest,
+        appState.phase,
+        appState.appLockScreenVisible,
+        appState.activeAccountRef,
+        appState.accounts,
+        chatsController,
+        chatsController.boundAccountRef,
+        chatsController.isLoading,
+        chatsController.items,
+    ) {
+        val request = inboundShareRequest ?: return@LaunchedEffect
+        if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
+        if (appState.accounts.isEmpty()) return@LaunchedEffect
+        val accountRef = appState.activeAccountRef ?: return@LaunchedEffect
+        val chatListReady =
+            chatsController.boundAccountRef == accountRef &&
+                !chatsController.isLoading
+        if (!chatListReady) return@LaunchedEffect
+        val allChats = chatsController.items + chatsController.archivedItems
+        val activeGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex }
+        val directGroupId = resolveShareDirectGroupId(request, accountRef, activeGroupIds)
+        onShareRequestHandled(request)
+        if (directGroupId != null) {
+            stageShareToChats(request, listOf(directGroupId), allChats)
+        } else {
+            sharePickerRequest = request
+        }
+    }
+
     // One-shot restore after process death: once the chat list for the active
     // account is loaded, re-resolve the saved group id back to a live
     // ChatListItem (issue #386). Runs before the sync effect can clobber the
@@ -367,6 +451,22 @@ internal fun MainShell(
         selectedChatOpenedAsDmHint = justCreated
         selectedChat = item
         appState.clearPresentedProfile()
+    }
+
+    // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
+    if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+        sharePickerRequest?.let { request ->
+            ShareChatPickerSheet(
+                appState = appState,
+                payload = request.payload,
+                onDismiss = { sharePickerRequest = null },
+                onStage = { groupIds ->
+                    val allChats = chatsController.items + chatsController.archivedItems
+                    stageShareToChats(request, groupIds, allChats)
+                    sharePickerRequest = null
+                },
+            )
+        }
     }
 
     // The shell-level profile sheet covers every non-conversation entry point

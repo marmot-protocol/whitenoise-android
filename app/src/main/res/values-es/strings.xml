@@ -271,6 +271,24 @@
     <string name="toast_forwarded_to_chats">Reenviado a %1$s chats</string>
     <string name="toast_forwarded_partial">Reenviado a %1$s chats; algunos fallaron</string>
     <string name="toast_forward_failed">No se pudo reenviar el mensaje</string>
+    <string name="share_to">Compartir en</string>
+    <string name="share_search_chats">Buscar chats</string>
+    <string name="share_no_chats">No hay chats para compartir.</string>
+    <string name="share_no_matches">Ningún chat coincide con tu búsqueda.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d archivos adjuntos</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">Compartir en %1$d chat</item>
+        <item quantity="other">Compartir en %1$d chats</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">1 archivo adjunto</item>
+        <item quantity="other">%1$d archivos adjuntos</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">También preparado en %1$d chats más</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="one">No se pudo añadir %1$d archivo adjunto. Puedes enviar hasta 10 a la vez.</item>
+        <item quantity="other">No se pudieron añadir %1$d archivos adjuntos. Puedes enviar hasta 10 a la vez.</item>
+    </plurals>
     <string name="delete">Eliminar</string>
     <string name="delete_for_me">Eliminar para mí</string>
     <string name="delete_for_everyone">Eliminar para todos</string>

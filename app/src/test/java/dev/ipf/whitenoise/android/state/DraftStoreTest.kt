@@ -153,6 +153,14 @@ class DraftStoreTest {
     }
 
     @Test
+    fun mergeText_appendsWithoutOverwritingExistingDraft() {
+        val s = store()
+        s.set("a", "g", TextFieldValue("existing"))
+        s.mergeText("a", "g", "incoming")
+        assertEquals("existing\nincoming", s.get("a", "g"))
+    }
+
+    @Test
     fun selectionOnlyChangePersistsToBackingStore() {
         val backing = InMemoryDraftPersistence()
         val s = DraftStore(backing)

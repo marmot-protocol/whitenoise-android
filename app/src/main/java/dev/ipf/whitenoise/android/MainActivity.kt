@@ -27,6 +27,8 @@ import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
+import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.share.parseShareRequest
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
@@ -41,6 +43,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
+    private var inboundShareRequest by mutableStateOf<ShareRequest?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
@@ -110,6 +113,10 @@ class MainActivity : FragmentActivity() {
                     onNotificationTargetHandled = { handled ->
                         if (inboundNotificationTarget == handled) inboundNotificationTarget = null
                     },
+                    inboundShareRequest = inboundShareRequest,
+                    onShareRequestHandled = { handled ->
+                        if (inboundShareRequest == handled) inboundShareRequest = null
+                    },
                     inboundAppUpdateTap = inboundAppUpdateTap,
                     onAppUpdateTapHandled = { handled ->
                         if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
@@ -138,18 +145,21 @@ class MainActivity : FragmentActivity() {
             NotificationNavigation.parse(intent) { notificationKey, tapToken ->
                 notificationTapTokens.isValid(notificationKey, tapToken)
             }
+        val parsedShare = parseShareRequest(intent)
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
+                shareRequest = parsedShare,
                 dataString = intent?.dataString,
-                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
+                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload, inboundShareRequest),
             )
         inboundNotificationTarget = routing.notificationTarget
         inboundProfilePayload = routing.profilePayload
-        if (parsedTarget != null) {
-            // Notification taps are one-shot navigation requests. Replace the
-            // stored intent after parsing so activity recreation cannot replay
-            // the same target after the UI has already consumed it.
+        inboundShareRequest = routing.shareRequest
+        if (parsedTarget != null || parsedShare != null) {
+            // Notification taps and share intents are one-shot navigation requests.
+            // Replace the stored intent after parsing so activity recreation cannot
+            // replay the same target after the UI has already consumed it.
             setIntent(Intent(this, MainActivity::class.java))
         }
     }

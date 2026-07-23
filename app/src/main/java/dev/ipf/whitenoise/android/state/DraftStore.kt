@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -127,6 +128,28 @@ class DraftStore internal constructor(
             }
             pruneEmptyDraftStatesLocked(retainedState = state)
         }
+    }
+
+    /**
+     * Appends [incoming] to an existing draft with a newline separator. Blank
+     * [incoming] is a no-op. Used by inbound share staging — never overwrites
+     * an existing composer draft.
+     */
+    fun mergeText(
+        accountIdHex: String,
+        groupIdHex: String,
+        incoming: String,
+    ) {
+        val trimmedIncoming = incoming.trim()
+        if (trimmedIncoming.isEmpty()) return
+        val existing = get(accountIdHex, groupIdHex)
+        val merged =
+            if (existing.isNullOrBlank()) {
+                trimmedIncoming
+            } else {
+                "${existing.trimEnd()}\n$trimmedIncoming"
+            }
+        set(accountIdHex, groupIdHex, TextFieldValue(merged, TextRange(merged.length)))
     }
 
     fun clearAllForAccount(accountIdHex: String) {

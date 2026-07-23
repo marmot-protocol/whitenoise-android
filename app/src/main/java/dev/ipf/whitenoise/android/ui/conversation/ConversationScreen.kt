@@ -120,6 +120,7 @@ import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -153,6 +154,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
@@ -815,6 +817,31 @@ internal fun ConversationScreen(
     }
     var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaUris.size, pendingDocumentUris.size) {
+        val capped =
+            appState.consumeInboundShareStreamsCapped(
+                groupIdHex = chat.group.groupIdHex,
+                existingMediaCount = pendingMediaUris.size,
+                existingDocumentCount = pendingDocumentUris.size,
+                maxItems = MEDIA_PICKER_MAX_ITEMS,
+            ) ?: return@LaunchedEffect
+        val staged = capped.accepted
+        if (staged.mediaUris.isNotEmpty()) {
+            pendingMediaUris = (pendingMediaUris + staged.mediaUris).distinct()
+        }
+        if (staged.documentUris.isNotEmpty()) {
+            pendingDocumentUris = (pendingDocumentUris + staged.documentUris).distinct()
+        }
+        if (capped.droppedCount > 0) {
+            val message =
+                context.resources.getQuantityString(
+                    R.plurals.toast_share_attachments_dropped,
+                    capped.droppedCount,
+                    capped.droppedCount,
+                )
+            appState.presentText(AppText.Plain(message))
+        }
     }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
@@ -2336,10 +2363,16 @@ internal fun ConversationScreen(
     // them. Created at screen scope so both the bottom-bar composer and the
     // per-message reader can receive the same instance.
     val restoredDraftSnapshot = appState.draftSnapshotFor(controller.group.groupIdHex)
+    val composerShareRevision =
+        rememberComposerShareRevision(
+            externalRevision = appState.inboundShareRevision,
+            editingMessageId = controller.editingMessageId,
+        )
     val composerTextState =
         rememberComposerTextState(
             draftKey = controller.group.groupIdHex,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+            externalRevision = composerShareRevision,
         )
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 

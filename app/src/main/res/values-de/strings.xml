@@ -271,6 +271,24 @@
     <string name="toast_forwarded_to_chats">An %1$s Chats weitergeleitet</string>
     <string name="toast_forwarded_partial">An %1$s Chats weitergeleitet; einige fehlgeschlagen</string>
     <string name="toast_forward_failed">Nachricht konnte nicht weitergeleitet werden</string>
+    <string name="share_to">Teilen in</string>
+    <string name="share_search_chats">Chats suchen</string>
+    <string name="share_no_chats">Keine Chats zum Teilen.</string>
+    <string name="share_no_matches">Keine Chats entsprechen Ihrer Suche.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d Anhänge</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">In %1$d Chat teilen</item>
+        <item quantity="other">In %1$d Chats teilen</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">1 Anhang</item>
+        <item quantity="other">%1$d Anhänge</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">Auch in %1$d weiteren Chats vorbereitet</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="one">%1$d Anhang konnte nicht hinzugefügt werden. Du kannst bis zu 10 auf einmal senden.</item>
+        <item quantity="other">%1$d Anhänge konnten nicht hinzugefügt werden. Du kannst bis zu 10 auf einmal senden.</item>
+    </plurals>
     <string name="delete">Löschen</string>
     <string name="delete_for_me">Für mich löschen</string>
     <string name="delete_for_everyone">Für alle löschen</string>

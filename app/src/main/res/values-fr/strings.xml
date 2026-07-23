@@ -271,6 +271,24 @@
     <string name="toast_forwarded_to_chats">Transfere vers %1$s discussions</string>
     <string name="toast_forwarded_partial">Transfere vers %1$s discussions ; certaines ont echoue</string>
     <string name="toast_forward_failed">Impossible de transferer le message</string>
+    <string name="share_to">Partager vers</string>
+    <string name="share_search_chats">Rechercher des discussions</string>
+    <string name="share_no_chats">Aucune discussion pour partager.</string>
+    <string name="share_no_matches">Aucune discussion ne correspond à votre recherche.</string>
+    <string name="share_preview_text_and_attachments">%1$s\n+%2$d pièces jointes</string>
+    <plurals name="share_to_chats_count">
+        <item quantity="one">Partager vers %1$d discussion</item>
+        <item quantity="other">Partager vers %1$d discussions</item>
+    </plurals>
+    <plurals name="share_preview_attachments_count">
+        <item quantity="one">%1$d pièce jointe</item>
+        <item quantity="other">%1$d pièces jointes</item>
+    </plurals>
+    <string name="toast_share_staged_other_chats">Également préparé dans %1$d autres discussions</string>
+    <plurals name="toast_share_attachments_dropped">
+        <item quantity="one">%1$d pièce jointe n\'a pas pu être ajoutée. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
+        <item quantity="other">%1$d pièces jointes n\'ont pas pu être ajoutées. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
+    </plurals>
     <string name="delete">Supprimer</string>
     <string name="delete_for_me">Supprimer pour moi</string>
     <string name="delete_for_everyone">Supprimer pour tout le monde</string>

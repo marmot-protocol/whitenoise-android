@@ -95,6 +95,12 @@ class LocalNotificationPresenter(
         NotificationChannels.ensureChannels(context)
     }
 
+    fun clearConversationShortcuts() {
+        clearAllConversationShortcuts(context)
+        shortcutSnapshots.clear()
+        shortcutLastUsed.clear()
+    }
+
     fun canPostNotifications(): Boolean =
         ContextCompat.checkSelfPermission(
             context,
@@ -258,6 +264,7 @@ class LocalNotificationPresenter(
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         recipientAccountSubtext: String? = null,
         redactContent: Boolean = false,
+        directShareEligible: Boolean = false,
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
         isPostStillAllowed: () -> Boolean = { true },
@@ -396,6 +403,7 @@ class LocalNotificationPresenter(
                                 senderAvatarUrl,
                                 senderAvatarBitmap,
                                 sender,
+                                directShareEligible = directShareEligible,
                             )
                         }
                     }
@@ -875,6 +883,7 @@ class LocalNotificationPresenter(
         senderAvatarUrl: String?,
         senderAvatarBitmap: android.graphics.Bitmap?,
         sender: Person,
+        directShareEligible: Boolean,
     ) {
         runCatching {
             val candidateTitle = content.conversationTitle ?: content.title
@@ -898,6 +907,7 @@ class LocalNotificationPresenter(
                     avatarApplied = conversationAvatarBitmap != null,
                     senderAvatarUrl = senderAvatarUrl,
                     senderAvatarApplied = senderAvatarBitmap != null,
+                    directShareEligible = directShareEligible,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
@@ -905,35 +915,64 @@ class LocalNotificationPresenter(
                 return
             }
             pruneConversationShortcutsBeforePublish(shortcutId)
-            val intent =
-                Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    NotificationNavigation.fromUpdate(update)?.let { target ->
-                        NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
-                    }
-                }
+            val intent = conversationShortcutOpenIntent(update, content)
             val shortcut =
-                ShortcutInfoCompat
-                    .Builder(context, shortcutId)
-                    .setShortLabel(snapshot.shortLabel)
-                    .setLongLabel(snapshot.longLabel)
-                    .setIcon(
-                        notificationConversationIcon(
-                            title = snapshot.longLabel,
-                            seed = snapshot.shortcutId,
-                            avatarBitmap = conversationAvatarBitmap,
-                        ),
-                    ).setIntent(intent)
-                    .setLocusId(locusId)
-                    .setPerson(sender)
-                    .setLongLived(true)
-                    .build()
+                conversationShortcutInfo(
+                    shortcutId = shortcutId,
+                    snapshot = snapshot,
+                    intent = intent,
+                    locusId = locusId,
+                    sender = sender,
+                    conversationAvatarBitmap = conversationAvatarBitmap,
+                    directShareEligible = directShareEligible,
+                )
             shortcutPublisher(shortcut)
             shortcutSnapshots[shortcutId] = snapshot
             ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
         }
+    }
+
+    private fun conversationShortcutOpenIntent(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+    ): Intent =
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            NotificationNavigation.fromUpdate(update)?.let { target ->
+                NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
+            }
+        }
+
+    private fun conversationShortcutInfo(
+        shortcutId: String,
+        snapshot: ConversationShortcutSnapshot,
+        intent: Intent,
+        locusId: LocusIdCompat,
+        sender: Person,
+        conversationAvatarBitmap: android.graphics.Bitmap?,
+        directShareEligible: Boolean,
+    ): ShortcutInfoCompat {
+        val builder =
+            ShortcutInfoCompat
+                .Builder(context, shortcutId)
+                .setShortLabel(snapshot.shortLabel)
+                .setLongLabel(snapshot.longLabel)
+                .setIcon(
+                    notificationConversationIcon(
+                        title = snapshot.longLabel,
+                        seed = snapshot.shortcutId,
+                        avatarBitmap = conversationAvatarBitmap,
+                    ),
+                ).setIntent(intent)
+                .setLocusId(locusId)
+                .setPerson(sender)
+                .setLongLived(true)
+        if (directShareEligible) {
+            builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
+        }
+        return builder.build()
     }
 
     private suspend fun resolveAvatarBitmap(url: String?): android.graphics.Bitmap? {
@@ -1073,6 +1112,7 @@ private data class ConversationShortcutSnapshot(
     val avatarApplied: Boolean,
     val senderAvatarUrl: String?,
     val senderAvatarApplied: Boolean,
+    val directShareEligible: Boolean,
 )
 
 /**
