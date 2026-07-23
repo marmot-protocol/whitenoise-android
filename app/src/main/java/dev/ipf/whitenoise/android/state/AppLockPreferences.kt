@@ -28,26 +28,31 @@ internal object AppLockPreferences {
     private var cachedSecure: SharedPreferences? = null
     private val cacheLock = Any()
 
-    fun readLastUnlockedAtMillis(context: Context): Long =
-        runCatching { openSecure(context.applicationContext).getLong(LAST_UNLOCKED_AT_KEY, 0L) }
-            .getOrElse {
-                // A cached instance whose Keystore entry was invalidated stays
-                // broken for the whole process — drop it so the next call
-                // recreates (and recovers the corrupt file if needed).
-                cachedSecure = null
-                0L
-            }
+    fun readLastUnlockedAtMillis(context: Context): Long {
+        // One immediate retry after invalidating the cache: a Keystore entry
+        // invalidated mid-process recreates through the corruption-recovery
+        // path right away instead of failing every call until the next one.
+        repeat(2) {
+            runCatching {
+                return openSecure(context.applicationContext).getLong(LAST_UNLOCKED_AT_KEY, 0L)
+            }.onFailure { cachedSecure = null }
+        }
+        return 0L
+    }
 
     fun writeLastUnlockedAtMillis(
         context: Context,
         value: Long,
     ) {
-        runCatching {
-            openSecure(context.applicationContext)
-                .edit()
-                .putLong(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L))
-                .apply()
-        }.onFailure { cachedSecure = null }
+        repeat(2) {
+            runCatching {
+                openSecure(context.applicationContext)
+                    .edit()
+                    .putLong(LAST_UNLOCKED_AT_KEY, value.coerceAtLeast(0L))
+                    .apply()
+                return
+            }.onFailure { cachedSecure = null }
+        }
     }
 
     private fun openSecure(context: Context): SharedPreferences {
