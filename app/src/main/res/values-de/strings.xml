@@ -1109,6 +1109,11 @@
     <string name="tts_auto_read_title">Nachrichten vorlesen</string>
     <string name="tts_auto_read_subtitle">Ungelesene Nachrichten beim Öffnen dieses Chats vorlesen</string>
     <string name="tts_settings_rate_system">System (Geräteeinstellung folgen)</string>
+    <string name="connectivity_offline">Kein Internet — Wi-Fi oder mobile Daten aktivieren</string>
+    <string name="connectivity_connecting">Verbinden…</string>
+    <string name="connectivity_connected">Verbunden</string>
+    <string name="amber_signin_waiting_request">Identitätsanfrage im Signer bestätigen (Schritt 1 von 2)…</string>
+    <string name="amber_signin_waiting_proof">Identitätsnachweis im Signer signieren (Schritt 2 von 2)…</string>
     <string name="tts_settings_engine_local">Sprachausgabe auf dem Gerät</string>
     <string name="tts_settings_engine_unknown">Kann Netzwerk-Sprache nutzen</string>
 </resources>

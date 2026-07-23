@@ -1109,6 +1109,11 @@
     <string name="tts_auto_read_title">Mesajları sesli oku</string>
     <string name="tts_auto_read_subtitle">Bu sohbet açıldığında okunmamış mesajları sesli oku</string>
     <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
+    <string name="connectivity_offline">İnternet yok — Wi-Fi veya mobil veriyi açın</string>
+    <string name="connectivity_connecting">Bağlanıyor…</string>
+    <string name="connectivity_connected">Bağlandı</string>
+    <string name="amber_signin_waiting_request">İmzalayıcıda kimlik isteğini onaylayın (adım 1/2)…</string>
+    <string name="amber_signin_waiting_proof">İmzalayıcıda kimlik kanıtını imzalayın (adım 2/2)…</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>
 </resources>

@@ -100,6 +100,8 @@ object Nip55 {
     // matching sign_event calls via ContentResolver without a per-call prompt.
     private val SIGN_EVENT_PERMISSION_KINDS =
         listOf(
+            450, // identity proof — signed at login and on signer re-registration;
+            //      pre-approving lets a remembered signer answer it promptless
             30443, // mlsKeyPackage
             443, // mlsKeyPackageLegacy
             444, // mlsWelcome

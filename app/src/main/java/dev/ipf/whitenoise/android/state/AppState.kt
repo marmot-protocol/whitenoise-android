@@ -106,6 +106,8 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
+import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
@@ -136,7 +138,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -1102,6 +1108,14 @@ class WhiteNoiseAppState(
 ) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+
+    // Which of the two sequential signer round-trips the Amber sign-in is
+    // waiting on (1 = identity request, 2 = identity proof), or null when
+    // idle. The prompts are protocol-sequential — the proof can't be built
+    // before the signer reveals which key signs it — so the fix for the
+    // "sign-in hangs" perception is telling the user where they are.
+    var amberSignInStage by mutableStateOf<Int?>(null)
+        private set
 
     /**
      * App-lifetime cache of decrypted attachment bytes, keyed by the globally
@@ -2675,6 +2689,7 @@ class WhiteNoiseAppState(
      */
     suspend fun loginWithAmber() {
         try {
+            amberSignInStage = 1
             val reportedPubkey = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
             // Normalize npub/hex to the canonical hex the account is keyed by, so
             // the login-time signer and the startup re-registration signer share
@@ -2682,6 +2697,7 @@ class WhiteNoiseAppState(
             val pubkeyHex =
                 marmotIo { accountIdHex(reportedPubkey) }
                     ?: throw MarmotKitException.Runtime("signer returned an invalid public key")
+            amberSignInStage = 2
             val summary =
                 marmotIo {
                     loginExternalSigner(
@@ -2718,6 +2734,8 @@ class WhiteNoiseAppState(
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
                 present(R.string.toast_couldnt_login_amber, AppText.Plain(error.readableMessage()), copyable = true)
             }
+        } finally {
+            amberSignInStage = null
         }
     }
 
@@ -3893,6 +3911,72 @@ class WhiteNoiseAppState(
     private var hasActiveNetworkSnapshot = false
 
     /**
+     * Reactive mirror of the two signals the chat-list connectivity banner
+     * consumes: device network presence (state 1 of the banner) and whether
+     * the engine's relay pool reports at least one connected relay. The pool
+     * counts come from [refreshRelayConnectivity] polls — the notification
+     * subscription cannot stand in for connectivity because it rides an
+     * in-process event bus and stays open with every relay down.
+     */
+    data class ConnectivitySignals(
+        val hasNetwork: Boolean = false,
+        val relaysConnected: Boolean = true,
+    )
+
+    private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
+    val connectivitySignals: StateFlow<ConnectivitySignals> = _connectivitySignals.asStateFlow()
+
+    // Bumped on every hasNetwork transition (callback or seed-observed) so a
+    // relay-health snapshot that was in flight across the transition can be
+    // recognized and discarded in [refreshRelayConnectivity].
+    private val connectivityNetworkGeneration = AtomicLong(0)
+
+    private fun updateConnectivitySignals(
+        hasNetwork: Boolean? = null,
+        relaysConnected: Boolean? = null,
+    ) {
+        _connectivitySignals.update { current ->
+            val nextHasNetwork = hasNetwork ?: current.hasNetwork
+            current.copy(
+                hasNetwork = nextHasNetwork,
+                // Structural invariant: no active network means no connected
+                // relays, whatever an optimistic seed default or a stale
+                // health snapshot claims. Every writer goes through this clamp.
+                relaysConnected =
+                    relaysConnectedOnNetworkChange(
+                        isOnline = nextHasNetwork,
+                        cached = relaysConnected ?: current.relaysConnected,
+                    ),
+            )
+        }
+    }
+
+    /**
+     * Refresh [connectivitySignals] from the engine's relay-health snapshot.
+     * No-op while backgrounded or offline; a failed read keeps the previous
+     * value rather than flashing a guess, and a snapshot that straddled a
+     * network transition is discarded via [connectivityNetworkGeneration].
+     * The banner only changes state on evidence from the current network.
+     */
+    suspend fun refreshRelayConnectivity() {
+        // Offline needs no sample: the write clamp already pinned the signal
+        // false, and pool counts read while offline are stale by definition.
+        if (!appInForeground || !_connectivitySignals.value.hasNetwork) return
+        val generation = connectivityNetworkGeneration.get()
+        val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
+        // A snapshot that straddled a network transition describes the wrong
+        // network; drop it — the next poll is ≤2s out.
+        if (health == null || connectivityNetworkGeneration.get() != generation) return
+        updateConnectivitySignals(
+            relaysConnected =
+                relaysConnectedFromHealth(
+                    connectedRelays = health.connected.toInt(),
+                    totalRelays = health.totalRelays.toInt(),
+                ),
+        )
+    }
+
+    /**
      * Register the process-lifetime default-network callback that keeps
      * [activeNetworkTypesSnapshot]/[hasActiveNetworkSnapshot] current. Runs off
      * the main thread (see `init`): registration and the one-shot seed query
@@ -3909,6 +3993,7 @@ class WhiteNoiseAppState(
         runCatchingCancellable {
             val network = cm.activeNetwork
             hasActiveNetworkSnapshot = network != null
+            updateConnectivitySignals(hasNetwork = network != null)
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -3955,6 +4040,8 @@ class WhiteNoiseAppState(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
+        if (wasOnline != isOnline) connectivityNetworkGeneration.incrementAndGet()
+        updateConnectivitySignals(hasNetwork = isOnline)
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
