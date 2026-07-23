@@ -163,14 +163,19 @@ class NotificationNetworkReconnectCoverageTest {
         assertTrue(
             "connectivity callbacks must not reinstall notification work during account teardown",
             "if (networkNotificationRecoverySuppressed) return" in reconnect &&
+                "if (networkNotificationRecoverySuppressed) return@launch" in reconnect &&
                 "if (networkNotificationRecoverySuppressed ||" in pendingPushDrain,
         )
         assertTrue(
             "failed and successful wipes must release reconnect suppression before listener restart",
             restore.indexOf("networkNotificationRecoverySuppressed = false") in 0 until
                 restore.indexOf("startNotificationListener()") &&
-                wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") in 0 until
+                wipe.indexOf("networkNotificationRecoverySuppressed = false") in 0 until
                 wipe.lastIndexOf("startNotificationListener()"),
+        )
+        assertTrue(
+            "the wipe must clear reconnect suppression in a finally backstop so a throw cannot latch it",
+            wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") > wipe.lastIndexOf("} finally {"),
         )
     }
 

@@ -3184,52 +3184,61 @@ class WhiteNoiseAppState(
         clearCrossAccountCaches()
         clearConversationShortcutSurfaces()
         val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
-        val wipeResult =
-            nativePushSyncMutex.withSerializedNativePushWipe {
-                runCatching { marmotIo { signOutAndWipe(wipedRef) } }
-                    .onSuccess {
-                        pushTokenStore.clearPendingDisable(wipedRef)
-                        // The wipe invalidates server-side registration state for this account.
-                        // withSerializedNativePushWipe already holds nativePushSyncMutex here.
-                        perAccountSyncedFingerprints.remove(wipedRef)
-                        pushTokenStore.clear()
-                    }
-            }
-        val failure = wipeResult.exceptionOrNull()
-        if (failure != null) {
-            rethrowIfCancellation(failure)
-            appStateDebug(failure) { "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}" }
-            restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
-            return null
-        }
-        val outcome =
-            wipeResult.getOrNull() ?: run {
+        try {
+            val wipeResult =
+                nativePushSyncMutex.withSerializedNativePushWipe {
+                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+                        .onSuccess {
+                            pushTokenStore.clearPendingDisable(wipedRef)
+                            // The wipe invalidates server-side registration state for this account.
+                            // withSerializedNativePushWipe already holds nativePushSyncMutex here.
+                            perAccountSyncedFingerprints.remove(wipedRef)
+                            pushTokenStore.clear()
+                        }
+                }
+            val failure = wipeResult.exceptionOrNull()
+            if (failure != null) {
+                rethrowIfCancellation(failure)
+                appStateDebug(failure) {
+                    "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}"
+                }
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return null
             }
-        clearContactPrivateDetailsForAccount(wipedRef)
-        wipeDecryptedMediaFromDisk()
-        clearHiddenMessagesForAccount(wipedRef)
-        val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
-        accounts = refreshedAccounts
-        releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-        refreshAccountUnreadCounts(refreshedAccounts)
-        val next = refreshedAccounts.firstOrNull()?.label
-        activeAccountRef = next
-        preferences
-            .edit()
-            .apply {
-                if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
-            }.apply()
-        reloadMediaAutoDownloadMatrix()
-        phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
-        next?.let { label ->
-            refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            val outcome =
+                wipeResult.getOrNull() ?: run {
+                    restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                    return null
+                }
+            clearContactPrivateDetailsForAccount(wipedRef)
+            wipeDecryptedMediaFromDisk()
+            clearHiddenMessagesForAccount(wipedRef)
+            val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
+            accounts = refreshedAccounts
+            releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+            refreshAccountUnreadCounts(refreshedAccounts)
+            val next = refreshedAccounts.firstOrNull()?.label
+            activeAccountRef = next
+            preferences
+                .edit()
+                .apply {
+                    if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
+                }.apply()
+            reloadMediaAutoDownloadMatrix()
+            phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
+            next?.let { label ->
+                refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            }
+            networkNotificationRecoverySuppressed = false
+            if (restartNotifications) startNotificationListener()
+            refreshLocalNotificationSettings()
+            return outcome
+        } finally {
+            // Backstop: the suppression bracket must not outlive this call
+            // whatever throws above — a latched flag would silently disable
+            // network-restore recovery until process death.
+            networkNotificationRecoverySuppressed = false
         }
-        networkNotificationRecoverySuppressed = false
-        if (restartNotifications) startNotificationListener()
-        refreshLocalNotificationSettings()
-        return outcome
     }
 
     suspend fun exportEncryptedSecretKeyBackup(passphrase: String): String? {
@@ -4064,6 +4073,11 @@ class WhiteNoiseAppState(
         notificationReconnectJob.startIfInactive {
             val reconnectJob =
                 notificationScope.launch {
+                    // Re-check under the launched coroutine: a connectivity
+                    // callback preempted between the outer check and this
+                    // launch would otherwise survive a wipe's cancel sweep
+                    // (the wipe sets the flag before sweeping the slots).
+                    if (networkNotificationRecoverySuppressed) return@launch
                     runNotificationReconnectOnNetworkRestore(
                         ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
                         catchUpAccounts = {
