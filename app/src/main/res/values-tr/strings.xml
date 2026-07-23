@@ -1112,6 +1112,8 @@
     <string name="connectivity_offline">İnternet yok — Wi-Fi veya mobil veriyi açın</string>
     <string name="connectivity_connecting">Bağlanıyor…</string>
     <string name="connectivity_connected">Bağlandı</string>
+    <string name="amber_signin_waiting_request">İmzalayıcıda kimlik isteğini onaylayın (adım 1/2)…</string>
+    <string name="amber_signin_waiting_proof">İmzalayıcıda kimlik kanıtını imzalayın (adım 2/2)…</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>
 </resources>

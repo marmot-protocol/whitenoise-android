@@ -118,6 +118,7 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             }
         },
         loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
+        amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = {
             inFlightAction = OnboardingAction.AmberLogin
@@ -159,6 +160,7 @@ fun OnboardingContent(
     importErrorRes: Int? = null,
     onImportErrorChange: (Int?) -> Unit = {},
     loggingInWithAmber: Boolean = false,
+    amberSignInStage: Int? = null,
     amberSignerAvailable: Boolean = false,
     onLoginWithAmber: () -> Unit = {},
 ) {
@@ -294,6 +296,26 @@ fun OnboardingContent(
                                 stringResource(R.string.onboarding_login_with_amber),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        // Two sequential signer prompts are unavoidable (the
+                        // proof needs the key the first prompt reveals), so
+                        // say which one the wait is for instead of reading
+                        // as a hang.
+                        if (loggingInWithAmber && amberSignInStage != null) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        if (amberSignInStage == 1) {
+                                            R.string.amber_signin_waiting_request
+                                        } else {
+                                            R.string.amber_signin_waiting_proof
+                                        },
+                                    ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                textAlign = TextAlign.Center,
                             )
                         }
                     }

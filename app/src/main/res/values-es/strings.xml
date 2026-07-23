@@ -1114,6 +1114,8 @@
     <string name="connectivity_offline">Sin internet: activa el Wi-Fi o los datos móviles</string>
     <string name="connectivity_connecting">Conectando…</string>
     <string name="connectivity_connected">Conectado</string>
+    <string name="amber_signin_waiting_request">Aprueba la solicitud de identidad en tu firmante (paso 1 de 2)…</string>
+    <string name="amber_signin_waiting_proof">Firma la prueba de identidad en tu firmante (paso 2 de 2)…</string>
     <string name="tts_settings_engine_local">Motor en el dispositivo</string>
     <string name="tts_settings_engine_unknown">Puede usar voz en red</string>
 </resources>

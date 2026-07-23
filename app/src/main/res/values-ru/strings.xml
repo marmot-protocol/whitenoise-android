@@ -1154,6 +1154,8 @@
     <string name="connectivity_offline">Нет интернета — включите Wi-Fi или мобильные данные</string>
     <string name="connectivity_connecting">Подключение…</string>
     <string name="connectivity_connected">Подключено</string>
+    <string name="amber_signin_waiting_request">Подтвердите запрос личности в подписывающем приложении (шаг 1 из 2)…</string>
+    <string name="amber_signin_waiting_proof">Подпишите подтверждение личности в подписывающем приложении (шаг 2 из 2)…</string>
     <string name="tts_settings_engine_local">Движок на устройстве</string>
     <string name="tts_settings_engine_unknown">Может использовать сеть</string>
 </resources>

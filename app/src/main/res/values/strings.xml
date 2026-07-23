@@ -1144,6 +1144,8 @@
     <string name="connectivity_offline">No internet — turn on Wi-Fi or mobile data</string>
     <string name="connectivity_connecting">Connecting…</string>
     <string name="connectivity_connected">Connected</string>
+    <string name="amber_signin_waiting_request">Approve the identity request in your signer (step 1 of 2)…</string>
+    <string name="amber_signin_waiting_proof">Sign the identity proof in your signer (step 2 of 2)…</string>
     <string name="tts_settings_engine_local">On-device engine</string>
     <string name="tts_settings_engine_unknown">May use network speech</string>
 </resources>

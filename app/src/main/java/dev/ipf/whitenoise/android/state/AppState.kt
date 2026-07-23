@@ -1107,6 +1107,14 @@ class WhiteNoiseAppState(
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
 
+    // Which of the two sequential signer round-trips the Amber sign-in is
+    // waiting on (1 = identity request, 2 = identity proof), or null when
+    // idle. The prompts are protocol-sequential — the proof can't be built
+    // before the signer reveals which key signs it — so the fix for the
+    // "sign-in hangs" perception is telling the user where they are.
+    var amberSignInStage by mutableStateOf<Int?>(null)
+        private set
+
     /**
      * App-lifetime cache of decrypted attachment bytes, keyed by the globally
      * unique `messageIdHex`. Lives here (not on the per-conversation
@@ -2679,6 +2687,7 @@ class WhiteNoiseAppState(
      */
     suspend fun loginWithAmber() {
         try {
+            amberSignInStage = 1
             val reportedPubkey = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
             // Normalize npub/hex to the canonical hex the account is keyed by, so
             // the login-time signer and the startup re-registration signer share
@@ -2686,6 +2695,7 @@ class WhiteNoiseAppState(
             val pubkeyHex =
                 marmotIo { accountIdHex(reportedPubkey) }
                     ?: throw MarmotKitException.Runtime("signer returned an invalid public key")
+            amberSignInStage = 2
             val summary =
                 marmotIo {
                     loginExternalSigner(
@@ -2722,6 +2732,8 @@ class WhiteNoiseAppState(
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
                 present(R.string.toast_couldnt_login_amber, AppText.Plain(error.readableMessage()), copyable = true)
             }
+        } finally {
+            amberSignInStage = null
         }
     }
 
