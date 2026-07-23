@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -206,7 +207,10 @@ internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
 @Composable
 internal fun rememberedClockTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]
-    return remember(epochSeconds, locale) {
-        IdentityFormatter.clockTime(epochSeconds, locale)
+    // Android's explicit 12/24-hour setting wins over the locale default; it
+    // keys the remember so a toggled preference reformats newly rendered rows.
+    val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    return remember(epochSeconds, locale, use24Hour) {
+        IdentityFormatter.clockTime(epochSeconds, locale, force24Hour = use24Hour)
     }
 }
