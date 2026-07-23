@@ -1151,6 +1151,9 @@
     <string name="tts_auto_read_title">Читать сообщения вслух</string>
     <string name="tts_auto_read_subtitle">Читать непрочитанные сообщения при открытии этого чата</string>
     <string name="tts_settings_rate_system">Системная (по настройке устройства)</string>
+    <string name="connectivity_offline">Нет интернета — включите Wi-Fi или мобильные данные</string>
+    <string name="connectivity_connecting">Подключение…</string>
+    <string name="connectivity_connected">Подключено</string>
     <string name="tts_settings_engine_local">Движок на устройстве</string>
     <string name="tts_settings_engine_unknown">Может использовать сеть</string>
 </resources>

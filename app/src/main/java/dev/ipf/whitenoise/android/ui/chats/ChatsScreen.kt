@@ -454,93 +454,98 @@ internal fun ChatsScreen(
 
     Scaffold(
         topBar = {
-            if (selectionMode) {
-                ChatListSelectionBar(
-                    count = selectedChatIds.size,
-                    archiveAction = bulkArchiveAction,
-                    actionsEnabled = selectedChatIds.isNotEmpty(),
-                    allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
-                    showMarkRead =
-                        singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
-                    showMuteToggle = singleSelectedItem != null,
-                    muted = singleSelectionMuted,
-                    onClose = ::clearSelection,
-                    onArchive = {
-                        val selected = selectedVisibleItems
-                        if (selected.isEmpty()) return@ChatListSelectionBar
-                        val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
-                        clearSelection()
-                        appState.launchMutation {
-                            var succeeded = 0
-                            selected.forEach { item ->
-                                if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) {
-                                    succeeded++
+            Column {
+                if (selectionMode) {
+                    ChatListSelectionBar(
+                        count = selectedChatIds.size,
+                        archiveAction = bulkArchiveAction,
+                        actionsEnabled = selectedChatIds.isNotEmpty(),
+                        allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
+                        showMarkRead =
+                            singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                        showMuteToggle = singleSelectedItem != null,
+                        muted = singleSelectionMuted,
+                        onClose = ::clearSelection,
+                        onArchive = {
+                            val selected = selectedVisibleItems
+                            if (selected.isEmpty()) return@ChatListSelectionBar
+                            val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
+                            clearSelection()
+                            appState.launchMutation {
+                                var succeeded = 0
+                                selected.forEach { item ->
+                                    if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) {
+                                        succeeded++
+                                    }
+                                }
+                                if (succeeded > 0) {
+                                    val pluralRes =
+                                        if (archive) {
+                                            R.plurals.toast_chat_list_chats_archived
+                                        } else {
+                                            R.plurals.toast_chat_list_chats_restored
+                                        }
+                                    appState.present(
+                                        context.resources.getQuantityString(pluralRes, succeeded, succeeded),
+                                    )
                                 }
                             }
-                            if (succeeded > 0) {
-                                val pluralRes =
-                                    if (archive) {
-                                        R.plurals.toast_chat_list_chats_archived
-                                    } else {
-                                        R.plurals.toast_chat_list_chats_restored
-                                    }
-                                appState.present(
-                                    context.resources.getQuantityString(pluralRes, succeeded, succeeded),
-                                )
+                        },
+                        onDelete = {
+                            pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                        },
+                        onMarkRead = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            clearSelection()
+                            appState.launchMutation { controller.markAllRead(item) }
+                        },
+                        onMuteToggle = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            val nextMuted = !singleSelectionMuted
+                            clearSelection()
+                            appState.setConversationMuted(
+                                item.group.groupIdHex,
+                                nextMuted,
+                            )
+                        },
+                        onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
+                        onDeselectAll = { selectedChatIds.clear() },
+                    )
+                } else {
+                    ChatListTopBar(
+                        appState = appState,
+                        searchOpen = searchOpen,
+                        searchQuery = searchQuery,
+                        searchFocusRequester = searchFocusRequester,
+                        onSearchQueryChange = { searchQuery = it },
+                        onSearchOpen = { searchOpen = true },
+                        onSearchClose = { searchOpen = false },
+                        onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
+                        onMic = {
+                            val intent =
+                                android.content
+                                    .Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                    .putExtra(
+                                        android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                        android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                                    )
+                            // ActivityNotFoundException fires on devices without
+                            // any RecognizerIntent handler (rare on consumer
+                            // hardware; possible on AOSP forks or kiosk-mode
+                            // devices). Surface that as a toast instead of
+                            // swallowing — otherwise the mic tap is silent.
+                            try {
+                                voiceSearchLauncher.launch(intent)
+                            } catch (_: android.content.ActivityNotFoundException) {
+                                appState.present(R.string.chat_list_voice_unavailable)
                             }
-                        }
-                    },
-                    onDelete = {
-                        pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
-                    },
-                    onMarkRead = {
-                        val item = singleSelectedItem ?: return@ChatListSelectionBar
-                        clearSelection()
-                        appState.launchMutation { controller.markAllRead(item) }
-                    },
-                    onMuteToggle = {
-                        val item = singleSelectedItem ?: return@ChatListSelectionBar
-                        val nextMuted = !singleSelectionMuted
-                        clearSelection()
-                        appState.setConversationMuted(
-                            item.group.groupIdHex,
-                            nextMuted,
-                        )
-                    },
-                    onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
-                    onDeselectAll = { selectedChatIds.clear() },
-                )
-            } else {
-                ChatListTopBar(
-                    appState = appState,
-                    searchOpen = searchOpen,
-                    searchQuery = searchQuery,
-                    searchFocusRequester = searchFocusRequester,
-                    onSearchQueryChange = { searchQuery = it },
-                    onSearchOpen = { searchOpen = true },
-                    onSearchClose = { searchOpen = false },
-                    onSwitchAccount = { label -> scope.launch { appState.setActiveAccount(label) } },
-                    onMic = {
-                        val intent =
-                            android.content
-                                .Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                .putExtra(
-                                    android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                                )
-                        // ActivityNotFoundException fires on devices without
-                        // any RecognizerIntent handler (rare on consumer
-                        // hardware; possible on AOSP forks or kiosk-mode
-                        // devices). Surface that as a toast instead of
-                        // swallowing — otherwise the mic tap is silent.
-                        try {
-                            voiceSearchLauncher.launch(intent)
-                        } catch (_: android.content.ActivityNotFoundException) {
-                            appState.present(R.string.chat_list_voice_unavailable)
-                        }
-                    },
-                    onOpenSettings = onOpenSettings,
-                )
+                        },
+                        onOpenSettings = onOpenSettings,
+                    )
+                }
+                // Transient connectivity strip: offline prompt, connecting
+                // spinner, brief connected flash — hidden at steady state.
+                ChatListConnectivityBanner(appState)
             }
         },
         floatingActionButton = {

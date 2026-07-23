@@ -136,7 +136,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -3893,6 +3897,33 @@ class WhiteNoiseAppState(
     private var hasActiveNetworkSnapshot = false
 
     /**
+     * Reactive mirror of the two signals the chat-list connectivity banner
+     * consumes: device network presence (state 1 of the banner) and whether
+     * the live notification subscription currently has an open stream (the
+     * v1 "actually connected to relays" approximation until a per-relay
+     * liveness projection exists engine-side).
+     */
+    data class ConnectivitySignals(
+        val hasNetwork: Boolean = false,
+        val liveStreamConnected: Boolean = false,
+    )
+
+    private val _connectivitySignals = MutableStateFlow(ConnectivitySignals())
+    val connectivitySignals: StateFlow<ConnectivitySignals> = _connectivitySignals.asStateFlow()
+
+    private fun updateConnectivitySignals(
+        hasNetwork: Boolean? = null,
+        liveStreamConnected: Boolean? = null,
+    ) {
+        _connectivitySignals.update { current ->
+            current.copy(
+                hasNetwork = hasNetwork ?: current.hasNetwork,
+                liveStreamConnected = liveStreamConnected ?: current.liveStreamConnected,
+            )
+        }
+    }
+
+    /**
      * Register the process-lifetime default-network callback that keeps
      * [activeNetworkTypesSnapshot]/[hasActiveNetworkSnapshot] current. Runs off
      * the main thread (see `init`): registration and the one-shot seed query
@@ -3909,6 +3940,7 @@ class WhiteNoiseAppState(
         runCatchingCancellable {
             val network = cm.activeNetwork
             hasActiveNetworkSnapshot = network != null
+            updateConnectivitySignals(hasNetwork = network != null)
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -3955,6 +3987,7 @@ class WhiteNoiseAppState(
         networkTypes: Set<MediaAutoDownloadNetwork>? = null,
     ) {
         val wasOnline = hasActiveNetworkSnapshot
+        updateConnectivitySignals(hasNetwork = isOnline)
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()

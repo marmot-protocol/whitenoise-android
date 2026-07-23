@@ -1141,6 +1141,9 @@
     <string name="tts_auto_read_title">Read messages aloud</string>
     <string name="tts_auto_read_subtitle">Read the unread backlog when this chat opens</string>
     <string name="tts_settings_rate_system">System (follow device setting)</string>
+    <string name="connectivity_offline">No internet — turn on Wi-Fi or mobile data</string>
+    <string name="connectivity_connecting">Connecting…</string>
+    <string name="connectivity_connected">Connected</string>
     <string name="tts_settings_engine_local">On-device engine</string>
     <string name="tts_settings_engine_unknown">May use network speech</string>
 </resources>

@@ -1111,6 +1111,9 @@
     <string name="tts_auto_read_title">Leer mensajes en voz alta</string>
     <string name="tts_auto_read_subtitle">Leer los mensajes no leídos al abrir este chat</string>
     <string name="tts_settings_rate_system">Sistema (seguir el ajuste del dispositivo)</string>
+    <string name="connectivity_offline">Sin internet: activa el Wi-Fi o los datos móviles</string>
+    <string name="connectivity_connecting">Conectando…</string>
+    <string name="connectivity_connected">Conectado</string>
     <string name="tts_settings_engine_local">Motor en el dispositivo</string>
     <string name="tts_settings_engine_unknown">Puede usar voz en red</string>
 </resources>
