@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 internal enum class OpenAttachmentResult { Opened, NoHandler, Error }
 
@@ -47,7 +48,7 @@ internal fun MediaCircleAction(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.55f),
+        color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
         contentColor = Color.White,
         modifier = modifier.size(52.dp),
     ) {

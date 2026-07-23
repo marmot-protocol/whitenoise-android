@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -192,7 +193,7 @@ internal fun GroupEditScreen(
                                         .offset(x = 6.dp, y = 6.dp)
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.62f))
+                                        .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY))
                                         .clickable(
                                             onClickLabel = editImageLabel,
                                             role = Role.Button,

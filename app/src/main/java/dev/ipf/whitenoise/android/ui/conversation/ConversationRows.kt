@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -55,6 +54,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -76,10 +76,7 @@ internal fun UnreadMessagesDivider(count: Int) {
                 .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        AppDivider(modifier = Modifier.weight(1f))
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
@@ -92,10 +89,7 @@ internal fun UnreadMessagesDivider(count: Int) {
                         shape = RoundedCornerShape(12.dp),
                     ).padding(horizontal = 10.dp, vertical = 4.dp),
         )
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        AppDivider(modifier = Modifier.weight(1f))
     }
 }
 
