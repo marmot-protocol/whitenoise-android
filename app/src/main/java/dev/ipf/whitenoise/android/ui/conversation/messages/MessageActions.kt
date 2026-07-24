@@ -422,7 +422,7 @@ private fun forwardFolderBulkRows(
         }.filter { (_, memberIds) -> memberIds.size >= 2 }
 }
 
-private fun visibleForwardFolderRows(
+internal fun visibleForwardFolderRows(
     rows: List<Pair<ChatFolder, List<String>>>,
     query: String,
 ): List<Pair<ChatFolder, List<String>>> {
@@ -559,6 +559,9 @@ internal fun ForwardMessageSheet(
                         .padding(horizontal = Dimens.spaceLg)
                         .onFocusChanged { searchFocused = it.isFocused },
             )
+            // A query that matches only a folder name must still surface that
+            // folder row, so emptiness is judged across chats AND folders.
+            val visibleFolderRows = visibleForwardFolderRows(folderBulkRows, query)
             LazyColumn(
                 modifier =
                     Modifier
@@ -566,7 +569,7 @@ internal fun ForwardMessageSheet(
                         .fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = Dimens.spaceLg),
             ) {
-                if (targets.isEmpty() || filtered.isEmpty()) {
+                if ((targets.isEmpty() || filtered.isEmpty()) && visibleFolderRows.isEmpty()) {
                     item {
                         Text(
                             stringResource(
@@ -578,8 +581,8 @@ internal fun ForwardMessageSheet(
                         )
                     }
                 } else {
-                    forwardFolderSection(visibleForwardFolderRows(folderBulkRows, query), selected)
-                    item { SectionHeader(stringResource(R.string.recent_chats)) }
+                    forwardFolderSection(visibleFolderRows, selected)
+                    if (filtered.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
                     items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
                         val groupId = item.group.groupIdHex
                         val isSelected = selected.contains(groupId)
