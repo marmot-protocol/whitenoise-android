@@ -252,12 +252,26 @@ data class ChatListItem(
     }
 }
 
-internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> =
+internal fun sortChatListItems(
+    items: List<ChatListItem>,
+    draftedAtSeconds: (ChatListItem) -> ULong? = { null },
+): List<ChatListItem> =
     items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
-            .thenByDescending { it.latestAt ?: 0uL }
+            .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtSeconds(it)) }
             .thenBy { chatListItemSortKey(it) },
     )
+
+// A chat with an unsent draft rises to reflect when drafting began, but only
+// when that is newer than the chat's last activity — a stale draft never
+// outranks a fresher incoming message. Same unix-seconds unit as [latestAt].
+internal fun chatListItemDraftSortAt(
+    latestAt: ULong?,
+    draftedAtSeconds: ULong?,
+): ULong {
+    val base = latestAt ?: 0uL
+    return if (draftedAtSeconds != null && draftedAtSeconds > base) draftedAtSeconds else base
+}
 
 /**
  * Sort tie-breaker key. Mirrors the gating that the UI uses to derive a
@@ -3083,6 +3097,16 @@ class ChatsController(
         }
     }
 
+    /**
+     * A draft started or cleared, so the chat's effective sort time changed.
+     * Re-sort — deferred while the list is hidden (you are in the conversation
+     * drafting), and flushed when the list returns, like every other recompute.
+     */
+    fun onDraftSortOrderChanged() {
+        if (isCleared) return
+        recompute()
+    }
+
     private var recomputeScheduled = false
     private val recomputeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -3174,7 +3198,11 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val all = sortChatListItems(projected)
+        val draftAccount = accountRef
+        val all =
+            sortChatListItems(projected) { item ->
+                draftAccount?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
+            }
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         // Limit speculative network work to the recent visible conversations the

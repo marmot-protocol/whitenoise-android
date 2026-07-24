@@ -47,11 +47,24 @@ private class EvictedDraftStateReference(
  */
 class DraftStore internal constructor(
     private val persistence: DraftPersistence,
+    private val nowSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
 ) {
     private val lock = Any()
     private val drafts = LinkedHashMap<String, MutableState<String?>>(16, 0.75f, true)
     private val collectedEvictedDraftStates = ReferenceQueue<MutableState<String?>>()
     private val evictedEmptyDraftStates = mutableMapOf<String, EvictedDraftStateReference>()
+
+    // Unix-seconds "drafted-at" per key, updated only when a draft starts
+    // (empty→non-empty) or clears — never on an ordinary keystroke — so the
+    // chat list re-sorts on those transitions alone, not on every character.
+    // Kept off the per-key draft [MutableState]s deliberately: routing it
+    // through those would either recompose every row per keystroke or need a
+    // shared revision the store was built to avoid.
+    private val draftedAtSeconds = HashMap<String, Long>()
+
+    /** Fired after a draft's sort timestamp changes (start or clear), outside
+     *  the lock, so the chat list can re-sort. Never fired per keystroke. */
+    var onDraftSortOrderChanged: (() -> Unit)? = null
 
     init {
         persistence.read().forEach { (k, value) -> drafts[k] = mutableStateOf(value) }
@@ -107,6 +120,7 @@ class DraftStore internal constructor(
         value: TextFieldValue,
     ) {
         val k = key(accountIdHex, groupIdHex)
+        var sortOrderChanged = false
         // Keep persistence writes inside the same lock as the cache mutation so
         // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
@@ -115,6 +129,7 @@ class DraftStore internal constructor(
                 if (state.value != null) {
                     state.value = null
                     persistence.write(k, null)
+                    if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
                     pruneEmptyDraftStatesLocked()
                 }
                 return@synchronized
@@ -122,13 +137,27 @@ class DraftStore internal constructor(
 
             val encoded = encodeComposerDraft(value)
             val state = stateForLocked(k)
+            // Stamp only the empty→non-empty transition — the moment drafting
+            // began. Editing an already-non-empty draft leaves the stamp (and
+            // the sort order) untouched.
+            if (state.value == null) {
+                draftedAtSeconds[k] = nowSeconds()
+                sortOrderChanged = true
+            }
             if (state.value != encoded) {
                 state.value = encoded
                 persistence.write(k, encoded)
             }
             pruneEmptyDraftStatesLocked(retainedState = state)
         }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
+
+    /** Drafted-at (unix seconds) for the chat, or null when it has no draft. */
+    fun draftedAtSecondsFor(
+        accountIdHex: String,
+        groupIdHex: String,
+    ): ULong? = synchronized(lock) { draftedAtSeconds[key(accountIdHex, groupIdHex)]?.toULong() }
 
     /**
      * Appends [incoming] to an existing draft with a newline separator. Blank
@@ -154,6 +183,7 @@ class DraftStore internal constructor(
 
     fun clearAllForAccount(accountIdHex: String) {
         val prefix = "$accountIdHex "
+        var sortOrderChanged = false
         synchronized(lock) {
             val matchingDrafts =
                 drafts.entries
@@ -165,10 +195,12 @@ class DraftStore internal constructor(
                 if (state.value == snapshottedValue) {
                     state.value = null
                     persistence.write(k, null)
+                    if (draftedAtSeconds.remove(k) != null) sortOrderChanged = true
                     pruneEmptyDraftStatesLocked()
                 }
             }
         }
+        if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
     private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
@@ -192,6 +224,7 @@ class DraftStore internal constructor(
 
     companion object {
         internal const val MAX_IN_MEMORY_DRAFT_STATES = 512
+        private const val MILLIS_PER_SECOND = 1_000L
 
         fun forContext(context: Context): DraftStore = DraftStore(EncryptedDraftPersistence(context.applicationContext))
     }

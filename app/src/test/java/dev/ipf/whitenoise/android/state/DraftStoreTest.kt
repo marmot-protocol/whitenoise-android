@@ -451,6 +451,67 @@ class DraftStoreTest {
 
         override fun component2(): (String?) -> Unit = { value = it }
     }
+
+    @Test
+    fun draftedAtStampsTheStartOfDraftingAndClearsWithTheDraft() {
+        var clock = 100L
+        val s = DraftStore(InMemoryDraftPersistence()) { clock }
+        var signals = 0
+        s.onDraftSortOrderChanged = { signals++ }
+
+        assertNull(s.draftedAtSecondsFor("a", "g"))
+
+        // empty→non-empty: stamped, one re-sort signal.
+        s.set("a", "g", TextFieldValue("hi"))
+        assertEquals(100uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(1, signals)
+
+        // editing a non-empty draft must not restamp or re-signal — this is the
+        // per-keystroke path the chat list must not churn on.
+        clock = 200L
+        s.set("a", "g", TextFieldValue("hi there"))
+        assertEquals(100uL, s.draftedAtSecondsFor("a", "g"))
+        assertEquals(1, signals)
+
+        // clearing drops the stamp and signals a re-sort.
+        s.set("a", "g", TextFieldValue(""))
+        assertNull(s.draftedAtSecondsFor("a", "g"))
+        assertEquals(2, signals)
+    }
+
+    @Test
+    fun clearingADraftThatWasNeverSetDoesNotSignal() {
+        val s = store()
+        var signals = 0
+        s.onDraftSortOrderChanged = { signals++ }
+        s.set("a", "g", TextFieldValue(""))
+        assertEquals(0, signals)
+        assertNull(s.draftedAtSecondsFor("a", "g"))
+    }
+
+    @Test
+    fun retypingAfterAClearRestampsWithTheCurrentTime() {
+        var clock = 10L
+        val s = DraftStore(InMemoryDraftPersistence()) { clock }
+        s.set("a", "g", TextFieldValue("first"))
+        s.set("a", "g", TextFieldValue(""))
+        clock = 999L
+        s.set("a", "g", TextFieldValue("again"))
+        assertEquals(999uL, s.draftedAtSecondsFor("a", "g"))
+    }
+
+    @Test
+    fun clearAllForAccountDropsDraftedAtAndSignalsOnce() {
+        val s = DraftStore(InMemoryDraftPersistence()) { 50L }
+        s.set("a", "g1", TextFieldValue("x"))
+        s.set("a", "g2", TextFieldValue("y"))
+        var signals = 0
+        s.onDraftSortOrderChanged = { signals++ }
+        s.clearAllForAccount("a")
+        assertNull(s.draftedAtSecondsFor("a", "g1"))
+        assertNull(s.draftedAtSecondsFor("a", "g2"))
+        assertEquals(1, signals)
+    }
 }
 
 private class InMemoryDraftPersistence : DraftPersistence {

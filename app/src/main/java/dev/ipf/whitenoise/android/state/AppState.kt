@@ -2020,6 +2020,9 @@ class WhiteNoiseAppState(
 
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
+        // Route draft start/clear re-sorts to whichever controller is attached;
+        // reads the field at call time so a later re-attach still resolves.
+        draftStore.onDraftSortOrderChanged = { chatsController?.onDraftSortOrderChanged() }
     }
 
     fun attachConversationController(controller: ConversationController) {
