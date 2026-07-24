@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
@@ -43,6 +44,7 @@ internal fun ChatListSelectionBar(
     onClose: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    onAddToFolder: () -> Unit,
     onMarkRead: () -> Unit,
     onMuteToggle: () -> Unit,
     onSelectAll: () -> Unit,
@@ -123,6 +125,14 @@ internal fun ChatListSelectionBar(
                         },
                     )
                 }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_list_action_add_to_folder)) },
+                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    onClick = {
+                        overflowOpen = false
+                        onAddToFolder()
+                    },
+                )
                 if (allVisibleSelected) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.chat_list_deselect_all)) },

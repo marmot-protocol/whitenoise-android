@@ -50,6 +50,34 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    @Test
+    fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
+        val source = chatsScreenSource().readText()
+        val selectionBar =
+            source.requiredSection(
+                start = "ChatListSelectionBar(",
+                end = "\n                    )\n                } else {",
+            )
+        val addToFolderHandler =
+            selectionBar.requiredSection(
+                start = "onAddToFolder = {",
+                end = "\n                        onMarkRead = {",
+            )
+
+        assertTrue(
+            "add-to-folder must capture the selected chats as picker targets",
+            "folderPickerChatIds" in addToFolderHandler,
+        )
+        assertTrue(
+            "the picker's New-folder entry must hand the targets to the create form",
+            "folderEditorChatIds = targets.toSet()" in source,
+        )
+        assertTrue(
+            "the create form must preload the targets as manual members",
+            "initialManualChatIds = folderEditorTargets" in source,
+        )
+    }
+
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),

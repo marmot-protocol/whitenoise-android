@@ -3,6 +3,11 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import java.util.Locale
 
+data class ConversationSearchMatch(
+    val messageIdHex: String,
+    val timelineAt: ULong,
+)
+
 /**
  * In-conversation / cross-conversation message-content search primitives.
  *
@@ -108,5 +113,31 @@ object MessageSearch {
         } else {
             (safeCurrent - 1 + matchCount) % matchCount
         }
+    }
+
+    /**
+     * Merges the loaded-window matches (edit-resolved text, authoritative for
+     * rows currently loaded) with a full-history store scan (raw stored text,
+     * covering pages not yet loaded). Inside the loaded window the window
+     * verdict wins in both directions — a store hit the window rejected is an
+     * edited-away body, a window hit the store missed is an edited-in one.
+     * Outside the window the store scan is the only evidence. Timestamp + id
+     * provide a durable total order, including when every loaded-window hit is
+     * edit-only and therefore has no neighboring raw-store hit to anchor it.
+     */
+    fun mergeWithHistoryScan(
+        windowMatches: List<ConversationSearchMatch>,
+        loadedWindowIds: Set<String>,
+        scanMatchesOldestFirst: List<ConversationSearchMatch>,
+    ): List<ConversationSearchMatch> {
+        val windowById = windowMatches.associateBy { it.messageIdHex }
+        val mergedById =
+            scanMatchesOldestFirst
+                .filterNot { it.messageIdHex in loadedWindowIds && it.messageIdHex !in windowById }
+                .associateByTo(LinkedHashMap()) { it.messageIdHex }
+        // Loaded-window projections are authoritative for both match verdict
+        // and timeline position, so they overwrite any raw-store counterpart.
+        windowMatches.forEach { mergedById[it.messageIdHex] = it }
+        return mergedById.values.sortedWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
     }
 }

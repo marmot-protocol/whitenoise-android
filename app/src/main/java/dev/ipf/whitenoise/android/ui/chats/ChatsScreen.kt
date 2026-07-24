@@ -81,6 +81,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
+import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
@@ -94,6 +95,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
@@ -130,6 +132,10 @@ internal fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    // Folder-assignment sheet targets for the current selection, and the
+    // create form pre-populated with them when New folder is picked there.
+    var folderPickerChatIds by remember { mutableStateOf<List<String>?>(null) }
+    var folderEditorChatIds by remember { mutableStateOf<Set<String>?>(null) }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
@@ -169,13 +175,38 @@ internal fun ChatsScreen(
             SystemFolderKind.GROUPS -> ChatListFilter.Groups
             null -> ChatListFilter.All
         }
+    // Effective folder membership: manual members plus rule matches,
+    // re-derived from the live list so rule-driven chats join and leave
+    // folders as rosters, unread state, and mute state change.
+    val resolveFolderChatIds: (String) -> Set<String> =
+        remember(
+            folderStoreState,
+            appState.activeAccountRef,
+            controller.items,
+            mutedConversations,
+            groupTitleCopy,
+            // Keyword rules match the rendered row title, which resolves as
+            // peer profiles land — re-derive when the presentation cache bumps.
+            appState.profileRevisionForCompose,
+        ) {
+            { folderId ->
+                appState.activeAccountRef
+                    ?.let { accountRef ->
+                        chatFolderChatIds(
+                            items = controller.items,
+                            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
+                            rule = appState.chatFolderPreferences.folderRule(accountRef, folderId),
+                            isMuted = { groupIdHex ->
+                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
+                            },
+                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                        )
+                    }.orEmpty()
+            }
+        }
     val customFolderChatIds =
-        remember(selectedFolder, folderStoreState, appState.activeAccountRef) {
-            selectedFolder
-                ?.takeIf { !it.isSystem }
-                ?.let { folder ->
-                    appState.activeAccountRef?.let { appState.chatFolderPreferences.membershipFor(it, folder.id) }
-                }
+        remember(selectedFolder, resolveFolderChatIds) {
+            selectedFolder?.takeIf { !it.isSystem }?.let { resolveFolderChatIds(it.id) }
         }
     // The Archived filter is a view switch, not a row predicate: it swaps the
     // source list to archived chats (replacing the old dedicated Archived row).
@@ -464,18 +495,13 @@ internal fun ChatsScreen(
             accountFolders,
             controller.items,
             controller.archivedItems,
-            folderStoreState,
-            appState.activeAccountRef,
+            resolveFolderChatIds,
         ) {
             chatFolderChipModels(
                 folders = accountFolders,
                 activeItems = controller.items,
                 archivedItems = controller.archivedItems,
-                membershipOf = { folderId ->
-                    appState.activeAccountRef
-                        ?.let { appState.chatFolderPreferences.membershipFor(it, folderId) }
-                        .orEmpty()
-                },
+                membershipOf = resolveFolderChatIds,
             )
         }
     // Clear the selection whenever its chip disappears — the last archived
@@ -497,6 +523,22 @@ internal fun ChatsScreen(
                 openGroupFromVisibleList(item, null, justCreated)
             },
             onClose = { showNewChatFlow = false },
+        )
+        return
+    }
+
+    // New-folder handoff from the assignment sheet: the create form takes the
+    // screen over (same swap the new-chat flow uses) with the selection
+    // preloaded as manual members.
+    val folderEditorTargets = folderEditorChatIds
+    val folderEditorAccountRef = appState.activeAccountRef
+    if (folderEditorTargets != null && folderEditorAccountRef != null) {
+        ChatFolderEditScreen(
+            appState = appState,
+            accountRef = folderEditorAccountRef,
+            folderId = null,
+            onClose = { folderEditorChatIds = null },
+            initialManualChatIds = folderEditorTargets,
         )
         return
     }
@@ -542,6 +584,12 @@ internal fun ChatsScreen(
                         },
                         onDelete = {
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                        },
+                        onAddToFolder = {
+                            folderPickerChatIds =
+                                selectedVisibleItems
+                                    .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
+                                    .takeIf { it.isNotEmpty() }
                         },
                         onMarkRead = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
@@ -791,6 +839,19 @@ internal fun ChatsScreen(
                 }
             }
         }
+    }
+
+    folderPickerChatIds?.let { targets ->
+        ChatFolderPickerSheet(
+            appState = appState,
+            targetChatIds = targets,
+            onCreateFolder = {
+                folderPickerChatIds = null
+                folderEditorChatIds = targets.toSet()
+                clearSelection()
+            },
+            onDismiss = { folderPickerChatIds = null },
+        )
     }
 
     pendingBulkDelete?.let { items ->

@@ -341,6 +341,11 @@
     <string name="audit_logs_settings_subtitle">Créer et envoyer des fichiers de journaux d’audit de sécurité.</string>
     <string name="delete_audit_logs">Supprimer les journaux d’audit</string>
     <string name="delete_audit_logs_subtitle">Supprime tous les fichiers d’audit locaux. Si la journalisation reste active, elle continue dans un nouveau fichier.</string>
+    <string name="redact_audit_data">Masquer les données d’audit sensibles</string>
+    <string name="redact_audit_data_subtitle">Exclut le contenu déchiffré et les identités complètes des fichiers d’audit ; conserve les références salées, les empreintes et les compteurs.</string>
+    <string name="redact_audit_data_confirm_title">Enregistrer les données d’audit complètes ?</string>
+    <string name="redact_audit_data_confirm_body">Sans masquage, les fichiers d’audit peuvent contenir les messages déchiffrés, le contenu de l’application et les identités complètes. Laissez-le activé sauf si vous avez besoin du détail forensique complet.</string>
+    <string name="redact_audit_data_confirm_action">Enregistrer les données complètes</string>
     <string name="developer">Développeur</string>
     <string name="developer_mode">Mode développeur</string>
     <string name="developer_mode_subtitle">Affiche les diagnostics et les éléments internes MLS.</string>
@@ -845,6 +850,31 @@
     <string name="profile_lightning_no_network">Impossible de vérifier l\'adresse Lightning (pas de réseau).</string>
     <string name="reaction_tap_to_remove">Toucher pour retirer</string>
     <string name="chat_list_filter_groups">Groupes</string>
+    <string name="chat_folders_title">Dossiers</string>
+    <string name="chat_folders_settings_subtitle">Organiser les discussions en dossiers</string>
+    <string name="chat_folder_new">Nouveau dossier</string>
+    <string name="chat_folder_edit_title">Modifier le dossier</string>
+    <string name="chat_folder_delete_title">Supprimer le dossier ?</string>
+    <string name="chat_folder_delete_message">« %1$s » sera supprimé. Vos discussions restent dans la liste.</string>
+    <string name="chat_folder_move_up">Monter</string>
+    <string name="chat_folder_move_down">Descendre</string>
+    <string name="chat_folder_name_label">Nom</string>
+    <string name="chat_folder_description_label">Description</string>
+    <string name="chat_folder_keyword_label">Mot-clé</string>
+    <string name="chat_folder_keyword_hint">Inclure les discussions dont le nom ou la description contient ce texte</string>
+    <string name="chat_folder_unread_only">Non lues uniquement</string>
+    <string name="chat_folder_unread_only_subtitle">Inclure uniquement les discussions avec des messages non lus</string>
+    <string name="chat_folder_include_muted">Inclure les discussions en sourdine</string>
+    <string name="chat_folder_manual_chats">Discussions incluses</string>
+    <string name="chat_folder_people">Personnes</string>
+    <string name="chat_folder_people_subtitle">Inclure toute discussion avec ces personnes</string>
+    <string name="chat_list_action_add_to_folder">Ajouter à un dossier</string>
+    <string name="chat_folders_none">Aucun</string>
+    <string name="chat_folder_included_by_rule">Inclus par les règles de ce dossier</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d discussion</item>
+        <item quantity="other">%1$d discussions</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Rechercher</string>
     <string name="conversation_search_hint">Rechercher dans cette discussion</string>

@@ -124,4 +124,58 @@ class MessageSearchTest {
             Locale.setDefault(old)
         }
     }
+
+    @Test
+    fun mergeUsesTheScanAsSpineOutsideTheLoadedWindow() {
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatches = listOf(match("e", 5u), match("f", 6u)),
+                loadedWindowIds = setOf("d", "e", "f"),
+                scanMatchesOldestFirst = listOf(match("a", 1u), match("b", 2u), match("e", 5u), match("f", 6u)),
+            )
+        assertEquals(listOf("a", "b", "e", "f"), merged.map { it.messageIdHex })
+    }
+
+    @Test
+    fun mergeDropsScanHitsTheWindowRejected() {
+        // "d" matched the raw stored body but the loaded window's edit-resolved
+        // text no longer matches — the window verdict wins inside the window.
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatches = listOf(match("e", 5u)),
+                loadedWindowIds = setOf("d", "e"),
+                scanMatchesOldestFirst = listOf(match("a", 1u), match("d", 4u), match("e", 5u)),
+            )
+        assertEquals(listOf("a", "e"), merged.map { it.messageIdHex })
+    }
+
+    @Test
+    fun mergeOrdersWindowOnlyHitsByTheirTimelinePosition() {
+        // "e" only matches after an edit and has no loaded-window scan
+        // neighbor. Its durable timeline position still places it between the
+        // older and newer history hits instead of appending it at the end.
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatches = listOf(match("e", 5u)),
+                loadedWindowIds = setOf("d", "e", "f"),
+                scanMatchesOldestFirst = listOf(match("a", 1u), match("z", 10u)),
+            )
+        assertEquals(listOf("a", "e", "z"), merged.map { it.messageIdHex })
+    }
+
+    @Test
+    fun mergeWithEmptyScanKeepsWindowMatches() {
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatches = listOf(match("a", 1u), match("b", 2u)),
+                loadedWindowIds = setOf("a", "b", "c"),
+                scanMatchesOldestFirst = emptyList(),
+            )
+        assertEquals(listOf("a", "b"), merged.map { it.messageIdHex })
+    }
+
+    private fun match(
+        id: String,
+        at: UInt,
+    ) = ConversationSearchMatch(messageIdHex = id, timelineAt = at.toULong())
 }

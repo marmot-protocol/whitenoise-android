@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
@@ -30,6 +31,7 @@ import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.parseShareRequest
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
@@ -56,6 +58,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         val initialSystemDarkTheme = resources.configuration.isNightModeActive
         // Apply the pre-Compose theme here, not in attachBaseContext: the window
         // doesn't exist that early, so Activity.setTheme() NPEs on getWindow().
@@ -63,21 +66,13 @@ class MainActivity : FragmentActivity() {
         setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        holdSplashThroughBootstrap(splashScreen)
         appState.onAllowChatScreenshotsChanged = allowChatScreenshotsCallback
         applyRecentsPreferenceSecureFlag(
             allowChatScreenshots = ChatScreenshotPreferences.readAllowChatScreenshots(this),
         )
         notificationTapTokens = NotificationTapTokens.create(this)
-        // NIP-55 (Amber) approval prompts route through this launcher. Registered
-        // here and attached to the app-scoped coordinator; results are fed back on
-        // the main thread. Detached in onDestroy so a background signer callback
-        // finds no launcher (and throws a typed unavailable error) rather than a
-        // stale one.
-        amberSignerLauncher =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                AmberActivityCoordinator.deliverResult(result.resultCode == RESULT_OK, result.data)
-            }
-        AmberActivityCoordinator.attach(amberSignerLauncher)
+        registerAmberSignerLauncher()
         consumeIntent(intent)
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -125,6 +120,26 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
+    }
+
+    // NIP-55 (Amber) approval prompts route through this launcher. Registered
+    // here and attached to the app-scoped coordinator; results are fed back on
+    // the main thread. Detached in onDestroy so a background signer callback
+    // finds no launcher (and throws a typed unavailable error) rather than a
+    // stale one.
+    private fun registerAmberSignerLauncher() {
+        amberSignerLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                AmberActivityCoordinator.deliverResult(result.resultCode == RESULT_OK, result.data)
+            }
+        AmberActivityCoordinator.attach(amberSignerLauncher)
+    }
+
+    // Keep the system splash (icon on the themed window background) up until
+    // engine bootstrap flips the phase, instead of a bare spinner mid-boot.
+    // Installed before super.onCreate, held from here once appState exists.
+    private fun holdSplashThroughBootstrap(splashScreen: androidx.core.splashscreen.SplashScreen) {
+        splashScreen.setKeepOnScreenCondition { appState.phase == AppPhase.Bootstrapping }
     }
 
     /**
