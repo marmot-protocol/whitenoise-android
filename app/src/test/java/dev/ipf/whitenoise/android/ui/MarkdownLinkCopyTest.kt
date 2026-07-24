@@ -30,6 +30,7 @@ import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.messages.consumePointerInputUntilReleased
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleLongPressPositionInWindow
@@ -66,6 +67,7 @@ class MarkdownLinkCopyTest {
                     dest = destination,
                     title = null,
                     children = listOf(MarkdownInlineFfi.Text("visible label")),
+                    classification = MarkdownLinkDestinationKindFfi.WEB,
                 ),
             )
 
@@ -107,6 +109,7 @@ class MarkdownLinkCopyTest {
                     dest = destination,
                     title = null,
                     children = listOf(MarkdownInlineFfi.Text(label)),
+                    classification = MarkdownLinkDestinationKindFfi.WEB,
                 ),
             )
 
@@ -127,6 +130,7 @@ class MarkdownLinkCopyTest {
                     dest = destination,
                     title = null,
                     children = listOf(MarkdownInlineFfi.Text("your-bank.example")),
+                    classification = MarkdownLinkDestinationKindFfi.WEB,
                 ),
             )
 
@@ -261,7 +265,14 @@ class MarkdownLinkCopyTest {
         return context.getString(resId)
     }
 
-    private fun autolinkDocument(url: String) = paragraphDocument(MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI))
+    private fun autolinkDocument(url: String) =
+        paragraphDocument(
+            MarkdownInlineFfi.Autolink(
+                url,
+                MarkdownAutolinkKindFfi.URI,
+                MarkdownLinkDestinationKindFfi.WEB,
+            ),
+        )
 
     private fun paragraphDocument(inline: MarkdownInlineFfi) =
         MarkdownDocumentFfi(

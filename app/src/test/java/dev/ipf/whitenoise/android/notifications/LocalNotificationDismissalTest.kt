@@ -123,6 +123,7 @@ class LocalNotificationDismissalTest {
                 LocalNotificationFormatter.conversationDismissalKey(account, group),
                 LocalNotificationFormatter.reactionDismissalKey(account, group),
                 LocalNotificationFormatter.mentionDismissalKey(account, group),
+                LocalNotificationFormatter.agentActivityDismissalKey(account, group),
             )
         siblingKeys.forEach { key -> manager.notify(key.tag, key.id, notification()) }
         manager.notify(
@@ -209,7 +210,8 @@ class LocalNotificationDismissalTest {
         val conversation = LocalNotificationFormatter.conversationDismissalKey(account, group)
         val reaction = LocalNotificationFormatter.reactionDismissalKey(account, group)
         val mention = LocalNotificationFormatter.mentionDismissalKey(account, group)
-        listOf(conversation, reaction, mention).forEach { manager.notify(it.tag, it.id, notification()) }
+        val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(account, group)
+        listOf(conversation, reaction, mention, agentActivity).forEach { manager.notify(it.tag, it.id, notification()) }
         manager.notify(
             "invite-target",
             41,

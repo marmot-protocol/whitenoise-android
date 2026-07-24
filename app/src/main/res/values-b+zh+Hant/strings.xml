@@ -488,6 +488,8 @@
     <string name="notification_channel_reactions_description">對你訊息的回應</string>
     <string name="notification_channel_invites">邀請</string>
     <string name="notification_channel_invites_description">群組邀請和歡迎</string>
+    <string name="notification_channel_agent_activity">代理活動</string>
+    <string name="notification_channel_agent_activity_description">工具進度和代理狀態更新</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
     <string name="notification_hidden_content">新通知</string>
@@ -1021,6 +1023,7 @@
     <string name="chat_lock">聊天鎖定</string>
     <string name="collapse_long_messages">摺疊長訊息</string>
     <string name="notify">通知方式</string>
+    <string name="sounds_and_notifications">音效與通知</string>
     <string name="notify_all_messages">所有訊息</string>
     <string name="notify_only_mentions">僅限提及</string>
     <string name="notify_nothing">無</string>

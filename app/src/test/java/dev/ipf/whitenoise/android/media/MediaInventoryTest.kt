@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import org.junit.Assert.assertEquals
@@ -81,6 +82,7 @@ class MediaInventoryTest {
                                     dest = "https://example.com/never",
                                     title = null,
                                     children = listOf(MarkdownInlineFfi.Text("never")),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
                                 ),
                         ),
                     ),
@@ -198,7 +200,15 @@ class MediaInventoryTest {
             blocks =
                 listOf(
                     MarkdownBlockFfi.Paragraph(
-                        inlines = listOf(MarkdownInlineFfi.Link(dest = url, title = null, children = listOf(MarkdownInlineFfi.Text(url)))),
+                        inlines =
+                            listOf(
+                                MarkdownInlineFfi.Link(
+                                    dest = url,
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text(url)),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                            ),
                     ),
                 ),
         )

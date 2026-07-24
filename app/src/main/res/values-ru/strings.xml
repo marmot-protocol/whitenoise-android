@@ -517,6 +517,8 @@
     <string name="notification_channel_reactions_description">Реакции на ваши сообщения</string>
     <string name="notification_channel_invites">Приглашения</string>
     <string name="notification_channel_invites_description">Приглашения в группы и приветствия</string>
+    <string name="notification_channel_agent_activity">Активность агента</string>
+    <string name="notification_channel_agent_activity_description">Ход выполнения инструментов и обновления статуса агента</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
     <string name="notification_hidden_content">Новое уведомление</string>
@@ -1083,6 +1085,7 @@
     <string name="chat_lock">Блокировка чата</string>
     <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
     <string name="notify">Уведомлять</string>
+    <string name="sounds_and_notifications">Звуки и уведомления</string>
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
     <string name="notify_nothing">Ничего</string>

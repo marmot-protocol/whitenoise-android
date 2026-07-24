@@ -38,6 +38,7 @@ class TimelineRecordProfileSendersTest {
             media = emptyList(),
             agentTextStreamJson = null,
             deleted = false,
+            invalidationStatus = null,
         )
 
     private fun record(
