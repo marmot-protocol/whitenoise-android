@@ -1,43 +1,66 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -47,12 +70,13 @@ import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
-import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import java.util.Locale
 
 /**
@@ -97,14 +121,13 @@ internal fun ChatFolderEditScreen(
     BackHandler { onClose() }
 
     fun save() {
-        // Name and description are both required by the create/edit contract.
-        if (description.isBlank()) return
         val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return
+        val trimmedDescription = description.trim()
         val id =
             folderId?.also {
                 store.renameFolder(accountRef, it, trimmedName)
-                store.editFolderDescription(accountRef, it, description)
-            } ?: store.createFolder(accountRef, trimmedName, description)?.id
+                store.editFolderDescription(accountRef, it, trimmedDescription)
+            } ?: store.createFolder(accountRef, trimmedName, trimmedDescription)?.id
         if (id != null) {
             val before = store.membershipFor(accountRef, id)
             (manualChatIds - before).forEach { store.setChatInFolder(accountRef, id, it, included = true) }
@@ -152,10 +175,11 @@ internal fun ChatFolderEditScreen(
         remember(memberHexes, appState.profileRevisionForCompose) {
             memberHexes.joinToString(", ") { appState.displayName(it) }
         }
+    val canSave = name.isNotBlank()
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = {
                     Text(
                         stringResource(
@@ -168,12 +192,29 @@ internal fun ChatFolderEditScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
-                actions = {
-                    TextButton(onClick = { save() }, enabled = name.isNotBlank() && description.isNotBlank()) {
-                        Text(stringResource(R.string.save))
-                    }
-                },
             )
+        },
+        bottomBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+            ) {
+                Button(
+                    onClick = { save() },
+                    enabled = canSave,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier =
+                        Modifier
+                            .navigationBarsPadding()
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd)
+                            .height(56.dp),
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(Dimens.spaceSm))
+                    Text(stringResource(R.string.save), style = MaterialTheme.typography.labelLarge)
+                }
+            }
         },
     ) { padding ->
         Column(
@@ -182,54 +223,65 @@ internal fun ChatFolderEditScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(Dimens.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.chat_folder_name_label)) },
-            )
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.chat_folder_description_label)) },
-            )
-            SettingsActionRow(
+            FolderEditorIntro()
+            FolderEditorPanel {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    label = { Text(stringResource(R.string.chat_folder_name_label)) },
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    label = { Text(stringResource(R.string.chat_folder_description_label)) },
+                )
+            }
+            FolderEditorActionCard(
                 icon = Icons.AutoMirrored.Filled.Chat,
                 title = stringResource(R.string.chat_folder_manual_chats),
                 value = pluralStringResource(R.plurals.chat_folder_chat_count, manualChatIds.size, manualChatIds.size),
                 onClick = { showChatPicker = true },
             )
-            SettingsActionRow(
+            FolderEditorActionCard(
                 icon = Icons.Default.People,
                 title = stringResource(R.string.chat_folder_people),
                 value = selectedPeople.ifEmpty { stringResource(R.string.chat_folder_people_subtitle) },
                 onClick = { showMemberPicker = true },
             )
-            OutlinedTextField(
-                value = keyword,
-                onValueChange = { keyword = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
-                supportingText = { Text(stringResource(R.string.chat_folder_keyword_hint)) },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.chat_folder_unread_only),
-                subtitle = stringResource(R.string.chat_folder_unread_only_subtitle),
-                checked = unreadOnly,
-                onCheckedChange = { unreadOnly = it },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.chat_folder_include_muted),
-                subtitle = null,
-                checked = includeMuted,
-                onCheckedChange = { includeMuted = it },
-            )
+            FolderEditorPanel {
+                OutlinedTextField(
+                    value = keyword,
+                    onValueChange = { keyword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null) },
+                    label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
+                    supportingText = { Text(stringResource(R.string.chat_folder_keyword_hint)) },
+                )
+                FolderRuleToggle(
+                    title = stringResource(R.string.chat_folder_unread_only),
+                    subtitle = stringResource(R.string.chat_folder_unread_only_subtitle),
+                    checked = unreadOnly,
+                    onCheckedChange = { unreadOnly = it },
+                )
+                FolderRuleToggle(
+                    title = stringResource(R.string.chat_folder_include_muted),
+                    subtitle = null,
+                    checked = includeMuted,
+                    onCheckedChange = { includeMuted = it },
+                )
+            }
         }
     }
 
@@ -256,6 +308,165 @@ internal fun ChatFolderEditScreen(
             },
             onDismiss = { showMemberPicker = false },
         )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun FolderEditorIntro() {
+    val shape = RoundedCornerShape(28.dp)
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(shape),
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLg),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(56.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(28.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                Text(
+                    stringResource(R.string.chat_folders_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.chat_folders_settings_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun FolderEditorPanel(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(shape),
+        shape = shape,
+        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+            content = content,
+        )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun FolderEditorActionCard(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(24.dp)
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(shape),
+        shape = shape,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLg),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f).animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun FolderRuleToggle(
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val containerColor by
+        animateColorAsState(
+            targetValue =
+                if (checked) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+            label = "folderRuleContainer",
+        )
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = containerColor,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = checked,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
+                ),
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Switch(checked = checked, onCheckedChange = null)
+        }
     }
 }
 
