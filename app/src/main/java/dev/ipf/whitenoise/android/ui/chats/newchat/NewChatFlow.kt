@@ -51,7 +51,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
@@ -131,7 +131,7 @@ internal suspend fun attemptStartProfileChat(
     awaitChatListItem: suspend (String) -> ChatListItem?,
     displayName: (String) -> String,
 ): StartChatAttemptResult =
-    try {
+    runCatchingCancellable {
         val groupIdHex = retryGroupIdHex ?: createGroup(npub)
         val item = awaitChatListItem(groupIdHex)
         if (item != null) {
@@ -148,8 +148,7 @@ internal suspend fun attemptStartProfileChat(
                 ),
             )
         }
-    } catch (error: Throwable) {
-        rethrowIfCancellation(error)
+    }.getOrElse { error ->
         StartChatAttemptResult.Failed(
             startChatErrorUiState(
                 npub = npub,
