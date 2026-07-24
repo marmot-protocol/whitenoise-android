@@ -8,6 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,6 +70,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -213,9 +215,8 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ConversationSearchScrollAnchor(
+    val bookmark: ConversationScrollBookmark,
     val match: ConversationSearchMatch?,
-    val fallbackIndex: Int,
-    val scrollOffset: Int,
 )
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
@@ -388,6 +389,21 @@ internal fun ConversationScreen(
             rememberLazyListState(
                 initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
+            )
+        }
+    val scrollCoordinator =
+        remember(controller, listState) {
+            ConversationScrollCoordinator(
+                writer = LazyListConversationScrollWriter(listState),
+                initialMode =
+                    if (scrollRestore != null) {
+                        ConversationScrollMode.ReadingHistory(
+                            anchorMessageId = scrollRestore.anchorMessageIdHex,
+                            pixelOffset = scrollRestore.firstVisibleItemScrollOffset,
+                        )
+                    } else {
+                        ConversationScrollMode.FollowingTail
+                    },
             )
         }
     // Single conversation-level owner of which message's action menu is open, so
@@ -587,8 +603,8 @@ internal fun ConversationScreen(
     var searchPinnedMatchId by remember(controller) { mutableStateOf<String?>(null) }
     var searchJob by remember(controller) { mutableStateOf<Job?>(null) }
     // The durable local message position lets close-search move the bounded
-    // subscription window back before restoring the exact viewport offset.
-    // Numeric index remains a fallback for headers and optimistic rows.
+    // subscription window back before the coordinator restores the exact
+    // logical bookmark and viewport offset.
     var preSearchScrollAnchor by remember(controller) { mutableStateOf<ConversationSearchScrollAnchor?>(null) }
     DisposableEffect(controller) {
         onDispose {
@@ -735,6 +751,55 @@ internal fun ConversationScreen(
             renderedTimelineSize = renderedSize,
             hasOlderHeader = hasOlderHeader,
         )
+
+    fun currentScrollAnchor(): ConversationScrollAnchor {
+        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+        val listIndex = listState.firstVisibleItemIndex
+        val timelineIndex = listIndex - 1 - (if (liveHasOlderHeader) 1 else 0)
+        val item = liveRenderedTimeline.getOrNull(timelineIndex)
+        return ConversationScrollAnchor(
+            listIndex = listIndex,
+            pixelOffset = listState.firstVisibleItemScrollOffset,
+            itemId = item?.id,
+            messageId = item?.record?.messageIdHex,
+        )
+    }
+
+    fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
+        val timelineIndex =
+            anchor.messageId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { messageId -> renderedTimeline.indexOfFirst { it.record.messageIdHex == messageId } }
+                ?.takeIf { it >= 0 }
+                ?: anchor.itemId
+                    ?.let { itemId -> renderedTimeline.indexOfFirst { it.id == itemId } }
+                    ?.takeIf { it >= 0 }
+                ?: return null
+        return 1 + (if (hasOlderHeader) 1 else 0) + timelineIndex
+    }
+
+    // Drag interactions are the authority for user intent. Programmatic list
+    // movement never emits these, so it cannot accidentally downgrade a tail
+    // follower or overwrite a history anchor.
+    LaunchedEffect(listState, scrollCoordinator) {
+        listState.interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                is DragInteraction.Stop,
+                is DragInteraction.Cancel,
+                -> {
+                    snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
+                    val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                    val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+                    scrollCoordinator.onUserGestureSettled(
+                        currentScrollAnchor(),
+                        isNearBottom(listState, liveRenderedSize, liveHasOlderHeader),
+                    )
+                }
+            }
+        }
+    }
     // Read anchor stored as the message id of the deepest row the user has
     // settled on. Looked up live each time so load-older prepends shift both
     // the candidate and the anchor by the same offset — position comparisons
@@ -781,12 +846,7 @@ internal fun ConversationScreen(
                 conversationScrollSnapshotOnLeave(
                     firstVisibleItemIndex = listState.firstVisibleItemIndex,
                     firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
-                    nearBottom =
-                        isNearBottom(
-                            listState,
-                            rendered.size,
-                            hasOlderHeader,
-                        ),
+                    nearBottom = scrollCoordinator.isFollowingTail,
                     anchorItemId = anchor?.id,
                     anchorMessageIdHex = anchor?.record?.messageIdHex,
                 ),
@@ -848,8 +908,8 @@ internal fun ConversationScreen(
     // doesn't carry the previous chat's keyboard state across.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
-    val imeOpenReanchorNearBottom =
-        rememberImeOpenReanchorNearBottom(chat.id, imeIsOpen, composerFocused, nearBottom)
+    var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
+    var pauseScrollBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
     // #589: used by the resume observer to clear focus and drop the keyboard
@@ -858,6 +918,20 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+
+    fun revealSentMessage(targetIndex: Int? = null) {
+        scope.launch {
+            scrollCoordinator.programmaticJump(
+                targetMessageId = null,
+                reason = ConversationScrollReason.Send,
+                resultingMode = ConversationScrollMode.FollowingTail,
+            ) {
+                val target = targetIndex ?: (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                animateScrollToItem(target)
+            }
+        }
+    }
+
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -1054,10 +1128,7 @@ internal fun ConversationScreen(
         val body = formatUserShareText(candidate.displayName, candidate.npub)
         appState.launchMutation {
             controller.send(body) {
-                scope.launch {
-                    val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                    listState.animateScrollToItem(target)
-                }
+                revealSentMessage()
             }
         }
     }
@@ -1080,10 +1151,7 @@ internal fun ConversationScreen(
                 )
             val caption = formatContactShareText(contact).ifBlank { null }
             val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
-            scope.launch {
-                val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                listState.animateScrollToItem(target)
-            }
+            revealSentMessage()
             controller.uploadQueued(seeded)
         }
     }
@@ -1122,10 +1190,7 @@ internal fun ConversationScreen(
                     fileName = "voice-${durationMs}ms.${dev.ipf.whitenoise.android.audio.VoiceRecorder.FILE_EXTENSION}",
                 )
             val seeded = controller.queueAttachments(listOf(attachment), null) ?: return@launchMutation
-            scope.launch {
-                val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                listState.animateScrollToItem(target)
-            }
+            revealSentMessage()
             controller.uploadQueued(seeded)
         }
     }
@@ -1709,6 +1774,17 @@ internal fun ConversationScreen(
         }
     }
 
+    fun currentTimelineListIndex(messageId: String): Int? {
+        val timelineIndex =
+            controller.timeline
+                .filterNot { MessageProjector.isEdit(it.record) }
+                .indexOfFirst { it.record.messageIdHex == messageId }
+                .takeIf { it >= 0 }
+                ?: return null
+        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        return 1 + olderMessagesHeaderCount + timelineIndex
+    }
+
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
     // vertical center of the message-list viewport, leaving context above and
     // below the target visible (#595, #794). Uses one animated scroll; if the
@@ -1717,70 +1793,62 @@ internal fun ConversationScreen(
     suspend fun centerTimelineItemAt(
         targetMessageId: String,
         fallbackTargetIndex: Int,
+        reason: ConversationScrollReason,
     ) {
-        fun currentTargetIndex(): Int? {
-            val timelineIndex =
-                controller.timeline
-                    .filterNot { MessageProjector.isEdit(it.record) }
-                    .indexOfFirst { it.record.messageIdHex == targetMessageId }
-                    .takeIf { it >= 0 }
-                    ?: return null
-            val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-            return 1 + olderMessagesHeaderCount + timelineIndex
-        }
-
-        val targetIndex = currentTargetIndex() ?: fallbackTargetIndex
-        val layoutInfo = listState.layoutInfo
-        val viewportHeight = layoutInfo.viewportSize.height
-        if (viewportHeight <= 0) {
-            // Layout not measured yet (rare on a fresh open): fall back to the
-            // plain top-aligned jump rather than guessing an offset.
-            listState.animateScrollToItem(targetIndex)
-            return
-        }
-        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val firstTimelineListIndex = 1 + olderMessagesHeaderCount
-        val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
-        val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
-        val visibleTimelineHeights =
-            layoutInfo.visibleItemsInfo
-                .filter { visibleItem ->
-                    if (visibleItem.index !in firstTimelineListIndex..lastTimelineListIndex) return@filter false
-                    val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false
-                    timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
-                }.map { it.size }
-        val itemHeight =
-            ReplyNavigation.itemHeightForScrollPx(
+        val completed =
+            scrollCoordinator.programmaticJump(
                 targetMessageId = targetMessageId,
-                measuredItemHeightsByMessageId = timelineItemHeightsPx,
-                visibleTargetHeightPx = visibleTargetHeight,
-                visibleTimelineItemHeightsPx = visibleTimelineHeights,
-            )
-        // Compose clamps the resulting scroll at the list bounds, so this still
-        // degrades as #595 asks: a near-top match can't scroll up past the
-        // first row (top-aligned) and a near-bottom match can't scroll down
-        // past the last row (bottom-aligned); only the middle case truly
-        // centers.
-        val animatedOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
-        listState.animateScrollToItem(targetIndex, animatedOffset)
+                reason = reason,
+            ) {
+                val targetIndex = currentTimelineListIndex(targetMessageId) ?: fallbackTargetIndex
+                val layoutInfo = listState.layoutInfo
+                val viewportHeight = layoutInfo.viewportSize.height
+                if (viewportHeight <= 0) {
+                    // Layout not measured yet (rare on a fresh open): fall back to the
+                    // plain top-aligned jump rather than guessing an offset.
+                    animateScrollToItem(targetIndex)
+                    return@programmaticJump
+                }
+                val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                val firstTimelineListIndex = 1 + olderMessagesHeaderCount
+                val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
+                val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
+                val visibleTimelineHeights =
+                    layoutInfo.visibleItemsInfo
+                        .filter { visibleItem ->
+                            if (visibleItem.index !in firstTimelineListIndex..lastTimelineListIndex) return@filter false
+                            val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false
+                            timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
+                        }.map { it.size }
+                val itemHeight =
+                    ReplyNavigation.itemHeightForScrollPx(
+                        targetMessageId = targetMessageId,
+                        measuredItemHeightsByMessageId = timelineItemHeightsPx,
+                        visibleTargetHeightPx = visibleTargetHeight,
+                        visibleTimelineItemHeightsPx = visibleTimelineHeights,
+                    )
+                val animatedOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
+                animateScrollToItem(targetIndex, animatedOffset)
 
-        // After an off-screen row is composed, use its real measured height for
-        // exact final centering. This must remain non-animated: the old second
-        // animateScrollToItem is what produced the visible overshoot/backtrack.
-        withFrameNanos { }
-        val resolvedTargetIndex = currentTargetIndex() ?: targetIndex
-        val postScrollLayoutInfo = listState.layoutInfo
-        val measuredItemHeight =
-            postScrollLayoutInfo.visibleItemsInfo.firstOrNull { it.index == resolvedTargetIndex }?.size
-                ?: timelineItemHeightsPx[targetMessageId]
-        val measuredViewportHeight = postScrollLayoutInfo.viewportSize.height
-        if (measuredViewportHeight > 0 && measuredItemHeight != null) {
-            val measuredOffset = ReplyNavigation.centeredScrollOffset(measuredViewportHeight, measuredItemHeight)
-            if (resolvedTargetIndex != targetIndex || measuredOffset != animatedOffset) {
-                listState.scrollToItem(resolvedTargetIndex, measuredOffset)
+                // Keep the measured correction in the same coordinator command. A
+                // newer drag/jump cancels this whole block before it can snap back.
+                withFrameNanos { }
+                val resolvedTargetIndex = currentTimelineListIndex(targetMessageId) ?: targetIndex
+                val postScrollLayoutInfo = listState.layoutInfo
+                val measuredItemHeight =
+                    postScrollLayoutInfo.visibleItemsInfo.firstOrNull { it.index == resolvedTargetIndex }?.size
+                        ?: timelineItemHeightsPx[targetMessageId]
+                val measuredViewportHeight = postScrollLayoutInfo.viewportSize.height
+                if (measuredViewportHeight > 0 && measuredItemHeight != null) {
+                    val measuredOffset =
+                        ReplyNavigation.centeredScrollOffset(measuredViewportHeight, measuredItemHeight)
+                    if (resolvedTargetIndex != targetIndex || measuredOffset != animatedOffset) {
+                        scrollToItem(resolvedTargetIndex, measuredOffset)
+                    }
+                }
             }
-        }
+        if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     }
 
     fun recordReactionEmoji(emoji: String) {
@@ -1829,7 +1897,11 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                centerTimelineItemAt(targetMessageId, 1 + olderMessagesHeaderCount + timelineIndex)
+                centerTimelineItemAt(
+                    targetMessageId,
+                    1 + olderMessagesHeaderCount + timelineIndex,
+                    ConversationScrollReason.Reply,
+                )
                 highlightedMessageId = targetMessageId
                 delay(1_500L)
                 if (highlightedMessageId == targetMessageId) {
@@ -1856,7 +1928,11 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                centerTimelineItemAt(targetMessageId, 1 + olderMessagesHeaderCount + timelineIndex)
+                centerTimelineItemAt(
+                    targetMessageId,
+                    1 + olderMessagesHeaderCount + timelineIndex,
+                    ConversationScrollReason.Mention,
+                )
                 highlightedMessageId = targetMessageId
                 // Mark read up to the visited mention so the count — and the
                 // chat-list @-badge — decrement in step; advance the local read
@@ -2005,7 +2081,11 @@ internal fun ConversationScreen(
                 .indexOfFirst { it.record.messageIdHex == messageIdHex }
         if (timelineIndex < 0) return
         val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        centerTimelineItemAt(messageIdHex, 1 + liveOlderHeaderCount + timelineIndex)
+        centerTimelineItemAt(
+            messageIdHex,
+            1 + liveOlderHeaderCount + timelineIndex,
+            ConversationScrollReason.Search,
+        )
         highlightedMessageId = messageIdHex
         delay(1_500L)
         if (highlightedMessageId == messageIdHex) {
@@ -2058,8 +2138,8 @@ internal fun ConversationScreen(
         previousSearchJob?.cancel()
         highlightedMessageId = null
         // A deep search jump can evict the original viewport from the capped
-        // window. Page back to its durable local message before restoring the
-        // offset; numeric index is only the non-projected fallback.
+        // window. Page back to its durable local message before asking the
+        // coordinator to restore the logical anchor and exact offset.
         preSearchScrollAnchor?.let { anchor ->
             searchJob =
                 scope.launch {
@@ -2067,24 +2147,18 @@ internal fun ConversationScreen(
                     val match = anchor.match
                     if (match != null && controller.loadSearchResultMessageAvailable(match)) {
                         withFrameNanos { }
-                        val timelineIndex =
-                            controller.timeline
-                                .filterNot { MessageProjector.isEdit(it.record) }
-                                .indexOfFirst { it.record.messageIdHex == match.messageIdHex }
-                        if (timelineIndex >= 0) {
-                            val headerCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-                            listState.scrollToItem(1 + headerCount + timelineIndex, anchor.scrollOffset)
-                            return@launch
-                        }
                     }
-                    withFrameNanos { }
-                    val lastIndex = listState.layoutInfo.totalItemsCount - 1
-                    if (lastIndex >= 0) {
-                        listState.scrollToItem(
-                            anchor.fallbackIndex.coerceIn(0, lastIndex),
-                            anchor.scrollOffset,
-                        )
-                    }
+                    scrollCoordinator.restoreBookmark(
+                        anchor.bookmark,
+                        force = true,
+                        resolveAnchorIndex = { saved ->
+                            resolveScrollAnchorIndex(saved)
+                                ?: saved.listIndex.coerceIn(
+                                    0,
+                                    (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0),
+                                )
+                        },
+                    )
                 }
         }
         preSearchScrollAnchor = null
@@ -2156,28 +2230,26 @@ internal fun ConversationScreen(
         }
         unreadDivergenceLogged = true
     }
-    // Boolean-edge key avoids per-frame coroutine cancellation. The IME open
-    // animation takes ~200ms; the LazyColumn measures a smaller viewport on
-    // each tick, so a single snap at frame 0 leaves the bubble below the
-    // final viewport. The repeat loop re-snaps every frame for ~24 frames,
-    // chasing the shrinking viewport to its settled bottom. Gated on
-    // the last closed-IME near-bottom value (not live nearBottom) so a transient
-    // canScrollForward=false during IME viewport resize cannot yank a history
-    // reader to the newest row (#1375). imeIsOpen is derived once above
-    // (boolean edge of WindowInsets.ime) to avoid recomposing the
-    // body on every keyboard-animation frame. Keyed on initialTimelineAnchored
-    // too so that when you open a chat with the keyboard already up (no
-    // imeIsOpen edge), the chase still fires the moment the first-open anchor
-    // settles — otherwise the anchor lands against the pre-IME viewport and the
-    // newest message sits a few rows above the bottom until the keyboard closes.
+    // IME re-anchoring is authorized by the coordinator snapshot taken at
+    // the pre-inset focus edge, never by transient live list geometry.
     LaunchedEffect(controller, imeIsOpen, initialTimelineAnchored) {
-        if (!imeIsOpen) return@LaunchedEffect
+        if (!imeIsOpen) {
+            imeTransitionBookmark = null
+            return@LaunchedEffect
+        }
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
-        if (!initialTimelineAnchored || !imeOpenReanchorNearBottom || suppressForCustomInputSwap) return@LaunchedEffect
-        repeat(24) {
-            withFrameNanos { }
-            val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-            runCatching { listState.scrollToItem(last) }
+        if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
+        val snapshot = imeTransitionBookmark ?: scrollCoordinator.bookmark(currentScrollAnchor())
+        when (snapshot.settledMode) {
+            ConversationScrollMode.FollowingTail ->
+                scrollCoordinator.followTailIfAllowed(
+                    tailIndex = bottomTimelineIndex,
+                    reason = ConversationScrollReason.ImeTransition,
+                    frameCount = 24,
+                )
+            is ConversationScrollMode.ReadingHistory ->
+                scrollCoordinator.restoreBookmark(snapshot, resolveAnchorIndex = ::resolveScrollAnchorIndex)
+            else -> Unit
         }
     }
     // #589: app-switch resume handling. Two bugs surfaced when returning to a
@@ -2203,6 +2275,12 @@ internal fun ConversationScreen(
     // rebind the observer; resolved through the existing Context.lifecycleOwner()
     // idiom (no new Local import).
     val resumeLifecycleOwner = context.lifecycleOwner()
+    val currentScrollAnchorProvider by rememberUpdatedState(newValue = { currentScrollAnchor() })
+    val currentScrollAnchorResolver by
+        rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })
+    val currentResumeTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
+    val currentInitialTimelineAnchored by rememberUpdatedState(newValue = initialTimelineAnchored)
+    val currentImeIsOpen by rememberUpdatedState(newValue = imeIsOpen)
     DisposableEffect(controller, resumeLifecycleOwner) {
         if (resumeLifecycleOwner == null) {
             onDispose { }
@@ -2211,9 +2289,8 @@ internal fun ConversationScreen(
                 LifecycleEventObserver { _, event ->
                     when (event) {
                         Lifecycle.Event.ON_PAUSE -> {
-                            // Snapshot the keyboard state we're leaving with so
-                            // resume can faithfully restore it (Case B).
                             wasComposerFocusedOnPause = composerFocused
+                            pauseScrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider())
                         }
                         Lifecycle.Event.ON_RESUME -> {
                             val restoreFocus =
@@ -2223,10 +2300,10 @@ internal fun ConversationScreen(
                                         controller.editingMessageId != null ||
                                             controller.replyingTo != null,
                                 )
+                            val scrollSnapshot = pauseScrollBookmark
+                            pauseScrollBookmark = null
                             scope.launch {
                                 if (restoreFocus) {
-                                    // Case B (was focused): re-raise the keyboard
-                                    // exactly as it was before the switch.
                                     runCatching { composerFocus.requestFocus() }
                                     keyboardController?.show()
                                 } else if (shouldClearFocusOnResume(
@@ -2234,36 +2311,12 @@ internal fun ConversationScreen(
                                         searchOpen = searchOpen,
                                     )
                                 ) {
-                                    // Case B (was NOT focused): the system tried
-                                    // to restore focus/IME — undo it so the
-                                    // keyboard does not pop unrequested.
-                                    //
-                                    // Guarded on !searchOpen: in-chat search
-                                    // (#292) legitimately owns focus + IME while
-                                    // open, and clearFocus(force = true) is
-                                    // screen-wide. Clearing here would drop the
-                                    // search field's focus and hide its keyboard,
-                                    // and LaunchedEffect(searchOpen) does not
-                                    // re-fire on resume to restore it — so we
-                                    // leave focus untouched while search is open.
                                     focusManager.clearFocus(force = true)
                                     keyboardController?.hide()
                                 }
-                                // Case A: re-anchor to the newest row AFTER the
-                                // IME inset has settled, so the latest bubble
-                                // sits above (not behind) the keyboard. Gated on
-                                // nearBottom so a reader scrolled up into history
-                                // is never yanked down. Poll the ime bottom inset
-                                // across frames until it stops changing, then
-                                // run the same 24-frame chase the IME-open path
-                                // uses so the snap tracks the settling viewport.
-                                if (initialTimelineAnchored && nearBottom) {
+                                if (currentInitialTimelineAnchored && scrollSnapshot != null) {
                                     var lastInset = -1
                                     var stableFrames = 0
-                                    // Cap the settle wait so a keyboard that
-                                    // never animates (Case B, staying closed)
-                                    // can't spin here forever. Bail out early
-                                    // once the inset holds steady for two frames.
                                     var settleFrame = 0
                                     while (settleFrame < 24 && stableFrames < 2) {
                                         withFrameNanos { }
@@ -2276,15 +2329,11 @@ internal fun ConversationScreen(
                                         }
                                         settleFrame++
                                     }
-                                    if (nearBottom) {
-                                        repeat(24) {
-                                            withFrameNanos { }
-                                            val last =
-                                                (listState.layoutInfo.totalItemsCount - 1)
-                                                    .coerceAtLeast(0)
-                                            runCatching { listState.scrollToItem(last) }
-                                        }
-                                    }
+                                    scrollCoordinator.restoreViewport(
+                                        snapshot = scrollSnapshot,
+                                        resolveAnchorIndex = currentScrollAnchorResolver,
+                                        tailIndex = currentResumeTailIndex,
+                                    )
                                 }
                             }
                         }
@@ -2295,6 +2344,31 @@ internal fun ConversationScreen(
             onDispose { resumeLifecycleOwner.lifecycle.removeObserver(observer) }
         }
     }
+    LaunchedEffect(listState, scrollCoordinator) {
+        var previousViewportHeight: Int? = null
+        snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
+            val previous = previousViewportHeight
+            previousViewportHeight = viewportHeight
+            val unchangedOrUninitialized = previous == null || previous == viewportHeight
+            if (unchangedOrUninitialized || !currentInitialTimelineAnchored || currentImeIsOpen) {
+                return@collect
+            }
+            when (scrollCoordinator.mode) {
+                ConversationScrollMode.FollowingTail ->
+                    scrollCoordinator.programmaticJump(
+                        targetMessageId = null,
+                        reason = ConversationScrollReason.ViewportChange,
+                        resultingMode = ConversationScrollMode.FollowingTail,
+                    ) {
+                        scrollToItem(currentResumeTailIndex)
+                    }
+                is ConversationScrollMode.ReadingHistory ->
+                    scrollCoordinator.reanchorReadingHistory(currentScrollAnchorResolver)
+                else -> Unit
+            }
+        }
+    }
+
     // Re-apply a saved scroll position once the timeline materializes (#1107).
     // Seeding rememberLazyListState alone is not enough: the list can clamp
     // while the window is still empty, and the first-open anchor would snap to
@@ -2322,10 +2396,30 @@ internal fun ConversationScreen(
                 }
             }.filterNotNull()
                 .first()
-        listState.scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
+        scrollCoordinator.programmaticJump(
+            targetMessageId = restore.anchorMessageIdHex,
+            reason = ConversationScrollReason.SavedRestore,
+            resultingMode =
+                ConversationScrollMode.ReadingHistory(
+                    restore.anchorMessageIdHex,
+                    restore.firstVisibleItemScrollOffset,
+                ),
+        ) {
+            scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
+        }
         initialTimelineAnchored = true
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        val restoredItem = restoredRendered.getOrNull(targetIndex - 1 - restoredOlderHeaderCount)
+        scrollCoordinator.settleReadingAt(
+            ConversationScrollAnchor(
+                listIndex = targetIndex,
+                pixelOffset = restore.firstVisibleItemScrollOffset,
+                itemId = restoredItem?.id ?: restore.anchorItemId,
+                messageId = restoredItem?.record?.messageIdHex ?: restore.anchorMessageIdHex,
+            ),
+        )
         lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
     LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
@@ -2357,7 +2451,30 @@ internal fun ConversationScreen(
                     } else {
                         bottomTimelineIndex
                     }
-                listState.scrollToItem(targetIndex)
+                val resultingMode =
+                    if (renderedUnreadIndex >= 0) {
+                        ConversationScrollMode.ReadingHistory(unreadId, 0)
+                    } else {
+                        ConversationScrollMode.FollowingTail
+                    }
+                scrollCoordinator.programmaticJump(
+                    targetMessageId = unreadId,
+                    reason = ConversationScrollReason.InitialAnchor,
+                    resultingMode = resultingMode,
+                ) {
+                    scrollToItem(targetIndex)
+                }
+                if (resultingMode is ConversationScrollMode.ReadingHistory) {
+                    val unreadItem = renderedTimeline.getOrNull(renderedUnreadIndex)
+                    scrollCoordinator.settleReadingAt(
+                        ConversationScrollAnchor(
+                            listIndex = targetIndex,
+                            pixelOffset = 0,
+                            itemId = unreadItem?.id,
+                            messageId = unreadId,
+                        ),
+                    )
+                }
                 initialTimelineAnchored = true
                 lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
@@ -2372,10 +2489,22 @@ internal fun ConversationScreen(
                         latestId != previousId &&
                         renderedTimeline.any { it.id == previousId }
                 lastFollowedLatestId = latestId ?: previousId
-                if (isAppend && nearBottom) {
-                    listState.scrollToItem(bottomTimelineIndex)
+                if (isAppend) {
+                    scrollCoordinator.followTailIfAllowed(
+                        tailIndex = bottomTimelineIndex,
+                        reason = ConversationScrollReason.NewMessage,
+                    )
                 }
             }
+        }
+    }
+
+    // Re-resolve the durable history anchor whenever row/header composition
+    // changes. Stable message identity, not the old lazy-list index, owns the
+    // restoration after pagination, hydration, separators, or tail appends.
+    LaunchedEffect(controller, renderedTimeline, olderHeaderCount, initialTimelineAnchored) {
+        if (initialTimelineAnchored) {
+            scrollCoordinator.reanchorReadingHistory(::resolveScrollAnchorIndex)
         }
     }
 
@@ -2394,19 +2523,22 @@ internal fun ConversationScreen(
             ?.messageIdHex
             ?.let { controller.reactions[it] },
     ) {
-        if (initialTimelineAnchored && nearBottom && renderedTimeline.isNotEmpty()) {
-            listState.scrollToItem(bottomTimelineIndex)
+        if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
+            scrollCoordinator.followTailIfAllowed(
+                tailIndex = bottomTimelineIndex,
+                reason = ConversationScrollReason.ReactionLayout,
+            )
         }
     }
 
     fun reanchorNewestAfterBottomInputChange() {
-        if (!initialTimelineAnchored || !nearBottom) return
+        if (!initialTimelineAnchored) return
         scope.launch {
-            repeat(24) {
-                withFrameNanos { }
-                val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                runCatching { listState.scrollToItem(last) }
-            }
+            scrollCoordinator.followTailIfAllowed(
+                tailIndex = bottomTimelineIndex,
+                reason = ConversationScrollReason.BottomInput,
+                frameCount = 24,
+            )
         }
     }
 
@@ -2438,7 +2570,11 @@ internal fun ConversationScreen(
         }
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         // Center the match so prior + subsequent context is visible (#595).
-        centerTimelineItemAt(target, 1 + olderMessagesHeaderCount + timelineIndex)
+        centerTimelineItemAt(
+            target,
+            1 + olderMessagesHeaderCount + timelineIndex,
+            ConversationScrollReason.FocusMessage,
+        )
         highlightedMessageId = target
         delay(1_500L)
         if (highlightedMessageId == target) {
@@ -2765,17 +2901,14 @@ internal fun ConversationScreen(
                                         // Snapshot the current scroll position before the
                                         // search auto-scroll effect can move the list, so
                                         // closing search can restore it (#292).
-                                        val firstVisibleIndex = listState.firstVisibleItemIndex
-                                        val visibleMessage =
-                                            listState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                                                val key = visible.key as? String ?: return@firstNotNullOfOrNull null
-                                                renderedTimeline
-                                                    .firstOrNull { it.id == key }
-                                                    ?.let { visible to it }
+                                        val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                                        val anchorMessage =
+                                            bookmark.anchor.messageId?.let { messageId ->
+                                                renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
                                             }
-                                        val anchorMessage = visibleMessage?.second
                                         preSearchScrollAnchor =
                                             ConversationSearchScrollAnchor(
+                                                bookmark = bookmark,
                                                 match =
                                                     anchorMessage?.let {
                                                         ConversationSearchMatch(
@@ -2785,10 +2918,6 @@ internal fun ConversationScreen(
                                                                     ?: it.record.recordedAt,
                                                         )
                                                     },
-                                                fallbackIndex = firstVisibleIndex,
-                                                scrollOffset =
-                                                    visibleMessage?.first?.let { -it.offset }
-                                                        ?: listState.firstVisibleItemScrollOffset,
                                             )
                                         searchOpen = true
                                     },
@@ -2950,10 +3079,7 @@ internal fun ConversationScreen(
                                         // Always pull the user down to see their just-sent
                                         // bubble, even if they were reading older history.
                                         // Matches standard chat-app behavior.
-                                        scope.launch {
-                                            val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                            listState.animateScrollToItem(lastIndex)
-                                        }
+                                        revealSentMessage()
                                     },
                                     onPickFromGallery = {
                                         imagePickerLauncher.launch(
@@ -3038,7 +3164,15 @@ internal fun ConversationScreen(
                                     // resume observer restore focus, and the callback keeps
                                     // `composerFocused` tracking the live keyboard state.
                                     composerFocus = composerFocus,
-                                    onComposerFocusChanged = { composerFocused = it },
+                                    onComposerFocusChanged = { focused ->
+                                        if (focused && !composerFocused && !imeIsOpen) {
+                                            imeTransitionBookmark =
+                                                scrollCoordinator.bookmark(currentScrollAnchor())
+                                        } else if (!focused && !imeIsOpen) {
+                                            imeTransitionBookmark = null
+                                        }
+                                        composerFocused = focused
+                                    },
                                     onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
                                     onKeyboardRestoreFromCustomInput = {
                                         suppressNextImeOpenReanchor.set(true)
@@ -3401,7 +3535,18 @@ internal fun ConversationScreen(
                                                                 olderHeaderCount = olderHeaderCount,
                                                                 bottomTimelineIndex = bottomTimelineIndex,
                                                             )
-                                                        listState.animateScrollToItem(targetIndex)
+                                                        scrollCoordinator.programmaticJump(
+                                                            targetMessageId = null,
+                                                            reason = ConversationScrollReason.JumpToNewest,
+                                                            resultingMode =
+                                                                if (targetIndex == bottomTimelineIndex) {
+                                                                    ConversationScrollMode.FollowingTail
+                                                                } else {
+                                                                    null
+                                                                },
+                                                        ) {
+                                                            animateScrollToItem(targetIndex)
+                                                        }
                                                     }
                                                 },
                                         contentAlignment = Alignment.Center,
@@ -3600,7 +3745,7 @@ internal fun ConversationScreen(
                 locationPickerOpen = false
                 appState.launchMutation {
                     controller.send(formatLocationShareText(location)) {
-                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                        revealSentMessage(bottomTimelineIndex)
                     }
                 }
             },
@@ -3647,7 +3792,7 @@ internal fun ConversationScreen(
                         // is stale until the next recompose — for a
                         // multi-file send that staleness leaves the user
                         // one-or-more rows above the new bubble.
-                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                        revealSentMessage(bottomTimelineIndex)
                     },
                 )
             },

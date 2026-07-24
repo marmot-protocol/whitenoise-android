@@ -8,14 +8,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollReason
+import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
-import dev.ipf.whitenoise.android.ui.conversation.rememberImeOpenReanchorNearBottom
+import dev.ipf.whitenoise.android.ui.conversation.restoreViewport
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,10 +30,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * Pins the conversation near-bottom derived state (issue #1253) and the
- * IME-open bottom-chase gate (issue #1375).
- */
+/** Pins real LazyListState integration for conversation scroll intent. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationNearBottomTest {
@@ -50,36 +51,6 @@ class ConversationNearBottomTest {
             }
             item { Spacer(Modifier.height(1.dp)) }
         }
-    }
-
-    @Composable
-    private fun ImeOpenChaseHarness(
-        listState: LazyListState,
-        timelineSize: Int,
-        imeIsOpen: Boolean,
-        composerFocused: Boolean,
-        initialTimelineAnchored: Boolean,
-        liveNearBottom: Boolean,
-        chaseCount: IntArray,
-    ) {
-        val gateNearBottom =
-            rememberImeOpenReanchorNearBottom(
-                chatId = "chat-under-test",
-                imeIsOpen = imeIsOpen,
-                composerFocused = composerFocused,
-                nearBottom = liveNearBottom,
-            )
-
-        // Mirrors ConversationScreen's keys and guards; one snap is enough to
-        // prove whether the production 24-frame chase started.
-        LaunchedEffect(imeIsOpen, initialTimelineAnchored) {
-            if (!imeIsOpen || !initialTimelineAnchored || !gateNearBottom) return@LaunchedEffect
-            chaseCount[0]++
-            val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-            listState.scrollToItem(last)
-        }
-
-        TimelineHarness(listState = listState, timelineSize = timelineSize)
     }
 
     @Test
@@ -103,16 +74,9 @@ class ConversationNearBottomTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            timelineSize.value = 50
-        }
+        composeRule.runOnUiThread { timelineSize.value = 50 }
         composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            runBlocking {
-                listState.scrollToItem(20)
-            }
-        }
-        composeRule.waitForIdle()
+        scrollTo(listState, 20)
 
         composeRule.runOnUiThread {
             assertFalse(
@@ -123,171 +87,134 @@ class ConversationNearBottomTest {
     }
 
     @Test
-    fun imeOpenGateRetainsHistoryStateThroughTransientLayoutRead() {
-        val imeOpen = mutableStateOf(false)
-        val composerFocused = mutableStateOf(false)
-        val nearBottom = mutableStateOf(false)
-        val gateHolder = arrayOf<Boolean?>(null)
-
-        composeRule.setContent {
-            gateHolder[0] =
-                rememberImeOpenReanchorNearBottom(
-                    chatId = "chat-under-test",
-                    imeIsOpen = imeOpen.value,
-                    composerFocused = composerFocused.value,
-                    nearBottom = nearBottom.value,
-                )
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            composerFocused.value = true
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            // The viewport can report a transient near-bottom layout before
-            // the IME inset edge becomes observable.
-            nearBottom.value = true
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            imeOpen.value = true
-        }
-        composeRule.waitForIdle()
-
-        assertFalse(gateHolder[0]!!)
-    }
-
-    @Test
-    fun imeOpenChasePreservesHistoryScrollPosition() {
-        val timelineSize = 50
+    fun readingHistoryViewportRestoreKeepsTheSameListAnchorAndPixelOffset() {
         val listState = LazyListState()
-        val imeOpen = mutableStateOf(false)
-        val composerFocused = mutableStateOf(false)
-        val liveNearBottom = mutableStateOf(false)
-        val chaseCount = intArrayOf(0)
-
         composeRule.setContent {
-            ImeOpenChaseHarness(
+            TimelineHarness(
                 listState = listState,
-                timelineSize = timelineSize,
-                imeIsOpen = imeOpen.value,
-                composerFocused = composerFocused.value,
-                initialTimelineAnchored = true,
-                liveNearBottom = liveNearBottom.value,
-                chaseCount = chaseCount,
+                timelineSize = 50,
+                modifier = Modifier.height(100.dp),
             )
         }
-
         composeRule.waitForIdle()
+        scrollTo(listState, 20, 17)
+        val indexBefore = listState.firstVisibleItemIndex
+        val offsetBefore = listState.firstVisibleItemScrollOffset
+        val coordinator =
+            ConversationScrollCoordinator(
+                writer = LazyListConversationScrollWriter(listState),
+                initialMode = ConversationScrollMode.ReadingHistory("reader", offsetBefore),
+            )
+        val snapshot =
+            coordinator.bookmark(
+                ConversationScrollAnchor(indexBefore, offsetBefore, "msg:reader", "reader"),
+            )
+
         composeRule.runOnUiThread {
             runBlocking {
-                listState.scrollToItem(20)
+                coordinator.restoreViewport(
+                    snapshot = snapshot,
+                    resolveAnchorIndex = { indexBefore },
+                    tailIndex = listState.layoutInfo.totalItemsCount - 1,
+                    frameCount = 1,
+                    awaitFrame = {},
+                )
             }
         }
         composeRule.waitForIdle()
 
-        val indexBeforeIme = listState.firstVisibleItemIndex
-        assertFalse(isNearBottom(listState, timelineSize, hasOlderHeader = true))
-
-        composeRule.runOnUiThread {
-            composerFocused.value = true
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            // Explicitly model the live layout race without violating the
-            // production invariant: all 50 timeline rows are still rendered.
-            liveNearBottom.value = true
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            imeOpen.value = true
-        }
-        composeRule.waitForIdle()
-
-        assertEquals(0, chaseCount[0])
-        assertEquals(indexBeforeIme, listState.firstVisibleItemIndex)
+        assertEquals(indexBefore, listState.firstVisibleItemIndex)
+        assertEquals(offsetBefore, listState.firstVisibleItemScrollOffset)
+        assertFalse(coordinator.isFollowingTail)
     }
 
     @Test
-    fun imeOpenGateRetainsPreImeBottomState() {
-        val imeOpen = mutableStateOf(false)
-        val composerFocused = mutableStateOf(false)
-        val nearBottom = mutableStateOf(true)
-        val gateHolder = arrayOf<Boolean?>(null)
-
+    fun followingTailViewportRestoreReanchorsAfterViewportMovement() {
+        val listState = LazyListState()
         composeRule.setContent {
-            gateHolder[0] =
-                rememberImeOpenReanchorNearBottom(
-                    chatId = "chat-under-test",
-                    imeIsOpen = imeOpen.value,
-                    composerFocused = composerFocused.value,
-                    nearBottom = nearBottom.value,
+            TimelineHarness(
+                listState = listState,
+                timelineSize = 50,
+                modifier = Modifier.height(100.dp),
+            )
+        }
+        composeRule.waitForIdle()
+        val tail = listState.layoutInfo.totalItemsCount - 1
+        scrollTo(listState, tail)
+        val coordinator = ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
+        val snapshot =
+            coordinator.bookmark(
+                ConversationScrollAnchor(tail, 0, "msg:last", "last"),
+            )
+
+        // Models a transient viewport relayout before the IME settles.
+        scrollTo(listState, 20)
+        composeRule.runOnUiThread {
+            runBlocking {
+                coordinator.restoreViewport(
+                    snapshot = snapshot,
+                    resolveAnchorIndex = { tail },
+                    tailIndex = tail,
+                    frameCount = 3,
+                    awaitFrame = {},
                 )
+            }
         }
         composeRule.waitForIdle()
 
-        composeRule.runOnUiThread {
-            composerFocused.value = true
-        }
-        composeRule.waitForIdle()
-
-        composeRule.runOnUiThread {
-            nearBottom.value = false
-            imeOpen.value = true
-        }
-        composeRule.waitForIdle()
-
-        assertTrue(gateHolder[0]!!)
+        assertTrue(isNearBottom(listState, timelineSize = 50, hasOlderHeader = false))
+        assertTrue(coordinator.isFollowingTail)
     }
 
     @Test
-    fun imeOpenGateResetsForChatOpenedWithKeyboardUp() {
-        val chatId = mutableStateOf("first-chat")
-        val imeOpen = mutableStateOf(false)
-        val composerFocused = mutableStateOf(false)
-        val nearBottom = mutableStateOf(false)
-        val gateHolder = arrayOf<Boolean?>(null)
-
+    fun newMessageDoesNotMoveAHistoryReader() {
+        val listState = LazyListState()
+        val timelineSize = mutableStateOf(50)
         composeRule.setContent {
-            gateHolder[0] =
-                rememberImeOpenReanchorNearBottom(
-                    chatId = chatId.value,
-                    imeIsOpen = imeOpen.value,
-                    composerFocused = composerFocused.value,
-                    nearBottom = nearBottom.value,
-                )
+            TimelineHarness(
+                listState = listState,
+                timelineSize = timelineSize.value,
+                modifier = Modifier.height(100.dp),
+            )
+        }
+        composeRule.waitForIdle()
+        scrollTo(listState, 20, 9)
+        val indexBefore = listState.firstVisibleItemIndex
+        val offsetBefore = listState.firstVisibleItemScrollOffset
+        val coordinator =
+            ConversationScrollCoordinator(
+                writer = LazyListConversationScrollWriter(listState),
+                initialMode = ConversationScrollMode.ReadingHistory("reader", offsetBefore),
+            )
+
+        composeRule.runOnUiThread { timelineSize.value = 51 }
+        composeRule.waitForIdle()
+        var followed = true
+        composeRule.runOnUiThread {
+            runBlocking {
+                followed =
+                    coordinator.followTailIfAllowed(
+                        tailIndex = listState.layoutInfo.totalItemsCount - 1,
+                        reason = ConversationScrollReason.NewMessage,
+                        awaitFrame = {},
+                    )
+            }
         }
         composeRule.waitForIdle()
 
-        composeRule.runOnUiThread {
-            // Latch the first chat as a history-reading session before the
-            // keyboard changes the viewport.
-            composerFocused.value = true
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            imeOpen.value = true
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            nearBottom.value = true
-        }
-        composeRule.waitForIdle()
-        assertFalse(gateHolder[0]!!)
+        assertFalse(followed)
+        assertEquals(indexBefore, listState.firstVisibleItemIndex)
+        assertEquals(offsetBefore, listState.firstVisibleItemScrollOffset)
+    }
 
+    private fun scrollTo(
+        listState: LazyListState,
+        index: Int,
+        offset: Int = 0,
+    ) {
         composeRule.runOnUiThread {
-            chatId.value = "second-chat"
+            runBlocking { listState.scrollToItem(index, offset) }
         }
         composeRule.waitForIdle()
-
-        assertTrue(
-            "A new chat first seen with IME open must follow live near-bottom",
-            gateHolder[0]!!,
-        )
     }
 }
