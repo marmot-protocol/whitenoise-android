@@ -88,6 +88,9 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -674,6 +677,42 @@ internal fun MessageBubble(
     fun copyMessageText() {
         clipboard.setText(AnnotatedString(displayedBody))
         onActionMenuOpenChange(false)
+    }
+
+    // Speak aloud reads from this message onward: catch-up listening is the
+    // point of the action, and Stop on the transport bar is one tap. The
+    // session takes auto-read ownership so messages arriving while it speaks
+    // continue the read. Falls back to just this bubble's text when the
+    // record has left the loaded timeline.
+    fun speakFromHere() {
+        val timeline = controller.timeline
+        val startIndex = timeline.indexOfFirst { it.record.messageIdHex == record.messageIdHex }
+        val entries =
+            if (startIndex < 0) {
+                emptyList()
+            } else {
+                timeline
+                    .drop(startIndex)
+                    .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
+                    .mapNotNull { message ->
+                        val entryRecord = message.record
+                        val text = MessageProjector.copyableText(entryRecord, null) ?: return@mapNotNull null
+                        TtsSpeakableEntry(
+                            senderKey = entryRecord.sender,
+                            senderDisplayName = appState.displayName(entryRecord.sender),
+                            text = text,
+                        )
+                    }
+            }
+        if (entries.isEmpty()) {
+            appState.speakAloud(displayedBody, java.util.Locale.getDefault())
+        } else {
+            appState.speakAloudAutoRead(
+                controller.group.groupIdHex,
+                ttsAutoReadScript(entries),
+                java.util.Locale.getDefault(),
+            )
+        }
     }
 
     fun copyMarkdownLink(url: String) {
@@ -1841,7 +1880,7 @@ internal fun MessageBubble(
                     onCopyText = ::copyMessageText,
                     onSpeak = {
                         onActionMenuOpenChange(false)
-                        appState.speakAloud(displayedBody, java.util.Locale.getDefault())
+                        speakFromHere()
                     },
                     onSave = ::saveAttachments,
                     onSelectText = ::beginTextSelection,

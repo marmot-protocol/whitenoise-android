@@ -207,6 +207,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -224,6 +225,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
+
+// Foreground catch-up normally materializes almost immediately. Keep the
+// background-arrival listener bounded so a later, genuinely foreground
+// message does not unexpectedly start an otherwise idle auto-reader.
+private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
 
 // Per-file ceiling for a document attachment. Matches the retained-uploads
 // LRU cap so a single oversize pick can't OOM the picker pass before the
@@ -409,23 +415,25 @@ internal fun ConversationScreen(
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
-    // Auto-read (#1483): once the timeline is anchored, read the unread
-    // backlog aloud, oldest first, bounded — an inflated unread count must
-    // not narrate ancient history. Names are announced on speaker changes.
-    LaunchedEffect(controller, chat.id, initialTimelineAnchored) {
-        if (!initialTimelineAnchored) return@LaunchedEffect
-        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
-        val groupIdHex = controller.group.groupIdHex
-        if (!appState.isConversationAutoRead(groupIdHex)) return@LaunchedEffect
-        if (entryUnreadCount <= 0) return@LaunchedEffect
-        val start = controller.firstUnreadTimelineIndex(entryUnreadCount)
-        if (start < 0) return@LaunchedEffect
-        val entries =
+
+    // The current unread backlog as speakable entries, oldest-first and bounded
+    // so an inflated unread count can't narrate ancient history. Anchored on
+    // the unread cursor — the last-read position — so it never skips
+    // loaded-but-unspoken messages; shared by the open-time and
+    // return-from-background paths.
+    fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
+        val ready =
+            appState.ttsHasUsableEngine &&
+                appState.isConversationAutoRead(controller.group.groupIdHex) &&
+                entryUnreadCount > 0
+        val start = if (ready) controller.firstUnreadTimelineIndex(entryUnreadCount) else -1
+        return if (start < 0) {
+            emptyList()
+        } else {
             controller.timeline
                 .drop(start)
                 // Bound BEFORE mapping so the cost scales with the speak cap,
-                // not the unread count; 2x slack absorbs filtered-out entries
-                // (reactions, system events) without walking a huge backlog.
+                // not the unread count; 2x slack absorbs filtered-out entries.
                 .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
                 .mapNotNull { message ->
                     val record = message.record
@@ -436,8 +444,15 @@ internal fun ConversationScreen(
                         text = text,
                     )
                 }
-        if (entries.isEmpty()) return@LaunchedEffect
-        appState.speakAloudAutoRead(groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
+        }
+    }
+    // Auto-read (#1483): once the timeline is anchored, read the unread backlog.
+    LaunchedEffect(controller, chat.id, initialTimelineAnchored) {
+        if (!initialTimelineAnchored) return@LaunchedEffect
+        val entries = autoReadBacklogEntries()
+        if (entries.isNotEmpty()) {
+            appState.speakAloudAutoRead(controller.group.groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
+        }
     }
     // Live continuation: a speakable message arriving while speech is active
     // appends to the queue; while speech sits idle it stays quiet, so
@@ -469,6 +484,76 @@ internal fun ConversationScreen(
                 val text = MessageProjector.copyableText(record, null) ?: return@collect
                 appState.appendSpeech("${appState.displayName(record.sender)}: $text", Locale.getDefault())
             }
+    }
+    // Auto-read return-from-background: capture the actual timeline tail when
+    // foreground-only speech is stopped, then narrate rows that materialize
+    // after that cursor. Do not use unread state here: an open conversation can
+    // advance its read watermark before delayed background arrivals sync.
+    var autoReadResumeCursor by
+        remember(controller, chat.id) {
+            mutableStateOf(conversationAutoReadCursor(controller.timeline))
+        }
+    var autoReadResumeGeneration by remember(controller, chat.id) { mutableStateOf(0L) }
+    val autoReadLifecycleOwner = LocalContext.current.lifecycleOwner()
+    DisposableEffect(controller, chat.id, autoReadLifecycleOwner) {
+        if (autoReadLifecycleOwner == null) {
+            onDispose { }
+        } else {
+            // Arm only on a real return — a preceding pause — so a cold open's
+            // ON_RESUME does not double-fire alongside the open-time backlog.
+            var hadPaused = false
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_PAUSE -> {
+                            autoReadResumeCursor = conversationAutoReadCursor(controller.timeline)
+                            hadPaused = true
+                        }
+                        Lifecycle.Event.ON_RESUME ->
+                            if (hadPaused) {
+                                hadPaused = false
+                                autoReadResumeGeneration += 1L
+                            }
+                        else -> Unit
+                    }
+                }
+            autoReadLifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { autoReadLifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+    LaunchedEffect(controller, chat.id, autoReadResumeGeneration) {
+        if (autoReadResumeGeneration == 0L) return@LaunchedEffect
+        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
+        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        val cursor = autoReadResumeCursor
+        val entries =
+            withTimeoutOrNull(TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS) {
+                snapshotFlow {
+                    conversationMessagesAfterAutoReadCursor(controller.timeline, cursor)
+                        // Bound before projecting so a delayed bulk sync cannot
+                        // make the resume pass scale with the whole timeline.
+                        .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
+                        .mapNotNull { message ->
+                            val record = message.record
+                            val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
+                            TtsSpeakableEntry(
+                                senderKey = record.sender,
+                                senderDisplayName = appState.displayName(record.sender),
+                                text = text,
+                            )
+                        }
+                }.first { it.isNotEmpty() }
+            } ?: return@LaunchedEffect
+        // A newly started/manual session owns the transport; never replace it
+        // with delayed foreground catch-up speech.
+        val ttsState = appState.ttsController.state.value
+        if (ttsState is TtsState.Speaking || ttsState is TtsState.Paused) return@LaunchedEffect
+        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        appState.speakAloudAutoRead(
+            controller.group.groupIdHex,
+            ttsAutoReadScript(entries),
+            Locale.getDefault(),
+        )
     }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
