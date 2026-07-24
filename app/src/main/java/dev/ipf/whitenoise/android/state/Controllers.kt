@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
+import dev.ipf.whitenoise.android.core.ConversationMessageSearch
+import dev.ipf.whitenoise.android.core.ConversationMessageSearchTimelineReader
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
@@ -2624,6 +2626,7 @@ class ChatsController(
         // rows until the first eligible body match surfaces or the local
         // timeline is exhausted, capped at SEARCH_MAX_PAGES so a pathological
         // history (thousands of excluded hits) can't pin an IO thread.
+        var before: ULong? = null
         var beforeMessageId: String? = null
         var pagesScanned = 0
         while (pagesScanned < SEARCH_MAX_PAGES) {
@@ -2635,7 +2638,7 @@ class ChatsController(
                             TimelineMessageQueryFfi(
                                 groupIdHex = groupIdHex,
                                 search = needle,
-                                before = null,
+                                before = before,
                                 beforeMessageId = beforeMessageId,
                                 after = null,
                                 afterMessageId = null,
@@ -2683,10 +2686,9 @@ class ChatsController(
             // Cursor to the oldest row in this page so the next query returns
             // strictly older needle hits. Use the minimum timelineAt (tie-broken
             // by id) rather than assuming a fixed array order.
-            beforeMessageId =
-                page.messages
-                    .minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
-                    .messageIdHex
+            val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+            before = oldest.timelineAt
+            beforeMessageId = oldest.messageIdHex
         }
         return null
     }
@@ -3462,6 +3464,42 @@ private inline fun chatsDebug(
 
 private val ConversationTimelinePageLimit = 50u
 
+internal fun compareTimelinePosition(
+    firstAt: ULong,
+    firstId: String,
+    secondAt: ULong,
+    secondId: String,
+): Int = firstAt.compareTo(secondAt).takeIf { it != 0 } ?: firstId.compareTo(secondId)
+
+internal enum class ConversationSearchPageDirection { OLDER, NEWER }
+
+internal fun conversationSearchPageDirection(
+    match: ConversationMessageSearch.Match,
+    oldestTimelineAt: ULong,
+    oldestMessageId: String,
+    newestTimelineAt: ULong,
+    newestMessageId: String,
+    hasMoreBefore: Boolean,
+    hasMoreAfter: Boolean,
+): ConversationSearchPageDirection? =
+    when {
+        hasMoreBefore &&
+            compareTimelinePosition(
+                match.timelineAt,
+                match.messageIdHex,
+                oldestTimelineAt,
+                oldestMessageId,
+            ) < 0 -> ConversationSearchPageDirection.OLDER
+        hasMoreAfter &&
+            compareTimelinePosition(
+                match.timelineAt,
+                match.messageIdHex,
+                newestTimelineAt,
+                newestMessageId,
+            ) > 0 -> ConversationSearchPageDirection.NEWER
+        else -> null
+    }
+
 // Cap on the live-projected timeline window (≈4 pages). Bounds memory for a
 // long-open, busy conversation while leaving ample scroll headroom before
 // loadOlder() must re-fetch.
@@ -3673,6 +3711,7 @@ class ConversationController(
         private set
     var hasMoreBefore by mutableStateOf(false)
         private set
+    private var hasMoreAfter = false
 
     // Single guard for archive/leave/member-management mutations so the UI can
     // disable buttons while one is in flight and prevent double-submits.
@@ -5377,6 +5416,37 @@ class ConversationController(
             ?: record.plaintext
 
     /**
+     * Exhaustively search this conversation's local SQLite timeline without
+     * extending the subscription-owned Compose window. The UI loads a bounded
+     * window only after the user selects one of the returned message ids.
+     */
+    suspend fun searchLocalMessages(rawQuery: String): List<ConversationMessageSearch.Match> {
+        val account = conversationAccountRef ?: return emptyList()
+        return runCatchingCancellable {
+            withContext(Dispatchers.IO) {
+                ConversationMessageSearch.findMatches(
+                    timelineReader =
+                        object : ConversationMessageSearchTimelineReader {
+                            override suspend fun timelineMessages(
+                                accountRef: String,
+                                query: TimelineMessageQueryFfi,
+                            ): TimelinePageFfi = appState.marmotIo { timelineMessages(accountRef, query) }
+                        },
+                    accountRef = account,
+                    groupIdHex = group.groupIdHex,
+                    rawQuery = rawQuery,
+                )
+            }
+        }.onFailure { throwable ->
+            Log.w(
+                "DMConversation",
+                "local message search failed group=${group.groupIdHex.take(8)}",
+                throwable,
+            )
+        }.getOrDefault(emptyList())
+    }
+
+    /**
      * Body shown for [targetId] before any in-flight optimistic edit: the
      * latest confirmed kind-1009 text if one exists, otherwise the message's
      * original plaintext. Captured as an optimistic edit's revert target.
@@ -6527,6 +6597,44 @@ class ConversationController(
         return timelineRecords.containsKey(messageIdHex)
     }
 
+    /**
+     * Move the subscription-owned bounded window toward [match] until that local
+     * search result is present or the relevant side of local history is
+     * exhausted. The match timestamp lets next/previous traversal move both
+     * backward and forward after an earlier jump has shifted the capped window.
+     */
+    suspend fun loadSearchResultMessageAvailable(match: ConversationMessageSearch.Match): Boolean {
+        while (!timelineRecords.containsKey(match.messageIdHex)) {
+            if (timelineRecords.isEmpty()) break
+            val oldest =
+                timelineRecords.values.minWithOrNull(
+                    compareBy({ it.timelineAt }, { it.messageIdHex }),
+                ) ?: break
+            val newest =
+                timelineRecords.values.maxWithOrNull(
+                    compareBy({ it.timelineAt }, { it.messageIdHex }),
+                ) ?: break
+            val direction =
+                conversationSearchPageDirection(
+                    match = match,
+                    oldestTimelineAt = oldest.timelineAt,
+                    oldestMessageId = oldest.messageIdHex,
+                    newestTimelineAt = newest.timelineAt,
+                    newestMessageId = newest.messageIdHex,
+                    hasMoreBefore = hasMoreBefore,
+                    hasMoreAfter = hasMoreAfter,
+                )
+            val madeProgress =
+                when (direction) {
+                    ConversationSearchPageDirection.OLDER -> loadOlderPage()
+                    ConversationSearchPageDirection.NEWER -> loadNewerPage()
+                    null -> false
+                }
+            if (!madeProgress) break
+        }
+        return timelineRecords.containsKey(match.messageIdHex)
+    }
+
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
     /**
@@ -6603,6 +6711,37 @@ class ConversationController(
         }
     }
 
+    private suspend fun loadNewerPage(): Boolean {
+        val subscription = timelineSubscription
+        if (!hasMoreAfter || isLoadingOlder || subscription == null) return false
+        val priorMessageIds = timelineRecords.keys.toSet()
+        error = null
+        isLoadingOlder = true
+        return try {
+            val page = paginateNewerIfSubscriptionActive(subscription)
+            if (page == null) {
+                false
+            } else {
+                hasLoadedOlderPages = page.hasMoreAfter
+                applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+                protectedTimelineMessageIds.clear()
+                if (hasLoadedOlderPages) {
+                    protectedTimelineMessageIds.addAll(timelineRecords.keys)
+                }
+                if (pageContainsMedia(page)) refreshMediaReferences()
+                timelineRecords.size > priorMessageIds.size ||
+                    timelineRecords.keys.any { it !in priorMessageIds }
+            }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            error = throwable.message ?: throwable.javaClass.simpleName
+            false
+        } finally {
+            isLoadingOlder = false
+        }
+    }
+
     private suspend fun paginateOlderIfSubscriptionActive(subscription: TimelineMessagesSubscription): TimelinePageFfi? =
         timelineSubscriptionActiveCallMutex.withLock {
             val stillActive =
@@ -6612,6 +6751,18 @@ class ConversationController(
             if (!stillActive) return@withLock null
             withContext(Dispatchers.IO) {
                 subscription.paginateBackwards(ConversationTimelinePageLimit)
+            }
+        }
+
+    private suspend fun paginateNewerIfSubscriptionActive(subscription: TimelineMessagesSubscription): TimelinePageFfi? =
+        timelineSubscriptionActiveCallMutex.withLock {
+            val stillActive =
+                synchronized(liveSubscriptionLock) {
+                    !accountTeardownRequested && timelineSubscription === subscription
+                }
+            if (!stillActive) return@withLock null
+            withContext(Dispatchers.IO) {
+                subscription.paginateForwards(ConversationTimelinePageLimit)
             }
         }
 
@@ -6737,6 +6888,7 @@ class ConversationController(
         appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(page.messages))
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
+            hasMoreAfter = page.hasMoreAfter
         }
         pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()

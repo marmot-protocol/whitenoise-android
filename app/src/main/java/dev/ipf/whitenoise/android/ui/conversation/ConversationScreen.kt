@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
+import dev.ipf.whitenoise.android.core.ConversationMessageSearch
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -209,6 +210,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+
+private data class ConversationSearchScrollAnchor(
+    val match: ConversationMessageSearch.Match?,
+    val fallbackIndex: Int,
+    val scrollOffset: Int,
+)
 
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
@@ -486,18 +493,22 @@ internal fun ConversationScreen(
     // In-chat search (#292). Opening from the overflow menu swaps the top
     // bar into an inline search field; closing it restores the normal bar.
     // `searchPinnedMatchId` keeps the active match anchored to a concrete
-    // message id so the N/M cursor follows that message as older pages load
-    // and the match set grows. `searchJob` serializes scroll-jump coroutines
-    // the same way `navigateReplyJob` does for reply navigation.
+    // message id in the authoritative local-store result set. `searchJob`
+    // serializes scroll-jump coroutines the same way `navigateReplyJob` does for
+    // reply navigation; the keyed search request itself is owned by
+    // LaunchedEffect below so query replacement cancels the previous scan.
     var searchOpen by remember(chat.id) { mutableStateOf(false) }
     var searchQuery by remember(chat.id) { mutableStateOf("") }
+    var searchMatches by remember(chat.id) {
+        mutableStateOf<List<ConversationMessageSearch.Match>>(emptyList())
+    }
     var searchPinnedMatchId by remember(chat.id) { mutableStateOf<String?>(null) }
     var searchJob by remember(chat.id) { mutableStateOf<Job?>(null) }
-    // Scroll anchor captured the moment search opens, restored verbatim on
-    // close so leaving search returns the list to where the reader was —
-    // #292 requires "Closing search restores the normal top bar and scroll
-    // position." Pair = (firstVisibleItemIndex, firstVisibleItemScrollOffset).
-    var preSearchScrollAnchor by remember(chat.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Scroll anchor captured when search opens. The local message id/timestamp
+    // lets close-search move the subscription's capped window back before
+    // restoring the exact offset; numeric index is only a fallback for headers
+    // or optimistic rows that have no durable local-store position.
+    var preSearchScrollAnchor by remember(chat.id) { mutableStateOf<ConversationSearchScrollAnchor?>(null) }
     val searchFocusRequester = remember { FocusRequester() }
     // Jump-to-newest plumbing.
     //
@@ -1818,42 +1829,27 @@ internal fun ConversationScreen(
             }
         }
 
-    // In-chat search match set. Computed over the currently-loaded, rendered
-    // (edit-filtered) timeline only — no relay fetch, no full-history preload.
-    // Reactions / deletes / group-system / agent-stream rows carry no
-    // user-typed body and are excluded by `MessageSearch.isSearchable`. As
-    // older pages load, `renderedTimeline` grows and the match set expands
-    // naturally. Keyed on `controller.timeline` (not just `renderedTimeline`'s
-    // edges/size) so a kind-1009 edit — which changes the body returned by
-    // `controller.displayedText(...)` without altering the rendered timeline's
-    // first/last id or size — re-runs the derivation and keeps matches fresh.
-    val searchMatchIds =
-        remember(searchQuery, controller.timeline, renderedTimeline) {
-            if (searchQuery.isBlank()) {
-                emptyList()
-            } else {
-                // Restrict to rows that carry a user-typed body, then run the
-                // shared substring matcher over those bodies and map the hit
-                // indices back to message ids (timeline order preserved).
-                // Snapshot the body once per row so the displayed (post-edit)
-                // text used for matching is the same text used to map hits.
-                val searchable =
-                    renderedTimeline.mapNotNull { item ->
-                        val body = controller.displayedText(item.record)
-                        if (MessageSearch.isSearchable(item.record, body)) {
-                            item.record.messageIdHex to body
-                        } else {
-                            null
-                        }
-                    }
-                val bodies = searchable.map { it.second }
-                MessageSearch
-                    .matchIndices(bodies, searchQuery)
-                    .map { searchable[it].first }
-            }
-        }
-    // The active match ordinal, re-anchored to the pinned message id so it
-    // tracks that message as the set grows. -1 when there are no matches.
+    // In-chat search reads every matching page from the local SQLite store,
+    // independent of the subscription-owned Compose timeline window. The effect
+    // is keyed by query/open state: replacement cancels the old debounced scan,
+    // clears its count immediately, and only the still-active request publishes.
+    // The returned ids are the authoritative current local-store N/M set; no
+    // relay fetch and no full-history UI-state preload occurs.
+    LaunchedEffect(controller, searchOpen, searchQuery, controller.isLoading) {
+        searchMatches = emptyList()
+        searchPinnedMatchId = null
+        if (!searchOpen || searchQuery.isBlank() || controller.isLoading) return@LaunchedEffect
+        val requestedQuery = searchQuery
+        runConversationSearchRequest(
+            rawQuery = requestedQuery,
+            search = controller::searchLocalMessages,
+            isCurrent = { searchOpen && searchQuery == requestedQuery },
+            publish = { matches -> searchMatches = matches },
+        )
+    }
+    val searchMatchIds = remember(searchMatches) { searchMatches.map { it.messageIdHex } }
+    // The active match ordinal, re-anchored to the pinned message id if the
+    // current local-store result set changes. -1 when there are no matches.
     val searchActiveIndex = MessageSearch.resolveCursor(searchMatchIds, searchPinnedMatchId)
     // Keep the pin valid: if the resolved cursor fell back to the first match
     // (pin gone / unset) adopt that match id as the new pin so subsequent
@@ -1865,52 +1861,105 @@ internal fun ConversationScreen(
         }
     }
 
-    fun scrollToSearchMatch(messageIdHex: String) {
-        searchJob?.cancel()
+    suspend fun centerLoadedSearchMessage(messageIdHex: String) {
+        // Read the controller's current window after pagination; the
+        // renderedTimeline captured by the launching composition is stale once
+        // an older/newer page replaces it.
+        val currentRenderedTimeline =
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val timelineIndex =
+            currentRenderedTimeline.indexOfFirst {
+                it.record.messageIdHex == messageIdHex
+            }
+        if (timelineIndex < 0) return
+        val currentOlderHeaderCount =
+            if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        centerTimelineItemAt(
+            messageIdHex,
+            1 + currentOlderHeaderCount + timelineIndex,
+        )
+        highlightedMessageId = messageIdHex
+        delay(1_500L)
+        if (highlightedMessageId == messageIdHex) {
+            highlightedMessageId = null
+        }
+    }
+
+    fun scrollToSearchMatch(match: ConversationMessageSearch.Match) {
+        val previousSearchJob = searchJob
+        previousSearchJob?.cancel()
+        highlightedMessageId = null
         searchJob =
             scope.launch {
-                // Local-only: the message is already in the loaded window
-                // (matches are derived from it), so this resolves immediately;
-                // the helper is reused for symmetry with reply navigation and
-                // guards the rare case where a concurrent trim dropped the row.
+                previousSearchJob?.join()
+                loadAndCenterConversationSearchMatch(
+                    target = match,
+                    load = controller::loadSearchResultMessageAvailable,
+                    center = { loadedMatch -> centerLoadedSearchMessage(loadedMatch.messageIdHex) },
+                )
+            }
+    }
+
+    // Group-details search can jump to a known id without local-search metadata;
+    // retain its bounded reply-navigation path separately from exhaustive
+    // in-conversation search traversal.
+    fun scrollToSearchMatch(messageIdHex: String) {
+        val previousSearchJob = searchJob
+        previousSearchJob?.cancel()
+        highlightedMessageId = null
+        searchJob =
+            scope.launch {
+                previousSearchJob?.join()
                 if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
-                val timelineIndex =
-                    renderedTimeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
-                if (timelineIndex < 0) return@launch
-                // Center the match so prior + subsequent context is visible (#595).
-                centerTimelineItemAt(messageIdHex, 1 + olderHeaderCount + timelineIndex)
-                highlightedMessageId = messageIdHex
-                delay(1_500L)
-                if (highlightedMessageId == messageIdHex) {
-                    highlightedMessageId = null
-                }
+                centerLoadedSearchMessage(messageIdHex)
             }
     }
 
     // Step the cursor (next = forward/newer, previous = backward/older) with
     // wrap-around, pin the new match, and jump+highlight it.
     fun navigateToSearchMatch(forward: Boolean) {
-        if (searchMatchIds.isEmpty()) return
-        val next = MessageSearch.step(searchActiveIndex, searchMatchIds.size, forward)
+        if (searchMatches.isEmpty()) return
+        val next = MessageSearch.step(searchActiveIndex, searchMatches.size, forward)
         if (next < 0) return
-        val targetId = searchMatchIds[next]
-        searchPinnedMatchId = targetId
-        scrollToSearchMatch(targetId)
+        val target = searchMatches[next]
+        searchPinnedMatchId = target.messageIdHex
+        scrollToSearchMatch(target)
     }
 
     fun closeSearch() {
         searchOpen = false
         searchQuery = ""
+        searchMatches = emptyList()
         searchPinnedMatchId = null
-        searchJob?.cancel()
+        val previousSearchJob = searchJob
+        previousSearchJob?.cancel()
         highlightedMessageId = null
-        // Restore the scroll position captured when search opened (#292). The
-        // cancel above stops any in-flight search scroll-jump, so this resolves
-        // to the pre-search anchor without racing the search animation.
-        preSearchScrollAnchor?.let { (index, offset) ->
+        // A deep search jump can shift the subscription's capped window far
+        // enough to evict the original viewport. Move it back to the captured
+        // local message before restoring the saved offset; fall back to the old
+        // numeric index only when the anchor was not a durable projected row.
+        preSearchScrollAnchor?.let { anchor ->
             searchJob =
                 scope.launch {
-                    listState.scrollToItem(index, offset)
+                    previousSearchJob?.join()
+                    val match = anchor.match
+                    if (match != null && controller.loadSearchResultMessageAvailable(match)) {
+                        withFrameNanos { }
+                        val timelineIndex =
+                            controller.timeline
+                                .filterNot { MessageProjector.isEdit(it.record) }
+                                .indexOfFirst { it.record.messageIdHex == match.messageIdHex }
+                        if (timelineIndex >= 0) {
+                            val headerCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                            listState.scrollToItem(1 + headerCount + timelineIndex, anchor.scrollOffset)
+                            return@launch
+                        }
+                    }
+                    withFrameNanos { }
+                    val lastIndex = listState.layoutInfo.totalItemsCount - 1
+                    if (lastIndex >= 0) {
+                        listState.scrollToItem(anchor.fallbackIndex.coerceIn(0, lastIndex), anchor.scrollOffset)
+                    }
                 }
         }
         preSearchScrollAnchor = null
@@ -1937,12 +1986,12 @@ internal fun ConversationScreen(
         }
     }
     // Jump to the first match as soon as one exists for the current query, so
-    // typing immediately scrolls to (and highlights) the newest match without
-    // requiring the user to tap an arrow first.
-    LaunchedEffect(searchMatchIds.firstOrNull(), searchOpen) {
-        if (searchOpen && searchMatchIds.isNotEmpty()) {
-            val firstId = searchMatchIds[searchActiveIndex.coerceAtLeast(0)]
-            scrollToSearchMatch(firstId)
+    // typing immediately loads, centers, and highlights that local result
+    // without requiring the user to tap an arrow first.
+    LaunchedEffect(searchMatches.firstOrNull(), searchOpen) {
+        if (searchOpen && searchMatches.isNotEmpty()) {
+            val first = searchMatches[searchActiveIndex.coerceAtLeast(0)]
+            scrollToSearchMatch(first)
         }
     }
 
@@ -2424,14 +2473,19 @@ internal fun ConversationScreen(
                     ConversationSearchTopBar(
                         query = searchQuery,
                         onQueryChange = {
+                            searchJob?.cancel()
+                            highlightedMessageId = null
                             searchQuery = it
-                            // Re-anchor the cursor to the new query's match set on
-                            // the next derivation; clearing the pin makes it land
-                            // on the first match again.
+                            searchMatches = emptyList()
+                            // The keyed local-store scan clears the old count and
+                            // re-anchors to the replacement query's first match.
                             searchPinnedMatchId = null
                         },
                         onClear = {
+                            searchJob?.cancel()
+                            highlightedMessageId = null
                             searchQuery = ""
+                            searchMatches = emptyList()
                             searchPinnedMatchId = null
                         },
                         onClose = { closeSearch() },
@@ -2584,9 +2638,29 @@ internal fun ConversationScreen(
                                         // Snapshot the current scroll position before the
                                         // search auto-scroll effect can move the list, so
                                         // closing search can restore it (#292).
+                                        val firstVisibleIndex = listState.firstVisibleItemIndex
+                                        val visibleMessage =
+                                            listState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
+                                                val key = visible.key as? String ?: return@firstNotNullOfOrNull null
+                                                renderedTimeline
+                                                    .firstOrNull { it.id == key }
+                                                    ?.let { visible to it }
+                                            }
+                                        val projectedAnchor = visibleMessage?.second?.projected
                                         preSearchScrollAnchor =
-                                            listState.firstVisibleItemIndex to
-                                            listState.firstVisibleItemScrollOffset
+                                            ConversationSearchScrollAnchor(
+                                                match =
+                                                    projectedAnchor?.let {
+                                                        ConversationMessageSearch.Match(
+                                                            messageIdHex = it.messageIdHex,
+                                                            timelineAt = it.timelineAt,
+                                                        )
+                                                    },
+                                                fallbackIndex = firstVisibleIndex,
+                                                scrollOffset =
+                                                    visibleMessage?.first?.let { -it.offset }
+                                                        ?: listState.firstVisibleItemScrollOffset,
+                                            )
                                         searchOpen = true
                                     },
                                 )

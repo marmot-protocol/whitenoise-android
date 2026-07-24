@@ -22,26 +22,29 @@ import java.util.Locale
  *     query matches what the user actually sees on the row.
  */
 object MessageSearch {
+    private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
+
+    /**
+     * Whether a projected local-store row contributes a user-authored plaintext
+     * body. Deleted rows and machine-authored event kinds are never searchable.
+     */
+    fun isSearchableBody(
+        kind: ULong,
+        deleted: Boolean,
+        displayedText: String,
+    ): Boolean = !deleted && kind in SearchableBodyKinds && displayedText.isNotBlank()
+
     /**
      * Whether [record] contributes a searchable plaintext body.
      *
-     * A row is searchable when it is a plain text message (not a reaction,
-     * delete, group-system event, or agent-stream marker) AND it actually
-     * carries text. Media rows are searchable only by their accompanying
-     * caption text — never by attachment filenames (explicitly out of scope
-     * for v1) — which falls out naturally because [displayedText] for a
-     * caption-less media row resolves to a blank body here.
+     * Media captions ride kind 9 and remain searchable; attachment filenames do
+     * not enter [displayedText]. App records do not carry the projection's
+     * deleted flag, so loaded-window callers exclude deletion rows by kind.
      */
     fun isSearchable(
         record: AppMessageRecordFfi,
         displayedText: String,
-    ): Boolean {
-        if (MessageProjector.isReaction(record)) return false
-        if (MessageProjector.isDelete(record)) return false
-        if (MessageProjector.isGroupSystem(record)) return false
-        if (MessageProjector.isStreamStart(record)) return false
-        return displayedText.isNotBlank()
-    }
+    ): Boolean = isSearchableBody(record.kind, MessageProjector.isDelete(record), displayedText)
 
     /** Trim + lowercase a query or body to the canonical match form. */
     fun normalize(value: String): String = value.trim().lowercase(Locale.ROOT)

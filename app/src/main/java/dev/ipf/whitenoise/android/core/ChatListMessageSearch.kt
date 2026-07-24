@@ -17,24 +17,16 @@ import java.util.Locale
  * `timelineMessages` FFI search query; the UI consumes [MessageBodyMatch].
  */
 object ChatListMessageSearch {
-    // Kinds whose plaintext body is user-authored conversation text and is
-    // therefore searchable. Per the issue's scope decision: kind:1 (legacy
-    // note), kind:9 (chat), kind:1209 (agent stream final). Everything else --
-    // reactions (7), deletes (5), edits (1009), stream-start (1200), and
-    // group-system events (1210) -- is excluded so search never matches on
-    // machine-authored content or raw JSON the user never typed.
-    private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
-
     /**
      * Whether a timeline record's body is eligible to match a chat-list
-     * query. Deleted messages are skipped -- their plaintext is gone and a
-     * "deleted message" tombstone has no body to search.
+     * query. Shares the in-chat search classifier so both local-store search
+     * surfaces accept exactly kind 1/9/1209 user-authored bodies.
      */
     fun isSearchableBody(
         kind: ULong,
         deleted: Boolean,
         plaintext: String,
-    ): Boolean = !deleted && kind in SearchableBodyKinds && plaintext.isNotBlank()
+    ): Boolean = MessageSearch.isSearchableBody(kind, deleted, plaintext)
 
     /**
      * Case-insensitive, trimmed needle match against a whitespace-normalized
