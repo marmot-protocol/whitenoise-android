@@ -2624,7 +2624,11 @@ class ChatsController(
         // rows until the first eligible body match surfaces or the local
         // timeline is exhausted, capped at SEARCH_MAX_PAGES so a pathological
         // history (thousands of excluded hits) can't pin an IO thread.
-        var beforeMessageId: String? = null
+        // The engine rejects a beforeMessageId without a matching before, so the
+        // cursor is the oldest row's (timelineAt, id) pair — both null on page
+        // one. Passing the id alone silently failed every page-two scan.
+        var cursorBefore: ULong? = null
+        var cursorMessageId: String? = null
         var pagesScanned = 0
         while (pagesScanned < SEARCH_MAX_PAGES) {
             val page =
@@ -2635,8 +2639,8 @@ class ChatsController(
                             TimelineMessageQueryFfi(
                                 groupIdHex = groupIdHex,
                                 search = needle,
-                                before = null,
-                                beforeMessageId = beforeMessageId,
+                                before = cursorBefore,
+                                beforeMessageId = cursorMessageId,
                                 after = null,
                                 afterMessageId = null,
                                 limit = SEARCH_PER_CHAT_LIMIT,
@@ -2683,10 +2687,9 @@ class ChatsController(
             // Cursor to the oldest row in this page so the next query returns
             // strictly older needle hits. Use the minimum timelineAt (tie-broken
             // by id) rather than assuming a fixed array order.
-            beforeMessageId =
-                page.messages
-                    .minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
-                    .messageIdHex
+            val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+            cursorBefore = oldest.timelineAt
+            cursorMessageId = oldest.messageIdHex
         }
         return null
     }

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.util.Locale
@@ -42,6 +43,17 @@ internal suspend fun searchConversationHistoryMessageIds(
     }
 }
 
+/** One scanned page reduced to what cursor paging needs: eligible body
+ *  matches as (timelineAt, id), the oldest row for the next cursor, and
+ *  whether older rows remain. */
+internal data class HistoryScanPage(
+    val matches: List<Pair<ULong, String>>,
+    val oldest: Pair<ULong, String>?,
+    val hasMoreBefore: Boolean,
+)
+
+internal typealias HistoryPageFetcher = suspend (before: ULong?, beforeMessageId: String?) -> HistoryScanPage?
+
 private suspend fun scanHistoryForNeedle(
     appState: WhiteNoiseAppState,
     account: String,
@@ -49,13 +61,7 @@ private suspend fun scanHistoryForNeedle(
     needle: String,
 ): List<String>? {
     val ciNeedle = needle.lowercase(Locale.ROOT)
-    val matches = ArrayList<Pair<ULong, String>>()
-    var beforeMessageId: String? = null
-    var pages = 0
-    var failed = false
-    var exhausted = false
-    while (!failed && !exhausted && pages < HISTORY_SEARCH_MAX_PAGES) {
-        currentCoroutineContext().ensureActive()
+    return paginateHistoryMatches { cursorBefore, cursorMessageId ->
         val page =
             runCatching {
                 appState.marmotIo {
@@ -64,36 +70,62 @@ private suspend fun scanHistoryForNeedle(
                         TimelineMessageQueryFfi(
                             groupIdHex = groupIdHex,
                             search = needle,
-                            before = null,
-                            beforeMessageId = beforeMessageId,
+                            before = cursorBefore,
+                            beforeMessageId = cursorMessageId,
                             after = null,
                             afterMessageId = null,
                             limit = HISTORY_SEARCH_PAGE_SIZE,
                         ),
                     )
                 }
-            }.getOrNull()
+            }.getOrElse { throwable ->
+                // A cancelled scan must propagate, not resolve to a value the
+                // caller could publish over a newer query's results.
+                if (throwable is CancellationException) throw throwable
+                return@paginateHistoryMatches null
+            }
+        val matches =
+            page.messages
+                .filter {
+                    ChatListMessageSearch.isSearchableBody(it.kind, it.deleted, it.plaintext) &&
+                        ChatListMessageSearch.bodyMatches(it.plaintext, ciNeedle)
+                }.map { it.timelineAt to it.messageIdHex }
+        val oldest =
+            page.messages
+                .minWithOrNull(compareBy({ it.timelineAt }, { it.messageIdHex }))
+                ?.let { it.timelineAt to it.messageIdHex }
+        HistoryScanPage(matches = matches, oldest = oldest, hasMoreBefore = page.hasMoreBefore)
+    }
+}
+
+/**
+ * Cursor-paged accumulation, isolated from the FFI so the paired-cursor
+ * contract is unit-testable. [fetchPage] receives the (before, beforeMessageId)
+ * pair — both null on the first page, both advancing to the previous page's
+ * oldest row thereafter, because the engine rejects one without the other.
+ * Returns null when a page read fails (the caller keeps its loaded-window
+ * matches); otherwise ids oldest-first.
+ */
+internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List<String>? {
+    val matches = ArrayList<Pair<ULong, String>>()
+    var cursorBefore: ULong? = null
+    var cursorMessageId: String? = null
+    var pages = 0
+    var failed = false
+    var exhausted = false
+    while (!failed && !exhausted && pages < HISTORY_SEARCH_MAX_PAGES) {
+        currentCoroutineContext().ensureActive()
+        val page = fetchPage(cursorBefore, cursorMessageId)
         if (page == null) {
             failed = true
         } else {
-            for (record in page.messages) {
-                if (ChatListMessageSearch.isSearchableBody(record.kind, record.deleted, record.plaintext) &&
-                    ChatListMessageSearch.bodyMatches(record.plaintext, ciNeedle)
-                ) {
-                    matches += record.timelineAt to record.messageIdHex
-                }
-            }
-            // Cursor to the oldest row in this page so the next query returns
-            // strictly older needle hits — order-agnostic, same as the
-            // chat-list search's paging. A non-advancing cursor means done.
-            val cursor =
-                page.messages
-                    .minWithOrNull(compareBy({ it.timelineAt }, { it.messageIdHex }))
-                    ?.messageIdHex
-            if (!page.hasMoreBefore || cursor == null || cursor == beforeMessageId) {
+            matches += page.matches
+            val oldest = page.oldest
+            if (!page.hasMoreBefore || oldest == null || oldest.second == cursorMessageId) {
                 exhausted = true
             } else {
-                beforeMessageId = cursor
+                cursorBefore = oldest.first
+                cursorMessageId = oldest.second
                 pages += 1
             }
         }
