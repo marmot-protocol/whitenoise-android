@@ -3564,6 +3564,21 @@ class WhiteNoiseAppState(
     suspend fun refreshSecurityPrivacySettings() {
         relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
         auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+        reconcileRedactionWithEngineAuditMode()
+    }
+
+    // The engine's recorded data mode is the truth while recording is on: a
+    // pre-redaction session that enabled audit logs under FULL_DATA must not
+    // display as redacted. Sync the displayed switch (and the persisted
+    // choice) to what the recorder is actually doing.
+    private fun reconcileRedactionWithEngineAuditMode() {
+        val settings = auditLogSettings ?: return
+        if (!settings.enabled) return
+        val engineRedacts = settings.dataMode != AuditDataModeFfi.FULL_DATA
+        if (redactSensitiveAuditData != engineRedacts) {
+            redactSensitiveAuditData = engineRedacts
+            AuditLogPreferences.writeRedactSensitiveData(preferences, engineRedacts)
+        }
     }
 
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
