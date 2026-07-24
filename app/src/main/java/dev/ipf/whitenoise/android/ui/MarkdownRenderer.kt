@@ -1,6 +1,11 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +16,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -517,12 +528,20 @@ private fun MarkdownBlockView(
         return
     }
     when (block) {
-        is MarkdownBlockFfi.Paragraph ->
-            MarkdownBodyText(
-                text = rememberMarkdownInlineText(block.inlines, ctx),
-                style = MaterialTheme.typography.bodyLarge,
-                onTextLayout = onTextLayout,
-            )
+        is MarkdownBlockFfi.Paragraph -> {
+            val details = remember(block) { markdownDetailsSection(block.inlines) }
+            if (details == null) {
+                MarkdownBodyText(
+                    text = rememberMarkdownInlineText(block.inlines, ctx),
+                    style = MaterialTheme.typography.bodyLarge,
+                    onTextLayout = onTextLayout,
+                )
+            } else {
+                // A collapsible has no stable trailing text line, so the
+                // inline-footer callback stays unset like other non-text blocks.
+                MarkdownDetailsView(details, ctx)
+            }
+        }
         is MarkdownBlockFfi.Heading ->
             MarkdownBodyText(
                 text = rememberMarkdownInlineText(block.inlines, ctx),
@@ -585,6 +604,123 @@ private fun MarkdownCodeBlockView(
                     RoundedCornerShape(8.dp),
                 ).padding(horizontal = 10.dp, vertical = 8.dp),
     )
+}
+
+/** One recognized `<details>` disclosure: optional summary label + the collapsed inline content. */
+internal data class MarkdownDetailsSection(
+    val summary: String?,
+    val content: List<MarkdownInlineFfi>,
+)
+
+// Opening line: bare `<details>`, optionally carrying the `<summary>…</summary>` on the same line.
+private val DETAILS_OPEN_LINE = Regex("(?i)^<details>\\s*(?:<summary>(.*)</summary>)?$")
+
+// A `<summary>…</summary>` line of its own directly after the opening tag.
+private val DETAILS_SUMMARY_LINE = Regex("(?i)^<summary>(.*)</summary>$")
+
+private const val DETAILS_CLOSE_TAG = "</details>"
+
+private fun isMarkdownLineBreak(inline: MarkdownInlineFfi): Boolean =
+    when (inline) {
+        MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> true
+        else -> false
+    }
+
+/**
+ * Detects a GitHub-style `<details>`/`<summary>` disclosure written as one
+ * paragraph. The engine's markdown parser does not recognize HTML, so the
+ * markup arrives as literal per-line [MarkdownInlineFfi.Text] runs separated
+ * by soft breaks; this matches that shape: an opening `<details>` line
+ * (optionally carrying the summary), an optional `<summary>…</summary>` line
+ * of its own, the hidden inline content, and a closing `</details>` line.
+ * Anything else — no closing tag, tags sharing a line with content — is not a
+ * disclosure and renders as the literal text it is.
+ *
+ * Known limitation: a blank line, or a construct that interrupts a paragraph
+ * (list, heading, fence), inside the markup splits it across blocks; cross-block
+ * reassembly is not attempted, so those documents render literally too.
+ */
+internal fun markdownDetailsSection(inlines: List<MarkdownInlineFfi>): MarkdownDetailsSection? {
+    val nodes = markdownVisibleSiblings(inlines)
+    val openMatch =
+        (nodes.firstOrNull() as? MarkdownInlineFfi.Text)
+            ?.content
+            ?.trim()
+            ?.let { DETAILS_OPEN_LINE.matchEntire(it) }
+    val closed =
+        nodes.size > 1 &&
+            (nodes.last() as? MarkdownInlineFfi.Text)?.content?.trim().equals(DETAILS_CLOSE_TAG, ignoreCase = true)
+    if (openMatch == null || !closed) return null
+    var summary = openMatch.groupValues[1].trim().takeIf { it.isNotEmpty() }
+    var content = nodes.subList(1, nodes.size - 1).dropWhile(::isMarkdownLineBreak).dropLastWhile(::isMarkdownLineBreak)
+    if (summary == null && openMatch.groups[1] == null) {
+        val summaryLine =
+            (content.firstOrNull() as? MarkdownInlineFfi.Text)
+                ?.content
+                ?.trim()
+                ?.let { DETAILS_SUMMARY_LINE.matchEntire(it) }
+        if (summaryLine != null) {
+            summary = summaryLine.groupValues[1].trim().takeIf { it.isNotEmpty() }
+            content = content.drop(1).dropWhile(::isMarkdownLineBreak)
+        }
+    }
+    return MarkdownDetailsSection(summary, content)
+}
+
+private val DETAILS_CHEVRON_SIZE = 20.dp
+private val DETAILS_CONTENT_INDENT = 24.dp
+private const val DETAILS_CHEVRON_COLLAPSED_DEGREES = -90f
+private const val DETAILS_CHEVRON_EXPANDED_DEGREES = 0f
+
+/**
+ * Header row (chevron + summary) toggling the hidden content, collapsed by
+ * default. Expansion state lives in the composition only — scrolling the
+ * message away and back resets to collapsed, which is acceptable for a chat
+ * bubble. The content keeps the full inline treatment (formatting, links,
+ * mentions) since it is the same paragraph's inline run.
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun MarkdownDetailsView(
+    section: MarkdownDetailsSection,
+    ctx: MarkdownBodyContext,
+) {
+    var expanded by remember(section) { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) DETAILS_CHEVRON_EXPANDED_DEGREES else DETAILS_CHEVRON_COLLAPSED_DEGREES,
+        label = "detailsChevron",
+    )
+    val summaryText = section.summary?.let { markdownSafeDisplayText(it) } ?: stringResource(R.string.details)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .clickable { expanded = !expanded }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(DETAILS_CHEVRON_SIZE)
+                        .rotate(chevronRotation),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                summaryText,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+            MarkdownBodyText(
+                text = rememberMarkdownInlineText(section.content, ctx),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
+            )
+        }
+    }
 }
 
 @Composable
