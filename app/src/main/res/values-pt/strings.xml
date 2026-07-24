@@ -341,6 +341,11 @@
     <string name="audit_logs_settings_subtitle">Criar e enviar arquivos de log de auditoria de segurança.</string>
     <string name="delete_audit_logs">Excluir logs de auditoria</string>
     <string name="delete_audit_logs_subtitle">Remove todos os arquivos locais de auditoria. Se a auditoria estiver ativa, continua em um arquivo novo.</string>
+    <string name="redact_audit_data">Ocultar dados sensíveis de auditoria</string>
+    <string name="redact_audit_data_subtitle">Exclui conteúdo descriptografado e identidades completas dos arquivos de auditoria; mantém referências com salt, resumos e contagens.</string>
+    <string name="redact_audit_data_confirm_title">Registrar dados completos de auditoria?</string>
+    <string name="redact_audit_data_confirm_body">Sem a ocultação, os arquivos de auditoria podem incluir mensagens descriptografadas, conteúdo do app e identidades completas. Deixe-a ativada, a menos que precise do detalhe forense completo.</string>
+    <string name="redact_audit_data_confirm_action">Registrar dados completos</string>
     <string name="developer">Desenvolvedor</string>
     <string name="developer_mode">Modo de desenvolvedor</string>
     <string name="developer_mode_subtitle">Mostra diagnósticos e componentes internos do MLS.</string>

@@ -341,6 +341,11 @@
     <string name="audit_logs_settings_subtitle">Sicherheitsprüfprotokolle erstellen und senden.</string>
     <string name="delete_audit_logs">Prüfprotokolle löschen</string>
     <string name="delete_audit_logs_subtitle">Entferne alle lokalen Prüfprotokoll-Dateien. Wenn die Aufzeichnung an ist, läuft sie in einer neuen Datei weiter.</string>
+    <string name="redact_audit_data">Sensible Prüfdaten schwärzen</string>
+    <string name="redact_audit_data_subtitle">Entfernt entschlüsselte Inhalte und vollständige Identitäten aus den Prüfdateien; gesalzene Referenzen, Prüfsummen und Zähler bleiben erhalten.</string>
+    <string name="redact_audit_data_confirm_title">Vollständige Prüfdaten aufzeichnen?</string>
+    <string name="redact_audit_data_confirm_body">Prüfdateien können dann entschlüsselte Nachrichten- und App-Inhalte sowie vollständige Identitäten enthalten. Die Schwärzung sollte nur deaktiviert werden, wenn vollständige forensische Details benötigt werden.</string>
+    <string name="redact_audit_data_confirm_action">Vollständige Daten aufzeichnen</string>
     <string name="developer">Entwickler</string>
     <string name="developer_mode">Entwicklermodus</string>
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>

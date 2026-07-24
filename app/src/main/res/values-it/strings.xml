@@ -341,6 +341,11 @@
     <string name="audit_logs_settings_subtitle">Crea e invia file di log di audit di sicurezza.</string>
     <string name="delete_audit_logs">Elimina log di audit</string>
     <string name="delete_audit_logs_subtitle">Rimuove tutti i file di audit locali. Se l’audit è attivo, continua su un nuovo file.</string>
+    <string name="redact_audit_data">Oscura i dati sensibili di audit</string>
+    <string name="redact_audit_data_subtitle">Esclude i contenuti decifrati e le identità complete dai file di audit; conserva riferimenti con salt, digest e conteggi.</string>
+    <string name="redact_audit_data_confirm_title">Registrare i dati di audit completi?</string>
+    <string name="redact_audit_data_confirm_body">Senza oscuramento i file di audit possono includere messaggi decifrati, contenuti dell’app e identità complete. Lascialo attivo a meno che non serva il dettaglio forense completo.</string>
+    <string name="redact_audit_data_confirm_action">Registra i dati completi</string>
     <string name="developer">Sviluppatore</string>
     <string name="developer_mode">Modalità sviluppatore</string>
     <string name="developer_mode_subtitle">Mostra la diagnostica e gli interni MLS.</string>

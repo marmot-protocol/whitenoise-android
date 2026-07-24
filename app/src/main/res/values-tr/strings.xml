@@ -341,6 +341,11 @@
     <string name="audit_logs_settings_subtitle">Güvenlik denetim günlüğü dosyaları oluştur ve gönder.</string>
     <string name="delete_audit_logs">Denetim günlüklerini sil</string>
     <string name="delete_audit_logs_subtitle">Tüm yerel denetim günlüğü dosyalarını siler. Günlük tutma açıksa yeni bir dosyada devam eder.</string>
+    <string name="redact_audit_data">Hassas denetim verilerini gizle</string>
+    <string name="redact_audit_data_subtitle">Şifresi çözülmüş içerikleri ve tam kimlikleri denetim dosyalarının dışında tutar; tuzlanmış referansları, özetleri ve sayıları korur.</string>
+    <string name="redact_audit_data_confirm_title">Tam denetim verileri kaydedilsin mi?</string>
+    <string name="redact_audit_data_confirm_body">Gizleme kapalıyken denetim dosyaları şifresi çözülmüş mesajları, uygulama içeriğini ve tam kimlikleri içerebilir. Tam adli ayrıntı gerekmedikçe gizlemeyi açık bırakın.</string>
+    <string name="redact_audit_data_confirm_action">Tam verileri kaydet</string>
     <string name="developer">Geliştirici</string>
     <string name="developer_mode">Geliştirici modu</string>
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>

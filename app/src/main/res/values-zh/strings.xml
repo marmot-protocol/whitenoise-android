@@ -332,6 +332,11 @@
     <string name="audit_logs_settings_subtitle">创建并发送安全审计日志文件。</string>
     <string name="delete_audit_logs">删除审计日志</string>
     <string name="delete_audit_logs_subtitle">移除所有本地审计文件。如果审计仍开启，会在新文件中继续记录。</string>
+    <string name="redact_audit_data">隐去敏感审计数据</string>
+    <string name="redact_audit_data_subtitle">审计文件中不包含解密内容和完整身份，仅保留加盐引用、摘要和计数。</string>
+    <string name="redact_audit_data_confirm_title">记录完整审计数据？</string>
+    <string name="redact_audit_data_confirm_body">关闭后，审计文件可能包含解密的消息和应用内容以及完整身份。除非需要完整的取证细节，否则请保持开启。</string>
+    <string name="redact_audit_data_confirm_action">记录完整数据</string>
     <string name="developer">开发商</string>
     <string name="developer_mode">开发者模式</string>
     <string name="developer_mode_subtitle">显示诊断和 MLS 内部结构。</string>

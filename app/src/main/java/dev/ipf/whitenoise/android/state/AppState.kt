@@ -273,6 +273,29 @@ internal object ChatScreenshotPreferences {
     }
 }
 
+internal object AuditLogPreferences {
+    private const val KEY_REDACT_SENSITIVE_AUDIT_DATA = "redact_sensitive_audit_data"
+
+    fun SharedPreferences.readRedactSensitiveData(): Boolean = getBoolean(KEY_REDACT_SENSITIVE_AUDIT_DATA, true)
+
+    fun writeRedactSensitiveData(
+        preferences: SharedPreferences,
+        redact: Boolean,
+    ) {
+        preferences.edit().putBoolean(KEY_REDACT_SENSITIVE_AUDIT_DATA, redact).apply()
+    }
+
+    fun settingsFor(
+        enabled: Boolean,
+        redactSensitiveData: Boolean,
+    ): AuditLogSettingsFfi =
+        AuditLogSettingsFfi(
+            enabled = enabled,
+            dataMode =
+                if (redactSensitiveData) AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA else AuditDataModeFfi.FULL_DATA,
+        )
+}
+
 internal object LongMessageCollapsePreferences {
     private const val KEY_PREFIX = "collapse_long_messages:"
 
@@ -1526,6 +1549,9 @@ class WhiteNoiseAppState(
         private set
 
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
+        private set
+
+    var redactSensitiveAuditData by mutableStateOf(with(AuditLogPreferences) { preferences.readRedactSensitiveData() })
         private set
 
     var runtimeGeneration by mutableStateOf(0)
@@ -3567,17 +3593,36 @@ class WhiteNoiseAppState(
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
             // required on the host side.
-            // Full-data mode: when an operator opts into audit logging they want
-            // complete forensic detail (decrypted content, full identifiers), not
-            // the obfuscated safety posture. Account identity is added by the core
-            // into the JSONL source context, so the host no longer supplies it.
+            // The data mode follows the persisted redaction preference, so the
+            // choice survives toggling audit logging off and on.
             val updated =
                 marmotIo {
                     setAuditLogSettings(
-                        AuditLogSettingsFfi(enabled = enabled, dataMode = AuditDataModeFfi.FULL_DATA),
+                        AuditLogPreferences
+                            .settingsFor(enabled = enabled, redactSensitiveData = redactSensitiveAuditData),
                     )
                 }
             auditLogSettings = updated
+            present(R.string.toast_security_privacy_updated)
+            true
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
+            false
+        }
+
+    suspend fun setRedactSensitiveAuditData(redact: Boolean): Boolean =
+        runCatching {
+            if (auditLogSettings?.enabled == true) {
+                auditLogSettings =
+                    marmotIo {
+                        setAuditLogSettings(
+                            AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = redact),
+                        )
+                    }
+            }
+            redactSensitiveAuditData = redact
+            AuditLogPreferences.writeRedactSensitiveData(preferences, redact)
             present(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {

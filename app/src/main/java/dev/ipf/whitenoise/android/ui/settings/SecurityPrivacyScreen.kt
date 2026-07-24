@@ -153,6 +153,63 @@ internal fun SecurityPrivacyScreen(
                             }
                         },
                     )
+                    if (appState.auditLogSettings?.enabled == true) {
+                        var fullAuditDataConfirmOpen by remember { mutableStateOf(false) }
+                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.redact_audit_data),
+                            subtitle = stringResource(R.string.redact_audit_data_subtitle),
+                            checked = appState.redactSensitiveAuditData,
+                            enabled = !auditLogsBusy,
+                            busy = auditLogsBusy,
+                            onCheckedChange = { redact ->
+                                if (!redact) {
+                                    fullAuditDataConfirmOpen = true
+                                } else {
+                                    auditLogsBusy = true
+                                    appState.launchMutation {
+                                        try {
+                                            appState.setRedactSensitiveAuditData(true)
+                                        } finally {
+                                            auditLogsBusy = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                        if (fullAuditDataConfirmOpen) {
+                            AlertDialog(
+                                onDismissRequest = { fullAuditDataConfirmOpen = false },
+                                title = { Text(stringResource(R.string.redact_audit_data_confirm_title)) },
+                                text = { Text(stringResource(R.string.redact_audit_data_confirm_body)) },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            fullAuditDataConfirmOpen = false
+                                            auditLogsBusy = true
+                                            appState.launchMutation {
+                                                try {
+                                                    appState.setRedactSensitiveAuditData(false)
+                                                } finally {
+                                                    auditLogsBusy = false
+                                                }
+                                            }
+                                        },
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.redact_audit_data_confirm_action),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { fullAuditDataConfirmOpen = false }) {
+                                        Text(stringResource(R.string.cancel))
+                                    }
+                                },
+                            )
+                        }
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 12.dp))
                     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
                     Row(
