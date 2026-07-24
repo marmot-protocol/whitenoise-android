@@ -81,6 +81,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.applyChatListSearchAndFilter
+import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
@@ -169,13 +170,28 @@ internal fun ChatsScreen(
             SystemFolderKind.GROUPS -> ChatListFilter.Groups
             null -> ChatListFilter.All
         }
+    // Effective folder membership: manual members plus rule matches,
+    // re-derived from the live list so rule-driven chats join and leave
+    // folders as rosters, unread state, and mute state change.
+    val resolveFolderChatIds: (String) -> Set<String> =
+        remember(folderStoreState, appState.activeAccountRef, controller.items, mutedConversations) {
+            { folderId ->
+                appState.activeAccountRef
+                    ?.let { accountRef ->
+                        chatFolderChatIds(
+                            items = controller.items,
+                            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
+                            rule = appState.chatFolderPreferences.folderRule(accountRef, folderId),
+                            isMuted = { groupIdHex ->
+                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
+                            },
+                        )
+                    }.orEmpty()
+            }
+        }
     val customFolderChatIds =
-        remember(selectedFolder, folderStoreState, appState.activeAccountRef) {
-            selectedFolder
-                ?.takeIf { !it.isSystem }
-                ?.let { folder ->
-                    appState.activeAccountRef?.let { appState.chatFolderPreferences.membershipFor(it, folder.id) }
-                }
+        remember(selectedFolder, resolveFolderChatIds) {
+            selectedFolder?.takeIf { !it.isSystem }?.let { resolveFolderChatIds(it.id) }
         }
     // The Archived filter is a view switch, not a row predicate: it swaps the
     // source list to archived chats (replacing the old dedicated Archived row).
@@ -464,18 +480,13 @@ internal fun ChatsScreen(
             accountFolders,
             controller.items,
             controller.archivedItems,
-            folderStoreState,
-            appState.activeAccountRef,
+            resolveFolderChatIds,
         ) {
             chatFolderChipModels(
                 folders = accountFolders,
                 activeItems = controller.items,
                 archivedItems = controller.archivedItems,
-                membershipOf = { folderId ->
-                    appState.activeAccountRef
-                        ?.let { appState.chatFolderPreferences.membershipFor(it, folderId) }
-                        .orEmpty()
-                },
+                membershipOf = resolveFolderChatIds,
             )
         }
     // Clear the selection whenever its chip disappears — the last archived

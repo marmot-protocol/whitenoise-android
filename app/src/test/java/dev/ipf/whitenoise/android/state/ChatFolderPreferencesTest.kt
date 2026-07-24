@@ -116,8 +116,39 @@ class ChatFolderPreferencesTest {
 
         assertTrue(store.setFolderRule("acct-a", folder.id, rule))
         assertEquals(rule, store.folderRule("acct-a", folder.id))
+        // Rules ride the state flow so folder consumers observe rule edits.
+        assertEquals(
+            rule,
+            store.state.value
+                .getValue("acct-a")
+                .rules[folder.id],
+        )
         assertTrue(store.setFolderRule("acct-a", folder.id, null))
         assertNull(store.folderRule("acct-a", folder.id))
+        assertNull(
+            store.state.value
+                .getValue("acct-a")
+                .rules[folder.id],
+        )
+    }
+
+    @Test
+    fun rulesReloadFromDiskAndAbsentFieldsDefaultOff() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val folder = store.createFolder("acct-a", "VIPs")!!
+        // A rule persisted with only the member list — newer fields absent.
+        context
+            .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+            .edit()
+            .putString("cf:acct-a:r:${folder.id}", """{"includeMemberPubkeys":["aa"]}""")
+            .commit()
+
+        val reloaded = ChatFolderPreferences(context)
+
+        assertEquals(
+            ChatFolderRule(includeMemberPubkeys = setOf("aa"), unreadOnly = false, includeMuted = false),
+            reloaded.folderRule("acct-a", folder.id),
+        )
     }
 
     @Test
