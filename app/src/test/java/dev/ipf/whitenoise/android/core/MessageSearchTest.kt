@@ -124,4 +124,52 @@ class MessageSearchTest {
             Locale.setDefault(old)
         }
     }
+
+    @Test
+    fun mergeUsesTheScanAsSpineOutsideTheLoadedWindow() {
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatchIds = listOf("e", "f"),
+                loadedWindowIds = setOf("d", "e", "f"),
+                scanMatchIdsOldestFirst = listOf("a", "b", "e", "f"),
+            )
+        assertEquals(listOf("a", "b", "e", "f"), merged)
+    }
+
+    @Test
+    fun mergeDropsScanHitsTheWindowRejected() {
+        // "d" matched the raw stored body but the loaded window's edit-resolved
+        // text no longer matches — the window verdict wins inside the window.
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatchIds = listOf("e"),
+                loadedWindowIds = setOf("d", "e"),
+                scanMatchIdsOldestFirst = listOf("a", "d", "e"),
+            )
+        assertEquals(listOf("a", "e"), merged)
+    }
+
+    @Test
+    fun mergeInsertsWindowOnlyHitsByTheirWindowNeighbors() {
+        // "e" only matches after an edit (window-only): it slots after its
+        // preceding window neighbor "d", before "f".
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatchIds = listOf("d", "e", "f"),
+                loadedWindowIds = setOf("d", "e", "f"),
+                scanMatchIdsOldestFirst = listOf("a", "d", "f"),
+            )
+        assertEquals(listOf("a", "d", "e", "f"), merged)
+    }
+
+    @Test
+    fun mergeWithEmptyScanKeepsWindowMatches() {
+        val merged =
+            MessageSearch.mergeWithHistoryScan(
+                windowMatchIds = listOf("a", "b"),
+                loadedWindowIds = setOf("a", "b", "c"),
+                scanMatchIdsOldestFirst = emptyList(),
+            )
+        assertEquals(listOf("a", "b"), merged)
+    }
 }

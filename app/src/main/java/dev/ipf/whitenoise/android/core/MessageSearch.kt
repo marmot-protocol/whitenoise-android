@@ -109,4 +109,53 @@ object MessageSearch {
             (safeCurrent - 1 + matchCount) % matchCount
         }
     }
+
+    /**
+     * Merges the loaded-window matches (edit-resolved text, authoritative for
+     * rows currently loaded) with a full-history store scan (raw stored text,
+     * covering pages not yet loaded). Inside the loaded window the window
+     * verdict wins in both directions — a store hit the window rejected is an
+     * edited-away body, a window hit the store missed is an edited-in one.
+     * Outside the window the store scan is the only evidence. Both inputs are
+     * oldest-first and the merged list preserves that order; window-only hits
+     * are placed relative to their nearest window neighbor already merged.
+     */
+    fun mergeWithHistoryScan(
+        windowMatchIds: List<String>,
+        loadedWindowIds: Set<String>,
+        scanMatchIdsOldestFirst: List<String>,
+    ): List<String> {
+        val windowMatchSet = windowMatchIds.toHashSet()
+        val merged = ArrayList<String>(scanMatchIdsOldestFirst.size + windowMatchIds.size)
+        for (id in scanMatchIdsOldestFirst) {
+            if (id in loadedWindowIds && id !in windowMatchSet) continue
+            merged += id
+        }
+        val mergedSet = merged.toHashSet()
+        for (windowIndex in windowMatchIds.indices) {
+            val id = windowMatchIds[windowIndex]
+            if (id in mergedSet) continue
+            merged.add(windowOnlyInsertionIndex(merged, windowMatchIds, windowIndex), id)
+            mergedSet += id
+        }
+        return merged
+    }
+
+    // The nearest already-merged window neighbor decides where a window-only
+    // hit lands: after its closest predecessor, else before its closest
+    // successor, else at the end.
+    private fun windowOnlyInsertionIndex(
+        merged: List<String>,
+        windowMatchIds: List<String>,
+        windowIndex: Int,
+    ): Int {
+        for (previous in windowIndex - 1 downTo 0) {
+            val at = merged.indexOf(windowMatchIds[previous])
+            if (at >= 0) return at + 1
+        }
+        val nextAt =
+            (windowIndex + 1 until windowMatchIds.size)
+                .firstNotNullOfOrNull { next -> merged.indexOf(windowMatchIds[next]).takeIf { it >= 0 } }
+        return nextAt ?: merged.size
+    }
 }

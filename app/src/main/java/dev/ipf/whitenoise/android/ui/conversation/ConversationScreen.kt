@@ -1852,15 +1852,41 @@ internal fun ConversationScreen(
                     .map { searchable[it].first }
             }
         }
+    // Full local-store matches: the loaded-window derivation above is instant
+    // feedback while typing; the exhaustive history scan is the authority once
+    // it lands, so a result cannot depend on incidental scroll history. The
+    // effect restarting on each keystroke cancels a superseded scan, and the
+    // debounce keeps typing from firing one scan per character.
+    var historySearchMatchIds by remember(chat.id) { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(searchQuery, chat.id, controller) {
+        historySearchMatchIds = null
+        if (searchQuery.isBlank()) return@LaunchedEffect
+        delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
+        historySearchMatchIds =
+            searchConversationHistoryMessageIds(appState, controller.group.groupIdHex, searchQuery)
+    }
+    val effectiveSearchMatchIds =
+        remember(searchMatchIds, historySearchMatchIds, renderedTimeline) {
+            val scan = historySearchMatchIds
+            if (scan == null) {
+                searchMatchIds
+            } else {
+                MessageSearch.mergeWithHistoryScan(
+                    windowMatchIds = searchMatchIds,
+                    loadedWindowIds = renderedTimeline.mapTo(HashSet()) { it.record.messageIdHex },
+                    scanMatchIdsOldestFirst = scan,
+                )
+            }
+        }
     // The active match ordinal, re-anchored to the pinned message id so it
     // tracks that message as the set grows. -1 when there are no matches.
-    val searchActiveIndex = MessageSearch.resolveCursor(searchMatchIds, searchPinnedMatchId)
+    val searchActiveIndex = MessageSearch.resolveCursor(effectiveSearchMatchIds, searchPinnedMatchId)
     // Keep the pin valid: if the resolved cursor fell back to the first match
     // (pin gone / unset) adopt that match id as the new pin so subsequent
     // steps move relative to a real anchor.
-    LaunchedEffect(searchMatchIds, searchActiveIndex) {
+    LaunchedEffect(effectiveSearchMatchIds, searchActiveIndex) {
         if (searchActiveIndex >= 0) {
-            val resolvedId = searchMatchIds[searchActiveIndex]
+            val resolvedId = effectiveSearchMatchIds[searchActiveIndex]
             if (searchPinnedMatchId != resolvedId) searchPinnedMatchId = resolvedId
         }
     }
@@ -1869,10 +1895,9 @@ internal fun ConversationScreen(
         searchJob?.cancel()
         searchJob =
             scope.launch {
-                // Local-only: the message is already in the loaded window
-                // (matches are derived from it), so this resolves immediately;
-                // the helper is reused for symmetry with reply navigation and
-                // guards the rare case where a concurrent trim dropped the row.
+                // A history-scan match can live beyond the loaded window: this
+                // loads only the pages needed to bring the target in (the same
+                // helper reply navigation uses), never the whole history.
                 if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
                 val timelineIndex =
                     renderedTimeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
@@ -1890,10 +1915,10 @@ internal fun ConversationScreen(
     // Step the cursor (next = forward/newer, previous = backward/older) with
     // wrap-around, pin the new match, and jump+highlight it.
     fun navigateToSearchMatch(forward: Boolean) {
-        if (searchMatchIds.isEmpty()) return
-        val next = MessageSearch.step(searchActiveIndex, searchMatchIds.size, forward)
+        if (effectiveSearchMatchIds.isEmpty()) return
+        val next = MessageSearch.step(searchActiveIndex, effectiveSearchMatchIds.size, forward)
         if (next < 0) return
-        val targetId = searchMatchIds[next]
+        val targetId = effectiveSearchMatchIds[next]
         searchPinnedMatchId = targetId
         scrollToSearchMatch(targetId)
     }
@@ -1939,9 +1964,9 @@ internal fun ConversationScreen(
     // Jump to the first match as soon as one exists for the current query, so
     // typing immediately scrolls to (and highlights) the newest match without
     // requiring the user to tap an arrow first.
-    LaunchedEffect(searchMatchIds.firstOrNull(), searchOpen) {
-        if (searchOpen && searchMatchIds.isNotEmpty()) {
-            val firstId = searchMatchIds[searchActiveIndex.coerceAtLeast(0)]
+    LaunchedEffect(effectiveSearchMatchIds.firstOrNull(), searchOpen) {
+        if (searchOpen && effectiveSearchMatchIds.isNotEmpty()) {
+            val firstId = effectiveSearchMatchIds[searchActiveIndex.coerceAtLeast(0)]
             scrollToSearchMatch(firstId)
         }
     }
@@ -2672,7 +2697,7 @@ internal fun ConversationScreen(
                     // navigation bar pinned above the keyboard.
                     searchOpen ->
                         ConversationSearchNavBar(
-                            matchCount = searchMatchIds.size,
+                            matchCount = effectiveSearchMatchIds.size,
                             activeIndex = searchActiveIndex,
                             hasQuery = searchQuery.isNotBlank(),
                             onPrev = { navigateToSearchMatch(forward = false) },
