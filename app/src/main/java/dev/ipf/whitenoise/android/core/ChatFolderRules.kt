@@ -14,10 +14,15 @@ import java.util.Locale
  * Rule semantics:
  *   - member criterion (non-empty [ChatFolderRule.includeMemberPubkeys]) —
  *     the chat contains at least one of the listed pubkeys,
+ *   - keyword criterion ([ChatFolderRule.keyword]) — the chat's visible
+ *     title or its group description contains the keyword, with the same
+ *     case-insensitive fold + substring containment the chat-list search
+ *     applies; [displayTitle] must supply the same title the row renders,
+ *   - the two criteria are additive: matching either puts the chat in,
  *   - [ChatFolderRule.unreadOnly] constrains matches to chats with unread
  *     messages (the same [ChatListItem.hasUnread] the Unread system folder
- *     filters by); with no member criterion it stands alone as a pure
- *     unread rule,
+ *     filters by); with no member or keyword criterion it stands alone as
+ *     a pure unread rule,
  *   - [ChatFolderRule.includeMuted] false (the default) drops muted chats
  *     from rule matches; manual members are the user's explicit choice and
  *     are never filtered here.
@@ -27,32 +32,50 @@ internal fun chatFolderChatIds(
     manualChatIds: Set<String>,
     rule: ChatFolderRule?,
     isMuted: (groupIdHex: String) -> Boolean,
+    displayTitle: (ChatListItem) -> String,
 ): Set<String> {
     if (rule == null) return manualChatIds
-    val wantedMemberHexes = rule.includeMemberPubkeys.mapTo(HashSet()) { it.lowercase(Locale.ROOT) }
+    val criteria =
+        FolderRuleCriteria(
+            rule = rule,
+            memberHexes = rule.includeMemberPubkeys.mapTo(HashSet()) { it.lowercase(Locale.ROOT) },
+            ciKeyword =
+                rule.keyword
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let(::localeInvariantFold),
+        )
     return manualChatIds +
         items
-            .filter { chatFolderRuleMatches(rule, wantedMemberHexes, it, isMuted) }
+            .filter { chatFolderRuleMatches(criteria, it, isMuted, displayTitle) }
             .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
 }
 
+// The rule with its match inputs pre-normalized once per evaluation pass.
+private data class FolderRuleCriteria(
+    val rule: ChatFolderRule,
+    val memberHexes: Set<String>,
+    val ciKeyword: String?,
+)
+
 private fun chatFolderRuleMatches(
-    rule: ChatFolderRule,
-    wantedMemberHexes: Set<String>,
+    criteria: FolderRuleCriteria,
     item: ChatListItem,
     isMuted: (groupIdHex: String) -> Boolean,
+    displayTitle: (ChatListItem) -> String,
 ): Boolean {
-    // With no member criterion the rule matches every chat only when
-    // unreadOnly narrows it — an empty rule must not swallow the whole list.
+    // With no member or keyword criterion the rule matches every chat only
+    // when unreadOnly narrows it — an empty rule must not swallow the list.
     val base =
-        if (wantedMemberHexes.isEmpty()) {
-            rule.unreadOnly
+        if (criteria.memberHexes.isEmpty() && criteria.ciKeyword == null) {
+            criteria.rule.unreadOnly
         } else {
-            chatHasAnyMember(item, wantedMemberHexes)
+            chatHasAnyMember(item, criteria.memberHexes) ||
+                chatMatchesKeyword(item, criteria.ciKeyword, displayTitle)
         }
     return base &&
-        (!rule.unreadOnly || item.hasUnread) &&
-        (rule.includeMuted || !isMuted(item.group.groupIdHex))
+        (!criteria.rule.unreadOnly || item.hasUnread) &&
+        (criteria.rule.includeMuted || !isMuted(item.group.groupIdHex))
 }
 
 // Matches against the roster snapshot the chat-list row already carries. A
@@ -69,3 +92,16 @@ private fun chatHasAnyMember(
     return (counterpart != null && counterpart in wantedMemberHexes) ||
         roster.any { it.memberIdHex.lowercase(Locale.ROOT) in wantedMemberHexes }
 }
+
+// Same fold + substring containment the chat-list search applies to titles
+// and descriptions, so a folder keyword matches exactly what search would.
+private fun chatMatchesKeyword(
+    item: ChatListItem,
+    ciKeyword: String?,
+    displayTitle: (ChatListItem) -> String,
+): Boolean =
+    ciKeyword != null &&
+        (
+            localeInvariantFold(displayTitle(item)).contains(ciKeyword) ||
+                localeInvariantFold(item.group.description).contains(ciKeyword)
+        )

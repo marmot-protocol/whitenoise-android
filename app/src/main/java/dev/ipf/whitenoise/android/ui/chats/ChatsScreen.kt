@@ -174,7 +174,16 @@ internal fun ChatsScreen(
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
     val resolveFolderChatIds: (String) -> Set<String> =
-        remember(folderStoreState, appState.activeAccountRef, controller.items, mutedConversations) {
+        remember(
+            folderStoreState,
+            appState.activeAccountRef,
+            controller.items,
+            mutedConversations,
+            groupTitleCopy,
+            // Keyword rules match the rendered row title, which resolves as
+            // peer profiles land — re-derive when the presentation cache bumps.
+            appState.profileRevisionForCompose,
+        ) {
             { folderId ->
                 appState.activeAccountRef
                     ?.let { accountRef ->
@@ -185,6 +194,7 @@ internal fun ChatsScreen(
                             isMuted = { groupIdHex ->
                                 ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
                             },
+                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                         )
                     }.orEmpty()
             }

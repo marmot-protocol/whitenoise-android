@@ -31,6 +31,7 @@ data class ChatFolderRule(
     val includeMemberPubkeys: Set<String> = emptySet(),
     val unreadOnly: Boolean = false,
     val includeMuted: Boolean = false,
+    val keyword: String? = null,
 )
 
 /** One account's folder state: ordered folders, manual memberships, rules. */
@@ -205,6 +206,7 @@ class ChatFolderPreferences(
                         .put(RULE_MEMBERS, JSONArray(rule.includeMemberPubkeys.toList()))
                         .put(RULE_UNREAD_ONLY, rule.unreadOnly)
                         .put(RULE_INCLUDE_MUTED, rule.includeMuted)
+                rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
                 edit.putString(ruleKey(account, folderId), json.toString())
             }
             edit.apply()
@@ -289,6 +291,7 @@ class ChatFolderPreferences(
                 includeMemberPubkeys = json.optJSONArray(RULE_MEMBERS).toStringSet(),
                 unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
                 includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, false),
+                keyword = json.optString(RULE_KEYWORD).takeIf { it.isNotBlank() },
             )
         }.getOrNull()
     }
@@ -367,6 +370,7 @@ class ChatFolderPreferences(
         private const val RULE_MEMBERS = "includeMemberPubkeys"
         private const val RULE_UNREAD_ONLY = "unreadOnly"
         private const val RULE_INCLUDE_MUTED = "includeMuted"
+        private const val RULE_KEYWORD = "keyword"
 
         // Stable ids so the chip row and future deep links can reference the
         // absorbed system folders without a per-account lookup.

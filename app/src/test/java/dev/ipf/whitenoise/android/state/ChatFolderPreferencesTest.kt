@@ -112,6 +112,7 @@ class ChatFolderPreferencesTest {
                 includeMemberPubkeys = setOf("aa", "bb"),
                 unreadOnly = true,
                 includeMuted = false,
+                keyword = "work",
             )
 
         assertTrue(store.setFolderRule("acct-a", folder.id, rule))
