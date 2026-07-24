@@ -65,6 +65,19 @@ internal sealed interface ProfileForegroundRoute {
     ) : ProfileForegroundRoute
 }
 
+internal class ProfileGroupForegroundState {
+    var initialMember by mutableStateOf<RecipientSearch.Candidate?>(null)
+        private set
+
+    fun open(member: RecipientSearch.Candidate) {
+        initialMember = member
+    }
+
+    fun close() {
+        initialMember = null
+    }
+}
+
 internal fun profileForegroundRoute(
     pendingProfileNpub: String?,
     startGroupMember: RecipientSearch.Candidate?,
@@ -122,9 +135,7 @@ internal fun MainShell(
     // before the live roster has necessarily settled. Suppresses the group-style
     // member-count subtitle during that transient 0/1-member window (#998).
     var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
-    var profileStartGroupMember by remember(appState.activeAccountRef) {
-        mutableStateOf<RecipientSearch.Candidate?>(null)
-    }
+    val profileGroupForegroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     // Per-conversation scroll anchors for back-to-list re-entry (issue #1107).
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
@@ -490,12 +501,12 @@ internal fun MainShell(
 
     val startGroupFromProfile: (RecipientSearch.Candidate) -> Unit = { candidate ->
         appState.clearPresentedProfile()
-        profileStartGroupMember = candidate
+        profileGroupForegroundState.open(candidate)
     }
     val profileRoute =
         profileForegroundRoute(
             pendingProfileNpub = appState.pendingProfileNpub,
-            startGroupMember = profileStartGroupMember,
+            startGroupMember = profileGroupForegroundState.initialMember,
             conversationOpen = selectedChat != null,
         )
     if (profileRoute is ProfileForegroundRoute.NewGroup) {
@@ -506,12 +517,12 @@ internal fun MainShell(
             appState = appState,
             initialMembers = listOf(profileRoute.initialMember),
             onOpenConversation = { item, justCreated ->
-                profileStartGroupMember = null
+                profileGroupForegroundState.close()
                 openGroupFromProfile(item, justCreated)
             },
             onClose = {
                 chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
-                profileStartGroupMember = null
+                profileGroupForegroundState.close()
             },
         )
         return

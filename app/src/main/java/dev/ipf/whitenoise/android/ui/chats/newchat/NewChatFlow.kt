@@ -195,8 +195,8 @@ internal fun NewChatFlowHost(
 }
 
 /**
- * Member picker + group setup pair. Also used standalone by the shell host for
- * the profile sheet's "Start new group with …" action via [initialMembers].
+ * Member picker + group setup pair. Also used standalone by the profile
+ * sheet's "Start new group with …" action via [initialMembers].
  */
 @Composable
 internal fun NewGroupFlow(

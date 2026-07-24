@@ -11,12 +11,13 @@ class ProfileStartGroupNavigationTest {
     @Test
     fun shellProfileStartGroupPromotesPickerWithViewedMember() {
         val candidate = viewedCandidate()
+        val state = ProfileGroupForegroundState().apply { open(candidate) }
 
         assertEquals(
             ProfileForegroundRoute.NewGroup(candidate),
             profileForegroundRoute(
-                pendingProfileNpub = candidate.npub,
-                startGroupMember = candidate,
+                pendingProfileNpub = null,
+                startGroupMember = state.initialMember,
                 conversationOpen = false,
             ),
         )
@@ -25,48 +26,68 @@ class ProfileStartGroupNavigationTest {
     @Test
     fun conversationProfileStartGroupPromotesPickerAboveConversation() {
         val candidate = viewedCandidate()
+        val state = ProfileGroupForegroundState().apply { open(candidate) }
 
         assertEquals(
             ProfileForegroundRoute.NewGroup(candidate),
             profileForegroundRoute(
-                pendingProfileNpub = candidate.npub,
-                startGroupMember = candidate,
+                pendingProfileNpub = null,
+                startGroupMember = state.initialMember,
                 conversationOpen = true,
             ),
         )
     }
 
     @Test
-    fun closingPickerLeavesNoProfileOverlayAtShell() {
+    fun closingPickerClearsShellForegroundRoute() {
+        val candidate = viewedCandidate()
+        val state = ProfileGroupForegroundState().apply { open(candidate) }
+
+        assertEquals(
+            ProfileForegroundRoute.NewGroup(candidate),
+            profileForegroundRoute(null, state.initialMember, conversationOpen = false),
+        )
+
+        state.close()
+
         assertEquals(
             ProfileForegroundRoute.None,
-            profileForegroundRoute(
-                pendingProfileNpub = null,
-                startGroupMember = null,
-                conversationOpen = false,
-            ),
+            profileForegroundRoute(null, state.initialMember, conversationOpen = false),
         )
     }
 
     @Test
-    fun closingPickerLeavesNoProfileOverlayInConversation() {
+    fun closingPickerClearsConversationForegroundRoute() {
+        val candidate = viewedCandidate()
+        val state = ProfileGroupForegroundState().apply { open(candidate) }
+
+        assertEquals(
+            ProfileForegroundRoute.NewGroup(candidate),
+            profileForegroundRoute(null, state.initialMember, conversationOpen = true),
+        )
+
+        state.close()
+
         assertEquals(
             ProfileForegroundRoute.None,
-            profileForegroundRoute(
-                pendingProfileNpub = null,
-                startGroupMember = null,
-                conversationOpen = true,
-            ),
+            profileForegroundRoute(null, state.initialMember, conversationOpen = true),
         )
     }
 
     @Test
     fun profileSheetDelegatesGroupStartInsteadOfComposingTheForegroundFlow() {
         val source = sourceFile("ui/profile/ProfileSheet.kt").readText()
+        val actionStart = source.indexOf("title = stringResource(R.string.profile_start_new_group_with")
+        val action = source.substring(actionStart, source.indexOf("SettingsActionRow(", actionStart + 1))
 
         assertFalse(
             "ProfileSheet must not emit a full-screen group flow from behind its modal",
             source.contains("NewGroupFlow("),
+        )
+        assertTrue("the profile action must invoke the shell handoff", action.contains("onStartGroup("))
+        assertTrue(
+            "the shell handoff must retain the viewed member",
+            action.contains("RecipientSearch.Candidate("),
         )
     }
 
@@ -78,8 +99,14 @@ class ProfileStartGroupNavigationTest {
         val conversationIndex = shellSource.indexOf("        ConversationScreen(")
         val promotedBlockIndex =
             shellSource.lastIndexOf("    if (profileRoute is ProfileForegroundRoute.NewGroup)", flowIndex)
+        val closeBlock =
+            shellSource.substringAfter("            onClose = {").substringBefore("            },")
 
         assertTrue("MainShell must render the promoted group flow", flowIndex >= 0)
+        assertTrue(
+            "picker back must invoke the tested foreground-state cleanup",
+            closeBlock.contains("profileGroupForegroundState.close()"),
+        )
         assertTrue(
             "the promoted flow must retain the owning chat surface's secure-window policy",
             shellSource.substring(promotedBlockIndex, flowIndex).contains("WindowSecureFlag("),
