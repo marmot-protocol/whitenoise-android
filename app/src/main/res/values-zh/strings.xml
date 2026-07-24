@@ -606,7 +606,6 @@
     <string name="support_the_project_subtitle">White Noise 免费且开源。捐赠有助于保持这一点。</string>
     <string name="chat_with_support">与支持团队聊天</string>
     <string name="chat_with_support_subtitle">直接给团队发消息</string>
-    <string name="chat_with_support_failed">无法开始支持聊天，请检查网络后重试。</string>
     <string name="donate_lightning_address">Lightning 地址</string>
     <string name="donate_bitcoin_silent_payment">Bitcoin 静默支付</string>
     <string name="donate_method_lightning">Lightning</string>

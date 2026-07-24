@@ -615,7 +615,6 @@
     <string name="support_the_project_subtitle">White Noise est gratuit et open source. Les dons aident à le garder ainsi.</string>
     <string name="chat_with_support">Discuter avec l\'assistance</string>
     <string name="chat_with_support_subtitle">Écrivez directement à l\'équipe</string>
-    <string name="chat_with_support_failed">Impossible de démarrer la discussion avec l\'assistance. Vérifiez votre connexion et réessayez.</string>
     <string name="donate_lightning_address">Adresse Lightning</string>
     <string name="donate_bitcoin_silent_payment">Paiement silencieux Bitcoin</string>
     <string name="donate_method_lightning">Lightning</string>

@@ -21,12 +21,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -61,7 +59,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.SupportContact
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
@@ -239,34 +236,16 @@ private fun SettingsHomeScreen(
     }
 
     // Chat with support: reopen the existing direct chat with the canonical
-    // support identity, or start one through the ordinary direct-chat path —
-    // no special protocol path, no hard-coded group id.
-    var supportChatInFlight by remember { mutableStateOf(false) }
-
+    // support identity. Matches the prior behavior: reopen the existing DM if
+    // there is one, otherwise present the support profile — whose Message
+    // action runs the ordinary start-chat flow (KeyPackage handling, typed
+    // failure, invitation) instead of a bespoke path.
     fun startSupportChat() {
-        if (supportChatInFlight) return
-        appState.existingDirectChat(SupportContact.NPUB)?.let {
-            onOpenSupportChat(it)
-            return
-        }
-        supportChatInFlight = true
-        appState.launchMutation {
-            try {
-                runCatching { appState.createProfileChatGroup(SupportContact.NPUB) }
-                    .onSuccess { groupIdHex ->
-                        val item = appState.awaitChatListItem(groupIdHex)
-                        if (item != null) {
-                            onOpenSupportChat(item)
-                        } else {
-                            appState.present(R.string.chat_with_support_failed)
-                        }
-                    }.onFailure { error ->
-                        rethrowIfCancellation(error)
-                        appState.present(R.string.chat_with_support_failed)
-                    }
-            } finally {
-                supportChatInFlight = false
-            }
+        val existing = appState.existingDirectChat(SupportContact.NPUB)
+        if (existing != null) {
+            onOpenSupportChat(existing)
+        } else {
+            appState.presentProfile(SupportContact.NPUB)
         }
     }
 
@@ -293,7 +272,6 @@ private fun SettingsHomeScreen(
         onOpenAccountSelector = { showAccountSelector = true },
         onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
         onOpenDetail = onOpenDetail,
-        supportChatInFlight = supportChatInFlight,
         onChatWithSupport = ::startSupportChat,
         onAppUpdateAction = {
             scope.launch {
@@ -329,7 +307,7 @@ private fun SettingsHomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun SettingsHomeContent(
@@ -344,7 +322,6 @@ internal fun SettingsHomeContent(
     onOpenQr: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
-    supportChatInFlight: Boolean = false,
     onChatWithSupport: () -> Unit = {},
 ) {
     Scaffold(
@@ -388,8 +365,7 @@ internal fun SettingsHomeContent(
                                 colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
                             ) {
                                 ListItem(
-                                    modifier =
-                                        Modifier.clickable(enabled = !supportChatInFlight) { onChatWithSupport() },
+                                    modifier = Modifier.clickable { onChatWithSupport() },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                     headlineContent = { Text(stringResource(R.string.chat_with_support)) },
                                     supportingContent = {
@@ -399,14 +375,6 @@ internal fun SettingsHomeContent(
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     },
-                                    trailingContent =
-                                        if (supportChatInFlight) {
-                                            // Expressive loader, matching the sign-in screen's
-                                            // loading state rather than a plain ring.
-                                            { LoadingIndicator(modifier = Modifier.size(20.dp)) }
-                                        } else {
-                                            null
-                                        },
                                 )
                                 ListItem(
                                     modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
