@@ -849,6 +849,7 @@
     <string name="chat_folder_people_subtitle">包含與這些人的任何聊天</string>
     <string name="chat_list_action_add_to_folder">加入資料夾</string>
     <string name="chat_folders_none">無</string>
+    <string name="chat_folder_included_by_rule">由此資料夾的規則加入</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 個聊天</item>
     </plurals>

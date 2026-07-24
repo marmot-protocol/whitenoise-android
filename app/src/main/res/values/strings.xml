@@ -53,6 +53,7 @@
     <string name="chat_folder_people_subtitle">Include any chat with these people</string>
     <string name="chat_list_action_add_to_folder">Add to folder</string>
     <string name="chat_folders_none">None</string>
+    <string name="chat_folder_included_by_rule">Included by this folder\'s rules</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chats</item>

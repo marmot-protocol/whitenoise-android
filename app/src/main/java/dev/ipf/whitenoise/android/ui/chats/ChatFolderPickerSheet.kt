@@ -45,6 +45,7 @@ internal fun ChatFolderPickerSheet(
     targetChatIds: List<String>,
     onCreateFolder: () -> Unit,
     onDismiss: () -> Unit,
+    ruleMatchedFolderIds: Set<String> = emptySet(),
 ) {
     val accountRef = appState.activeAccountRef
     val store = appState.chatFolderPreferences
@@ -78,6 +79,14 @@ internal fun ChatFolderPickerSheet(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     leadingContent = { TriStateCheckbox(state = checkboxState, onClick = null) },
                     headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent =
+                        if (folder.id in ruleMatchedFolderIds) {
+                            // The checkbox reflects manual membership only; a
+                            // rule keeps this chat in the folder regardless.
+                            { Text(stringResource(R.string.chat_folder_included_by_rule)) }
+                        } else {
+                            null
+                        },
                 )
             }
             ListItem(

@@ -758,26 +758,32 @@ internal fun GroupDetailsScreen(
                     appState.chatFolderPreferences
                         .foldersFor(accountRef)
                         .filterNot { it.isSystem }
-                        .filter { folder ->
-                            chatIdLower in
-                                chatFolderChatIds(
-                                    items = thisChatRow,
-                                    manualChatIds =
-                                        appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                    rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                    isMuted = {
-                                        ChatMutePreferences.compositeKey(accountRef, it) in
-                                            chatNotificationState.mutedConversations
-                                    },
-                                    displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                )
-                        }.map { it.name }
+                        .mapNotNull { folder ->
+                            val manual =
+                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                            val effective =
+                                chatIdLower in
+                                    chatFolderChatIds(
+                                        items = thisChatRow,
+                                        manualChatIds =
+                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                        isMuted = {
+                                            ChatMutePreferences.compositeKey(accountRef, it) in
+                                                chatNotificationState.mutedConversations
+                                        },
+                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                    )
+                            if (effective) folder to manual else null
+                        }
                 }
             SettingsActionRow(
                 icon = Icons.Default.Folder,
                 title = stringResource(R.string.chat_folders_title),
                 value =
-                    folderNames.takeIf { it.isNotEmpty() }?.joinToString(", ")
+                    folderNames
+                        .takeIf { it.isNotEmpty() }
+                        ?.joinToString(", ") { (folder, _) -> folder.name }
                         ?: stringResource(R.string.chat_folders_none),
                 onClick = { showFolderPicker = true },
             )
@@ -785,6 +791,12 @@ internal fun GroupDetailsScreen(
                 ChatFolderPickerSheet(
                     appState = appState,
                     targetChatIds = listOf(chatIdLower),
+                    // Rule-matched membership is visible in the row above but
+                    // not toggleable here — the sheet edits manual membership
+                    // only, so it must say why a checked-looking folder shows
+                    // an unchecked box.
+                    ruleMatchedFolderIds =
+                        folderNames.filterNot { (_, manual) -> manual }.mapTo(HashSet()) { (folder, _) -> folder.id },
                     onCreateFolder = {
                         showFolderPicker = false
                         showFolderCreate = true

@@ -866,6 +866,7 @@
     <string name="chat_folder_people_subtitle">Incluir qualquer conversa com essas pessoas</string>
     <string name="chat_list_action_add_to_folder">Adicionar à pasta</string>
     <string name="chat_folders_none">Nenhuma</string>
+    <string name="chat_folder_included_by_rule">Incluído pelas regras desta pasta</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d conversa</item>
         <item quantity="other">%1$d conversas</item>
