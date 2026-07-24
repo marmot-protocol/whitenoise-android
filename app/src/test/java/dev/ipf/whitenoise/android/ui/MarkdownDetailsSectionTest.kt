@@ -1,11 +1,88 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MarkdownDetailsSectionTest {
+    private fun paragraph(vararg lines: String): MarkdownBlockFfi.Paragraph {
+        val inlines = mutableListOf<MarkdownInlineFfi>()
+        lines.forEachIndexed { index, line ->
+            if (index > 0) inlines += MarkdownInlineFfi.SoftBreak
+            inlines += MarkdownInlineFfi.Text(line)
+        }
+        return MarkdownBlockFfi.Paragraph(inlines)
+    }
+
+    private fun heading(text: String) = MarkdownBlockFfi.Heading(1u, listOf(MarkdownInlineFfi.Text(text)))
+
+    @Test
+    fun groupsCanonicalMultiBlockDetailsWithNestedContent() {
+        // The issue's shape: <details> + own-line <summary>, a blank line (so
+        // the content is separate blocks), non-paragraph content, then a lone
+        // </details>. All of it must fold into one collapsible.
+        val head = heading("Section")
+        val body = paragraph("first line", "second line")
+        val groups =
+            groupMarkdownDetailsBlocks(
+                listOf(
+                    paragraph("<details>", "<summary>Logs</summary>"),
+                    head,
+                    body,
+                    paragraph("</details>"),
+                ),
+            )
+        assertEquals(1, groups.size)
+        val details = groups.single() as MarkdownRenderGroup.Details
+        assertEquals("Logs", details.summary)
+        assertEquals(listOf(head, body), details.content)
+    }
+
+    @Test
+    fun closeTagTrailingContentStaysInsideTheGroup() {
+        val groups =
+            groupMarkdownDetailsBlocks(
+                listOf(
+                    paragraph("<details>"),
+                    paragraph("hidden line</details>"),
+                ),
+            )
+        val details = groups.single() as MarkdownRenderGroup.Details
+        assertNull(details.summary)
+        assertEquals(listOf(paragraph("hidden line")), details.content)
+    }
+
+    @Test
+    fun unterminatedMultiBlockDetailsRendersEveryBlockLiterally() {
+        val blocks =
+            listOf(
+                paragraph("<details>", "<summary>Never closed</summary>"),
+                heading("orphan"),
+            )
+        val groups = groupMarkdownDetailsBlocks(blocks)
+        assertTrue(groups.all { it is MarkdownRenderGroup.Plain })
+        assertEquals(blocks, groups.map { (it as MarkdownRenderGroup.Plain).block })
+    }
+
+    @Test
+    fun plainBlocksArePassedThroughUngrouped() {
+        val blocks = listOf(paragraph("just prose"), heading("x"))
+        val groups = groupMarkdownDetailsBlocks(blocks)
+        assertEquals(blocks, groups.map { (it as MarkdownRenderGroup.Plain).block })
+    }
+
+    @Test
+    fun selfContainedSingleParagraphIsNotMultiBlockGrouped() {
+        // Handled inline by the block view via markdownDetailsSection, so the
+        // grouper must leave it a Plain block, not swallow it.
+        val single = paragraph("<details>", "<summary>x</summary>", "body", "</details>")
+        val groups = groupMarkdownDetailsBlocks(listOf(single))
+        assertTrue(groups.single() is MarkdownRenderGroup.Plain)
+    }
+
     @Test
     fun extractsOwnLineSummaryAndContent() {
         val section =

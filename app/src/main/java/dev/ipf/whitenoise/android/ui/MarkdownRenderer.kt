@@ -484,14 +484,19 @@ private fun MarkdownBlockList(
 ) {
     val visibleBlocks = markdownVisibleSiblings(blocks)
     val blocksElided = markdownSiblingsElided(blocks)
+    val groups = remember(visibleBlocks) { groupMarkdownDetailsBlocks(visibleBlocks) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        visibleBlocks.forEachIndexed { index, block ->
-            MarkdownBlockView(
-                block,
-                ctx,
-                depth = depth,
-                onTextLayout = if (!blocksElided && index == visibleBlocks.lastIndex) onLastTextLayout else null,
-            )
+        groups.forEachIndexed { index, group ->
+            // A collapsible has no stable trailing text line, so the inline
+            // footer callback only rides the last group when it is a plain block.
+            val lastPlainCallback =
+                if (!blocksElided && index == groups.lastIndex) onLastTextLayout else null
+            when (group) {
+                is MarkdownRenderGroup.Plain ->
+                    MarkdownBlockView(group.block, ctx, depth = depth, onTextLayout = lastPlainCallback)
+                is MarkdownRenderGroup.Details ->
+                    MarkdownDetailsBlocksView(group.summary, group.content, ctx, depth = depth)
+            }
         }
         if (blocksElided) {
             MarkdownElisionMarker(onTextLayout = onLastTextLayout)
@@ -667,30 +672,145 @@ internal fun markdownDetailsSection(inlines: List<MarkdownInlineFfi>): MarkdownD
     return MarkdownDetailsSection(summary, content)
 }
 
+/**
+ * A message's blocks grouped so a `<details>` disclosure that spans several
+ * blocks (the canonical GitHub form: a blank line after `</summary>`, then
+ * lists/code/quotes, then `</details>`) collapses as one unit. The engine emits
+ * no HTML block, so the tags arrive as literal-text paragraphs around ordinary
+ * content blocks; this reassembles them.
+ */
+internal sealed interface MarkdownRenderGroup {
+    data class Plain(
+        val block: MarkdownBlockFfi,
+    ) : MarkdownRenderGroup
+
+    data class Details(
+        val summary: String?,
+        val content: List<MarkdownBlockFfi>,
+    ) : MarkdownRenderGroup
+}
+
+private data class MarkdownDetailsOpen(
+    val summary: String?,
+)
+
+/**
+ * Reassemble multi-block `<details>` groups. A self-contained single-paragraph
+ * disclosure is left as a Plain block — [MarkdownBlockView] renders that case
+ * inline via [markdownDetailsSection]. An opener with no matching close renders
+ * literally (stays Plain), so unterminated markup never swallows the rest.
+ */
+internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> {
+    val out = ArrayList<MarkdownRenderGroup>()
+    var index = 0
+    while (index < blocks.size) {
+        val opener = markdownDetailsOpener(blocks[index])
+        val closeIndex = if (opener == null) -1 else markdownDetailsCloseIndex(blocks, index + 1)
+        if (opener == null || closeIndex < 0) {
+            out += MarkdownRenderGroup.Plain(blocks[index])
+            index += 1
+        } else {
+            val content = ArrayList<MarkdownBlockFfi>(blocks.subList(index + 1, closeIndex))
+            stripTrailingDetailsClose(blocks[closeIndex])?.let { content += it }
+            out += MarkdownRenderGroup.Details(opener.summary, content)
+            index = closeIndex + 1
+        }
+    }
+    return out
+}
+
+// A Paragraph whose only lines are the <details> tag (optional same-line
+// summary) and optionally an own-line <summary>. Residual content on the
+// opening paragraph is not the canonical multi-block form and renders literally.
+private fun markdownDetailsOpener(block: MarkdownBlockFfi): MarkdownDetailsOpen? {
+    val paragraph =
+        (block as? MarkdownBlockFfi.Paragraph)?.takeIf { markdownDetailsSection(it.inlines) == null } ?: return null
+    return detailsOpenFromLines(markdownVisibleSiblings(paragraph.inlines).filterNot(::isMarkdownLineBreak))
+}
+
+private fun detailsOpenFromLines(lines: List<MarkdownInlineFfi>): MarkdownDetailsOpen? {
+    val openMatch =
+        (lines.firstOrNull() as? MarkdownInlineFfi.Text)?.content?.trim()?.let { DETAILS_OPEN_LINE.matchEntire(it) }
+            ?: return null
+    val sameLineSummary = openMatch.groupValues[1].trim().takeIf { it.isNotEmpty() }
+    val ownLineSummary =
+        (lines.getOrNull(1) as? MarkdownInlineFfi.Text)?.content?.trim()?.let { DETAILS_SUMMARY_LINE.matchEntire(it) }
+    return when {
+        sameLineSummary != null -> if (lines.size == 1) MarkdownDetailsOpen(sameLineSummary) else null
+        lines.size == 1 -> MarkdownDetailsOpen(null)
+        lines.size == 2 && ownLineSummary != null ->
+            MarkdownDetailsOpen(ownLineSummary.groupValues[1].trim().takeIf { it.isNotEmpty() })
+        else -> null
+    }
+}
+
+private fun markdownDetailsCloseIndex(
+    blocks: List<MarkdownBlockFfi>,
+    from: Int,
+): Int {
+    for (index in from until blocks.size) {
+        if (blockEndsWithDetailsClose(blocks[index])) return index
+    }
+    return -1
+}
+
+private fun blockEndsWithDetailsClose(block: MarkdownBlockFfi): Boolean {
+    val lastLine =
+        (block as? MarkdownBlockFfi.Paragraph)
+            ?.let { markdownVisibleSiblings(it.inlines).filterNot(::isMarkdownLineBreak) }
+            ?.lastOrNull() as? MarkdownInlineFfi.Text
+    return lastLine?.content?.trim()?.endsWith(DETAILS_CLOSE_TAG, ignoreCase = true) == true
+}
+
+// The closing paragraph minus its trailing </details>. Null when the paragraph
+// is only the close tag (contributes no content). The close may sit alone or
+// trail a content paragraph's last line.
+@Suppress("ReturnCount")
+private fun stripTrailingDetailsClose(block: MarkdownBlockFfi): MarkdownBlockFfi? {
+    val inlines = (block as? MarkdownBlockFfi.Paragraph)?.inlines ?: return null
+    val lastTextIndex = inlines.indexOfLast { it is MarkdownInlineFfi.Text }
+    val lastText = inlines.getOrNull(lastTextIndex) as? MarkdownInlineFfi.Text ?: return null
+    val stripped = stripClosingDetailsTag(lastText.content)
+    val rebuilt =
+        if (stripped.isBlank()) {
+            inlines.subList(0, lastTextIndex).dropLastWhile(::isMarkdownLineBreak)
+        } else {
+            inlines.toMutableList().also { it[lastTextIndex] = MarkdownInlineFfi.Text(stripped) }
+        }
+    return rebuilt.takeIf { it.isNotEmpty() }?.let { MarkdownBlockFfi.Paragraph(it) }
+}
+
+private fun stripClosingDetailsTag(content: String): String {
+    val trimmedEnd = content.trimEnd()
+    val idx = trimmedEnd.lowercase(Locale.ROOT).lastIndexOf(DETAILS_CLOSE_TAG)
+    return if (idx >= 0 && idx + DETAILS_CLOSE_TAG.length == trimmedEnd.length) {
+        trimmedEnd.substring(0, idx).trimEnd()
+    } else {
+        content
+    }
+}
+
 private val DETAILS_CHEVRON_SIZE = 20.dp
 private val DETAILS_CONTENT_INDENT = 24.dp
 private const val DETAILS_CHEVRON_COLLAPSED_DEGREES = -90f
 private const val DETAILS_CHEVRON_EXPANDED_DEGREES = 0f
 
-/**
- * Header row (chevron + summary) toggling the hidden content, collapsed by
- * default. Expansion state lives in the composition only — scrolling the
- * message away and back resets to collapsed, which is acceptable for a chat
- * bubble. The content keeps the full inline treatment (formatting, links,
- * mentions) since it is the same paragraph's inline run.
- */
+// Chevron + summary header toggling hidden content, collapsed by default.
+// Expansion lives in composition only (scroll away and back resets), keyed on
+// [stateKey] so a recomposed content lambda does not drop the current state.
 @Suppress("FunctionNaming")
 @Composable
-private fun MarkdownDetailsView(
-    section: MarkdownDetailsSection,
-    ctx: MarkdownBodyContext,
+private fun MarkdownDetailsScaffold(
+    stateKey: Any?,
+    summary: String?,
+    content: @Composable () -> Unit,
 ) {
-    var expanded by remember(section) { mutableStateOf(false) }
+    var expanded by remember(stateKey) { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) DETAILS_CHEVRON_EXPANDED_DEGREES else DETAILS_CHEVRON_COLLAPSED_DEGREES,
         label = "detailsChevron",
     )
-    val summaryText = section.summary?.let { markdownSafeDisplayText(it) } ?: stringResource(R.string.details)
+    val summaryText = summary?.let { markdownSafeDisplayText(it) } ?: stringResource(R.string.details)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -714,12 +834,45 @@ private fun MarkdownDetailsView(
             )
         }
         AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
-            MarkdownBodyText(
-                text = rememberMarkdownInlineText(section.content, ctx),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
-            )
+            content()
         }
+    }
+}
+
+// Single-paragraph disclosure: content is the same paragraph's inline run, so
+// it keeps full inline treatment (formatting, links, mentions).
+@Suppress("FunctionNaming")
+@Composable
+private fun MarkdownDetailsView(
+    section: MarkdownDetailsSection,
+    ctx: MarkdownBodyContext,
+) {
+    MarkdownDetailsScaffold(stateKey = section, summary = section.summary) {
+        MarkdownBodyText(
+            text = rememberMarkdownInlineText(section.content, ctx),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
+        )
+    }
+}
+
+// Multi-block disclosure: the enclosed blocks render through the normal block
+// renderer, so lists, code blocks, and quotes inside keep full treatment.
+@Suppress("FunctionNaming")
+@Composable
+private fun MarkdownDetailsBlocksView(
+    summary: String?,
+    content: List<MarkdownBlockFfi>,
+    ctx: MarkdownBodyContext,
+    depth: Int,
+) {
+    MarkdownDetailsScaffold(stateKey = content, summary = summary) {
+        MarkdownBlockList(
+            blocks = content,
+            ctx = ctx,
+            depth = depth + 1,
+            modifier = Modifier.padding(start = DETAILS_CONTENT_INDENT, top = 2.dp),
+        )
     }
 }
 
