@@ -207,6 +207,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -224,6 +225,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
+
+// Foreground catch-up normally materializes almost immediately. Keep the
+// background-arrival listener bounded so a later, genuinely foreground
+// message does not unexpectedly start an otherwise idle auto-reader.
+private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
 
 // Per-file ceiling for a document attachment. Matches the retained-uploads
 // LRU cap so a single oversize pick can't OOM the picker pass before the
@@ -479,15 +485,15 @@ internal fun ConversationScreen(
                 appState.appendSpeech("${appState.displayName(record.sender)}: $text", Locale.getDefault())
             }
     }
-    // Auto-read return-from-background: a message arriving while the app is
-    // backgrounded with this chat open is caught by neither path above —
-    // backgrounding stops speech (ending the session the live collector gates
-    // on) and the open-time backlog fires once per open. On a genuine
-    // background→foreground return, re-run the unread-cursor backlog: it
-    // resumes from the last-read position (not the newest visible row, which
-    // would skip unspoken messages), and keying the effect on the unread count
-    // lets it fire again once background arrivals finish syncing.
-    var autoReadResumeArmed by remember(controller, chat.id) { mutableStateOf(false) }
+    // Auto-read return-from-background: capture the actual timeline tail when
+    // foreground-only speech is stopped, then narrate rows that materialize
+    // after that cursor. Do not use unread state here: an open conversation can
+    // advance its read watermark before delayed background arrivals sync.
+    var autoReadResumeCursor by
+        remember(controller, chat.id) {
+            mutableStateOf(conversationAutoReadCursor(controller.timeline))
+        }
+    var autoReadResumeGeneration by remember(controller, chat.id) { mutableStateOf(0L) }
     val autoReadLifecycleOwner = LocalContext.current.lifecycleOwner()
     DisposableEffect(controller, chat.id, autoReadLifecycleOwner) {
         if (autoReadLifecycleOwner == null) {
@@ -499,11 +505,14 @@ internal fun ConversationScreen(
             val observer =
                 LifecycleEventObserver { _, event ->
                     when (event) {
-                        Lifecycle.Event.ON_PAUSE -> hadPaused = true
+                        Lifecycle.Event.ON_PAUSE -> {
+                            autoReadResumeCursor = conversationAutoReadCursor(controller.timeline)
+                            hadPaused = true
+                        }
                         Lifecycle.Event.ON_RESUME ->
                             if (hadPaused) {
                                 hadPaused = false
-                                autoReadResumeArmed = true
+                                autoReadResumeGeneration += 1L
                             }
                         else -> Unit
                     }
@@ -512,17 +521,39 @@ internal fun ConversationScreen(
             onDispose { autoReadLifecycleOwner.lifecycle.removeObserver(observer) }
         }
     }
-    LaunchedEffect(controller, chat.id, autoReadResumeArmed, entryUnreadCount) {
-        if (!autoReadResumeArmed) return@LaunchedEffect
-        // A live session already covers new arrivals through the collector
-        // above; only wake a stopped reader here.
+    LaunchedEffect(controller, chat.id, autoReadResumeGeneration) {
+        if (autoReadResumeGeneration == 0L) return@LaunchedEffect
+        if (!appState.ttsHasUsableEngine) return@LaunchedEffect
+        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        val cursor = autoReadResumeCursor
+        val entries =
+            withTimeoutOrNull(TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS) {
+                snapshotFlow {
+                    conversationMessagesAfterAutoReadCursor(controller.timeline, cursor)
+                        // Bound before projecting so a delayed bulk sync cannot
+                        // make the resume pass scale with the whole timeline.
+                        .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
+                        .mapNotNull { message ->
+                            val record = message.record
+                            val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
+                            TtsSpeakableEntry(
+                                senderKey = record.sender,
+                                senderDisplayName = appState.displayName(record.sender),
+                                text = text,
+                            )
+                        }
+                }.first { it.isNotEmpty() }
+            } ?: return@LaunchedEffect
+        // A newly started/manual session owns the transport; never replace it
+        // with delayed foreground catch-up speech.
         val ttsState = appState.ttsController.state.value
         if (ttsState is TtsState.Speaking || ttsState is TtsState.Paused) return@LaunchedEffect
-        val entries = autoReadBacklogEntries()
-        if (entries.isNotEmpty()) {
-            appState.speakAloudAutoRead(controller.group.groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
-            autoReadResumeArmed = false
-        }
+        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        appState.speakAloudAutoRead(
+            controller.group.groupIdHex,
+            ttsAutoReadScript(entries),
+            Locale.getDefault(),
+        )
     }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
