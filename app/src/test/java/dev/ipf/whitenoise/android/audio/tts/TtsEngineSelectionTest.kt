@@ -4,8 +4,8 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -101,18 +101,22 @@ class TtsEngineSelectionTest {
         runBlocking {
             val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
             try {
-                val resolved = CompletableDeferred<Unit>()
+                val jobReady = CompletableDeferred<Job>()
                 val tts = TrackingTextToSpeech(org.robolectric.RuntimeEnvironment.getApplication())
                 val resolution = discoveryResolution(TtsEngineHandle(tts, "com.google.android.tts", EngineTrust.Unknown))
                 val job =
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         resolveTtsOnDispatcher(dispatcher) {
-                            resolution.also { resolved.complete(Unit) }
+                            // Cancel the caller from inside resolve, before
+                            // returning: the dispatcher handoff back is then
+                            // guaranteed to observe a cancelled caller instead
+                            // of racing an external cancel against completion.
+                            jobReady.await().cancel()
+                            resolution
                         }
                     }
-
-                resolved.await()
-                job.cancelAndJoin()
+                jobReady.complete(job)
+                job.join()
 
                 assertEquals(1, tts.shutdownCount)
             } finally {
