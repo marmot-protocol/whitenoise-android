@@ -860,6 +860,7 @@
     <string name="chat_folder_people">Persone</string>
     <string name="chat_folder_people_subtitle">Includi qualsiasi chat con queste persone</string>
     <string name="chat_list_action_add_to_folder">Aggiungi a una cartella</string>
+    <string name="chat_folders_none">Nessuna</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chat</item>

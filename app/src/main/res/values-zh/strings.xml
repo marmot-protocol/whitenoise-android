@@ -843,6 +843,7 @@
     <string name="chat_folder_people">人员</string>
     <string name="chat_folder_people_subtitle">包含与这些人的任何聊天</string>
     <string name="chat_list_action_add_to_folder">添加到文件夹</string>
+    <string name="chat_folders_none">无</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="other">%1$d 个聊天</item>
     </plurals>
