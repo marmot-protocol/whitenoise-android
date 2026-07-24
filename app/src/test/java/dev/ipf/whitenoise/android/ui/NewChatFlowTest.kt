@@ -17,6 +17,8 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
+import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
+import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.canSubmitNewChatSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.groupContainsResolvedMember
@@ -28,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.resolvedRecipientRefs
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
 import dev.ipf.whitenoise.android.ui.conversation.shouldShowConversationMembersSubtitle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -237,6 +240,85 @@ class NewChatFlowTest {
         )
         assertFalse(startProfileChatFailureCopyable(noActiveAccount))
     }
+
+    @Test
+    fun sharedStartChatAttemptCreatesAndOpensMaterializedChat() =
+        runTest {
+            val expected = chatListItem(group("Support"), otherMemberAccount = "support", members = emptyList())
+            var createdFor: String? = null
+
+            val result =
+                attemptStartProfileChat(
+                    npub = "npub1support",
+                    progressHex = "support",
+                    recipientName = "White Noise support",
+                    createGroup = {
+                        createdFor = it
+                        "created-group"
+                    },
+                    awaitChatListItem = {
+                        assertEquals("created-group", it)
+                        expected
+                    },
+                    displayName = { it },
+                )
+
+            assertEquals("npub1support", createdFor)
+            assertEquals(StartChatAttemptResult.Open(expected), result)
+        }
+
+    @Test
+    fun sharedStartChatAttemptRetriesCreatedGroupWithoutCreatingDuplicate() =
+        runTest {
+            var createCalled = false
+
+            val result =
+                attemptStartProfileChat(
+                    npub = "npub1support",
+                    progressHex = "support",
+                    recipientName = "White Noise support",
+                    retryGroupIdHex = "created-group",
+                    createGroup = {
+                        createCalled = true
+                        "duplicate-group"
+                    },
+                    awaitChatListItem = {
+                        assertEquals("created-group", it)
+                        null
+                    },
+                    displayName = { it },
+                )
+
+            assertFalse(createCalled)
+            val failure = result as StartChatAttemptResult.Failed
+            assertEquals("created-group", failure.error.retryGroupIdHex)
+            assertEquals(AppText.Resource(R.string.error_chat_created_not_loaded), failure.error.detail)
+        }
+
+    @Test
+    fun sharedStartChatAttemptMapsMissingKeyPackageToInvitation() =
+        runTest {
+            val result =
+                attemptStartProfileChat(
+                    npub = "npub1support",
+                    progressHex = "support",
+                    recipientName = "White Noise support",
+                    createGroup = { throw MarmotKitException.MissingKeyPackage("support") },
+                    awaitChatListItem = { error("must not await a failed create") },
+                    displayName = { "White Noise support" },
+                )
+
+            val failure = result as StartChatAttemptResult.Failed
+            assertTrue(failure.error.invitation)
+            assertEquals(AppText.Resource(R.string.invite_to_white_noise), failure.error.title)
+            assertEquals(
+                AppText.Resource(
+                    R.string.invite_to_white_noise_description,
+                    listOf("White Noise support"),
+                ),
+                failure.error.detail,
+            )
+        }
 
     @Test
     fun emptyGroupInviteCtaRequiresLoadedAdminSelfOnlyGroup() {

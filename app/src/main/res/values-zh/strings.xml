@@ -606,6 +606,8 @@
     <string name="settings_version_label">版本 %1$s</string>
     <string name="support_the_project">支持项目</string>
     <string name="support_the_project_subtitle">White Noise 免费且开源。捐赠有助于保持这一点。</string>
+    <string name="chat_with_support">与支持团队聊天</string>
+    <string name="chat_with_support_subtitle">直接给团队发消息</string>
     <string name="donate_lightning_address">Lightning 地址</string>
     <string name="donate_bitcoin_silent_payment">Bitcoin 静默支付</string>
     <string name="donate_method_lightning">Lightning</string>
