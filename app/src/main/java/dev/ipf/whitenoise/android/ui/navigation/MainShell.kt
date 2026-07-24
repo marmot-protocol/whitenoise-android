@@ -1,3 +1,5 @@
+@file:Suppress("ReturnCount") // Foreground routes must stop lower surfaces from composing over them.
+
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.provider.Settings
@@ -16,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
@@ -30,6 +33,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
@@ -44,6 +48,34 @@ internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
     val notificationOpenRequestId: Long = 0L,
 )
+
+internal sealed interface ProfileForegroundRoute {
+    data object None : ProfileForegroundRoute
+
+    data class ShellProfile(
+        val npub: String,
+    ) : ProfileForegroundRoute
+
+    data class ConversationProfile(
+        val npub: String,
+    ) : ProfileForegroundRoute
+
+    data class NewGroup(
+        val initialMember: RecipientSearch.Candidate,
+    ) : ProfileForegroundRoute
+}
+
+internal fun profileForegroundRoute(
+    pendingProfileNpub: String?,
+    startGroupMember: RecipientSearch.Candidate?,
+    conversationOpen: Boolean,
+): ProfileForegroundRoute =
+    when {
+        startGroupMember != null -> ProfileForegroundRoute.NewGroup(startGroupMember)
+        pendingProfileNpub == null -> ProfileForegroundRoute.None
+        conversationOpen -> ProfileForegroundRoute.ConversationProfile(pendingProfileNpub)
+        else -> ProfileForegroundRoute.ShellProfile(pendingProfileNpub)
+    }
 
 internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
     ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
@@ -90,6 +122,9 @@ internal fun MainShell(
     // before the live roster has necessarily settled. Suppresses the group-style
     // member-count subtitle during that transient 0/1-member window (#998).
     var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
+    var profileStartGroupMember by remember(appState.activeAccountRef) {
+        mutableStateOf<RecipientSearch.Candidate?>(null)
+    }
     // Per-conversation scroll anchors for back-to-list re-entry (issue #1107).
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
@@ -453,6 +488,35 @@ internal fun MainShell(
         appState.clearPresentedProfile()
     }
 
+    val startGroupFromProfile: (RecipientSearch.Candidate) -> Unit = { candidate ->
+        appState.clearPresentedProfile()
+        profileStartGroupMember = candidate
+    }
+    val profileRoute =
+        profileForegroundRoute(
+            pendingProfileNpub = appState.pendingProfileNpub,
+            startGroupMember = profileStartGroupMember,
+            conversationOpen = selectedChat != null,
+        )
+    if (profileRoute is ProfileForegroundRoute.NewGroup) {
+        if (selectedChat != null || section == MainSection.Chats) {
+            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+        }
+        NewGroupFlow(
+            appState = appState,
+            initialMembers = listOf(profileRoute.initialMember),
+            onOpenConversation = { item, justCreated ->
+                profileStartGroupMember = null
+                openGroupFromProfile(item, justCreated)
+            },
+            onClose = {
+                chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
+                profileStartGroupMember = null
+            },
+        )
+        return
+    }
+
     // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
     if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
         sharePickerRequest?.let { request ->
@@ -474,24 +538,23 @@ internal fun MainShell(
     // active the in-conversation copy inside ConversationScreen renders it
     // instead — with group-admin context (#635) — so gate this one off to avoid
     // double-rendering the same sheet.
-    if (selectedChat == null) {
-        appState.pendingProfileNpub?.let { npub ->
-            ProfileSheet(
-                appState = appState,
-                npub = npub,
-                onOpenGroup = openGroupFromProfile,
-                onDismiss = {
-                    chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
-                    appState.clearPresentedProfile()
+    if (profileRoute is ProfileForegroundRoute.ShellProfile) {
+        ProfileSheet(
+            appState = appState,
+            npub = profileRoute.npub,
+            onOpenGroup = openGroupFromProfile,
+            onStartGroup = startGroupFromProfile,
+            onDismiss = {
+                chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
+                appState.clearPresentedProfile()
+            },
+            securePolicy =
+                when {
+                    section != MainSection.Chats -> SecureFlagPolicy.Inherit
+                    appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
+                    else -> SecureFlagPolicy.SecureOn
                 },
-                securePolicy =
-                    when {
-                        section != MainSection.Chats -> SecureFlagPolicy.Inherit
-                        appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
-                        else -> SecureFlagPolicy.SecureOn
-                    },
-            )
-        }
+        )
     }
 
     if (selectedChat != null) {
@@ -519,6 +582,7 @@ internal fun MainShell(
                 selectedChatOpenedAsDmHint = false
             },
             onOpenProfileGroup = openGroupFromProfile,
+            onStartProfileGroup = startGroupFromProfile,
         )
         return
     }
