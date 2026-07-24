@@ -1,14 +1,23 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.test.currentTime
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -16,9 +25,117 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-private const val TEST_TIMEOUT_MILLIS = 5_000L
-
+@OptIn(ExperimentalCoroutinesApi::class)
 class NotificationJobSlotTest {
+    @Test
+    fun reconnectWakeDuringFailedSubscribeSkipsThePendingBackoff() =
+        runTest {
+            val retryWake = MutableStateFlow(0L)
+            val capturedBeforeSubscribe = retryWake.value
+
+            // Models reconnect arriving while subscribe/cleanup is still in flight.
+            retryWake.value += 1L
+            awaitNotificationRetryWindow(
+                retryWake = retryWake,
+                capturedGeneration = capturedBeforeSubscribe,
+                backoffMillis = 60_000L,
+            )
+
+            assertEquals(0L, currentTime)
+        }
+
+    @Test
+    fun listenerUsesTheNormalBackoffWithoutAReconnectWake() =
+        runTest {
+            val retryWake = MutableStateFlow(0L)
+
+            awaitNotificationRetryWindow(
+                retryWake = retryWake,
+                capturedGeneration = retryWake.value,
+                backoffMillis = 1_000L,
+            )
+
+            assertEquals(1_000L, currentTime)
+        }
+
+    @Test
+    fun listenerBackoffRemainsCancellable() =
+        runTest {
+            val retryWake = MutableStateFlow(0L)
+            val waiting =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    awaitNotificationRetryWindow(
+                        retryWake = retryWake,
+                        capturedGeneration = retryWake.value,
+                        backoffMillis = 60_000L,
+                    )
+                }
+
+            runCurrent()
+            assertFalse(waiting.isCompleted)
+            waiting.cancel()
+            assertTrue(waiting.isCancelled)
+        }
+
+    @Test
+    fun activeReceiverIsReusedWithoutWaiting() =
+        runTest {
+            var waited = false
+
+            val ready =
+                awaitActiveNotificationReceiver(
+                    isReceiverActive = { true },
+                    listenerJob = Job(),
+                    awaitReceiverActive = { waited = true },
+                )
+
+            assertTrue(ready)
+            assertFalse(waited)
+        }
+
+    @Test
+    fun reconnectAwaitsTheReceiverOwnedByTheCurrentListenerJob() =
+        runTest {
+            var receiverActive = false
+            val receiverAttached = CompletableDeferred<Unit>()
+            val listenerJob = Job()
+
+            val result =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    awaitActiveNotificationReceiver(
+                        isReceiverActive = { receiverActive },
+                        listenerJob = listenerJob,
+                        awaitReceiverActive = { receiverAttached.await() },
+                    )
+                }
+
+            assertFalse("the receiver was not active yet", result.isCompleted)
+            receiverActive = true
+            receiverAttached.complete(Unit)
+
+            assertTrue(result.await())
+            listenerJob.cancel()
+        }
+
+    @Test
+    fun reconnectStopsWaitingWhenTheOwningListenerEnds() =
+        runTest {
+            val listenerJob = Job()
+
+            val result =
+                async {
+                    awaitActiveNotificationReceiver(
+                        isReceiverActive = { false },
+                        listenerJob = listenerJob,
+                        awaitReceiverActive = { awaitCancellation() },
+                    )
+                }
+
+            listenerJob.complete()
+
+            assertFalse(result.await())
+        }
+
     @Test
     fun startIfInactiveStartsOnlyOneJobAcrossConcurrentCallers() {
         val slot = NotificationJobSlot()
@@ -50,221 +167,46 @@ class NotificationJobSlotTest {
     }
 
     @Test
-    fun handoffKeepsPreviousJobUntilReplacementSubscribes() =
+    fun cancellationReservesTheSlotUntilTheOwnedJobHasStopped() =
         runBlocking {
             val slot = NotificationJobSlot()
-            lateinit var oldJob: Job
-            val replacementReachedSubscribe = CompletableDeferred<Unit>()
-            val handoffCompleted = CompletableDeferred<Unit>()
-            var previousActiveWhenReplacementSubscribes = false
-
-            slot.startIfInactive {
-                launch { awaitCancellation() }.also { oldJob = it }
-            }
-
-            val handoffJob =
-                launch {
-                    slot.handoff { ready ->
-                        launch {
-                            previousActiveWhenReplacementSubscribes = oldJob.isActive
-                            replacementReachedSubscribe.complete(Unit)
-                            ready.complete(Unit)
-                            awaitCancellation()
-                        }
-                    }
-                    handoffCompleted.complete(Unit)
-                }
-
-            try {
-                replacementReachedSubscribe.await()
-                assertTrue(
-                    "previous listener must remain active until replacement has subscribed",
-                    previousActiveWhenReplacementSubscribes,
-                )
-                handoffCompleted.await()
-                assertTrue("previous listener must be cancelled after the replacement is ready", oldJob.isCancelled)
-            } finally {
-                handoffJob.cancelAndJoin()
-                slot.cancelAndJoin()
-            }
-        }
-
-    // Bare Jobs + invokeOnCompletion observe the cancellation cause without a
-    // coroutine body — the existing tests' pattern. Wrapped in withTimeout so a
-    // logic regression fails fast instead of hanging the whole unit-test task.
-    @Test
-    fun handoffRetiresThePreviousJobWithTheRetirementCause() =
-        runBlocking {
-            withTimeout(TEST_TIMEOUT_MILLIS) {
-                val slot = NotificationJobSlot()
-                val previousCause = CompletableDeferred<Throwable?>()
-                val previous = Job().also { it.invokeOnCompletion { cause -> previousCause.complete(cause) } }
-                slot.startIfInactive { previous }
-
-                val replacementReady = CompletableDeferred<Unit>()
-                lateinit var replacement: Job
-                val handoffJob =
-                    launch {
-                        slot.handoff { ready ->
-                            Job().also {
-                                replacement = it
-                                replacementReady.complete(Unit)
-                                ready.complete(Unit)
-                            }
-                        }
-                    }
-
-                replacementReady.await()
-                val cause = previousCause.await()
-                assertTrue(
-                    "a handoff must retire the previous listener with the retirement cause " +
-                        "so it drains its buffered updates: got $cause",
-                    cause is NotificationHandoffRetirement,
-                )
-                replacement.cancel()
-                handoffJob.cancelAndJoin()
-                slot.cancelAndJoin()
-            }
-        }
-
-    @Test
-    fun plainCancelDoesNotUseTheRetirementCause() =
-        runBlocking {
-            withTimeout(TEST_TIMEOUT_MILLIS) {
-                val slot = NotificationJobSlot()
-                val cancelCause = CompletableDeferred<Throwable?>()
-                val job = Job().also { it.invokeOnCompletion { cause -> cancelCause.complete(cause) } }
-                slot.startIfInactive { job }
-
-                slot.cancelAndJoin()
-                val cause = cancelCause.await()
-                assertFalse(
-                    "teardown cancellation must stay plain so wipes never trigger a drain: got $cause",
-                    cause is NotificationHandoffRetirement,
-                )
-            }
-        }
-
-    @Test
-    fun handoffKeepsPreviousJobWhenReplacementFailsBeforeReady() =
-        runBlocking {
-            val slot = NotificationJobSlot()
-            var oldJobCancelled = false
-
-            slot.startIfInactive {
+            val cancellationEntered = CompletableDeferred<Unit>()
+            val releaseCancellation = CompletableDeferred<Unit>()
+            val listener =
                 launch {
                     try {
                         awaitCancellation()
                     } finally {
-                        oldJobCancelled = true
-                    }
-                }
-            }
-
-            try {
-                val failure =
-                    runCatching {
-                        slot.handoff { _ ->
-                            Job().apply {
-                                completeExceptionally(IllegalStateException("subscribeNotifications failed"))
-                            }
-                        }
-                    }
-
-                assertTrue("replacement failure must be reported to the caller", failure.isFailure)
-
-                assertTrue("old listener must stay in the slot", slot.isActive())
-                assertFalse("old listener must not be cancelled on replacement failure", oldJobCancelled)
-            } finally {
-                slot.cancelAndJoin()
-            }
-        }
-
-    @Test
-    fun cancelAndJoinCancelsReplacementWaitingForReadiness() =
-        runBlocking {
-            val slot = NotificationJobSlot()
-            val replacementStarted = CompletableDeferred<Unit>()
-            lateinit var replacement: Job
-
-            slot.startIfInactive { Job() }
-            val handoffJob =
-                launch {
-                    runCatching {
-                        slot.handoff {
-                            Job().also {
-                                replacement = it
-                                replacementStarted.complete(Unit)
-                            }
+                        cancellationEntered.complete(Unit)
+                        withContext(NonCancellable) {
+                            releaseCancellation.await()
                         }
                     }
                 }
+            slot.startIfInactive { listener }
 
-            replacementStarted.await()
-            try {
-                slot.cancelAndJoin()
-                assertTrue("account teardown must cancel a replacement waiting for readiness", replacement.isCancelled)
-            } finally {
-                replacement.cancel()
-                handoffJob.cancelAndJoin()
-            }
-        }
+            val cancellation = launch { slot.cancelAndJoin() }
+            cancellationEntered.await()
 
-    @Test
-    fun handoffRegistersReplacementBeforeConcurrentCancellation() {
-        val slot = NotificationJobSlot()
-        val replacementStartEntered = CountDownLatch(1)
-        val allowReplacementStartToReturn = CountDownLatch(1)
-        val cancellationAttempted = CountDownLatch(1)
-        val cancellationReturned = CountDownLatch(1)
-        val pool = Executors.newFixedThreadPool(2)
-        var replacement: Job? = null
-
-        slot.startIfInactive { Job() }
-        val handoff =
-            pool.submit {
-                runBlocking {
-                    runCatching {
-                        slot.handoff {
-                            val replacementJob = Job()
-                            replacement = replacementJob
-                            replacementStartEntered.countDown()
-                            assertTrue(
-                                "replacement start was not released",
-                                allowReplacementStartToReturn.await(2, TimeUnit.SECONDS),
-                            )
-                            replacementJob
-                        }
-                    }
+            var replacementStarts = 0
+            val duringCancellation =
+                slot.currentOrStart {
+                    replacementStarts += 1
+                    Job()
                 }
-            }
+            assertNull("a concurrent startup must not escape account teardown", duringCancellation)
+            assertEquals(0, replacementStarts)
 
-        try {
-            assertTrue("replacement did not start", replacementStartEntered.await(2, TimeUnit.SECONDS))
-            val cancellation =
-                pool.submit {
-                    runBlocking {
-                        cancellationAttempted.countDown()
-                        slot.cancelAndJoin()
-                        cancellationReturned.countDown()
-                    }
+            releaseCancellation.complete(Unit)
+            cancellation.join()
+
+            val afterCancellation =
+                slot.currentOrStart {
+                    replacementStarts += 1
+                    Job()
                 }
-            assertTrue("cancellation did not start", cancellationAttempted.await(2, TimeUnit.SECONDS))
-            assertFalse(
-                "cancellation must not miss a replacement between start and slot registration",
-                cancellationReturned.await(200, TimeUnit.MILLISECONDS),
-            )
-
-            allowReplacementStartToReturn.countDown()
-            cancellation.get(2, TimeUnit.SECONDS)
-            handoff.get(2, TimeUnit.SECONDS)
-            assertTrue("concurrent cancellation must own and cancel the replacement", replacement?.isCancelled == true)
-        } finally {
-            allowReplacementStartToReturn.countDown()
-            replacement?.cancel()
-            runBlocking { slot.cancelAndJoin() }
-            handoff.cancel(true)
-            pool.shutdownNow()
+            assertNotNull(afterCancellation)
+            assertEquals(1, replacementStarts)
+            slot.cancelAndJoin()
         }
-    }
 }
