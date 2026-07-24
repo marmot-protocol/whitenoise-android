@@ -422,6 +422,14 @@ private fun forwardFolderBulkRows(
         }.filter { (_, memberIds) -> memberIds.size >= 2 }
 }
 
+// No rows at all only when there are no chat rows to show AND no folder rows
+// matched — a query hitting only a folder name must still render that folder.
+private fun forwardPickerHasNoRows(
+    targetsEmpty: Boolean,
+    filteredEmpty: Boolean,
+    foldersEmpty: Boolean,
+): Boolean = (targetsEmpty || filteredEmpty) && foldersEmpty
+
 internal fun visibleForwardFolderRows(
     rows: List<Pair<ChatFolder, List<String>>>,
     query: String,
@@ -569,7 +577,7 @@ internal fun ForwardMessageSheet(
                         .fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = Dimens.spaceLg),
             ) {
-                if ((targets.isEmpty() || filtered.isEmpty()) && visibleFolderRows.isEmpty()) {
+                if (forwardPickerHasNoRows(targets.isEmpty(), filtered.isEmpty(), visibleFolderRows.isEmpty())) {
                     item {
                         Text(
                             stringResource(
