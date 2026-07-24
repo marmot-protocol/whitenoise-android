@@ -332,6 +332,11 @@
     <string name="audit_logs_settings_subtitle">创建并发送安全审计日志文件。</string>
     <string name="delete_audit_logs">删除审计日志</string>
     <string name="delete_audit_logs_subtitle">移除所有本地审计文件。如果审计仍开启，会在新文件中继续记录。</string>
+    <string name="redact_audit_data">隐去敏感审计数据</string>
+    <string name="redact_audit_data_subtitle">审计文件中不包含解密内容和完整身份，仅保留加盐引用、摘要和计数。</string>
+    <string name="redact_audit_data_confirm_title">记录完整审计数据？</string>
+    <string name="redact_audit_data_confirm_body">关闭后，审计文件可能包含解密的消息和应用内容以及完整身份。除非需要完整的取证细节，否则请保持开启。</string>
+    <string name="redact_audit_data_confirm_action">记录完整数据</string>
     <string name="developer">开发商</string>
     <string name="developer_mode">开发者模式</string>
     <string name="developer_mode_subtitle">显示诊断和 MLS 内部结构。</string>
@@ -828,6 +833,30 @@
     <string name="profile_lightning_no_network">无法验证 Lightning 地址（无网络）。</string>
     <string name="reaction_tap_to_remove">点按以移除</string>
     <string name="chat_list_filter_groups">群组</string>
+    <string name="chat_folders_title">文件夹</string>
+    <string name="chat_folders_settings_subtitle">将聊天整理到文件夹中</string>
+    <string name="chat_folder_new">新建文件夹</string>
+    <string name="chat_folder_edit_title">编辑文件夹</string>
+    <string name="chat_folder_delete_title">删除文件夹？</string>
+    <string name="chat_folder_delete_message">「%1$s」将被移除。聊天仍会保留在列表中。</string>
+    <string name="chat_folder_move_up">上移</string>
+    <string name="chat_folder_move_down">下移</string>
+    <string name="chat_folder_name_label">名称</string>
+    <string name="chat_folder_description_label">描述</string>
+    <string name="chat_folder_keyword_label">关键词</string>
+    <string name="chat_folder_keyword_hint">包含名称或描述中含有此文本的聊天</string>
+    <string name="chat_folder_unread_only">仅未读</string>
+    <string name="chat_folder_unread_only_subtitle">仅包含有未读消息的聊天</string>
+    <string name="chat_folder_include_muted">包含已静音的聊天</string>
+    <string name="chat_folder_manual_chats">已包含的聊天</string>
+    <string name="chat_folder_people">人员</string>
+    <string name="chat_folder_people_subtitle">包含与这些人的任何聊天</string>
+    <string name="chat_list_action_add_to_folder">添加到文件夹</string>
+    <string name="chat_folders_none">无</string>
+    <string name="chat_folder_included_by_rule">由此文件夹的规则加入</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="other">%1$d 个聊天</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">搜索</string>
     <string name="conversation_search_hint">搜索此聊天</string>

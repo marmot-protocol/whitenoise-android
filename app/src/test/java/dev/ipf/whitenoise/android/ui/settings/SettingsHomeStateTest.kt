@@ -33,6 +33,7 @@ class SettingsHomeStateTest {
         assertEquals(
             listOf(
                 SettingsHomeRow.Appearance,
+                SettingsHomeRow.ChatFolders,
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,

@@ -273,6 +273,39 @@ internal object ChatScreenshotPreferences {
     }
 }
 
+internal object AuditLogPreferences {
+    private const val KEY_REDACT_SENSITIVE_AUDIT_DATA = "redact_sensitive_audit_data"
+
+    fun SharedPreferences.readRedactSensitiveData(): Boolean = getBoolean(KEY_REDACT_SENSITIVE_AUDIT_DATA, true)
+
+    fun hasRedactionPreference(prefs: SharedPreferences): Boolean = prefs.contains(KEY_REDACT_SENSITIVE_AUDIT_DATA)
+
+    fun requiresSafeEnabledMigration(
+        preferences: SharedPreferences,
+        settings: AuditLogSettingsFfi,
+    ): Boolean =
+        !hasRedactionPreference(preferences) &&
+            settings.enabled &&
+            settings.dataMode == AuditDataModeFfi.FULL_DATA
+
+    fun writeRedactSensitiveData(
+        preferences: SharedPreferences,
+        redact: Boolean,
+    ) {
+        preferences.edit().putBoolean(KEY_REDACT_SENSITIVE_AUDIT_DATA, redact).apply()
+    }
+
+    fun settingsFor(
+        enabled: Boolean,
+        redactSensitiveData: Boolean,
+    ): AuditLogSettingsFfi =
+        AuditLogSettingsFfi(
+            enabled = enabled,
+            dataMode =
+                if (redactSensitiveData) AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA else AuditDataModeFfi.FULL_DATA,
+        )
+}
+
 internal object LongMessageCollapsePreferences {
     private const val KEY_PREFIX = "collapse_long_messages:"
 
@@ -1528,6 +1561,9 @@ class WhiteNoiseAppState(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
+    var redactSensitiveAuditData by mutableStateOf(with(AuditLogPreferences) { preferences.readRedactSensitiveData() })
+        private set
+
     var runtimeGeneration by mutableStateOf(0)
         private set
 
@@ -2350,6 +2386,10 @@ class WhiteNoiseAppState(
      */
     val chatListItems: List<ChatListItem>
         get() = chatsController?.items.orEmpty()
+
+    /** Archived counterpart to [chatListItems], from the same recompute. */
+    val archivedChatListItems: List<ChatListItem>
+        get() = chatsController?.archivedItems.orEmpty()
 
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
@@ -3534,6 +3574,46 @@ class WhiteNoiseAppState(
     suspend fun refreshSecurityPrivacySettings() {
         relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
         auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+        reconcileRedactionWithEngineAuditMode()
+    }
+
+    // Existing installs may have enabled FULL_DATA before the redaction
+    // preference existed. A missing key means "adopt the new safe default",
+    // so migrate the live recorder before persisting that default. If the
+    // engine update fails, reflect the real unsafe mode in the UI but leave the
+    // key absent so the next refresh retries instead of silently opting out.
+    private suspend fun reconcileRedactionWithEngineAuditMode() {
+        val settings = auditLogSettings
+        if (settings != null) {
+            if (AuditLogPreferences.requiresSafeEnabledMigration(preferences, settings)) {
+                val migrated =
+                    runCatchingCancellable {
+                        marmotIo {
+                            setAuditLogSettings(
+                                AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = true),
+                            )
+                        }
+                    }.getOrNull()
+                if (migrated == null) {
+                    redactSensitiveAuditData = false
+                } else {
+                    auditLogSettings = migrated
+                    redactSensitiveAuditData = true
+                    AuditLogPreferences.writeRedactSensitiveData(preferences, true)
+                }
+            } else {
+                if (!AuditLogPreferences.hasRedactionPreference(preferences)) {
+                    AuditLogPreferences.writeRedactSensitiveData(preferences, true)
+                }
+                if (settings.enabled) {
+                    val engineRedacts = settings.dataMode != AuditDataModeFfi.FULL_DATA
+                    if (redactSensitiveAuditData != engineRedacts) {
+                        redactSensitiveAuditData = engineRedacts
+                        AuditLogPreferences.writeRedactSensitiveData(preferences, engineRedacts)
+                    }
+                }
+            }
+        }
     }
 
     suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
@@ -3563,17 +3643,36 @@ class WhiteNoiseAppState(
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
             // required on the host side.
-            // Full-data mode: when an operator opts into audit logging they want
-            // complete forensic detail (decrypted content, full identifiers), not
-            // the obfuscated safety posture. Account identity is added by the core
-            // into the JSONL source context, so the host no longer supplies it.
+            // The data mode follows the persisted redaction preference, so the
+            // choice survives toggling audit logging off and on.
             val updated =
                 marmotIo {
                     setAuditLogSettings(
-                        AuditLogSettingsFfi(enabled = enabled, dataMode = AuditDataModeFfi.FULL_DATA),
+                        AuditLogPreferences
+                            .settingsFor(enabled = enabled, redactSensitiveData = redactSensitiveAuditData),
                     )
                 }
             auditLogSettings = updated
+            present(R.string.toast_security_privacy_updated)
+            true
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
+            false
+        }
+
+    suspend fun setRedactSensitiveAuditData(redact: Boolean): Boolean =
+        runCatching {
+            if (auditLogSettings?.enabled == true) {
+                auditLogSettings =
+                    marmotIo {
+                        setAuditLogSettings(
+                            AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = redact),
+                        )
+                    }
+            }
+            redactSensitiveAuditData = redact
+            AuditLogPreferences.writeRedactSensitiveData(preferences, redact)
             present(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {

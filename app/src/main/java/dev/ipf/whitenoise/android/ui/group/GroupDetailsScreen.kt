@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -105,10 +106,14 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.core.chatFolderChatIds
+import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -131,6 +136,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
+import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
@@ -427,6 +433,8 @@ internal fun GroupDetailsScreen(
         }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
+    var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
 
     if (showMediaLibrary) {
         BackHandler { showMediaLibrary = false }
@@ -479,6 +487,18 @@ internal fun GroupDetailsScreen(
 
     if (showEditGroup) {
         GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
+        return
+    }
+
+    val folderAccountRef = appState.activeAccountRef
+    if (showFolderCreate && folderAccountRef != null) {
+        ChatFolderEditScreen(
+            appState = appState,
+            accountRef = folderAccountRef,
+            folderId = null,
+            onClose = { showFolderCreate = false },
+            initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
+        )
         return
     }
 
@@ -742,6 +762,73 @@ internal fun GroupDetailsScreen(
                 title = stringResource(R.string.chat_bubble_colors),
                 onClick = { showBubbleColors = true },
             )
+            // Custom folders containing this chat — manual membership or a
+            // live rule match — so the value tracks membership changes made
+            // anywhere (chat list, Settings, or a rule flipping).
+            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+            val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
+            val folderNames =
+                remember(
+                    folderStoreState,
+                    chatNotificationState,
+                    appState.chatListItems,
+                    appState.profileRevisionForCompose,
+                    folderAccountRef,
+                    chatIdLower,
+                    groupTitleCopy,
+                ) {
+                    val accountRef = folderAccountRef ?: return@remember emptyList()
+                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                    appState.chatFolderPreferences
+                        .foldersFor(accountRef)
+                        .filterNot { it.isSystem }
+                        .mapNotNull { folder ->
+                            val manual =
+                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                            val effective =
+                                chatIdLower in
+                                    chatFolderChatIds(
+                                        items = thisChatRow,
+                                        manualChatIds =
+                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                        isMuted = {
+                                            ChatMutePreferences.compositeKey(accountRef, it) in
+                                                chatNotificationState.mutedConversations
+                                        },
+                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                    )
+                            if (effective) folder to manual else null
+                        }
+                }
+            SettingsActionRow(
+                icon = Icons.Default.Folder,
+                title = stringResource(R.string.chat_folders_title),
+                value =
+                    folderNames
+                        .takeIf { it.isNotEmpty() }
+                        ?.joinToString(", ") { (folder, _) -> folder.name }
+                        ?: stringResource(R.string.chat_folders_none),
+                onClick = { showFolderPicker = true },
+            )
+            if (showFolderPicker) {
+                ChatFolderPickerSheet(
+                    appState = appState,
+                    targetChatIds = listOf(chatIdLower),
+                    // Rule-matched membership is visible in the row above but
+                    // not toggleable here — the sheet edits manual membership
+                    // only, so it must say why a checked-looking folder shows
+                    // an unchecked box.
+                    ruleMatchedFolderIds =
+                        folderNames.filterNot { (_, manual) -> manual }.mapTo(HashSet()) { (folder, _) -> folder.id },
+                    onCreateFolder = {
+                        showFolderPicker = false
+                        showFolderCreate = true
+                    },
+                    onDismiss = { showFolderPicker = false },
+                )
+            }
             GroupSwitchActionRow(
                 icon = Icons.AutoMirrored.Filled.WrapText,
                 title = stringResource(R.string.collapse_long_messages),

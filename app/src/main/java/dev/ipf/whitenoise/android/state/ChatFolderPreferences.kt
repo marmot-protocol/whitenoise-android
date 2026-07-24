@@ -22,19 +22,23 @@ data class ChatFolder(
 )
 
 /**
- * Optional automatic-membership rule for one folder. Storage only here —
- * evaluation belongs to the group-details sub-issue that introduces rules.
+ * Optional automatic-membership rule for one folder, evaluated against the
+ * loaded chat list by `chatFolderChatIds`. Absent fields in a stored rule
+ * (and a folder with no stored rule at all) fall back to these defaults —
+ * folders saved before rules existed stay manual-only.
  */
 data class ChatFolderRule(
-    val includeMemberPubkeys: Set<String>,
-    val unreadOnly: Boolean,
-    val includeMuted: Boolean,
+    val includeMemberPubkeys: Set<String> = emptySet(),
+    val unreadOnly: Boolean = false,
+    val includeMuted: Boolean = false,
+    val keyword: String? = null,
 )
 
-/** One account's folder state: ordered folders plus manual memberships. */
+/** One account's folder state: ordered folders, manual memberships, rules. */
 data class ChatFolderAccountState(
     val folders: List<ChatFolder> = emptyList(),
     val membership: Map<String, Set<String>> = emptyMap(),
+    val rules: Map<String, ChatFolderRule> = emptyMap(),
 )
 
 /**
@@ -128,6 +132,7 @@ class ChatFolderPreferences(
                 ChatFolderAccountState(
                     folders = current.folders.filterNot { it.id == folderId },
                     membership = current.membership - folderId,
+                    rules = current.rules - folderId,
                 ),
             )
             true
@@ -180,17 +185,7 @@ class ChatFolderPreferences(
         folderId: String,
     ): ChatFolderRule? {
         val account = normalizedAccount(accountRef) ?: return null
-        val raw = preferences.getString(ruleKey(account, folderId), null)
-        return raw?.let {
-            runCatching {
-                val json = JSONObject(it)
-                ChatFolderRule(
-                    includeMemberPubkeys = json.optJSONArray(RULE_MEMBERS).toStringSet(),
-                    unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
-                    includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, true),
-                )
-            }.getOrNull()
-        }
+        return synchronized(mutationLock) { loadAccount(account).rules[folderId] }
     }
 
     fun setFolderRule(
@@ -200,7 +195,8 @@ class ChatFolderPreferences(
     ): Boolean {
         val account = normalizedAccount(accountRef) ?: return false
         return synchronized(mutationLock) {
-            if (loadAccount(account).folders.none { it.id == folderId }) return@synchronized false
+            val current = loadAccount(account)
+            if (current.folders.none { it.id == folderId }) return@synchronized false
             val edit = preferences.edit()
             if (rule == null) {
                 edit.remove(ruleKey(account, folderId))
@@ -210,9 +206,12 @@ class ChatFolderPreferences(
                         .put(RULE_MEMBERS, JSONArray(rule.includeMemberPubkeys.toList()))
                         .put(RULE_UNREAD_ONLY, rule.unreadOnly)
                         .put(RULE_INCLUDE_MUTED, rule.includeMuted)
+                rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
                 edit.putString(ruleKey(account, folderId), json.toString())
             }
             edit.apply()
+            val rules = if (rule == null) current.rules - folderId else current.rules + (folderId to rule)
+            _state.value = _state.value + (account to current.copy(rules = rules))
             true
         }
     }
@@ -272,9 +271,29 @@ class ChatFolderPreferences(
                         .orEmpty()
                         .toSet()
             }
-        val loaded = ChatFolderAccountState(folders = folders, membership = membership)
+        val rules =
+            folders
+                .mapNotNull { folder -> readRule(account, folder.id)?.let { folder.id to it } }
+                .toMap()
+        val loaded = ChatFolderAccountState(folders = folders, membership = membership, rules = rules)
         _state.value = _state.value + (account to loaded)
         return loaded
+    }
+
+    private fun readRule(
+        account: String,
+        folderId: String,
+    ): ChatFolderRule? {
+        val raw = preferences.getString(ruleKey(account, folderId), null) ?: return null
+        return runCatching {
+            val json = JSONObject(raw)
+            ChatFolderRule(
+                includeMemberPubkeys = json.optJSONArray(RULE_MEMBERS).toStringSet(),
+                unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
+                includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, false),
+                keyword = json.optString(RULE_KEYWORD).takeIf { it.isNotBlank() },
+            )
+        }.getOrNull()
     }
 
     private fun persistFolders(
@@ -351,6 +370,7 @@ class ChatFolderPreferences(
         private const val RULE_MEMBERS = "includeMemberPubkeys"
         private const val RULE_UNREAD_ONLY = "unreadOnly"
         private const val RULE_INCLUDE_MUTED = "includeMuted"
+        private const val RULE_KEYWORD = "keyword"
 
         // Stable ids so the chip row and future deep links can reference the
         // absorbed system folders without a per-account lookup.
