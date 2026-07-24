@@ -65,6 +65,7 @@ class NotificationPushWakeDrainCoverageTest {
         runBlocking {
             val calls = mutableListOf<String>()
             val listener = appStateFunctionBody("launchNotificationListenerLoop")
+            val updateProcessing = appStateFunctionBody("processNotificationUpdate")
 
             postAfterNotificationAvatarPreWarm(
                 preWarm = {
@@ -77,10 +78,11 @@ class NotificationPushWakeDrainCoverageTest {
             assertEquals(listOf("pre-warm", "post:resolved-avatar-urls"), calls)
             assertTrue(
                 "the UI-independent notification subscription must use the tested pre-warm/post sequence",
-                "postAfterNotificationAvatarPreWarm(" in listener &&
-                    "val postEpoch = notificationPostEpoch.capture()" in listener &&
-                    "preWarm = { preWarmNotificationAvatars(update) }" in listener &&
-                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) }" in listener,
+                "processNotificationUpdate(update)" in listener &&
+                    "postAfterNotificationAvatarPreWarm(" in updateProcessing &&
+                    "val postEpoch = notificationPostEpoch.capture()" in updateProcessing &&
+                    "preWarm = { preWarmNotificationAvatars(update) }" in updateProcessing &&
+                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) }" in updateProcessing,
             )
         }
 

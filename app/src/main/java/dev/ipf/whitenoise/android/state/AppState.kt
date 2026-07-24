@@ -145,6 +145,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -588,78 +589,90 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
     }
 }
 
+/**
+ * A live notification subscription is a healthy local broadcast receiver and
+ * survives relay connectivity changes. Reuse the listener job so queued or
+ * in-flight updates are never destroyed; if it is backing off, reconnect wakes
+ * that same job and awaits the receiver state it owns.
+ */
+internal suspend fun awaitActiveNotificationReceiver(
+    isReceiverActive: () -> Boolean,
+    listenerJob: Job,
+    awaitReceiverActive: suspend () -> Unit,
+): Boolean {
+    if (isReceiverActive()) return true
+    return coroutineScope {
+        val ready =
+            async(start = CoroutineStart.UNDISPATCHED) {
+                awaitReceiverActive()
+                true
+            }
+        try {
+            select {
+                ready.onAwait { it }
+                listenerJob.onJoin { isReceiverActive() }
+            }
+        } finally {
+            ready.cancel()
+        }
+    }
+}
+
+internal suspend fun awaitNotificationRetryWindow(
+    retryWake: StateFlow<Long>,
+    capturedGeneration: Long,
+    backoffMillis: Long,
+) {
+    withTimeoutOrNull(backoffMillis) {
+        retryWake.first { it != capturedGeneration }
+    }
+}
+
 internal class NotificationJobSlot {
     private val lock = Any()
     private var job: Job? = null
-    private var pendingHandoff: Job? = null
+    private var cancellation: CompletableDeferred<Unit>? = null
 
-    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true || pendingHandoff?.isActive == true }
+    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true }
 
     // Called while holding [lock]; [start] must only enqueue work and return promptly.
     fun startIfInactive(start: () -> Job) {
-        synchronized(lock) {
-            if (job?.isActive == true || pendingHandoff?.isActive == true) return
-            job = start()
-        }
+        currentOrStart(start)
     }
+
+    fun currentOrStart(start: () -> Job): Job? =
+        synchronized(lock) {
+            if (cancellation != null) return@synchronized null
+            job?.takeIf { it.isActive } ?: start().also { job = it }
+        }
 
     suspend fun cancelAndJoin() {
-        val jobs =
+        var ownsCancellation = false
+        var ownedJob: Job? = null
+        val completion =
             synchronized(lock) {
-                listOfNotNull(job, pendingHandoff).distinct().also {
-                    job = null
-                    pendingHandoff = null
-                }
+                cancellation
+                    ?: CompletableDeferred<Unit>().also {
+                        cancellation = it
+                        ownsCancellation = true
+                        ownedJob = job
+                        job = null
+                    }
             }
-        withContext(NonCancellable) {
-            jobs.forEach { it.cancel() }
-            jobs.forEach { it.join() }
+        if (!ownsCancellation) {
+            completion.await()
+            return
         }
-    }
-
-    /**
-     * Start a replacement listener and keep the previous job until [start] signals
-     * readiness (for example after [subscribeNotifications] succeeds). [start]
-     * must only enqueue work and return promptly because the slot lock prevents
-     * concurrent teardown from missing the replacement before it is registered.
-     */
-    suspend fun handoff(start: (ready: CompletableDeferred<Unit>) -> Job) {
-        val ready = CompletableDeferred<Unit>()
-        val (newJob, previousPending) =
-            synchronized(lock) {
-                val replacement = start(ready)
-                replacement to pendingHandoff.also { pendingHandoff = replacement }
-            }
-        newJob.invokeOnCompletion { cause ->
-            ready.completeExceptionally(cause ?: CancellationException("replacement listener ended before ready"))
-        }
-        var readySucceeded = false
         try {
-            withContext(NonCancellable) { previousPending?.cancelAndJoin() }
-            ready.await()
-            readySucceeded = true
+            withContext(NonCancellable) {
+                ownedJob?.cancelAndJoin()
+            }
         } finally {
-            if (!readySucceeded) {
-                synchronized(lock) {
-                    if (pendingHandoff === newJob) pendingHandoff = null
-                }
-                withContext(NonCancellable) { newJob.cancelAndJoin() }
-            }
-        }
-        val (promoted, previous) =
             synchronized(lock) {
-                if (pendingHandoff === newJob) {
-                    pendingHandoff = null
-                    true to job.also { job = newJob }
-                } else {
-                    false to null
-                }
+                if (cancellation === completion) cancellation = null
             }
-        if (!promoted) {
-            withContext(NonCancellable) { newJob.cancelAndJoin() }
-            throw CancellationException("notification listener handoff was cancelled")
+            completion.complete(Unit)
         }
-        withContext(NonCancellable) { previous?.cancelAndJoin() }
     }
 }
 
@@ -1741,6 +1754,9 @@ class WhiteNoiseAppState(
     @Volatile
     private var networkNotificationRecoverySuppressed = false
 
+    private val notificationReceiverActive = MutableStateFlow(false)
+    private val notificationReceiverRetryWake = MutableStateFlow(0L)
+
     private val notificationDrainSequence = AtomicLong(0)
     private val notificationPostEpoch = NotificationPostEpoch()
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -2582,17 +2598,38 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun ensureNotificationReceiverForNetworkReconnect(): Boolean {
-        if (client == null) {
-            bootstrap()
-            if (client == null) return false
+        if (client == null) bootstrap()
+        var listenerJob: Job? = null
+        var receiverReady = false
+        if (client != null) {
+            localNotificationPresenter.ensureChannels()
+            refreshLocalNotificationPermission()
+            if (!networkNotificationRecoverySuppressed) {
+                listenerJob = notificationJob.currentOrStart { launchNotificationListenerLoop() }
+                if (listenerJob != null) {
+                    if (!notificationReceiverActive.value) {
+                        notificationReceiverRetryWake.update { it + 1L }
+                    }
+                    receiverReady =
+                        awaitActiveNotificationReceiver(
+                            isReceiverActive = { notificationReceiverActive.value },
+                            listenerJob = listenerJob,
+                            awaitReceiverActive = { notificationReceiverActive.first { it } },
+                        )
+                }
+            }
         }
-        localNotificationPresenter.ensureChannels()
-        refreshLocalNotificationPermission()
-        handoffNotificationListener()
-        if (accounts.isEmpty()) refreshAccounts()
-        refreshLocalNotificationSettings()
-        drainPendingNativePushRegistrationSyncIfNeeded()
-        return true
+        if (receiverReady && !networkNotificationRecoverySuppressed) {
+            if (accounts.isEmpty()) refreshAccounts()
+            if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
+                refreshLocalNotificationSettings()
+                drainPendingNativePushRegistrationSyncIfNeeded()
+            }
+        }
+        return receiverReady &&
+            !networkNotificationRecoverySuppressed &&
+            notificationReceiverActive.value &&
+            listenerJob?.isActive == true
     }
 
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
@@ -3223,53 +3260,62 @@ class WhiteNoiseAppState(
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
         clearConversationShortcutSurfaces()
-        val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
-        val wipeResult =
-            nativePushSyncMutex.withSerializedNativePushWipe {
-                runCatching { marmotIo { signOutAndWipe(wipedRef) } }
-                    .onSuccess {
-                        pushTokenStore.clearPendingDisable(wipedRef)
-                        // The wipe invalidates server-side registration state for this account.
-                        // withSerializedNativePushWipe already holds nativePushSyncMutex here.
-                        perAccountSyncedFingerprints.remove(wipedRef)
-                        pushTokenStore.clear()
-                    }
-            }
-        val failure = wipeResult.exceptionOrNull()
-        if (failure != null) {
-            rethrowIfCancellation(failure)
-            appStateDebug(failure) { "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}" }
-            restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
-            return null
-        }
-        val outcome =
-            wipeResult.getOrNull() ?: run {
+        try {
+            val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
+            val wipeResult =
+                nativePushSyncMutex.withSerializedNativePushWipe {
+                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+                        .onSuccess {
+                            pushTokenStore.clearPendingDisable(wipedRef)
+                            // The wipe invalidates server-side registration state for this account.
+                            // withSerializedNativePushWipe already holds nativePushSyncMutex here.
+                            perAccountSyncedFingerprints.remove(wipedRef)
+                            pushTokenStore.clear()
+                        }
+                }
+            val failure = wipeResult.exceptionOrNull()
+            if (failure != null) {
+                rethrowIfCancellation(failure)
+                appStateDebug(failure) {
+                    "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}"
+                }
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return null
             }
-        clearContactPrivateDetailsForAccount(wipedRef)
-        wipeDecryptedMediaFromDisk()
-        clearHiddenMessagesForAccount(wipedRef)
-        val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
-        accounts = refreshedAccounts
-        releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-        refreshAccountUnreadCounts(refreshedAccounts)
-        val next = refreshedAccounts.firstOrNull()?.label
-        activeAccountRef = next
-        preferences
-            .edit()
-            .apply {
-                if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
-            }.apply()
-        reloadMediaAutoDownloadMatrix()
-        phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
-        next?.let { label ->
-            refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            val outcome =
+                wipeResult.getOrNull() ?: run {
+                    restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                    return null
+                }
+            clearContactPrivateDetailsForAccount(wipedRef)
+            wipeDecryptedMediaFromDisk()
+            clearHiddenMessagesForAccount(wipedRef)
+            val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
+            accounts = refreshedAccounts
+            releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+            refreshAccountUnreadCounts(refreshedAccounts)
+            val next = refreshedAccounts.firstOrNull()?.label
+            activeAccountRef = next
+            preferences
+                .edit()
+                .apply {
+                    if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
+                }.apply()
+            reloadMediaAutoDownloadMatrix()
+            phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
+            next?.let { label ->
+                refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+            }
+            networkNotificationRecoverySuppressed = false
+            if (restartNotifications) startNotificationListener()
+            refreshLocalNotificationSettings()
+            return outcome
+        } finally {
+            // Backstop: the suppression bracket must not outlive this call
+            // whatever throws above — a latched flag would silently disable
+            // network-restore recovery until process death.
+            networkNotificationRecoverySuppressed = false
         }
-        networkNotificationRecoverySuppressed = false
-        if (restartNotifications) startNotificationListener()
-        refreshLocalNotificationSettings()
-        return outcome
     }
 
     suspend fun exportEncryptedSecretKeyBackup(passphrase: String): String? {
@@ -4163,6 +4209,11 @@ class WhiteNoiseAppState(
         notificationReconnectJob.startIfInactive {
             val reconnectJob =
                 notificationScope.launch {
+                    // Re-check under the launched coroutine: a connectivity
+                    // callback preempted between the outer check and this
+                    // launch would otherwise survive a wipe's cancel sweep
+                    // (the wipe sets the flag before sweeping the slots).
+                    if (networkNotificationRecoverySuppressed) return@launch
                     runNotificationReconnectOnNetworkRestore(
                         ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
                         catchUpAccounts = {
@@ -6228,7 +6279,9 @@ class WhiteNoiseAppState(
                 senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
                 shortNpub = ::shortNpub,
                 isPostStillAllowed = {
-                    notificationPostEpoch.isCurrent(postEpoch) && shouldPostNotification(update)
+                    !networkNotificationRecoverySuppressed &&
+                        notificationPostEpoch.isCurrent(postEpoch) &&
+                        shouldPostNotification(update)
                 },
             )
         }
@@ -6236,6 +6289,7 @@ class WhiteNoiseAppState(
         // chat-list + per-group roster cost once per update. The scheduler
         // drains pending accounts off the subscription loop, so the loop stays
         // free to process the next update (#729).
+        if (networkNotificationRecoverySuppressed) return
         unreadRefreshScheduler.schedule(update.accountRef)
         signalNotificationDrain()
     }
@@ -6245,16 +6299,11 @@ class WhiteNoiseAppState(
     }
 
     private fun startNotificationListener() {
+        if (networkNotificationRecoverySuppressed) return
         notificationJob.startIfInactive { launchNotificationListenerLoop() }
     }
 
-    private suspend fun handoffNotificationListener() {
-        notificationJob.handoff { ready ->
-            launchNotificationListenerLoop(signalReady = ready)
-        }
-    }
-
-    private fun launchNotificationListenerLoop(signalReady: CompletableDeferred<Unit>? = null): Job =
+    private fun launchNotificationListenerLoop(): Job =
         notificationScope.launch {
             // Restart the subscription on any failure (or clean end-of-stream)
             // with exponential backoff, so a transient relay/binding error
@@ -6263,21 +6312,18 @@ class WhiteNoiseAppState(
             // See #56.
             var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
             while (isActive) {
+                val retryWakeGeneration = notificationReceiverRetryWake.value
                 try {
                     val subscription = marmotIo { subscribeNotifications() }
-                    signalReady?.complete(Unit)
+                    notificationReceiverActive.value = true
                     try {
                         while (isActive) {
                             val update = marmotIo { subscription.next() } ?: break
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                            applyNotificationDisplayNameHint(update)
-                            val postEpoch = notificationPostEpoch.capture()
-                            postAfterNotificationAvatarPreWarm(
-                                preWarm = { preWarmNotificationAvatars(update) },
-                                post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
-                            )
+                            processNotificationUpdate(update)
                         }
                     } finally {
+                        notificationReceiverActive.value = false
                         runCatching {
                             withContext(NonCancellable + Dispatchers.IO) {
                                 subscription.close()
@@ -6292,10 +6338,19 @@ class WhiteNoiseAppState(
                     }
                 }
                 if (!isActive) break
-                delay(backoffMillis)
+                awaitNotificationRetryWindow(notificationReceiverRetryWake, retryWakeGeneration, backoffMillis)
                 backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
             }
         }
+
+    private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
+        applyNotificationDisplayNameHint(update)
+        val postEpoch = notificationPostEpoch.capture()
+        postAfterNotificationAvatarPreWarm(
+            preWarm = { preWarmNotificationAvatars(update) },
+            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
+        )
+    }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
         backgroundConnectionEnabled = enabled
@@ -6496,6 +6551,7 @@ class WhiteNoiseAppState(
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
+
         private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }
