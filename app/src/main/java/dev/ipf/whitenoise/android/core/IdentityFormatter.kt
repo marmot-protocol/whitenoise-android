@@ -188,13 +188,14 @@ object IdentityFormatter {
         locale: Locale = Locale.getDefault(),
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
+        force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
         return if (now.epochSecond - seconds < 3_600) {
             relativeTime(epochSeconds, copy, locale, now, zone)
         } else {
-            clockTime(epochSeconds, locale, zone)
+            clockTime(epochSeconds, locale, zone, force24Hour)
         }
     }
 

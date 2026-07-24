@@ -189,13 +189,17 @@ internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]
     val zone = ZoneId.systemDefault()
     val currentTime = rememberRelativeTimeNow()
-    return remember(epochSeconds, copy, locale, currentTime) {
+    // The clock portion (messages older than an hour) must honor Android's
+    // explicit 12/24-hour setting, same as the standalone clock-time path.
+    val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    return remember(epochSeconds, copy, locale, currentTime, use24Hour) {
         IdentityFormatter.messageBubbleTime(
             epochSeconds = epochSeconds,
             copy = copy,
             locale = locale,
             now = currentTime,
             zone = zone,
+            force24Hour = use24Hour,
         )
     }
 }

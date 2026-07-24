@@ -331,6 +331,28 @@ class IdentityFormatterTest {
         assertTrue("expected the 12-hour US default, got $localeDefault", localeDefault.contains("3:28"))
     }
 
+    @Test
+    fun messageBubbleClockPortionHonorsTheForcedClockSystem() {
+        // Older than an hour, so the footer shows a clock time — the portion the
+        // 12/24-hour preference governs. `now` is two hours after the message.
+        val epoch = utcEpoch(hour = 15, minute = 28)
+        val now = Instant.parse("2026-07-23T17:28:00Z")
+        val utc = ZoneId.of("UTC")
+        assertEquals(
+            "15:28",
+            IdentityFormatter.messageBubbleTime(epoch, locale = Locale.US, now = now, zone = utc, force24Hour = true),
+        )
+        val us12 =
+            IdentityFormatter.messageBubbleTime(
+                epoch,
+                locale = Locale.GERMANY,
+                now = now,
+                zone = utc,
+                force24Hour = false,
+            )
+        assertTrue("expected a 12-hour rendering, got $us12", us12.startsWith("3:28"))
+    }
+
     private fun utcEpoch(
         hour: Int,
         minute: Int,
