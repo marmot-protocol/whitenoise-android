@@ -5599,24 +5599,6 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Create a 1:1 DM group with [npub] and return its group id hex, or null on
-     * failure (a toast explains why). Caller can open the new chat once the
-     * chat-list projection surfaces it — see [awaitChatListItem].
-     */
-    suspend fun startProfileChat(npub: String): String? =
-        runCatching {
-            createProfileChatGroup(npub)
-        }.getOrElse {
-            rethrowIfCancellation(it)
-            present(
-                R.string.toast_couldnt_start_chat,
-                startProfileChatFailureDetail(it, ::displayName),
-                copyable = startProfileChatFailureCopyable(it),
-            )
-            null
-        }
-
-    /**
      * Suspend until the chat list materializes [groupIdHex] (a freshly created
      * group surfaces a beat after `createGroup` returns, via the worker's
      * recompute), or null if it doesn't within [timeoutMs].

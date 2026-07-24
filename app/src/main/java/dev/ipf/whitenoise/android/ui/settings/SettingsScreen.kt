@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.SupportContact
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
@@ -137,6 +139,7 @@ internal fun SettingsScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenSupportChat: (ChatListItem) -> Unit,
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
@@ -186,6 +189,7 @@ internal fun SettingsScreen(
                 appState = appState,
                 onBackToChats = onBackToChats,
                 onOpenDetail = { onDetailChange(it) },
+                onOpenSupportChat = onOpenSupportChat,
             )
     }
 }
@@ -218,6 +222,7 @@ private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
+    onOpenSupportChat: (ChatListItem) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
@@ -228,6 +233,20 @@ private fun SettingsHomeScreen(
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
+    }
+
+    // Chat with support: reopen the existing direct chat with the canonical
+    // support identity. Matches the prior behavior: reopen the existing DM if
+    // there is one, otherwise present the support profile — whose Message
+    // action runs the ordinary start-chat flow (KeyPackage handling, typed
+    // failure, invitation) instead of a bespoke path.
+    fun startSupportChat() {
+        val existing = appState.existingDirectChat(SupportContact.NPUB)
+        if (existing != null) {
+            onOpenSupportChat(existing)
+        } else {
+            appState.presentProfile(SupportContact.NPUB)
+        }
     }
 
     SettingsHomeContent(
@@ -253,6 +272,7 @@ private fun SettingsHomeScreen(
         onOpenAccountSelector = { showAccountSelector = true },
         onOpenQr = { qrAccountId = activeAccount?.accountIdHex },
         onOpenDetail = onOpenDetail,
+        onChatWithSupport = ::startSupportChat,
         onAppUpdateAction = {
             scope.launch {
                 // Await the check before acting so the first tap uses a fresh result.
@@ -302,6 +322,7 @@ internal fun SettingsHomeContent(
     onOpenQr: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
+    onChatWithSupport: () -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
@@ -343,6 +364,18 @@ internal fun SettingsHomeContent(
                                 modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
                                 colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
                             ) {
+                                ListItem(
+                                    modifier = Modifier.clickable { onChatWithSupport() },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    headlineContent = { Text(stringResource(R.string.chat_with_support)) },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.chat_with_support_subtitle),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                )
                                 ListItem(
                                     modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),

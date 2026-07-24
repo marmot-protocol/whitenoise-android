@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,10 +59,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,6 +87,11 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.chats.newchat.QuickActionButton
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
+import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
+import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
+import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
+import dev.ipf.whitenoise.android.ui.chats.newchat.inviteShareIntent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
@@ -161,6 +169,7 @@ internal fun ProfileSheet(
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -221,6 +230,7 @@ internal fun ProfileSheet(
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
+    var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var showStartGroup by remember(npub) { mutableStateOf(false) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
@@ -230,6 +240,8 @@ internal fun ProfileSheet(
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    val inviteTitle = stringResource(R.string.invite_to_white_noise)
+    val inviteMessage = stringResource(R.string.invite_message)
     val addableGroups =
         remember(hex, appState.chatListItems) {
             hex?.let { appState.profileAddableGroups(it) }.orEmpty()
@@ -293,8 +305,36 @@ internal fun ProfileSheet(
         )
     }
 
+    fun openOrCreateProfileChat(retryGroupIdHex: String? = null) {
+        if (creatingChat) return
+        val progressHex = hex ?: return
+        startChatError = null
+        creatingChat = true
+        appState.launchMutation {
+            try {
+                when (
+                    val result =
+                        attemptStartProfileChat(
+                            npub = npub,
+                            progressHex = progressHex,
+                            recipientName = displayTitle,
+                            retryGroupIdHex = retryGroupIdHex,
+                            createGroup = appState::createProfileChatGroup,
+                            awaitChatListItem = appState::awaitChatListItem,
+                            displayName = appState::displayName,
+                        )
+                ) {
+                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, true)
+                    is StartChatAttemptResult.Failed -> startChatError = result.error
+                }
+            } finally {
+                creatingChat = false
+            }
+        }
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!creatingChat) onDismiss() },
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
         properties = ModalBottomSheetProperties(securePolicy = securePolicy),
@@ -357,12 +397,7 @@ internal fun ProfileSheet(
                         if (existing != null) {
                             onOpenGroup(existing, false)
                         } else {
-                            creatingChat = true
-                            appState.launchMutation {
-                                val groupId = appState.startProfileChat(npub)
-                                val item = groupId?.let { appState.awaitChatListItem(it) }
-                                if (item != null) onOpenGroup(item, true) else creatingChat = false
-                            }
+                            openOrCreateProfileChat()
                         }
                     },
                 )
@@ -377,6 +412,21 @@ internal fun ProfileSheet(
                     label = stringResource(R.string.quick_action_video),
                     onClick = {},
                     enabled = false,
+                )
+            }
+            startChatError?.let { error ->
+                StartChatErrorCard(
+                    error = error,
+                    onRetry = { openOrCreateProfileChat(error.retryGroupIdHex) },
+                    onInvite = {
+                        context.startActivity(
+                            Intent.createChooser(
+                                inviteShareIntent(inviteMessage),
+                                inviteTitle,
+                            ),
+                        )
+                    },
+                    onCopy = { detail -> clipboard.setText(AnnotatedString(detail)) },
                 )
             }
             Column(

@@ -770,6 +770,8 @@
     <string name="settings_staging_badge" translatable="false">STAGING</string>
     <string name="support_the_project">Support the project</string>
     <string name="support_the_project_subtitle">White Noise is free and open source. Donations keep it that way.</string>
+    <string name="chat_with_support">Chat with support</string>
+    <string name="chat_with_support_subtitle">Message the team directly</string>
     <string name="donate_lightning_address">Lightning address</string>
     <string name="donate_bitcoin_silent_payment">Bitcoin silent payment</string>
     <string name="donate_method_lightning">Lightning</string>
