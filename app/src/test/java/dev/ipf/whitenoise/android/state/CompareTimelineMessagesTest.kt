@@ -2,7 +2,11 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CompareTimelineMessagesTest {
@@ -50,5 +54,93 @@ class CompareTimelineMessagesTest {
         ).forEach { permutation ->
             assertEquals(expected, permutation.sortedWith(::compareTimelineMessages).map { it.id })
         }
+    }
+
+    @Test
+    fun adjacentTimelineInversionsCapturesAnOverrideThatReversesEngineOrder() {
+        val older = projectedMsg("older", displayedAt = 200uL, timelineAt = 100uL, receivedAt = 100uL, order = 9uL)
+        val newer = projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 150uL, order = 0uL)
+
+        val inversion =
+            adjacentTimelineInversions(
+                listOf(older, newer).sortedWith(::compareTimelineMessages),
+            ).single()
+
+        assertEquals("newer", inversion.above.record.messageIdHex)
+        assertEquals("older", inversion.below.record.messageIdHex)
+        assertEquals(150uL, inversion.above.record.recordedAt)
+        assertEquals(100uL, inversion.below.projected?.timelineAt)
+        assertTrue(inversion.sourceTimelineInverted)
+        assertTrue(inversion.arrivalInverted)
+    }
+
+    @Test
+    fun adjacentTimelineInversionsCapturesSenderTimeSkewAgainstArrivalOrder() {
+        val delayedOlder =
+            projectedMsg("older", displayedAt = 100uL, timelineAt = 100uL, receivedAt = 200uL, order = 0uL)
+        val arrivedFirst =
+            projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 100uL, order = 0uL)
+
+        val inversion =
+            adjacentTimelineInversions(
+                listOf(delayedOlder, arrivedFirst).sortedWith(::compareTimelineMessages),
+            ).single()
+
+        assertEquals("older", inversion.above.record.messageIdHex)
+        assertEquals("newer", inversion.below.record.messageIdHex)
+        assertFalse(inversion.sourceTimelineInverted)
+        assertTrue(inversion.arrivalInverted)
+        assertEquals("received", inversion.above.record.direction)
+    }
+
+    @Test
+    fun adjacentTimelineInversionsIgnoresChronologicalAndOptimisticPairs() {
+        val older = projectedMsg("older", displayedAt = 100uL, timelineAt = 100uL, receivedAt = 100uL, order = 0uL)
+        val newer = projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 150uL, order = 0uL)
+        val optimistic = msg("optimistic", recordedAt = 200uL, order = 1uL)
+
+        assertTrue(
+            adjacentTimelineInversions(listOf(older, newer, optimistic)).isEmpty(),
+        )
+    }
+
+    private fun projectedMsg(
+        id: String,
+        displayedAt: ULong,
+        timelineAt: ULong,
+        receivedAt: ULong,
+        order: ULong,
+    ): TimelineMessage {
+        val record =
+            TimelineMessageRecordFfi(
+                messageIdHex = id,
+                sourceMessageIdHex = id,
+                direction = "received",
+                groupIdHex = "g",
+                sender = "s",
+                plaintext = "",
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                kind = 9uL,
+                tags = emptyList(),
+                timelineAt = timelineAt,
+                receivedAt = receivedAt,
+                replyToMessageIdHex = null,
+                replyPreview = null,
+                mediaJson = null,
+                media = emptyList(),
+                agentTextStreamJson = null,
+                groupSystem = null,
+                reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+                deleted = false,
+                deletedByMessageIdHex = null,
+                invalidationStatus = null,
+            )
+        return TimelineMessage(
+            id = "msg:$id",
+            record = msg(id, displayedAt, order).record,
+            status = MessageStatus.Received,
+            projected = record,
+            timelineOrder = order,
+        )
     }
 }

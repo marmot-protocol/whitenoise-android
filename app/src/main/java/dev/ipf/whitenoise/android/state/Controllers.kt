@@ -1423,6 +1423,35 @@ internal fun compareTimelineMessages(
         it.record.recordedAt
     }, { it.timelineOrder }, { it.id })
 
+internal data class TimelineAdjacentInversion(
+    val above: TimelineMessage,
+    val below: TimelineMessage,
+    val sourceTimelineInverted: Boolean,
+    val arrivalInverted: Boolean,
+)
+
+/**
+ * Finds rendered neighbours whose display order reverses either the engine's
+ * authenticated timeline time or this device's observation order. Optimistic
+ * rows are skipped because they have no authoritative projection yet.
+ */
+internal fun adjacentTimelineInversions(ordered: List<TimelineMessage>): List<TimelineAdjacentInversion> =
+    ordered
+        .windowed(size = 2)
+        .mapNotNull { (above, below) ->
+            val aboveSource = above.projected ?: return@mapNotNull null
+            val belowSource = below.projected ?: return@mapNotNull null
+            val sourceTimelineInverted = aboveSource.timelineAt > belowSource.timelineAt
+            val arrivalInverted = aboveSource.receivedAt > belowSource.receivedAt
+            if (!sourceTimelineInverted && !arrivalInverted) return@mapNotNull null
+            TimelineAdjacentInversion(
+                above = above,
+                below = below,
+                sourceTimelineInverted = sourceTimelineInverted,
+                arrivalInverted = arrivalInverted,
+            )
+        }
+
 private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
 
 /**
@@ -7451,6 +7480,7 @@ class ConversationController(
     // edits index.
     private var publishSuppressionDepth = 0
     private var publishPending = false
+    private var loggedTimelineOrderingInversionPairs = emptySet<Pair<String, String>>()
 
     private inline fun coalesceTimelinePublishes(block: () -> Unit) {
         assertMainThread { "coalesceTimelinePublishes" }
@@ -7538,11 +7568,44 @@ class ConversationController(
             .filter { (target, edit) -> edit.status == MessageStatus.Sent && aggregated[target]?.latestText == edit.text }
             .map { it.key }
             .forEach(optimisticEdits::remove)
-        timeline =
+        val nextTimeline =
             (visible + streamDebugTimelineItems.values)
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
+        timeline = nextTimeline
+        if (BuildConfig.DEBUG) {
+            val inversionsByPair =
+                adjacentTimelineInversions(nextTimeline).associateBy { inversion ->
+                    checkNotNull(inversion.above.projected).messageIdHex to
+                        checkNotNull(inversion.below.projected).messageIdHex
+                }
+            (inversionsByPair.keys - loggedTimelineOrderingInversionPairs).forEach { pair ->
+                val inversion = inversionsByPair.getValue(pair)
+                val above = inversion.above
+                val aboveSource = checkNotNull(above.projected)
+                val below = inversion.below
+                val belowSource = checkNotNull(below.projected)
+                Log.w(
+                    "DMConversation",
+                    "timeline-order inversion group=${group.groupIdHex.take(8)} " +
+                        "source=${inversion.sourceTimelineInverted} arrival=${inversion.arrivalInverted} " +
+                        "above[id=${aboveSource.messageIdHex} direction=${above.record.direction} " +
+                        "displayAt=${above.record.recordedAt} sourceAt=${aboveSource.timelineAt} " +
+                        "receivedAt=${aboveSource.receivedAt} order=${above.timelineOrder} " +
+                        "timestampOverride=${aboveSource.messageIdHex in localTimelineTimestampOverrides} " +
+                        "orderOverride=${aboveSource.messageIdHex in localTimelineOrderOverrides} " +
+                        "durable=${aboveSource.messageIdHex in durableStreamPositionOverrideIds}] " +
+                        "below[id=${belowSource.messageIdHex} direction=${below.record.direction} " +
+                        "displayAt=${below.record.recordedAt} sourceAt=${belowSource.timelineAt} " +
+                        "receivedAt=${belowSource.receivedAt} order=${below.timelineOrder} " +
+                        "timestampOverride=${belowSource.messageIdHex in localTimelineTimestampOverrides} " +
+                        "orderOverride=${belowSource.messageIdHex in localTimelineOrderOverrides} " +
+                        "durable=${belowSource.messageIdHex in durableStreamPositionOverrideIds}]",
+                )
+            }
+            loggedTimelineOrderingInversionPairs = inversionsByPair.keys
+        }
         editsByTarget = applyOptimisticEdits(aggregated)
         signalForegroundSweepScheduleChanged()
     }
