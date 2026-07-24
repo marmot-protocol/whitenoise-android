@@ -640,6 +640,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("net.java.dev.jna:jna:5.19.1@aar")
