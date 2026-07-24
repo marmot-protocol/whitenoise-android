@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -256,7 +257,7 @@ internal fun MediaVideoGridTile(
                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         }
         Surface(
-            color = Color.Black.copy(alpha = 0.55f),
+            color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
             shape = CircleShape,
             modifier =
                 Modifier
@@ -300,7 +301,7 @@ internal fun MediaVideoGridTile(
                 modifier =
                     Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.45f)),
+                        .background(Color.Black.copy(alpha = ScrimAlpha.CONTROLS)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -312,7 +313,7 @@ internal fun MediaVideoGridTile(
         }
         if (uploading) {
             Box(
-                modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
+                modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = ScrimAlpha.FAINT)),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
@@ -502,7 +503,7 @@ internal fun MediaVideoBubble(
             // When startDownload is gated off (policy says no auto-fetch), the
             // triangle becomes a download icon and tap consents to the fetch.
             Surface(
-                color = Color.Black.copy(alpha = 0.55f),
+                color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
                 shape = CircleShape,
                 modifier =
                     Modifier
@@ -636,7 +637,7 @@ internal fun MediaVideoBubble(
             // Duration pill bottom-start. Only shown once duration is known.
             if (durationMs > 0L) {
                 Surface(
-                    color = Color.Black.copy(alpha = 0.55f),
+                    color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
                     shape = RoundedCornerShape(6.dp),
                     modifier =
                         Modifier

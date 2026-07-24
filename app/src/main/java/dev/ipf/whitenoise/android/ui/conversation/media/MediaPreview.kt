@@ -69,6 +69,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -458,7 +459,7 @@ private fun HeroMediaPreview(
             )
         }
         if (metadata?.isVideo == true) {
-            Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f)) {
+            Surface(shape = CircleShape, color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE)) {
                 Icon(
                     Icons.Default.PlayArrow,
                     contentDescription = stringResource(R.string.reply_media_video),
@@ -555,7 +556,7 @@ private fun PreviewStripThumb(
                 }
                 if (metadata?.isVideo == true) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f)) {
+                        Surface(shape = CircleShape, color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE)) {
                             Icon(
                                 Icons.Default.PlayArrow,
                                 contentDescription = null,

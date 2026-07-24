@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import kotlinx.coroutines.launch
 
@@ -113,7 +113,7 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(R.string.keep_connected), style = MaterialTheme.typography.bodyLarge)
@@ -133,7 +133,7 @@ internal fun NotificationsScreen(
                         )
                     }
                     val nativePushAvailable = appState.isNativePushAvailable()
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(R.string.native_push), style = MaterialTheme.typography.bodyLarge)
@@ -161,7 +161,7 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    AppDivider(Modifier.padding(vertical = 12.dp))
                     // Per-type controls (sound, vibration, importance, lockscreen,
                     // DND bypass) live in the OS notification details — Android's
                     // native per-channel UI. We deep-link there instead of

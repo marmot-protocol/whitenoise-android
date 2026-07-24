@@ -20,6 +20,8 @@ object IdentityFormatter {
     // so each visible row does not re-allocate them (#1011).
     private val WHITESPACE = Regex("\\s+")
     private val YEAR_SEPARATORS = setOf(',', '.', '/', '-', '年')
+    private const val HOUR_PATTERN_TOKENS = "hKHk"
+    private const val DAY_PERIOD_PATTERN_TOKENS = "abB"
 
     // BreakIterator is not thread-safe, so keep one per thread rather than
     // allocating a fresh instance on every initials() call.
@@ -30,6 +32,7 @@ object IdentityFormatter {
     private val noYearFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val shortDateFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val shortTimeFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
+    private val coercedClockFormatters = ConcurrentHashMap<Pair<Locale, Boolean>, DateTimeFormatter>()
 
     fun short(
         value: String,
@@ -162,14 +165,20 @@ object IdentityFormatter {
         epochSeconds: ULong,
         locale: Locale = Locale.getDefault(),
         zone: ZoneId = ZoneId.systemDefault(),
+        force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        val formatter =
+            when (force24Hour) {
+                null -> shortTimeFormatter(locale)
+                else -> coercedClockFormatter(locale, force24Hour)
+            }
         return runCatching {
             Instant
                 .ofEpochSecond(seconds)
                 .atZone(zone)
-                .format(shortTimeFormatter(locale))
+                .format(formatter)
         }.getOrDefault("")
     }
 
@@ -179,13 +188,14 @@ object IdentityFormatter {
         locale: Locale = Locale.getDefault(),
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
+        force24Hour: Boolean? = null,
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
         return if (now.epochSecond - seconds < 3_600) {
             relativeTime(epochSeconds, copy, locale, now, zone)
         } else {
-            clockTime(epochSeconds, locale, zone)
+            clockTime(epochSeconds, locale, zone, force24Hour)
         }
     }
 
@@ -211,6 +221,110 @@ object IdentityFormatter {
         shortTimeFormatters.computeIfAbsent(locale) { requestedLocale ->
             DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(requestedLocale)
         }
+
+    private fun coercedClockFormatter(
+        locale: Locale,
+        use24Hour: Boolean,
+    ): DateTimeFormatter =
+        coercedClockFormatters.computeIfAbsent(locale to use24Hour) { (requestedLocale, requested24) ->
+            val localized =
+                DateTimeFormatterBuilder.getLocalizedDateTimePattern(
+                    null,
+                    FormatStyle.SHORT,
+                    IsoChronology.INSTANCE,
+                    requestedLocale,
+                )
+            DateTimeFormatter.ofPattern(coerceClockPattern(localized, requested24), requestedLocale)
+        }
+
+    /**
+     * Rewrites a localized SHORT time pattern to the requested clock system so
+     * Android's explicit 12/24-hour setting wins over the locale default.
+     * Quoted literals are preserved. 24-hour drops the day-period token and its
+     * separator and zero-pads the hour; 12-hour uses a single-digit hour and
+     * appends a day-period marker when the locale pattern has none.
+     */
+    internal fun coerceClockPattern(
+        pattern: String,
+        use24Hour: Boolean,
+    ): String {
+        // A pattern already in the requested clock system stays byte-identical,
+        // so a preference matching the locale default changes nothing.
+        if (patternMatchesClockSystem(pattern, use24Hour)) return pattern
+        val out = StringBuilder()
+        var index = 0
+        var inQuote = false
+        while (index < pattern.length) {
+            val char = pattern[index]
+            when {
+                char == '\'' || inQuote -> {
+                    if (char == '\'') inQuote = !inQuote
+                    out.append(char)
+                    index += 1
+                }
+                char in HOUR_PATTERN_TOKENS -> {
+                    out.append(if (use24Hour) "HH" else "h")
+                    index = endOfPatternRun(pattern, index)
+                }
+                char in DAY_PERIOD_PATTERN_TOKENS && use24Hour -> {
+                    // Drop the day-period token and the separator space before
+                    // it; a leading one falls to the final trim.
+                    while (out.isNotEmpty() && out.last() == ' ') out.deleteCharAt(out.length - 1)
+                    index = endOfPatternRun(pattern, index)
+                }
+                else -> {
+                    out.append(char)
+                    index += 1
+                }
+            }
+        }
+        return finishCoercedPattern(out, pattern, use24Hour)
+    }
+
+    private fun patternMatchesClockSystem(
+        pattern: String,
+        use24Hour: Boolean,
+    ): Boolean =
+        if (use24Hour) {
+            patternContainsUnquoted(pattern, "Hk") && !patternContainsUnquoted(pattern, "hK")
+        } else {
+            patternContainsUnquoted(pattern, "hK") && !patternContainsUnquoted(pattern, "Hk")
+        }
+
+    private fun finishCoercedPattern(
+        out: StringBuilder,
+        pattern: String,
+        use24Hour: Boolean,
+    ): String {
+        val result = out.toString().trim()
+        val needsDayPeriod = !use24Hour && !patternContainsUnquoted(pattern, DAY_PERIOD_PATTERN_TOKENS)
+        return if (needsDayPeriod) "$result a" else result
+    }
+
+    private fun endOfPatternRun(
+        pattern: String,
+        start: Int,
+    ): Int {
+        val token = pattern[start]
+        var index = start
+        while (index < pattern.length && pattern[index] == token) index += 1
+        return index
+    }
+
+    private fun patternContainsUnquoted(
+        pattern: String,
+        tokens: String,
+    ): Boolean {
+        var inQuote = false
+        for (char in pattern) {
+            if (char == '\'') {
+                inQuote = !inQuote
+            } else if (!inQuote && char in tokens) {
+                return true
+            }
+        }
+        return false
+    }
 
     internal fun stripYearFromLocalizedDatePattern(pattern: String): String {
         val chars = pattern.toMutableList()

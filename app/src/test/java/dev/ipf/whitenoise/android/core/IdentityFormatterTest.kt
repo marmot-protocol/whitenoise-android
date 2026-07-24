@@ -302,6 +302,68 @@ class IdentityFormatterTest {
         assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM 'de' y"))
     }
 
+    // ---- clockTime 12/24-hour system-preference coercion --------------------
+
+    @Test
+    fun coerceClockPatternRewritesHourAndDayPeriodTokens() {
+        assertEquals("HH:mm", IdentityFormatter.coerceClockPattern("h:mm a", use24Hour = true))
+        assertEquals("HH:mm", IdentityFormatter.coerceClockPattern("a h:mm", use24Hour = true))
+        assertEquals("h:mm a", IdentityFormatter.coerceClockPattern("HH:mm", use24Hour = false))
+        // Already matching patterns stay stable.
+        assertEquals("HH:mm", IdentityFormatter.coerceClockPattern("HH:mm", use24Hour = true))
+        assertEquals("h:mm a", IdentityFormatter.coerceClockPattern("h:mm a", use24Hour = false))
+        // Quoted literals are never rewritten.
+        assertEquals("HH'h'mm", IdentityFormatter.coerceClockPattern("hh'h'mm a", use24Hour = true))
+    }
+
+    @Test
+    fun clockTimeHonorsAForcedClockSystemAgainstTheLocaleDefault() {
+        val epoch = utcEpoch(hour = 15, minute = 28)
+        val utc = ZoneId.of("UTC")
+        // en_US defaults to 12-hour: forcing 24-hour must drop the day period.
+        assertEquals("15:28", IdentityFormatter.clockTime(epoch, Locale.US, utc, force24Hour = true))
+        // de_DE defaults to 24-hour: forcing 12-hour must gain a day period.
+        val german12 = IdentityFormatter.clockTime(epoch, Locale.GERMANY, utc, force24Hour = false)
+        assertTrue("expected a 12-hour German rendering, got $german12", german12.startsWith("3:28"))
+        assertTrue("expected a day-period marker, got $german12", german12.length > "3:28".length)
+        // Null keeps the locale default untouched.
+        val localeDefault = IdentityFormatter.clockTime(epoch, Locale.US, utc)
+        assertTrue("expected the 12-hour US default, got $localeDefault", localeDefault.contains("3:28"))
+    }
+
+    @Test
+    fun messageBubbleClockPortionHonorsTheForcedClockSystem() {
+        // Older than an hour, so the footer shows a clock time — the portion the
+        // 12/24-hour preference governs. `now` is two hours after the message.
+        val epoch = utcEpoch(hour = 15, minute = 28)
+        val now = Instant.parse("2026-07-23T17:28:00Z")
+        val utc = ZoneId.of("UTC")
+        assertEquals(
+            "15:28",
+            IdentityFormatter.messageBubbleTime(epoch, locale = Locale.US, now = now, zone = utc, force24Hour = true),
+        )
+        val us12 =
+            IdentityFormatter.messageBubbleTime(
+                epoch,
+                locale = Locale.GERMANY,
+                now = now,
+                zone = utc,
+                force24Hour = false,
+            )
+        assertTrue("expected a 12-hour rendering, got $us12", us12.startsWith("3:28"))
+    }
+
+    private fun utcEpoch(
+        hour: Int,
+        minute: Int,
+    ): ULong =
+        Instant
+            .parse("2026-07-23T00:00:00Z")
+            .plus(hour.toLong(), ChronoUnit.HOURS)
+            .plus(minute.toLong(), ChronoUnit.MINUTES)
+            .epochSecond
+            .toULong()
+
     // ---- messageBubbleTime (bubble footer timestamps, #1513) ----------------
 
     @Test
