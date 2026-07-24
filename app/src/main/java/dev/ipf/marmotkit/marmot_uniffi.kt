@@ -9477,7 +9477,13 @@ data class AppMessageRecordFfi (
      * Nostr `tags` of the inner Marmot app event.
      */
     var `tags`: List<MessageTagFfi>, 
+    /**
+     * Sender-authenticated inner app-event timestamp.
+     */
     var `recordedAt`: kotlin.ULong, 
+    /**
+     * Local wall-clock time when this device observed the delivery.
+     */
     var `receivedAt`: kotlin.ULong
 ) {
     
@@ -11413,6 +11419,7 @@ data class NotificationUpdateFfi (
     var `notificationKey`: kotlin.String, 
     var `conversationKey`: kotlin.String, 
     var `trigger`: NotificationTriggerFfi, 
+    var `trafficClass`: NotificationTrafficClassFfi, 
     var `accountRef`: kotlin.String, 
     var `accountIdHex`: kotlin.String, 
     var `groupIdHex`: kotlin.String, 
@@ -11441,6 +11448,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterTypeNotificationTriggerFfi.read(buf),
+            FfiConverterTypeNotificationTrafficClassFfi.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
@@ -11462,6 +11470,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.allocationSize(value.`notificationKey`) +
             FfiConverterString.allocationSize(value.`conversationKey`) +
             FfiConverterTypeNotificationTriggerFfi.allocationSize(value.`trigger`) +
+            FfiConverterTypeNotificationTrafficClassFfi.allocationSize(value.`trafficClass`) +
             FfiConverterString.allocationSize(value.`accountRef`) +
             FfiConverterString.allocationSize(value.`accountIdHex`) +
             FfiConverterString.allocationSize(value.`groupIdHex`) +
@@ -11482,6 +11491,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.write(value.`notificationKey`, buf)
             FfiConverterString.write(value.`conversationKey`, buf)
             FfiConverterTypeNotificationTriggerFfi.write(value.`trigger`, buf)
+            FfiConverterTypeNotificationTrafficClassFfi.write(value.`trafficClass`, buf)
             FfiConverterString.write(value.`accountRef`, buf)
             FfiConverterString.write(value.`accountIdHex`, buf)
             FfiConverterString.write(value.`groupIdHex`, buf)
@@ -11613,12 +11623,13 @@ data class ReceivedMessageFfi (
      */
     var `tags`: List<MessageTagFfi>, 
     /**
-     * Source-event timestamp (seconds since epoch) for the MLS-delivered
-     * message. Clients should sort the timeline by this value so chronology
-     * reflects send time, not delivery time. Zero means the timestamp was
-     * unavailable at decode time.
+     * Sender-authenticated inner app-event timestamp (seconds since epoch).
      */
-    var `recordedAt`: kotlin.ULong
+    var `recordedAt`: kotlin.ULong, 
+    /**
+     * Local wall-clock time when this device observed the delivery.
+     */
+    var `receivedAt`: kotlin.ULong
 ) {
     
     companion object
@@ -11639,6 +11650,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
@@ -11651,7 +11663,8 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
-            FfiConverterULong.allocationSize(value.`recordedAt`)
+            FfiConverterULong.allocationSize(value.`recordedAt`) +
+            FfiConverterULong.allocationSize(value.`receivedAt`)
     )
 
     override fun write(value: ReceivedMessageFfi, buf: ByteBuffer) {
@@ -11664,6 +11677,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
+            FfiConverterULong.write(value.`receivedAt`, buf)
     }
 }
 
@@ -12196,7 +12210,14 @@ data class TimelineMessageRecordFfi (
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `tags`: List<MessageTagFfi>, 
+    /**
+     * Authenticated inner app-event time, or observation time for synthesized
+     * rows without an inner timestamp.
+     */
     var `timelineAt`: kotlin.ULong, 
+    /**
+     * Local wall-clock time when this device observed or created the row.
+     */
     var `receivedAt`: kotlin.ULong, 
     var `replyToMessageIdHex`: kotlin.String?, 
     var `replyPreview`: TimelineReplyPreviewFfi?, 
@@ -12485,7 +12506,12 @@ data class TimelineReplyPreviewFfi (
      */
     var `media`: List<MediaAttachmentReferenceFfi>, 
     var `agentTextStreamJson`: kotlin.String?, 
-    var `deleted`: kotlin.Boolean
+    var `deleted`: kotlin.Boolean, 
+    /**
+     * Convergence invalidation reason for the previewed message. The content
+     * fields are intentionally preserved so the application controls display.
+     */
+    var `invalidationStatus`: kotlin.String?
 ) {
     
     companion object
@@ -12506,6 +12532,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -12518,7 +12545,8 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterOptionalString.allocationSize(value.`mediaJson`) +
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.allocationSize(value.`media`) +
             FfiConverterOptionalString.allocationSize(value.`agentTextStreamJson`) +
-            FfiConverterBoolean.allocationSize(value.`deleted`)
+            FfiConverterBoolean.allocationSize(value.`deleted`) +
+            FfiConverterOptionalString.allocationSize(value.`invalidationStatus`)
     )
 
     override fun write(value: TimelineReplyPreviewFfi, buf: ByteBuffer) {
@@ -12531,6 +12559,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterSequenceTypeMediaAttachmentReferenceFfi.write(value.`media`, buf)
             FfiConverterOptionalString.write(value.`agentTextStreamJson`, buf)
             FfiConverterBoolean.write(value.`deleted`, buf)
+            FfiConverterOptionalString.write(value.`invalidationStatus`, buf)
     }
 }
 
@@ -13835,20 +13864,23 @@ sealed class MarkdownInlineFfi {
     data class Link(
         val `dest`: kotlin.String, 
         val `title`: kotlin.String?, 
-        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `children`: List<MarkdownInlineFfi>, 
+        val `classification`: MarkdownLinkDestinationKindFfi) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Image(
         val `dest`: kotlin.String, 
         val `title`: kotlin.String?, 
-        val `alt`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `alt`: List<MarkdownInlineFfi>, 
+        val `classification`: MarkdownLinkDestinationKindFfi) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Autolink(
         val `url`: kotlin.String, 
-        val `kind`: MarkdownAutolinkKindFfi) : MarkdownInlineFfi() {
+        val `kind`: MarkdownAutolinkKindFfi, 
+        val `classification`: MarkdownLinkDestinationKindFfi) : MarkdownInlineFfi() {
         companion object
     }
     
@@ -13899,15 +13931,18 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
                 FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.read(buf),
                 )
             9 -> MarkdownInlineFfi.Image(
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
                 FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.read(buf),
                 )
             10 -> MarkdownInlineFfi.Autolink(
                 FfiConverterString.read(buf),
                 FfiConverterTypeMarkdownAutolinkKindFfi.read(buf),
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.read(buf),
                 )
             11 -> MarkdownInlineFfi.Math(
                 FfiConverterString.read(buf),
@@ -13977,6 +14012,7 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 + FfiConverterString.allocationSize(value.`dest`)
                 + FfiConverterOptionalString.allocationSize(value.`title`)
                 + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`children`)
+                + FfiConverterTypeMarkdownLinkDestinationKindFfi.allocationSize(value.`classification`)
             )
         }
         is MarkdownInlineFfi.Image -> {
@@ -13986,6 +14022,7 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 + FfiConverterString.allocationSize(value.`dest`)
                 + FfiConverterOptionalString.allocationSize(value.`title`)
                 + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`alt`)
+                + FfiConverterTypeMarkdownLinkDestinationKindFfi.allocationSize(value.`classification`)
             )
         }
         is MarkdownInlineFfi.Autolink -> {
@@ -13994,6 +14031,7 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 4UL
                 + FfiConverterString.allocationSize(value.`url`)
                 + FfiConverterTypeMarkdownAutolinkKindFfi.allocationSize(value.`kind`)
+                + FfiConverterTypeMarkdownLinkDestinationKindFfi.allocationSize(value.`classification`)
             )
         }
         is MarkdownInlineFfi.Math -> {
@@ -14059,6 +14097,7 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 FfiConverterString.write(value.`dest`, buf)
                 FfiConverterOptionalString.write(value.`title`, buf)
                 FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`children`, buf)
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.write(value.`classification`, buf)
                 Unit
             }
             is MarkdownInlineFfi.Image -> {
@@ -14066,12 +14105,14 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 FfiConverterString.write(value.`dest`, buf)
                 FfiConverterOptionalString.write(value.`title`, buf)
                 FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`alt`, buf)
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.write(value.`classification`, buf)
                 Unit
             }
             is MarkdownInlineFfi.Autolink -> {
                 buf.putInt(10)
                 FfiConverterString.write(value.`url`, buf)
                 FfiConverterTypeMarkdownAutolinkKindFfi.write(value.`kind`, buf)
+                FfiConverterTypeMarkdownLinkDestinationKindFfi.write(value.`classification`, buf)
                 Unit
             }
             is MarkdownInlineFfi.Math -> {
@@ -14090,6 +14131,44 @@ public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<Markdow
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+
+enum class MarkdownLinkDestinationKindFfi {
+    
+    WEB,
+    CONTACT,
+    APP,
+    NOSTR,
+    RELATIVE,
+    UNKNOWN,
+    DANGEROUS,
+    SENSITIVE;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownLinkDestinationKindFfi: FfiConverterRustBuffer<MarkdownLinkDestinationKindFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MarkdownLinkDestinationKindFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MarkdownLinkDestinationKindFfi) = 4UL
+
+    override fun write(value: MarkdownLinkDestinationKindFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
     }
 }
 
@@ -15298,6 +15377,38 @@ public object FfiConverterTypeNotificationCollectionStatusFfi: FfiConverterRustB
     override fun allocationSize(value: NotificationCollectionStatusFfi) = 4UL
 
     override fun write(value: NotificationCollectionStatusFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class NotificationTrafficClassFfi {
+    
+    STANDARD,
+    AGENT_ACTIVITY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNotificationTrafficClassFfi: FfiConverterRustBuffer<NotificationTrafficClassFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        NotificationTrafficClassFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: NotificationTrafficClassFfi) = 4UL
+
+    override fun write(value: NotificationTrafficClassFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

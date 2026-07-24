@@ -56,6 +56,7 @@ object NotificationChannels {
 
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
+                NotificationChannelSpec.AGENT_ACTIVITY,
                 NotificationChannelSpec.APP_UPDATES,
                 -> Unit
             }
@@ -68,6 +69,7 @@ object NotificationChannels {
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         }
 
@@ -78,6 +80,7 @@ object NotificationChannels {
             NotificationChannelSpec.MENTIONS -> R.string.notification_channel_mentions_description
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_description
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_description
+            NotificationChannelSpec.AGENT_ACTIVITY -> R.string.notification_channel_agent_activity_description
             NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_description
         }
 

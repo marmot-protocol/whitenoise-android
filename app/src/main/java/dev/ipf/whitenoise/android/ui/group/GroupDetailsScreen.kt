@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
@@ -106,7 +105,6 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -223,6 +221,7 @@ internal fun GroupDetailsScreen(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
+    var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationModePicker by remember { mutableStateOf(false) }
     // Auto-opened straight from the empty-group "Add members" CTA: render the
     // picker on the first frame (no details-screen flash) and route its Back to
@@ -277,6 +276,14 @@ internal fun GroupDetailsScreen(
     val readOnlyInvite = controller.group.pendingConfirmation
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
+    val isDm = controller.isDm
+    val conversationTitle = controller.title(groupTitleCopy)
+    val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+    val notificationModes = chatNotificationState.notificationModes
+    val conversationNotifyMode =
+        remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
+            appState.conversationNotifyMode(controller.group.groupIdHex)
+        }
 
     suspend fun refreshMlsDetails() {
         if (!appState.developerMode) return
@@ -443,6 +450,31 @@ internal fun GroupDetailsScreen(
         return
     }
 
+    if (showNotificationSettings) {
+        BackHandler { showNotificationSettings = false }
+        ConversationNotificationSettingsScreen(
+            appState = appState,
+            groupIdHex = controller.group.groupIdHex,
+            conversationTitle = conversationTitle,
+            conversationAvatarUrl = controller.avatarUrl,
+            isDm = isDm,
+            notifyMode = conversationNotifyMode,
+            onBack = { showNotificationSettings = false },
+            onChooseNotifyMode = { showNotificationModePicker = true },
+        )
+        if (showNotificationModePicker) {
+            NotificationModePickerDialog(
+                currentMode = conversationNotifyMode,
+                onDismiss = { showNotificationModePicker = false },
+                onSelect = { mode ->
+                    showNotificationModePicker = false
+                    appState.setConversationNotifyMode(controller.group.groupIdHex, mode)
+                },
+            )
+        }
+        return
+    }
+
     BackHandler { onBack() }
 
     if (showEditGroup) {
@@ -594,14 +626,7 @@ internal fun GroupDetailsScreen(
     ) { padding ->
         val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
-        val isDm = GroupProjector.isDm(controller.memberCount, controller.group.name)
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
-        val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
-        val notificationModes = chatNotificationState.notificationModes
-        val conversationNotifyMode =
-            remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
-                appState.conversationNotifyMode(controller.group.groupIdHex)
-            }
         Column(
             Modifier
                 .fillMaxSize()
@@ -737,28 +762,11 @@ internal fun GroupDetailsScreen(
                     },
                 )
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            SectionHeader(stringResource(R.string.notifications))
             SettingsActionRow(
                 icon = Icons.Default.Notifications,
-                title = stringResource(R.string.notify),
+                title = stringResource(R.string.sounds_and_notifications),
                 value = notificationModeLabel(conversationNotifyMode),
-                onClick = { showNotificationModePicker = true },
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Settings,
-                title = stringResource(R.string.customize_sound_vibration),
-                onClick =
-                    appState.activeAccountRef?.let { accountRef ->
-                        {
-                            openConversationNotificationSettings(
-                                context = context,
-                                accountRef = accountRef,
-                                groupIdHex = controller.group.groupIdHex,
-                                isDm = isDm,
-                            )
-                        }
-                    },
+                onClick = { showNotificationSettings = true },
             )
             SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
@@ -766,17 +774,6 @@ internal fun GroupDetailsScreen(
                 enabled = false,
                 comingSoon = true,
             )
-
-            if (showNotificationModePicker) {
-                NotificationModePickerDialog(
-                    currentMode = conversationNotifyMode,
-                    onDismiss = { showNotificationModePicker = false },
-                    onSelect = { mode ->
-                        showNotificationModePicker = false
-                        appState.setConversationNotifyMode(controller.group.groupIdHex, mode)
-                    },
-                )
-            }
 
             if (showDisappearingPicker) {
                 DisappearingMessagesPickerDialog(
@@ -1451,16 +1448,6 @@ private fun NotificationModePickerDialog(
         confirmButton = {},
     )
 }
-
-@Composable
-private fun notificationModeLabel(mode: ChatNotifyMode): String =
-    stringResource(
-        when (mode) {
-            ChatNotifyMode.ALL -> R.string.notify_all_messages
-            ChatNotifyMode.MENTIONS_ONLY -> R.string.notify_only_mentions
-            ChatNotifyMode.NONE -> R.string.notify_nothing
-        },
-    )
 
 @Composable
 private fun GroupSwitchActionRow(

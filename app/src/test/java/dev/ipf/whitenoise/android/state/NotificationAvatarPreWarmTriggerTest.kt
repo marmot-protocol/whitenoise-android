@@ -78,6 +78,7 @@ class NotificationAvatarPreWarmTriggerTest {
         notificationKey = "message:account-a:message-a",
         conversationKey = "conversation:account-a:group-a",
         trigger = trigger,
+        trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
         accountRef = "account-a",
         accountIdHex = "account-id-a",
         groupIdHex = "group-a",

@@ -16,8 +16,8 @@ import android.content.Context
  * it Android silently falls back to the app-wide parent channel.
  *
  * A single conversation can receive traffic on more than one parent — ordinary
- * messages on its DM/group channel and mentions on the mentions channel — so a
- * conversation channel is created per relevant parent. The channel id is derived
+ * messages on its DM/group channel, mentions, reactions, invites, and agent
+ * activity — so a conversation channel is created per relevant parent. The channel id is derived
  * deterministically from (parent id, conversation shortcut id) so both the post
  * path and the settings deep link name the same channel.
  *
@@ -39,33 +39,36 @@ object ConversationNotificationChannels {
     ): String = "$parentChannelId:$CONVERSATION_CHANNEL_INFIX:$conversationShortcutId"
 
     /**
-     * The parent whose conversation channel the "Customize sound & vibration"
-     * deep link targets. A conversation spans its message parent plus mentions,
-     * but the message parent is where the bulk of a chat's traffic lands, so the
-     * sound the user sets there is what "this chat's sound" means to them. The
-     * mentions conversation channel still exists and stays customizable from the
-     * OS conversation list; we just don't point the single in-app row at it.
+     * The default parent for callers that want the conversation's ordinary
+     * message settings. Typed settings rows pass their parent explicitly.
      */
     fun primaryMessageParent(isDm: Boolean): NotificationChannelSpec =
         if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
 
     /**
-     * Parents a conversation can receive per-conversation messages on: its
-     * primary message parent and the mentions channel. Reactions and invites are
-     * not conversation notifications (plain style, no shortcut), so they stay on
-     * their parent channel and are intentionally excluded here.
+     * Every notification type that can be scoped to a conversation. Keeping this
+     * matrix complete lets each chat expose independent native sound, vibration,
+     * and importance controls for each type.
      */
-    fun relevantParents(isDm: Boolean): List<NotificationChannelSpec> = listOf(primaryMessageParent(isDm), NotificationChannelSpec.MENTIONS)
+    fun relevantParents(isDm: Boolean): List<NotificationChannelSpec> =
+        listOf(
+            primaryMessageParent(isDm),
+            NotificationChannelSpec.MENTIONS,
+            NotificationChannelSpec.REACTIONS,
+            NotificationChannelSpec.INVITES,
+            NotificationChannelSpec.AGENT_ACTIVITY,
+        )
 
     /** Creates the conversation channel for every parent this conversation can receive on. */
     fun ensureConversationChannels(
         context: Context,
         conversationShortcutId: String,
         isDm: Boolean,
+        conversationTitle: String? = null,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         relevantParents(isDm).forEach { parent ->
-            ensureConversationChannel(manager, parent.id, conversationShortcutId)
+            ensureConversationChannel(manager, parent.id, conversationShortcutId, conversationTitle)
         }
     }
 
@@ -78,25 +81,52 @@ object ConversationNotificationChannels {
         context: Context,
         parentChannelId: String,
         conversationShortcutId: String,
+        conversationTitle: String? = null,
     ): String? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
-        return ensureConversationChannel(manager, parentChannelId, conversationShortcutId)
+        return ensureConversationChannel(manager, parentChannelId, conversationShortcutId, conversationTitle)
     }
 
     private fun ensureConversationChannel(
         manager: NotificationManager,
         parentChannelId: String,
         conversationShortcutId: String,
+        conversationTitle: String?,
     ): String? {
         val conversationChannelId = conversationChannelId(parentChannelId, conversationShortcutId)
-        // Already published: Android freezes channel settings after creation, so
-        // recreating would wipe the user's per-conversation sound/vibration
-        // overrides. Leave it alone.
-        if (manager.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
         val parent = manager.getNotificationChannel(parentChannelId) ?: return null
-        manager.createNotificationChannel(conversationChannel(parent, conversationChannelId, conversationShortcutId))
+        val displayName = conversationChannelDisplayName(parent.name, conversationTitle)
+        val existing = manager.getNotificationChannel(conversationChannelId)
+        if (existing != null) {
+            // Android permits an app to refresh a channel's user-visible name
+            // while retaining every user-controlled alerting override. This
+            // upgrades channels created before profile/group metadata resolved.
+            // A title-less notification post must not undo that upgrade after
+            // a process restart.
+            if (
+                !conversationTitle.isNullOrBlank() &&
+                existing.name.toString() != displayName.toString()
+            ) {
+                existing.name = displayName
+                manager.createNotificationChannel(existing)
+            }
+            return conversationChannelId
+        }
+        manager.createNotificationChannel(
+            conversationChannel(parent, conversationChannelId, conversationShortcutId, displayName),
+        )
         return conversationChannelId
     }
+
+    internal fun conversationChannelDisplayName(
+        parentName: CharSequence,
+        conversationTitle: String?,
+    ): CharSequence =
+        conversationTitle
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { "$it · $parentName" }
+            ?: parentName
 
     // Clone the parent's importance and alerting defaults onto the conversation
     // channel at creation time; the user can then diverge per conversation from
@@ -105,8 +135,9 @@ object ConversationNotificationChannels {
         parent: NotificationChannel,
         conversationChannelId: String,
         conversationShortcutId: String,
+        displayName: CharSequence,
     ): NotificationChannel =
-        NotificationChannel(conversationChannelId, parent.name, parent.importance).apply {
+        NotificationChannel(conversationChannelId, displayName, parent.importance).apply {
             setConversationId(parent.id, conversationShortcutId)
             group = parent.group
             description = parent.description

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -166,6 +167,23 @@ class LocalNotificationFormatterTest {
         assertEquals(LocalNotificationFormatter.MENTION_NOTIFICATION_ID, mention?.notificationId)
         assertNotEquals(message?.notificationId, mention?.notificationId)
         assertNotEquals(message?.notificationTag, mention?.notificationTag)
+    }
+
+    @Test
+    fun agentActivityGetsItsOwnNotificationIdentityDistinctFromFinalReplies() {
+        val finalReply = content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
+        val activity =
+            content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupIdHex = "group-a",
+                    trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+                ),
+            )
+
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, finalReply?.notificationId)
+        assertEquals(LocalNotificationFormatter.AGENT_ACTIVITY_NOTIFICATION_ID, activity?.notificationId)
+        assertNotEquals(finalReply?.notificationTag, activity?.notificationTag)
     }
 
     @Test
@@ -610,11 +628,13 @@ class LocalNotificationFormatterTest {
         isMention: Boolean = false,
         reactionEmoji: String? = null,
         reactedToPreview: String? = null,
+        trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = notificationKey,
         conversationKey = "conversation:account:$groupIdHex",
         trigger = trigger,
+        trafficClass = trafficClass,
         accountRef = "account",
         accountIdHex = "account",
         groupIdHex = groupIdHex,

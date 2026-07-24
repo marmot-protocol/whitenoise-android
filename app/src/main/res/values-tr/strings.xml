@@ -492,6 +492,8 @@
     <string name="notification_channel_reactions_description">Mesajlarınıza verilen tepkiler</string>
     <string name="notification_channel_invites">Davetler</string>
     <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
+    <string name="notification_channel_agent_activity">Ajan etkinliği</string>
+    <string name="notification_channel_agent_activity_description">Araç ilerlemesi ve ajan durumu güncellemeleri</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_hidden_content">Yeni bildirim</string>
@@ -1011,6 +1013,7 @@
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="collapse_long_messages">Uzun mesajları daralt</string>
     <string name="notify">Bildirimler</string>
+    <string name="sounds_and_notifications">Sesler ve bildirimler</string>
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
     <string name="notify_nothing">Hiçbiri</string>

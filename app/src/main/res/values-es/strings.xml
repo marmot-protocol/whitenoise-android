@@ -492,6 +492,8 @@
     <string name="notification_channel_reactions_description">Reacciones a tus mensajes</string>
     <string name="notification_channel_invites">Invitaciones</string>
     <string name="notification_channel_invites_description">Invitaciones de grupo y bienvenidas</string>
+    <string name="notification_channel_agent_activity">Actividad del agente</string>
+    <string name="notification_channel_agent_activity_description">Progreso de herramientas y actualizaciones del estado del agente</string>
     <string name="notification_group_invite">Has sido invitado a un chat seguro</string>
     <string name="notification_new_message">Nuevo mensaje</string>
     <string name="notification_hidden_content">Nueva notificación</string>
@@ -1013,6 +1015,7 @@
     <string name="chat_lock">Bloqueo del chat</string>
     <string name="collapse_long_messages">Contraer mensajes largos</string>
     <string name="notify">Notificar</string>
+    <string name="sounds_and_notifications">Sonidos y notificaciones</string>
     <string name="notify_all_messages">Todos los mensajes</string>
     <string name="notify_only_mentions">Solo menciones</string>
     <string name="notify_nothing">Nada</string>

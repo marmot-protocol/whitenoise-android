@@ -565,6 +565,7 @@ class LocalNotificationReplyRaceTest {
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trafficClass = dev.ipf.marmotkit.NotificationTrafficClassFfi.STANDARD,
         accountRef = ACCOUNT,
         accountIdHex = ACCOUNT,
         groupIdHex = GROUP,

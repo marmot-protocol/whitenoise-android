@@ -108,7 +108,7 @@ class LocalNotificationPresenter(
         ) == PackageManager.PERMISSION_GRANTED
 
     // Opening / reading a conversation clears every card for it: the
-    // accumulating message card, the separate reaction card, and any pending
+    // accumulating message card, separate typed sibling cards, and any pending
     // group-invite card. Invites are tagged by their opaque notificationKey, not
     // the per-conversation tag, so they're found by the account + group stamped
     // into their extras at post time rather than by key.
@@ -122,7 +122,8 @@ class LocalNotificationPresenter(
             val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
             val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
             val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
-            listOf(message, reaction, mention).forEach { key ->
+            val agentActivity = LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex)
+            listOf(message, reaction, mention, agentActivity).forEach { key ->
                 cancelSynchronized(manager, key.tag, key.id)
             }
             dismissInvitesForGroup(accountRef, groupIdHex)
@@ -213,6 +214,7 @@ class LocalNotificationPresenter(
         listOf(
             LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
             LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
+            LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
         ).forEach { key ->
             cancelSynchronizedNotNewerThan(manager, compat, key.tag, key.id, sinceMs)
         }
@@ -324,21 +326,22 @@ class LocalNotificationPresenter(
                 notificationContent.notificationId,
             )
             if (!isPostStillAllowed()) return@withRegisteredShow false
-            // A shortcut-backed message posts on its per-conversation channel (the
-            // child of whichever parent it routed to — message OR mention), so
-            // Android treats it as a conversation and the user's per-conversation
-            // sound/vibration applies. Locked/redacted posts and non-message cards
-            // stay on the parent channel and carry no shortcut.
-            val messagingShortcutId =
-                if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+            // Every non-redacted notification with a conversation target posts on
+            // the child of its typed parent (messages, mentions, reactions,
+            // invites, or agent activity), so that chat's native per-type settings
+            // apply. Messaging cards additionally carry/publish the shortcut used
+            // by Android's People UI; plain cards still use the child channel.
+            val channelShortcutId =
+                if (!redactContent) {
                     conversationShortcutId(update.accountRef, update.groupIdHex)
                 } else {
                     null
                 }
+            val messagingShortcutId = channelShortcutId.takeIf { decision.style == NotificationStyleChoice.Messaging }
             val channelId =
-                if (messagingShortcutId != null) {
+                if (channelShortcutId != null) {
                     withContext(Dispatchers.Default) {
-                        ensureConversationChannel(decision.channelId, messagingShortcutId)
+                        ensureConversationChannel(decision.channelId, channelShortcutId)
                     } ?: decision.channelId
                 } else {
                     decision.channelId
