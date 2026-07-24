@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
@@ -373,6 +374,7 @@ internal fun MediaViewerFrame(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
+            snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
  * Bottom inset the global snackbar host should reserve to clear any
@@ -102,6 +104,15 @@ internal fun snackbarShowsCopyAffordance(visuals: SnackbarVisuals): Boolean =
     visuals.actionLabel == null && (visuals as? ToastSnackbarVisuals)?.copyable == true
 
 /**
+ * The one snackbar surface treatment: AMOLED resolves `inverseSurface` to pure
+ * black, so a subtle 1dp `outlineVariant` stroke on the standard snackbar shape
+ * keeps the transient surface readable against a black canvas. Light and
+ * standard dark render the Material 3 defaults unchanged.
+ */
+@Composable
+internal fun Modifier.snackbarSurfaceBoundary(): Modifier = amoledSurfaceBorder(SnackbarDefaults.shape)
+
+/**
  * A [Snackbar] the user can swipe away horizontally (issue #352). Material 3's
  * [SnackbarHost] does not wire up swipe-to-dismiss itself, so a snackbar
  * otherwise sits until it times out or an action is tapped. Wrapping it in a
@@ -142,6 +153,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             val clipboard = LocalClipboardManager.current
             val message = data.visuals.message
             Snackbar(
+                modifier = Modifier.snackbarSurfaceBoundary(),
                 action = {
                     IconButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
                         Icon(
@@ -161,7 +173,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             // untouched) and non-copyable toasts like success confirmations —
             // renders plain, with the message text still selectable.
             SelectionContainer {
-                Snackbar(snackbarData = data)
+                Snackbar(snackbarData = data, modifier = Modifier.snackbarSurfaceBoundary())
             }
         }
     }

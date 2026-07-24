@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -256,7 +257,7 @@ internal fun ProfileEditScreen(
                                         .offset(x = 6.dp, y = 6.dp)
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.62f))
+                                        .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY))
                                         .clickable(
                                             onClickLabel = editPictureLabel,
                                             role = Role.Button,

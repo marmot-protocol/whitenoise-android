@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
+import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.VIEWER_MIN_SCALE
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
@@ -330,6 +331,7 @@ internal fun AvatarViewerFrame(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding(),
+            snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
 }

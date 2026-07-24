@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
@@ -30,7 +31,7 @@ private fun MediaScrimFooter(
 ) {
     Box(
         modifier
-            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = ScrimAlpha.CHIP), RoundedCornerShape(percent = 50))
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         content()

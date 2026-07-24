@@ -21,7 +21,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,6 +51,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 
@@ -326,7 +326,7 @@ private fun AgentOperationHeader(
 
 @Composable
 private fun AgentOperationExpandedDetails(operation: AgentOperationPresentation) {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    AppDivider()
     operation.text.takeIf(String::isNotBlank)?.let { text ->
         AgentOperationDetail(
             label = stringResource(R.string.message),
