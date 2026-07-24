@@ -40,7 +40,8 @@ internal fun decideNotificationPost(
 
     val style =
         when {
-            spec == NotificationChannelSpec.REACTIONS -> NotificationStyleChoice.Plain
+            spec == NotificationChannelSpec.REACTIONS ||
+                spec == NotificationChannelSpec.AGENT_ACTIVITY -> NotificationStyleChoice.Plain
             update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> NotificationStyleChoice.Messaging
             update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank() ->
                 NotificationStyleChoice.InviteWithExtras(update.accountRef, update.groupIdHex)

@@ -6,9 +6,19 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
+import androidx.core.app.Person
+import androidx.core.content.LocusIdCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import java.security.MessageDigest
+
+private const val CONVERSATION_SHORTCUT_LABEL_MAX_LENGTH = 24
+private const val TAG = "ConversationSettings"
 
 internal fun conversationShortcutId(
     accountRef: String,
@@ -45,26 +55,62 @@ internal fun openConversationNotificationSettings(
     accountRef: String,
     groupIdHex: String,
     isDm: Boolean,
+    parent: NotificationChannelSpec? = null,
+    conversationTitle: String? = null,
+    conversationAvatarUrl: String? = null,
 ) {
     val shortcutId = conversationShortcutId(accountRef, groupIdHex)
-    val primaryParent = ConversationNotificationChannels.primaryMessageParent(isDm)
-    val channelId =
-        if (shortcutId != null) {
-            // Create the per-conversation channels up front so the deep link
-            // resolves even before any notification has posted for this
-            // conversation, then target the PRIMARY message parent's
-            // conversation channel — never a bare parent channel.
-            ConversationNotificationChannels.ensureConversationChannels(context, shortcutId, isDm)
-            ConversationNotificationChannels.conversationChannelId(primaryParent.id, shortcutId)
-        } else {
-            primaryParent.id
+    val targetParent = parent ?: ConversationNotificationChannels.primaryMessageParent(isDm)
+    var channelConversationTitle = conversationTitle
+    if (shortcutId != null) {
+        conversationTitle?.trim()?.takeIf(String::isNotEmpty)?.let { title ->
+            // The settings screen may be opened before this chat has ever
+            // posted a notification. Publish its identity first so Android
+            // can associate the child channel with a named conversation.
+            runCatching {
+                val existing =
+                    ShortcutManagerCompat
+                        .getDynamicShortcuts(context)
+                        .firstOrNull { it.id == shortcutId }
+                val shortcut =
+                    conversationSettingsShortcut(
+                        context = context,
+                        shortcutId = shortcutId,
+                        accountRef = accountRef,
+                        groupIdHex = groupIdHex,
+                        title = title,
+                        avatarUrl = conversationAvatarUrl,
+                        existing = existing,
+                    )
+                // If the UI briefly regressed to an npub fallback, preserve
+                // a previously resolved shortcut name in the channel too.
+                channelConversationTitle = shortcut.longLabel.toString()
+                ShortcutManagerCompat.pushDynamicShortcut(
+                    context,
+                    shortcut,
+                )
+            }.onFailure { exception ->
+                Log.w(TAG, "Failed to publish conversation shortcut", exception)
+            }
         }
+        // Create all typed children before asking Android to resolve this
+        // shortcut beneath the requested parent channel.
+        ConversationNotificationChannels.ensureConversationChannels(
+            context = context,
+            conversationShortcutId = shortcutId,
+            isDm = isDm,
+            conversationTitle = channelConversationTitle,
+        )
+    }
     val preferred =
         conversationNotificationSettingsIntent(
             context = context,
             accountRef = accountRef,
             groupIdHex = groupIdHex,
-            channelId = channelId,
+            // Android resolves a conversation from its typed parent channel
+            // plus the shortcut ID. Supplying the child ID would incorrectly
+            // ask the platform to find a conversation beneath a child.
+            channelId = targetParent.id,
         )
     if (context.tryStartActivity(preferred)) return
     if (preferred.action != Settings.ACTION_APP_NOTIFICATION_SETTINGS && context.tryStartActivity(appNotificationSettingsIntent(context))) return
@@ -76,6 +122,59 @@ internal fun openConversationNotificationSettings(
     if (context.tryStartActivity(appDetailsIntent)) return
 
     Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
+}
+
+internal fun conversationSettingsShortcut(
+    context: Context,
+    shortcutId: String,
+    accountRef: String,
+    groupIdHex: String,
+    title: String,
+    avatarUrl: String?,
+    existing: ShortcutInfoCompat? = null,
+): ShortcutInfoCompat {
+    val requestedTitle = title.trim().ifBlank { context.getString(R.string.app_name) }
+    val displayTitle = preferredConversationShortcutTitle(requestedTitle, existing?.longLabel?.toString())
+    val avatarBitmap = AvatarImageLoader.peekBitmap(avatarUrl)
+    val icon =
+        notificationConversationIcon(
+            title = displayTitle,
+            seed = shortcutId,
+            avatarBitmap = avatarBitmap,
+        )
+    val person =
+        Person
+            .Builder()
+            .setName(displayTitle)
+            .setKey(shortcutId)
+            .setIcon(icon)
+            .build()
+    val intent =
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            NotificationNavigation.applyToIntent(
+                intent = this,
+                target =
+                    NotificationTarget(
+                        accountRef = accountRef,
+                        groupIdHex = groupIdHex,
+                        messageIdHex = null,
+                        kind = NotificationTargetKind.MESSAGE,
+                    ),
+                notificationKey = shortcutId,
+                tapToken = NotificationTapTokens.create(context).tokenFor(shortcutId),
+            )
+        }
+    return ShortcutInfoCompat
+        .Builder(context, shortcutId)
+        .setShortLabel(displayTitle.take(CONVERSATION_SHORTCUT_LABEL_MAX_LENGTH))
+        .setLongLabel(displayTitle)
+        .setIcon(icon)
+        .setIntent(intent)
+        .setLocusId(LocusIdCompat(shortcutId))
+        .setPerson(person)
+        .setLongLived(true)
+        .build()
 }
 
 private fun appNotificationSettingsIntent(context: Context): Intent =

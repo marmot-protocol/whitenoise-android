@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
@@ -222,9 +223,14 @@ class MarkdownPreviewTextTest {
                                 dest = "https://example.com/page",
                                 title = null,
                                 children = listOf(MarkdownInlineFfi.Text("example")),
+                                classification = MarkdownLinkDestinationKindFfi.WEB,
                             ),
                             MarkdownInlineFfi.Text(" "),
-                            MarkdownInlineFfi.Autolink("https://example.com", MarkdownAutolinkKindFfi.URI),
+                            MarkdownInlineFfi.Autolink(
+                                "https://example.com",
+                                MarkdownAutolinkKindFfi.URI,
+                                MarkdownLinkDestinationKindFfi.WEB,
+                            ),
                         ),
                     ),
                 ),
@@ -246,6 +252,7 @@ class MarkdownPreviewTextTest {
                                 dest = "https://example.com/cat.png",
                                 title = null,
                                 alt = listOf(MarkdownInlineFfi.Text("a cat")),
+                                classification = MarkdownLinkDestinationKindFfi.WEB,
                             ),
                         ),
                     ),

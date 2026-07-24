@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
@@ -62,7 +63,11 @@ class MarkdownInlineTextTest {
                     MarkdownInlineFfi.SoftBreak,
                     MarkdownInlineFfi.Code("sha\u2066-256"),
                     MarkdownInlineFfi.Text(" "),
-                    MarkdownInlineFfi.Autolink("https://example.com/\u202Egpj.exe", MarkdownAutolinkKindFfi.URI),
+                    MarkdownInlineFfi.Autolink(
+                        "https://example.com/\u202Egpj.exe",
+                        MarkdownAutolinkKindFfi.URI,
+                        MarkdownLinkDestinationKindFfi.WEB,
+                    ),
                 ),
             )
 
@@ -144,6 +149,7 @@ class MarkdownInlineTextTest {
                         dest = "https://example.com/page",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("example")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
                     ),
                 ),
             )
@@ -165,6 +171,7 @@ class MarkdownInlineTextTest {
                         dest = "https://evil.example/phish",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("https://your-bank.example/login")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
                     ),
                 ),
             )
@@ -182,6 +189,7 @@ class MarkdownInlineTextTest {
                         dest = "https://myblog.example/post",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("myblog.example")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
                     ),
                 ),
             )
@@ -255,6 +263,7 @@ class MarkdownInlineTextTest {
                         dest = unicodeUrl,
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("international domain")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
                     ),
                 ),
             )
@@ -263,7 +272,16 @@ class MarkdownInlineTextTest {
         val explicitLink = explicit.getLinkAnnotations(0, explicit.length).single()
         assertEquals(canonicalUrl, (explicitLink.item as LinkAnnotation.Url).url)
 
-        val autolink = build(listOf(MarkdownInlineFfi.Autolink(unicodeUrl, MarkdownAutolinkKindFfi.URI)))
+        val autolink =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Autolink(
+                        unicodeUrl,
+                        MarkdownAutolinkKindFfi.URI,
+                        MarkdownLinkDestinationKindFfi.WEB,
+                    ),
+                ),
+            )
         val autoLinkAnnotation = autolink.getLinkAnnotations(0, autolink.length).single()
         assertEquals(canonicalUrl, (autoLinkAnnotation.item as LinkAnnotation.Url).url)
     }
@@ -289,6 +307,7 @@ class MarkdownInlineTextTest {
                         dest = "javascript:alert(1)",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("sneaky")),
+                        classification = MarkdownLinkDestinationKindFfi.DANGEROUS,
                     ),
                 ),
             )
@@ -301,7 +320,11 @@ class MarkdownInlineTextTest {
         val annotated =
             build(
                 listOf(
-                    MarkdownInlineFfi.Autolink("https://example.com", MarkdownAutolinkKindFfi.URI),
+                    MarkdownInlineFfi.Autolink(
+                        "https://example.com",
+                        MarkdownAutolinkKindFfi.URI,
+                        MarkdownLinkDestinationKindFfi.WEB,
+                    ),
                 ),
             )
         assertEquals("https://example.com", annotated.text)
@@ -316,7 +339,11 @@ class MarkdownInlineTextTest {
         val annotated =
             build(
                 listOf(
-                    MarkdownInlineFfi.Autolink("  https://example.com  ", MarkdownAutolinkKindFfi.URI),
+                    MarkdownInlineFfi.Autolink(
+                        "  https://example.com  ",
+                        MarkdownAutolinkKindFfi.URI,
+                        MarkdownLinkDestinationKindFfi.WEB,
+                    ),
                 ),
             )
         // The author's padding stays visible, but the stored destination is
@@ -331,7 +358,11 @@ class MarkdownInlineTextTest {
         val annotated =
             build(
                 listOf(
-                    MarkdownInlineFfi.Autolink("user@example.com", MarkdownAutolinkKindFfi.EMAIL),
+                    MarkdownInlineFfi.Autolink(
+                        "user@example.com",
+                        MarkdownAutolinkKindFfi.EMAIL,
+                        MarkdownLinkDestinationKindFfi.CONTACT,
+                    ),
                 ),
             )
         // Visible text stays the bare address; the annotation carries the
@@ -388,12 +419,14 @@ class MarkdownInlineTextTest {
                         dest = "mailto:user@example.com",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("mail")),
+                        classification = MarkdownLinkDestinationKindFfi.CONTACT,
                     ),
                     MarkdownInlineFfi.Text(" "),
                     MarkdownInlineFfi.Link(
                         dest = "tel:+15551234567",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("call")),
+                        classification = MarkdownLinkDestinationKindFfi.CONTACT,
                     ),
                 ),
             )
@@ -422,6 +455,7 @@ class MarkdownInlineTextTest {
                         dest = "  https://example.com  ",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("padded")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
                     ),
                 ),
             )
@@ -439,6 +473,7 @@ class MarkdownInlineTextTest {
                         dest = " javascript:alert(1)",
                         title = null,
                         children = listOf(MarkdownInlineFfi.Text("sneaky")),
+                        classification = MarkdownLinkDestinationKindFfi.DANGEROUS,
                     ),
                 ),
             )

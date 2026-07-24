@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -40,6 +41,9 @@ object LocalNotificationFormatter {
 
     const val MENTION_NOTIFICATION_ID = 2
     private const val MENTION_TAG_PREFIX = "mention|"
+
+    const val AGENT_ACTIVITY_NOTIFICATION_ID = 3
+    private const val AGENT_ACTIVITY_TAG_PREFIX = "agent-activity|"
 
     private val whitespaceRun = Regex("\\s+")
 
@@ -84,6 +88,15 @@ object LocalNotificationFormatter {
         NotificationDismissalKey(
             tag = MENTION_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
             id = MENTION_NOTIFICATION_ID,
+        )
+
+    fun agentActivityDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = AGENT_ACTIVITY_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
+            id = AGENT_ACTIVITY_NOTIFICATION_ID,
         )
 
     /**
@@ -180,6 +193,8 @@ object LocalNotificationFormatter {
                         REACTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                     update.isMention ->
                         MENTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
+                    update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY ->
+                        AGENT_ACTIVITY_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                     else -> conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                 },
             notificationId =
@@ -187,6 +202,7 @@ object LocalNotificationFormatter {
                     update.trigger == NotificationTriggerFfi.GROUP_INVITE -> 0
                     isReaction(update) -> REACTION_NOTIFICATION_ID
                     update.isMention -> MENTION_NOTIFICATION_ID
+                    update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY -> AGENT_ACTIVITY_NOTIFICATION_ID
                     else -> MESSAGE_NOTIFICATION_ID
                 },
             title = title,
