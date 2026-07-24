@@ -71,7 +71,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -449,11 +448,9 @@ private fun LazyListScope.forwardFolderSection(
         ListItem(
             modifier =
                 Modifier.clickable {
-                    if (triState == ToggleableState.On) {
-                        selected.removeAll(memberIds)
-                    } else {
-                        selected.addAll(memberIds.filterNot { it in selected })
-                    }
+                    val nextSelection = forwardSelectionAfterFolderToggle(selected, memberIds)
+                    selected.clear()
+                    selected.addAll(nextSelection)
                 },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = { TriStateCheckbox(state = triState, onClick = null) },
@@ -627,7 +624,7 @@ internal fun ForwardMessageSheet(
             ) {
                 Button(
                     onClick = {
-                        onForward(selected.toList())
+                        onForward(forwardRecipientGroupIds(selected, originGroupIdHex))
                         onDismiss()
                     },
                     enabled = selected.isNotEmpty(),

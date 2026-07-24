@@ -3,6 +3,11 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import java.util.Locale
 
+data class ConversationSearchMatch(
+    val messageIdHex: String,
+    val timelineAt: ULong,
+)
+
 /**
  * In-conversation / cross-conversation message-content search primitives.
  *

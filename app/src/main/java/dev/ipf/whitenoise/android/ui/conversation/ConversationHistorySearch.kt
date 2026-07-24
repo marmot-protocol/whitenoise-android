@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
+import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -29,11 +30,11 @@ internal const val HISTORY_SEARCH_DEBOUNCE_MILLIS = 350L
  * Returns null on a failed page read — callers fall back to the loaded-window
  * matches rather than presenting a partial set as the total.
  */
-internal suspend fun searchConversationHistoryMessageIds(
+internal suspend fun searchConversationHistoryMatches(
     appState: WhiteNoiseAppState,
     groupIdHex: String,
     query: String,
-): List<String>? {
+): List<ConversationSearchMatch>? {
     val account = appState.activeAccountRef
     val needle = query.trim()
     return when {
@@ -59,7 +60,7 @@ private suspend fun scanHistoryForNeedle(
     account: String,
     groupIdHex: String,
     needle: String,
-): List<String>? {
+): List<ConversationSearchMatch>? {
     val ciNeedle = needle.lowercase(Locale.ROOT)
     return paginateHistoryMatches { cursorBefore, cursorMessageId ->
         val page =
@@ -106,7 +107,7 @@ private suspend fun scanHistoryForNeedle(
  * Returns null when a page read fails (the caller keeps its loaded-window
  * matches); otherwise ids oldest-first.
  */
-internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List<String>? {
+internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List<ConversationSearchMatch>? {
     val matches = ArrayList<Pair<ULong, String>>()
     var cursorBefore: ULong? = null
     var cursorMessageId: String? = null
@@ -135,6 +136,8 @@ internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List
     } else {
         matches
             .sortedWith(compareBy({ it.first }, { it.second }))
-            .map { it.second }
+            .map { (timelineAt, messageIdHex) ->
+                ConversationSearchMatch(messageIdHex = messageIdHex, timelineAt = timelineAt)
+            }
     }
 }

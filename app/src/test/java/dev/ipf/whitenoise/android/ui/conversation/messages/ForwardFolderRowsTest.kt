@@ -32,4 +32,37 @@ class ForwardFolderRowsTest {
     fun queryMatchingNoFolderHidesTheSection() {
         assertEquals(emptyList<Pair<ChatFolder, List<String>>>(), visibleForwardFolderRows(rows, "zzz"))
     }
+
+    @Test
+    fun folderToggleAddsMissingMembersWithoutDuplicatingExistingSelections() {
+        assertEquals(
+            listOf("individual", "FOLDER-A", "folder-b"),
+            forwardSelectionAfterFolderToggle(
+                selected = listOf("individual", "FOLDER-A"),
+                memberIds = listOf("folder-a", "folder-b", "folder-b"),
+            ),
+        )
+    }
+
+    @Test
+    fun folderToggleRemovesOnlyThatFoldersMembersWhenFullySelected() {
+        assertEquals(
+            listOf("individual"),
+            forwardSelectionAfterFolderToggle(
+                selected = listOf("individual", "folder-a", "folder-b"),
+                memberIds = listOf("FOLDER-A", "folder-b"),
+            ),
+        )
+    }
+
+    @Test
+    fun forwardRecipientsExcludeOriginAndDuplicateGroupIds() {
+        assertEquals(
+            listOf("individual", "folder-a"),
+            forwardRecipientGroupIds(
+                selected = listOf("individual", "origin", "folder-a", "FOLDER-A", "ORIGIN"),
+                originGroupIdHex = "origin",
+            ),
+        )
+    }
 }

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -35,7 +36,13 @@ class ConversationHistorySearchTest {
             // is exactly the bug that silently capped the scan at page one.
             assertEquals(listOf<Pair<ULong?, String?>>(null to null, 20uL to "b"), seenCursors)
             // Both pages' matches survive, oldest-first.
-            assertEquals(listOf("a", "c"), result)
+            assertEquals(
+                listOf(
+                    ConversationSearchMatch(messageIdHex = "a", timelineAt = 10uL),
+                    ConversationSearchMatch(messageIdHex = "c", timelineAt = 30uL),
+                ),
+                result,
+            )
         }
 
     @Test
@@ -67,6 +74,6 @@ class ConversationHistorySearchTest {
                     HistoryScanPage(matches = listOf(1uL to "x"), oldest = 1uL to "x", hasMoreBefore = false)
                 }
             assertEquals(1, calls)
-            assertEquals(listOf("x"), result)
+            assertEquals(listOf(ConversationSearchMatch(messageIdHex = "x", timelineAt = 1uL)), result)
         }
 }
