@@ -752,6 +752,7 @@ private fun markdownDetailsCloseIndex(
     for (index in from until blocks.size) {
         when {
             markdownDetailsOpener(blocks[index]) != null -> nestedDepth += 1
+            isSelfContainedMarkdownDetails(blocks[index]) -> Unit
             blockEndsWithDetailsClose(blocks[index]) -> {
                 if (nestedDepth == 0) return index
                 nestedDepth -= 1
@@ -760,6 +761,12 @@ private fun markdownDetailsCloseIndex(
     }
     return -1
 }
+
+// A complete one-paragraph disclosure owns its closing tag. It is rendered
+// inline by MarkdownBlockView and must not close a surrounding multi-block
+// disclosure while the outer matcher scans for its corresponding close.
+private fun isSelfContainedMarkdownDetails(block: MarkdownBlockFfi): Boolean =
+    (block as? MarkdownBlockFfi.Paragraph)?.let { markdownDetailsSection(it.inlines) } != null
 
 private fun blockEndsWithDetailsClose(block: MarkdownBlockFfi): Boolean {
     val lastLine =

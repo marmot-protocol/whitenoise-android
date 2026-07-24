@@ -489,21 +489,27 @@ internal fun ConversationScreen(
     // measure a target after it has been composed; keeping the measured height
     // by message id lets future off-screen jumps animate straight to the exact
     // centered offset, while never becoming protocol/data source-of-truth state.
-    val timelineItemHeightsPx = remember(chat.id) { mutableStateMapOf<String, Int>() }
+    val timelineItemHeightsPx = remember(controller) { mutableStateMapOf<String, Int>() }
     // In-chat search (#292). Opening from the overflow menu swaps the top
     // bar into an inline search field; closing it restores the normal bar.
     // `searchPinnedMatchId` keeps the active match anchored to a concrete
     // message id so the N/M cursor follows that message as older pages load
     // and the match set grows. `searchJob` serializes scroll-jump coroutines
     // the same way `navigateReplyJob` does for reply navigation.
-    var searchOpen by remember(chat.id) { mutableStateOf(false) }
-    var searchQuery by remember(chat.id) { mutableStateOf("") }
-    var searchPinnedMatchId by remember(chat.id) { mutableStateOf<String?>(null) }
-    var searchJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    var searchOpen by remember(controller) { mutableStateOf(false) }
+    var searchQuery by remember(controller) { mutableStateOf("") }
+    var searchPinnedMatchId by remember(controller) { mutableStateOf<String?>(null) }
+    var searchJob by remember(controller) { mutableStateOf<Job?>(null) }
     // The durable local message position lets close-search move the bounded
     // subscription window back before restoring the exact viewport offset.
     // Numeric index remains a fallback for headers and optimistic rows.
-    var preSearchScrollAnchor by remember(chat.id) { mutableStateOf<ConversationSearchScrollAnchor?>(null) }
+    var preSearchScrollAnchor by remember(controller) { mutableStateOf<ConversationSearchScrollAnchor?>(null) }
+    DisposableEffect(controller) {
+        onDispose {
+            searchJob?.cancel()
+            navigateReplyJob?.cancel()
+        }
+    }
     val searchFocusRequester = remember { FocusRequester() }
     // Jump-to-newest plumbing.
     //
@@ -1866,7 +1872,7 @@ internal fun ConversationScreen(
     // it lands, so a result cannot depend on incidental scroll history. The
     // effect restarting on each keystroke cancels a superseded scan, and the
     // debounce keeps typing from firing one scan per character.
-    var historySearchMatches by remember(chat.id) { mutableStateOf<List<ConversationSearchMatch>?>(null) }
+    var historySearchMatches by remember(controller) { mutableStateOf<List<ConversationSearchMatch>?>(null) }
     LaunchedEffect(searchQuery, chat.id, controller) {
         historySearchMatches = null
         if (searchQuery.isBlank()) return@LaunchedEffect
@@ -1884,14 +1890,12 @@ internal fun ConversationScreen(
             if (scan == null) {
                 searchWindowMatches
             } else {
-                val windowById = searchWindowMatches.associateBy { it.messageIdHex }
-                val scanById = scan.associateBy { it.messageIdHex }
                 MessageSearch
                     .mergeWithHistoryScan(
-                        windowMatchIds = searchWindowMatches.map { it.messageIdHex },
+                        windowMatches = searchWindowMatches,
                         loadedWindowIds = renderedTimeline.mapTo(HashSet()) { it.record.messageIdHex },
-                        scanMatchIdsOldestFirst = scan.map { it.messageIdHex },
-                    ).mapNotNull { id -> windowById[id] ?: scanById[id] }
+                        scanMatchesOldestFirst = scan,
+                    )
             }
         }
     val effectiveSearchMatchIds = effectiveSearchMatches.map { it.messageIdHex }
@@ -2508,6 +2512,9 @@ internal fun ConversationScreen(
                     ConversationSearchTopBar(
                         query = searchQuery,
                         onQueryChange = {
+                            searchJob?.cancel()
+                            searchJob = null
+                            highlightedMessageId = null
                             searchQuery = it
                             // Re-anchor the cursor to the new query's match set on
                             // the next derivation; clearing the pin makes it land
@@ -2515,6 +2522,9 @@ internal fun ConversationScreen(
                             searchPinnedMatchId = null
                         },
                         onClear = {
+                            searchJob?.cancel()
+                            searchJob = null
+                            highlightedMessageId = null
                             searchQuery = ""
                             searchPinnedMatchId = null
                         },

@@ -76,4 +76,17 @@ class ConversationHistorySearchTest {
             assertEquals(1, calls)
             assertEquals(listOf(ConversationSearchMatch(messageIdHex = "x", timelineAt = 1uL)), result)
         }
+
+    @Test
+    fun runawayCapReturnsNullInsteadOfPublishingPartialResults() =
+        runBlocking {
+            var calls = 0
+            val result =
+                paginateHistoryMatches(maxPages = 1) { _, _ ->
+                    calls += 1
+                    HistoryScanPage(matches = listOf(2uL to "partial"), oldest = 1uL to "cursor", hasMoreBefore = true)
+                }
+            assertEquals(1, calls)
+            assertNull(result)
+        }
 }

@@ -121,46 +121,23 @@ object MessageSearch {
      * covering pages not yet loaded). Inside the loaded window the window
      * verdict wins in both directions — a store hit the window rejected is an
      * edited-away body, a window hit the store missed is an edited-in one.
-     * Outside the window the store scan is the only evidence. Both inputs are
-     * oldest-first and the merged list preserves that order; window-only hits
-     * are placed relative to their nearest window neighbor already merged.
+     * Outside the window the store scan is the only evidence. Timestamp + id
+     * provide a durable total order, including when every loaded-window hit is
+     * edit-only and therefore has no neighboring raw-store hit to anchor it.
      */
     fun mergeWithHistoryScan(
-        windowMatchIds: List<String>,
+        windowMatches: List<ConversationSearchMatch>,
         loadedWindowIds: Set<String>,
-        scanMatchIdsOldestFirst: List<String>,
-    ): List<String> {
-        val windowMatchSet = windowMatchIds.toHashSet()
-        val merged = ArrayList<String>(scanMatchIdsOldestFirst.size + windowMatchIds.size)
-        for (id in scanMatchIdsOldestFirst) {
-            if (id in loadedWindowIds && id !in windowMatchSet) continue
-            merged += id
-        }
-        val mergedSet = merged.toHashSet()
-        for (windowIndex in windowMatchIds.indices) {
-            val id = windowMatchIds[windowIndex]
-            if (id in mergedSet) continue
-            merged.add(windowOnlyInsertionIndex(merged, windowMatchIds, windowIndex), id)
-            mergedSet += id
-        }
-        return merged
-    }
-
-    // The nearest already-merged window neighbor decides where a window-only
-    // hit lands: after its closest predecessor, else before its closest
-    // successor, else at the end.
-    private fun windowOnlyInsertionIndex(
-        merged: List<String>,
-        windowMatchIds: List<String>,
-        windowIndex: Int,
-    ): Int {
-        for (previous in windowIndex - 1 downTo 0) {
-            val at = merged.indexOf(windowMatchIds[previous])
-            if (at >= 0) return at + 1
-        }
-        val nextAt =
-            (windowIndex + 1 until windowMatchIds.size)
-                .firstNotNullOfOrNull { next -> merged.indexOf(windowMatchIds[next]).takeIf { it >= 0 } }
-        return nextAt ?: merged.size
+        scanMatchesOldestFirst: List<ConversationSearchMatch>,
+    ): List<ConversationSearchMatch> {
+        val windowById = windowMatches.associateBy { it.messageIdHex }
+        val mergedById =
+            scanMatchesOldestFirst
+                .filterNot { it.messageIdHex in loadedWindowIds && it.messageIdHex !in windowById }
+                .associateByTo(LinkedHashMap()) { it.messageIdHex }
+        // Loaded-window projections are authoritative for both match verdict
+        // and timeline position, so they overwrite any raw-store counterpart.
+        windowMatches.forEach { mergedById[it.messageIdHex] = it }
+        return mergedById.values.sortedWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
     }
 }

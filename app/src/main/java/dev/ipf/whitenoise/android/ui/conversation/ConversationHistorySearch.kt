@@ -104,17 +104,21 @@ private suspend fun scanHistoryForNeedle(
  * contract is unit-testable. [fetchPage] receives the (before, beforeMessageId)
  * pair — both null on the first page, both advancing to the previous page's
  * oldest row thereafter, because the engine rejects one without the other.
- * Returns null when a page read fails (the caller keeps its loaded-window
- * matches); otherwise ids oldest-first.
+ * Returns null when a page read fails or the runaway cap is reached before
+ * exhaustion (the caller keeps its loaded-window matches); otherwise ids
+ * oldest-first.
  */
-internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List<ConversationSearchMatch>? {
+internal suspend fun paginateHistoryMatches(
+    maxPages: Int = HISTORY_SEARCH_MAX_PAGES,
+    fetchPage: HistoryPageFetcher,
+): List<ConversationSearchMatch>? {
     val matches = ArrayList<Pair<ULong, String>>()
     var cursorBefore: ULong? = null
     var cursorMessageId: String? = null
     var pages = 0
     var failed = false
     var exhausted = false
-    while (!failed && !exhausted && pages < HISTORY_SEARCH_MAX_PAGES) {
+    while (!failed && !exhausted && pages < maxPages) {
         currentCoroutineContext().ensureActive()
         val page = fetchPage(cursorBefore, cursorMessageId)
         if (page == null) {
@@ -131,7 +135,7 @@ internal suspend fun paginateHistoryMatches(fetchPage: HistoryPageFetcher): List
             }
         }
     }
-    return if (failed) {
+    return if (failed || !exhausted) {
         null
     } else {
         matches

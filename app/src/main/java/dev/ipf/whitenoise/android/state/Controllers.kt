@@ -6693,7 +6693,6 @@ class ConversationController(
             if (page == null) {
                 false
             } else {
-                hasLoadedOlderPages = page.hasMoreAfter
                 applyTimelinePage(page, replaceWindow = true, updatePagination = true)
                 protectedTimelineMessageIds.clear()
                 if (hasLoadedOlderPages) {

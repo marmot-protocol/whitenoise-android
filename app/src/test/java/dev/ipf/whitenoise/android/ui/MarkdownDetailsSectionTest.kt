@@ -79,6 +79,25 @@ class MarkdownDetailsSectionTest {
     }
 
     @Test
+    fun selfContainedNestedDetailsDoesNotCloseItsOuterGroup() {
+        val nested = paragraph("<details>", "<summary>Inner</summary>", "nested body", "</details>")
+        val outerBody = paragraph("outer body after nested details")
+        val groups =
+            groupMarkdownDetailsBlocks(
+                listOf(
+                    paragraph("<details>", "<summary>Outer</summary>"),
+                    nested,
+                    outerBody,
+                    paragraph("</details>"),
+                ),
+            )
+
+        val outer = groups.single() as MarkdownRenderGroup.Details
+        assertEquals("Outer", outer.summary)
+        assertEquals(listOf(nested, outerBody), outer.content)
+    }
+
+    @Test
     fun unterminatedMultiBlockDetailsRendersEveryBlockLiterally() {
         val blocks =
             listOf(
