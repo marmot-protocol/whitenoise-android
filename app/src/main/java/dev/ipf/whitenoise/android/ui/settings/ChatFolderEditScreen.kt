@@ -97,6 +97,8 @@ internal fun ChatFolderEditScreen(
     BackHandler { onClose() }
 
     fun save() {
+        // Name and description are both required by the create/edit contract.
+        if (description.isBlank()) return
         val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return
         val id =
             folderId?.also {
@@ -167,7 +169,7 @@ internal fun ChatFolderEditScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { save() }, enabled = name.isNotBlank()) {
+                    TextButton(onClick = { save() }, enabled = name.isNotBlank() && description.isNotBlank()) {
                         Text(stringResource(R.string.save))
                     }
                 },
