@@ -101,6 +101,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -589,7 +590,7 @@ internal fun ForwardMessageSheet(
                     forwardFolderSection(visibleFolderRows, selected)
                     if (filtered.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
                     items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
-                        val groupId = item.group.groupIdHex
+                        val groupId = item.group.groupIdHex.lowercase(Locale.ROOT)
                         val isSelected = selected.contains(groupId)
                         val avatarAccount = forwardTargetAvatarAccount(item)
                         // Group rows preview the other members' names, mirroring

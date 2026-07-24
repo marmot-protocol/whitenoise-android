@@ -278,6 +278,16 @@ internal object AuditLogPreferences {
 
     fun SharedPreferences.readRedactSensitiveData(): Boolean = getBoolean(KEY_REDACT_SENSITIVE_AUDIT_DATA, true)
 
+    fun hasRedactionPreference(prefs: SharedPreferences): Boolean = prefs.contains(KEY_REDACT_SENSITIVE_AUDIT_DATA)
+
+    fun requiresSafeEnabledMigration(
+        preferences: SharedPreferences,
+        settings: AuditLogSettingsFfi,
+    ): Boolean =
+        !hasRedactionPreference(preferences) &&
+            settings.enabled &&
+            settings.dataMode == AuditDataModeFfi.FULL_DATA
+
     fun writeRedactSensitiveData(
         preferences: SharedPreferences,
         redact: Boolean,
@@ -3567,17 +3577,42 @@ class WhiteNoiseAppState(
         reconcileRedactionWithEngineAuditMode()
     }
 
-    // The engine's recorded data mode is the truth while recording is on: a
-    // pre-redaction session that enabled audit logs under FULL_DATA must not
-    // display as redacted. Sync the displayed switch (and the persisted
-    // choice) to what the recorder is actually doing.
-    private fun reconcileRedactionWithEngineAuditMode() {
-        val settings = auditLogSettings ?: return
-        if (!settings.enabled) return
-        val engineRedacts = settings.dataMode != AuditDataModeFfi.FULL_DATA
-        if (redactSensitiveAuditData != engineRedacts) {
-            redactSensitiveAuditData = engineRedacts
-            AuditLogPreferences.writeRedactSensitiveData(preferences, engineRedacts)
+    // Existing installs may have enabled FULL_DATA before the redaction
+    // preference existed. A missing key means "adopt the new safe default",
+    // so migrate the live recorder before persisting that default. If the
+    // engine update fails, reflect the real unsafe mode in the UI but leave the
+    // key absent so the next refresh retries instead of silently opting out.
+    private suspend fun reconcileRedactionWithEngineAuditMode() {
+        val settings = auditLogSettings
+        if (settings != null) {
+            if (AuditLogPreferences.requiresSafeEnabledMigration(preferences, settings)) {
+                val migrated =
+                    runCatchingCancellable {
+                        marmotIo {
+                            setAuditLogSettings(
+                                AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = true),
+                            )
+                        }
+                    }.getOrNull()
+                if (migrated == null) {
+                    redactSensitiveAuditData = false
+                } else {
+                    auditLogSettings = migrated
+                    redactSensitiveAuditData = true
+                    AuditLogPreferences.writeRedactSensitiveData(preferences, true)
+                }
+            } else {
+                if (!AuditLogPreferences.hasRedactionPreference(preferences)) {
+                    AuditLogPreferences.writeRedactSensitiveData(preferences, true)
+                }
+                if (settings.enabled) {
+                    val engineRedacts = settings.dataMode != AuditDataModeFfi.FULL_DATA
+                    if (redactSensitiveAuditData != engineRedacts) {
+                        redactSensitiveAuditData = engineRedacts
+                        AuditLogPreferences.writeRedactSensitiveData(preferences, engineRedacts)
+                    }
+                }
+            }
         }
     }
 

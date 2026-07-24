@@ -36,7 +36,7 @@ class ForwardFolderRowsTest {
     @Test
     fun folderToggleAddsMissingMembersWithoutDuplicatingExistingSelections() {
         assertEquals(
-            listOf("individual", "FOLDER-A", "folder-b"),
+            listOf("individual", "folder-a", "folder-b"),
             forwardSelectionAfterFolderToggle(
                 selected = listOf("individual", "FOLDER-A"),
                 memberIds = listOf("folder-a", "folder-b", "folder-b"),

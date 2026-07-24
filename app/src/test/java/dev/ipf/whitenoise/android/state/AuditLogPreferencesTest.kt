@@ -33,6 +33,31 @@ class AuditLogPreferencesTest {
     }
 
     @Test
+    fun enabledLegacyFullDataWithoutPreferenceRequiresSafeMigration() {
+        val legacySettings = AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = false)
+
+        assertFalse(AuditLogPreferences.hasRedactionPreference(preferences))
+        assertTrue(AuditLogPreferences.requiresSafeEnabledMigration(preferences, legacySettings))
+
+        AuditLogPreferences.writeRedactSensitiveData(preferences, true)
+        val migrated =
+            AuditLogPreferences.settingsFor(
+                enabled = legacySettings.enabled,
+                redactSensitiveData = with(AuditLogPreferences) { preferences.readRedactSensitiveData() },
+            )
+        assertTrue(AuditLogPreferences.hasRedactionPreference(preferences))
+        assertEquals(AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA, migrated.dataMode)
+    }
+
+    @Test
+    fun explicitFullDataChoiceDoesNotRequireMigration() {
+        AuditLogPreferences.writeRedactSensitiveData(preferences, false)
+        val settings = AuditLogPreferences.settingsFor(enabled = true, redactSensitiveData = false)
+
+        assertFalse(AuditLogPreferences.requiresSafeEnabledMigration(preferences, settings))
+    }
+
+    @Test
     fun redactionRoundTripsThroughPreferences() {
         AuditLogPreferences.writeRedactSensitiveData(preferences, false)
         assertFalse(with(AuditLogPreferences) { preferences.readRedactSensitiveData() })

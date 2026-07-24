@@ -748,8 +748,15 @@ private fun markdownDetailsCloseIndex(
     blocks: List<MarkdownBlockFfi>,
     from: Int,
 ): Int {
+    var nestedDepth = 0
     for (index in from until blocks.size) {
-        if (blockEndsWithDetailsClose(blocks[index])) return index
+        when {
+            markdownDetailsOpener(blocks[index]) != null -> nestedDepth += 1
+            blockEndsWithDetailsClose(blocks[index]) -> {
+                if (nestedDepth == 0) return index
+                nestedDepth -= 1
+            }
+        }
     }
     return -1
 }

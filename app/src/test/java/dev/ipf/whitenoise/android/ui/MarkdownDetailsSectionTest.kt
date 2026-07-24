@@ -56,6 +56,29 @@ class MarkdownDetailsSectionTest {
     }
 
     @Test
+    fun nestedDetailsUseTheirMatchingCloseTags() {
+        val nestedOpener = paragraph("<details>", "<summary>Inner</summary>")
+        val nestedBody = paragraph("nested body")
+        val nestedClose = paragraph("</details>")
+        val groups =
+            groupMarkdownDetailsBlocks(
+                listOf(
+                    paragraph("<details>", "<summary>Outer</summary>"),
+                    nestedOpener,
+                    nestedBody,
+                    nestedClose,
+                    paragraph("</details>"),
+                ),
+            )
+
+        val outer = groups.single() as MarkdownRenderGroup.Details
+        assertEquals("Outer", outer.summary)
+        val inner = groupMarkdownDetailsBlocks(outer.content).single() as MarkdownRenderGroup.Details
+        assertEquals("Inner", inner.summary)
+        assertEquals(listOf(nestedBody), inner.content)
+    }
+
+    @Test
     fun unterminatedMultiBlockDetailsRendersEveryBlockLiterally() {
         val blocks =
             listOf(
