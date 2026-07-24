@@ -1862,8 +1862,12 @@ internal fun ConversationScreen(
         historySearchMatchIds = null
         if (searchQuery.isBlank()) return@LaunchedEffect
         delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
-        historySearchMatchIds =
-            searchConversationHistoryMessageIds(appState, controller.group.groupIdHex, searchQuery)
+        val launchedForQuery = searchQuery
+        val scan = searchConversationHistoryMessageIds(appState, controller.group.groupIdHex, launchedForQuery)
+        // Only publish if this is still the current query. Cancellation already
+        // propagates from the scan, so this only guards a scan that completed
+        // in the gap before the effect restarted for a newer keystroke.
+        if (searchQuery == launchedForQuery) historySearchMatchIds = scan
     }
     val effectiveSearchMatchIds =
         remember(searchMatchIds, historySearchMatchIds, renderedTimeline) {
@@ -1899,11 +1903,17 @@ internal fun ConversationScreen(
                 // loads only the pages needed to bring the target in (the same
                 // helper reply navigation uses), never the whole history.
                 if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
+                // Resolve against the LIVE timeline, not the composition-captured
+                // renderedTimeline — loading older pages above grew the timeline
+                // and the captured snapshot would miss a just-loaded match.
                 val timelineIndex =
-                    renderedTimeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
+                    controller.timeline
+                        .filterNot { MessageProjector.isEdit(it.record) }
+                        .indexOfFirst { it.record.messageIdHex == messageIdHex }
                 if (timelineIndex < 0) return@launch
+                val liveOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
                 // Center the match so prior + subsequent context is visible (#595).
-                centerTimelineItemAt(messageIdHex, 1 + olderHeaderCount + timelineIndex)
+                centerTimelineItemAt(messageIdHex, 1 + liveOlderHeaderCount + timelineIndex)
                 highlightedMessageId = messageIdHex
                 delay(1_500L)
                 if (highlightedMessageId == messageIdHex) {
