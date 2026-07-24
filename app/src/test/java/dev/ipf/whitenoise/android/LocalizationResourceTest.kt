@@ -577,11 +577,13 @@ class LocalizationResourceTest {
                     setOf(
                         // "Name" is the German word for "name".
                         "profile_contact_name_hint",
+                        "chat_folder_name_label",
                     ),
                 "values-es" to
                     setOf(
                         // "chat"/"chats" are common loan words in Spanish.
                         "archived_chats_count",
+                        "chat_folder_chat_count",
                     ),
                 "values-fr" to
                     setOf(
@@ -592,11 +594,14 @@ class LocalizationResourceTest {
                         "contacts",
                         // "Contact" is spelled identically in French.
                         "attach_contact",
+                        // "Description" is spelled identically in French.
+                        "chat_folder_description_label",
                     ),
                 "values-it" to
                     setOf(
                         // "chat" is a common loan word in Italian.
                         "archived_chats_count",
+                        "chat_folder_chat_count",
                     ),
             )
     }

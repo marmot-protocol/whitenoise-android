@@ -839,6 +839,28 @@
     <string name="profile_lightning_no_network">Lightning adresi doğrulanamadı (ağ yok).</string>
     <string name="reaction_tap_to_remove">Kaldırmak için dokun</string>
     <string name="chat_list_filter_groups">Gruplar</string>
+    <string name="chat_folders_title">Klasörler</string>
+    <string name="chat_folders_settings_subtitle">Sohbetleri klasörlerde düzenleyin</string>
+    <string name="chat_folder_new">Yeni klasör</string>
+    <string name="chat_folder_edit_title">Klasörü düzenle</string>
+    <string name="chat_folder_delete_title">Klasör silinsin mi?</string>
+    <string name="chat_folder_delete_message">\"%1$s\" kaldırılacak. Sohbetleriniz listede kalır.</string>
+    <string name="chat_folder_move_up">Yukarı taşı</string>
+    <string name="chat_folder_move_down">Aşağı taşı</string>
+    <string name="chat_folder_name_label">Ad</string>
+    <string name="chat_folder_description_label">Açıklama</string>
+    <string name="chat_folder_keyword_label">Anahtar kelime</string>
+    <string name="chat_folder_keyword_hint">Adı veya açıklaması bu metni içeren sohbetleri dahil et</string>
+    <string name="chat_folder_unread_only">Yalnızca okunmamış</string>
+    <string name="chat_folder_unread_only_subtitle">Yalnızca okunmamış mesajı olan sohbetleri dahil et</string>
+    <string name="chat_folder_include_muted">Sessize alınmış sohbetleri dahil et</string>
+    <string name="chat_folder_manual_chats">Dahil edilen sohbetler</string>
+    <string name="chat_folder_people">Kişiler</string>
+    <string name="chat_folder_people_subtitle">Bu kişilerin olduğu her sohbeti dahil et</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d sohbet</item>
+        <item quantity="other">%1$d sohbet</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Ara</string>
     <string name="conversation_search_hint">Bu sohbette ara</string>

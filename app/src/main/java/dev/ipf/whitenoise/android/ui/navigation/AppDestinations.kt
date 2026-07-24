@@ -22,4 +22,5 @@ internal enum class SettingsDetail {
     SecurityPrivacy,
     Donate,
     TextToSpeech,
+    ChatFolders,
 }

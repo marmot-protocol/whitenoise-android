@@ -2351,6 +2351,10 @@ class WhiteNoiseAppState(
     val chatListItems: List<ChatListItem>
         get() = chatsController?.items.orEmpty()
 
+    /** Archived counterpart to [chatListItems], from the same recompute. */
+    val archivedChatListItems: List<ChatListItem>
+        get() = chatsController?.archivedItems.orEmpty()
+
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
     private fun isActiveConversation(

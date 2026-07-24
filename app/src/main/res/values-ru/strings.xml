@@ -871,6 +871,30 @@
     <string name="profile_lightning_no_network">Не удалось проверить Lightning-адрес (нет сети).</string>
     <string name="reaction_tap_to_remove">Нажмите, чтобы убрать</string>
     <string name="chat_list_filter_groups">Группы</string>
+    <string name="chat_folders_title">Папки</string>
+    <string name="chat_folders_settings_subtitle">Организуйте чаты по папкам</string>
+    <string name="chat_folder_new">Новая папка</string>
+    <string name="chat_folder_edit_title">Изменить папку</string>
+    <string name="chat_folder_delete_title">Удалить папку?</string>
+    <string name="chat_folder_delete_message">«%1$s» будет удалена. Чаты останутся в списке.</string>
+    <string name="chat_folder_move_up">Вверх</string>
+    <string name="chat_folder_move_down">Вниз</string>
+    <string name="chat_folder_name_label">Название</string>
+    <string name="chat_folder_description_label">Описание</string>
+    <string name="chat_folder_keyword_label">Ключевое слово</string>
+    <string name="chat_folder_keyword_hint">Включать чаты, в названии или описании которых есть этот текст</string>
+    <string name="chat_folder_unread_only">Только непрочитанные</string>
+    <string name="chat_folder_unread_only_subtitle">Включать только чаты с непрочитанными сообщениями</string>
+    <string name="chat_folder_include_muted">Включать чаты с отключёнными уведомлениями</string>
+    <string name="chat_folder_manual_chats">Включённые чаты</string>
+    <string name="chat_folder_people">Люди</string>
+    <string name="chat_folder_people_subtitle">Включать любой чат с этими людьми</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d чат</item>
+        <item quantity="few">%1$d чата</item>
+        <item quantity="many">%1$d чатов</item>
+        <item quantity="other">%1$d чатов</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Поиск</string>
     <string name="conversation_search_hint">Поиск в этом чате</string>

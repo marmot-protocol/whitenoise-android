@@ -824,6 +824,27 @@
     <string name="profile_lightning_no_network">無法驗證 Lightning 位址（無網路）。</string>
     <string name="reaction_tap_to_remove">輕觸以移除</string>
     <string name="chat_list_filter_groups">群組</string>
+    <string name="chat_folders_title">資料夾</string>
+    <string name="chat_folders_settings_subtitle">將聊天整理到資料夾中</string>
+    <string name="chat_folder_new">新增資料夾</string>
+    <string name="chat_folder_edit_title">編輯資料夾</string>
+    <string name="chat_folder_delete_title">刪除資料夾？</string>
+    <string name="chat_folder_delete_message">「%1$s」將被移除。聊天仍會保留在清單中。</string>
+    <string name="chat_folder_move_up">上移</string>
+    <string name="chat_folder_move_down">下移</string>
+    <string name="chat_folder_name_label">名稱</string>
+    <string name="chat_folder_description_label">描述</string>
+    <string name="chat_folder_keyword_label">關鍵字</string>
+    <string name="chat_folder_keyword_hint">包含名稱或描述中含有此文字的聊天</string>
+    <string name="chat_folder_unread_only">僅未讀</string>
+    <string name="chat_folder_unread_only_subtitle">僅包含有未讀訊息的聊天</string>
+    <string name="chat_folder_include_muted">包含已靜音的聊天</string>
+    <string name="chat_folder_manual_chats">已包含的聊天</string>
+    <string name="chat_folder_people">人員</string>
+    <string name="chat_folder_people_subtitle">包含與這些人的任何聊天</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="other">%1$d 個聊天</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">搜尋</string>
     <string name="conversation_search_hint">搜尋此聊天</string>

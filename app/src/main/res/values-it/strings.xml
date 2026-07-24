@@ -841,6 +841,28 @@
     <string name="profile_lightning_no_network">Impossibile verificare l\'indirizzo Lightning (nessuna rete).</string>
     <string name="reaction_tap_to_remove">Tocca per rimuovere</string>
     <string name="chat_list_filter_groups">Gruppi</string>
+    <string name="chat_folders_title">Cartelle</string>
+    <string name="chat_folders_settings_subtitle">Organizza le chat in cartelle</string>
+    <string name="chat_folder_new">Nuova cartella</string>
+    <string name="chat_folder_edit_title">Modifica cartella</string>
+    <string name="chat_folder_delete_title">Eliminare la cartella?</string>
+    <string name="chat_folder_delete_message">\"%1$s\" verrà rimossa. Le tue chat restano nell\'elenco.</string>
+    <string name="chat_folder_move_up">Sposta su</string>
+    <string name="chat_folder_move_down">Sposta giù</string>
+    <string name="chat_folder_name_label">Nome</string>
+    <string name="chat_folder_description_label">Descrizione</string>
+    <string name="chat_folder_keyword_label">Parola chiave</string>
+    <string name="chat_folder_keyword_hint">Includi le chat il cui nome o la cui descrizione contiene questo testo</string>
+    <string name="chat_folder_unread_only">Solo non lette</string>
+    <string name="chat_folder_unread_only_subtitle">Includi solo le chat con messaggi non letti</string>
+    <string name="chat_folder_include_muted">Includi le chat silenziate</string>
+    <string name="chat_folder_manual_chats">Chat incluse</string>
+    <string name="chat_folder_people">Persone</string>
+    <string name="chat_folder_people_subtitle">Includi qualsiasi chat con queste persone</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d chat</item>
+        <item quantity="other">%1$d chat</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Cerca</string>
     <string name="conversation_search_hint">Cerca in questa chat</string>

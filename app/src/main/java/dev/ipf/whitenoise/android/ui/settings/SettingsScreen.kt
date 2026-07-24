@@ -86,6 +86,7 @@ internal enum class SettingsHomeRow {
     Relays,
     KeyPackages,
     Appearance,
+    ChatFolders,
     DataAndStorage,
     Notifications,
     TextToSpeech,
@@ -123,6 +124,7 @@ internal fun settingsHomeState(
         preferenceRows =
             listOf(
                 SettingsHomeRow.Appearance,
+                SettingsHomeRow.ChatFolders,
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
@@ -181,6 +183,7 @@ internal fun SettingsScreen(
             )
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         null ->
             SettingsHomeScreen(
                 appState = appState,
@@ -425,6 +428,7 @@ private fun SettingsHomeRows(
                 SettingsHomeRow.Relays -> SettingsDetail.Relays
                 SettingsHomeRow.KeyPackages -> SettingsDetail.KeyPackages
                 SettingsHomeRow.Appearance -> SettingsDetail.Appearance
+                SettingsHomeRow.ChatFolders -> SettingsDetail.ChatFolders
                 SettingsHomeRow.DataAndStorage -> SettingsDetail.Data
                 SettingsHomeRow.Notifications -> SettingsDetail.Notifications
                 SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
@@ -437,6 +441,7 @@ private fun SettingsHomeRows(
                 SettingsHomeRow.Relays -> stringResource(R.string.relays)
                 SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages)
                 SettingsHomeRow.Appearance -> stringResource(R.string.appearance)
+                SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_title)
                 SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
                 SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
                 SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
@@ -449,6 +454,7 @@ private fun SettingsHomeRows(
                 SettingsHomeRow.Relays -> stringResource(R.string.relays_settings_subtitle)
                 SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages_settings_subtitle)
                 SettingsHomeRow.Appearance -> stringResource(R.string.appearance_settings_subtitle)
+                SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_settings_subtitle)
                 SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
                 SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
                 SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)

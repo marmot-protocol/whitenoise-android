@@ -839,6 +839,28 @@
     <string name="profile_lightning_no_network">Lightning-Adresse konnte nicht überprüft werden (kein Netzwerk).</string>
     <string name="reaction_tap_to_remove">Zum Entfernen tippen</string>
     <string name="chat_list_filter_groups">Gruppen</string>
+    <string name="chat_folders_title">Ordner</string>
+    <string name="chat_folders_settings_subtitle">Chats in Ordnern organisieren</string>
+    <string name="chat_folder_new">Neuer Ordner</string>
+    <string name="chat_folder_edit_title">Ordner bearbeiten</string>
+    <string name="chat_folder_delete_title">Ordner löschen?</string>
+    <string name="chat_folder_delete_message">\"%1$s\" wird entfernt. Deine Chats bleiben in der Liste.</string>
+    <string name="chat_folder_move_up">Nach oben</string>
+    <string name="chat_folder_move_down">Nach unten</string>
+    <string name="chat_folder_name_label">Name</string>
+    <string name="chat_folder_description_label">Beschreibung</string>
+    <string name="chat_folder_keyword_label">Stichwort</string>
+    <string name="chat_folder_keyword_hint">Chats aufnehmen, deren Name oder Beschreibung diesen Text enthält</string>
+    <string name="chat_folder_unread_only">Nur ungelesen</string>
+    <string name="chat_folder_unread_only_subtitle">Nur Chats mit ungelesenen Nachrichten aufnehmen</string>
+    <string name="chat_folder_include_muted">Stummgeschaltete Chats einbeziehen</string>
+    <string name="chat_folder_manual_chats">Enthaltene Chats</string>
+    <string name="chat_folder_people">Personen</string>
+    <string name="chat_folder_people_subtitle">Jeden Chat mit diesen Personen aufnehmen</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d Chat</item>
+        <item quantity="other">%1$d Chats</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Suchen</string>
     <string name="conversation_search_hint">In diesem Chat suchen</string>

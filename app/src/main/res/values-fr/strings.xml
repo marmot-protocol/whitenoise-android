@@ -841,6 +841,28 @@
     <string name="profile_lightning_no_network">Impossible de vérifier l\'adresse Lightning (pas de réseau).</string>
     <string name="reaction_tap_to_remove">Toucher pour retirer</string>
     <string name="chat_list_filter_groups">Groupes</string>
+    <string name="chat_folders_title">Dossiers</string>
+    <string name="chat_folders_settings_subtitle">Organiser les discussions en dossiers</string>
+    <string name="chat_folder_new">Nouveau dossier</string>
+    <string name="chat_folder_edit_title">Modifier le dossier</string>
+    <string name="chat_folder_delete_title">Supprimer le dossier ?</string>
+    <string name="chat_folder_delete_message">« %1$s » sera supprimé. Vos discussions restent dans la liste.</string>
+    <string name="chat_folder_move_up">Monter</string>
+    <string name="chat_folder_move_down">Descendre</string>
+    <string name="chat_folder_name_label">Nom</string>
+    <string name="chat_folder_description_label">Description</string>
+    <string name="chat_folder_keyword_label">Mot-clé</string>
+    <string name="chat_folder_keyword_hint">Inclure les discussions dont le nom ou la description contient ce texte</string>
+    <string name="chat_folder_unread_only">Non lues uniquement</string>
+    <string name="chat_folder_unread_only_subtitle">Inclure uniquement les discussions avec des messages non lus</string>
+    <string name="chat_folder_include_muted">Inclure les discussions en sourdine</string>
+    <string name="chat_folder_manual_chats">Discussions incluses</string>
+    <string name="chat_folder_people">Personnes</string>
+    <string name="chat_folder_people_subtitle">Inclure toute discussion avec ces personnes</string>
+    <plurals name="chat_folder_chat_count">
+        <item quantity="one">%1$d discussion</item>
+        <item quantity="other">%1$d discussions</item>
+    </plurals>
     <!-- Conversation in-chat search (#292) -->
     <string name="conversation_search_open">Rechercher</string>
     <string name="conversation_search_hint">Rechercher dans cette discussion</string>
