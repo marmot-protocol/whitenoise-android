@@ -77,6 +77,16 @@ internal data class StartChatErrorUiState(
     val retryGroupIdHex: String? = null,
 )
 
+internal sealed interface StartChatAttemptResult {
+    data class Open(
+        val item: ChatListItem,
+    ) : StartChatAttemptResult
+
+    data class Failed(
+        val error: StartChatErrorUiState,
+    ) : StartChatAttemptResult
+}
+
 internal fun startChatErrorUiState(
     npub: String,
     progressHex: String,
@@ -105,6 +115,51 @@ internal fun startChatErrorUiState(
             },
     )
 }
+
+/**
+ * Shared direct-chat create/retry state machine used by every profile entry
+ * point. Keeping creation and chat-list materialization together is important:
+ * a successful MLS create must retry by group id rather than creating a second
+ * direct chat when the projection is merely delayed.
+ */
+internal suspend fun attemptStartProfileChat(
+    npub: String,
+    progressHex: String,
+    recipientName: String?,
+    retryGroupIdHex: String? = null,
+    createGroup: suspend (String) -> String,
+    awaitChatListItem: suspend (String) -> ChatListItem?,
+    displayName: (String) -> String,
+): StartChatAttemptResult =
+    try {
+        val groupIdHex = retryGroupIdHex ?: createGroup(npub)
+        val item = awaitChatListItem(groupIdHex)
+        if (item != null) {
+            StartChatAttemptResult.Open(item)
+        } else {
+            StartChatAttemptResult.Failed(
+                StartChatErrorUiState(
+                    npub = npub,
+                    progressHex = progressHex,
+                    detail = AppText.Resource(R.string.error_chat_created_not_loaded),
+                    copyable = false,
+                    title = AppText.Resource(R.string.couldnt_load_chats),
+                    retryGroupIdHex = groupIdHex,
+                ),
+            )
+        }
+    } catch (error: Throwable) {
+        rethrowIfCancellation(error)
+        StartChatAttemptResult.Failed(
+            startChatErrorUiState(
+                npub = npub,
+                progressHex = progressHex,
+                error = error,
+                recipientName = recipientName,
+                displayName = displayName,
+            ),
+        )
+    }
 
 internal fun inviteShareIntent(message: String): Intent =
     Intent(Intent.ACTION_SEND)
@@ -236,33 +291,20 @@ private fun NewMessageScreen(
         creatingHex = hexForProgress
         appState.launchMutation {
             try {
-                runCatching {
-                    retryGroupIdHex ?: appState.createProfileChatGroup(npub)
-                }.onSuccess { groupIdHex ->
-                    val item = appState.awaitChatListItem(groupIdHex)
-                    if (item != null) {
-                        onOpenConversation(item, true)
-                    } else {
-                        startChatError =
-                            StartChatErrorUiState(
-                                npub = npub,
-                                progressHex = hexForProgress,
-                                detail = AppText.Resource(R.string.error_chat_created_not_loaded),
-                                copyable = false,
-                                title = AppText.Resource(R.string.couldnt_load_chats),
-                                retryGroupIdHex = groupIdHex,
-                            )
-                    }
-                }.onFailure { error ->
-                    rethrowIfCancellation(error)
-                    startChatError =
-                        startChatErrorUiState(
+                when (
+                    val result =
+                        attemptStartProfileChat(
                             npub = npub,
                             progressHex = hexForProgress,
-                            error = error,
                             recipientName = recipientName,
+                            retryGroupIdHex = retryGroupIdHex,
+                            createGroup = appState::createProfileChatGroup,
+                            awaitChatListItem = appState::awaitChatListItem,
                             displayName = appState::displayName,
                         )
+                ) {
+                    is StartChatAttemptResult.Open -> onOpenConversation(result.item, true)
+                    is StartChatAttemptResult.Failed -> startChatError = result.error
                 }
             } finally {
                 creatingHex = null
