@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
@@ -131,6 +132,10 @@ internal fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    // Folder-assignment sheet targets for the current selection, and the
+    // create form pre-populated with them when New folder is picked there.
+    var folderPickerChatIds by remember { mutableStateOf<List<String>?>(null) }
+    var folderEditorChatIds by remember { mutableStateOf<Set<String>?>(null) }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
@@ -522,6 +527,22 @@ internal fun ChatsScreen(
         return
     }
 
+    // New-folder handoff from the assignment sheet: the create form takes the
+    // screen over (same swap the new-chat flow uses) with the selection
+    // preloaded as manual members.
+    val folderEditorTargets = folderEditorChatIds
+    val folderEditorAccountRef = appState.activeAccountRef
+    if (folderEditorTargets != null && folderEditorAccountRef != null) {
+        ChatFolderEditScreen(
+            appState = appState,
+            accountRef = folderEditorAccountRef,
+            folderId = null,
+            onClose = { folderEditorChatIds = null },
+            initialManualChatIds = folderEditorTargets,
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             Column {
@@ -563,6 +584,12 @@ internal fun ChatsScreen(
                         },
                         onDelete = {
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                        },
+                        onAddToFolder = {
+                            folderPickerChatIds =
+                                selectedVisibleItems
+                                    .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
+                                    .takeIf { it.isNotEmpty() }
                         },
                         onMarkRead = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
@@ -812,6 +839,19 @@ internal fun ChatsScreen(
                 }
             }
         }
+    }
+
+    folderPickerChatIds?.let { targets ->
+        ChatFolderPickerSheet(
+            appState = appState,
+            targetChatIds = targets,
+            onCreateFolder = {
+                folderPickerChatIds = null
+                folderEditorChatIds = targets.toSet()
+                clearSelection()
+            },
+            onDismiss = { folderPickerChatIds = null },
+        )
     }
 
     pendingBulkDelete?.let { items ->

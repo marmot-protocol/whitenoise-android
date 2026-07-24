@@ -889,6 +889,7 @@
     <string name="chat_folder_manual_chats">Включённые чаты</string>
     <string name="chat_folder_people">Люди</string>
     <string name="chat_folder_people_subtitle">Включать любой чат с этими людьми</string>
+    <string name="chat_list_action_add_to_folder">Добавить в папку</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d чат</item>
         <item quantity="few">%1$d чата</item>

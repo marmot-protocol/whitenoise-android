@@ -859,6 +859,7 @@
     <string name="chat_folder_manual_chats">Discussions incluses</string>
     <string name="chat_folder_people">Personnes</string>
     <string name="chat_folder_people_subtitle">Inclure toute discussion avec ces personnes</string>
+    <string name="chat_list_action_add_to_folder">Ajouter à un dossier</string>
     <plurals name="chat_folder_chat_count">
         <item quantity="one">%1$d discussion</item>
         <item quantity="other">%1$d discussions</item>

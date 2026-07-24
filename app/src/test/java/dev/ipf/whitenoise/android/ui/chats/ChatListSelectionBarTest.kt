@@ -49,6 +49,7 @@ class ChatListSelectionBarTest {
                     onClose = { closes++ },
                     onArchive = { archives++ },
                     onDelete = { deletes++ },
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = { selectAll++ },
@@ -91,6 +92,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = { selectAll++ },
@@ -125,6 +127,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = { selectAll++ },
@@ -157,6 +160,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = {},
@@ -186,6 +190,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = { markRead++ },
                     onMuteToggle = { muteToggle++ },
                     onSelectAll = {},
@@ -221,6 +226,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = {},
@@ -234,6 +240,69 @@ class ChatListSelectionBarTest {
         composeRule.onNodeWithText(string(R.string.chat_row_action_mute)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
+    }
+
+    @Test
+    fun overflowRoutesAddToFolderForMultiSelection() {
+        var addToFolder = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 2,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMuteToggle = false,
+                    muted = false,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onAddToFolder = { addToFolder++ },
+                    onMarkRead = {},
+                    onMuteToggle = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_list_action_add_to_folder)).performClick()
+
+        assertEquals(1, addToFolder)
+    }
+
+    @Test
+    fun overflowShowsAddToFolderForSingleSelection() {
+        var addToFolder = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 1,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = true,
+                    showMuteToggle = true,
+                    muted = false,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onAddToFolder = { addToFolder++ },
+                    onMarkRead = {},
+                    onMuteToggle = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_list_action_add_to_folder)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_list_action_add_to_folder)).performClick()
+
+        assertEquals(1, addToFolder)
     }
 
     @Test
@@ -251,6 +320,7 @@ class ChatListSelectionBarTest {
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
+                    onAddToFolder = {},
                     onMarkRead = {},
                     onMuteToggle = {},
                     onSelectAll = {},
