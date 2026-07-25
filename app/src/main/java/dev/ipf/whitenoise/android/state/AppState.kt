@@ -4359,6 +4359,10 @@ class WhiteNoiseAppState(
         if (foreground) {
             maybeShowAppLockForForeground()
             dismissVisibleConversationNotifications()
+            // The timed-mute scheduler's delay is frozen during device deep sleep,
+            // so mutes that elapsed while asleep must be resolved on resume or the
+            // chat-list badge and folder rules stay muted until a getter runs.
+            chatMutePreferences.resolveExpiredNow()
         } else {
             recordAppLockBackgrounded()
             // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):

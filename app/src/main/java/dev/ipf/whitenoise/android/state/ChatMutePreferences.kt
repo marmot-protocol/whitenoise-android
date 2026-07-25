@@ -89,7 +89,7 @@ class ChatMutePreferences(
         groupIdHex: String,
     ): ChatNotifyMode {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
-        resolveExpiredLocked()
+        synchronized(mutationLock) { resolveExpiredLockedInternal() }
         return _state.value.notificationModes[key] ?: ChatNotifyMode.ALL
     }
 
@@ -104,8 +104,10 @@ class ChatMutePreferences(
         groupIdHex: String,
     ): Long? {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return null
-        resolveExpiredLocked()
-        return synchronized(mutationLock) { muteExpiries[key]?.expiryMillis }
+        return synchronized(mutationLock) {
+            resolveExpiredLockedInternal()
+            muteExpiries[key]?.expiryMillis
+        }
     }
 
     fun setMode(
@@ -173,16 +175,30 @@ class ChatMutePreferences(
         }
     }
 
-    private fun resolveExpiredLocked() {
-        synchronized(mutationLock) { resolveExpiredLockedInternal() }
+    /**
+     * Resolve any mutes that have elapsed by wall-clock time and re-arm the next
+     * timer. The scheduler coroutine's [delay] runs on a clock that excludes
+     * device deep sleep (Handler uptime), so a mute can elapse in real time while
+     * that timer is still counting down; call this from a foreground/lifecycle
+     * signal so the visible chat-list and folder state catch up immediately
+     * instead of waiting for the delayed timer or the next notification getter.
+     */
+    fun resolveExpiredNow() {
+        synchronized(mutationLock) {
+            // publishLocked re-arms the timer whenever it publishes; when nothing
+            // elapsed (an early wake, or the wall clock moved backward) re-arm
+            // here so the pending timer is never dropped.
+            if (!resolveExpiredLockedInternal()) scheduleNextExpiryLocked()
+        }
     }
 
     // Caller must hold [mutationLock]. Restores any elapsed timed mutes and
-    // republishes if anything changed.
-    private fun resolveExpiredLockedInternal() {
+    // republishes if anything changed. Returns whether it published.
+    private fun resolveExpiredLockedInternal(): Boolean {
         val (modes, expiries, changed) =
             resolveExpiredMutes(_state.value.notificationModes, muteExpiries, now())
         if (changed) publishLocked(modes, expiries)
+        return changed
     }
 
     // Caller must hold [mutationLock].
@@ -204,7 +220,10 @@ class ChatMutePreferences(
     }
 
     // Caller must hold [mutationLock]. Sleeps until the nearest timed mute
-    // elapses, then resolves + republishes (which reschedules for the next one).
+    // elapses, then resolves + re-arms. The wake goes through resolveExpiredNow()
+    // so that if the wall clock has not actually reached the expiry (the delay
+    // fired early, or the clock moved backward) the timer re-arms instead of
+    // exiting and dropping the pending mute.
     private fun scheduleNextExpiryLocked() {
         expiryJob?.cancel()
         expiryJob = null
@@ -214,7 +233,7 @@ class ChatMutePreferences(
         expiryJob =
             scope.launch {
                 delay(delayMillis)
-                resolveExpiredLocked()
+                resolveExpiredNow()
             }
     }
 

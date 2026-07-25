@@ -345,6 +345,57 @@ class ChatMutePreferencesTest {
             )
         }
 
+    @Test
+    fun foregroundActivationResolvesAMuteThatElapsedWhileTheSchedulerWasFrozen() =
+        runTest {
+            // `now` is the wall clock; the scheduler's delay runs on virtual time.
+            // Advancing one without the other models device deep sleep: the mute
+            // elapses in real time while Handler-uptime delay stays frozen.
+            var clock = 0L
+            val prefs = ChatMutePreferences(context, now = { clock }, scope = backgroundScope)
+            prefs.muteFor("a", "g", durationMillis = 1_000L)
+            assertTrue("a|g" in prefs.state.value.mutedConversations)
+
+            clock = 2_000L
+            runCurrent()
+            assertTrue(
+                "a frozen scheduler leaves the mute visibly active",
+                "a|g" in prefs.state.value.mutedConversations,
+            )
+
+            prefs.resolveExpiredNow()
+            assertFalse(
+                "resolveExpiredNow must restore state from the wall clock on resume",
+                "a|g" in prefs.state.value.mutedConversations,
+            )
+        }
+
+    @Test
+    fun aTimerWakingBeforeExpiryReArmsInsteadOfDroppingTheMute() =
+        runTest {
+            var clock = 0L
+            val prefs = ChatMutePreferences(context, now = { clock }, scope = backgroundScope)
+            prefs.muteFor("a", "g", durationMillis = 1_000L)
+
+            // The delay fires, but the wall clock moved backward so the expiry is
+            // not actually reached — the timer must re-arm, not exit.
+            clock = -5_000L
+            advanceTimeBy(1_001L)
+            runCurrent()
+            assertTrue(
+                "an early wake must not drop the still-pending mute",
+                "a|g" in prefs.state.value.mutedConversations,
+            )
+
+            clock = 1_500L
+            advanceTimeBy(7_000L)
+            runCurrent()
+            assertFalse(
+                "the re-armed timer must restore the state once the expiry passes",
+                "a|g" in prefs.state.value.mutedConversations,
+            )
+        }
+
     private fun chatMutePreferencesSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/ChatMutePreferences.kt"),
