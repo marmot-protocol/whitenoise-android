@@ -1455,48 +1455,41 @@ internal fun orphanedOptimisticSendPreserveIds(
         "msg:$id" !in optimisticKeys && id in projectedMessageIds
     }
 
-/** An adjacent pair whose rendered (oldest→newest) order contradicts true send order. */
-data class TimelineInversion(
-    val upperId: String,
-    val lowerId: String,
-    val upperRenderedAt: ULong,
-    val lowerRenderedAt: ULong,
-    val upperTrueAt: ULong,
-    val lowerTrueAt: ULong,
+/** An adjacent pair whose rendered order reverses the engine timeline or arrival order. */
+internal data class TimelineAdjacentInversion(
+    val above: TimelineMessage,
+    val below: TimelineMessage,
+    val sourceTimelineInverted: Boolean,
+    val arrivalInverted: Boolean,
 )
 
 /**
- * Detect adjacent rows in a rendered timeline whose true send order is inverted:
- * an upper row (rendered above, so treated as older) that is actually newer than
- * the lower row beneath it. [rows] is already sorted by [compareTimelineMessages];
- * because that is a total order, an inversion means the comparator read an
- * overridden position for one of the rows rather than its true send time (#1578).
- * [trueRecordedAt] returns a row's un-overridden send time.
+ * Finds rendered neighbours whose display order reverses either the engine's
+ * authenticated timeline time or this device's observation (receive) order — the
+ * #1578 symptom of a newer message above an older one. The sort is a total order,
+ * so an inversion means the comparator read an overridden position rather than a
+ * row's true send time. Optimistic rows are skipped: they have no authoritative
+ * projection yet, so their position is legitimately provisional. Splitting source
+ * vs. arrival inversion tells a stale local override (source-inverted, usually
+ * carrying an override) apart from faithful engine timestamp skew on receive
+ * (arrival-inverted only) — the issue's source #1 vs #3.
  */
-internal fun detectTimelineInversions(
-    rows: List<TimelineMessage>,
-    trueRecordedAt: (TimelineMessage) -> ULong,
-): List<TimelineInversion> {
-    val inversions = mutableListOf<TimelineInversion>()
-    for (index in 0 until rows.size - 1) {
-        val upper = rows[index]
-        val lower = rows[index + 1]
-        val upperTrue = trueRecordedAt(upper)
-        val lowerTrue = trueRecordedAt(lower)
-        if (upperTrue > lowerTrue) {
-            inversions +=
-                TimelineInversion(
-                    upperId = upper.record.messageIdHex,
-                    lowerId = lower.record.messageIdHex,
-                    upperRenderedAt = upper.record.recordedAt,
-                    lowerRenderedAt = lower.record.recordedAt,
-                    upperTrueAt = upperTrue,
-                    lowerTrueAt = lowerTrue,
-                )
+internal fun adjacentTimelineInversions(ordered: List<TimelineMessage>): List<TimelineAdjacentInversion> =
+    ordered
+        .windowed(size = 2)
+        .mapNotNull { (above, below) ->
+            val aboveSource = above.projected ?: return@mapNotNull null
+            val belowSource = below.projected ?: return@mapNotNull null
+            val sourceTimelineInverted = aboveSource.timelineAt > belowSource.timelineAt
+            val arrivalInverted = aboveSource.receivedAt > belowSource.receivedAt
+            if (!sourceTimelineInverted && !arrivalInverted) return@mapNotNull null
+            TimelineAdjacentInversion(
+                above = above,
+                below = below,
+                sourceTimelineInverted = sourceTimelineInverted,
+                arrivalInverted = arrivalInverted,
+            )
         }
-    }
-    return inversions
-}
 
 private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
 
@@ -7426,22 +7419,38 @@ class ConversationController(
     // comparator the stale position. DEBUG-only; no effect on release builds.
     private fun logTimelineInversionsForDebug(rows: List<TimelineMessage>) {
         if (!BuildConfig.DEBUG) return
-        val inversions =
-            detectTimelineInversions(rows) { row ->
-                timelineRecords[row.record.messageIdHex]?.timelineAt ?: row.record.recordedAt
+        val inversionsByPair =
+            adjacentTimelineInversions(rows).associateBy { inversion ->
+                checkNotNull(inversion.above.projected).messageIdHex to
+                    checkNotNull(inversion.below.projected).messageIdHex
             }
-        inversions.forEach { inversion ->
-            Log.w(
-                "TimelineOrder",
-                "inversion(#1578) upper=${inversion.upperId} lower=${inversion.lowerId} " +
-                    "renderedAt=${inversion.upperRenderedAt}/${inversion.lowerRenderedAt} " +
-                    "trueAt=${inversion.upperTrueAt}/${inversion.lowerTrueAt} " +
-                    "upperOverride=${inversion.upperId in localTimelineTimestampOverrides} " +
-                    "upperDurable=${inversion.upperId in durableStreamPositionOverrideIds} " +
-                    "upperOptimisticPreserve=${inversion.upperId in optimisticSendPreserveIds}",
-            )
+        // De-dup so a persistent inversion logs once, not every publish.
+        (inversionsByPair.keys - loggedTimelineOrderingInversionPairs).forEach { pair ->
+            Log.w("TimelineOrder", describeTimelineInversion(inversionsByPair.getValue(pair)))
         }
+        loggedTimelineOrderingInversionPairs = inversionsByPair.keys
     }
+
+    private fun describeTimelineInversion(inversion: TimelineAdjacentInversion): String {
+        val aboveSource = checkNotNull(inversion.above.projected)
+        val belowSource = checkNotNull(inversion.below.projected)
+        return "inversion(#1578) group=${group.groupIdHex.take(8)} " +
+            "source=${inversion.sourceTimelineInverted} arrival=${inversion.arrivalInverted} " +
+            "above[${describeTimelineInversionRow(inversion.above, aboveSource)}] " +
+            "below[${describeTimelineInversionRow(inversion.below, belowSource)}]"
+    }
+
+    private fun describeTimelineInversionRow(
+        row: TimelineMessage,
+        source: TimelineMessageRecordFfi,
+    ): String =
+        "id=${source.messageIdHex} direction=${row.record.direction} " +
+            "displayAt=${row.record.recordedAt} sourceAt=${source.timelineAt} " +
+            "receivedAt=${source.receivedAt} order=${row.timelineOrder} " +
+            "timestampOverride=${source.messageIdHex in localTimelineTimestampOverrides} " +
+            "orderOverride=${source.messageIdHex in localTimelineOrderOverrides} " +
+            "durable=${source.messageIdHex in durableStreamPositionOverrideIds} " +
+            "optimisticPreserve=${source.messageIdHex in optimisticSendPreserveIds}"
 
     private fun preserveStreamFinalDisplayPosition(
         projectedId: String,
@@ -7597,6 +7606,9 @@ class ConversationController(
     // edits index.
     private var publishSuppressionDepth = 0
     private var publishPending = false
+
+    // #1578 detector de-dup: adjacent inversion pairs already logged this session.
+    private var loggedTimelineOrderingInversionPairs = emptySet<Pair<String, String>>()
 
     private inline fun coalesceTimelinePublishes(block: () -> Unit) {
         assertMainThread { "coalesceTimelinePublishes" }

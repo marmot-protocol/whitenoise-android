@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,71 +49,117 @@ class TimelineOrderingInversionTest {
     }
 
     @Test
-    fun aTimelineInTrueOrderReportsNoInversions() {
-        val rows = listOf(row("a", renderedAt = 1uL), row("b", renderedAt = 2uL), row("c", renderedAt = 3uL))
+    fun adjacentInversionsCaptureAnOverrideThatReversesEngineOrder() {
+        // "older" carries a display override (200) that renders it below the newer
+        // row, but its engine timeline time (100) is older — the #1578 symptom.
+        val older = projectedMsg("older", displayedAt = 200uL, timelineAt = 100uL, receivedAt = 100uL, order = 9uL)
+        val newer = projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 150uL, order = 0uL)
 
-        val inversions = detectTimelineInversions(rows) { trueAt.getValue(it.record.messageIdHex) }
+        val inversion =
+            adjacentTimelineInversions(
+                listOf(older, newer).sortedWith(::compareTimelineMessages),
+            ).single()
 
-        assertTrue(inversions.isEmpty())
+        assertEquals("newer", inversion.above.record.messageIdHex)
+        assertEquals("older", inversion.below.record.messageIdHex)
+        assertTrue(inversion.sourceTimelineInverted)
+        assertTrue(inversion.arrivalInverted)
     }
 
     @Test
-    fun aStaleOverridePinningANewerRowAboveAnOlderOneIsDetected() {
-        // "b" carries an override that renders it at 1 (above "a" at 2), but its
-        // true send time is 3 — newer than "a". That is the reported #1578 symptom.
-        val rows = listOf(row("b", renderedAt = 1uL), row("a", renderedAt = 2uL))
+    fun adjacentInversionsCaptureSenderTimeSkewAgainstArrivalOrder() {
+        // A delayed relay delivery: the older-by-send-time row arrived last, so it
+        // is arrival-inverted but NOT source-inverted (faithful engine skew, #3).
+        val delayedOlder =
+            projectedMsg("older", displayedAt = 100uL, timelineAt = 100uL, receivedAt = 200uL, order = 0uL)
+        val arrivedFirst =
+            projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 100uL, order = 0uL)
 
-        val inversions = detectTimelineInversions(rows) { trueAt.getValue(it.record.messageIdHex) }
+        val inversion =
+            adjacentTimelineInversions(
+                listOf(delayedOlder, arrivedFirst).sortedWith(::compareTimelineMessages),
+            ).single()
 
-        assertEquals(1, inversions.size)
-        val inversion = inversions.single()
-        assertEquals("b", inversion.upperId)
-        assertEquals("a", inversion.lowerId)
-        assertEquals(3uL, inversion.upperTrueAt)
-        assertEquals(2uL, inversion.lowerTrueAt)
+        assertFalse(inversion.sourceTimelineInverted)
+        assertTrue(inversion.arrivalInverted)
     }
 
     @Test
-    fun releasingTheStaleOverrideRestoresTrueChronologicalOrder() {
-        // With the stale override, "b" (rendered 1) sorts above older "a" (rendered 2).
-        val pinned =
-            listOf(row("b", renderedAt = 1uL), row("a", renderedAt = 2uL))
-                .sortedWith(::compareTimelineMessages)
-        assertEquals(listOf("b", "a"), pinned.map { it.record.messageIdHex })
-        assertEquals(1, detectTimelineInversions(pinned) { trueAt.getValue(it.record.messageIdHex) }.size)
+    fun adjacentInversionsIgnoreChronologicalAndOptimisticPairs() {
+        val older = projectedMsg("older", displayedAt = 100uL, timelineAt = 100uL, receivedAt = 100uL, order = 0uL)
+        val newer = projectedMsg("newer", displayedAt = 150uL, timelineAt = 150uL, receivedAt = 150uL, order = 0uL)
+        // An optimistic row has no projection yet, so it is never flagged.
+        val optimistic = optimisticMsg("optimistic", recordedAt = 200uL, order = 1uL)
 
-        // Orphan release re-seats "b" to its true send time (3); the order corrects
-        // and no inversion remains.
-        val released =
-            listOf(row("b", renderedAt = 3uL), row("a", renderedAt = 2uL))
-                .sortedWith(::compareTimelineMessages)
-        assertEquals(listOf("a", "b"), released.map { it.record.messageIdHex })
-        assertTrue(detectTimelineInversions(released) { trueAt.getValue(it.record.messageIdHex) }.isEmpty())
+        assertTrue(adjacentTimelineInversions(listOf(older, newer, optimistic)).isEmpty())
     }
 
-    private val trueAt = mapOf("a" to 2uL, "b" to 3uL, "c" to 3uL)
-
-    private fun row(
+    private fun projectedMsg(
         id: String,
-        renderedAt: ULong,
-        order: ULong = 0uL,
+        displayedAt: ULong,
+        timelineAt: ULong,
+        receivedAt: ULong,
+        order: ULong,
+    ): TimelineMessage {
+        val projected =
+            TimelineMessageRecordFfi(
+                messageIdHex = id,
+                sourceMessageIdHex = id,
+                direction = "received",
+                groupIdHex = "g",
+                sender = "s",
+                plaintext = "",
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                kind = 9uL,
+                tags = emptyList(),
+                timelineAt = timelineAt,
+                receivedAt = receivedAt,
+                replyToMessageIdHex = null,
+                replyPreview = null,
+                mediaJson = null,
+                media = emptyList(),
+                agentTextStreamJson = null,
+                groupSystem = null,
+                reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+                deleted = false,
+                deletedByMessageIdHex = null,
+                invalidationStatus = null,
+            )
+        return TimelineMessage(
+            id = "msg:$id",
+            record = record(id, recordedAt = displayedAt),
+            status = MessageStatus.Sent,
+            projected = projected,
+            timelineOrder = order,
+        )
+    }
+
+    private fun optimisticMsg(
+        id: String,
+        recordedAt: ULong,
+        order: ULong,
     ): TimelineMessage =
         TimelineMessage(
             id = "msg:$id",
-            record =
-                AppMessageRecordFfi(
-                    messageIdHex = id,
-                    direction = "sent",
-                    groupIdHex = "group",
-                    sender = "alice",
-                    plaintext = "hi",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
-                    kind = 9uL,
-                    tags = emptyList(),
-                    recordedAt = renderedAt,
-                    receivedAt = renderedAt,
-                ),
-            status = MessageStatus.Sent,
+            record = record(id, recordedAt = recordedAt),
+            status = MessageStatus.Pending,
             timelineOrder = order,
+        )
+
+    private fun record(
+        id: String,
+        recordedAt: ULong,
+    ): AppMessageRecordFfi =
+        AppMessageRecordFfi(
+            messageIdHex = id,
+            direction = "received",
+            groupIdHex = "g",
+            sender = "s",
+            plaintext = "",
+            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            kind = 9uL,
+            tags = emptyList(),
+            recordedAt = recordedAt,
+            receivedAt = recordedAt,
         )
 }
