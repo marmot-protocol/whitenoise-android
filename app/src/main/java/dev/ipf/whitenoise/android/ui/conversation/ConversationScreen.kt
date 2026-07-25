@@ -281,6 +281,7 @@ internal fun ConversationScreen(
     // Reuses the shell's existing open-group lambda so this path matches the
     // shell-level sheet's onOpenGroup exactly.
     onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
+    onStartProfileGroup: (RecipientSearch.Candidate) -> Unit = {},
     // Scroll position captured when the user last left this chat while reading
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
@@ -2478,6 +2479,7 @@ internal fun ConversationScreen(
             onOpenGroup = { item, justCreatedChat ->
                 onOpenProfileGroup(item, justCreatedChat)
             },
+            onStartGroup = onStartProfileGroup,
             onDismiss = { appState.clearPresentedProfile() },
             adminController = controller,
             securePolicy =

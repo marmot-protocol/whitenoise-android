@@ -81,7 +81,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.chats.newchat.QuickActionButton
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
@@ -156,6 +155,7 @@ internal fun ProfileSheet(
     // opens with the composer focused + keyboard up. Opening an existing DM or
     // a shared group passes false.
     onOpenGroup: (ChatListItem, Boolean) -> Unit,
+    onStartGroup: (RecipientSearch.Candidate) -> Unit,
     onDismiss: () -> Unit,
     // Non-null only when the sheet is opened from inside a group conversation
     // by tapping a member's bubble avatar (issue #635). Supplies the live
@@ -230,7 +230,6 @@ internal fun ProfileSheet(
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
-    var showStartGroup by remember(npub) { mutableStateOf(false) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
@@ -245,23 +244,6 @@ internal fun ProfileSheet(
         remember(hex, appState.chatListItems) {
             hex?.let { appState.profileAddableGroups(it) }.orEmpty()
         }
-
-    if (showStartGroup && hex != null) {
-        NewGroupFlow(
-            appState = appState,
-            initialMembers =
-                listOf(
-                    RecipientSearch.Candidate(
-                        accountIdHex = hex!!,
-                        displayName = displayTitle,
-                        npub = npub,
-                    ),
-                ),
-            onOpenConversation = { chat, justCreated -> onOpenGroup(chat, justCreated) },
-            onClose = { showStartGroup = false },
-        )
-        return
-    }
 
     if (showAddToGroups && hex != null) {
         ProfileAddToGroupsSheet(
@@ -484,7 +466,17 @@ internal fun ProfileSheet(
                         icon = Icons.Default.Group,
                         title = stringResource(R.string.profile_start_new_group_with, displayTitle),
                         enabled = !creatingChat,
-                        onClick = { showStartGroup = true },
+                        onClick = {
+                            hex?.let { accountIdHex ->
+                                onStartGroup(
+                                    RecipientSearch.Candidate(
+                                        accountIdHex = accountIdHex,
+                                        displayName = displayTitle,
+                                        npub = npub,
+                                    ),
+                                )
+                            }
+                        },
                     )
                     if (addableGroups.isNotEmpty()) {
                         SettingsActionRow(
