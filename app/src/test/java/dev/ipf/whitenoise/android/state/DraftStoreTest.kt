@@ -512,6 +512,27 @@ class DraftStoreTest {
         assertNull(s.draftedAtSecondsFor("a", "g2"))
         assertEquals(1, signals)
     }
+
+    @Test
+    fun draftedAtSurvivesAProcessRestartThroughPersistence() {
+        val persistence = InMemoryDraftPersistence()
+        DraftStore(persistence) { 500L }.set("a", "g", TextFieldValue("hi"))
+        // A fresh store over the same persistence simulates a process restart.
+        val restored = DraftStore(persistence)
+        assertEquals(500uL, restored.draftedAtSecondsFor("a", "g"))
+    }
+
+    @Test
+    fun editingALegacyRestoredDraftStampsItSoItCanPromote() {
+        val persistence = InMemoryDraftPersistence()
+        // A legacy raw-string draft, as an older build would have persisted it.
+        persistence.write("a g", "old draft text")
+        val restored = DraftStore(persistence) { 700L }
+        assertNull(restored.draftedAtSecondsFor("a", "g"))
+
+        restored.set("a", "g", TextFieldValue("old draft text!"))
+        assertEquals(700uL, restored.draftedAtSecondsFor("a", "g"))
+    }
 }
 
 private class InMemoryDraftPersistence : DraftPersistence {

@@ -3198,10 +3198,12 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val draftAccount = accountRef
+        // Drafts are keyed by accountIdHex; accountRef is the bound label, so
+        // translate before the lookup or every draft misses.
+        val draftAccountIdHex = appState.draftAccountIdHexForRef(accountRef)
         val all =
             sortChatListItems(projected) { item ->
-                draftAccount?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
+                draftAccountIdHex?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
             }
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }

@@ -67,7 +67,13 @@ class DraftStore internal constructor(
     var onDraftSortOrderChanged: (() -> Unit)? = null
 
     init {
-        persistence.read().forEach { (k, value) -> drafts[k] = mutableStateOf(value) }
+        persistence.read().forEach { (k, value) ->
+            drafts[k] = mutableStateOf(value)
+            // Restore the persisted drafted-at so a draft written before a
+            // process restart still promotes its chat. v1/legacy blobs carry
+            // none; those get stamped on the next edit (see set).
+            decodeComposerDraftStored(value).draftedAtSeconds?.let { draftedAtSeconds[k] = it }
+        }
     }
 
     // Per-key state so reads/writes are observed independently. Creating an
@@ -135,15 +141,16 @@ class DraftStore internal constructor(
                 return@synchronized
             }
 
-            val encoded = encodeComposerDraft(value)
             val state = stateForLocked(k)
-            // Stamp only the empty→non-empty transition — the moment drafting
-            // began. Editing an already-non-empty draft leaves the stamp (and
-            // the sort order) untouched.
-            if (state.value == null) {
+            // Stamp the empty→non-empty transition — the moment drafting began —
+            // or a restored draft with no stamp yet (a v1/legacy blob), so
+            // editing a persisted draft still promotes its chat. Editing an
+            // already-stamped draft leaves the stamp and sort order untouched.
+            if (state.value == null || draftedAtSeconds[k] == null) {
                 draftedAtSeconds[k] = nowSeconds()
                 sortOrderChanged = true
             }
+            val encoded = encodeComposerDraft(value, draftedAtSeconds[k])
             if (state.value != encoded) {
                 state.value = encoded
                 persistence.write(k, encoded)
