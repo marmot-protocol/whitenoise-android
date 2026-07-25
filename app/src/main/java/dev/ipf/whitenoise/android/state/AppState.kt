@@ -1802,6 +1802,9 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
+        // Drive timed-mute expiry emission so muted icons and folder rules
+        // refresh when a mute elapses, not only on the next getter call.
+        chatMutePreferences.attachExpiryScheduler(mutationsScope)
         if (BuildConfig.SELF_UPDATE_ENABLED) {
             // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
             mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }

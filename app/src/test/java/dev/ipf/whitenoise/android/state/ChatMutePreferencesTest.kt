@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -282,6 +285,65 @@ class ChatMutePreferencesTest {
         assertEquals(ChatNotifyMode.ALL, reloaded.mode("a", "g"))
         assertFalse(reloaded.isMuted("a", "g"))
     }
+
+    @Test
+    fun timedMuteOnAPermanentlyMutedChatUnmutesAfterExpiry() {
+        var clock = 0L
+        val prefs = ChatMutePreferences(context, now = { clock })
+        prefs.setMuted("a", "g", true) // permanent NONE
+
+        prefs.muteFor("a", "g", durationMillis = 1_000L)
+        assertTrue(prefs.isMuted("a", "g"))
+
+        clock = 2_000L
+        // A timed mute must not restore to permanent mute — it unmutes.
+        assertEquals(ChatNotifyMode.ALL, prefs.mode("a", "g"))
+        assertFalse(prefs.isMuted("a", "g"))
+    }
+
+    @Test
+    fun restoreModePersistsByNameAndLegacyOrdinalStillDecodes() {
+        // New writes encode the stable mode name, never the reorder-fragile ordinal.
+        val encoded =
+            ChatMutePreferences.encodeMuteExpiry(
+                mapOf("a|g" to MuteExpiry(10_000L, ChatNotifyMode.MENTIONS_ONLY)).entries.first(),
+            )
+        assertTrue("expected the mode name in the blob", encoded.contains("MENTIONS_ONLY"))
+
+        // A legacy ordinal-encoded blob (ordinal 1 = MENTIONS_ONLY) still decodes.
+        // The persisted fields are NUL-delimited (a separator no account label can
+        // contain); an isolated prefs keeps a sibling test's async write from racing.
+        val sep = "\u0000"
+        val legacyPrefs = context.getSharedPreferences("test.legacy.mute", Context.MODE_PRIVATE)
+        legacyPrefs
+            .edit()
+            .clear()
+            .putStringSet("mutedConversations", setOf("a|g2"))
+            .putStringSet("muteExpiries", setOf("5000${sep}1${sep}a|g2"))
+            .commit()
+        val reloaded = ChatMutePreferences(context, preferences = legacyPrefs, now = { 9_000L })
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, reloaded.mode("a", "g2"))
+    }
+
+    @Test
+    fun stateEmitsWhenATimedMuteElapsesViaScheduler() =
+        runTest {
+            val prefs = ChatMutePreferences(context, now = { testScheduler.currentTime }, scope = backgroundScope)
+            prefs.muteFor("a", "g", durationMillis = 1_000L)
+            assertTrue(
+                prefs.state.value.mutedConversations
+                    .contains("a|g"),
+            )
+
+            advanceTimeBy(1_001L)
+            runCurrent()
+            // The flow itself reflects the restore — no mode()/isMuted() call.
+            assertFalse(
+                "the state flow must emit the restore without a getter call",
+                prefs.state.value.mutedConversations
+                    .contains("a|g"),
+            )
+        }
 
     private fun chatMutePreferencesSource(): File =
         listOf(

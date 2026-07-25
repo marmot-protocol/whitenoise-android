@@ -230,6 +230,10 @@ internal fun GroupDetailsScreen(
     var showEditGroup by remember { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationModePicker by remember { mutableStateOf(false) }
+    // Captured when the picker opens (an event callback, not composition) so
+    // reading it — which can resolve an elapsed mute and write prefs — never
+    // happens during composition.
+    var muteExpiryForPicker by remember { mutableStateOf<Long?>(null) }
     // Auto-opened straight from the empty-group "Add members" CTA: render the
     // picker on the first frame (no details-screen flash) and route its Back to
     // the conversation instead of to the details body underneath.
@@ -469,12 +473,15 @@ internal fun GroupDetailsScreen(
             isDm = isDm,
             notifyMode = conversationNotifyMode,
             onBack = { showNotificationSettings = false },
-            onChooseNotifyMode = { showNotificationModePicker = true },
+            onChooseNotifyMode = {
+                muteExpiryForPicker = appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
+                showNotificationModePicker = true
+            },
         )
         if (showNotificationModePicker) {
             NotificationModePickerDialog(
                 currentMode = conversationNotifyMode,
-                muteExpiryMillis = appState.conversationMuteExpiryMillis(controller.group.groupIdHex),
+                muteExpiryMillis = muteExpiryForPicker,
                 onDismiss = { showNotificationModePicker = false },
                 onSelect = { mode ->
                     showNotificationModePicker = false
@@ -1569,11 +1576,20 @@ private fun NotificationModeRow(
     selected: Boolean?,
     onClick: () -> Unit,
 ) {
+    // A radio row for a selectable mode; a plain button row for the one-shot
+    // timed-mute actions (selected == null), so accessibility services don't
+    // announce those as never-selected radio buttons.
+    val rowModifier =
+        if (selected == null) {
+            Modifier.clickable(role = Role.Button, onClick = onClick)
+        } else {
+            Modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .selectable(selected = selected == true, onClick = onClick, role = Role.RadioButton)
+                .then(rowModifier)
                 .padding(vertical = Dimens.spaceSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
