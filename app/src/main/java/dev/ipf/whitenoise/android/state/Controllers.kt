@@ -1437,6 +1437,67 @@ internal fun compareTimelineMessages(
         it.record.recordedAt
     }, { it.timelineOrder }, { it.id })
 
+/**
+ * An optimistic-send position override (#1256) is a transient bridge: it pins a
+ * confirmed row to where its optimistic bubble sat so the row doesn't jump on the
+ * optimistic→confirmed handoff. Once the optimistic bubble is gone and the real
+ * projection has landed the override has done its job — leaving it keyed to a
+ * confirmed id pins that row at a stale position while its neighbours re-sort,
+ * which renders a newer message above an older one (#1578). Returns the override
+ * ids that are now orphaned and safe to release back to their true projected spot.
+ */
+internal fun orphanedOptimisticSendPreserveIds(
+    optimisticSendPreserveIds: Set<String>,
+    optimisticKeys: Set<String>,
+    projectedMessageIds: Set<String>,
+): Set<String> =
+    optimisticSendPreserveIds.filterTo(mutableSetOf()) { id ->
+        "msg:$id" !in optimisticKeys && id in projectedMessageIds
+    }
+
+/** An adjacent pair whose rendered (oldest→newest) order contradicts true send order. */
+data class TimelineInversion(
+    val upperId: String,
+    val lowerId: String,
+    val upperRenderedAt: ULong,
+    val lowerRenderedAt: ULong,
+    val upperTrueAt: ULong,
+    val lowerTrueAt: ULong,
+)
+
+/**
+ * Detect adjacent rows in a rendered timeline whose true send order is inverted:
+ * an upper row (rendered above, so treated as older) that is actually newer than
+ * the lower row beneath it. [rows] is already sorted by [compareTimelineMessages];
+ * because that is a total order, an inversion means the comparator read an
+ * overridden position for one of the rows rather than its true send time (#1578).
+ * [trueRecordedAt] returns a row's un-overridden send time.
+ */
+internal fun detectTimelineInversions(
+    rows: List<TimelineMessage>,
+    trueRecordedAt: (TimelineMessage) -> ULong,
+): List<TimelineInversion> {
+    val inversions = mutableListOf<TimelineInversion>()
+    for (index in 0 until rows.size - 1) {
+        val upper = rows[index]
+        val lower = rows[index + 1]
+        val upperTrue = trueRecordedAt(upper)
+        val lowerTrue = trueRecordedAt(lower)
+        if (upperTrue > lowerTrue) {
+            inversions +=
+                TimelineInversion(
+                    upperId = upper.record.messageIdHex,
+                    lowerId = lower.record.messageIdHex,
+                    upperRenderedAt = upper.record.recordedAt,
+                    lowerRenderedAt = lower.record.recordedAt,
+                    upperTrueAt = upperTrue,
+                    lowerTrueAt = lowerTrue,
+                )
+        }
+    }
+    return inversions
+}
+
 private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
 
 /**
@@ -3806,6 +3867,12 @@ class ConversationController(
     private val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
+
+    // Subset of the preserves above that came from an optimistic *send* handoff
+    // (not a stream-final live preview). These are transient and get released
+    // once their optimistic bubble is gone, so a stale one can't pin a confirmed
+    // row above a newer neighbour (#1578). Stream-final preserves stay session-long.
+    private val optimisticSendPreserveIds = mutableSetOf<String>()
     private val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
     // Holding pen for media projection echoes that arrive while their
@@ -6847,6 +6914,7 @@ class ConversationController(
             localTimelineOrderOverrides.keys.retainAll(optimisticIds)
             localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
             preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
+            optimisticSendPreserveIds.retainAll(localTimelineTimestampOverrides.keys)
             durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
         }
         page.messages.forEach { record ->
@@ -7282,6 +7350,7 @@ class ConversationController(
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
         durableStreamPositionOverrideIds.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
+        optimisticSendPreserveIds.add(projectedId)
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
         localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
     }
@@ -7331,6 +7400,49 @@ class ConversationController(
         insertTimelineItemId(itemId)
     }
 
+    // Drop optimistic-send position overrides whose optimistic bubble is gone and
+    // whose real projection has landed, so a stale one can't keep a confirmed row
+    // pinned above a newer neighbour (#1578). The row settles to its true projected
+    // send time, which is its correct chronological position.
+    private fun releaseOrphanedOptimisticSendPreserves() {
+        if (optimisticSendPreserveIds.isEmpty()) return
+        val orphaned =
+            orphanedOptimisticSendPreserveIds(
+                optimisticSendPreserveIds = optimisticSendPreserveIds,
+                optimisticKeys = optimisticMessages.keys,
+                projectedMessageIds = projectedMessageIds,
+            )
+        orphaned.forEach { id ->
+            localTimelineOrderOverrides.remove(id)
+            localTimelineTimestampOverrides.remove(id)
+            preservedTimelinePositionOverrideIds.remove(id)
+            optimisticSendPreserveIds.remove(id)
+            refreshProjectedTimelinePosition(id)
+        }
+    }
+
+    // Field diagnostic for #1578: surface any adjacent rows still rendered out of
+    // true send order after the sort, tagged with which override (if any) fed the
+    // comparator the stale position. DEBUG-only; no effect on release builds.
+    private fun logTimelineInversionsForDebug(rows: List<TimelineMessage>) {
+        if (!BuildConfig.DEBUG) return
+        val inversions =
+            detectTimelineInversions(rows) { row ->
+                timelineRecords[row.record.messageIdHex]?.timelineAt ?: row.record.recordedAt
+            }
+        inversions.forEach { inversion ->
+            Log.w(
+                "TimelineOrder",
+                "inversion(#1578) upper=${inversion.upperId} lower=${inversion.lowerId} " +
+                    "renderedAt=${inversion.upperRenderedAt}/${inversion.lowerRenderedAt} " +
+                    "trueAt=${inversion.upperTrueAt}/${inversion.lowerTrueAt} " +
+                    "upperOverride=${inversion.upperId in localTimelineTimestampOverrides} " +
+                    "upperDurable=${inversion.upperId in durableStreamPositionOverrideIds} " +
+                    "upperOptimisticPreserve=${inversion.upperId in optimisticSendPreserveIds}",
+            )
+        }
+    }
+
     private fun preserveStreamFinalDisplayPosition(
         projectedId: String,
         actionRecord: AppMessageRecordFfi,
@@ -7344,6 +7456,9 @@ class ConversationController(
         val position = streamFinalDisplayPosition(actionRecord, displayedStream) ?: return
         durableStreamPositionOverrideIds.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
+        // A stream-final live preview holds its position for the whole session, so
+        // it is not an orphan-releasable optimistic-send preserve (#1578).
+        optimisticSendPreserveIds.remove(projectedId)
         localTimelineOrderOverrides[projectedId] = position.timelineOrder
         localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
@@ -7355,6 +7470,7 @@ class ConversationController(
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
         preservedTimelinePositionOverrideIds.remove(messageIdHex)
+        optimisticSendPreserveIds.remove(messageIdHex)
         durableStreamPositionOverrideIds.remove(messageIdHex)
         readAnchoredAtSeconds.remove(messageIdHex)
         deletedMessageIds = deletedMessageIds - messageIdHex
@@ -7506,6 +7622,7 @@ class ConversationController(
     }
 
     private fun publishTimelineFromIndexesInternal() {
+        releaseOrphanedOptimisticSendPreserves()
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
         // Read-anchored local expiry (#797) with send-time fallback for rows
         // the user has already read through. Unread received rows stay visible
@@ -7573,6 +7690,7 @@ class ConversationController(
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
+        logTimelineInversionsForDebug(timeline)
         editsByTarget = applyOptimisticEdits(aggregated)
         signalForegroundSweepScheduleChanged()
     }
