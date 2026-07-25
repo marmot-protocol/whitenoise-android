@@ -3867,6 +3867,21 @@ class WhiteNoiseAppState(
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
     }
 
+    /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
+    fun muteConversationFor(
+        groupIdHex: String,
+        durationMillis: Long,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.muteFor(accountRef, groupIdHex, durationMillis)
+    }
+
+    /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
+    fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
+        val accountRef = activeAccountRef ?: return null
+        return chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+    }
+
     fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
 
     fun resolvedTtsEnginePackage(): String? =

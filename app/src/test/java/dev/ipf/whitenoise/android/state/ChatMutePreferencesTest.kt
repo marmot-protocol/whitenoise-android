@@ -148,9 +148,14 @@ class ChatMutePreferencesTest {
     fun mutationAndPersistenceStayInsideOneSerializedStateUpdate() {
         val source = chatMutePreferencesSource().readText()
         val setMode = source.functionBody("setMode")
+        val publishLocked = source.functionBody("publishLocked")
 
         assertTrue("mode updates must be serialized", "synchronized(mutationLock)" in setMode)
-        assertTrue("mode and muted projections must publish together", "_state.value = ChatNotificationState(immutableModes)" in setMode)
+        assertTrue("mutations must route through the atomic publisher", "publishLocked(" in setMode)
+        assertTrue(
+            "mode and muted projections must publish together",
+            "_state.value = ChatNotificationState(modes)" in publishLocked,
+        )
         assertFalse("there must not be a second mutable muted flow", "_mutedConversations" in source)
     }
 
@@ -191,6 +196,91 @@ class ChatMutePreferencesTest {
         val reloaded = ChatMutePreferences(context)
         assertEquals(expectedModes, reloaded.state.value.notificationModes)
         assertEquals(expectedMuted, reloaded.state.value.mutedConversations)
+    }
+
+    @Test
+    fun resolveExpiredMutesRestoresElapsedEntriesOnly() {
+        val modes = mapOf("k1" to ChatNotifyMode.NONE, "k2" to ChatNotifyMode.NONE)
+        val expiries =
+            mapOf(
+                "k1" to MuteExpiry(100L, ChatNotifyMode.ALL),
+                "k2" to MuteExpiry(300L, ChatNotifyMode.MENTIONS_ONLY),
+            )
+        val (resolved, remaining, changed) = resolveExpiredMutes(modes, expiries, now = 200L)
+        assertTrue(changed)
+        // k1 elapsed → restored to ALL (dropped from the modes map); k2 stays.
+        assertEquals(mapOf("k2" to ChatNotifyMode.NONE), resolved)
+        assertEquals(mapOf("k2" to MuteExpiry(300L, ChatNotifyMode.MENTIONS_ONLY)), remaining)
+    }
+
+    @Test
+    fun resolveExpiredMutesLeavesUnelapsedUntouched() {
+        val modes = mapOf("k" to ChatNotifyMode.NONE)
+        val expiries = mapOf("k" to MuteExpiry(500L, ChatNotifyMode.ALL))
+        val (resolved, remaining, changed) = resolveExpiredMutes(modes, expiries, now = 100L)
+        assertFalse(changed)
+        assertEquals(modes, resolved)
+        assertEquals(expiries, remaining)
+    }
+
+    @Test
+    fun muteForSilencesNowAndRestoresPriorModeAfterExpiry() {
+        var clock = 1_000L
+        val prefs = ChatMutePreferences(context, now = { clock })
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+
+        prefs.muteFor("a", "g", durationMillis = 500L)
+        assertTrue(prefs.isMuted("a", "g"))
+        assertEquals(1_500L, prefs.muteExpiryMillis("a", "g"))
+
+        clock = 1_600L
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.mode("a", "g"))
+        assertFalse(prefs.isMuted("a", "g"))
+        assertEquals(null, prefs.muteExpiryMillis("a", "g"))
+    }
+
+    @Test
+    fun permanentMuteHasNoExpiry() {
+        val prefs = ChatMutePreferences(context, now = { 0L })
+        prefs.muteFor("a", "g", durationMillis = 0L)
+        assertTrue(prefs.isMuted("a", "g"))
+        assertEquals(null, prefs.muteExpiryMillis("a", "g"))
+    }
+
+    @Test
+    fun explicitModeChoiceCancelsAPendingTimedMute() {
+        val prefs = ChatMutePreferences(context, now = { 0L })
+        prefs.muteFor("a", "g", durationMillis = 10_000L)
+        assertEquals(10_000L, prefs.muteExpiryMillis("a", "g"))
+
+        prefs.setMode("a", "g", ChatNotifyMode.ALL)
+        assertEquals(null, prefs.muteExpiryMillis("a", "g"))
+        assertEquals(ChatNotifyMode.ALL, prefs.mode("a", "g"))
+    }
+
+    @Test
+    fun extendingATimedMuteKeepsTheOriginalRestoreMode() {
+        var clock = 0L
+        val prefs = ChatMutePreferences(context, now = { clock })
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+        prefs.muteFor("a", "g", durationMillis = 100L)
+        // Re-mute while still muted — restore mode must remain MENTIONS_ONLY.
+        prefs.muteFor("a", "g", durationMillis = 1_000L)
+
+        clock = 2_000L
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.mode("a", "g"))
+    }
+
+    @Test
+    fun timedMuteExpiryPersistsAndRestoresAcrossReload() {
+        var clock = 1_000L
+        ChatMutePreferences(context, now = { clock }).muteFor("a", "g", durationMillis = 500L)
+
+        // A fresh instance simulates a restart; the clock is now past expiry.
+        clock = 2_000L
+        val reloaded = ChatMutePreferences(context, now = { clock })
+        assertEquals(ChatNotifyMode.ALL, reloaded.mode("a", "g"))
+        assertFalse(reloaded.isMuted("a", "g"))
     }
 
     private fun chatMutePreferencesSource(): File =

@@ -1049,6 +1049,10 @@
     <string name="notify_all_messages">Alle Nachrichten</string>
     <string name="notify_only_mentions">Nur Erwähnungen</string>
     <string name="notify_nothing">Nichts</string>
+    <string name="notify_mute_1_hour">1 Stunde stummschalten</string>
+    <string name="notify_mute_8_hours">8 Stunden stummschalten</string>
+    <string name="notify_mute_until_off">Stummschalten, bis ich es wieder einschalte</string>
+    <string name="notify_muted_until">Stummgeschaltet bis %1$s</string>
     <string name="customize_sound_vibration">Ton und Vibration anpassen</string>
     <string name="chat_muted_badge">Stummgeschaltet</string>
     <string name="collapse_long_messages_subtitle">Für lange Nachrichten in diesem Chat eine „Mehr lesen“-Verknüpfung anzeigen</string>
