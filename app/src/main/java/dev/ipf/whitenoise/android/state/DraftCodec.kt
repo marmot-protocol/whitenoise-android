@@ -8,6 +8,13 @@ internal const val COMPOSER_DRAFT_VERSION_PREFIX = "\u0001WN\u0001v1\u0001"
 private const val FIELD_SEPARATOR = '\u001E'
 private const val VERSIONED_DRAFT_FIELD_COUNT = 4
 
+// v2 adds a leading drafted-at (unix seconds) field so the chat-list draft-sort
+// timestamp survives a process restart alongside the draft text. v1 blobs still
+// decode (drafted-at absent); every write now emits v2.
+internal const val COMPOSER_DRAFT_V2_PREFIX = "\u0001WN\u0001v2\u0001"
+private const val VERSIONED_DRAFT_V2_FIELD_COUNT = 5
+private const val DRAFTED_AT_UNSTAMPED = -1L
+
 /**
  * Restored composer draft: field value plus whether returning to the chat should
  * auto-focus the composer. Only drafts saved in [COMPOSER_DRAFT_VERSION_PREFIX]
@@ -17,13 +24,19 @@ private const val VERSIONED_DRAFT_FIELD_COUNT = 4
 data class ComposerDraftSnapshot(
     val textFieldValue: TextFieldValue,
     val focusOnRestore: Boolean,
+    val draftedAtSeconds: Long? = null,
 )
 
-internal fun encodeComposerDraft(value: TextFieldValue): String {
+internal fun encodeComposerDraft(
+    value: TextFieldValue,
+    draftedAtSeconds: Long? = null,
+): String {
     val text = value.text
     val selection = value.selection
     return buildString {
-        append(COMPOSER_DRAFT_VERSION_PREFIX)
+        append(COMPOSER_DRAFT_V2_PREFIX)
+        append(draftedAtSeconds ?: DRAFTED_AT_UNSTAMPED)
+        append(FIELD_SEPARATOR)
         append(selection.start)
         append(FIELD_SEPARATOR)
         append(selection.end)
@@ -35,11 +48,37 @@ internal fun encodeComposerDraft(value: TextFieldValue): String {
 }
 
 internal fun decodeComposerDraftStored(stored: String): ComposerDraftSnapshot =
-    if (!stored.startsWith(COMPOSER_DRAFT_VERSION_PREFIX)) {
-        legacyComposerDraftSnapshot(stored)
-    } else {
-        decodeVersionedComposerDraft(stored)
+    when {
+        stored.startsWith(COMPOSER_DRAFT_V2_PREFIX) -> decodeVersionedComposerDraftV2(stored)
+        stored.startsWith(COMPOSER_DRAFT_VERSION_PREFIX) -> decodeVersionedComposerDraft(stored)
+        else -> legacyComposerDraftSnapshot(stored)
     }
+
+private fun decodeVersionedComposerDraftV2(stored: String): ComposerDraftSnapshot {
+    val body = stored.substring(COMPOSER_DRAFT_V2_PREFIX.length)
+    val fields = body.split(FIELD_SEPARATOR, limit = VERSIONED_DRAFT_V2_FIELD_COUNT)
+    val draftedAtRaw = fields.getOrNull(0)?.toLongOrNull()
+    val selectionStart = fields.getOrNull(1)?.toIntOrNull()
+    val selectionEnd = fields.getOrNull(2)?.toIntOrNull()
+    val declaredLength = fields.getOrNull(3)?.toIntOrNull()
+    val text = fields.getOrNull(4)
+    return when {
+        fields.size != VERSIONED_DRAFT_V2_FIELD_COUNT -> malformedComposerDraftSnapshot(stored)
+        draftedAtRaw == null || selectionStart == null || selectionEnd == null || declaredLength == null ->
+            malformedComposerDraftSnapshot(stored)
+        text == null || declaredLength != text.length -> malformedComposerDraftSnapshot(stored)
+        else ->
+            ComposerDraftSnapshot(
+                textFieldValue =
+                    TextFieldValue(
+                        text = text,
+                        selection = clampComposerDraftSelection(text, selectionStart, selectionEnd),
+                    ),
+                focusOnRestore = true,
+                draftedAtSeconds = draftedAtRaw.takeIf { it >= 0 },
+            )
+    }
+}
 
 private fun decodeVersionedComposerDraft(stored: String): ComposerDraftSnapshot {
     val body = stored.substring(COMPOSER_DRAFT_VERSION_PREFIX.length)

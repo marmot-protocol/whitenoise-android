@@ -39,6 +39,47 @@ class ChatListSortingTest {
     }
 
     @Test
+    fun aNewerDraftRaisesAChatAboveOneWithAMoreRecentMessage() {
+        val draftedIn = item("drafted-in", latestAt = 10uL)
+        val recentMessage = item("recent-message", latestAt = 50uL)
+
+        val sorted =
+            sortChatListItems(listOf(recentMessage, draftedIn)) { item ->
+                if (item.id == "drafted-in") 90uL else null
+            }
+
+        assertEquals(listOf("drafted-in", "recent-message"), sorted.map { it.id })
+    }
+
+    @Test
+    fun aStaleDraftDoesNotOutrankAFresherMessage() {
+        // The draft is older than the chat's own last message, so it must not
+        // change the order — an incoming message stays ahead of an old draft.
+        val chatWithOldDraft = item("old-draft", latestAt = 80uL)
+        val freshMessage = item("fresh", latestAt = 60uL)
+
+        val sorted =
+            sortChatListItems(listOf(chatWithOldDraft, freshMessage)) { item ->
+                if (item.id == "old-draft") 20uL else null
+            }
+
+        assertEquals(listOf("old-draft", "fresh"), sorted.map { it.id })
+    }
+
+    @Test
+    fun aDraftInAMessagelessChatRaisesItAboveOlderConversations() {
+        val draftedNewChat = item("new-drafted", latestAt = null)
+        val olderChat = item("older", latestAt = 40uL)
+
+        val sorted =
+            sortChatListItems(listOf(olderChat, draftedNewChat)) { item ->
+                if (item.id == "new-drafted") 99uL else null
+            }
+
+        assertEquals(listOf("new-drafted", "older"), sorted.map { it.id })
+    }
+
+    @Test
     fun pendingInvitesSortBeforeExistingChats() {
         val sorted =
             sortChatListItems(

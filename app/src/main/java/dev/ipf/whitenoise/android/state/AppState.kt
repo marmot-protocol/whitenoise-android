@@ -1830,6 +1830,16 @@ class WhiteNoiseAppState(
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
+    /**
+     * The draft-store account id for an account [ref] (a label). Drafts are
+     * keyed by `accountIdHex`, not the label a controller binds to, so the
+     * chat-list draft-sort lookup must translate through here.
+     */
+    internal fun draftAccountIdHexForRef(ref: String?): String? {
+        val label = ref ?: return null
+        return accounts.firstOrNull { it.label == label }?.accountIdHex
+    }
+
     /** Convenience: return the active account's draft for [groupIdHex], or null. */
     fun draftFor(groupIdHex: String): String? = draftSnapshotFor(groupIdHex)?.textFieldValue?.text
 
@@ -2036,6 +2046,9 @@ class WhiteNoiseAppState(
 
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
+        // Route draft start/clear re-sorts to whichever controller is attached;
+        // reads the field at call time so a later re-attach still resolves.
+        draftStore.onDraftSortOrderChanged = { chatsController?.onDraftSortOrderChanged() }
     }
 
     fun attachConversationController(controller: ConversationController) {
