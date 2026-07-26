@@ -1029,9 +1029,6 @@
     <string name="notify_all_messages">所有訊息</string>
     <string name="notify_only_mentions">僅限提及</string>
     <string name="notify_nothing">無</string>
-    <string name="notify_mute_1_hour">靜音 1 小時</string>
-    <string name="notify_mute_8_hours">靜音 8 小時</string>
-    <string name="notify_mute_until_off">靜音直到我重新開啟</string>
     <string name="notify_muted_until">靜音至 %1$s</string>
     <string name="customize_sound_vibration">自訂音效與震動</string>
     <string name="chat_muted_badge">已靜音</string>
@@ -1135,4 +1132,12 @@
     <string name="amber_signin_waiting_proof">請在簽名應用中簽署身分證明（第 2 步，共 2 步）…</string>
     <string name="tts_settings_engine_local">本機引擎</string>
     <string name="tts_settings_engine_unknown">可能使用網路語音</string>
+    <string name="mute">靜音</string>
+    <string name="mute_dialog_title">靜音訊息通知</string>
+    <string name="mute_dialog_description">其他人不會看到你靜音了此聊天。</string>
+    <string name="mute_duration_8_hours">8 小時</string>
+    <string name="mute_duration_1_week">1 週</string>
+    <string name="mute_duration_always">永遠</string>
+    <string name="notify_for">通知</string>
+    <string name="ok">確定</string>
 </resources>

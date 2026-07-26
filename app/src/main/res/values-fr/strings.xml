@@ -1051,9 +1051,6 @@
     <string name="notify_all_messages">Tous les messages</string>
     <string name="notify_only_mentions">Mentions uniquement</string>
     <string name="notify_nothing">Rien</string>
-    <string name="notify_mute_1_hour">Mettre en sourdine 1 heure</string>
-    <string name="notify_mute_8_hours">Mettre en sourdine 8 heures</string>
-    <string name="notify_mute_until_off">Mettre en sourdine jusqu\'à réactivation</string>
     <string name="notify_muted_until">En sourdine jusqu\'à %1$s</string>
     <string name="customize_sound_vibration">Personnaliser le son et les vibrations</string>
     <string name="chat_muted_badge">En sourdine</string>
@@ -1157,4 +1154,12 @@
     <string name="amber_signin_waiting_proof">Signez la preuve d\'identité dans votre signataire (étape 2 sur 2)…</string>
     <string name="tts_settings_engine_local">Moteur sur l\'appareil</string>
     <string name="tts_settings_engine_unknown">Peut utiliser la voix en réseau</string>
+    <string name="mute">Muet</string>
+    <string name="mute_dialog_title">Couper les notifications</string>
+    <string name="mute_dialog_description">Les autres ne verront pas que vous avez mis ce chat en sourdine.</string>
+    <string name="mute_duration_8_hours">8 heures</string>
+    <string name="mute_duration_1_week">1 semaine</string>
+    <string name="mute_duration_always">Toujours</string>
+    <string name="notify_for">Notifier</string>
+    <string name="ok">OK</string>
 </resources>

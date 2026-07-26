@@ -1049,9 +1049,6 @@
     <string name="notify_all_messages">Alle Nachrichten</string>
     <string name="notify_only_mentions">Nur Erwähnungen</string>
     <string name="notify_nothing">Nichts</string>
-    <string name="notify_mute_1_hour">1 Stunde stummschalten</string>
-    <string name="notify_mute_8_hours">8 Stunden stummschalten</string>
-    <string name="notify_mute_until_off">Stummschalten, bis ich es wieder einschalte</string>
     <string name="notify_muted_until">Stummgeschaltet bis %1$s</string>
     <string name="customize_sound_vibration">Ton und Vibration anpassen</string>
     <string name="chat_muted_badge">Stummgeschaltet</string>
@@ -1155,4 +1152,12 @@
     <string name="amber_signin_waiting_proof">Identitätsnachweis im Signer signieren (Schritt 2 von 2)…</string>
     <string name="tts_settings_engine_local">Sprachausgabe auf dem Gerät</string>
     <string name="tts_settings_engine_unknown">Kann Netzwerk-Sprache nutzen</string>
+    <string name="mute">Stumm</string>
+    <string name="mute_dialog_title">Nachrichten stummschalten</string>
+    <string name="mute_dialog_description">Andere sehen nicht, dass du diesen Chat stummgeschaltet hast.</string>
+    <string name="mute_duration_8_hours">8 Stunden</string>
+    <string name="mute_duration_1_week">1 Woche</string>
+    <string name="mute_duration_always">Immer</string>
+    <string name="notify_for">Benachrichtigung für</string>
+    <string name="ok">OK</string>
 </resources>

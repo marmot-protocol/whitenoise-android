@@ -1091,9 +1091,6 @@
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
     <string name="notify_nothing">Ничего</string>
-    <string name="notify_mute_1_hour">Отключить на 1 час</string>
-    <string name="notify_mute_8_hours">Отключить на 8 часов</string>
-    <string name="notify_mute_until_off">Отключить до повторного включения</string>
     <string name="notify_muted_until">Отключено до %1$s</string>
     <string name="customize_sound_vibration">Настроить звук и вибрацию</string>
     <string name="chat_muted_badge">Без звука</string>
@@ -1199,4 +1196,12 @@
     <string name="amber_signin_waiting_proof">Подпишите подтверждение личности в подписывающем приложении (шаг 2 из 2)…</string>
     <string name="tts_settings_engine_local">Движок на устройстве</string>
     <string name="tts_settings_engine_unknown">Может использовать сеть</string>
+    <string name="mute">Без звука</string>
+    <string name="mute_dialog_title">Отключить уведомления</string>
+    <string name="mute_dialog_description">Другие не увидят, что вы отключили уведомления в этом чате.</string>
+    <string name="mute_duration_8_hours">8 часов</string>
+    <string name="mute_duration_1_week">1 неделя</string>
+    <string name="mute_duration_always">Всегда</string>
+    <string name="notify_for">Уведомлять</string>
+    <string name="ok">OK</string>
 </resources>
