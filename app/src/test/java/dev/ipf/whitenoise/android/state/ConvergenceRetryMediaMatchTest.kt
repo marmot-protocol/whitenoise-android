@@ -129,6 +129,9 @@ class ConvergenceRetryMediaMatchTest {
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
             tags = tags,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
         )

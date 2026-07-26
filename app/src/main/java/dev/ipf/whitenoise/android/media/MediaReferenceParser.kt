@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -9,7 +10,7 @@ import java.net.URI
 import java.util.Locale
 
 /**
- * Pure parser for the encrypted-media-v1 `imeta` tag carried on kind-9
+ * Pure parser for encrypted-media `imeta` tags carried on kind-9
  * messages. Rust validates incoming tags before projection; this parser is
  * used for optimistic UI bridge records that Android creates locally before
  * the projected event echoes back.
@@ -29,7 +30,8 @@ import java.util.Locale
  */
 object MediaReferenceParser {
     private const val TAG_NAME = "imeta"
-    private const val VERSION_VALUE = "encrypted-media-v1"
+    private const val VERSION_V1_VALUE = "encrypted-media-v1"
+    private const val VERSION_V2_VALUE = "encrypted-media-v2"
     private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
     private const val NONCE_HEX_LEN = 24 // 12 bytes
@@ -41,7 +43,7 @@ object MediaReferenceParser {
     )
 
     /**
-     * Build the `imeta` tag for [reference] in the canonical encrypted-media-v1 field
+     * Build the `imeta` tag for [reference] in canonical encrypted-media field
      * order. Inverse of [parseImetaTag]; used to render a just-uploaded image
      * optimistically (bridging the gap until the published event echoes back)
      * without waiting for the projection round-trip.
@@ -50,7 +52,7 @@ object MediaReferenceParser {
         MessageTagFfi(
             buildList {
                 add(TAG_NAME)
-                add("v $VERSION_VALUE")
+                add("v ${reference.version.wireValue()}")
                 reference.locators.forEach { add("locator ${it.kind} ${it.value}") }
                 add("ciphertext_sha256 ${reference.ciphertextSha256}")
                 add("plaintext_sha256 ${reference.plaintextSha256}")
@@ -70,7 +72,7 @@ object MediaReferenceParser {
 
     /**
      * Parses every valid imeta tag in [tags] in order. Album messages from
-     * encrypted-media-v1 carry N imeta tags (one per attachment); the order
+     * encrypted-media messages carry N imeta tags (one per attachment); the order
      * is the album's display order. Invalid tags are skipped silently.
      */
     fun parseAllImetaTags(tags: List<MessageTagFfi>): List<MediaAttachmentReferenceFfi> =
@@ -126,7 +128,12 @@ object MediaReferenceParser {
         val ciphertextHash = fields["ciphertext_sha256"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
         val plaintextHash = fields["plaintext_sha256"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
         val nonce = fields["nonce"]?.takeIf { isHex(it, NONCE_HEX_LEN) } ?: return null
-        val version = fields["v"]?.takeIf { it == VERSION_VALUE } ?: return null
+        val version =
+            when (fields["v"]) {
+                VERSION_V1_VALUE -> EncryptedMediaVersionFfi.V1
+                VERSION_V2_VALUE -> EncryptedMediaVersionFfi.V2
+                else -> return null
+            }
         return MediaAttachmentReferenceFfi(
             locators = locators,
             ciphertextSha256 = ciphertextHash,
@@ -140,6 +147,12 @@ object MediaReferenceParser {
             thumbhash = fields["thumbhash"],
         )
     }
+
+    private fun EncryptedMediaVersionFfi.wireValue(): String =
+        when (this) {
+            EncryptedMediaVersionFfi.V1 -> VERSION_V1_VALUE
+            EncryptedMediaVersionFfi.V2 -> VERSION_V2_VALUE
+        }
 
     /**
      * Whether [raw] is a media URL we're willing to download: a non-blank

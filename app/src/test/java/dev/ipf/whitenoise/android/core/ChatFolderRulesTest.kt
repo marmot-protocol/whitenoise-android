@@ -191,6 +191,8 @@ class ChatFolderRulesTest {
     ) = AppGroupRecordFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = id,
+        protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+        profilePresent = false,
         endpoint = "endpoint-$id",
         name = "",
         description = description,
@@ -204,6 +206,7 @@ class ChatFolderRulesTest {
         encryptedMedia = encryptedMedia(),
         archived = false,
         pendingConfirmation = false,
+        unrecoverable = false,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
@@ -214,6 +217,7 @@ class ChatFolderRulesTest {
             componentId = 0x8008u,
             component = "marmot.group.encrypted-media.v1",
             required = true,
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             mediaFormat = "encrypted-media-v1",
             allowedLocatorKinds = listOf("blossom-v1"),
             defaultBlobEndpoints =

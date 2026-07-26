@@ -112,6 +112,9 @@ class AgentOperationPresentationTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = 1202uL,
         tags = tags,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
     )

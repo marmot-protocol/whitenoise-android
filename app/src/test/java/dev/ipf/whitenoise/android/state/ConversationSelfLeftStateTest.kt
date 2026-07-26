@@ -92,6 +92,8 @@ class ConversationSelfLeftStateTest {
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = "group",
+            protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+            profilePresent = false,
             endpoint = "endpoint",
             name = "Test Group",
             description = "A group",
@@ -105,6 +107,7 @@ class ConversationSelfLeftStateTest {
             encryptedMedia = encryptedMedia(),
             archived = false,
             pendingConfirmation = false,
+            unrecoverable = false,
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disappearingMessageSecs = 0uL,
@@ -131,6 +134,7 @@ class ConversationSelfLeftStateTest {
             componentId = 0x8008u,
             component = "marmot.group.encrypted-media.v1",
             required = true,
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             mediaFormat = "encrypted-media-v1",
             allowedLocatorKinds = listOf("blossom-v1"),
             defaultBlobEndpoints =

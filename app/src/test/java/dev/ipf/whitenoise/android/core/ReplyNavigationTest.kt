@@ -231,6 +231,9 @@ class ReplyNavigationTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
         tags = tags,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
     )

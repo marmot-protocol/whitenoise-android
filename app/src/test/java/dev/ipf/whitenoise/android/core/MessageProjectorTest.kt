@@ -519,6 +519,9 @@ class MessageProjectorTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
         tags = tags,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
     )

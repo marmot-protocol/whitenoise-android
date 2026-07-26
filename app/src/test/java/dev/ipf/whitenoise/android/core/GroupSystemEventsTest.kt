@@ -589,6 +589,9 @@ class GroupSystemEventsTest {
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = 1210uL,
         tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
     )

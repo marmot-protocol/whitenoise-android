@@ -227,6 +227,8 @@ class ChatListTitleTest {
     ) = AppGroupRecordFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = groupId,
+        protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+        profilePresent = false,
         endpoint = "endpoint",
         name = name,
         description = "",
@@ -240,6 +242,7 @@ class ChatListTitleTest {
         encryptedMedia = encryptedMedia(),
         archived = false,
         pendingConfirmation = pendingConfirmation,
+        unrecoverable = false,
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
@@ -304,6 +307,7 @@ class ChatListTitleTest {
             componentId = 0x8008u,
             component = "marmot.group.encrypted-media.v1",
             required = true,
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             mediaFormat = "encrypted-media-v1",
             allowedLocatorKinds = listOf("blossom-v1"),
             defaultBlobEndpoints =
