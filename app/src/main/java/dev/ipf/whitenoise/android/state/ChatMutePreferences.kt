@@ -168,21 +168,21 @@ class ChatMutePreferences(
         groupIdHex: String,
         mode: ChatNotifyMode,
     ) {
-        if (mode == ChatNotifyMode.NONE) return
-        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
+        val key = compositeKeyOrNull(accountRef, groupIdHex)
+        if (mode == ChatNotifyMode.NONE || key == null) return
         synchronized(mutationLock) {
             resolveExpiredLockedInternal()
             if (_state.value.notificationModes[key] != ChatNotifyMode.NONE) {
                 setMode(accountRef, groupIdHex, mode)
-                return
+            } else {
+                // A legacy permanent mute may have no metadata yet. Create a
+                // null-expiry record so its newly selected restore mode persists.
+                val expiry = muteExpiries[key]?.expiryMillis
+                val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, mode))
+                if (nextExpiries != muteExpiries) {
+                    publishLocked(_state.value.notificationModes, nextExpiries)
+                }
             }
-
-            // A legacy permanent mute may have no metadata yet. Create a
-            // null-expiry record so its newly selected restore mode persists.
-            val expiry = muteExpiries[key]?.expiryMillis
-            val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, mode))
-            if (nextExpiries == muteExpiries) return
-            publishLocked(_state.value.notificationModes, nextExpiries)
         }
     }
 
