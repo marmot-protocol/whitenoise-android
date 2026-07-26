@@ -591,6 +591,23 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
 }
 
 /**
+ * Prefer the battery-efficient native-push wake path when this build/device
+ * supports it. If enabling push fails, retain the persistent relay connection
+ * so first-run setup never silently leaves the account without background
+ * delivery.
+ */
+internal suspend fun configureDefaultNotificationDelivery(
+    nativePushAvailable: Boolean,
+    enableNativePush: suspend () -> Boolean,
+    setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
+): Boolean {
+    if (nativePushAvailable && enableNativePush()) {
+        if (setBackgroundConnectionEnabled(false)) return true
+    }
+    return setBackgroundConnectionEnabled(true)
+}
+
+/**
  * A live notification subscription is a healthy local broadcast receiver and
  * survives relay connectivity changes. Reuse the listener job so queued or
  * in-flight updates are never destroyed; if it is backing off, reconnect wakes
@@ -5384,12 +5401,14 @@ class WhiteNoiseAppState private constructor(
         refreshLocalNotificationPermission()
         if (!localNotificationPermissionGranted) return false
         markDefaultNotificationsEnableAttempted()
-        if (backgroundConnectionEnabled) {
-            return setBackgroundConnectionEnabled(true)
-        }
         val settings = marmotIo { setLocalNotificationsEnabled(account, true) }
         localNotificationSettings = settings
-        return settings.localNotificationsEnabled
+        if (!settings.localNotificationsEnabled) return false
+        return configureDefaultNotificationDelivery(
+            nativePushAvailable = isNativePushAvailable(),
+            enableNativePush = { setNativePushEnabled(true) },
+            setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
+        )
     }
 
     fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
