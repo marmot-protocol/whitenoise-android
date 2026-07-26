@@ -45,6 +45,7 @@ import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
@@ -1691,6 +1692,8 @@ class WhiteNoiseAppState(
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
+    private val optimisticSendPositionPreservesByConversation =
+        mutableMapOf<String, OptimisticSendPositionPreserves>()
 
     // Retained-upload bytes survive screen disposal so a user who navigates
     // out of a chat mid-send and returns sees the pending bubble still carry
@@ -1946,6 +1949,17 @@ class WhiteNoiseAppState(
             timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun optimisticSendPositionPreserves(
+        accountRef: String?,
+        groupIdHex: String,
+    ): OptimisticSendPositionPreserves =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticSendPositionPreservesByConversation.getOrPut(key) {
+                OptimisticSendPositionPreserves()
+            }
+        }
+
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -2029,6 +2043,7 @@ class WhiteNoiseAppState(
         projectedMessageIdsByConversation.remove(staleKey)
         timelineOrderOverridesByConversation.remove(staleKey)
         timelineTimestampOverridesByConversation.remove(staleKey)
+        optimisticSendPositionPreservesByConversation.remove(staleKey)
         retainedMediaUploadsByConversation.remove(staleKey)
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
@@ -2057,6 +2072,21 @@ class WhiteNoiseAppState(
 
     fun detachConversationController(controller: ConversationController) {
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
+    }
+
+    internal fun deliverConfirmedMediaHandoff(
+        accountRef: String?,
+        groupIdHex: String,
+        confirmedId: String,
+        deferredProjection: TimelineMessageRecordFfi?,
+    ): Boolean {
+        val controller =
+            synchronized(conversationControllerLock) {
+                newestMatchingController(conversationControllers) {
+                    it.matchesConversation(accountRef, groupIdHex)
+                }
+            } ?: return false
+        return controller.acceptConfirmedMediaHandoff(confirmedId, deferredProjection)
     }
 
     private fun conversationControllersForAccountTeardown(): List<ConversationController> =
@@ -3036,7 +3066,7 @@ class WhiteNoiseAppState(
         // a cancelled upload cannot resume against an emptied retained-upload
         // map and falsely mark the bubble Failed (or publish after the switch).
         inFlightMediaUploads.cancelAll()
-        // The four per-conversation maps below hold (or potentially hold)
+        // The per-conversation maps below hold (or potentially hold)
         // decrypted plaintext keyed by account/group. Wiping them at the
         // same call site keeps account-switch and sign-out symmetric with
         // the L1 plaintext clear above; an unwiped retained-upload cache
@@ -3061,6 +3091,8 @@ class WhiteNoiseAppState(
             timelineOrderOverridesByConversation.clear()
             timelineTimestampOverridesByConversation.values.forEach { it.clear() }
             timelineTimestampOverridesByConversation.clear()
+            optimisticSendPositionPreservesByConversation.values.forEach { it.clear() }
+            optimisticSendPositionPreservesByConversation.clear()
         }
         // Cancel any in-flight downloads (their Deferred holds the plaintext
         // result) and drop the index so the next session starts cold.

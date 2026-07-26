@@ -5,8 +5,12 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -51,15 +55,92 @@ class TimelineOrderingInversionTest {
     }
 
     @Test
+    fun preserveOwnershipSurvivesControllerReplacementAndCanBeReleasedByTheReplacement() {
+        val conversationPreserves = OptimisticSendPositionPreserves()
+        conversationPreserves.add("confirmed")
+
+        // AppState hands the same conversation-retained owner to a replacement
+        // controller after the sender's controller leaves the screen.
+        val replacementControllerPreserves = conversationPreserves
+        assertEquals(setOf("confirmed"), replacementControllerPreserves.snapshot())
+
+        val released =
+            replacementControllerPreserves.releaseOrphaned(
+                optimisticKeys = emptySet(),
+                projectedMessageIds = setOf("confirmed"),
+            )
+
+        assertEquals(setOf("confirmed"), released)
+        assertTrue(conversationPreserves.snapshot().isEmpty())
+    }
+
+    @Test
+    fun confirmedMediaBridgeBecomesPrunableAsSoonAsItsProjectionExists() {
+        assertEquals(
+            setOf("msg:confirmed"),
+            confirmedOptimisticMessageKeys(
+                optimisticKeys = setOf("msg:pending", "msg:confirmed"),
+                projectedMessageIds = setOf("confirmed"),
+            ),
+        )
+    }
+
+    @Test
+    fun controllerReplacementRoutesTheHandoffToTheNewestMatchingController() {
+        data class AttachedController(
+            val name: String,
+            val conversation: String,
+        )
+
+        val old = AttachedController("old", "group")
+        val replacement = AttachedController("replacement", "group")
+        val unrelated = AttachedController("unrelated", "other")
+
+        assertEquals(
+            replacement,
+            newestMatchingController(listOf(old, unrelated, replacement)) {
+                it.conversation == "group"
+            },
+        )
+    }
+
+    @Test
+    fun settlementPublishesOnceOnTheNextTurnAndCoalescesDuplicateRequests() =
+        runTest {
+            var publications = 1
+            var settlementJob: Job? = null
+            settlementJob =
+                deferTimelinePositionSettlement(backgroundScope, settlementJob) {
+                    publications += 1
+                }
+            val firstJob = settlementJob
+
+            settlementJob =
+                deferTimelinePositionSettlement(backgroundScope, settlementJob) {
+                    publications += 1
+                }
+
+            assertSame(firstJob, settlementJob)
+            assertEquals("the handoff snapshot must remain observable first", 1, publications)
+            runCurrent()
+            assertEquals("true projected order must publish exactly once afterward", 2, publications)
+        }
+
+    @Test
     fun confirmedSnapshotIsBuiltBeforeOrphanedPreservesAreReleased() {
         val publishBody = controllersSource().readText().functionBody("publishTimelineFromIndexesInternal")
         val snapshotAssignment = publishBody.indexOf("timeline =")
         val orphanRelease = publishBody.indexOf("releaseOrphanedOptimisticSendPreserves()")
+        val settlementSchedule = publishBody.indexOf("scheduleTimelinePositionSettlement()")
 
         assertTrue("timeline snapshot assignment must exist", snapshotAssignment >= 0)
         assertTrue(
             "the confirmed row must publish once with its optimistic position before cleanup",
             orphanRelease > snapshotAssignment,
+        )
+        assertTrue(
+            "cleanup must schedule a second observable publication in true order",
+            settlementSchedule > orphanRelease,
         )
     }
 
@@ -77,6 +158,24 @@ class TimelineOrderingInversionTest {
         assertTrue(
             "media bridge overrides must be registered for orphan cleanup",
             trackedPreserve > bridgeInsert,
+        )
+        assertTrue(
+            "media completion must route reconciliation to the attached controller",
+            uploadBody.indexOf(
+                "appState.deliverConfirmedMediaHandoff(",
+                startIndex = trackedPreserve,
+            ) >
+                trackedPreserve,
+        )
+
+        val handoffBody = controllersSource().readText().functionBody("acceptConfirmedMediaHandoff")
+        assertTrue(
+            "the receiving controller must prune the exact confirmed bridge",
+            "optimisticMessages.remove(\"msg:\$confirmedId\")" in handoffBody,
+        )
+        assertTrue(
+            "the receiving controller must publish without another engine event",
+            "publishTimelineFromIndexes()" in handoffBody,
         )
     }
 
