@@ -1049,9 +1049,6 @@
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
     <string name="notify_nothing">Hiçbiri</string>
-    <string name="notify_mute_1_hour">1 saat sessize al</string>
-    <string name="notify_mute_8_hours">8 saat sessize al</string>
-    <string name="notify_mute_until_off">Yeniden açana kadar sessize al</string>
     <string name="notify_muted_until">%1$s tarihine kadar sessiz</string>
     <string name="customize_sound_vibration">Ses ve titreşimi özelleştir</string>
     <string name="chat_muted_badge">Sessize alındı</string>
@@ -1155,4 +1152,12 @@
     <string name="amber_signin_waiting_proof">İmzalayıcıda kimlik kanıtını imzalayın (adım 2/2)…</string>
     <string name="tts_settings_engine_local">Cihaz üzerindeki motor</string>
     <string name="tts_settings_engine_unknown">Ağ konuşması kullanabilir</string>
+    <string name="mute">Sessize al</string>
+    <string name="mute_dialog_title">Bildirimleri sessize al</string>
+    <string name="mute_dialog_description">Diğerleri bu sohbeti sessize aldığınızı görmez.</string>
+    <string name="mute_duration_8_hours">8 saat</string>
+    <string name="mute_duration_1_week">1 hafta</string>
+    <string name="mute_duration_always">Her zaman</string>
+    <string name="notify_for">Bildirim</string>
+    <string name="ok">Tamam</string>
 </resources>

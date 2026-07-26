@@ -20,10 +20,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -61,7 +59,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -229,11 +226,8 @@ internal fun GroupDetailsScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showNotificationModePicker by remember { mutableStateOf(false) }
-    // Captured when the picker opens (an event callback, not composition) so
-    // reading it — which can resolve an elapsed mute and write prefs — never
-    // happens during composition.
-    var muteExpiryForPicker by remember { mutableStateOf<Long?>(null) }
+    var showMuteDurationDialog by remember { mutableStateOf(false) }
+    var showNotifyForDialog by remember { mutableStateOf(false) }
     // Auto-opened straight from the empty-group "Add members" CTA: render the
     // picker on the first frame (no details-screen flash) and route its Back to
     // the conversation instead of to the details body underneath.
@@ -294,6 +288,27 @@ internal fun GroupDetailsScreen(
     val conversationNotifyMode =
         remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
             appState.conversationNotifyMode(controller.group.groupIdHex)
+        }
+    val conversationMuted = conversationNotifyMode == ChatNotifyMode.NONE
+    // The All/Only-mentions preference behind the mute, and the timed-mute expiry,
+    // resolved off the same state key so an elapsed mute settles once (not per frame).
+    val conversationRestoreMode =
+        remember(
+            appState.activeAccountRef,
+            controller.group.groupIdHex,
+            notificationModes,
+            chatNotificationState.muteExpiries,
+        ) {
+            appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
+        }
+    val conversationMuteExpiry =
+        remember(
+            appState.activeAccountRef,
+            controller.group.groupIdHex,
+            notificationModes,
+            chatNotificationState.muteExpiries,
+        ) {
+            appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
         }
 
     suspend fun refreshMlsDetails() {
@@ -471,25 +486,36 @@ internal fun GroupDetailsScreen(
             conversationTitle = conversationTitle,
             conversationAvatarUrl = controller.avatarUrl,
             isDm = isDm,
-            notifyMode = conversationNotifyMode,
+            isMuted = conversationMuted,
+            muteExpiryMillis = conversationMuteExpiry,
+            notifyForMode = conversationRestoreMode,
             onBack = { showNotificationSettings = false },
-            onChooseNotifyMode = {
-                muteExpiryForPicker = appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
-                showNotificationModePicker = true
+            onToggleMute = { turnOn ->
+                if (turnOn) {
+                    showMuteDurationDialog = true
+                } else {
+                    // Unmute back to the All/Only-mentions preference the mute hid.
+                    appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
+                }
             },
+            onChooseNotifyFor = { showNotifyForDialog = true },
         )
-        if (showNotificationModePicker) {
-            NotificationModePickerDialog(
-                currentMode = conversationNotifyMode,
-                muteExpiryMillis = muteExpiryForPicker,
-                onDismiss = { showNotificationModePicker = false },
-                onSelect = { mode ->
-                    showNotificationModePicker = false
-                    appState.setConversationNotifyMode(controller.group.groupIdHex, mode)
-                },
-                onMuteFor = { duration ->
-                    showNotificationModePicker = false
+        if (showMuteDurationDialog) {
+            MuteDurationDialog(
+                onDismiss = { showMuteDurationDialog = false },
+                onConfirm = { duration ->
+                    showMuteDurationDialog = false
                     appState.muteConversationFor(controller.group.groupIdHex, duration)
+                },
+            )
+        }
+        if (showNotifyForDialog) {
+            NotifyForDialog(
+                currentMode = conversationRestoreMode,
+                onDismiss = { showNotifyForDialog = false },
+                onSelect = { mode ->
+                    showNotifyForDialog = false
+                    appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
                 },
             )
         }
@@ -1512,94 +1538,6 @@ private fun GroupMutationErrorBanner(
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
             }
         }
-    }
-}
-
-private const val MILLIS_PER_SECOND = 1_000L
-private const val MUTE_ONE_HOUR_MILLIS = 3_600_000L
-private const val MUTE_EIGHT_HOURS_MILLIS = 8 * MUTE_ONE_HOUR_MILLIS
-private val NOTIFY_ROW_LEADING_WIDTH = 24.dp
-
-@Composable
-private fun NotificationModePickerDialog(
-    currentMode: ChatNotifyMode,
-    muteExpiryMillis: Long?,
-    onDismiss: () -> Unit,
-    onSelect: (ChatNotifyMode) -> Unit,
-    onMuteFor: (Long) -> Unit,
-) {
-    val timedMuteActive = currentMode == ChatNotifyMode.NONE && muteExpiryMillis != null
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notify)) },
-        text = {
-            Column {
-                NotificationModeRow(R.string.notify_all_messages, selected = currentMode == ChatNotifyMode.ALL) {
-                    onSelect(ChatNotifyMode.ALL)
-                }
-                NotificationModeRow(
-                    R.string.notify_only_mentions,
-                    selected = currentMode == ChatNotifyMode.MENTIONS_ONLY,
-                ) { onSelect(ChatNotifyMode.MENTIONS_ONLY) }
-                // Timed mutes are momentary actions, so they carry no radio.
-                NotificationModeRow(R.string.notify_mute_1_hour, selected = null) {
-                    onMuteFor(MUTE_ONE_HOUR_MILLIS)
-                }
-                NotificationModeRow(R.string.notify_mute_8_hours, selected = null) {
-                    onMuteFor(MUTE_EIGHT_HOURS_MILLIS)
-                }
-                NotificationModeRow(
-                    R.string.notify_mute_until_off,
-                    selected = currentMode == ChatNotifyMode.NONE && muteExpiryMillis == null,
-                ) { onSelect(ChatNotifyMode.NONE) }
-                if (timedMuteActive) {
-                    Text(
-                        stringResource(
-                            R.string.notify_muted_until,
-                            IdentityFormatter.clockTime((muteExpiryMillis!! / MILLIS_PER_SECOND).toULong()),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = Dimens.spaceSm),
-                    )
-                }
-            }
-        },
-        confirmButton = {},
-    )
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun NotificationModeRow(
-    labelRes: Int,
-    selected: Boolean?,
-    onClick: () -> Unit,
-) {
-    // A radio row for a selectable mode; a plain button row for the one-shot
-    // timed-mute actions (selected == null), so accessibility services don't
-    // announce those as never-selected radio buttons.
-    val rowModifier =
-        if (selected == null) {
-            Modifier.clickable(role = Role.Button, onClick = onClick)
-        } else {
-            Modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .then(rowModifier)
-                .padding(vertical = Dimens.spaceSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
-    ) {
-        if (selected == null) {
-            Spacer(Modifier.width(NOTIFY_ROW_LEADING_WIDTH))
-        } else {
-            RadioButton(selected = selected, onClick = null)
-        }
-        Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
     }
 }
 
