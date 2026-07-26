@@ -764,16 +764,18 @@ internal fun ConversationScreen(
     }
 
     fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
+        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
         val timelineIndex =
             anchor.messageId
                 ?.takeIf { it.isNotBlank() }
-                ?.let { messageId -> renderedTimeline.indexOfFirst { it.record.messageIdHex == messageId } }
+                ?.let { messageId -> liveRenderedTimeline.indexOfFirst { it.record.messageIdHex == messageId } }
                 ?.takeIf { it >= 0 }
                 ?: anchor.itemId
-                    ?.let { itemId -> renderedTimeline.indexOfFirst { it.id == itemId } }
+                    ?.let { itemId -> liveRenderedTimeline.indexOfFirst { it.id == itemId } }
                     ?.takeIf { it >= 0 }
                 ?: return null
-        return 1 + (if (hasOlderHeader) 1 else 0) + timelineIndex
+        return 1 + (if (liveHasOlderHeader) 1 else 0) + timelineIndex
     }
 
     // Drag interactions are the authority for user intent. Programmatic list

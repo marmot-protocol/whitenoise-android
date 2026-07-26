@@ -163,7 +163,7 @@ class ConversationNearBottomTest {
         }
         composeRule.waitForIdle()
 
-        assertTrue(isNearBottom(listState, timelineSize = 50, hasOlderHeader = false))
+        assertTrue(isNearBottom(listState, timelineSize = 50, hasOlderHeader = true))
         assertTrue(coordinator.isFollowingTail)
     }
 
