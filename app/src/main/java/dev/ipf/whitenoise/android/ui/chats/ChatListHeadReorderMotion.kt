@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 
 /** Placement-only reorder animation for keyed chat rows (#1651). */
 internal fun LazyItemScope.chatListHeadReorderPlacement(): Modifier =
@@ -55,7 +56,9 @@ internal fun ChatListActiveHeadScrollEffect(
                     isActiveList = isActiveList,
                 )
             ) {
-                listState.animateScrollToItem(0)
+                launch {
+                    listState.animateScrollToItem(0)
+                }
             }
         }
     }

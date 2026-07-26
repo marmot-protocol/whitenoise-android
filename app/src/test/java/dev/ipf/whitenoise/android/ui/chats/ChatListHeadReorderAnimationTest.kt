@@ -14,10 +14,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
@@ -138,6 +140,65 @@ class ChatListHeadReorderAnimationTest {
         assertEquals(bBefore, rowTop("B"), 0.5f)
     }
 
+    @Test
+    fun userInterruptionDoesNotCancelFutureHeadReorderCorrections() {
+        var itemIds by mutableStateOf(listOf("A", "B", "C"))
+        val listStateHolder = arrayOf<LazyListState?>(null)
+
+        composeRule.setContent {
+            val listState = rememberLazyListState()
+            listStateHolder[0] = listState
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = listState,
+                rowHeight = rowHeight,
+            )
+        }
+
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread {
+            itemIds = listOf("B", "A", "C")
+        }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            assertTrue(
+                "first head correction should be active before interruption",
+                listStateHolder[0]!!.isScrollInProgress,
+            )
+        }
+
+        composeRule.onNodeWithTag(CHAT_LIST_HEAD_REORDER_LIST_TAG).performTouchInput {
+            down(center)
+            moveBy(Offset(x = 0f, y = 100f))
+            up()
+        }
+        composeRule.runOnIdle {
+            assertEquals(0, listStateHolder[0]!!.firstVisibleItemIndex)
+            assertEquals(0, listStateHolder[0]!!.firstVisibleItemScrollOffset)
+        }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.runOnIdle { }
+        assertEquals(0f, rowTop("B"), 0.5f)
+
+        composeRule.runOnUiThread {
+            itemIds = listOf("C", "B", "A")
+        }
+        composeRule.runOnIdle { }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            assertTrue(
+                "a later head correction should still animate after user interruption",
+                listStateHolder[0]!!.isScrollInProgress,
+            )
+        }
+
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.runOnIdle { }
+        assertEquals(0f, rowTop("C"), 0.5f)
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -158,7 +219,10 @@ private fun ChatListHeadReorderMotionHarness(
         activeHeadId = itemIds.firstOrNull(),
         isActiveList = true,
     )
-    LazyColumn(state = listState) {
+    LazyColumn(
+        modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
+        state = listState,
+    ) {
         items(itemIds, key = { it }) { id ->
             Box(modifier = chatListHeadReorderPlacement()) {
                 Box(
@@ -176,3 +240,5 @@ private fun ChatListHeadReorderMotionHarness(
 }
 
 private fun chatListHeadReorderRowTag(id: String): String = "chat-list-head-row-$id"
+
+private const val CHAT_LIST_HEAD_REORDER_LIST_TAG = "chat-list-head"
