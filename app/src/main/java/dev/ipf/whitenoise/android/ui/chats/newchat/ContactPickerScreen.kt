@@ -116,7 +116,12 @@ internal fun ContactPickerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (selected.isEmpty()) title else stringResource(R.string.members_count, selected.size),
+                        contactPickerTopBarTitle(
+                            pickerTitle = title,
+                            selectedCount = selected.size,
+                            oneMember = stringResource(R.string.one_member),
+                            membersFormat = stringResource(R.string.members_count),
+                        ),
                     )
                 },
                 navigationIcon = {
@@ -275,6 +280,18 @@ internal fun ContactPickerScreen(
         )
     }
 }
+
+internal fun contactPickerTopBarTitle(
+    pickerTitle: String,
+    selectedCount: Int,
+    oneMember: String,
+    membersFormat: String,
+): String =
+    when (selectedCount) {
+        0 -> pickerTitle
+        1 -> oneMember
+        else -> String.format(membersFormat, selectedCount)
+    }
 
 internal fun shouldAutoSelectResolvedIdentifier(
     autoSelectResolvedIdentifier: Boolean,
