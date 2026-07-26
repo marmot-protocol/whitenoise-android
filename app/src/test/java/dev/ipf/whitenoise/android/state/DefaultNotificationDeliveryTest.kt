@@ -11,6 +11,7 @@ class DefaultNotificationDeliveryTest {
     fun nativePushDisablesPersistentConnectionWhenAvailable() =
         runTest {
             var nativePushEnableCalls = 0
+            var nativePushDisableCalls = 0
             val backgroundUpdates = mutableListOf<Boolean>()
 
             val configured =
@@ -18,6 +19,10 @@ class DefaultNotificationDeliveryTest {
                     nativePushAvailable = true,
                     enableNativePush = {
                         nativePushEnableCalls += 1
+                        true
+                    },
+                    disableNativePush = {
+                        nativePushDisableCalls += 1
                         true
                     },
                     setBackgroundConnectionEnabled = {
@@ -28,6 +33,7 @@ class DefaultNotificationDeliveryTest {
 
             assertTrue(configured)
             assertEquals(1, nativePushEnableCalls)
+            assertEquals(0, nativePushDisableCalls)
             assertEquals(listOf(false), backgroundUpdates)
         }
 
@@ -35,6 +41,7 @@ class DefaultNotificationDeliveryTest {
     fun missingNativePushUsesPersistentConnection() =
         runTest {
             var nativePushEnableCalled = false
+            var nativePushDisableCalled = false
             val backgroundUpdates = mutableListOf<Boolean>()
 
             val configured =
@@ -42,6 +49,10 @@ class DefaultNotificationDeliveryTest {
                     nativePushAvailable = false,
                     enableNativePush = {
                         nativePushEnableCalled = true
+                        true
+                    },
+                    disableNativePush = {
+                        nativePushDisableCalled = true
                         true
                     },
                     setBackgroundConnectionEnabled = {
@@ -52,44 +63,91 @@ class DefaultNotificationDeliveryTest {
 
             assertTrue(configured)
             assertFalse(nativePushEnableCalled)
+            assertFalse(nativePushDisableCalled)
             assertEquals(listOf(true), backgroundUpdates)
         }
 
     @Test
     fun failedNativePushEnableFallsBackToPersistentConnection() =
         runTest {
-            val backgroundUpdates = mutableListOf<Boolean>()
+            val updates = mutableListOf<String>()
 
             val configured =
                 configureDefaultNotificationDelivery(
                     nativePushAvailable = true,
-                    enableNativePush = { false },
+                    enableNativePush = {
+                        updates += "native:on"
+                        false
+                    },
+                    disableNativePush = {
+                        updates += "native:off"
+                        true
+                    },
                     setBackgroundConnectionEnabled = {
-                        backgroundUpdates += it
+                        updates += "background:$it"
                         true
                     },
                 )
 
             assertTrue(configured)
-            assertEquals(listOf(true), backgroundUpdates)
+            assertEquals(listOf("native:on", "native:off", "background:true"), updates)
         }
 
     @Test
     fun failedNativePushShutdownRestoresPersistentConnection() =
         runTest {
-            val backgroundUpdates = mutableListOf<Boolean>()
+            val updates = mutableListOf<String>()
 
             val configured =
                 configureDefaultNotificationDelivery(
                     nativePushAvailable = true,
-                    enableNativePush = { true },
+                    enableNativePush = {
+                        updates += "native:on"
+                        true
+                    },
+                    disableNativePush = {
+                        updates += "native:off"
+                        true
+                    },
                     setBackgroundConnectionEnabled = {
-                        backgroundUpdates += it
+                        updates += "background:$it"
                         it
                     },
                 )
 
             assertTrue(configured)
-            assertEquals(listOf(false, true), backgroundUpdates)
+            assertEquals(
+                listOf("native:on", "background:false", "native:off", "background:true"),
+                updates,
+            )
+        }
+
+    @Test
+    fun failedNativePushRollbackReportsUnconfiguredButRestoresPersistentConnection() =
+        runTest {
+            val updates = mutableListOf<String>()
+
+            val configured =
+                configureDefaultNotificationDelivery(
+                    nativePushAvailable = true,
+                    enableNativePush = {
+                        updates += "native:on"
+                        true
+                    },
+                    disableNativePush = {
+                        updates += "native:off"
+                        false
+                    },
+                    setBackgroundConnectionEnabled = {
+                        updates += "background:$it"
+                        it
+                    },
+                )
+
+            assertFalse(configured)
+            assertEquals(
+                listOf("native:on", "background:false", "native:off", "background:true"),
+                updates,
+            )
         }
 }

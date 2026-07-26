@@ -594,17 +594,21 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
  * Prefer the battery-efficient native-push wake path when this build/device
  * supports it. If enabling push fails, retain the persistent relay connection
  * so first-run setup never silently leaves the account without background
- * delivery.
+ * delivery. Any partial native-push enablement is rolled back before the
+ * persistent fallback is restored, keeping the two delivery modes exclusive.
  */
 internal suspend fun configureDefaultNotificationDelivery(
     nativePushAvailable: Boolean,
     enableNativePush: suspend () -> Boolean,
+    disableNativePush: suspend () -> Boolean,
     setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
 ): Boolean {
-    if (nativePushAvailable && enableNativePush()) {
-        if (setBackgroundConnectionEnabled(false)) return true
-    }
-    return setBackgroundConnectionEnabled(true)
+    if (!nativePushAvailable) return setBackgroundConnectionEnabled(true)
+    val nativePushReady = enableNativePush()
+    if (nativePushReady && setBackgroundConnectionEnabled(false)) return true
+    val nativePushDisabled = disableNativePush()
+    val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
+    return nativePushDisabled && backgroundConnectionEnabled
 }
 
 /**
@@ -5143,6 +5147,9 @@ class WhiteNoiseAppState private constructor(
         nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
     }
 
+    private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
+        nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
+
     private suspend fun syncNativePushRegistrationIfEnabledLocked() {
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
@@ -5296,14 +5303,19 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val settings = marmotIo { setNativePushEnabled(account, enabled) }
             localNotificationSettings = settings
+            if (settings.nativePushEnabled != enabled) return@runCatching false
             if (enabled) {
                 // Explicit enable beats a queued sign-out disable for this account.
                 pushTokenStore.clearPendingDisable(account)
                 syncNativePushRegistrationIfEnabled()
+                // The runtime flag alone is not a usable delivery path. Only
+                // report enablement after upsertPushRegistration succeeded
+                // and cached the exact account/token/server fingerprint.
+                hasConfirmedNativePushRegistration(account)
             } else {
                 clearPushRegistrationForAccount(account)
+                true
             }
-            true
         }.getOrElse {
             rethrowIfCancellation(it)
             present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
@@ -5407,6 +5419,7 @@ class WhiteNoiseAppState private constructor(
         return configureDefaultNotificationDelivery(
             nativePushAvailable = isNativePushAvailable(),
             enableNativePush = { setNativePushEnabled(true) },
+            disableNativePush = { setNativePushEnabled(false) },
             setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
         )
     }
