@@ -8,6 +8,28 @@ import org.junit.Test
 
 class DefaultNotificationDeliveryTest {
     @Test
+    fun nativePushEnablementRequiresAllAccountsAndActiveRegistration() {
+        assertTrue(
+            nativePushEnablementConfirmed(
+                allAccountsReady = true,
+                activeAccountRegistered = true,
+            ),
+        )
+        assertFalse(
+            nativePushEnablementConfirmed(
+                allAccountsReady = false,
+                activeAccountRegistered = true,
+            ),
+        )
+        assertFalse(
+            nativePushEnablementConfirmed(
+                allAccountsReady = true,
+                activeAccountRegistered = false,
+            ),
+        )
+    }
+
+    @Test
     fun nativePushDisablesPersistentConnectionWhenAvailable() =
         runTest {
             var nativePushEnableCalls = 0
