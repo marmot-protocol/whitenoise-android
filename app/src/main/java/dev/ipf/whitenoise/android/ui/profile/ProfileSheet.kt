@@ -145,6 +145,21 @@ internal fun profileSheetAdminActions(
     ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
 }
 
+@Suppress("FunctionNaming")
+@Composable
+internal fun ProfileStartGroupAction(
+    candidate: RecipientSearch.Candidate,
+    enabled: Boolean,
+    onStartGroup: (RecipientSearch.Candidate) -> Unit,
+) {
+    SettingsActionRow(
+        icon = Icons.Default.Group,
+        title = stringResource(R.string.profile_start_new_group_with, candidate.displayName),
+        enabled = enabled,
+        onClick = { onStartGroup(candidate) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileSheet(
@@ -462,21 +477,15 @@ internal fun ProfileSheet(
                         enabled = !creatingChat,
                         onClick = { showContactEditorDialog = true },
                     )
-                    SettingsActionRow(
-                        icon = Icons.Default.Group,
-                        title = stringResource(R.string.profile_start_new_group_with, displayTitle),
+                    ProfileStartGroupAction(
+                        candidate =
+                            RecipientSearch.Candidate(
+                                accountIdHex = hex!!,
+                                displayName = displayTitle,
+                                npub = npub,
+                            ),
                         enabled = !creatingChat,
-                        onClick = {
-                            hex?.let { accountIdHex ->
-                                onStartGroup(
-                                    RecipientSearch.Candidate(
-                                        accountIdHex = accountIdHex,
-                                        displayName = displayTitle,
-                                        npub = npub,
-                                    ),
-                                )
-                            }
-                        },
+                        onStartGroup = onStartGroup,
                     )
                     if (addableGroups.isNotEmpty()) {
                         SettingsActionRow(

@@ -1,13 +1,43 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.app.Application
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.profile.ProfileStartGroupAction
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
-import java.io.File
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ProfileStartGroupNavigationTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private val app: Application = ApplicationProvider.getApplicationContext()
+
     @Test
     fun shellProfileStartGroupPromotesPickerWithViewedMember() {
         val candidate = viewedCandidate()
@@ -75,55 +105,97 @@ class ProfileStartGroupNavigationTest {
     }
 
     @Test
-    fun profileSheetDelegatesGroupStartInsteadOfComposingTheForegroundFlow() {
-        val source = sourceFile("ui/profile/ProfileSheet.kt").readText()
-        val actionStart = source.indexOf("title = stringResource(R.string.profile_start_new_group_with")
-        val action = source.substring(actionStart, source.indexOf("SettingsActionRow(", actionStart + 1))
+    fun shellProfileHandoffShowsSelectedMemberAndBackClearsOverlays() {
+        val fixture = renderProfileHandoff(conversationOpen = false)
 
-        assertFalse(
-            "ProfileSheet must not emit a full-screen group flow from behind its modal",
-            source.contains("NewGroupFlow("),
-        )
-        assertTrue("the profile action must invoke the shell handoff", action.contains("onStartGroup("))
-        assertTrue(
-            "the shell handoff must retain the viewed member",
-            action.contains("RecipientSearch.Candidate("),
-        )
+        startGroupFromProfile(fixture)
+
+        composeRule.onNodeWithText(PROFILE_SURFACE).assertDoesNotExist()
+        composeRule.onNodeWithText(SHELL_SURFACE).assertDoesNotExist()
+        assertSelectedMemberPicker(fixture)
+
+        closePicker()
+
+        composeRule.onNodeWithText(PROFILE_SURFACE).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.members_count, 1)).assertDoesNotExist()
+        composeRule.onNodeWithText(SHELL_SURFACE).assertIsDisplayed()
     }
 
     @Test
-    fun shellOwnsGroupFlowBeforeRenderingEitherProfileEntryPoint() {
-        val shellSource = sourceFile("ui/navigation/MainShell.kt").readText()
-        val conversationSource = sourceFile("ui/conversation/ConversationScreen.kt").readText()
-        val flowIndex = shellSource.indexOf("        NewGroupFlow(")
-        val conversationIndex = shellSource.indexOf("        ConversationScreen(")
-        val promotedBlockIndex =
-            shellSource.lastIndexOf("    if (profileRoute is ProfileForegroundRoute.NewGroup)", flowIndex)
-        val closeBlock =
-            shellSource.substringAfter("            onClose = {").substringBefore("            },")
+    fun conversationProfileHandoffRemovesAdminSheetAndBackRestoresConversationOnly() {
+        val fixture = renderProfileHandoff(conversationOpen = true)
 
-        assertTrue("MainShell must render the promoted group flow", flowIndex >= 0)
-        assertTrue(
-            "picker back must invoke the tested foreground-state cleanup",
-            closeBlock.contains("profileGroupForegroundState.close()"),
-        )
-        assertTrue(
-            "the promoted flow must retain the owning chat surface's secure-window policy",
-            shellSource.substring(promotedBlockIndex, flowIndex).contains("WindowSecureFlag("),
-        )
-        assertTrue("the promoted flow must replace, not sit behind, a conversation", flowIndex < conversationIndex)
-        assertTrue(
-            "the promoted flow must return before the conversation can render over it",
-            shellSource.substring(flowIndex, conversationIndex).contains("\n        return\n"),
-        )
-        assertTrue(
-            "the viewed profile must remain preselected in the promoted picker",
-            shellSource.contains("initialMembers = listOf(profileRoute.initialMember)"),
-        )
-        assertTrue(
-            "the in-conversation profile must delegate the same handoff to MainShell",
-            conversationSource.contains("onStartGroup = onStartProfileGroup"),
-        )
+        composeRule.onNodeWithText(ADMIN_CONTEXT).assertIsDisplayed()
+        startGroupFromProfile(fixture)
+
+        composeRule.onNodeWithText(PROFILE_SURFACE).assertDoesNotExist()
+        composeRule.onNodeWithText(ADMIN_CONTEXT).assertDoesNotExist()
+        composeRule.onNodeWithText(CONVERSATION_SURFACE).assertDoesNotExist()
+        assertSelectedMemberPicker(fixture)
+
+        closePicker()
+
+        composeRule.onNodeWithText(PROFILE_SURFACE).assertDoesNotExist()
+        composeRule.onNodeWithText(ADMIN_CONTEXT).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.members_count, 1)).assertDoesNotExist()
+        composeRule.onNodeWithText(CONVERSATION_SURFACE).assertIsDisplayed()
+    }
+
+    private fun renderProfileHandoff(conversationOpen: Boolean): HandoffFixture {
+        val candidate = viewedCandidate()
+        val appState = WhiteNoiseAppState(app, DraftStore(EmptyDraftPersistence()))
+        val targetLabel = appState.displayName(candidate.accountIdHex)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                var profileOpen by remember { mutableStateOf(true) }
+                val foregroundState = remember { ProfileGroupForegroundState() }
+                val pickerOpen =
+                    ProfileGroupForegroundFlow(
+                        appState = appState,
+                        initialMember = foregroundState.initialMember,
+                        secureWindowEnabled = null,
+                        onOpenConversation = { _, _ -> foregroundState.close() },
+                        onClose = foregroundState::close,
+                    )
+                if (!pickerOpen) {
+                    Text(if (conversationOpen) CONVERSATION_SURFACE else SHELL_SURFACE)
+                    if (profileOpen) {
+                        Column {
+                            Text(PROFILE_SURFACE)
+                            if (conversationOpen) Text(ADMIN_CONTEXT)
+                            ProfileStartGroupAction(
+                                candidate = candidate,
+                                enabled = true,
+                                onStartGroup = {
+                                    profileOpen = false
+                                    foregroundState.open(it)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        return HandoffFixture(candidate = candidate, targetLabel = targetLabel)
+    }
+
+    private fun startGroupFromProfile(fixture: HandoffFixture) {
+        composeRule
+            .onNodeWithText(app.getString(R.string.profile_start_new_group_with, fixture.candidate.displayName))
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun assertSelectedMemberPicker(fixture: HandoffFixture) {
+        composeRule.onNodeWithText(app.getString(R.string.members_count, 1)).assertIsDisplayed()
+        composeRule.onNodeWithText(fixture.targetLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.back)).assertIsEnabled()
+    }
+
+    private fun closePicker() {
+        composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+        composeRule.waitForIdle()
     }
 
     private fun viewedCandidate() =
@@ -133,9 +205,24 @@ class ProfileStartGroupNavigationTest {
             npub = "npub1alice",
         )
 
-    private fun sourceFile(relativePath: String): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::isFile) ?: error("Missing source file: $relativePath")
+    private data class HandoffFixture(
+        val candidate: RecipientSearch.Candidate,
+        val targetLabel: String,
+    )
+
+    private class EmptyDraftPersistence : DraftPersistence {
+        override fun read(): Map<String, String> = emptyMap()
+
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
+    }
+
+    private companion object {
+        const val PROFILE_SURFACE = "Profile modal"
+        const val SHELL_SURFACE = "Chat list shell"
+        const val CONVERSATION_SURFACE = "Active group conversation"
+        const val ADMIN_CONTEXT = "Group admin profile context"
+    }
 }

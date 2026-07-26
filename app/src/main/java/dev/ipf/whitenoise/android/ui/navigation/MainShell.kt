@@ -90,6 +90,26 @@ internal fun profileForegroundRoute(
         else -> ProfileForegroundRoute.ShellProfile(pendingProfileNpub)
     }
 
+@Suppress("FunctionNaming")
+@Composable
+internal fun ProfileGroupForegroundFlow(
+    appState: WhiteNoiseAppState,
+    initialMember: RecipientSearch.Candidate?,
+    secureWindowEnabled: Boolean?,
+    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onClose: () -> Unit,
+): Boolean {
+    val member = initialMember ?: return false
+    secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
+    NewGroupFlow(
+        appState = appState,
+        initialMembers = listOf(member),
+        onOpenConversation = onOpenConversation,
+        onClose = onClose,
+    )
+    return true
+}
+
 internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
     ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
 
@@ -509,13 +529,17 @@ internal fun MainShell(
             startGroupMember = profileGroupForegroundState.initialMember,
             conversationOpen = selectedChat != null,
         )
-    if (profileRoute is ProfileForegroundRoute.NewGroup) {
-        if (selectedChat != null || section == MainSection.Chats) {
-            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
-        }
-        NewGroupFlow(
+    val newGroupRoute = profileRoute as? ProfileForegroundRoute.NewGroup
+    if (
+        ProfileGroupForegroundFlow(
             appState = appState,
-            initialMembers = listOf(profileRoute.initialMember),
+            initialMember = newGroupRoute?.initialMember,
+            secureWindowEnabled =
+                if (newGroupRoute != null && (selectedChat != null || section == MainSection.Chats)) {
+                    !appState.allowChatScreenshotsInChats
+                } else {
+                    null
+                },
             onOpenConversation = { item, justCreated ->
                 profileGroupForegroundState.close()
                 openGroupFromProfile(item, justCreated)
@@ -525,6 +549,7 @@ internal fun MainShell(
                 profileGroupForegroundState.close()
             },
         )
+    ) {
         return
     }
 

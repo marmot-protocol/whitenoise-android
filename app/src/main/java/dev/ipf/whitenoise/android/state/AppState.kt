@@ -1149,9 +1149,16 @@ private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 private const val TTS_PREVIEW_MAX_LENGTH = 120
 
-class WhiteNoiseAppState(
+class WhiteNoiseAppState private constructor(
     context: Context,
+    val draftStore: DraftStore,
+    startPlatformServices: Boolean,
 ) {
+    constructor(context: Context) : this(context, DraftStore.forContext(context.applicationContext), true)
+
+    /** JVM Compose tests use in-memory drafts and do not start Android platform services. */
+    internal constructor(context: Context, draftStore: DraftStore) : this(context, draftStore, false)
+
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
 
@@ -1718,7 +1725,6 @@ class WhiteNoiseAppState(
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
-    val draftStore: DraftStore = DraftStore.forContext(appContext)
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
@@ -1802,32 +1808,34 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
-        // Drive timed-mute expiry emission so muted icons and folder rules
-        // refresh when a mute elapses, not only on the next getter call.
-        chatMutePreferences.attachExpiryScheduler(mutationsScope)
-        if (BuildConfig.SELF_UPDATE_ENABLED) {
-            // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
-            mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
-            notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
-        }
-        // Off-main: the ConnectivityManager registration + seed query are
-        // binder IPCs and this constructor runs on the main thread. Until the
-        // seed lands, the snapshot reads as offline/no-networks — the same
-        // conservative answer the auto-download gate gives for "unknown".
-        mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
-        // Wipe pre-encryption cache entries promptly after upgrade without doing
-        // directory I/O in this main-thread constructor.
-        mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
-        if (requireAppUnlock) {
-            // Pre-warm the Keystore-backed unlock timestamp off-main so the
-            // first foreground lock evaluation is a cache hit. Assigned on
-            // Main, and only if an unlock hasn't already stamped a newer value.
-            mutationsScope.launch {
-                val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
-                if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+        if (startPlatformServices) {
+            // Drive timed-mute expiry emission so muted icons and folder rules
+            // refresh when a mute elapses, not only on the next getter call.
+            chatMutePreferences.attachExpiryScheduler(mutationsScope)
+            if (BuildConfig.SELF_UPDATE_ENABLED) {
+                // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
+                mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
+                notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
             }
+            // Off-main: the ConnectivityManager registration + seed query are
+            // binder IPCs and this constructor runs on the main thread. Until the
+            // seed lands, the snapshot reads as offline/no-networks — the same
+            // conservative answer the auto-download gate gives for "unknown".
+            mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
+            // Wipe pre-encryption cache entries promptly after upgrade without doing
+            // directory I/O in this main-thread constructor.
+            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            if (requireAppUnlock) {
+                // Pre-warm the Keystore-backed unlock timestamp off-main so the
+                // first foreground lock evaluation is a cache hit. Assigned on
+                // Main, and only if an unlock hasn't already stamped a newer value.
+                mutationsScope.launch {
+                    val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+                    if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+                }
+            }
+            mutationsScope.launch { refreshTtsAvailability() }
         }
-        mutationsScope.launch { refreshTtsAvailability() }
     }
 
     val activeAccount: AccountSummaryFfi?
