@@ -293,11 +293,21 @@ internal fun GroupDetailsScreen(
     // The All/Only-mentions preference behind the mute, and the timed-mute expiry,
     // resolved off the same state key so an elapsed mute settles once (not per frame).
     val conversationRestoreMode =
-        remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
+        remember(
+            appState.activeAccountRef,
+            controller.group.groupIdHex,
+            notificationModes,
+            chatNotificationState.muteExpiries,
+        ) {
             appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
         }
     val conversationMuteExpiry =
-        remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
+        remember(
+            appState.activeAccountRef,
+            controller.group.groupIdHex,
+            notificationModes,
+            chatNotificationState.muteExpiries,
+        ) {
             appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
         }
 
@@ -505,7 +515,7 @@ internal fun GroupDetailsScreen(
                 onDismiss = { showNotifyForDialog = false },
                 onSelect = { mode ->
                     showNotifyForDialog = false
-                    appState.setConversationNotifyMode(controller.group.groupIdHex, mode)
+                    appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
                 },
             )
         }

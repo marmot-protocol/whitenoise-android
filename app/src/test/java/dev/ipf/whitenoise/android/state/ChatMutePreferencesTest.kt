@@ -171,7 +171,7 @@ class ChatMutePreferencesTest {
         assertTrue("mutations must route through the atomic publisher", "publishLocked(" in setMode)
         assertTrue(
             "mode and muted projections must publish together",
-            "_state.value = ChatNotificationState(modes)" in publishLocked,
+            "_state.value = ChatNotificationState(modes, expiries)" in publishLocked,
         )
         assertFalse("there must not be a second mutable muted flow", "_mutedConversations" in source)
     }
@@ -279,6 +279,46 @@ class ChatMutePreferencesTest {
         assertTrue(prefs.isMuted("a", "g"))
         // The Mute row hides the chat; "Notify for" must still show the real choice.
         assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
+    fun changingNotifyForWhileTimedMutedKeepsTheMuteAndItsExpiry() {
+        val prefs = ChatMutePreferences(context, now = { 1_000L })
+        prefs.muteFor("a", "g", durationMillis = 8_000L)
+
+        prefs.setNotifyForMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+
+        assertTrue(prefs.isMuted("a", "g"))
+        assertEquals(9_000L, prefs.muteExpiryMillis("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("a", "g"))
+        assertEquals(
+            ChatNotifyMode.MENTIONS_ONLY,
+            prefs.state.value.muteExpiries["a|g"]
+                ?.restoreMode,
+        )
+    }
+
+    @Test
+    fun changingNotifyForWhilePermanentlyMutedKeepsTheMuteAcrossReload() {
+        val prefs = ChatMutePreferences(context)
+        prefs.muteFor("a", "g", durationMillis = 0L)
+
+        prefs.setNotifyForMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+
+        assertTrue(prefs.isMuted("a", "g"))
+        val reloaded = ChatMutePreferences(context)
+        assertTrue(reloaded.isMuted("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, reloaded.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
+    fun changingNotifyForWhileUnmutedAppliesTheLiveMode() {
+        val prefs = ChatMutePreferences(context)
+
+        prefs.setNotifyForMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+
+        assertFalse(prefs.isMuted("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.mode("a", "g"))
     }
 
     @Test

@@ -28,6 +28,7 @@ data class MuteExpiry(
 
 data class ChatNotificationState(
     val notificationModes: Map<String, ChatNotifyMode>,
+    val muteExpiries: Map<String, MuteExpiry>,
 ) {
     val mutedConversations: Set<String> = ChatMutePreferences.mutedKeysOf(notificationModes)
 }
@@ -66,7 +67,13 @@ class ChatMutePreferences(
 ) {
     private val mutationLock = Any()
     private var muteExpiries: Map<String, MuteExpiry> = readMuteExpiries(preferences)
-    private val _state = MutableStateFlow(ChatNotificationState(readNotificationModes(preferences)))
+    private val _state =
+        MutableStateFlow(
+            ChatNotificationState(
+                notificationModes = readNotificationModes(preferences),
+                muteExpiries = muteExpiries,
+            ),
+        )
     val state: StateFlow<ChatNotificationState> = _state.asStateFlow()
 
     // When set, a coroutine sleeps until the nearest timed mute elapses and then
@@ -152,6 +159,33 @@ class ChatMutePreferences(
         }
     }
 
+    /**
+     * Updates the All/Only-mentions preference without ending an active mute.
+     * When unmuted this is the same as [setMode].
+     */
+    fun setNotifyForMode(
+        accountRef: String,
+        groupIdHex: String,
+        mode: ChatNotifyMode,
+    ) {
+        if (mode == ChatNotifyMode.NONE) return
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
+        synchronized(mutationLock) {
+            resolveExpiredLockedInternal()
+            if (_state.value.notificationModes[key] != ChatNotifyMode.NONE) {
+                setMode(accountRef, groupIdHex, mode)
+                return
+            }
+
+            // A legacy permanent mute may have no metadata yet. Create a
+            // null-expiry record so its newly selected restore mode persists.
+            val expiry = muteExpiries[key]?.expiryMillis
+            val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, mode))
+            if (nextExpiries == muteExpiries) return
+            publishLocked(_state.value.notificationModes, nextExpiries)
+        }
+    }
+
     fun setMuted(
         accountRef: String,
         groupIdHex: String,
@@ -232,7 +266,7 @@ class ChatMutePreferences(
         expiries: Map<String, MuteExpiry>,
     ) {
         muteExpiries = expiries
-        _state.value = ChatNotificationState(modes)
+        _state.value = ChatNotificationState(modes, expiries)
         preferences
             .edit()
             .putStringSet(KEY_MUTED_CONVERSATIONS, modes.filterValues { it == ChatNotifyMode.NONE }.keys)

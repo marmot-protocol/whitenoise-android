@@ -3900,6 +3900,14 @@ class WhiteNoiseAppState private constructor(
         chatMutePreferences.setMode(accountRef, groupIdHex, mode)
     }
 
+    fun setConversationNotifyForMode(
+        groupIdHex: String,
+        mode: ChatNotifyMode,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.setNotifyForMode(accountRef, groupIdHex, mode)
+    }
+
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,
