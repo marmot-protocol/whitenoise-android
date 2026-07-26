@@ -371,6 +371,26 @@ class ChatMutePreferencesTest {
         }
 
     @Test
+    fun systemTimeChangeResolvesAForwardWallClockJumpWithoutSchedulerTimeAdvancing() =
+        runTest {
+            var clock = 0L
+            val prefs = ChatMutePreferences(context, now = { clock }, scope = backgroundScope)
+            prefs.muteFor("a", "g", durationMillis = 8_000L)
+            assertTrue("a|g" in prefs.state.value.mutedConversations)
+
+            // ACTION_TIME_CHANGED routes to resolveExpiredNow(). Model automatic
+            // time sync while the app remains foreground by advancing only wall
+            // time, leaving the uptime-backed coroutine delay untouched.
+            clock = 9_000L
+            prefs.resolveExpiredNow()
+
+            assertFalse(
+                "a wall-clock change past expiry must restore the raw state flow",
+                "a|g" in prefs.state.value.mutedConversations,
+            )
+        }
+
+    @Test
     fun aTimerWakingBeforeExpiryReArmsInsteadOfDroppingTheMute() =
         runTest {
             var clock = 0L
