@@ -467,13 +467,15 @@ internal fun ProfileSheet(
                         title = stringResource(R.string.profile_start_new_group_with, displayTitle),
                         enabled = !creatingChat,
                         onClick = {
-                            onStartGroup(
-                                RecipientSearch.Candidate(
-                                    accountIdHex = hex!!,
-                                    displayName = displayTitle,
-                                    npub = npub,
-                                ),
-                            )
+                            hex?.let { accountIdHex ->
+                                onStartGroup(
+                                    RecipientSearch.Candidate(
+                                        accountIdHex = accountIdHex,
+                                        displayName = displayTitle,
+                                        npub = npub,
+                                    ),
+                                )
+                            }
                         },
                     )
                     if (addableGroups.isNotEmpty()) {
