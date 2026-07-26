@@ -5141,23 +5141,11 @@ class ConversationController(
             }
         val body = trimmedCaption ?: "📎 $placeholderName"
         val optimistic =
-            AppMessageRecordFfi(
-                messageIdHex = tempId,
-                direction = "sent",
-                groupIdHex = group.groupIdHex,
-                sender = conversationAccountIdHex ?: "",
-                plaintext = body,
-                contentTokens = appState.parseMarkdownOrEmpty(body),
-                kind = 9uL,
-                tags =
-                    attachments.map {
-                        MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-                    },
-                sourceEpoch = null,
-                retentionSeconds = null,
-                retentionExpiresAt = null,
-                recordedAt = now,
-                receivedAt = now,
+            pendingAttachmentRecord(
+                tempId = tempId,
+                body = body,
+                attachments = attachments,
+                now = now,
             )
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
@@ -5177,6 +5165,31 @@ class ConversationController(
         publishTimelineFromIndexes()
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
+
+    private suspend fun pendingAttachmentRecord(
+        tempId: String,
+        body: String,
+        attachments: List<PendingAttachment>,
+        now: ULong,
+    ): AppMessageRecordFfi =
+        AppMessageRecordFfi(
+            messageIdHex = tempId,
+            direction = "sent",
+            groupIdHex = group.groupIdHex,
+            sender = conversationAccountIdHex ?: "",
+            plaintext = body,
+            contentTokens = appState.parseMarkdownOrEmpty(body),
+            kind = 9uL,
+            tags =
+                attachments.map {
+                    MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
+                },
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
+            recordedAt = now,
+            receivedAt = now,
+        )
 
     /** Drive the upload + publish for a previously [queueAttachments]-seeded slot. */
     suspend fun uploadQueued(seeded: QueuedAttachmentSend) {
