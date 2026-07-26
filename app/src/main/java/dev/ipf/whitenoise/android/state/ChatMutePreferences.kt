@@ -16,9 +16,13 @@ enum class ChatNotifyMode {
     NONE,
 }
 
-/** A time-bounded mute: silence until [expiryMillis], then restore [restoreMode]. */
+/**
+ * A mute and the mode to restore when it ends. [expiryMillis] is the epoch time to
+ * silence until, or null for a permanent mute — kept (rather than dropping the
+ * record) so a permanent mute still remembers the notify mode it hid.
+ */
 data class MuteExpiry(
-    val expiryMillis: Long,
+    val expiryMillis: Long?,
     val restoreMode: ChatNotifyMode,
 )
 
@@ -38,7 +42,7 @@ internal fun resolveExpiredMutes(
     expiries: Map<String, MuteExpiry>,
     now: Long,
 ): Triple<Map<String, ChatNotifyMode>, Map<String, MuteExpiry>, Boolean> {
-    val elapsed = expiries.filterValues { now >= it.expiryMillis }
+    val elapsed = expiries.filterValues { entry -> entry.expiryMillis?.let { now >= it } == true }
     if (elapsed.isEmpty()) return Triple(storedModes, expiries, false)
     val modes =
         storedModes.toMutableMap().apply {
@@ -184,12 +188,10 @@ class ChatMutePreferences(
                 _state.value.notificationModes
                     .toMutableMap()
                     .apply { put(key, ChatNotifyMode.NONE) }
-            val nextExpiries =
-                if (durationMillis <= 0) {
-                    muteExpiries - key
-                } else {
-                    muteExpiries + (key to MuteExpiry(now() + durationMillis, restoreMode))
-                }
+            // A non-positive duration is a permanent mute: keep a record with a
+            // null expiry so it still remembers [restoreMode] for when unmuted.
+            val expiry = if (durationMillis <= 0) null else now() + durationMillis
+            val nextExpiries = muteExpiries + (key to MuteExpiry(expiry, restoreMode))
             publishLocked(modes.toMap(), nextExpiries)
         }
     }
@@ -247,7 +249,8 @@ class ChatMutePreferences(
         expiryJob?.cancel()
         expiryJob = null
         val scope = expiryScope ?: return
-        val nearest = muteExpiries.values.minOfOrNull { it.expiryMillis } ?: return
+        // Permanent mutes (null expiry) carry no timer.
+        val nearest = muteExpiries.values.mapNotNull { it.expiryMillis }.minOrNull() ?: return
         val delayMillis = (nearest - now()).coerceAtLeast(0)
         expiryJob =
             scope.launch {
@@ -268,9 +271,12 @@ class ChatMutePreferences(
         // spaces), and split(limit = 3) leaves the final field whole. The mode
         // persists by stable name, not ordinal, so reordering the enum can't
         // silently reinterpret an installed user's pending timers.
-        fun encodeMuteExpiry(entry: Map.Entry<String, MuteExpiry>): String =
-            listOf(entry.value.expiryMillis, entry.value.restoreMode.name, entry.key)
+        // A permanent mute has no expiry, encoded as an empty first field.
+        fun encodeMuteExpiry(entry: Map.Entry<String, MuteExpiry>): String {
+            val expiryField = entry.value.expiryMillis?.toString() ?: ""
+            return listOf(expiryField, entry.value.restoreMode.name, entry.key)
                 .joinToString(EXPIRY_FIELD_SEPARATOR)
+        }
 
         fun readMuteExpiries(preferences: SharedPreferences): Map<String, MuteExpiry> =
             preferences
@@ -282,9 +288,13 @@ class ChatMutePreferences(
         private fun decodeMuteExpiry(encoded: String): Pair<String, MuteExpiry>? {
             val fields = encoded.split(EXPIRY_FIELD_SEPARATOR, limit = EXPIRY_FIELD_COUNT)
             if (fields.size != EXPIRY_FIELD_COUNT) return null
-            val expiry = fields[0].toLongOrNull()
+            val expiryField = fields[0]
+            val expiry = expiryField.toLongOrNull()
+            // Empty field = permanent mute (null expiry); a non-empty non-number is
+            // corrupt and dropped.
+            val corruptExpiry = expiryField.isNotEmpty() && expiry == null
             val restore = decodeRestoreMode(fields[1])
-            return if (expiry != null && restore != null) fields[2] to MuteExpiry(expiry, restore) else null
+            return if (!corruptExpiry && restore != null) fields[2] to MuteExpiry(expiry, restore) else null
         }
 
         // Prefer the stable name; fall back to the legacy ordinal form so a blob

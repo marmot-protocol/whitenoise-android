@@ -268,11 +268,29 @@ class ChatMutePreferencesTest {
     }
 
     @Test
-    fun restoreNotifyModeDefaultsToAllForAPermanentMute() {
+    fun permanentMuteThenUnmuteRestoresTheHiddenOnlyMentionsPreference() {
         val prefs = ChatMutePreferences(context)
-        prefs.setMuted("a", "g", muted = true)
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+        prefs.muteFor("a", "g", durationMillis = 0L) // "Always"
         assertTrue(prefs.isMuted("a", "g"))
-        assertEquals(ChatNotifyMode.ALL, prefs.restoreNotifyMode("a", "g"))
+        // The Notify-for preference the mute hid must survive a permanent mute.
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("a", "g"))
+
+        prefs.setMode("a", "g", prefs.restoreNotifyMode("a", "g")) // unmute
+        assertFalse(prefs.isMuted("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.mode("a", "g"))
+    }
+
+    @Test
+    fun permanentMuteRestoreModeSurvivesAReload() {
+        val prefs = ChatMutePreferences(context)
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+        prefs.muteFor("a", "g", durationMillis = 0L)
+
+        val reloaded = ChatMutePreferences(context)
+        assertTrue(reloaded.isMuted("a", "g"))
+        assertEquals(null, reloaded.muteExpiryMillis("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, reloaded.restoreNotifyMode("a", "g"))
     }
 
     @Test
