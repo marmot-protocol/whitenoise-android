@@ -1049,6 +1049,10 @@
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
     <string name="notify_nothing">Hiçbiri</string>
+    <string name="notify_mute_1_hour">1 saat sessize al</string>
+    <string name="notify_mute_8_hours">8 saat sessize al</string>
+    <string name="notify_mute_until_off">Yeniden açana kadar sessize al</string>
+    <string name="notify_muted_until">%1$s tarihine kadar sessiz</string>
     <string name="customize_sound_vibration">Ses ve titreşimi özelleştir</string>
     <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>

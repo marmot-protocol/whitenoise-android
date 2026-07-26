@@ -1091,6 +1091,10 @@
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
     <string name="notify_nothing">Ничего</string>
+    <string name="notify_mute_1_hour">Отключить на 1 час</string>
+    <string name="notify_mute_8_hours">Отключить на 8 часов</string>
+    <string name="notify_mute_until_off">Отключить до повторного включения</string>
+    <string name="notify_muted_until">Отключено до %1$s</string>
     <string name="customize_sound_vibration">Настроить звук и вибрацию</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>

@@ -1051,6 +1051,10 @@
     <string name="notify_all_messages">Todas as mensagens</string>
     <string name="notify_only_mentions">Apenas menções</string>
     <string name="notify_nothing">Nada</string>
+    <string name="notify_mute_1_hour">Silenciar por 1 hora</string>
+    <string name="notify_mute_8_hours">Silenciar por 8 horas</string>
+    <string name="notify_mute_until_off">Silenciar até eu reativar</string>
+    <string name="notify_muted_until">Silenciado até %1$s</string>
     <string name="customize_sound_vibration">Personalizar som e vibração</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostrar um atalho «Ler mais» para mensagens longas nesta conversa</string>
