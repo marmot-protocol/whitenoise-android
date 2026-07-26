@@ -70,7 +70,7 @@ class MessageBubbleMediaReferenceTest {
             nonceHex = "c".repeat(24),
             fileName = fileName,
             mediaType = "image/jpeg",
-            version = "encrypted-media-v1",
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             sourceEpoch = 1uL,
             dim = null,
             thumbhash = null,

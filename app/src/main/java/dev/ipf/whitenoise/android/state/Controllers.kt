@@ -16,12 +16,14 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
@@ -348,6 +350,9 @@ internal fun chatListItemFromProjection(
                     contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
+                    sourceEpoch = null,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     recordedAt = preview.timelineAt,
                     receivedAt = preview.timelineAt,
                 )
@@ -631,7 +636,9 @@ internal fun nextTimelineOrder(
 private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
     AppGroupRecordFfi(
         groupIdHex = row.groupIdHex,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
         endpoint = "",
+        profilePresent = false,
         name = row.groupName,
         description = "",
         admins = emptyList(),
@@ -644,6 +651,7 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
+        unrecoverable = false,
         selfMembership = row.selfMembership,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
@@ -655,6 +663,7 @@ private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi
         componentId = 0x8008u,
         component = "marmot.group.encrypted-media.v1",
         required = true,
+        version = EncryptedMediaVersionFfi.V1,
         mediaFormat = "encrypted-media-v1",
         allowedLocatorKinds = listOf("blossom-v1"),
         defaultBlobEndpoints =
@@ -4808,6 +4817,9 @@ class ConversationController(
                         ?.let {
                             listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
                         }.orEmpty(),
+                sourceEpoch = null,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
             )
@@ -5129,20 +5141,11 @@ class ConversationController(
             }
         val body = trimmedCaption ?: "📎 $placeholderName"
         val optimistic =
-            AppMessageRecordFfi(
-                messageIdHex = tempId,
-                direction = "sent",
-                groupIdHex = group.groupIdHex,
-                sender = conversationAccountIdHex ?: "",
-                plaintext = body,
-                contentTokens = appState.parseMarkdownOrEmpty(body),
-                kind = 9uL,
-                tags =
-                    attachments.map {
-                        MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-                    },
-                recordedAt = now,
-                receivedAt = now,
+            pendingAttachmentRecord(
+                tempId = tempId,
+                body = body,
+                attachments = attachments,
+                now = now,
             )
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
@@ -5162,6 +5165,31 @@ class ConversationController(
         publishTimelineFromIndexes()
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
+
+    private suspend fun pendingAttachmentRecord(
+        tempId: String,
+        body: String,
+        attachments: List<PendingAttachment>,
+        now: ULong,
+    ): AppMessageRecordFfi =
+        AppMessageRecordFfi(
+            messageIdHex = tempId,
+            direction = "sent",
+            groupIdHex = group.groupIdHex,
+            sender = conversationAccountIdHex ?: "",
+            plaintext = body,
+            contentTokens = appState.parseMarkdownOrEmpty(body),
+            kind = 9uL,
+            tags =
+                attachments.map {
+                    MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
+                },
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
+            recordedAt = now,
+            receivedAt = now,
+        )
 
     /** Drive the upload + publish for a previously [queueAttachments]-seeded slot. */
     suspend fun uploadQueued(seeded: QueuedAttachmentSend) {
@@ -8344,6 +8372,9 @@ class ConversationController(
                 contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = STREAM_DEBUG_KIND,
                 tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
+                sourceEpoch = null,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
             )
@@ -8411,6 +8442,9 @@ class ConversationController(
                     contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
+                    sourceEpoch = null,
+                    retentionSeconds = null,
+                    retentionExpiresAt = null,
                     recordedAt = nowSeconds(),
                     receivedAt = nowSeconds(),
                 )

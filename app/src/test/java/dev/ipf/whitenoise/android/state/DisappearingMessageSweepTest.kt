@@ -546,7 +546,7 @@ class DisappearingMessageSweepTest {
                     nonceHex = "nonce-$messageIdHex-$attachmentIndex",
                     fileName = "media.bin",
                     mediaType = "application/octet-stream",
-                    version = "1",
+                    version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
                     sourceEpoch = 0u,
                     dim = null,
                     thumbhash = null,

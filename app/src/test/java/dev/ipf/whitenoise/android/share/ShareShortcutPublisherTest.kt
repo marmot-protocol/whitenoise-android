@@ -140,6 +140,8 @@ private fun chat(
             AppGroupRecordFfi(
                 selfMembership = SelfMembershipFfi.MEMBER,
                 groupIdHex = groupId,
+                protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+                profilePresent = false,
                 endpoint = "endpoint-$groupId",
                 name = name,
                 description = "",
@@ -153,6 +155,7 @@ private fun chat(
                 encryptedMedia = encryptedMedia(),
                 archived = false,
                 pendingConfirmation = pending,
+                unrecoverable = false,
                 welcomerAccountIdHex = null,
                 viaWelcomeMessageIdHex = null,
                 disappearingMessageSecs = 0uL,
@@ -168,6 +171,7 @@ private fun encryptedMedia() =
         componentId = 0x8008u,
         component = "marmot.group.encrypted-media.v1",
         required = true,
+        version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
         mediaFormat = "encrypted-media-v1",
         allowedLocatorKinds = listOf("blossom-v1"),
         defaultBlobEndpoints =

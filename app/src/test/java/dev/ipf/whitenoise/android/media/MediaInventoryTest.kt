@@ -188,7 +188,7 @@ class MediaInventoryTest {
             nonceHex = "c".repeat(24),
             fileName = fileName,
             mediaType = mime,
-            version = "encrypted-media-v1",
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             sourceEpoch = 0uL,
             dim = null,
             thumbhash = null,
@@ -230,6 +230,9 @@ class MediaInventoryTest {
             contentTokens = body,
             kind = 9uL,
             tags = attachments.map { MediaReferenceParser.toImetaTag(it) },
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = 0uL,
             receivedAt = 0uL,
         )

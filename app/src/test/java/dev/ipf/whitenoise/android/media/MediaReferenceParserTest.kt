@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -34,7 +35,7 @@ class MediaReferenceParserTest {
         assertEquals(CIPHERTEXT_SHA256_HEX, ref.ciphertextSha256)
         assertEquals(PLAINTEXT_SHA256_HEX, ref.plaintextSha256)
         assertEquals(NONCE_HEX, ref.nonceHex)
-        assertEquals("encrypted-media-v1", ref.version)
+        assertEquals(EncryptedMediaVersionFfi.V1, ref.version)
         assertEquals("640x480", ref.dim)
         assertEquals(THUMBHASH, ref.thumbhash)
     }
@@ -253,6 +254,14 @@ class MediaReferenceParserTest {
     }
 
     @Test
+    fun toImetaTag_preservesV2Version() {
+        val original = referenceFixture(version = EncryptedMediaVersionFfi.V2)
+        val tag = MediaReferenceParser.toImetaTag(original)
+        assertEquals("v encrypted-media-v2", tag.values[1])
+        assertEquals(original.copy(sourceEpoch = 0uL), MediaReferenceParser.parseImetaTag(listOf(tag)))
+    }
+
+    @Test
     fun toImetaTag_preservesFilenameWithSpaces() {
         val original = referenceFixture(fileName = "Screenshot 2026-06-05 at 12.34.56.jpg")
         val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(original)))
@@ -321,6 +330,7 @@ class MediaReferenceParserTest {
         fileName: String = "photo.jpg",
         locatorUrl: String = URL,
         locators: List<MediaLocatorFfi> = listOf(MediaLocatorFfi(kind = "blossom-v1", value = locatorUrl)),
+        version: EncryptedMediaVersionFfi = EncryptedMediaVersionFfi.V1,
     ) = MediaAttachmentReferenceFfi(
         locators = locators,
         ciphertextSha256 = CIPHERTEXT_SHA256_HEX,
@@ -328,7 +338,7 @@ class MediaReferenceParserTest {
         nonceHex = NONCE_HEX,
         fileName = fileName,
         mediaType = MIME_JPEG,
-        version = "encrypted-media-v1",
+        version = version,
         sourceEpoch = 99uL,
         dim = "640x480",
         thumbhash = THUMBHASH,
