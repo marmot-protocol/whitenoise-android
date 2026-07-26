@@ -591,6 +591,40 @@ internal suspend fun runNotificationReconnectOnNetworkRestore(
 }
 
 /**
+ * Prefer the battery-efficient native-push wake path when this build/device
+ * supports it. If enabling push fails, retain the persistent relay connection
+ * so first-run setup never silently leaves the account without background
+ * delivery. Any partial native-push enablement is rolled back before the
+ * persistent fallback is restored, keeping the two delivery modes exclusive.
+ */
+internal suspend fun configureDefaultNotificationDelivery(
+    nativePushAvailable: Boolean,
+    enableNativePush: suspend () -> Boolean,
+    disableNativePush: suspend () -> Boolean,
+    setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
+): Boolean {
+    val configured =
+        if (!nativePushAvailable) {
+            setBackgroundConnectionEnabled(true)
+        } else {
+            val nativePushReady = enableNativePush()
+            if (nativePushReady && setBackgroundConnectionEnabled(false)) {
+                true
+            } else {
+                val nativePushDisabled = disableNativePush()
+                val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
+                nativePushDisabled && backgroundConnectionEnabled
+            }
+        }
+    return configured
+}
+
+internal fun nativePushEnablementConfirmed(
+    allAccountsReady: Boolean,
+    activeAccountRegistered: Boolean,
+): Boolean = allAccountsReady && activeAccountRegistered
+
+/**
  * A live notification subscription is a healthy local broadcast receiver and
  * survives relay connectivity changes. Reuse the listener job so queued or
  * in-flight updates are never destroyed; if it is backing off, reconnect wakes
@@ -5120,13 +5154,16 @@ class WhiteNoiseAppState private constructor(
      * push for account A still wakes the device when account B is in
      * focus. Idempotent per account: a successful sync caches the
      * (token, server, relay) fingerprint and skips on the next call until
-     * something changes.
+     * something changes. Returns true only when every account that currently
+     * requires native push is registered (or does not require registration).
      */
-    suspend fun syncNativePushRegistrationIfEnabled() {
-        nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
-    }
+    suspend fun syncNativePushRegistrationIfEnabled(): Boolean = nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
 
-    private suspend fun syncNativePushRegistrationIfEnabledLocked() {
+    private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
+        nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
+
+    @Suppress("ReturnCount")
+    private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
         // or GMS is uninstalled — otherwise a stale server-side registration
@@ -5134,27 +5171,29 @@ class WhiteNoiseAppState private constructor(
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         drainPendingPushDisables()
-        val config = PushServerConfig.current() ?: return
-        if (!isNativePushAvailable(config)) return
-        val accountRefs = accounts.map { it.label }
+        val config = PushServerConfig.current() ?: return false
+        if (!isNativePushAvailable(config)) return false
+        var accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) {
             // Only clear the durable #755 retry flag when the account list is
             // authoritative. setAppInForeground() can trigger this before
             // bootstrap/refreshAccounts() has loaded accounts; clearing then
             // would strand a signed-in device on a stale push token.
-            if (client == null) return
+            if (client == null) return false
             refreshAccounts()
-            if (accounts.isEmpty()) {
+            accountRefs = accounts.map { it.label }
+            if (accountRefs.isEmpty()) {
                 pushTokenStore.clearPendingNativePushRegistrationSync()
+                return true
             }
-            return
         }
-        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
+        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
         for (account in accountRefs) {
             val synced = syncPushForAccount(account, config, token)
-            if (!synced) return
+            if (!synced) return false
         }
         pushTokenStore.clearPendingNativePushRegistrationSync()
+        return true
     }
 
     /**
@@ -5279,14 +5318,30 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val settings = marmotIo { setNativePushEnabled(account, enabled) }
             localNotificationSettings = settings
+            if (settings.nativePushEnabled != enabled) return@runCatching false
             if (enabled) {
                 // Explicit enable beats a queued sign-out disable for this account.
                 pushTokenStore.clearPendingDisable(account)
-                syncNativePushRegistrationIfEnabled()
+                val allAccountsReady = syncNativePushRegistrationIfEnabled()
+                // The runtime flag alone is not a usable delivery path. Only
+                // report enablement after upsertPushRegistration succeeded
+                // for every enabled account and cached the active account's
+                // exact token/server fingerprint.
+                val confirmed =
+                    nativePushEnablementConfirmed(
+                        allAccountsReady = allAccountsReady,
+                        activeAccountRegistered = hasConfirmedNativePushRegistration(account),
+                    )
+                if (!confirmed) {
+                    val rollbackSettings = marmotIo { setNativePushEnabled(account, false) }
+                    localNotificationSettings = rollbackSettings
+                    clearPushRegistrationForAccount(account)
+                }
+                confirmed
             } else {
                 clearPushRegistrationForAccount(account)
+                true
             }
-            true
         }.getOrElse {
             rethrowIfCancellation(it)
             present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
@@ -5384,12 +5439,15 @@ class WhiteNoiseAppState private constructor(
         refreshLocalNotificationPermission()
         if (!localNotificationPermissionGranted) return false
         markDefaultNotificationsEnableAttempted()
-        if (backgroundConnectionEnabled) {
-            return setBackgroundConnectionEnabled(true)
-        }
         val settings = marmotIo { setLocalNotificationsEnabled(account, true) }
         localNotificationSettings = settings
-        return settings.localNotificationsEnabled
+        if (!settings.localNotificationsEnabled) return false
+        return configureDefaultNotificationDelivery(
+            nativePushAvailable = isNativePushAvailable(),
+            enableNativePush = { setNativePushEnabled(true) },
+            disableNativePush = { setNativePushEnabled(false) },
+            setBackgroundConnectionEnabled = ::setBackgroundConnectionEnabled,
+        )
     }
 
     fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
