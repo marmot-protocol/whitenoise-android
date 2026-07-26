@@ -1029,6 +1029,10 @@
     <string name="notify_all_messages">所有訊息</string>
     <string name="notify_only_mentions">僅限提及</string>
     <string name="notify_nothing">無</string>
+    <string name="notify_mute_1_hour">靜音 1 小時</string>
+    <string name="notify_mute_8_hours">靜音 8 小時</string>
+    <string name="notify_mute_until_off">靜音直到我重新開啟</string>
+    <string name="notify_muted_until">靜音至 %1$s</string>
     <string name="customize_sound_vibration">自訂音效與震動</string>
     <string name="chat_muted_badge">已靜音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中為長訊息顯示「閱讀更多」捷徑</string>

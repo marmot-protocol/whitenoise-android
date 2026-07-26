@@ -1082,6 +1082,10 @@
     <string name="notify_all_messages">All messages</string>
     <string name="notify_only_mentions">Only mentions</string>
     <string name="notify_nothing">Nothing</string>
+    <string name="notify_mute_1_hour">Mute for 1 hour</string>
+    <string name="notify_mute_8_hours">Mute for 8 hours</string>
+    <string name="notify_mute_until_off">Mute until I turn it back on</string>
+    <string name="notify_muted_until">Muted until %1$s</string>
     <string name="customize_sound_vibration">Customize sound &amp; vibration</string>
     <string name="chat_muted_badge">Muted</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>

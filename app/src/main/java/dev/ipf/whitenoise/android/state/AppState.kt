@@ -1802,6 +1802,9 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
+        // Drive timed-mute expiry emission so muted icons and folder rules
+        // refresh when a mute elapses, not only on the next getter call.
+        chatMutePreferences.attachExpiryScheduler(mutationsScope)
         if (BuildConfig.SELF_UPDATE_ENABLED) {
             // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
             mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
@@ -3867,6 +3870,21 @@ class WhiteNoiseAppState(
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
     }
 
+    /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
+    fun muteConversationFor(
+        groupIdHex: String,
+        durationMillis: Long,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.muteFor(accountRef, groupIdHex, durationMillis)
+    }
+
+    /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
+    fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
+        val accountRef = activeAccountRef ?: return null
+        return chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+    }
+
     fun ttsEngineChoice(): TtsEngineChoice = ttsResolution?.engineChoice() ?: TtsEngineChoice(null, emptyList())
 
     fun resolvedTtsEnginePackage(): String? =
@@ -4341,6 +4359,10 @@ class WhiteNoiseAppState(
         if (foreground) {
             maybeShowAppLockForForeground()
             dismissVisibleConversationNotifications()
+            // The timed-mute scheduler's delay is frozen during device deep sleep,
+            // so mutes that elapsed while asleep must be resolved on resume or the
+            // chat-list badge and folder rules stay muted until a getter runs.
+            chatMutePreferences.resolveExpiredNow()
         } else {
             recordAppLockBackgrounded()
             // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):

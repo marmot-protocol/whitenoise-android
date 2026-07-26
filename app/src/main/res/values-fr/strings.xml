@@ -1051,6 +1051,10 @@
     <string name="notify_all_messages">Tous les messages</string>
     <string name="notify_only_mentions">Mentions uniquement</string>
     <string name="notify_nothing">Rien</string>
+    <string name="notify_mute_1_hour">Mettre en sourdine 1 heure</string>
+    <string name="notify_mute_8_hours">Mettre en sourdine 8 heures</string>
+    <string name="notify_mute_until_off">Mettre en sourdine jusqu\'à réactivation</string>
+    <string name="notify_muted_until">En sourdine jusqu\'à %1$s</string>
     <string name="customize_sound_vibration">Personnaliser le son et les vibrations</string>
     <string name="chat_muted_badge">En sourdine</string>
     <string name="collapse_long_messages_subtitle">Afficher un raccourci « Lire la suite » pour les longs messages de cette discussion</string>
