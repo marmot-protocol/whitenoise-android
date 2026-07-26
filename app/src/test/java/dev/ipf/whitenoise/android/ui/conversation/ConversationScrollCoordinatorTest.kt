@@ -348,6 +348,54 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun laterPauseCancelsPendingResumeRestore() =
+        runTest {
+            val coordinator = ResumeScrollRestoreCoordinator()
+            val started = CompletableDeferred<Unit>()
+            val releaseRestore = CompletableDeferred<Unit>()
+            var restored = false
+
+            coordinator.launchResumeWork(this) {
+                started.complete(Unit)
+                releaseRestore.await()
+                restored = true
+            }
+            started.await()
+
+            coordinator.cancel()
+            releaseRestore.complete(Unit)
+            runCurrent()
+
+            assertFalse(restored)
+        }
+
+    @Test
+    fun replacementResumeCancelsPriorRestore() =
+        runTest {
+            val coordinator = ResumeScrollRestoreCoordinator()
+            val firstStarted = CompletableDeferred<Unit>()
+            val releaseFirst = CompletableDeferred<Unit>()
+            var firstRestored = false
+            var replacementRestored = false
+
+            coordinator.launchResumeWork(this) {
+                firstStarted.complete(Unit)
+                releaseFirst.await()
+                firstRestored = true
+            }
+            firstStarted.await()
+
+            coordinator.launchResumeWork(this) {
+                replacementRestored = true
+            }
+            releaseFirst.complete(Unit)
+            runCurrent()
+
+            assertFalse(firstRestored)
+            assertTrue(replacementRestored)
+        }
+
+    @Test
     fun conversationScreenRoutesEveryLazyListWriteThroughTheCoordinator() {
         val screen = sourceFile("ConversationScreen.kt").readText()
         val coordinator = sourceFile("ConversationScrollCoordinator.kt").readText()

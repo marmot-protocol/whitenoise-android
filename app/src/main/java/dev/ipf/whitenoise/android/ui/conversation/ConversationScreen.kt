@@ -884,6 +884,7 @@ internal fun ConversationScreen(
     var pauseScrollBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
+    val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
     // #589: used by the resume observer to clear focus and drop the keyboard
     // when the composer was NOT focused on pause (Case B), without poking the
     // composer's own focus requester.
@@ -2251,6 +2252,7 @@ internal fun ConversationScreen(
                 LifecycleEventObserver { _, event ->
                     when (event) {
                         Lifecycle.Event.ON_PAUSE -> {
+                            resumeScrollRestoreCoordinator.cancel()
                             wasComposerFocusedOnPause = composerFocused
                             pauseScrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider())
                         }
@@ -2264,7 +2266,7 @@ internal fun ConversationScreen(
                                 )
                             val scrollSnapshot = pauseScrollBookmark
                             pauseScrollBookmark = null
-                            scope.launch {
+                            resumeScrollRestoreCoordinator.launchResumeWork(scope) {
                                 if (restoreFocus) {
                                     runCatching { composerFocus.requestFocus() }
                                     keyboardController?.show()
@@ -2303,7 +2305,10 @@ internal fun ConversationScreen(
                     }
                 }
             resumeLifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { resumeLifecycleOwner.lifecycle.removeObserver(observer) }
+            onDispose {
+                resumeScrollRestoreCoordinator.cancel()
+                resumeLifecycleOwner.lifecycle.removeObserver(observer)
+            }
         }
     }
     LaunchedEffect(listState, scrollCoordinator) {
