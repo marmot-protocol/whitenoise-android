@@ -5,9 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.supervisorScope
 import java.util.concurrent.CancellationException
 
 /** The durable reading intent behind the conversation's transient list geometry. */
@@ -36,7 +39,6 @@ internal enum class ConversationScrollReason {
     LifecycleResume,
     ImeTransition,
     ViewportChange,
-    TimelineHydration,
     NewMessage,
     ReactionLayout,
     BottomInput,
@@ -56,10 +58,43 @@ internal data class ConversationScrollAnchor(
     val messageId: String?,
 )
 
+internal fun conversationScrollAnchor(
+    listState: LazyListState,
+    renderedItemIds: List<String>,
+    renderedMessageIds: List<String>,
+    hasOlderHeader: Boolean,
+): ConversationScrollAnchor {
+    val firstTimelineListIndex = 1 + (if (hasOlderHeader) 1 else 0)
+    val visibleTimelineRow =
+        listState.layoutInfo.visibleItemsInfo.firstOrNull { visible ->
+            val timelineIndex = visible.index - firstTimelineListIndex
+            timelineIndex in renderedItemIds.indices && timelineIndex in renderedMessageIds.indices
+        }
+    if (visibleTimelineRow != null) {
+        val timelineIndex = visibleTimelineRow.index - firstTimelineListIndex
+        return ConversationScrollAnchor(
+            listIndex = visibleTimelineRow.index,
+            pixelOffset = -visibleTimelineRow.offset,
+            itemId = renderedItemIds[timelineIndex],
+            messageId = renderedMessageIds[timelineIndex],
+        )
+    }
+    return ConversationScrollAnchor(
+        listIndex = listState.firstVisibleItemIndex,
+        pixelOffset = listState.firstVisibleItemScrollOffset,
+        itemId = null,
+        messageId = null,
+    )
+}
+
 internal data class ConversationScrollBookmark(
     val anchor: ConversationScrollAnchor,
     val settledMode: ConversationScrollMode,
     internal val intentRevision: Long,
+)
+
+internal class ConversationScrollIntentToken internal constructor(
+    internal val revision: Long,
 )
 
 /**
@@ -86,6 +121,9 @@ internal class ConversationScrollCoordinator(
 
     val isFollowingTail: Boolean
         get() = settledMode is ConversationScrollMode.FollowingTail
+
+    val intentToken: ConversationScrollIntentToken
+        get() = ConversationScrollIntentToken(intentRevision)
 
     fun bookmark(anchor: ConversationScrollAnchor): ConversationScrollBookmark {
         val stableAnchor =
@@ -162,10 +200,10 @@ internal class ConversationScrollCoordinator(
 
     suspend fun restoreBookmark(
         bookmark: ConversationScrollBookmark,
-        force: Boolean = false,
+        expectedIntent: ConversationScrollIntentToken = ConversationScrollIntentToken(bookmark.intentRevision),
         resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
     ): Boolean {
-        if (!force && bookmark.intentRevision != intentRevision) return false
+        if (expectedIntent.revision != intentRevision) return false
         val anchor = bookmark.anchor
         readingAnchor = anchor.takeIf { bookmark.settledMode is ConversationScrollMode.ReadingHistory }
         return runCommand(
@@ -177,7 +215,7 @@ internal class ConversationScrollCoordinator(
     }
 
     suspend fun followTailIfAllowed(
-        tailIndex: Int,
+        resolveTailIndex: () -> Int,
         reason: ConversationScrollReason,
         frameCount: Int = 1,
         awaitFrame: suspend () -> Unit = { withFrameNanos { } },
@@ -190,7 +228,7 @@ internal class ConversationScrollCoordinator(
         ) {
             repeat(frameCount.coerceAtLeast(1)) {
                 awaitFrame()
-                scrollToItem(tailIndex, 0)
+                scrollToItem(resolveTailIndex(), 0)
             }
         }
     }
@@ -199,37 +237,62 @@ internal class ConversationScrollCoordinator(
         targetMessageId: String?,
         reason: ConversationScrollReason,
         resultingMode: ConversationScrollMode? = null,
+        settledReadingAnchor: (() -> ConversationScrollAnchor)? = null,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
-    ): Boolean =
-        runCommand(
-            transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
-            resultingMode = resultingMode ?: settledMode,
-            operation = operation,
-        )
+    ): Boolean {
+        val completed =
+            runCommand(
+                transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
+                resultingMode =
+                    if (settledReadingAnchor != null) {
+                        ConversationScrollMode.ReadingHistory(targetMessageId, 0)
+                    } else {
+                        resultingMode ?: settledMode
+                    },
+                operation = operation,
+            )
+        if (!completed) return false
+        settledReadingAnchor?.let { settleReadingAt(it()) }
+        return true
+    }
 
     private suspend fun runCommand(
         transientMode: ConversationScrollMode,
         resultingMode: ConversationScrollMode,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
-    ): Boolean {
-        val commandJob = currentCoroutineContext()[Job]
-        val previous = activeCommand
-        val serial = ++commandSerial
-        if (previous != null && previous !== commandJob) previous.cancel()
-        activeCommand = commandJob
-        mode = transientMode
-        return try {
-            ConversationScrollCommandScope(serial).operation()
-            if (serial != commandSerial) return false
-            setSettledMode(resultingMode.requireSettled())
-            true
-        } finally {
-            if (serial == commandSerial) {
-                activeCommand = null
-                mode = settledMode
+    ): Boolean =
+        supervisorScope {
+            val previous = activeCommand
+            val serial = ++commandSerial
+            val command =
+                async(start = CoroutineStart.LAZY) {
+                    ConversationScrollCommandScope(serial).operation()
+                }
+            previous?.cancel()
+            activeCommand = command
+            mode = transientMode
+            command.start()
+            try {
+                command.await()
+                if (serial != commandSerial) {
+                    false
+                } else {
+                    setSettledMode(resultingMode.requireSettled())
+                    true
+                }
+            } catch (_: CancellationException) {
+                // A superseded command is expected to return false without
+                // cancelling its long-lived producer (for example snapshotFlow).
+                // Preserve normal cancellation when the producer itself is gone.
+                currentCoroutineContext().ensureActive()
+                false
+            } finally {
+                if (serial == commandSerial) {
+                    activeCommand = null
+                    mode = settledMode
+                }
             }
         }
-    }
 
     private fun invalidateActiveCommand() {
         commandSerial++
@@ -277,14 +340,14 @@ internal class ConversationScrollCoordinator(
 internal suspend fun ConversationScrollCoordinator.restoreViewport(
     snapshot: ConversationScrollBookmark,
     resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
-    tailIndex: Int,
+    resolveTailIndex: () -> Int,
     frameCount: Int = 24,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): Boolean =
     when (snapshot.settledMode) {
         ConversationScrollMode.FollowingTail ->
             followTailIfAllowed(
-                tailIndex = tailIndex,
+                resolveTailIndex = resolveTailIndex,
                 reason = ConversationScrollReason.LifecycleResume,
                 frameCount = frameCount,
                 awaitFrame = awaitFrame,

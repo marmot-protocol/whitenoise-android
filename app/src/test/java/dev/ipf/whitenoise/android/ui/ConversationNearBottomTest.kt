@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollReason
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.conversationScrollAnchor
 import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.restoreViewport
@@ -115,7 +116,7 @@ class ConversationNearBottomTest {
                 coordinator.restoreViewport(
                     snapshot = snapshot,
                     resolveAnchorIndex = { indexBefore },
-                    tailIndex = listState.layoutInfo.totalItemsCount - 1,
+                    resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
                     frameCount = 1,
                     awaitFrame = {},
                 )
@@ -154,7 +155,7 @@ class ConversationNearBottomTest {
                 coordinator.restoreViewport(
                     snapshot = snapshot,
                     resolveAnchorIndex = { tail },
-                    tailIndex = tail,
+                    resolveTailIndex = { tail },
                     frameCount = 3,
                     awaitFrame = {},
                 )
@@ -194,7 +195,7 @@ class ConversationNearBottomTest {
             runBlocking {
                 followed =
                     coordinator.followTailIfAllowed(
-                        tailIndex = listState.layoutInfo.totalItemsCount - 1,
+                        resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
                         reason = ConversationScrollReason.NewMessage,
                         awaitFrame = {},
                     )
@@ -205,6 +206,37 @@ class ConversationNearBottomTest {
         assertFalse(followed)
         assertEquals(indexBefore, listState.firstVisibleItemIndex)
         assertEquals(offsetBefore, listState.firstVisibleItemScrollOffset)
+    }
+
+    @Test
+    fun headerFirstViewportAnchorsTheFirstVisibleTimelineRow() {
+        val listState = LazyListState()
+        val itemIds = (0 until 50).map { "item-$it" }
+        val messageIds = (0 until 50).map { "message-$it" }
+        composeRule.setContent {
+            TimelineHarness(
+                listState = listState,
+                timelineSize = 50,
+                modifier = Modifier.height(100.dp),
+            )
+        }
+        composeRule.waitForIdle()
+        scrollTo(listState, 1)
+        val firstTimelineRow = listState.layoutInfo.visibleItemsInfo.first { it.index >= 2 }
+
+        val anchor =
+            conversationScrollAnchor(
+                listState = listState,
+                renderedItemIds = itemIds,
+                renderedMessageIds = messageIds,
+                hasOlderHeader = true,
+            )
+
+        assertEquals(1, listState.firstVisibleItemIndex)
+        assertEquals(firstTimelineRow.index, anchor.listIndex)
+        assertEquals(-firstTimelineRow.offset, anchor.pixelOffset)
+        assertEquals("item-0", anchor.itemId)
+        assertEquals("message-0", anchor.messageId)
     }
 
     private fun scrollTo(

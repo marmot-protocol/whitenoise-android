@@ -30,7 +30,7 @@ class ConversationScrollCoordinatorTest {
             coordinator.restoreViewport(
                 snapshot = paused,
                 resolveAnchorIndex = { 31 },
-                tailIndex = 99,
+                resolveTailIndex = { 99 },
                 frameCount = 1,
                 awaitFrame = {},
             )
@@ -70,7 +70,7 @@ class ConversationScrollCoordinatorTest {
             coordinator.restoreViewport(
                 snapshot = paused,
                 resolveAnchorIndex = { 40 },
-                tailIndex = 42,
+                resolveTailIndex = { 42 },
                 frameCount = 3,
                 awaitFrame = {},
             )
@@ -87,23 +87,50 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
-    fun userGestureCancelsAnInFlightViewportChase() =
+    fun multiFrameTailChaseResolvesTheCurrentTailOnEveryFrame() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var currentTailIndex = 49
+
+            coordinator.followTailIfAllowed(
+                resolveTailIndex = { currentTailIndex },
+                reason = ConversationScrollReason.ImeTransition,
+                frameCount = 3,
+                awaitFrame = { currentTailIndex++ },
+            )
+
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(50, 0),
+                    ScrollWrite.Snap(51, 0),
+                    ScrollWrite.Snap(52, 0),
+                ),
+                writer.writes,
+            )
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    @Test
+    fun userGestureCancelsOnlyTheInFlightCommandAndLeavesItsCallerAlive() =
         runTest {
             val writer = RecordingScrollWriter()
             val coordinator = ConversationScrollCoordinator(writer)
             val frames = Channel<Unit>(Channel.UNLIMITED)
             val started = CompletableDeferred<Unit>()
+            var chaseResult = true
             val chase =
                 launch(start = CoroutineStart.UNDISPATCHED) {
-                    coordinator.followTailIfAllowed(
-                        tailIndex = 50,
-                        reason = ConversationScrollReason.ImeTransition,
-                        frameCount = 24,
-                        awaitFrame = {
-                            started.complete(Unit)
-                            frames.receive()
-                        },
-                    )
+                    chaseResult =
+                        coordinator.followTailIfAllowed(
+                            resolveTailIndex = { 50 },
+                            reason = ConversationScrollReason.ImeTransition,
+                            frameCount = 24,
+                            awaitFrame = {
+                                started.complete(Unit)
+                                frames.receive()
+                            },
+                        )
                 }
             started.await()
             frames.send(Unit)
@@ -112,9 +139,10 @@ class ConversationScrollCoordinatorTest {
 
             coordinator.onUserGestureStarted(anchor(messageId = "reader", listIndex = 10, pixelOffset = 24))
             repeat(24) { frames.trySend(Unit) }
-            runCurrent()
+            chase.join()
 
-            assertTrue(chase.isCancelled)
+            assertFalse(chase.isCancelled)
+            assertFalse(chaseResult)
             assertEquals(listOf(ScrollWrite.Snap(50, 0)), writer.writes)
             assertEquals(ConversationScrollMode.ReadingHistory("reader", 24), coordinator.mode)
         }
@@ -153,7 +181,7 @@ class ConversationScrollCoordinatorTest {
 
             val followed =
                 coordinator.followTailIfAllowed(
-                    tailIndex = 101,
+                    resolveTailIndex = { 101 },
                     reason = ConversationScrollReason.NewMessage,
                     frameCount = 1,
                     awaitFrame = {},
@@ -184,8 +212,9 @@ class ConversationScrollCoordinatorTest {
             coordinator.settleReadingAt(anchor(messageId = "match", listIndex = 40, pixelOffset = 120))
             assertEquals(ConversationScrollMode.ReadingHistory("match", 120), coordinator.mode)
             assertFalse(coordinator.isFollowingTail)
+            val closeSearchIntent = coordinator.intentToken
 
-            coordinator.restoreBookmark(bookmark, force = true) { saved ->
+            coordinator.restoreBookmark(bookmark, expectedIntent = closeSearchIntent) { saved ->
                 assertEquals("reader", saved.messageId)
                 27
             }
@@ -198,6 +227,81 @@ class ConversationScrollCoordinatorTest {
                 writer.writes,
             )
             assertEquals(ConversationScrollMode.ReadingHistory("reader", 48), coordinator.mode)
+        }
+
+    @Test
+    fun partialJumpToNewestSettlesItsResolvedAnchorBeforeAReanchor() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("stale", 9),
+                )
+            coordinator.settleReadingAt(anchor(messageId = "stale", listIndex = 7, pixelOffset = 9))
+            val reached = anchor(messageId = "read-anchor", listIndex = 30, pixelOffset = 14)
+
+            val jumped =
+                coordinator.programmaticJump(
+                    targetMessageId = "read-anchor",
+                    reason = ConversationScrollReason.JumpToNewest,
+                    settledReadingAnchor = { reached },
+                ) {
+                    animateScrollToItem(30)
+                }
+            coordinator.reanchorReadingHistory { saved ->
+                assertEquals("read-anchor", saved.messageId)
+                assertEquals("msg:read-anchor", saved.itemId)
+                44
+            }
+
+            assertTrue(jumped)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Animate(30, 0),
+                    ScrollWrite.Snap(44, 14),
+                ),
+                writer.writes,
+            )
+            assertEquals(ConversationScrollMode.ReadingHistory("read-anchor", 14), coordinator.mode)
+        }
+
+    @Test
+    fun delayedSearchRestoreCannotOverrideANewerUserGesture() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val prior = anchor(messageId = "prior", listIndex = 12, pixelOffset = 48)
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("prior", 48),
+                )
+            coordinator.settleReadingAt(prior)
+            val bookmark = coordinator.bookmark(prior)
+            coordinator.settleReadingAt(anchor(messageId = "search-match", listIndex = 40, pixelOffset = 120))
+            val closeSearchIntent = coordinator.intentToken
+            val releasePaging = CompletableDeferred<Unit>()
+            var restored = true
+            val delayedRestore =
+                launch {
+                    releasePaging.await()
+                    restored =
+                        coordinator.restoreBookmark(
+                            bookmark = bookmark,
+                            expectedIntent = closeSearchIntent,
+                            resolveAnchorIndex = { 27 },
+                        )
+                }
+
+            val newerAnchor = anchor(messageId = "newer", listIndex = 55, pixelOffset = 6)
+            coordinator.onUserGestureStarted(newerAnchor)
+            coordinator.onUserGestureSettled(newerAnchor, nearBottom = false)
+            releasePaging.complete(Unit)
+            delayedRestore.join()
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+            assertEquals(ConversationScrollMode.ReadingHistory("newer", 6), coordinator.mode)
         }
 
     @Test
@@ -219,7 +323,7 @@ class ConversationScrollCoordinatorTest {
 
             val followed =
                 coordinator.followTailIfAllowed(
-                    tailIndex = 99,
+                    resolveTailIndex = { 99 },
                     reason = ConversationScrollReason.NewMessage,
                     awaitFrame = {},
                 )

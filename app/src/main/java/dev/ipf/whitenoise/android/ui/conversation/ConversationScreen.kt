@@ -755,14 +755,11 @@ internal fun ConversationScreen(
     fun currentScrollAnchor(): ConversationScrollAnchor {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-        val listIndex = listState.firstVisibleItemIndex
-        val timelineIndex = listIndex - 1 - (if (liveHasOlderHeader) 1 else 0)
-        val item = liveRenderedTimeline.getOrNull(timelineIndex)
-        return ConversationScrollAnchor(
-            listIndex = listIndex,
-            pixelOffset = listState.firstVisibleItemScrollOffset,
-            itemId = item?.id,
-            messageId = item?.record?.messageIdHex,
+        return conversationScrollAnchor(
+            listState = listState,
+            renderedItemIds = liveRenderedTimeline.map { it.id },
+            renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
+            hasOlderHeader = liveHasOlderHeader,
         )
     }
 
@@ -1969,6 +1966,7 @@ internal fun ConversationScreen(
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
+    val currentTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
 
     // Day label for the topmost visible message, surfaced by the sticky ribbon
     // overlay while scrolling. Hoisted into derivedStateOf and held as a State
@@ -2136,6 +2134,7 @@ internal fun ConversationScreen(
         searchPinnedMatchId = null
         val previousSearchJob = searchJob
         previousSearchJob?.cancel()
+        val expectedRestoreIntent = scrollCoordinator.intentToken
         highlightedMessageId = null
         // A deep search jump can evict the original viewport from the capped
         // window. Page back to its durable local message before asking the
@@ -2150,7 +2149,7 @@ internal fun ConversationScreen(
                     }
                     scrollCoordinator.restoreBookmark(
                         anchor.bookmark,
-                        force = true,
+                        expectedIntent = expectedRestoreIntent,
                         resolveAnchorIndex = { saved ->
                             resolveScrollAnchorIndex(saved)
                                 ?: saved.listIndex.coerceIn(
@@ -2243,7 +2242,7 @@ internal fun ConversationScreen(
         when (snapshot.settledMode) {
             ConversationScrollMode.FollowingTail ->
                 scrollCoordinator.followTailIfAllowed(
-                    tailIndex = bottomTimelineIndex,
+                    resolveTailIndex = { currentTailIndex },
                     reason = ConversationScrollReason.ImeTransition,
                     frameCount = 24,
                 )
@@ -2278,7 +2277,6 @@ internal fun ConversationScreen(
     val currentScrollAnchorProvider by rememberUpdatedState(newValue = { currentScrollAnchor() })
     val currentScrollAnchorResolver by
         rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })
-    val currentResumeTailIndex by rememberUpdatedState(newValue = bottomTimelineIndex)
     val currentInitialTimelineAnchored by rememberUpdatedState(newValue = initialTimelineAnchored)
     val currentImeIsOpen by rememberUpdatedState(newValue = imeIsOpen)
     DisposableEffect(controller, resumeLifecycleOwner) {
@@ -2332,7 +2330,7 @@ internal fun ConversationScreen(
                                     scrollCoordinator.restoreViewport(
                                         snapshot = scrollSnapshot,
                                         resolveAnchorIndex = currentScrollAnchorResolver,
-                                        tailIndex = currentResumeTailIndex,
+                                        resolveTailIndex = { currentTailIndex },
                                     )
                                 }
                             }
@@ -2360,7 +2358,7 @@ internal fun ConversationScreen(
                         reason = ConversationScrollReason.ViewportChange,
                         resultingMode = ConversationScrollMode.FollowingTail,
                     ) {
-                        scrollToItem(currentResumeTailIndex)
+                        scrollToItem(currentTailIndex)
                     }
                 is ConversationScrollMode.ReadingHistory ->
                     scrollCoordinator.reanchorReadingHistory(currentScrollAnchorResolver)
@@ -2491,7 +2489,7 @@ internal fun ConversationScreen(
                 lastFollowedLatestId = latestId ?: previousId
                 if (isAppend) {
                     scrollCoordinator.followTailIfAllowed(
-                        tailIndex = bottomTimelineIndex,
+                        resolveTailIndex = { currentTailIndex },
                         reason = ConversationScrollReason.NewMessage,
                     )
                 }
@@ -2525,7 +2523,7 @@ internal fun ConversationScreen(
     ) {
         if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
             scrollCoordinator.followTailIfAllowed(
-                tailIndex = bottomTimelineIndex,
+                resolveTailIndex = { currentTailIndex },
                 reason = ConversationScrollReason.ReactionLayout,
             )
         }
@@ -2535,7 +2533,7 @@ internal fun ConversationScreen(
         if (!initialTimelineAnchored) return
         scope.launch {
             scrollCoordinator.followTailIfAllowed(
-                tailIndex = bottomTimelineIndex,
+                resolveTailIndex = { currentTailIndex },
                 reason = ConversationScrollReason.BottomInput,
                 frameCount = 24,
             )
@@ -3535,17 +3533,28 @@ internal fun ConversationScreen(
                                                                 olderHeaderCount = olderHeaderCount,
                                                                 bottomTimelineIndex = bottomTimelineIndex,
                                                             )
-                                                        scrollCoordinator.programmaticJump(
-                                                            targetMessageId = null,
-                                                            reason = ConversationScrollReason.JumpToNewest,
-                                                            resultingMode =
-                                                                if (targetIndex == bottomTimelineIndex) {
-                                                                    ConversationScrollMode.FollowingTail
-                                                                } else {
-                                                                    null
-                                                                },
-                                                        ) {
-                                                            animateScrollToItem(targetIndex)
+                                                        if (targetIndex == bottomTimelineIndex) {
+                                                            scrollCoordinator.programmaticJump(
+                                                                targetMessageId = null,
+                                                                reason = ConversationScrollReason.JumpToNewest,
+                                                                resultingMode = ConversationScrollMode.FollowingTail,
+                                                            ) {
+                                                                animateScrollToItem(targetIndex)
+                                                            }
+                                                        } else {
+                                                            val targetTimelineIndex = targetIndex - 1 - olderHeaderCount
+                                                            val targetMessageId =
+                                                                renderedTimeline
+                                                                    .getOrNull(targetTimelineIndex)
+                                                                    ?.record
+                                                                    ?.messageIdHex
+                                                            scrollCoordinator.programmaticJump(
+                                                                targetMessageId = targetMessageId,
+                                                                reason = ConversationScrollReason.JumpToNewest,
+                                                                settledReadingAnchor = ::currentScrollAnchor,
+                                                            ) {
+                                                                animateScrollToItem(targetIndex)
+                                                            }
                                                         }
                                                     }
                                                 },
