@@ -105,8 +105,8 @@ class ChatMutePreferences(
 
     /**
      * The notify preference to show and restore when the chat is *not* muted:
-     * the live mode when it isn't [ChatNotifyMode.NONE], otherwise a timed mute's
-     * saved restore mode (a permanent mute keeps no restore, so defaults to ALL).
+     * the live mode when it isn't [ChatNotifyMode.NONE], otherwise the mute's
+     * saved restore mode (a legacy permanent mute without one defaults to ALL).
      * Lets the UI present Mute and the All/Only-mentions choice as separate rows.
      */
     fun restoreNotifyMode(
@@ -157,11 +157,15 @@ class ChatMutePreferences(
         groupIdHex: String,
         muted: Boolean,
     ) {
-        setMode(
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            mode = if (muted) ChatNotifyMode.NONE else ChatNotifyMode.ALL,
-        )
+        if (muted) {
+            muteFor(accountRef, groupIdHex, durationMillis = 0L)
+        } else {
+            // Hold the lock across reading the hidden mode and applying it so a
+            // concurrent update cannot be overwritten by a stale restore.
+            synchronized(mutationLock) {
+                setMode(accountRef, groupIdHex, restoreNotifyMode(accountRef, groupIdHex))
+            }
+        }
     }
 
     /**

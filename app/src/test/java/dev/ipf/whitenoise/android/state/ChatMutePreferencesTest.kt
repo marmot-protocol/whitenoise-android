@@ -84,6 +84,20 @@ class ChatMutePreferencesTest {
     }
 
     @Test
+    fun setMutedRestoresTheHiddenOnlyMentionsPreference() {
+        val prefs = ChatMutePreferences(context)
+        prefs.setMode("account-a", "group-a", ChatNotifyMode.MENTIONS_ONLY)
+
+        prefs.setMuted("account-a", "group-a", muted = true)
+        assertTrue(prefs.isMuted("account-a", "group-a"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("account-a", "group-a"))
+
+        prefs.setMuted("account-a", "group-a", muted = false)
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.mode("account-a", "group-a"))
+        assertFalse(prefs.isMuted("account-a", "group-a"))
+    }
+
+    @Test
     fun mentionOnlyModePersistsPerAccountGroup() {
         val prefs = ChatMutePreferences(context)
 
