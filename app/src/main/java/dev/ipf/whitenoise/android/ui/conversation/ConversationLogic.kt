@@ -2,12 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -235,33 +232,4 @@ internal fun rememberConversationNearBottom(
         }
     }
     return nearBottom
-}
-
-/**
- * Near-bottom gate for IME-open bottom chase. Until this conversation has
- * observed the IME closed, follows live [nearBottom] so a chat opened with the
- * keyboard already up can still chase once initial anchoring settles. After the
- * first composer-focus edge, holds that value while the IME is open so the
- * pre-inset layout transient cannot treat a history reader as "at bottom"
- * (#1375, #1574).
- */
-@Composable
-internal fun rememberImeOpenReanchorNearBottom(
-    chatId: String,
-    imeIsOpen: Boolean,
-    composerFocused: Boolean,
-    nearBottom: Boolean,
-): Boolean {
-    var nearBottomAtFocusEdge by remember(chatId) { mutableStateOf<Boolean?>(null) }
-    var wasComposerFocused by remember(chatId) { mutableStateOf(false) }
-    SideEffect {
-        if (composerFocused && !wasComposerFocused && !imeIsOpen) {
-            nearBottomAtFocusEdge = nearBottom
-        }
-        if (!composerFocused && !imeIsOpen) {
-            nearBottomAtFocusEdge = null
-        }
-        wasComposerFocused = composerFocused
-    }
-    return if (imeIsOpen) nearBottomAtFocusEdge ?: nearBottom else nearBottom
 }
