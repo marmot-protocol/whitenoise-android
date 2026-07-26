@@ -1833,38 +1833,6 @@ class WhiteNoiseAppState private constructor(
     private val conversationControllerLock = Any()
     private val conversationControllers = linkedSetOf<ConversationController>()
 
-    init {
-        applyLanguageTag(languageTag)
-        if (startPlatformServices) {
-            // Drive timed-mute expiry emission so muted icons and folder rules
-            // refresh when a mute elapses, not only on the next getter call.
-            chatMutePreferences.attachExpiryScheduler(mutationsScope)
-            if (BuildConfig.SELF_UPDATE_ENABLED) {
-                // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
-                mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
-                notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
-            }
-            // Off-main: the ConnectivityManager registration + seed query are
-            // binder IPCs and this constructor runs on the main thread. Until the
-            // seed lands, the snapshot reads as offline/no-networks — the same
-            // conservative answer the auto-download gate gives for "unknown".
-            mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
-            // Wipe pre-encryption cache entries promptly after upgrade without doing
-            // directory I/O in this main-thread constructor.
-            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
-            if (requireAppUnlock) {
-                // Pre-warm the Keystore-backed unlock timestamp off-main so the
-                // first foreground lock evaluation is a cache hit. Assigned on
-                // Main, and only if an unlock hasn't already stamped a newer value.
-                mutationsScope.launch {
-                    val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
-                    if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
-                }
-            }
-            mutationsScope.launch { refreshTtsAvailability() }
-        }
-    }
-
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
@@ -6602,6 +6570,41 @@ class WhiteNoiseAppState private constructor(
     ): String? {
         val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
         return "$account:$groupIdHex"
+    }
+
+    // Keep platform callbacks at the end of instance initialization. These
+    // coroutines can execute immediately on another thread and must not observe
+    // fields declared later in this class before their initializers have run.
+    init {
+        applyLanguageTag(languageTag)
+        if (startPlatformServices) {
+            // Drive timed-mute expiry emission so muted icons and folder rules
+            // refresh when a mute elapses, not only on the next getter call.
+            chatMutePreferences.attachExpiryScheduler(mutationsScope)
+            if (BuildConfig.SELF_UPDATE_ENABLED) {
+                // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
+                mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
+                notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
+            }
+            // Off-main: the ConnectivityManager registration + seed query are
+            // binder IPCs and this constructor runs on the main thread. Until the
+            // seed lands, the snapshot reads as offline/no-networks — the same
+            // conservative answer the auto-download gate gives for "unknown".
+            mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
+            // Wipe pre-encryption cache entries promptly after upgrade without doing
+            // directory I/O in this main-thread constructor.
+            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            if (requireAppUnlock) {
+                // Pre-warm the Keystore-backed unlock timestamp off-main so the
+                // first foreground lock evaluation is a cache hit. Assigned on
+                // Main, and only if an unlock hasn't already stamped a newer value.
+                mutationsScope.launch {
+                    val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+                    if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+                }
+            }
+            mutationsScope.launch { refreshTtsAvailability() }
+        }
     }
 
     companion object {
