@@ -56,7 +56,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -411,18 +410,17 @@ internal fun ChatsScreen(
                 }
             }
     }
-    // Snap the list flush to the top when a different chat reorders into
-    // position 0 (issue #541 / #1313). A send bumps the messaged conversation
-    // to the head via the live subscription; with keyed `items`, LazyColumn pins
-    // the previously-anchored row at its old pixel offset, so the new head lands
-    // one row down / clipped instead of flush. We snap to offset 0 so the
-    // freshest chat is fully visible.
+    // Keep a new chat-list head flush at the top when live activity reorders
+    // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
+    // previous head by key, leaving the promoted row above or clipped by the
+    // viewport.
     //
     // Two paths, both via [ChatListHeadSnap]:
     //   - Return from a conversation: if the head changed while the list was
     //     off-screen, snap regardless of the restored scroll index (#1313).
-    //   - Active on-list reader: only the clipped-head case at item 0 so a
-    //     background reorder cannot yank someone scrolled deeper (#541 review).
+    //   - Active on-list reader: animate the one-row correction only from the
+    //     true top so both keyed rows move together; never yank a deeper reader
+    //     or interrupt active scrolling (#541 / #1651).
     // Keyed on `showArchived` so the tracked head resets alongside
     // `chatListState` on a view swap.
     val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
@@ -447,41 +445,11 @@ internal fun ChatsScreen(
         }
         onConversationReturnHeadHandled()
     }
-    val liveActiveHeadId by rememberUpdatedState(activeHeadId)
-    LaunchedEffect(showArchived) {
-        // Pair consecutive snapshots: by the time a head change is observable,
-        // LazyColumn has already re-anchored to the old head's row by key, so
-        // the reader's true position is the one from the PREVIOUS emission.
-        data class HeadScrollSnapshot(
-            val headId: String?,
-            val firstVisibleItemIndex: Int,
-            val isScrollInProgress: Boolean,
-        )
-
-        var previous: HeadScrollSnapshot? = null
-        snapshotFlow {
-            HeadScrollSnapshot(
-                headId = liveActiveHeadId,
-                firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
-                isScrollInProgress = chatListState.isScrollInProgress,
-            )
-        }.collect { current ->
-            val before = previous
-            previous = current
-            if (
-                before != null &&
-                shouldSnapChatListForHeadReorder(
-                    previousHeadId = before.headId,
-                    currentHeadId = current.headId,
-                    preReorderFirstVisibleItemIndex = before.firstVisibleItemIndex,
-                    isScrollInProgress = before.isScrollInProgress || current.isScrollInProgress,
-                    isActiveList = !showArchived,
-                )
-            ) {
-                chatListState.scrollToItem(0)
-            }
-        }
-    }
+    ChatListActiveHeadScrollEffect(
+        listState = chatListState,
+        activeHeadId = activeHeadId,
+        isActiveList = !showArchived,
+    )
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
@@ -747,29 +715,31 @@ internal fun ChatsScreen(
                                             )
                                         }
                                     }
-                                ChatListRow(
-                                    item = item,
-                                    appState = appState,
-                                    isMuted =
-                                        appState.activeAccountRef?.let { accountRef ->
-                                            ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
-                                                mutedConversations
-                                        } ?: false,
-                                    selectionMode = selectionMode,
-                                    selected = item.id in selectedChatIds,
-                                    bodyMatch = bodyMatch,
-                                    onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
-                                    onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
-                                    onEnterSelection = {
-                                        selectedChatIds.clear()
-                                        selectedChatIds.addAll(enterChatListSelection(item.id))
-                                    },
-                                    onToggleSelection = {
-                                        val updated = toggleChatListSelection(selectedChatIds, item.id)
-                                        selectedChatIds.clear()
-                                        selectedChatIds.addAll(updated)
-                                    },
-                                )
+                                Box(modifier = chatListHeadReorderPlacement()) {
+                                    ChatListRow(
+                                        item = item,
+                                        appState = appState,
+                                        isMuted =
+                                            appState.activeAccountRef?.let { accountRef ->
+                                                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
+                                                    mutedConversations
+                                            } ?: false,
+                                        selectionMode = selectionMode,
+                                        selected = item.id in selectedChatIds,
+                                        bodyMatch = bodyMatch,
+                                        onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                                        onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                                        onEnterSelection = {
+                                            selectedChatIds.clear()
+                                            selectedChatIds.addAll(enterChatListSelection(item.id))
+                                        },
+                                        onToggleSelection = {
+                                            val updated = toggleChatListSelection(selectedChatIds, item.id)
+                                            selectedChatIds.clear()
+                                            selectedChatIds.addAll(updated)
+                                        },
+                                    )
+                                }
                             }
                         }
                 }
