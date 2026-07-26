@@ -3886,6 +3886,12 @@ class WhiteNoiseAppState private constructor(
         return chatMutePreferences.mode(accountRef, groupIdHex)
     }
 
+    /** The All/Only-mentions preference to show when the chat isn't muted. */
+    fun conversationRestoreNotifyMode(groupIdHex: String): ChatNotifyMode {
+        val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
+        return chatMutePreferences.restoreNotifyMode(accountRef, groupIdHex)
+    }
+
     fun setConversationNotifyMode(
         groupIdHex: String,
         mode: ChatNotifyMode,

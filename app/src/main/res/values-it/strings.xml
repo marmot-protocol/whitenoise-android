@@ -1051,9 +1051,6 @@
     <string name="notify_all_messages">Tutti i messaggi</string>
     <string name="notify_only_mentions">Solo menzioni</string>
     <string name="notify_nothing">Niente</string>
-    <string name="notify_mute_1_hour">Silenzia per 1 ora</string>
-    <string name="notify_mute_8_hours">Silenzia per 8 ore</string>
-    <string name="notify_mute_until_off">Silenzia finché non lo riattivo</string>
     <string name="notify_muted_until">Silenziato fino alle %1$s</string>
     <string name="customize_sound_vibration">Personalizza suono e vibrazione</string>
     <string name="chat_muted_badge">Silenziato</string>
@@ -1157,4 +1154,12 @@
     <string name="amber_signin_waiting_proof">Firma la prova di identità nel tuo signer (passaggio 2 di 2)…</string>
     <string name="tts_settings_engine_local">Motore sul dispositivo</string>
     <string name="tts_settings_engine_unknown">Può usare la voce in rete</string>
+    <string name="mute">Silenzia</string>
+    <string name="mute_dialog_title">Silenzia notifiche</string>
+    <string name="mute_dialog_description">Gli altri non vedranno che hai silenziato questa chat.</string>
+    <string name="mute_duration_8_hours">8 ore</string>
+    <string name="mute_duration_1_week">1 settimana</string>
+    <string name="mute_duration_always">Sempre</string>
+    <string name="notify_for">Notifica</string>
+    <string name="ok">OK</string>
 </resources>

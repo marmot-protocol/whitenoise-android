@@ -461,6 +461,8 @@ class LocalizationResourceTest {
                 // Pure positional-format string ("current/total"); no
                 // translatable text, identical across every locale by design.
                 "conversation_search_match_count",
+                // Dialog confirm button; "OK" is shared verbatim across most locales.
+                "ok",
                 "admin",
                 "app_name",
                 // In-app brand wordmark; the product name "White Noise" is kept

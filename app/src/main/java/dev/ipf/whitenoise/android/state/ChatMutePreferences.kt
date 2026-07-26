@@ -53,6 +53,7 @@ internal fun resolveExpiredMutes(
  * Per-account, per-conversation notification mode (#1179, #1252).
  * Android notification preference — not White Noise protocol data.
  */
+@Suppress("TooManyFunctions") // Cohesive per-chat notify store + expiry scheduler.
 class ChatMutePreferences(
     context: Context,
     private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
@@ -97,6 +98,24 @@ class ChatMutePreferences(
         accountRef: String,
         groupIdHex: String,
     ): Boolean = mode(accountRef, groupIdHex) == ChatNotifyMode.NONE
+
+    /**
+     * The notify preference to show and restore when the chat is *not* muted:
+     * the live mode when it isn't [ChatNotifyMode.NONE], otherwise a timed mute's
+     * saved restore mode (a permanent mute keeps no restore, so defaults to ALL).
+     * Lets the UI present Mute and the All/Only-mentions choice as separate rows.
+     */
+    fun restoreNotifyMode(
+        accountRef: String,
+        groupIdHex: String,
+    ): ChatNotifyMode {
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return ChatNotifyMode.ALL
+        return synchronized(mutationLock) {
+            resolveExpiredLockedInternal()
+            val current = _state.value.notificationModes[key] ?: ChatNotifyMode.ALL
+            if (current != ChatNotifyMode.NONE) current else muteExpiries[key]?.restoreMode ?: ChatNotifyMode.ALL
+        }
+    }
 
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
     fun muteExpiryMillis(

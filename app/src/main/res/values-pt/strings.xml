@@ -1051,9 +1051,6 @@
     <string name="notify_all_messages">Todas as mensagens</string>
     <string name="notify_only_mentions">Apenas menções</string>
     <string name="notify_nothing">Nada</string>
-    <string name="notify_mute_1_hour">Silenciar por 1 hora</string>
-    <string name="notify_mute_8_hours">Silenciar por 8 horas</string>
-    <string name="notify_mute_until_off">Silenciar até eu reativar</string>
     <string name="notify_muted_until">Silenciado até %1$s</string>
     <string name="customize_sound_vibration">Personalizar som e vibração</string>
     <string name="chat_muted_badge">Silenciado</string>
@@ -1157,4 +1154,12 @@
     <string name="amber_signin_waiting_proof">Assine a prova de identidade no seu assinador (etapa 2 de 2)…</string>
     <string name="tts_settings_engine_local">Motor no dispositivo</string>
     <string name="tts_settings_engine_unknown">Pode usar fala em rede</string>
+    <string name="mute">Silenciar</string>
+    <string name="mute_dialog_title">Silenciar notificações</string>
+    <string name="mute_dialog_description">Os outros não verão que você silenciou esta conversa.</string>
+    <string name="mute_duration_8_hours">8 horas</string>
+    <string name="mute_duration_1_week">1 semana</string>
+    <string name="mute_duration_always">Sempre</string>
+    <string name="notify_for">Notificar</string>
+    <string name="ok">OK</string>
 </resources>

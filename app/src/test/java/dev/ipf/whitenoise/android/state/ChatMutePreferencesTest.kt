@@ -251,6 +251,31 @@ class ChatMutePreferencesTest {
     }
 
     @Test
+    fun restoreNotifyModeReturnsTheLiveModeWhenNotMuted() {
+        val prefs = ChatMutePreferences(context)
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
+    fun restoreNotifyModeReturnsTheSavedRestoreWhileTimedMuted() {
+        val prefs = ChatMutePreferences(context, now = { 0L })
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+        prefs.muteFor("a", "g", durationMillis = 1_000L)
+        assertTrue(prefs.isMuted("a", "g"))
+        // The Mute row hides the chat; "Notify for" must still show the real choice.
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, prefs.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
+    fun restoreNotifyModeDefaultsToAllForAPermanentMute() {
+        val prefs = ChatMutePreferences(context)
+        prefs.setMuted("a", "g", muted = true)
+        assertTrue(prefs.isMuted("a", "g"))
+        assertEquals(ChatNotifyMode.ALL, prefs.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
     fun explicitModeChoiceCancelsAPendingTimedMute() {
         val prefs = ChatMutePreferences(context, now = { 0L })
         prefs.muteFor("a", "g", durationMillis = 10_000L)
