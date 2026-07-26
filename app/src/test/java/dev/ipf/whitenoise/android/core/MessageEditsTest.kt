@@ -25,6 +25,9 @@ class MessageEditsTest {
         contentTokens = empty,
         kind = 9uL,
         tags = emptyList(),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = at,
         receivedAt = at,
     )
@@ -44,6 +47,9 @@ class MessageEditsTest {
         contentTokens = empty,
         kind = 1009uL,
         tags = listOf(MessageTagFfi(values = listOf("e", target))),
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
         recordedAt = at,
         receivedAt = at,
     )

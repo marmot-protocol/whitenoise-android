@@ -85,6 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
@@ -1135,8 +1136,8 @@ internal fun MessageBubble(
                                     nonceHex = "",
                                     fileName = pending.fileName,
                                     mediaType = pending.mediaType,
-                                    version = "encrypted-media-v1",
-                                    sourceEpoch = 0u,
+                                    version = EncryptedMediaVersionFfi.V1,
+                                    sourceEpoch = 0uL,
                                     dim = pending.dim,
                                     thumbhash = pending.thumbhash,
                                 ),
@@ -1307,8 +1308,8 @@ internal fun MessageBubble(
                                             nonceHex = "",
                                             fileName = pending.fileName,
                                             mediaType = pending.mediaType,
-                                            version = "encrypted-media-v1",
-                                            sourceEpoch = 0u,
+                                            version = EncryptedMediaVersionFfi.V1,
+                                            sourceEpoch = 0uL,
                                             dim = null,
                                             thumbhash = null,
                                         )

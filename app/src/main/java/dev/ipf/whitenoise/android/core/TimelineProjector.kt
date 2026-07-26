@@ -67,6 +67,9 @@ object TimelineProjector {
             contentTokens = record.contentTokens,
             kind = record.kind,
             tags = record.tags,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
         )
@@ -139,6 +142,9 @@ object TimelineProjector {
             contentTokens = contentTokens,
             kind = kind,
             tags = emptyList(),
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = 0uL,
             receivedAt = 0uL,
         )

@@ -358,7 +358,7 @@ class VideoAttachmentCacheStateTest {
             nonceHex = "",
             fileName = "video",
             mediaType = mediaType,
-            version = "1",
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
             sourceEpoch = sourceEpoch,
             dim = null,
             thumbhash = null,

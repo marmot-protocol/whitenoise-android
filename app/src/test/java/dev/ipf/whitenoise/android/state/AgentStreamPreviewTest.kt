@@ -354,6 +354,9 @@ class AgentStreamPreviewTest {
                     add(MessageTagFfi(listOf("stream", streamId)))
                     if (final) add(MessageTagFfi(listOf("stream-start", "start")))
                 },
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
         )

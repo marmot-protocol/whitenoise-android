@@ -266,7 +266,7 @@ class TimelineProjectorTest {
         nonceHex = "cc".repeat(24),
         fileName = fileName,
         mediaType = mediaType,
-        version = "encrypted-media-v1",
+        version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
         sourceEpoch = 1uL,
         dim = null,
         thumbhash = null,

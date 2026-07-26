@@ -82,6 +82,9 @@ class DisappearingReadAnchorTest {
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
             tags = emptyList(),
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
             recordedAt = timelineAt,
             receivedAt = timelineAt,
         )
