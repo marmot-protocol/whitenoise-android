@@ -4,10 +4,12 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class TimelineOrderingInversionTest {
     @Test
@@ -46,6 +48,36 @@ class TimelineOrderingInversionTest {
             )
 
         assertTrue(orphaned.isEmpty())
+    }
+
+    @Test
+    fun confirmedSnapshotIsBuiltBeforeOrphanedPreservesAreReleased() {
+        val publishBody = controllersSource().readText().functionBody("publishTimelineFromIndexesInternal")
+        val snapshotAssignment = publishBody.indexOf("timeline =")
+        val orphanRelease = publishBody.indexOf("releaseOrphanedOptimisticSendPreserves()")
+
+        assertTrue("timeline snapshot assignment must exist", snapshotAssignment >= 0)
+        assertTrue(
+            "the confirmed row must publish once with its optimistic position before cleanup",
+            orphanRelease > snapshotAssignment,
+        )
+    }
+
+    @Test
+    fun mediaBridgeUsesTheTrackedOptimisticPreserveLifecycle() {
+        val uploadBody = controllersSource().readText().functionBody("performMediaUpload")
+        val bridgeInsert = uploadBody.indexOf("optimisticMessages[\"msg:\$confirmedId\"]")
+        val trackedPreserve =
+            uploadBody.indexOf(
+                "preserveOptimisticDisplayPosition(confirmedId, confirmedId)",
+                startIndex = bridgeInsert,
+            )
+
+        assertTrue("confirmed media bridge insertion must exist", bridgeInsert >= 0)
+        assertTrue(
+            "media bridge overrides must be registered for orphan cleanup",
+            trackedPreserve > bridgeInsert,
+        )
     }
 
     @Test
@@ -162,4 +194,10 @@ class TimelineOrderingInversionTest {
             recordedAt = recordedAt,
             receivedAt = recordedAt,
         )
+
+    private fun controllersSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing Controllers.kt")
 }

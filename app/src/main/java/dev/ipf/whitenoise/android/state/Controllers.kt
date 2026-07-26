@@ -5253,8 +5253,9 @@ class ConversationController(
                             MessageStatus.Sent,
                             timelineOrder = order,
                         )
-                    // Stamp the position overrides up front so the projection's
-                    // timeline position matches the optimistic order. Drain any
+                    // Register the bridge through the same tracked preserve path
+                    // as text sends so orphan cleanup can release its overrides
+                    // after the confirmed handoff. Drain any
                     // projection echo that arrived while this send was still
                     // mid-`sendMediaAttachments` — at that point the heuristic
                     // refused the match and the projection was stashed in
@@ -5262,8 +5263,7 @@ class ConversationController(
                     // render flip. Now that the overrides are stamped, the
                     // build below will produce a TimelineMessage at the right
                     // position.
-                    localTimelineOrderOverrides[confirmedId] = order
-                    localTimelineTimestampOverrides[confirmedId] = optimistic.recordedAt
+                    preserveOptimisticDisplayPosition(confirmedId, confirmedId)
                     val deferredProjection = pendingProjectionsAwaitingBridge.remove(confirmedId)
                     if (deferredProjection != null) {
                         timelineRecords[confirmedId] = deferredProjection
@@ -7417,13 +7417,20 @@ class ConversationController(
     // Field diagnostic for #1578: surface any adjacent rows still rendered out of
     // true send order after the sort, tagged with which override (if any) fed the
     // comparator the stale position. DEBUG-only; no effect on release builds.
-    private fun logTimelineInversionsForDebug(rows: List<TimelineMessage>) {
+    private fun logTimelineInversionsForDebug(
+        rows: List<TimelineMessage>,
+        expectedHandoffPreserves: Set<String>,
+    ) {
         if (!BuildConfig.DEBUG) return
         val inversionsByPair =
-            adjacentTimelineInversions(rows).associateBy { inversion ->
-                checkNotNull(inversion.above.projected).messageIdHex to
-                    checkNotNull(inversion.below.projected).messageIdHex
-            }
+            adjacentTimelineInversions(rows)
+                .filterNot { inversion ->
+                    checkNotNull(inversion.above.projected).messageIdHex in expectedHandoffPreserves ||
+                        checkNotNull(inversion.below.projected).messageIdHex in expectedHandoffPreserves
+                }.associateBy { inversion ->
+                    checkNotNull(inversion.above.projected).messageIdHex to
+                        checkNotNull(inversion.below.projected).messageIdHex
+                }
         // De-dup so a persistent inversion logs once, not every publish.
         (inversionsByPair.keys - loggedTimelineOrderingInversionPairs).forEach { pair ->
             Log.w("TimelineOrder", describeTimelineInversion(inversionsByPair.getValue(pair)))
@@ -7444,7 +7451,7 @@ class ConversationController(
         row: TimelineMessage,
         source: TimelineMessageRecordFfi,
     ): String =
-        "id=${source.messageIdHex} direction=${row.record.direction} " +
+        "id=${source.messageIdHex.take(8)} direction=${row.record.direction} " +
             "displayAt=${row.record.recordedAt} sourceAt=${source.timelineAt} " +
             "receivedAt=${source.receivedAt} order=${row.timelineOrder} " +
             "timestampOverride=${source.messageIdHex in localTimelineTimestampOverrides} " +
@@ -7634,7 +7641,6 @@ class ConversationController(
     }
 
     private fun publishTimelineFromIndexesInternal() {
-        releaseOrphanedOptimisticSendPreserves()
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
         // Read-anchored local expiry (#797) with send-time fallback for rows
         // the user has already read through. Unread received rows stay visible
@@ -7702,7 +7708,14 @@ class ConversationController(
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
-        logTimelineInversionsForDebug(timeline)
+        // The optimistic→confirmed handoff snapshot is intentionally preserved;
+        // do not report it as the stale-override symptom this detector targets.
+        logTimelineInversionsForDebug(timeline, optimisticSendPreserveIds)
+        // Publish the confirmed row once at its optimistic position before
+        // cleaning the transient bridge. Cleanup rebuilds only the internal
+        // indexes; the immutable snapshot above remains stable for observers,
+        // and the next publish settles the row to its projected position.
+        releaseOrphanedOptimisticSendPreserves()
         editsByTarget = applyOptimisticEdits(aggregated)
         signalForegroundSweepScheduleChanged()
     }
