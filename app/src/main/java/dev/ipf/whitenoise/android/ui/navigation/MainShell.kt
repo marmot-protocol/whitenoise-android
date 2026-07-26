@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
@@ -36,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
@@ -90,6 +92,67 @@ internal fun profileForegroundRoute(
         else -> ProfileForegroundRoute.ShellProfile(pendingProfileNpub)
     }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming")
+@Composable
+internal fun ProfileGroupForegroundCoordinator(
+    appState: WhiteNoiseAppState,
+    conversationController: ConversationController?,
+    secureWindowEnabled: Boolean?,
+    profileSecurePolicy: SecureFlagPolicy,
+    onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    onDismissProfile: () -> Unit,
+    onClosePicker: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val foregroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    val route =
+        profileForegroundRoute(
+            pendingProfileNpub = appState.pendingProfileNpub,
+            startGroupMember = foregroundState.initialMember,
+            conversationOpen = conversationController != null,
+        )
+    when (route) {
+        is ProfileForegroundRoute.NewGroup -> {
+            secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
+            NewGroupFlow(
+                appState = appState,
+                initialMembers = listOf(route.initialMember),
+                onOpenConversation = { item, justCreated ->
+                    foregroundState.close()
+                    onOpenConversation(item, justCreated)
+                },
+                onClose = {
+                    onClosePicker()
+                    foregroundState.close()
+                },
+            )
+            return
+        }
+        else -> content()
+    }
+    val profileNpub =
+        when (route) {
+            is ProfileForegroundRoute.ShellProfile -> route.npub
+            is ProfileForegroundRoute.ConversationProfile -> route.npub
+            else -> null
+        }
+    profileNpub?.let {
+        ProfileSheet(
+            appState = appState,
+            npub = it,
+            onOpenGroup = onOpenConversation,
+            onStartGroup = { candidate ->
+                appState.clearPresentedProfile()
+                foregroundState.open(candidate)
+            },
+            onDismiss = onDismissProfile,
+            adminController = conversationController,
+            securePolicy = profileSecurePolicy,
+        )
+    }
+}
+
 internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
     ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
 
@@ -135,7 +198,6 @@ internal fun MainShell(
     // before the live roster has necessarily settled. Suppresses the group-style
     // member-count subtitle during that transient 0/1-member window (#998).
     var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
-    val profileGroupForegroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     // Per-conversation scroll anchors for back-to-list re-entry (issue #1107).
     // Keyed by account + group id; dropped when the reader leaves near-bottom so
     // the normal unread/newest anchor still runs for chats left at the tail.
@@ -484,9 +546,8 @@ internal fun MainShell(
     }
 
     // Navigate the shell to a (possibly different) group when a profile sheet's
-    // shared-group / Message action fires. Shared by the shell-level sheet and,
-    // threaded through ConversationScreen, by the in-conversation sheet (#635) so
-    // both surfaces behave identically.
+    // shared-group / Message action fires. The shell-owned profile coordinator
+    // uses this for both shell and in-conversation sheets (#635).
     val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
         chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
         selectedChatOpenContext = ConversationOpenContext()
@@ -499,179 +560,181 @@ internal fun MainShell(
         appState.clearPresentedProfile()
     }
 
-    val startGroupFromProfile: (RecipientSearch.Candidate) -> Unit = { candidate ->
-        appState.clearPresentedProfile()
-        profileGroupForegroundState.open(candidate)
-    }
-    val profileRoute =
-        profileForegroundRoute(
-            pendingProfileNpub = appState.pendingProfileNpub,
-            startGroupMember = profileGroupForegroundState.initialMember,
-            conversationOpen = selectedChat != null,
-        )
-    if (profileRoute is ProfileForegroundRoute.NewGroup) {
-        if (selectedChat != null || section == MainSection.Chats) {
-            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+    val conversationControllerCopy = rememberConversationControllerCopy()
+    val conversationController =
+        selectedChat?.let { openChat ->
+            remember(openChat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+                ConversationController(
+                    appState = appState,
+                    initialGroup = openChat.group,
+                    initialMemberSnapshot =
+                        openChat.memberSnapshot
+                            ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, openChat.group.groupIdHex),
+                    initialLastReadMessageId = openChat.projection?.lastReadMessageIdHex,
+                    initialLastReadTimelineAt = openChat.projection?.lastReadTimelineAt,
+                    copy = conversationControllerCopy,
+                )
+            }
         }
-        NewGroupFlow(
-            appState = appState,
-            initialMembers = listOf(profileRoute.initialMember),
-            onOpenConversation = { item, justCreated ->
-                profileGroupForegroundState.close()
-                openGroupFromProfile(item, justCreated)
-            },
-            onClose = {
-                chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
-                profileGroupForegroundState.close()
-            },
-        )
-        return
-    }
-
-    // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
-    if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-        sharePickerRequest?.let { request ->
-            ShareChatPickerSheet(
-                appState = appState,
-                payload = request.payload,
-                onDismiss = { sharePickerRequest = null },
-                onStage = { groupIds ->
-                    val allChats = chatsController.items + chatsController.archivedItems
-                    stageShareToChats(request, groupIds, allChats)
-                    sharePickerRequest = null
-                },
-            )
+    // The controller is owned by the selected conversation route, not the
+    // ConversationScreen composition. The profile-to-group picker temporarily
+    // replaces that screen, so disposing the controller with the screen would
+    // retain and then reuse an already-cleared controller when Back restores it.
+    DisposableEffect(conversationController) {
+        conversationController?.let(appState::attachConversationController)
+        onDispose {
+            conversationController?.let {
+                appState.detachConversationController(it)
+                it.onCleared()
+            }
         }
     }
-
-    // The shell-level profile sheet covers every non-conversation entry point
-    // (chat list, search, settings, QR, reaction list). While a conversation is
-    // active the in-conversation copy inside ConversationScreen renders it
-    // instead — with group-admin context (#635) — so gate this one off to avoid
-    // double-rendering the same sheet.
-    if (profileRoute is ProfileForegroundRoute.ShellProfile) {
-        ProfileSheet(
-            appState = appState,
-            npub = profileRoute.npub,
-            onOpenGroup = openGroupFromProfile,
-            onStartGroup = startGroupFromProfile,
-            onDismiss = {
-                chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
-                appState.clearPresentedProfile()
-            },
-            securePolicy =
-                when {
-                    section != MainSection.Chats -> SecureFlagPolicy.Inherit
-                    appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
-                    else -> SecureFlagPolicy.SecureOn
-                },
-        )
+    LaunchedEffect(conversationController) {
+        conversationController?.start()
     }
+    ProfileGroupForegroundCoordinator(
+        appState = appState,
+        conversationController = conversationController,
+        secureWindowEnabled =
+            if (selectedChat != null || section == MainSection.Chats) {
+                !appState.allowChatScreenshotsInChats
+            } else {
+                null
+            },
+        profileSecurePolicy =
+            when {
+                conversationController != null && appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
+                conversationController != null -> SecureFlagPolicy.SecureOn
+                section != MainSection.Chats -> SecureFlagPolicy.Inherit
+                appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
+                else -> SecureFlagPolicy.SecureOn
+            },
+        onOpenConversation = openGroupFromProfile,
+        onDismissProfile = {
+            chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
+            appState.clearPresentedProfile()
+        },
+        onClosePicker = { chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap) },
+    ) {
+        // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
+        if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+            sharePickerRequest?.let { request ->
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = request.payload,
+                    onDismiss = { sharePickerRequest = null },
+                    onStage = { groupIds ->
+                        val allChats = chatsController.items + chatsController.archivedItems
+                        stageShareToChats(request, groupIds, allChats)
+                        sharePickerRequest = null
+                    },
+                )
+            }
+        }
 
-    if (selectedChat != null) {
-        val openChat = selectedChat!!
-        val scrollKey = conversationScrollKey(appState.activeAccountRef, openChat.group.groupIdHex)
-        ConversationScreen(
-            appState = appState,
-            chat = openChat,
-            focusMessageId = selectedChatOpenContext.focusMessageId,
-            notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
-            justCreated = selectedChatJustCreated,
-            openedAsDmHint = selectedChatOpenedAsDmHint,
-            restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-            onSaveScrollSnapshot = { snapshot ->
-                if (snapshot == null) {
-                    conversationScrollSnapshots.remove(scrollKey)
-                } else {
-                    conversationScrollSnapshots[scrollKey] = snapshot
+        val openChat = selectedChat
+        when {
+            openChat != null -> {
+                val scrollKey = conversationScrollKey(appState.activeAccountRef, openChat.group.groupIdHex)
+                ConversationScreen(
+                    appState = appState,
+                    chat = openChat,
+                    controller = requireNotNull(conversationController),
+                    focusMessageId = selectedChatOpenContext.focusMessageId,
+                    notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
+                    justCreated = selectedChatJustCreated,
+                    openedAsDmHint = selectedChatOpenedAsDmHint,
+                    restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
+                    onSaveScrollSnapshot = { snapshot ->
+                        if (snapshot == null) {
+                            conversationScrollSnapshots.remove(scrollKey)
+                        } else {
+                            conversationScrollSnapshots[scrollKey] = snapshot
+                        }
+                    },
+                    onBack = {
+                        selectedChat = null
+                        selectedChatOpenContext = ConversationOpenContext()
+                        selectedChatJustCreated = false
+                        selectedChatOpenedAsDmHint = false
+                    },
+                )
+            }
+            routingNotification -> {
+                // A notification tap on a non-active account resolves in steps
+                // (switch account → await its chat list → open conversation). Keep
+                // one loading surface over that whole route.
+                LoadingScreen()
+            }
+            else ->
+                when (section) {
+                    MainSection.Chats -> {
+                        WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+                        ChatsScreen(
+                            appState = appState,
+                            controller = chatsController,
+                            conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
+                            onConversationReturnHeadHandled = {
+                                chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
+                            },
+                            onOpenSettings = {
+                                chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                                sectionName = MainSection.Settings.name
+                                settingsDetailName = null
+                            },
+                            onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
+                                selectedChatOpenContext = ConversationOpenContext(focusMessageId = focusMessageId)
+                                selectedChatJustCreated = justCreated
+                                // `justCreated` is true only for freshly-created DMs; group
+                                // creation and existing-DM opens pass false. Reuse that DM-only
+                                // invariant for the open-time subtitle hint (#998).
+                                selectedChatOpenedAsDmHint = justCreated
+                                chatListReturnHeadSnap = openGroupFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                selectedChat = item
+                            },
+                            onPresentProfile = { npub, visibleHeadId ->
+                                chatListReturnHeadSnap =
+                                    presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                appState.presentProfile(npub)
+                            },
+                        )
+                    }
+                    MainSection.Settings ->
+                        SettingsScreen(
+                            appState = appState,
+                            onBackToChats = {
+                                sectionName = MainSection.Chats.name
+                                settingsDetailName = null
+                            },
+                            onOpenDiagnostics = {
+                                // Preserve `settingsDetailName` so backing out of
+                                // Diagnostics returns to Security & Privacy (its only
+                                // entry point) rather than the Settings home, restoring
+                                // the breadcrumb the user walked in on (#412).
+                                sectionName = MainSection.Diagnostics.name
+                            },
+                            onOpenSupportChat = { item ->
+                                // Land in the conversation itself, not the chat list; no
+                                // list scroll state exists to snapshot from Settings.
+                                selectedChatOpenedAsDmHint = false
+                                selectedChat = item
+                                sectionName = MainSection.Chats.name
+                                settingsDetailName = null
+                            },
+                            detail = settingsDetail,
+                            onDetailChange = { settingsDetailName = it?.name },
+                        )
+                    MainSection.Diagnostics ->
+                        DiagnosticsScreen(
+                            appState = appState,
+                            onBack = {
+                                // Leave `settingsDetailName` alone — it still holds the
+                                // detail (Security & Privacy) the user opened Diagnostics
+                                // from, so Settings re-enters that screen directly (#412).
+                                sectionName = MainSection.Settings.name
+                            },
+                        )
                 }
-            },
-            onBack = {
-                selectedChat = null
-                selectedChatOpenContext = ConversationOpenContext()
-                selectedChatJustCreated = false
-                selectedChatOpenedAsDmHint = false
-            },
-            onOpenProfileGroup = openGroupFromProfile,
-            onStartProfileGroup = startGroupFromProfile,
-        )
-        return
-    }
-
-    // A notification tap on a non-active account resolves in steps (switch
-    // account → await its chat list → open conversation). Render one stable
-    // loading state for that whole window so the chat list doesn't flash as an
-    // intermediate stop before the conversation appears.
-    if (routingNotification) {
-        LoadingScreen()
-        return
-    }
-
-    when (section) {
-        MainSection.Chats -> {
-            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
-            ChatsScreen(
-                appState = appState,
-                controller = chatsController,
-                conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
-                onConversationReturnHeadHandled = {
-                    chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
-                },
-                onOpenSettings = {
-                    chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                    sectionName = MainSection.Settings.name
-                    settingsDetailName = null
-                },
-                onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
-                    selectedChatOpenContext = ConversationOpenContext(focusMessageId = focusMessageId)
-                    selectedChatJustCreated = justCreated
-                    // `justCreated` is true only for freshly-created DMs; group
-                    // creation and existing-DM opens pass false. Reuse that DM-only
-                    // invariant for the open-time subtitle hint (#998).
-                    selectedChatOpenedAsDmHint = justCreated
-                    chatListReturnHeadSnap = openGroupFromChatList(chatListReturnHeadSnap, visibleHeadId)
-                    selectedChat = item
-                },
-                onPresentProfile = { npub, visibleHeadId ->
-                    chatListReturnHeadSnap = presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
-                    appState.presentProfile(npub)
-                },
-            )
         }
-        MainSection.Settings ->
-            SettingsScreen(
-                appState = appState,
-                onBackToChats = {
-                    sectionName = MainSection.Chats.name
-                    settingsDetailName = null
-                },
-                onOpenDiagnostics = {
-                    // Preserve `settingsDetailName` so backing out of
-                    // Diagnostics returns to Security & Privacy (its only
-                    // entry point) rather than the Settings home, restoring
-                    // the breadcrumb the user walked in on (#412).
-                    sectionName = MainSection.Diagnostics.name
-                },
-                onOpenSupportChat = { item ->
-                    // Land in the conversation itself, not the chat list; no
-                    // list scroll state exists to snapshot from Settings.
-                    selectedChatOpenedAsDmHint = false
-                    selectedChat = item
-                    sectionName = MainSection.Chats.name
-                    settingsDetailName = null
-                },
-                detail = settingsDetail,
-                onDetailChange = { settingsDetailName = it?.name },
-            )
-        MainSection.Diagnostics ->
-            DiagnosticsScreen(
-                appState = appState,
-                onBack = {
-                    // Leave `settingsDetailName` alone — it still holds the
-                    // detail (Security & Privacy) the user opened Diagnostics
-                    // from, so Settings re-enters that screen directly (#412).
-                    sectionName = MainSection.Settings.name
-                },
-            )
     }
 }

@@ -98,7 +98,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -147,7 +146,6 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
-import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -195,7 +193,6 @@ import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -257,6 +254,7 @@ private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RET
 internal fun ConversationScreen(
     appState: WhiteNoiseAppState,
     chat: ChatListItem,
+    controller: ConversationController,
     onBack: () -> Unit,
     // When opened from a chat-list message-body search hit (issue #290), the
     // matched message id to scroll to and briefly highlight once the timeline
@@ -276,12 +274,6 @@ internal fun ConversationScreen(
     // keep that transient state in the DM presentation instead of falling into
     // the group subtitle branch (#998).
     openedAsDmHint: Boolean = false,
-    // (chat, justCreated): navigate to another shared group when the user taps a
-    // shared group / Message in the in-conversation profile sheet (issue #635).
-    // Reuses the shell's existing open-group lambda so this path matches the
-    // shell-level sheet's onOpenGroup exactly.
-    onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
-    onStartProfileGroup: (RecipientSearch.Candidate) -> Unit = {},
     // Scroll position captured when the user last left this chat while reading
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
@@ -303,25 +295,6 @@ internal fun ConversationScreen(
         snackbarBottomInset.value = COMPOSER_SNACKBAR_INSET
         onDispose { snackbarBottomInset.value = 0.dp }
     }
-    val controllerCopy = rememberConversationControllerCopy()
-    val controller =
-        // Key on the active account too: chat.id is the groupIdHex, which is
-        // shared across local accounts that belong to the same group. Without
-        // the account in the key, switching accounts into the same conversation
-        // (e.g. tapping another account's notification) reuses a controller
-        // still bound to the previous account's timeline and read state.
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
-            ConversationController(
-                appState = appState,
-                initialGroup = chat.group,
-                initialMemberSnapshot =
-                    chat.memberSnapshot
-                        ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
-                initialLastReadMessageId = chat.projection?.lastReadMessageIdHex,
-                initialLastReadTimelineAt = chat.projection?.lastReadTimelineAt,
-                copy = controllerCopy,
-            )
-        }
     // Capture the unread boundary at chat open. Stays fixed for this controller
     // so the divider doesn't move as messages are marked read, but resets when
     // an account/runtime switch creates a new controller for the same group.
@@ -1872,21 +1845,10 @@ internal fun ConversationScreen(
 
     LaunchedEffect(controller) {
         initialTimelineLoadStarted = true
-        controller.start()
     }
     LaunchedEffect(controller.group.pendingConfirmation, controller.group.groupIdHex) {
         if (controller.group.pendingConfirmation) {
             controller.dismissConversationNotifications()
-        }
-    }
-    // inviteStreamScope outlives a single start() — acceptInvite() launches into
-    // it from a separate mutation scope — so it's cancelled on controller
-    // disposal here rather than in start()'s teardown (#279).
-    DisposableEffect(controller) {
-        appState.attachConversationController(controller)
-        onDispose {
-            appState.detachConversationController(controller)
-            controller.onCleared()
         }
     }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
@@ -2465,32 +2427,6 @@ internal fun ConversationScreen(
                 }
             }
     }
-    // In-conversation profile sheet (issue #635). Driven by the same
-    // appState.pendingProfileNpub the shell-level sheet uses, but passed the live
-    // ConversationController so it can offer group-admin actions. The shell-level
-    // sheet is suppressed while a conversation is active (selectedChat != null in
-    // the app shell), so the sheet renders exactly once here. Placed before the
-    // showDetails early-return so it also overlays the members-list row profile
-    // tap inside GroupDetailsScreen, which keeps the group context too.
-    appState.pendingProfileNpub?.let { profileNpub ->
-        ProfileSheet(
-            appState = appState,
-            npub = profileNpub,
-            onOpenGroup = { item, justCreatedChat ->
-                onOpenProfileGroup(item, justCreatedChat)
-            },
-            onStartGroup = onStartProfileGroup,
-            onDismiss = { appState.clearPresentedProfile() },
-            adminController = controller,
-            securePolicy =
-                if (appState.allowChatScreenshotsInChats) {
-                    SecureFlagPolicy.SecureOff
-                } else {
-                    SecureFlagPolicy.SecureOn
-                },
-        )
-    }
-
     if (showDetails) {
         GroupDetailsScreen(
             appState = appState,

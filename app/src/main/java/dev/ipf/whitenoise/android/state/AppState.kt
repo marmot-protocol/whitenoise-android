@@ -1150,9 +1150,40 @@ private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 private const val TTS_PREVIEW_MAX_LENGTH = 120
 
-class WhiteNoiseAppState(
+class WhiteNoiseAppState private constructor(
     context: Context,
+    val draftStore: DraftStore,
+    startPlatformServices: Boolean,
+    private val accountIdHexResolver: (suspend (String) -> String?)?,
+    initialAccounts: List<AccountSummaryFfi>,
+    initialActiveAccountRef: String?,
 ) {
+    constructor(context: Context) :
+        this(
+            context = context,
+            draftStore = DraftStore.forContext(context.applicationContext),
+            startPlatformServices = true,
+            accountIdHexResolver = null,
+            initialAccounts = emptyList(),
+            initialActiveAccountRef = null,
+        )
+
+    /** JVM Compose tests inject the profile resolver/state and do not start Android platform services. */
+    internal constructor(
+        context: Context,
+        draftStore: DraftStore,
+        accountIdHexResolver: suspend (String) -> String?,
+        accounts: List<AccountSummaryFfi>,
+        activeAccountRef: String,
+    ) : this(
+        context = context,
+        draftStore = draftStore,
+        startPlatformServices = false,
+        accountIdHexResolver = accountIdHexResolver,
+        initialAccounts = accounts,
+        initialActiveAccountRef = activeAccountRef,
+    )
+
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
 
@@ -1403,13 +1434,13 @@ class WhiteNoiseAppState(
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
 
-    var accounts by mutableStateOf<List<AccountSummaryFfi>>(emptyList())
+    var accounts by mutableStateOf(initialAccounts)
         private set
 
     var accountUnreadCounts by mutableStateOf<Map<String, ULong>>(emptyMap())
         private set
 
-    var activeAccountRef by mutableStateOf(preferences.getString(ACTIVE_ACCOUNT_KEY, null))
+    var activeAccountRef by mutableStateOf(initialActiveAccountRef ?: preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
 
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
@@ -1721,7 +1752,6 @@ class WhiteNoiseAppState(
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
-    val draftStore: DraftStore = DraftStore.forContext(appContext)
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
@@ -1805,32 +1835,34 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
-        // Drive timed-mute expiry emission so muted icons and folder rules
-        // refresh when a mute elapses, not only on the next getter call.
-        chatMutePreferences.attachExpiryScheduler(mutationsScope)
-        if (BuildConfig.SELF_UPDATE_ENABLED) {
-            // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
-            mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
-            notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
-        }
-        // Off-main: the ConnectivityManager registration + seed query are
-        // binder IPCs and this constructor runs on the main thread. Until the
-        // seed lands, the snapshot reads as offline/no-networks — the same
-        // conservative answer the auto-download gate gives for "unknown".
-        mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
-        // Wipe pre-encryption cache entries promptly after upgrade without doing
-        // directory I/O in this main-thread constructor.
-        mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
-        if (requireAppUnlock) {
-            // Pre-warm the Keystore-backed unlock timestamp off-main so the
-            // first foreground lock evaluation is a cache hit. Assigned on
-            // Main, and only if an unlock hasn't already stamped a newer value.
-            mutationsScope.launch {
-                val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
-                if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+        if (startPlatformServices) {
+            // Drive timed-mute expiry emission so muted icons and folder rules
+            // refresh when a mute elapses, not only on the next getter call.
+            chatMutePreferences.attachExpiryScheduler(mutationsScope)
+            if (BuildConfig.SELF_UPDATE_ENABLED) {
+                // Off-main: sweeping stale APKs touches the cache dir (listFiles + deletes).
+                mutationsScope.launch(Dispatchers.IO) { appSelfUpdateFlow.sweepStaleApks() }
+                notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
             }
+            // Off-main: the ConnectivityManager registration + seed query are
+            // binder IPCs and this constructor runs on the main thread. Until the
+            // seed lands, the snapshot reads as offline/no-networks — the same
+            // conservative answer the auto-download gate gives for "unknown".
+            mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
+            // Wipe pre-encryption cache entries promptly after upgrade without doing
+            // directory I/O in this main-thread constructor.
+            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            if (requireAppUnlock) {
+                // Pre-warm the Keystore-backed unlock timestamp off-main so the
+                // first foreground lock evaluation is a cache hit. Assigned on
+                // Main, and only if an unlock hasn't already stamped a newer value.
+                mutationsScope.launch {
+                    val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
+                    if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
+                }
+            }
+            mutationsScope.launch { refreshTtsAvailability() }
         }
-        mutationsScope.launch { refreshTtsAvailability() }
     }
 
     val activeAccount: AccountSummaryFfi?
@@ -5504,7 +5536,10 @@ class WhiteNoiseAppState(
         return resolved
     }
 
-    suspend fun accountIdHex(reference: String): String? = runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
+    suspend fun accountIdHex(reference: String): String? {
+        accountIdHexResolver?.invoke(reference)?.let { return it }
+        return runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
+    }
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
         // Observe profile cache invalidations for Compose callers.
