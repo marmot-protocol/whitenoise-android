@@ -603,12 +603,20 @@ internal suspend fun configureDefaultNotificationDelivery(
     disableNativePush: suspend () -> Boolean,
     setBackgroundConnectionEnabled: suspend (Boolean) -> Boolean,
 ): Boolean {
-    if (!nativePushAvailable) return setBackgroundConnectionEnabled(true)
-    val nativePushReady = enableNativePush()
-    if (nativePushReady && setBackgroundConnectionEnabled(false)) return true
-    val nativePushDisabled = disableNativePush()
-    val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
-    return nativePushDisabled && backgroundConnectionEnabled
+    val configured =
+        if (!nativePushAvailable) {
+            setBackgroundConnectionEnabled(true)
+        } else {
+            val nativePushReady = enableNativePush()
+            if (nativePushReady && setBackgroundConnectionEnabled(false)) {
+                true
+            } else {
+                val nativePushDisabled = disableNativePush()
+                val backgroundConnectionEnabled = setBackgroundConnectionEnabled(true)
+                nativePushDisabled && backgroundConnectionEnabled
+            }
+        }
+    return configured
 }
 
 internal fun nativePushEnablementConfirmed(
@@ -5154,6 +5162,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun hasConfirmedNativePushRegistration(account: String): Boolean =
         nativePushSyncMutex.withLock { perAccountSyncedFingerprints.containsKey(account) }
 
+    @Suppress("ReturnCount")
     private suspend fun syncNativePushRegistrationIfEnabledLocked(): Boolean {
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
