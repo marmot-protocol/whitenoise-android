@@ -145,21 +145,6 @@ internal fun profileSheetAdminActions(
     ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
 }
 
-@Suppress("FunctionNaming")
-@Composable
-internal fun ProfileStartGroupAction(
-    candidate: RecipientSearch.Candidate,
-    enabled: Boolean,
-    onStartGroup: (RecipientSearch.Candidate) -> Unit,
-) {
-    SettingsActionRow(
-        icon = Icons.Default.Group,
-        title = stringResource(R.string.profile_start_new_group_with, candidate.displayName),
-        enabled = enabled,
-        onClick = { onStartGroup(candidate) },
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileSheet(
@@ -477,15 +462,19 @@ internal fun ProfileSheet(
                         enabled = !creatingChat,
                         onClick = { showContactEditorDialog = true },
                     )
-                    ProfileStartGroupAction(
-                        candidate =
-                            RecipientSearch.Candidate(
-                                accountIdHex = hex!!,
-                                displayName = displayTitle,
-                                npub = npub,
-                            ),
+                    SettingsActionRow(
+                        icon = Icons.Default.Group,
+                        title = stringResource(R.string.profile_start_new_group_with, displayTitle),
                         enabled = !creatingChat,
-                        onStartGroup = onStartGroup,
+                        onClick = {
+                            onStartGroup(
+                                RecipientSearch.Candidate(
+                                    accountIdHex = hex!!,
+                                    displayName = displayTitle,
+                                    npub = npub,
+                                ),
+                            )
+                        },
                     )
                     if (addableGroups.isNotEmpty()) {
                         SettingsActionRow(

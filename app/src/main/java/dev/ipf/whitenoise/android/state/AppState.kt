@@ -1153,11 +1153,35 @@ class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
     startPlatformServices: Boolean,
+    private val accountIdHexResolver: (suspend (String) -> String?)?,
+    initialAccounts: List<AccountSummaryFfi>,
+    initialActiveAccountRef: String?,
 ) {
-    constructor(context: Context) : this(context, DraftStore.forContext(context.applicationContext), true)
+    constructor(context: Context) :
+        this(
+            context = context,
+            draftStore = DraftStore.forContext(context.applicationContext),
+            startPlatformServices = true,
+            accountIdHexResolver = null,
+            initialAccounts = emptyList(),
+            initialActiveAccountRef = null,
+        )
 
-    /** JVM Compose tests use in-memory drafts and do not start Android platform services. */
-    internal constructor(context: Context, draftStore: DraftStore) : this(context, draftStore, false)
+    /** JVM Compose tests inject the profile resolver/state and do not start Android platform services. */
+    internal constructor(
+        context: Context,
+        draftStore: DraftStore,
+        accountIdHexResolver: suspend (String) -> String?,
+        accounts: List<AccountSummaryFfi>,
+        activeAccountRef: String,
+    ) : this(
+        context = context,
+        draftStore = draftStore,
+        startPlatformServices = false,
+        accountIdHexResolver = accountIdHexResolver,
+        initialAccounts = accounts,
+        initialActiveAccountRef = activeAccountRef,
+    )
 
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -1409,13 +1433,13 @@ class WhiteNoiseAppState private constructor(
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
 
-    var accounts by mutableStateOf<List<AccountSummaryFfi>>(emptyList())
+    var accounts by mutableStateOf(initialAccounts)
         private set
 
     var accountUnreadCounts by mutableStateOf<Map<String, ULong>>(emptyMap())
         private set
 
-    var activeAccountRef by mutableStateOf(preferences.getString(ACTIVE_ACCOUNT_KEY, null))
+    var activeAccountRef by mutableStateOf(initialActiveAccountRef ?: preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
 
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
@@ -5480,7 +5504,10 @@ class WhiteNoiseAppState private constructor(
         return resolved
     }
 
-    suspend fun accountIdHex(reference: String): String? = runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
+    suspend fun accountIdHex(reference: String): String? {
+        accountIdHexResolver?.invoke(reference)?.let { return it }
+        return runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
+    }
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
         // Observe profile cache invalidations for Compose callers.

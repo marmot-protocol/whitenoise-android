@@ -30,7 +30,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val openGroupFromProfileBlock =
             mainShell.requiredSection(
                 start = "val openGroupFromProfile:",
-                end = "\n\n    // The shell-level profile sheet",
+                end = "\n\n    val conversationControllerCopy",
             )
         assertTrue(
             "profile conversation open must transfer or clear return-head provenance via reducer",
@@ -40,7 +40,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onPresentProfileBlock =
             mainShell.requiredSection(
                 start = "onPresentProfile = {",
-                end = "\n                },",
+                end = "\n                            },",
             )
         assertTrue(
             "chat-list profile presentation must arm the list-bound snapshot",
@@ -76,14 +76,15 @@ class ChatListProfileReturnSnapCoverageTest {
         val mainShell = mainShellSource().readText()
         val profileSheetBlock =
             mainShell.requiredSection(
-                start = "// The shell-level profile sheet",
-                end = "\n\n    if (selectedChat != null) {",
+                start = "ProfileGroupForegroundCoordinator(",
+                end = "\n    ) {",
+                occurrence = 1,
             )
 
         val onDismissBlock =
             profileSheetBlock.requiredSection(
-                start = "onDismiss = {",
-                end = "\n                },",
+                start = "onDismissProfile = {",
+                end = "\n        },",
             )
         assertTrue(
             "profile dismiss must clear the list-bound snapshot",
@@ -93,7 +94,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenSettingsBlock =
             mainShell.requiredSection(
                 start = "onOpenSettings = {",
-                end = "\n                },",
+                end = "\n                            },",
             )
         assertTrue(
             "unrelated chat-list navigation must reset return-head provenance",
@@ -103,7 +104,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onOpenGroupBlock =
             mainShell.requiredSection(
                 start = "onOpenGroup = {",
-                end = "\n                },",
+                end = "\n                            },",
             )
         assertTrue(
             "direct list opens must arm conversation return head via reducer",
@@ -162,7 +163,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "\n            )",
+                end = "\n                        )",
             )
         assertTrue(
             "ChatsScreen must receive the published head from the state machine",
