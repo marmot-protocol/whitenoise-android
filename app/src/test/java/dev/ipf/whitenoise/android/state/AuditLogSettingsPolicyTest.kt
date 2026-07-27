@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -107,69 +109,72 @@ class AuditLogSettingsPolicyTest {
     }
 
     @Test
-    fun legacyFalsePreservesFullDataAndCompletesMigration() {
-        preferences
-            .edit()
-            .putBoolean("redact_sensitive_audit_data", false)
-            .commit()
-        val settings =
-            AuditLogSettingsFfi(
-                enabled = true,
-                dataMode = AuditDataModeFfi.FULL_DATA,
+    fun legacyFalsePreservesFullDataAndCompletesMigration() =
+        runTest {
+            preferences
+                .edit()
+                .putBoolean("redact_sensitive_audit_data", false)
+                .commit()
+            val settings =
+                AuditLogSettingsFfi(
+                    enabled = true,
+                    dataMode = AuditDataModeFfi.FULL_DATA,
+                )
+
+            assertEquals(
+                AuditLogSettingsPolicy.MigrationAction.PreserveAndComplete,
+                AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
             )
 
-        assertEquals(
-            AuditLogSettingsPolicy.MigrationAction.PreserveAndComplete,
-            AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
-        )
+            assertTrue(AuditLogSettingsPolicy.completeMigration(preferences))
 
-        AuditLogSettingsPolicy.completeMigration(preferences)
-
-        assertFalse(AuditLogSettingsPolicy.hasLegacyRedactionPreference(preferences))
-        assertTrue(AuditLogSettingsPolicy.isMigrationComplete(preferences))
-        assertEquals(
-            AuditLogSettingsPolicy.MigrationAction.None,
-            AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
-        )
-    }
+            assertFalse(AuditLogSettingsPolicy.hasLegacyRedactionPreference(preferences))
+            assertTrue(AuditLogSettingsPolicy.isMigrationComplete(preferences))
+            assertEquals(
+                AuditLogSettingsPolicy.MigrationAction.None,
+                AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
+            )
+        }
 
     @Test
-    fun legacyRedactionPreferenceIsRetiredWithoutEncodingMode() {
-        preferences
-            .edit()
-            .putBoolean("redact_sensitive_audit_data", true)
-            .commit()
-        val obfuscated =
-            AuditLogSettingsFfi(
-                enabled = true,
-                dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
+    fun legacyRedactionPreferenceIsRetiredWithoutEncodingMode() =
+        runTest {
+            preferences
+                .edit()
+                .putBoolean("redact_sensitive_audit_data", true)
+                .commit()
+            val obfuscated =
+                AuditLogSettingsFfi(
+                    enabled = true,
+                    dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
+                )
+
+            assertEquals(
+                AuditLogSettingsPolicy.MigrationAction.CompleteOnly,
+                AuditLogSettingsPolicy.evaluateMigration(preferences, obfuscated),
             )
 
-        assertEquals(
-            AuditLogSettingsPolicy.MigrationAction.CompleteOnly,
-            AuditLogSettingsPolicy.evaluateMigration(preferences, obfuscated),
-        )
+            assertTrue(AuditLogSettingsPolicy.completeMigration(preferences))
 
-        AuditLogSettingsPolicy.completeMigration(preferences)
-
-        assertFalse(AuditLogSettingsPolicy.hasLegacyRedactionPreference(preferences))
-        assertTrue(AuditLogSettingsPolicy.isMigrationComplete(preferences))
-    }
+            assertFalse(AuditLogSettingsPolicy.hasLegacyRedactionPreference(preferences))
+            assertTrue(AuditLogSettingsPolicy.isMigrationComplete(preferences))
+        }
 
     @Test
-    fun explicitFullDataAfterMigrationCompleteSurvivesEvaluation() {
-        AuditLogSettingsPolicy.completeMigration(preferences)
-        val settings =
-            AuditLogSettingsFfi(
-                enabled = true,
-                dataMode = AuditDataModeFfi.FULL_DATA,
-            )
+    fun explicitFullDataAfterMigrationCompleteSurvivesEvaluation() =
+        runTest {
+            assertTrue(AuditLogSettingsPolicy.completeMigration(preferences))
+            val settings =
+                AuditLogSettingsFfi(
+                    enabled = true,
+                    dataMode = AuditDataModeFfi.FULL_DATA,
+                )
 
-        assertEquals(
-            AuditLogSettingsPolicy.MigrationAction.None,
-            AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
-        )
-    }
+            assertEquals(
+                AuditLogSettingsPolicy.MigrationAction.None,
+                AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
+            )
+        }
 
     @Test
     fun migrationPersistsEngineModeBeforeCompletingPolicy() =
@@ -191,7 +196,10 @@ class AuditLogSettingsPolicyTest {
                         recorded += requested
                         requested
                     },
-                    complete = { completionCount += 1 },
+                    complete = {
+                        completionCount += 1
+                        true
+                    },
                 )
 
             assertEquals(
@@ -221,7 +229,10 @@ class AuditLogSettingsPolicyTest {
                     executeAuditLogSettingsMigration(
                         action = action,
                         persist = { throw IllegalStateException("mdk write failed") },
-                        complete = { completionCount += 1 },
+                        complete = {
+                            completionCount += 1
+                            true
+                        },
                     )
                 }
 
@@ -232,30 +243,128 @@ class AuditLogSettingsPolicyTest {
         }
 
     @Test
+    fun migrationMarkerWriteFailureLeavesPolicyPendingForRetry() {
+        runBlocking {
+            val settings =
+                AuditLogSettingsFfi(
+                    enabled = true,
+                    dataMode = AuditDataModeFfi.FULL_DATA,
+                )
+            val action = AuditLogSettingsPolicy.evaluateMigration(preferences, settings)
+
+            val result =
+                runCatching {
+                    executeAuditLogSettingsMigration(
+                        action = action,
+                        persist = { it },
+                        complete = { false },
+                    )
+                }
+
+            assertTrue(result.isFailure)
+            assertFalse(AuditLogSettingsPolicy.isMigrationComplete(preferences))
+            assertEquals(action, AuditLogSettingsPolicy.evaluateMigration(preferences, settings))
+        }
+    }
+
+    @Test
+    fun migrationMarkerCommitFailureLeavesPolicyPendingForRetry() {
+        runBlocking {
+            val settings =
+                AuditLogSettingsFfi(
+                    enabled = true,
+                    dataMode = AuditDataModeFfi.FULL_DATA,
+                )
+            val action = AuditLogSettingsPolicy.evaluateMigration(preferences, settings)
+            val failingPreferences = FailingCommitSharedPreferences(preferences, failCommit = true)
+
+            val result =
+                runCatching {
+                    executeAuditLogSettingsMigration(
+                        action = action,
+                        persist = { it },
+                        complete = { AuditLogSettingsPolicy.completeMigration(failingPreferences) },
+                    )
+                }
+
+            assertTrue(result.isFailure)
+            assertFalse(AuditLogSettingsPolicy.isMigrationComplete(preferences))
+            assertEquals(action, AuditLogSettingsPolicy.evaluateMigration(preferences, settings))
+        }
+    }
+
+    @Test
+    fun migrationMarkerWriteRetriesAfterTransientFailure() {
+        runBlocking {
+            val settings =
+                AuditLogSettingsFfi(
+                    enabled = false,
+                    dataMode = AuditDataModeFfi.FULL_DATA,
+                )
+            val action = AuditLogSettingsPolicy.evaluateMigration(preferences, settings)
+            val failingPreferences = FailingCommitSharedPreferences(preferences, failCommit = true)
+
+            val firstAttempt =
+                runCatching {
+                    executeAuditLogSettingsMigration(
+                        action = action,
+                        persist = { it },
+                        complete = { AuditLogSettingsPolicy.completeMigration(failingPreferences) },
+                    )
+                }
+            assertTrue(firstAttempt.isFailure)
+
+            failingPreferences.failCommit = false
+            val migrated =
+                executeAuditLogSettingsMigration(
+                    action = AuditLogSettingsPolicy.evaluateMigration(preferences, settings),
+                    persist = { it },
+                    complete = { AuditLogSettingsPolicy.completeMigration(failingPreferences) },
+                )
+
+            assertEquals(
+                AuditLogSettingsFfi(
+                    enabled = false,
+                    dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
+                ),
+                migrated,
+            )
+            assertTrue(AuditLogSettingsPolicy.isMigrationComplete(preferences))
+        }
+    }
+
+    @Test
     fun setEnabledPreservesEngineDataMode() =
         runTest {
+            val mutex = Mutex()
             val initial =
                 AuditLogSettingsFfi(
                     enabled = true,
                     dataMode = AuditDataModeFfi.FULL_DATA,
                 )
+            var cached: AuditLogSettingsFfi? = initial
             val recorded = mutableListOf<AuditLogSettingsFfi>()
 
-            var current = initial
-            current =
-                applyAuditLogSettingsUpdate(
-                    current = current,
+            cached =
+                updateAuditLogSettingsSerialized(
+                    mutex = mutex,
+                    cachedSettings = { cached },
+                    storeCachedSettings = { cached = it },
+                    loadFromEngine = { initial },
                     transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, false) },
-                    persist = {
+                    persistToEngine = {
                         recorded += it
                         it
                     },
                 )
-            current =
-                applyAuditLogSettingsUpdate(
-                    current = current,
+            cached =
+                updateAuditLogSettingsSerialized(
+                    mutex = mutex,
+                    cachedSettings = { cached },
+                    storeCachedSettings = { cached = it },
+                    loadFromEngine = { initial },
                     transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, true) },
-                    persist = {
+                    persistToEngine = {
                         recorded += it
                         it
                     },
@@ -273,18 +382,23 @@ class AuditLogSettingsPolicyTest {
     @Test
     fun setRedactionPersistsThroughEngineWhileLoggingDisabled() =
         runTest {
+            val mutex = Mutex()
             val initial =
                 AuditLogSettingsFfi(
                     enabled = false,
                     dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
                 )
+            var cached: AuditLogSettingsFfi? = initial
             val recorded = mutableListOf<AuditLogSettingsFfi>()
 
             val updated =
-                applyAuditLogSettingsUpdate(
-                    current = initial,
+                updateAuditLogSettingsSerialized(
+                    mutex = mutex,
+                    cachedSettings = { cached },
+                    storeCachedSettings = { cached = it },
+                    loadFromEngine = { initial },
                     transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact = false) },
-                    persist = {
+                    persistToEngine = {
                         recorded += it
                         it
                     },
@@ -305,17 +419,22 @@ class AuditLogSettingsPolicyTest {
     @Test
     fun setRedactionHotSwapsActiveRecorderWhileLoggingEnabled() =
         runTest {
+            val mutex = Mutex()
             val initial =
                 AuditLogSettingsFfi(
                     enabled = true,
                     dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
                 )
+            var cached: AuditLogSettingsFfi? = initial
             val recorded = mutableListOf<AuditLogSettingsFfi>()
 
-            applyAuditLogSettingsUpdate(
-                current = initial,
+            updateAuditLogSettingsSerialized(
+                mutex = mutex,
+                cachedSettings = { cached },
+                storeCachedSettings = { cached = it },
+                loadFromEngine = { initial },
                 transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact = false) },
-                persist = {
+                persistToEngine = {
                     recorded += it
                     it
                 },
@@ -335,17 +454,22 @@ class AuditLogSettingsPolicyTest {
     @Test
     fun enablingAuditLoggingPreservesObfuscatedEngineMode() =
         runTest {
+            val mutex = Mutex()
             val initial =
                 AuditLogSettingsFfi(
                     enabled = false,
                     dataMode = AuditDataModeFfi.OBFUSCATED_SENSITIVE_DATA,
                 )
+            var cached: AuditLogSettingsFfi? = initial
             val recorded = mutableListOf<AuditLogSettingsFfi>()
 
-            applyAuditLogSettingsUpdate(
-                current = initial,
+            updateAuditLogSettingsSerialized(
+                mutex = mutex,
+                cachedSettings = { cached },
+                storeCachedSettings = { cached = it },
+                loadFromEngine = { initial },
                 transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, true) },
-                persist = {
+                persistToEngine = {
                     recorded += it
                     it
                 },
@@ -356,20 +480,79 @@ class AuditLogSettingsPolicyTest {
                 recorded.last().dataMode,
             )
         }
+}
 
-    @Test
-    fun turningOffRedactionRequiresConfirmation() {
-        assertEquals(
-            AuditRedactionToggleDecision.RequireFullDataConfirmation,
-            auditRedactionToggleDecision(requestedRedact = false),
-        )
-    }
+private class FailingCommitSharedPreferences(
+    private val delegate: android.content.SharedPreferences,
+    var failCommit: Boolean,
+) : android.content.SharedPreferences by delegate {
+    override fun edit(): android.content.SharedPreferences.Editor = FailingEditor(delegate.edit())
 
-    @Test
-    fun turningOnRedactionAppliesImmediately() {
-        assertEquals(
-            AuditRedactionToggleDecision.ApplyImmediately(redact = true),
-            auditRedactionToggleDecision(requestedRedact = true),
-        )
+    private inner class FailingEditor(
+        private val backing: android.content.SharedPreferences.Editor,
+    ) : android.content.SharedPreferences.Editor {
+        override fun putBoolean(
+            key: String?,
+            value: Boolean,
+        ): android.content.SharedPreferences.Editor {
+            backing.putBoolean(key, value)
+            return this
+        }
+
+        override fun remove(key: String?): android.content.SharedPreferences.Editor {
+            backing.remove(key)
+            return this
+        }
+
+        override fun clear(): android.content.SharedPreferences.Editor {
+            backing.clear()
+            return this
+        }
+
+        override fun putString(
+            key: String?,
+            value: String?,
+        ): android.content.SharedPreferences.Editor {
+            backing.putString(key, value)
+            return this
+        }
+
+        override fun putStringSet(
+            key: String?,
+            values: MutableSet<String>?,
+        ): android.content.SharedPreferences.Editor {
+            backing.putStringSet(key, values)
+            return this
+        }
+
+        override fun putInt(
+            key: String?,
+            value: Int,
+        ): android.content.SharedPreferences.Editor {
+            backing.putInt(key, value)
+            return this
+        }
+
+        override fun putLong(
+            key: String?,
+            value: Long,
+        ): android.content.SharedPreferences.Editor {
+            backing.putLong(key, value)
+            return this
+        }
+
+        override fun putFloat(
+            key: String?,
+            value: Float,
+        ): android.content.SharedPreferences.Editor {
+            backing.putFloat(key, value)
+            return this
+        }
+
+        override fun commit(): Boolean = if (failCommit) false else backing.commit()
+
+        override fun apply() {
+            commit()
+        }
     }
 }

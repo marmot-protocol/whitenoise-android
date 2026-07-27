@@ -36,9 +36,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
-import dev.ipf.whitenoise.android.state.AuditRedactionToggleDecision
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.auditRedactionToggleDecision
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import kotlinx.coroutines.delay
@@ -52,6 +50,17 @@ internal fun SecurityPrivacyScreen(
 ) {
     var telemetryBusy by remember { mutableStateOf(false) }
     var auditLogsBusy by remember { mutableStateOf(false) }
+
+    fun runAuditMutation(block: suspend () -> Unit) {
+        auditLogsBusy = true
+        appState.launchMutation {
+            try {
+                block()
+            } finally {
+                auditLogsBusy = false
+            }
+        }
+    }
 
     LaunchedEffect(appState.runtimeGeneration) {
         appState.refreshAppLockCredentialAvailability()
@@ -145,75 +154,19 @@ internal fun SecurityPrivacyScreen(
                         enabled = !auditLogsBusy,
                         busy = auditLogsBusy,
                         onCheckedChange = { enabled ->
-                            auditLogsBusy = true
-                            appState.launchMutation {
-                                try {
-                                    appState.setAuditLogsEnabled(enabled)
-                                } finally {
-                                    auditLogsBusy = false
-                                }
-                            }
+                            runAuditMutation { appState.setAuditLogsEnabled(enabled) }
                         },
                     )
                     if (appState.auditLogSettings?.enabled == true) {
-                        var fullAuditDataConfirmOpen by remember { mutableStateOf(false) }
                         AppDivider(Modifier.padding(vertical = 12.dp))
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.redact_audit_data),
-                            subtitle = stringResource(R.string.redact_audit_data_subtitle),
+                        AuditRedactionSwitch(
                             checked = appState.redactSensitiveAuditData,
                             enabled = !auditLogsBusy,
                             busy = auditLogsBusy,
-                            onCheckedChange = { redact ->
-                                when (val decision = auditRedactionToggleDecision(redact)) {
-                                    AuditRedactionToggleDecision.RequireFullDataConfirmation -> {
-                                        fullAuditDataConfirmOpen = true
-                                    }
-                                    is AuditRedactionToggleDecision.ApplyImmediately -> {
-                                        auditLogsBusy = true
-                                        appState.launchMutation {
-                                            try {
-                                                appState.setRedactSensitiveAuditData(decision.redact)
-                                            } finally {
-                                                auditLogsBusy = false
-                                            }
-                                        }
-                                    }
-                                }
+                            onApplyRedaction = { redact ->
+                                runAuditMutation { appState.setRedactSensitiveAuditData(redact) }
                             },
                         )
-                        if (fullAuditDataConfirmOpen) {
-                            AlertDialog(
-                                onDismissRequest = { fullAuditDataConfirmOpen = false },
-                                title = { Text(stringResource(R.string.redact_audit_data_confirm_title)) },
-                                text = { Text(stringResource(R.string.redact_audit_data_confirm_body)) },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            fullAuditDataConfirmOpen = false
-                                            auditLogsBusy = true
-                                            appState.launchMutation {
-                                                try {
-                                                    appState.setRedactSensitiveAuditData(false)
-                                                } finally {
-                                                    auditLogsBusy = false
-                                                }
-                                            }
-                                        },
-                                    ) {
-                                        Text(
-                                            stringResource(R.string.redact_audit_data_confirm_action),
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { fullAuditDataConfirmOpen = false }) {
-                                        Text(stringResource(R.string.cancel))
-                                    }
-                                },
-                            )
-                        }
                     }
                     AppDivider(Modifier.padding(vertical = 12.dp))
                     var deleteAuditLogsConfirmOpen by remember { mutableStateOf(false) }
@@ -245,14 +198,7 @@ internal fun SecurityPrivacyScreen(
                                 TextButton(
                                     onClick = {
                                         deleteAuditLogsConfirmOpen = false
-                                        auditLogsBusy = true
-                                        appState.launchMutation {
-                                            try {
-                                                appState.deleteAuditLogs()
-                                            } finally {
-                                                auditLogsBusy = false
-                                            }
-                                        }
+                                        runAuditMutation { appState.deleteAuditLogs() }
                                     },
                                 ) {
                                     Text(

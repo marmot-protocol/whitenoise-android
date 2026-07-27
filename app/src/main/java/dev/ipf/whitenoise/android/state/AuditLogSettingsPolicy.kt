@@ -3,6 +3,10 @@ package dev.ipf.whitenoise.android.state
 import android.content.SharedPreferences
 import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 internal object AuditLogSettingsPolicy {
     private const val LEGACY_REDACT_KEY = "redact_sensitive_audit_data"
@@ -46,13 +50,14 @@ internal object AuditLogSettingsPolicy {
             else -> MigrationAction.CompleteOnly
         }
 
-    fun completeMigration(preferences: SharedPreferences) {
-        preferences
-            .edit()
-            .remove(LEGACY_REDACT_KEY)
-            .putBoolean(MIGRATION_COMPLETE_KEY, true)
-            .apply()
-    }
+    suspend fun completeMigration(preferences: SharedPreferences): Boolean =
+        withContext(Dispatchers.IO) {
+            preferences
+                .edit()
+                .remove(LEGACY_REDACT_KEY)
+                .putBoolean(MIGRATION_COMPLETE_KEY, true)
+                .commit()
+        }
 
     sealed interface MigrationAction {
         data object None : MigrationAction
@@ -67,43 +72,37 @@ internal object AuditLogSettingsPolicy {
     }
 }
 
-internal suspend fun applyAuditLogSettingsUpdate(
-    current: AuditLogSettingsFfi,
+internal suspend fun updateAuditLogSettingsSerialized(
+    mutex: Mutex,
+    cachedSettings: () -> AuditLogSettingsFfi?,
+    storeCachedSettings: (AuditLogSettingsFfi) -> Unit,
+    loadFromEngine: suspend () -> AuditLogSettingsFfi,
     transform: (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
-    persist: suspend (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
-): AuditLogSettingsFfi {
-    val requested = transform(current)
-    return persist(requested)
-}
+    persistToEngine: suspend (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
+): AuditLogSettingsFfi =
+    mutex.withLock {
+        val current = cachedSettings() ?: loadFromEngine()
+        val updated = persistToEngine(transform(current))
+        storeCachedSettings(updated)
+        updated
+    }
 
 internal suspend fun executeAuditLogSettingsMigration(
     action: AuditLogSettingsPolicy.MigrationAction,
     persist: suspend (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
-    complete: () -> Unit,
+    complete: suspend () -> Boolean,
 ): AuditLogSettingsFfi? =
     when (action) {
         AuditLogSettingsPolicy.MigrationAction.None -> null
         AuditLogSettingsPolicy.MigrationAction.PreserveAndComplete,
         AuditLogSettingsPolicy.MigrationAction.CompleteOnly,
         -> {
-            complete()
+            if (!complete()) error("audit log migration marker write failed")
             null
         }
-        is AuditLogSettingsPolicy.MigrationAction.MigrateToObfuscated ->
-            persist(action.settings).also { complete() }
-    }
-
-internal sealed interface AuditRedactionToggleDecision {
-    data object RequireFullDataConfirmation : AuditRedactionToggleDecision
-
-    data class ApplyImmediately(
-        val redact: Boolean,
-    ) : AuditRedactionToggleDecision
-}
-
-internal fun auditRedactionToggleDecision(requestedRedact: Boolean): AuditRedactionToggleDecision =
-    if (requestedRedact) {
-        AuditRedactionToggleDecision.ApplyImmediately(redact = true)
-    } else {
-        AuditRedactionToggleDecision.RequireFullDataConfirmation
+        is AuditLogSettingsPolicy.MigrationAction.MigrateToObfuscated -> {
+            val persisted = persist(action.settings)
+            if (!complete()) error("audit log migration marker write failed")
+            persisted
+        }
     }

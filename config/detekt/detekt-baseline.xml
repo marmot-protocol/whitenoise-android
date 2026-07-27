@@ -136,6 +136,7 @@
     <ID>FunctionNaming:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AppearanceScreen</ID>
     <ID>FunctionNaming:AttachmentSheet.kt:@Composable internal fun ComposerAttachmentSheetPane</ID>
     <ID>FunctionNaming:AttachmentSheet.kt:@Composable private fun AttachmentActionTile</ID>
+    <ID>FunctionNaming:AuditRedactionSwitch.kt:@Composable internal fun AuditRedactionSwitch</ID>
     <ID>FunctionNaming:AutoDownloadScreen.kt:@Composable private fun MediaQualitySettingsCard</ID>
     <ID>FunctionNaming:AutoDownloadScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AutoDownloadDataScreen</ID>
     <ID>FunctionNaming:Avatar.kt:@Composable internal fun Avatar</ID>

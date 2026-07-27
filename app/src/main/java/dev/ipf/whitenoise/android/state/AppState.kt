@@ -1288,6 +1288,7 @@ class WhiteNoiseAppState private constructor(
     private val bootstrapMutex = Mutex()
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
+    private val auditLogSettingsMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -3667,14 +3668,16 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun refreshSecurityPrivacySettings() {
         relayTelemetrySettings = runCatchingCancellable { marmotIo { relayTelemetrySettings() } }.getOrNull()
-        auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
-        reconcileRedactionWithEngineAuditMode()
+        auditLogSettingsMutex.withLock {
+            auditLogSettings = runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()
+            reconcileRedactionWithEngineAuditModeLocked()
+        }
     }
 
     // Existing installs may have FULL_DATA before the one-time safe-default
     // migration ran. If the engine update fails, leave the marker pending so
     // the next refresh retries instead of silently opting out.
-    private suspend fun reconcileRedactionWithEngineAuditMode() {
+    private suspend fun reconcileRedactionWithEngineAuditModeLocked() {
         val settings = auditLogSettings ?: return
         val migrated =
             runCatchingCancellable {
@@ -3718,14 +3721,14 @@ class WhiteNoiseAppState private constructor(
             // required on the host side.
             // The data mode follows the engine-backed audit settings, so the
             // choice survives toggling audit logging off and on.
-            val current = auditLogSettings ?: marmotIo { auditLogSettings() }
-            val updated =
-                applyAuditLogSettingsUpdate(
-                    current = current,
-                    transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, enabled) },
-                    persist = { settings -> marmotIo { setAuditLogSettings(settings) } },
-                )
-            auditLogSettings = updated
+            updateAuditLogSettingsSerialized(
+                mutex = auditLogSettingsMutex,
+                cachedSettings = { auditLogSettings },
+                storeCachedSettings = { auditLogSettings = it },
+                loadFromEngine = { marmotIo { auditLogSettings() } },
+                transform = { AuditLogSettingsPolicy.settingsWithEnabled(it, enabled) },
+                persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
+            )
             present(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
@@ -3736,14 +3739,14 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun setRedactSensitiveAuditData(redact: Boolean): Boolean =
         runCatching {
-            val current = auditLogSettings ?: marmotIo { auditLogSettings() }
-            val updated =
-                applyAuditLogSettingsUpdate(
-                    current = current,
-                    transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact) },
-                    persist = { settings -> marmotIo { setAuditLogSettings(settings) } },
-                )
-            auditLogSettings = updated
+            updateAuditLogSettingsSerialized(
+                mutex = auditLogSettingsMutex,
+                cachedSettings = { auditLogSettings },
+                storeCachedSettings = { auditLogSettings = it },
+                loadFromEngine = { marmotIo { auditLogSettings() } },
+                transform = { AuditLogSettingsPolicy.settingsWithRedaction(it, redact) },
+                persistToEngine = { settings -> marmotIo { setAuditLogSettings(settings) } },
+            )
             present(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
