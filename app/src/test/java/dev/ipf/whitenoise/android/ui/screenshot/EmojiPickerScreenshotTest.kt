@@ -26,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFontScale
+import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPane
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
@@ -221,6 +222,8 @@ class EmojiPickerScreenshotTest {
                     ComposerEmojiPickerPane(
                         height = ComposerEmojiPickerFallbackHeight,
                         alpha = 1f,
+                        recentEmojis = RecentEmojiPreferences.load(context),
+                        onEmojiUsed = {},
                         onEmojiPicked = {},
                         onBackspace = {},
                         onSearchActiveChange = {},

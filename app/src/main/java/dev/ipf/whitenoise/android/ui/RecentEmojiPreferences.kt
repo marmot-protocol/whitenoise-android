@@ -17,11 +17,11 @@ object RecentEmojiPreferences {
             ?.filter { it.isNotBlank() }
             .orEmpty()
 
-    fun recordPicked(
+    fun save(
         context: Context,
-        emoji: String,
+        emojis: List<String>,
     ): List<String> {
-        val updated = RecentEmojiList.recordPicked(load(context), emoji)
+        val updated = emojis.filter { it.isNotBlank() }.take(RecentEmojiList.StoredLimit)
         context
             .preferences()
             .edit()

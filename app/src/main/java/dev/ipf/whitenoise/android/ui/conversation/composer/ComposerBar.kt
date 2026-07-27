@@ -342,6 +342,8 @@ internal fun ComposerBar(
     onBottomInputChanged: () -> Unit = {},
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
     onKeyboardRestoreFromCustomInputFailed: () -> Unit = {},
+    recentEmojis: List<String> = emptyList(),
+    onEmojiUsed: (String) -> Unit = {},
     // #1206: shared so the long-message reader's composer and the main composer
     // don't keep divergent text/edit state. Defaults to a private per-instance
     // state, preserving standalone behavior for any other caller.
@@ -1004,6 +1006,8 @@ internal fun ComposerBar(
                     ComposerEmojiPickerPane(
                         height = emojiPaneHeightAnim.value,
                         alpha = 1f,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
                         onEmojiPicked = { emoji ->
                             val updated = insertComposerEmoji(textFieldValue, emoji)
                             applyComposerFieldValue(updated)

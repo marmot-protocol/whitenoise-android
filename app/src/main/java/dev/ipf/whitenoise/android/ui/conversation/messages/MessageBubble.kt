@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
@@ -364,9 +365,10 @@ internal fun MessageBubble(
     selected: Boolean,
     onToggleSelection: () -> Unit,
     quickReactionEmojis: List<String>,
+    recentEmojis: List<String>,
+    onEmojiUsed: (String) -> Unit,
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
-    onReactionEmojiPicked: (String) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
     onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
@@ -672,7 +674,6 @@ internal fun MessageBubble(
         // (menu, emoji picker) called in — even if that surface was open when
         // the delete landed.
         if (deleted || readOnly) return
-        onReactionEmojiPicked(emoji)
         // Route via launchMutation: same survives-navigation rationale as delete/send.
         appState.launchMutation { controller.toggleReaction(emoji, record) }
     }
@@ -1860,6 +1861,7 @@ internal fun MessageBubble(
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
                         onActionMenuOpenChange(false)
+                        onEmojiUsed(emoji)
                         reactWithEmoji(emoji)
                     },
                     onOpenEmojiPicker = {
@@ -1973,6 +1975,8 @@ internal fun MessageBubble(
                                             mentionCandidates = mentionCandidates,
                                             mentionPickerEnabled = mentionPickerEnabled,
                                             enterKeyBehavior = appState.enterKeyBehavior,
+                                            recentEmojis = recentEmojis,
+                                            onEmojiUsed = onEmojiUsed,
                                         )
                                     }
                             }
@@ -1982,6 +1986,9 @@ internal fun MessageBubble(
                 if (emojiPickerOpen && !readOnly) {
                     EmojiPickerSheet(
                         restoreExpanded = restoreReactionPickerExpanded,
+                        purpose = EmojiPickerPurpose.USE,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
                         messageReactionEmojis =
                             item.projected
                                 ?.reactions
@@ -2009,6 +2016,7 @@ internal fun MessageBubble(
                     }
                     CustomizeReactionsDialog(
                         quickReactionEmojis = quickReactionEmojis,
+                        recentEmojis = recentEmojis,
                         onDismiss = ::closeCustomizeToReactionSheet,
                         onSave = { choices ->
                             onQuickReactionsSave(choices)

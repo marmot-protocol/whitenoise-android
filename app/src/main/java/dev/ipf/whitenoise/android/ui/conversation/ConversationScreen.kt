@@ -194,6 +194,7 @@ import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -203,8 +204,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
@@ -911,31 +910,20 @@ internal fun ConversationScreen(
     // Seeded empty and populated off the Main thread: the first access to a
     // SharedPreferences file blocks on disk, and doing that inside composition
     // stalls the conversation screen's first frame. See #147.
-    var recentReactionEmojis by remember(context) {
-        mutableStateOf(emptyList<String>())
-    }
+    val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     var quickReactionEmojis by remember(context) {
         mutableStateOf(RecentEmojiList.DefaultQuickChoices)
     }
     var quickReactionEmojisTouched by remember(context) { mutableStateOf(false) }
     LaunchedEffect(context) {
-        val (loaded, quick) =
+        val quick =
             withContext(Dispatchers.IO) {
-                RecentEmojiPreferences.load(context) to RecentEmojiPreferences.loadQuickReactions(context)
+                RecentEmojiPreferences.loadQuickReactions(context)
             }
-        // A pick made before this load lands has already merged the disk list
-        // (recordPicked re-reads prefs), so a non-empty state is strictly newer
-        // — don't clobber it with the stale read.
-        if (recentReactionEmojis.isEmpty()) {
-            recentReactionEmojis = loaded
-        }
         if (!quickReactionEmojisTouched) {
             quickReactionEmojis = quick
         }
     }
-    // Serialize the recents read-modify-write so rapid taps don't lose updates
-    // (concurrent recordPicked() is last-writer-wins on the disk list). See #172.
-    val recentEmojiWriteMutex = remember { Mutex() }
     // Selected-but-not-yet-sent image attachments. The preview sheet opens
     // when this or `pendingDocumentUris` is non-empty; the whole queue
     // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
@@ -1821,18 +1809,6 @@ internal fun ConversationScreen(
                 }
             }
         if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
-    }
-
-    fun recordReactionEmoji(emoji: String) {
-        // The read-modify-write touches SharedPreferences (disk); keep it off
-        // the Main thread, matching the off-Main load above. See #147.
-        // Held under a mutex so rapid taps serialize instead of losing updates.
-        scope.launch {
-            recentReactionEmojis =
-                recentEmojiWriteMutex.withLock {
-                    withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) }
-                }
-        }
     }
 
     fun saveQuickReactionEmojis(choices: List<String>) {
@@ -3124,6 +3100,8 @@ internal fun ConversationScreen(
                                     onKeyboardRestoreFromCustomInputFailed = {
                                         suppressNextImeOpenReanchor.set(false)
                                     },
+                                    recentEmojis = recentEmojiRecentsOwner.recents,
+                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                                 )
                             }
                         }
@@ -3368,6 +3346,8 @@ internal fun ConversationScreen(
                                                 }
                                             },
                                             quickReactionEmojis = quickReactionEmojis,
+                                            recentEmojis = recentEmojiRecentsOwner.recents,
+                                            onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                                             isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
                                             onActionMenuOpenChange = { open ->
                                                 if (open) clearTextSelection()
@@ -3378,7 +3358,6 @@ internal fun ConversationScreen(
                                             // function reference per recomposition, which made
                                             // every visible bubble recompose on any timeline
                                             // change. See #110.
-                                            onReactionEmojiPicked = { recordReactionEmoji(it) },
                                             onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                             onQuickReactionsReset = { resetQuickReactionEmojis() },
                                             onReplyPreviewClick = { navigateToReplyTarget(it) },
