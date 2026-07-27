@@ -2914,7 +2914,7 @@ class WhiteNoiseAppState private constructor(
      * the secondary top-bar avatars, and the account switcher so no avatar can
      * light for another account's unread.
      */
-    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts)
+    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts) || accountRef in accountManualUnreadRefs
 
     internal fun updateAccountUnreadCount(
         accountRef: String?,
@@ -2922,6 +2922,23 @@ class WhiteNoiseAppState private constructor(
     ) {
         val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+    }
+
+    /**
+     * Accounts with at least one manually-marked-unread chat. A boolean
+     * sidecar to [accountUnreadCounts]: the numeric map stays a real message
+     * count (it feeds literal count badges), while this set only lights dots.
+     */
+    internal var accountManualUnreadRefs by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    internal fun updateAccountManualUnread(
+        accountRef: String?,
+        hasManualUnread: Boolean,
+    ) {
+        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
+        accountManualUnreadRefs =
+            if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
     }
 
     private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
@@ -2948,8 +2965,12 @@ class WhiteNoiseAppState private constructor(
                         async {
                             accountGate.withPermit {
                                 val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+                                // The cheap engine total can't see the client's
+                                // manual-unread flag, so an account we believe is
+                                // manually flagged always takes the row fold —
+                                // which also refreshes that flag from the rows.
                                 summary.label to
-                                    if (rawCount == 0uL) {
+                                    if (rawCount == 0uL && summary.label !in accountManualUnreadRefs) {
                                         0uL
                                     } else {
                                         refreshEffectiveAccountUnreadCount(summary, memberGate)
@@ -3005,6 +3026,10 @@ class WhiteNoiseAppState private constructor(
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
+                updateAccountManualUnread(
+                    ref,
+                    accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                )
                 accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {

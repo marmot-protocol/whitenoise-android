@@ -32,15 +32,15 @@ class AccountUnreadTest {
     }
 
     @Test
-    fun accountUnreadCount_manualUnreadLightsTheDotWithoutACount() {
-        val total =
-            accountUnreadCount(
-                rows = listOf(row("a", unreadCount = 0uL, manuallyMarkedUnread = true)),
-                activeAccountIdHex = "self",
-                membersByGroupId = emptyMap(),
-            )
+    fun manualUnreadIsABooleanSidecarNotACount() {
+        val flagged = listOf(row("a", unreadCount = 0uL, manuallyMarkedUnread = true))
+        val plain = listOf(row("a", unreadCount = 0uL))
 
-        assertEquals(1uL, total)
+        // The numeric aggregate stays a literal message count (it feeds count
+        // badges); the manual flag only feeds the boolean attention signal.
+        assertEquals(0uL, accountUnreadCount(flagged, "self", emptyMap()))
+        assertTrue(accountHasManualUnread(flagged, "self", emptyMap()))
+        assertFalse(accountHasManualUnread(plain, "self", emptyMap()))
     }
 
     @Test

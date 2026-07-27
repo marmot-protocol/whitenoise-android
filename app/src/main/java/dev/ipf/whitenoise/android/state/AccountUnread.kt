@@ -86,15 +86,42 @@ internal fun accountUnreadCount(
         } else {
             val members = membersByGroupId[row.groupIdHex]
             val removed = accountMissingFromLoadedRoster(activeAccountIdHex, members)
-            val item =
+            total +
                 chatListItemFromProjection(
                     row = row,
                     activeAccountIdHex = activeAccountIdHex,
                     members = members,
                     removed = removed,
-                )
-            total + item.effectiveUnreadContribution(activeAccountIdHex)
+                ).effectiveUnreadCount(activeAccountIdHex)
         }
+    }
+
+/**
+ * Whether any unarchived, still-membered row is manually marked unread. Kept
+ * separate from [accountUnreadCount]: the numeric aggregate feeds a literal
+ * message-count badge, while manual unread is a boolean attention signal that
+ * only the account dot consumes.
+ */
+internal fun accountHasManualUnread(
+    rows: Iterable<ChatListRowFfi>,
+    activeAccountIdHex: String?,
+    membersByGroupId: Map<String, List<AppGroupMemberRecordFfi>>,
+): Boolean =
+    rows.any { row ->
+        !row.archived &&
+            row.manuallyMarkedUnread &&
+            !accountMissingFromLoadedRoster(activeAccountIdHex, membersByGroupId[row.groupIdHex])
+    }
+
+/** [accountHasManualUnread] over projected items for the live controller. */
+internal fun accountHasManualUnread(
+    items: Iterable<ChatListItem>,
+    activeAccountIdHex: String?,
+): Boolean =
+    items.any { item ->
+        !item.group.archived &&
+            item.projection?.manuallyMarkedUnread == true &&
+            !item.removedFromGroup(activeAccountIdHex)
     }
 
 /**
@@ -111,19 +138,8 @@ internal fun accountUnreadCount(
     activeAccountIdHex: String?,
 ): ULong =
     items.fold(0uL) { total, item ->
-        if (item.group.archived) total else total + item.effectiveUnreadContribution(activeAccountIdHex)
+        if (item.group.archived) total else total + item.effectiveUnreadCount(activeAccountIdHex)
     }
-
-/**
- * A row's contribution to the per-account unread aggregate. A manually
- * marked-unread chat has no numeric count but must still light the account
- * dot, so any effective unread state contributes at least one.
- */
-internal fun ChatListItem.effectiveUnreadContribution(activeAccountIdHex: String?): ULong =
-    maxOf(
-        effectiveUnreadCount(activeAccountIdHex),
-        if (effectiveHasUnread(activeAccountIdHex)) 1uL else 0uL,
-    )
 
 /**
  * Whether [accountRef]'s avatar should show the unread dot (#805). The dot is a

@@ -3425,6 +3425,10 @@ class ChatsController(
                 unreadAccountRef,
                 accountUnreadCount(projected, unreadAccountIdHex),
             )
+            appState.updateAccountManualUnread(
+                unreadAccountRef,
+                accountHasManualUnread(projected, unreadAccountIdHex),
+            )
         }
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
