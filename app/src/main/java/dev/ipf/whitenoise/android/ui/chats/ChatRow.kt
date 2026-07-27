@@ -51,12 +51,12 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
-import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
+import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)

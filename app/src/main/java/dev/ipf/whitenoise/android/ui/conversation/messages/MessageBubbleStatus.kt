@@ -29,6 +29,7 @@ internal fun OutgoingMessageStatusIcon(
     OutgoingIndicatorIcon(status.outgoingIndicator() ?: return, tint)
 }
 
+@Suppress("FunctionNaming")
 @Composable
 internal fun OutgoingIndicatorIcon(
     indicator: OutgoingMessageIndicator,

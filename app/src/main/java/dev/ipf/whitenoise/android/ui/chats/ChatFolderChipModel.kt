@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind

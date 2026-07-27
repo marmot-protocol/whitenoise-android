@@ -33,9 +33,9 @@ class ProjectedPreviewTextTest {
 
     @Test
     fun projectedAttachmentKindLabelsABlankPreview() {
-        val single = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u))
-        val album = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 3u))
-        val mixed = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.MIXED, attachmentCount = 2u))
+        val single = item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u))
+        val album = item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 3u))
+        val mixed = item(preview = attachmentPreview(ChatListAttachmentKindFfi.MIXED, count = 2u))
 
         assertEquals(copy.mediaPhoto, single.projectedPreviewText(copy))
         assertEquals("${copy.mediaPhoto} (3)", album.projectedPreviewText(copy))
@@ -45,7 +45,7 @@ class ProjectedPreviewTextTest {
     @Test
     fun captionStillBeatsTheProjectedAttachmentLabel() {
         val item =
-            item(preview = preview(plaintext = "look at this", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u))
+            item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u, plaintext = "look at this"))
 
         assertEquals("look at this", item.projectedPreviewText(copy))
     }
@@ -63,7 +63,10 @@ class ProjectedPreviewTextTest {
         val delivered =
             item(preview = preview(plaintext = "x", deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED))
         val deletedRow =
-            item(preview = preview(plaintext = "x", deleted = true, deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED))
+            item(
+                preview =
+                    preview(plaintext = "x", deleted = true, deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED),
+            )
 
         assertEquals(OutgoingMessageIndicator.Sent, delivered.projectedDeliveryIndicator())
         assertNull(deletedRow.projectedDeliveryIndicator())
@@ -235,6 +238,12 @@ class ProjectedPreviewTextTest {
             projection = preview?.let { row("group-a", it) },
             resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         )
+
+    private fun attachmentPreview(
+        kind: ChatListAttachmentKindFfi,
+        count: UInt,
+        plaintext: String = "",
+    ) = preview(plaintext = plaintext, attachmentKind = kind, attachmentCount = count)
 
     private fun preview(
         plaintext: String,

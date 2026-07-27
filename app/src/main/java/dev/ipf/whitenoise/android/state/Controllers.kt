@@ -244,7 +244,8 @@ data class ChatListItem(
 
     /** Delivery tick for the projected last message, or null for no tick. */
     fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
-        projection?.lastMessage
+        projection
+            ?.lastMessage
             ?.takeUnless { it.deleted }
             ?.deliveryState
             ?.outgoingIndicator()

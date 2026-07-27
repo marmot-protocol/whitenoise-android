@@ -535,6 +535,10 @@ class LocalizationResourceTest {
                 // in some locales ("Images" in French, "Videos" in German).
                 "shared_media_tab_images",
                 "shared_media_tab_videos",
+                // "Album" is a loan word spelled identically in DE/FR/IT, and the
+                // counted-preview format is punctuation-only in most locales.
+                "media_album",
+                "media_counted_format",
                 // Call quick-action labels: "Audio"/"Video" are loan words
                 // spelled identically in several locales (DE/ES/FR/IT).
                 "quick_action_audio",
