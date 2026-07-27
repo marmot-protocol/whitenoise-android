@@ -228,6 +228,51 @@ class ChatListSortingTest {
     }
 
     @Test
+    fun durableActivityTimestampOutranksAFresherMessagePreview() {
+        val pinnedByActivity =
+            chatListItemFromProjection(
+                row(
+                    groupId = "durable",
+                    title = "Durable",
+                    preview = "old message",
+                    latestAt = 100uL,
+                    unreadCount = 0uL,
+                    activitySortAt = 300uL,
+                ),
+            )
+        val fresherMessage =
+            chatListItemFromProjection(
+                row(
+                    groupId = "fresher",
+                    title = "Fresher",
+                    preview = "new message",
+                    latestAt = 200uL,
+                    unreadCount = 0uL,
+                ),
+            )
+
+        assertEquals(300uL, pinnedByActivity.latestAt)
+        val sorted = sortChatListItems(listOf(fresherMessage, pinnedByActivity))
+        assertEquals(listOf("durable", "fresher"), sorted.map { it.id })
+    }
+
+    @Test
+    fun emptyHistoryChatSortsByConversationCreationOverProjectionRebuild() {
+        val messaged =
+            chatListItemFromProjection(
+                row(groupId = "messaged", title = "Messaged", preview = "hi", latestAt = 200uL, unreadCount = 0uL),
+            )
+        val emptyHistory =
+            chatListItemFromProjection(
+                noMessageRow(groupId = "empty", title = "Empty", updatedAt = 50uL, conversationCreatedAt = 250uL),
+            )
+
+        assertEquals(250uL, emptyHistory.latestAt)
+        val sorted = sortChatListItems(listOf(messaged, emptyHistory))
+        assertEquals(listOf("empty", "messaged"), sorted.map { it.id })
+    }
+
+    @Test
     fun rollbackOptimisticChatListPreviewRestoresPreviousRowWhenTempMessageStillOwnsPreview() {
         val previous = row(groupId = "chat", title = "Chat", preview = "real latest", latestAt = 10uL, unreadCount = 0uL)
         val optimistic =
@@ -284,6 +329,7 @@ class ChatListSortingTest {
         preview: String,
         latestAt: ULong,
         unreadCount: ULong,
+        activitySortAt: ULong = 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -312,7 +358,7 @@ class ChatListSortingTest {
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
         conversationCreatedAt = 0uL,
-        activitySortAt = 0uL,
+        activitySortAt = activitySortAt,
         updatedAt = latestAt,
     )
 
@@ -336,6 +382,7 @@ class ChatListSortingTest {
         title: String,
         updatedAt: ULong,
         lastReadTimelineAt: ULong? = null,
+        conversationCreatedAt: ULong = 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -353,7 +400,7 @@ class ChatListSortingTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = lastReadTimelineAt,
-        conversationCreatedAt = 0uL,
+        conversationCreatedAt = conversationCreatedAt,
         activitySortAt = 0uL,
         updatedAt = updatedAt,
     )

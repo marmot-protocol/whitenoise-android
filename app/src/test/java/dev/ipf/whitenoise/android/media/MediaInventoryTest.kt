@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -53,6 +54,23 @@ class MediaInventoryTest {
             )
         assertEquals(2, inventory.images.size)
         assertTrue(inventory.images.all { it.source is MediaInventory.Source.Attachment })
+    }
+
+    @Test
+    fun authoritativeEmptyProjectionEmitsNothingDespiteMediaTags() {
+        // An id present in the projection map with an empty list is
+        // authoritative — the record's compatibility tags must not be parsed.
+        val tagged =
+            record(id = "m").copy(
+                tags = listOf(MessageTagFfi(listOf("imeta", "url https://media.example/a.png", "m image/png"))),
+            )
+        val inventory =
+            MediaInventory.build(
+                records = listOf(tagged),
+                projectedMediaByMessageId = mapOf("m" to emptyList()),
+            )
+
+        assertTrue(inventory.isEmpty)
     }
 
     @Test

@@ -19,6 +19,7 @@ import java.util.Locale
 object MediaReferenceSupport {
     private const val TAG_NAME = "imeta"
     private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
+    private const val HTTPS_DEFAULT_PORT = 443
 
     private data class ParsedFetchableLocator(
         val host: String,
@@ -53,6 +54,7 @@ object MediaReferenceSupport {
      * native downloader. This is Android's defense-in-depth SSRF/DNS-rebinding
      * gate; it is intentionally separate from MarmotKit's wire parser.
      */
+    @Suppress("ReturnCount")
     internal fun safeDownloadReference(
         reference: MediaAttachmentReferenceFfi,
         resolve: (String) -> List<InetAddress>?,
@@ -71,18 +73,21 @@ object MediaReferenceSupport {
         parsed: ParsedFetchableLocator,
         resolve: (String) -> List<InetAddress>?,
     ): String? {
-        if (HostSafety.isPrivateOrLoopbackHost(parsed.host)) return parsed.host
-        val resolved = resolve(parsed.host)
-        if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return parsed.host
-        return null
+        val unsafe =
+            HostSafety.isPrivateOrLoopbackHost(parsed.host) ||
+                resolve(parsed.host).let { resolved ->
+                    resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }
+                }
+        return parsed.host.takeIf { unsafe }
     }
 
+    @Suppress("ReturnCount")
     private fun parseFetchableLocator(raw: String): ParsedFetchableLocator? {
         if (raw.isBlank()) return null
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase(Locale.ROOT) != "https") return null
         if (!uri.rawUserInfo.isNullOrEmpty()) return null
-        if (uri.port != -1 && uri.port != 443) return null
+        if (uri.port != -1 && uri.port != HTTPS_DEFAULT_PORT) return null
         val host =
             uri.host
                 ?.trim()
@@ -105,9 +110,9 @@ object MediaReferenceSupport {
             uri.rawFragment?.let { append('#').append(it) }
         }
 
-    fun isImageMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
+    fun isImageMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("image/", ignoreCase = true)
 
-    fun isAudioMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("audio/", ignoreCase = true)
+    fun isAudioMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("audio/", ignoreCase = true)
 
-    fun isVideoMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("video/", ignoreCase = true)
+    fun isVideoMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("video/", ignoreCase = true)
 }

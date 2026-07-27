@@ -162,6 +162,33 @@ class ChatListSortKeyTest {
         assertEquals(120uL, item.latestAt)
     }
 
+    @Test
+    fun emptyConversationFallsBackToItsCreationTimestamp() {
+        val item =
+            item(
+                groupId = "fresh-empty",
+                groupName = "Fresh",
+                projectedActivitySortAt = 0uL,
+                projectedConversationCreatedAt = 250uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(250uL, item.latestAt)
+    }
+
+    @Test
+    fun projectionRebuildTimeIsTheFinalProjectedFallback() {
+        val item =
+            item(
+                groupId = "legacy-row",
+                groupName = "Legacy",
+                projectedActivitySortAt = 0uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(900uL, item.latestAt)
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private fun item(
@@ -169,6 +196,7 @@ class ChatListSortKeyTest {
         groupName: String,
         projectedTitle: String? = null,
         projectedActivitySortAt: ULong? = null,
+        projectedConversationCreatedAt: ULong = 0uL,
         projectedUpdatedAt: ULong = 0uL,
         otherMemberAccount: String? = null,
         memberCount: Int = 0,
@@ -187,6 +215,7 @@ class ChatListSortKeyTest {
                         groupName = groupName,
                         title = projectedTitle.orEmpty(),
                         activitySortAt = projectedActivitySortAt ?: 0uL,
+                        conversationCreatedAt = projectedConversationCreatedAt,
                         updatedAt = projectedUpdatedAt,
                     )
                 } else {
@@ -199,6 +228,7 @@ class ChatListSortKeyTest {
         groupName: String,
         title: String,
         activitySortAt: ULong = 0uL,
+        conversationCreatedAt: ULong = 0uL,
         updatedAt: ULong = 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
@@ -217,7 +247,7 @@ class ChatListSortKeyTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
-        conversationCreatedAt = 0uL,
+        conversationCreatedAt = conversationCreatedAt,
         activitySortAt = activitySortAt,
         updatedAt = updatedAt,
     )

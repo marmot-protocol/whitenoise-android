@@ -41,6 +41,18 @@ class MediaReferenceSupportTest {
     }
 
     @Test
+    fun safeDownloadReferenceRejectsMixedPublicAndPrivateDnsAnswers() {
+        // A rebinding-capable resolver can pad a private answer behind a public
+        // one — any private address in the answer set must reject the download.
+        val safe =
+            MediaReferenceSupport.safeDownloadReference(reference()) {
+                listOf(addr(93, 184, 216, 34), addr(10, 0, 0, 5))
+            }
+
+        assertNull(safe)
+    }
+
+    @Test
     fun safeDownloadReferenceBlocksLiteralPrivateHostWithoutDns() {
         var resolverCalled = false
         val safe =
@@ -122,5 +134,5 @@ class MediaReferenceSupportTest {
         thumbhash = null,
     )
 
-    private fun addr(vararg octets: Int): InetAddress = InetAddress.getByAddress(ByteArray(octets.size) { octets[it].toByte() })
+    private fun addr(vararg octets: Int): InetAddress = InetAddress.getByAddress(octets.map(Int::toByte).toByteArray())
 }

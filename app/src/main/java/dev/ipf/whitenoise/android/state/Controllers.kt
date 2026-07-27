@@ -834,14 +834,24 @@ data class TimelineMessage(
 internal fun timelineRecordsRenderEqual(
     a: TimelineMessageRecordFfi,
     b: TimelineMessageRecordFfi,
+): Boolean = timelineRecordEnvelopeEqual(a, b) && timelineRecordContentEqual(a, b)
+
+private fun timelineRecordEnvelopeEqual(
+    a: TimelineMessageRecordFfi,
+    b: TimelineMessageRecordFfi,
 ): Boolean =
     a.messageIdHex == b.messageIdHex &&
         a.sourceMessageIdHex == b.sourceMessageIdHex &&
         a.direction == b.direction &&
         a.groupIdHex == b.groupIdHex &&
         a.sender == b.sender &&
-        a.plaintext == b.plaintext &&
-        a.kind == b.kind &&
+        a.kind == b.kind
+
+private fun timelineRecordContentEqual(
+    a: TimelineMessageRecordFfi,
+    b: TimelineMessageRecordFfi,
+): Boolean =
+    a.plaintext == b.plaintext &&
         a.tags == b.tags &&
         a.replyToMessageIdHex == b.replyToMessageIdHex &&
         a.replyPreview == b.replyPreview &&
@@ -7421,12 +7431,8 @@ class ConversationController(
         // record is held but unprojected, fall through and (re)build it.
         val existing = timelineRecords[record.messageIdHex]
         val previousItemId = existing?.let(::projectedItemId)
-        if (
-            existing != null &&
-            timelineRecordsRenderEqual(existing, record) &&
-            previousItemId != null &&
-            timelineItemsById.containsKey(previousItemId)
-        ) {
+        val stillProjected = previousItemId != null && timelineItemsById.containsKey(previousItemId)
+        if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
             return TimelineProjector.toAppMessageRecord(record)
         }
         if (previousItemId != null) {
