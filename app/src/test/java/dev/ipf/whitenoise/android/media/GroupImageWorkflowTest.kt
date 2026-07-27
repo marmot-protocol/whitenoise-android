@@ -113,7 +113,7 @@ class GroupImageWorkflowTest {
             classifyGroupImageMutationFailure(
                 requestedMutationKey = "upload:replacement",
                 pendingLegacyClearMutationKey = "upload:previous",
-                attemptedLegacyClear = false,
+                attemptedLegacyClear = true,
             ),
         )
         assertEquals(

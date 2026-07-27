@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.core
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertFalse
@@ -34,14 +34,17 @@ class GroupAvatarImageLoaderTest {
                     }
                 }
             withTimeout(5_000) { firstStarted.await() }
+            val secondCallEntered = CompletableDeferred<Unit>()
             val second =
-                async {
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    secondCallEntered.complete(Unit)
                     GroupAvatarImageLoader.load("second") {
                         secondStarted.set(true)
                         byteArrayOf()
                     }
                 }
-            delay(50)
+            withTimeout(5_000) { secondCallEntered.await() }
+            assertFalse(second.isCompleted)
 
             GroupAvatarImageLoader.clear()
 
