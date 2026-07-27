@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -41,6 +43,16 @@ class ChatFolderEditContentTest {
         render(state = editState(name = "   "))
 
         composeRule.onNodeWithText(app.getString(R.string.save)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun editorUsesScreenTitleAndNeutralDetailsSectionTitle() {
+        render(state = editState(name = "Work"))
+
+        composeRule
+            .onAllNodesWithText(app.getString(R.string.chat_folder_new))
+            .assertCountEquals(1)
+        composeRule.onNodeWithText(app.getString(R.string.details)).assertIsDisplayed()
     }
 
     @Test

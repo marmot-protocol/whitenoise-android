@@ -281,12 +281,7 @@ internal fun ChatFolderEditContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                SectionCard(
-                    title =
-                        stringResource(
-                            if (state.isNew) R.string.chat_folder_new else R.string.chat_folder_edit_title,
-                        ),
-                ) {
+                SectionCard(title = stringResource(R.string.details)) {
                     TextField(
                         colors = profileFieldColors,
                         value = state.name,
