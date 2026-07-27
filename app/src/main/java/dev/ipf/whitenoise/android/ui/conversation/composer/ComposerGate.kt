@@ -19,6 +19,9 @@ internal enum class ComposerGate {
     /** Pending invite preview — read-only transcript with explicit Join/Decline. */
     INVITE,
 
+    /** MDK froze this local group copy until verified repair completes. */
+    FROZEN,
+
     /**
      * Membership is not yet known locally: render NOTHING this frame and wait
      * for `refreshMembers()` rather than flash a wrong state. See [PENDING] use
@@ -60,8 +63,10 @@ internal fun conversationComposerGate(
     seededSelfMember: Boolean,
     seededMembershipKnown: Boolean,
     assumeMemberUntilVerified: Boolean,
+    unrecoverable: Boolean = false,
 ): ComposerGate =
     when {
+        unrecoverable -> ComposerGate.FROZEN
         pendingInvite -> ComposerGate.INVITE
         isSelfMember -> ComposerGate.COMPOSER
         // Removed-member notice only once refreshMembers() has VERIFIED the

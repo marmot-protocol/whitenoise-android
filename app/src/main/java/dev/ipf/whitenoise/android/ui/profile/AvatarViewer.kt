@@ -104,14 +104,15 @@ internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
 internal fun AvatarFullScreenViewer(
     title: String,
     seed: String,
-    pictureUrl: String,
+    pictureUrl: String? = null,
+    picture: ImageBitmap? = null,
     onDismiss: () -> Unit,
     editActionLabel: String? = null,
     onEditPicture: (() -> Unit)? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.imageUrl(pictureUrl) }
-    if (safePictureUrl == null) {
+    if (safePictureUrl == null && picture == null) {
         LaunchedEffect(Unit) { onDismiss() }
         return
     }
@@ -121,42 +122,16 @@ internal fun AvatarFullScreenViewer(
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.media_saved)
     val saveFailedMessage = stringResource(R.string.media_save_failed)
-    val fileName = remember(safePictureUrl) { avatarViewerFileName(safePictureUrl) }
+    val fileName = remember(safePictureUrl) { safePictureUrl?.let(::avatarViewerFileName) ?: "avatar.jpg" }
     var menuOpen by remember { mutableStateOf(false) }
-    var scale by remember(safePictureUrl) { mutableStateOf(1f) }
-    var offset by remember(safePictureUrl) { mutableStateOf(Offset.Zero) }
+    var scale by remember(safePictureUrl, picture) { mutableStateOf(1f) }
+    var offset by remember(safePictureUrl, picture) { mutableStateOf(Offset.Zero) }
     val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
 
-    val imageState by produceState<AvatarViewerImageState>(
-        initialValue = AvatarViewerImageState.Loading,
-        safePictureUrl,
-    ) {
-        value = AvatarViewerImageState.Loading
-        val bytes =
-            withContext(Dispatchers.IO) {
-                SafeHttpsGet.get(
-                    url = safePictureUrl,
-                    maxBodyBytes = AVATAR_VIEWER_MAX_BYTES,
-                    connectTimeoutMillis = AVATAR_VIEWER_CONNECT_TIMEOUT_MS,
-                    readTimeoutMillis = AVATAR_VIEWER_READ_TIMEOUT_MS,
-                )
-            }
-        val bitmap =
-            bytes?.let { data ->
-                withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
-                }
-            }
-        value =
-            if (bytes != null && bitmap != null) {
-                AvatarViewerImageState.Ready(bytes, bitmap)
-            } else {
-                AvatarViewerImageState.Failed
-            }
-    }
+    val imageState = rememberAvatarViewerImageState(safePictureUrl, picture)
 
-    val ready = imageState as? AvatarViewerImageState.Ready
-    val readyBitmap = ready?.bitmap
+    val remote = imageState as? AvatarViewerImageState.Remote
+    val readyBitmap = remote?.bitmap
     DisposableEffect(readyBitmap) {
         onDispose { readyBitmap?.recycle() }
     }
@@ -178,11 +153,11 @@ internal fun AvatarFullScreenViewer(
             onDismiss = onDismiss,
             menuOpen = menuOpen,
             onMenuOpenChange = { menuOpen = it },
-            saveEnabled = ready != null,
+            saveEnabled = remote != null,
             editActionLabel = editActionLabel,
             onEditPicture = onEditPicture,
             onSave = {
-                val bytes = ready?.bytes ?: return@AvatarViewerFrame
+                val bytes = remote?.bytes ?: return@AvatarViewerFrame
                 scope.launch {
                     val ok =
                         withContext(Dispatchers.IO) {
@@ -193,34 +168,113 @@ internal fun AvatarFullScreenViewer(
             },
             snackbarHostState = snackbarHostState,
         ) {
-            when (val state = imageState) {
-                AvatarViewerImageState.Loading ->
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color.White,
-                    )
-                AvatarViewerImageState.Failed ->
-                    Avatar(
-                        title = title,
-                        seed = seed,
-                        size = 112.dp,
-                        pictureUrl = null,
-                    )
-                is AvatarViewerImageState.Ready -> {
-                    val image = remember(state.bitmap) { state.bitmap.asImageBitmap() }
-                    ZoomableAvatarImage(
-                        image = image,
-                        bitmapWidth = state.bitmap.width,
-                        bitmapHeight = state.bitmap.height,
-                        contentDescription = title,
-                        scale = scale,
-                        offset = offset,
-                        onScaleChange = { scale = it },
-                        onOffsetChange = { offset = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+            AvatarViewerImageContent(
+                state = imageState,
+                title = title,
+                seed = seed,
+                scale = scale,
+                offset = offset,
+                onScaleChange = { scale = it },
+                onOffsetChange = { offset = it },
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberAvatarViewerImageState(
+    safePictureUrl: String?,
+    picture: ImageBitmap?,
+): AvatarViewerImageState {
+    val state by produceState<AvatarViewerImageState>(
+        initialValue = picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Loading,
+        safePictureUrl,
+        picture,
+    ) {
+        if (picture != null) {
+            value = AvatarViewerImageState.Local(picture)
+            return@produceState
+        }
+        val remoteUrl = safePictureUrl
+        if (remoteUrl == null) {
+            value = AvatarViewerImageState.Failed
+            return@produceState
+        }
+        value = AvatarViewerImageState.Loading
+        val bytes =
+            withContext(Dispatchers.IO) {
+                SafeHttpsGet.get(
+                    url = remoteUrl,
+                    maxBodyBytes = AVATAR_VIEWER_MAX_BYTES,
+                    connectTimeoutMillis = AVATAR_VIEWER_CONNECT_TIMEOUT_MS,
+                    readTimeoutMillis = AVATAR_VIEWER_READ_TIMEOUT_MS,
+                )
+            }
+        val bitmap =
+            bytes?.let { data ->
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
                 }
             }
+        value =
+            if (bytes != null && bitmap != null) {
+                AvatarViewerImageState.Remote(bytes, bitmap)
+            } else {
+                AvatarViewerImageState.Failed
+            }
+    }
+    return state
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun BoxScope.AvatarViewerImageContent(
+    state: AvatarViewerImageState,
+    title: String,
+    seed: String,
+    scale: Float,
+    offset: Offset,
+    onScaleChange: (Float) -> Unit,
+    onOffsetChange: (Offset) -> Unit,
+) {
+    when (state) {
+        AvatarViewerImageState.Loading ->
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White,
+            )
+        AvatarViewerImageState.Failed ->
+            Avatar(
+                title = title,
+                seed = seed,
+                size = 112.dp,
+                pictureUrl = null,
+            )
+        is AvatarViewerImageState.Local ->
+            ZoomableAvatarImage(
+                image = state.image,
+                bitmapWidth = state.image.width,
+                bitmapHeight = state.image.height,
+                contentDescription = title,
+                scale = scale,
+                offset = offset,
+                onScaleChange = onScaleChange,
+                onOffsetChange = onOffsetChange,
+                modifier = Modifier.fillMaxSize(),
+            )
+        is AvatarViewerImageState.Remote -> {
+            val image = remember(state.bitmap) { state.bitmap.asImageBitmap() }
+            ZoomableAvatarImage(
+                image = image,
+                bitmapWidth = state.bitmap.width,
+                bitmapHeight = state.bitmap.height,
+                contentDescription = title,
+                scale = scale,
+                offset = offset,
+                onScaleChange = onScaleChange,
+                onOffsetChange = onOffsetChange,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -459,7 +513,11 @@ private sealed interface AvatarViewerImageState {
 
     data object Failed : AvatarViewerImageState
 
-    data class Ready(
+    data class Local(
+        val image: ImageBitmap,
+    ) : AvatarViewerImageState
+
+    data class Remote(
         val bytes: ByteArray,
         val bitmap: Bitmap,
     ) : AvatarViewerImageState

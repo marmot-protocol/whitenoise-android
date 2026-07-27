@@ -1,11 +1,16 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsHeader
@@ -38,6 +43,28 @@ class GroupDetailsHeaderScreenshotTest {
     fun groupDetailsHeaderDark() {
         render(darkTheme = true)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_details_header_dark.png")
+    }
+
+    @Test
+    fun encryptedOnlyAvatarOpensTheViewer() {
+        val picture = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).asImageBitmap()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                GroupDetailsHeader(
+                    title = "Weekend hikers",
+                    subtitle = "8 members",
+                    description = "",
+                    seed = "stable-screenshot-seed",
+                    pictureUrl = null,
+                    picture = picture,
+                    archived = false,
+                )
+            }
+        }
+
+        composeRule.onNode(hasClickAction()).performClick()
+
+        composeRule.onNodeWithContentDescription("Close").assertExists()
     }
 
     private fun render(darkTheme: Boolean) {

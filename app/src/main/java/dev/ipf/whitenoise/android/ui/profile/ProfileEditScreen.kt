@@ -33,6 +33,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,6 +63,7 @@ import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ProfilePublicWarning
@@ -69,6 +72,8 @@ import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +86,7 @@ internal fun ProfileEditScreen(
     var displayName by remember(active?.accountIdHex) { mutableStateOf("") }
     var about by remember(active?.accountIdHex) { mutableStateOf("") }
     var picture by remember(active?.accountIdHex) { mutableStateOf("") }
+    var banner by remember(active?.accountIdHex) { mutableStateOf("") }
     var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
     var lud16 by remember(active?.accountIdHex) { mutableStateOf("") }
     // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
@@ -90,6 +96,8 @@ internal fun ProfileEditScreen(
     var lud16ResolveError by remember(active?.accountIdHex) { mutableStateOf<Int?>(null) }
     val lud16FocusRequester = remember { FocusRequester() }
     var busy by remember { mutableStateOf(false) }
+    var pictureUploading by remember(active?.accountIdHex) { mutableStateOf(false) }
+    var pictureUploadJob by remember(active?.accountIdHex) { mutableStateOf<Job?>(null) }
     // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
     // The picture URL no longer lives as a standalone editor row; it's edited
     // exclusively through this control so the editor reads like an app screen,
@@ -97,13 +105,26 @@ internal fun ProfileEditScreen(
     var showPictureSheet by remember { mutableStateOf(false) }
     var fullPictureOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.imageUrl(picture)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
+    val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
-    val saveEnabled = !busy && active != null && pictureValid && nip05Valid && lud16Valid
+    val saveEnabled =
+        !busy &&
+            !pictureUploading &&
+            active != null &&
+            pictureValid &&
+            bannerValid &&
+            nip05Valid &&
+            lud16Valid
+
+    DisposableEffect(active?.accountIdHex) {
+        onDispose { pictureUploadJob?.cancel() }
+    }
 
     fun saveProfile() {
         if (!saveEnabled) return
@@ -118,6 +139,7 @@ internal fun ProfileEditScreen(
                 displayName = displayName.trim().ifBlank { null },
                 about = about.trim().ifBlank { null },
                 picture = picture.trim().ifBlank { null },
+                banner = banner.trim().ifBlank { null },
                 nip05 = nip05.trim().ifBlank { null },
                 lud16 = lud16.trim().ifBlank { null },
             )
@@ -157,12 +179,56 @@ internal fun ProfileEditScreen(
         }
     }
 
+    fun uploadPicture(prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft) {
+        val accountRef = appState.activeAccountRef ?: return
+        if (pictureUploading || busy) return
+        pictureUploading = true
+        pictureUploadJob =
+            scope.launch {
+                var prepared = false
+                try {
+                    val draft = prepare()
+                    prepared = true
+                    val uploaded =
+                        appState.marmotIo {
+                            uploadProfileImage(
+                                accountRef,
+                                draft.plaintext,
+                                draft.mediaType,
+                                null,
+                            )
+                        }
+                    val safeUploaded =
+                        ProfileSanitizer.imageUrl(uploaded)
+                            ?: throw IllegalStateException("profile image upload returned an unsafe URL")
+                    if (appState.activeAccountRef != accountRef) return@launch
+                    picture = safeUploaded
+                    showPictureSheet = false
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    appState.present(
+                        if (prepared) {
+                            R.string.toast_couldnt_upload_profile_image
+                        } else {
+                            R.string.toast_couldnt_prepare_image
+                        },
+                        copyable = true,
+                    )
+                } finally {
+                    pictureUploading = false
+                    pictureUploadJob = null
+                }
+            }
+    }
+
     LaunchedEffect(active?.accountIdHex) {
         val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
         if (profile != null) {
             displayName = profile.displayName ?: profile.name ?: ""
             about = profile.about ?: ""
             picture = profile.picture ?: ""
+            banner = profile.banner ?: ""
             nip05 = profile.nip05 ?: ""
             lud16 = profile.lud16 ?: ""
         }
@@ -387,6 +453,23 @@ internal fun ProfileEditScreen(
                     )
                     TextField(
                         colors = profileFieldColors,
+                        value = banner,
+                        onValueChange = { banner = it },
+                        label = { Text(stringResource(R.string.profile_banner)) },
+                        singleLine = true,
+                        isError = !bannerValid,
+                        supportingText = {
+                            Text(
+                                stringResource(
+                                    if (bannerValid) R.string.profile_banner_hint else R.string.profile_banner_invalid,
+                                ),
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
+                    )
+                    TextField(
+                        colors = profileFieldColors,
                         value = lud16,
                         onValueChange = {
                             lud16 = it
@@ -438,15 +521,22 @@ internal fun ProfileEditScreen(
             seed = active?.accountIdHex.orEmpty(),
             urlLabel = stringResource(R.string.profile_picture_hint),
             // The profile editor stages edits locally and persists on Publish,
-            // so there's no in-flight mutation to gate on here.
-            applyInFlight = false,
+            // so the returned Blossom URL remains staged until Save.
+            applyInFlight = pictureUploading,
             onApply = { picked ->
-                // picked is the sanitized URL (Apply) or null (Remove); either
-                // way it's normalized by the sheet before reaching us.
-                picture = picked.orEmpty()
-                showPictureSheet = false
+                if (picked == null) {
+                    picture = ""
+                    showPictureSheet = false
+                } else {
+                    uploadPicture { GroupImageDraftProcessor.fromRemoteUrl(picked) }
+                }
             },
-            onDismiss = { showPictureSheet = false },
+            onPickPhoto = { uri ->
+                uploadPicture {
+                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                }
+            },
+            onDismiss = { if (!pictureUploading) showPictureSheet = false },
         )
     }
 }

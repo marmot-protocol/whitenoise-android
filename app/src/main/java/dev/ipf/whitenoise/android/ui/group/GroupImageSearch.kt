@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -106,15 +111,21 @@ private enum class GroupImageAction { Apply, Remove }
 @Composable
 internal fun ImageSearchSheet(
     initialUrl: String,
+    hasCurrentImage: Boolean = initialUrl.isNotBlank(),
     header: String,
     title: String,
     seed: String,
     urlLabel: String,
     applyInFlight: Boolean,
     onApply: (String?) -> Unit,
+    onPickPhoto: ((Uri) -> Unit)? = null,
     onDismiss: () -> Unit,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
 ) {
+    val photoPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) onPickPhoto?.invoke(uri)
+        }
     // Tracks which button initiated the current in-flight mutation, so the
     // spinner lands on THAT button and the other one just greys out. Local
     // to the sheet because the caller's `applyInFlight` is a binary
@@ -187,7 +198,7 @@ internal fun ImageSearchSheet(
                     // intact for downstream loggers + structured
                     // concurrency tracking.
                     throw e
-                } catch (_: Throwable) {
+                } catch (_: Exception) {
                     if (requestId == ticket) searchErrorRes = badResponseRes
                 } finally {
                     if (requestId == ticket) isSearching = false
@@ -247,6 +258,21 @@ internal fun ImageSearchSheet(
                     )
                 }
             }
+            if (onPickPhoto != null) {
+                Button(
+                    onClick = {
+                        photoPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    enabled = !applyInFlight,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.group_image_choose_photo))
+                }
+            }
             OutlinedTextField(
                 value = urlDraft,
                 onValueChange = { urlDraft = it },
@@ -288,6 +314,11 @@ internal fun ImageSearchSheet(
                     }
                 }
             }
+            Text(
+                stringResource(R.string.group_image_search_privacy),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             searchErrorRes?.let { errRes ->
                 Text(
                     stringResource(errRes),
@@ -325,7 +356,7 @@ internal fun ImageSearchSheet(
             // avatar — for a group without one there's nothing to remove.
             // Greyed out while the mutation is running (no double-tap into
             // a silently no-op'd second call inside withMutationLockResult).
-            if (initialUrl.isNotBlank()) {
+            if (hasCurrentImage) {
                 TextButton(
                     onClick = {
                         pendingAction = GroupImageAction.Remove

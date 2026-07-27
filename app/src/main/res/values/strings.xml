@@ -160,6 +160,7 @@
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>
+    <string name="group_unrecoverable_notice">This group is temporarily frozen while White Noise verifies and repairs its state.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>
@@ -503,6 +504,10 @@
     <string name="profile_picture_paste_link">Paste a link</string>
     <string name="profile_picture_remove">Remove picture</string>
     <string name="profile_picture_use_link">Use this link</string>
+    <string name="profile_banner">Profile banner</string>
+    <string name="profile_banner_hint">Optional public HTTPS banner URL</string>
+    <string name="profile_banner_invalid">Only public HTTPS image URLs are allowed.</string>
+    <string name="toast_couldnt_upload_profile_image">Couldn\'t upload the profile image.</string>
     <string name="profile_nip05_hint">name@domain</string>
     <string name="profile_nip05_invalid">Enter an address like name@example.com.</string>
     <string name="profile_lightning_hint">Lightning address, e.g. you@walletprovider.com</string>
@@ -554,7 +559,7 @@
     <!-- Delete-key-packages toggle in the Sign Out sheet (#349). Default ON. -->
     <string name="sign_out_delete_key_packages_label">Delete key packages from relays</string>
     <string name="sign_out_delete_key_packages_help">Stops strangers from inviting you to new groups while you are signed out.</string>
-    <string name="toast_signed_out_locally_relay_retry">Signed out locally — relay cleanup will retry next time you sign in.</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">Signed out locally, but relay KeyPackage cleanup did not fully finish.</string>
     <!-- Staged progress + outcome UI for the destructive Sign Out & Wipe (#350). -->
     <string name="wipe_progress_title">Signing out &amp; wiping…</string>
     <string name="wipe_stage_leaving_groups">Leaving groups…</string>
@@ -749,6 +754,7 @@
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
     <string name="toast_group_updated">Group updated</string>
     <string name="toast_couldnt_update_group">Couldn\'t update group</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">The new image was uploaded, but the old group image could not be cleared. Retry to finish the update.</string>
     <string name="toast_invite_sent">Invite sent</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>
@@ -862,6 +868,7 @@
     <string name="message_status_streaming">Streaming</string>
     <string name="attach_image">Attach image</string>
     <string name="toast_couldnt_decode_image">Couldn\'t decode that image</string>
+    <string name="toast_couldnt_prepare_image">Couldn\'t download or prepare that image.</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_reattach_to_retry_media">Re-attach to retry</string>
     <string name="media_uploading">Uploading…</string>
@@ -907,7 +914,9 @@
     <string name="group_image_search_action">Search</string>
     <string name="group_image_search_query_label">Image search</string>
     <string name="group_image_search_query_hint">Search the web…</string>
+    <string name="group_image_search_privacy">Web search sends your query and IP address to DuckDuckGo and image hosts.</string>
     <string name="group_image_search_apply">Use this image</string>
+    <string name="group_image_choose_photo">Choose from photos</string>
     <string name="group_image_search_enter_query">Enter a search term.</string>
     <string name="group_image_search_unavailable">Image search is temporarily unavailable.</string>
     <string name="group_image_search_bad_response">Image search returned an unexpected response.</string>

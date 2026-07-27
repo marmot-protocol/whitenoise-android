@@ -28,6 +28,22 @@ import org.junit.Test
  */
 class ConversationComposerGateTest {
     @Test
+    fun unrecoverableGroupShowsFrozenNoticeBeforeOtherGates() {
+        assertEquals(
+            ComposerGate.FROZEN,
+            conversationComposerGate(
+                pendingInvite = false,
+                membersVerified = true,
+                isSelfMember = true,
+                seededSelfMember = true,
+                seededMembershipKnown = true,
+                assumeMemberUntilVerified = true,
+                unrecoverable = true,
+            ),
+        )
+    }
+
+    @Test
     fun pendingInviteShowsInviteActionsBeforeMembershipGate() {
         assertEquals(
             ComposerGate.INVITE,

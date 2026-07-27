@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.ui.chats.newchat.isPlainNameQuery
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -18,6 +20,7 @@ class NostrProfileReferenceTest {
             "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
             NostrProfileReference.accountIdHex(nprofile),
         )
+        assertFalse(isPlainNameQuery(nprofile))
     }
 
     @Test

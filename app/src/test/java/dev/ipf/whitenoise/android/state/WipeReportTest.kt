@@ -176,20 +176,20 @@ class SignOutCompletionTest {
     }
 
     @Test
-    fun engineCallFailureStillSignsOutLocallyButFlagsRelayRetry() {
+    fun engineCallFailureStillSignsOutLocallyButFlagsIncompleteRelayCleanup() {
         // #349: an FFI failure (relay unreachable, runtime error) must not
-        // abort the local sign-out — the mapping reports it as a pending
-        // relay cleanup so the UI shows the "will retry on next sign-in" hint.
-        assertEquals(SignOutCompletion.RelayCleanupPending, signOutCompletion(null))
+        // abort the local sign-out. The mapping accurately reports that the
+        // best-effort relay cleanup did not fully finish.
+        assertEquals(SignOutCompletion.RelayCleanupIncomplete, signOutCompletion(null))
     }
 
     @Test
-    fun perRelayKeyPackageFailuresFlagRelayRetry() {
+    fun perRelayKeyPackageFailuresFlagIncompleteRelayCleanup() {
         val outcome =
             signOutOutcomeFfi(
                 keyPackagesDeleted = 1u,
                 keyPackageFailures = listOf(RelayFailureFfi(eventIdHex = "ee".repeat(32), reason = "timeout")),
             )
-        assertEquals(SignOutCompletion.RelayCleanupPending, signOutCompletion(outcome))
+        assertEquals(SignOutCompletion.RelayCleanupIncomplete, signOutCompletion(outcome))
     }
 }

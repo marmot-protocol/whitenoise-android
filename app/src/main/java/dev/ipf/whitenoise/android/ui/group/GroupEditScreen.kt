@@ -40,22 +40,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import kotlinx.coroutines.CancellationException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,9 +81,13 @@ internal fun GroupEditScreen(
     var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
-    val canEdit = controller.isSelfMember && controller.isSelfAdmin
+    val context = LocalContext.current
+    val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
     val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
-    val groupAvatarImageAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
+    val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
+    val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
+    val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
+    val hasGroupImage = groupAvatarUrl != null || controller.group.imageHashHex != null
     val saveEnabled =
         !saving &&
             !controller.mutationInFlight &&
@@ -97,6 +106,24 @@ internal fun GroupEditScreen(
         }
     }
 
+    fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
+        if (imageSaving || controller.mutationInFlight) return
+        imageSaving = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            try {
+                val draft = prepare()
+                if (controller.updateGroupImage(draft)) showImageSearch = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } finally {
+                imageSaving = false
+            }
+        }
+    }
+
     // System back returns to Group Details, not all the way out to the
     // conversation. This composes after the details screen's own BackHandler
     // (rendered just before the early return that shows this screen), so it
@@ -105,7 +132,7 @@ internal fun GroupEditScreen(
 
     val editImageLabel =
         stringResource(
-            if (controller.group.avatarUrl.isNullOrBlank()) {
+            if (!hasGroupImage) {
                 R.string.group_image_search_set
             } else {
                 R.string.group_image_search_edit
@@ -178,11 +205,12 @@ internal fun GroupEditScreen(
                                         }
                                     },
                         ) {
-                            Avatar(
+                            GroupAvatar(
+                                appState = appState,
+                                group = controller.group,
                                 title = controller.title(groupTitleCopy),
                                 seed = controller.group.groupIdHex,
                                 size = 96.dp,
-                                pictureUrl = groupAvatarUrl,
                             )
                         }
                         if (canEdit) {
@@ -243,11 +271,12 @@ internal fun GroupEditScreen(
         }
     }
 
-    if (avatarViewerOpen && groupAvatarUrl != null && groupAvatarImageAvailable) {
+    if (avatarViewerOpen && groupAvatarImageAvailable) {
         AvatarFullScreenViewer(
             title = controller.title(groupTitleCopy),
             seed = controller.group.groupIdHex,
             pictureUrl = groupAvatarUrl,
+            picture = encryptedGroupAvatar,
             onDismiss = { avatarViewerOpen = false },
             editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
             onEditPicture =
@@ -265,20 +294,20 @@ internal fun GroupEditScreen(
     if (showImageSearch) {
         ImageSearchSheet(
             initialUrl = controller.group.avatarUrl.orEmpty(),
+            hasCurrentImage = hasGroupImage,
             header = stringResource(R.string.group_image_search_title),
             title = controller.title(groupTitleCopy),
             seed = controller.group.groupIdHex,
             urlLabel = stringResource(R.string.group_avatar_url),
             applyInFlight = imageSaving || controller.mutationInFlight,
             onApply = { picked ->
-                imageSaving = true
-                controller.clearLastMutationError()
-                appState.launchMutation {
-                    try {
-                        if (controller.updateGroupAvatarUrl(picked)) showImageSearch = false
-                    } finally {
-                        imageSaving = false
-                    }
+                updateImage {
+                    picked?.let { GroupImageDraftProcessor.fromRemoteUrl(it) }
+                }
+            },
+            onPickPhoto = { uri ->
+                updateImage {
+                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
                 }
             },
             onDismiss = { showImageSearch = false },
