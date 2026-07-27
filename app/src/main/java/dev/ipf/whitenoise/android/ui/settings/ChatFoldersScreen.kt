@@ -88,6 +88,8 @@ internal fun ChatFoldersScreen(
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val mutedConversations = chatNotificationState.mutedConversations
     val groupTitleCopy = rememberGroupTitleCopy()
+    // Keyword rules match rendered row titles; subscribe like ChatsScreen's folder resolver.
+    val profileRevision = appState.profileRevisionForCompose
     var editorOpenFor by remember { mutableStateOf<ChatFolderEditorTarget?>(null) }
     var pendingDelete by remember { mutableStateOf<ChatFolder?>(null) }
 
@@ -117,25 +119,23 @@ internal fun ChatFoldersScreen(
     }
 
     val folderItems =
-        remember(folders, appState, accountRef, mutedConversations, groupTitleCopy) {
-            folders.map { folder ->
-                ChatFolderManageItem(
-                    id = folder.id,
-                    name = folder.name,
-                    systemKind = folder.systemKind,
-                    chatCount =
-                        folderChatCount(
-                            folder = folder,
-                            appState = appState,
-                            accountRef = accountRef,
-                            mutedConversations = mutedConversations,
-                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                        ),
-                    isCustom = !folder.isSystem,
-                    canMoveUp = folders.firstOrNull()?.id != folder.id,
-                    canMoveDown = folders.lastOrNull()?.id != folder.id,
-                )
-            }
+        folders.map { folder ->
+            ChatFolderManageItem(
+                id = folder.id,
+                name = folder.name,
+                systemKind = folder.systemKind,
+                chatCount =
+                    folderChatCount(
+                        folder = folder,
+                        appState = appState,
+                        accountRef = accountRef,
+                        mutedConversations = mutedConversations,
+                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                    ),
+                isCustom = !folder.isSystem,
+                canMoveUp = folders.firstOrNull()?.id != folder.id,
+                canMoveDown = folders.lastOrNull()?.id != folder.id,
+            )
         }
 
     ChatFoldersContent(
