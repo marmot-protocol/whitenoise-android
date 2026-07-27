@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">靜音</string>
     <string name="chat_row_action_unmute">取消靜音</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
+    <string name="chat_row_action_mark_unread">標示為未讀</string>
     <string name="chat_row_action_delete_group">刪除群組</string>
     <string name="delete_group_dialog_title">刪除群組？</string>
     <string name="delete_group_dialog_message">從此裝置移除此群組？如果你仍是成員，將先退出群組。</string>

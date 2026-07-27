@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">Mettre en sourdine</string>
     <string name="chat_row_action_unmute">Réactiver le son</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
+    <string name="chat_row_action_mark_unread">Marquer comme non lu</string>
     <string name="chat_row_action_delete_group">Supprimer le groupe</string>
     <string name="delete_group_dialog_title">Supprimer le groupe ?</string>
     <string name="delete_group_dialog_message">Retirer ce groupe de cet appareil ? Si vous êtes encore membre, vous quitterez d\'abord le groupe.</string>

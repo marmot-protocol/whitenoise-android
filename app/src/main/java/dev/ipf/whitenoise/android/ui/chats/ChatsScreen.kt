@@ -531,6 +531,9 @@ internal fun ChatsScreen(
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                        showMarkUnread =
+                            singleSelectedItem != null &&
+                                singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
                         showMuteToggle = singleSelectedItem != null,
                         muted = singleSelectionMuted,
                         onClose = ::clearSelection,
@@ -572,6 +575,11 @@ internal fun ChatsScreen(
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
                             clearSelection()
                             appState.launchMutation { controller.markAllRead(item) }
+                        },
+                        onMarkUnread = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            clearSelection()
+                            appState.launchMutation { controller.markUnread(item) }
                         },
                         onMuteToggle = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar

@@ -16,6 +16,11 @@ class ChatsScreenSelectionActionsCoverageTest {
         val markReadHandler =
             selectionBar.requiredSection(
                 start = "onMarkRead = {",
+                end = "\n                        onMarkUnread = {",
+            )
+        val markUnreadHandler =
+            selectionBar.requiredSection(
+                start = "onMarkUnread = {",
                 end = "\n                        onMuteToggle = {",
             )
         val muteHandler =
@@ -39,6 +44,14 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "mark-read overflow must exit selection mode",
             "clearSelection()" in markReadHandler,
+        )
+        assertTrue(
+            "mark-unread overflow must route to controller.markUnread",
+            "controller.markUnread(item)" in markUnreadHandler,
+        )
+        assertTrue(
+            "mark-unread overflow must exit selection mode",
+            "clearSelection()" in markUnreadHandler,
         )
         assertTrue(
             "mute overflow must route to appState.setConversationMuted",

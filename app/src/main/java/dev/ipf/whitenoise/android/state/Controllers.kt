@@ -189,7 +189,9 @@ data class ChatListItem(
         get() = projection?.unreadCount ?: 0uL
 
     val hasUnread: Boolean
-        get() = projection?.hasUnread ?: false
+        // A manual mark-unread renders the same badge as real unread; the
+        // engine clears it when the conversation is read again.
+        get() = projection?.hasUnread == true || projection?.manuallyMarkedUnread == true
 
     /** At least one unread message in this chat mentions the active account. */
     val unreadMention: Boolean
@@ -3260,6 +3262,23 @@ class ChatsController(
             Log.w(
                 "DMChatsController",
                 "markAllRead failed for group=${item.group.groupIdHex.take(8)}",
+                it,
+            )
+        }.getOrDefault(false)
+    }
+
+    /** Flag the chat unread until it is next read; the engine owns the clear. */
+    suspend fun markUnread(item: ChatListItem): Boolean {
+        val account = accountRef ?: return false
+        return runCatchingCancellable {
+            val row = appState.marmotIo { setChatManuallyUnread(account, item.group.groupIdHex, true) }
+            row?.let(::applyChatListRow)
+            true
+        }.onFailure {
+            // Same quiet posture as markAllRead: log-only, no toast.
+            Log.w(
+                "DMChatsController",
+                "markUnread failed for group=${item.group.groupIdHex.take(8)}",
                 it,
             )
         }.getOrDefault(false)

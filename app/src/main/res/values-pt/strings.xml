@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">Silenciar</string>
     <string name="chat_row_action_unmute">Ativar som</string>
     <string name="chat_row_action_mark_read">Marcar como lido</string>
+    <string name="chat_row_action_mark_unread">Marcar como não lido</string>
     <string name="chat_row_action_delete_group">Excluir grupo</string>
     <string name="delete_group_dialog_title">Excluir grupo?</string>
     <string name="delete_group_dialog_message">Remover este grupo deste dispositivo? Se você ainda for membro, sairá do grupo primeiro.</string>
