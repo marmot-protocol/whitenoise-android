@@ -776,8 +776,8 @@ internal fun ComposerBar(
             } else if (replyingTo != null) {
                 val mediaFallback = remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
                 val mediaKind =
-                    remember(mediaFallback, replyingTo.tags) {
-                        composerReplyMediaKind(mediaFallback, replyingTo.tags)
+                    remember(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch) {
+                        composerReplyMediaKind(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch)
                     }
                 val profileRevision = appState?.profileRevisionForCompose
                 val replyMentionDisplayName =

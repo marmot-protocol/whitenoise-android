@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
@@ -483,6 +485,9 @@ class ChatListFoldUnreadRegressionTest {
                     kind = 9uL,
                     timelineAt = lastMessageAt,
                     deleted = deleted,
+                    attachmentKind = null,
+                    attachmentCount = 0u,
+                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
                 )
             } else {
                 null
@@ -492,7 +497,15 @@ class ChatListFoldUnreadRegressionTest {
         firstUnreadMessageIdHex = firstUnreadMessageIdHex,
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = lastMessageAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun received(id: String): TimelineMessage =

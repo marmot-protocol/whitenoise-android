@@ -76,8 +76,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.media.MediaInventory
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
@@ -167,12 +168,9 @@ internal data class SharedMediaTiles(
 }
 
 // Walk the loaded timeline once and project image/video tiles, newest first.
-// References come from the controller's listMedia cache (carries the real
-// `sourceEpoch`) with the imeta parser as the optimistic-record fallback —
-// mirroring the conversation bubble path so a tile here downloads through the
-// exact same cache keys the bubble already populated. Keyed on the timeline
-// identity and the media-reference map so it rebuilds on new-message arrival,
-// not per frame.
+// Projected rows provide typed media carrying the real source epoch; only
+// optimistic/compatibility records fall back to MarmotKit tag parsing. Keyed
+// on timeline identity so it rebuilds on projection changes, not per frame.
 @Composable
 internal fun rememberSharedMediaTiles(
     controller: ConversationController,
@@ -198,50 +196,48 @@ internal fun rememberSharedMediaTiles(
                 hasOther = false,
             ),
         controller.timeline,
-        controller.mediaReferences,
         myAccountId,
     ) {
         val timelineSnapshot = controller.timeline
-        val mediaReferences = controller.mediaReferences
         value =
             withContext(Dispatchers.Default) {
-                val records = timelineSnapshot.map { it.record }
-                val references = records.associate { it.messageIdHex to mediaReferences[it.messageIdHex] }
-                buildTiles(records, references, myAccountId)
+                buildTiles(timelineSnapshot, myAccountId)
             }
     }
     return tiles
 }
 
 // Pure tile projection extracted from the composable so it can run on a
-// background dispatcher. References are looked up from the controller cache
-// (carrying the real `sourceEpoch`) with the imeta parser as the
-// optimistic-record fallback — mirroring the conversation bubble path.
+// background dispatcher. Projected rows carry authoritative typed media;
+// optimistic/compatibility records alone fall back to MarmotKit tag parsing.
 private fun buildTiles(
-    records: List<dev.ipf.marmotkit.AppMessageRecordFfi>,
-    cachedReferences: Map<String, List<MediaAttachmentReferenceFfi>?>,
+    messages: List<TimelineMessage>,
     myAccountId: String?,
 ): SharedMediaTiles {
     val images = ArrayList<SharedMediaTile>()
     val videos = ArrayList<SharedMediaTile>()
     val voice = ArrayList<SharedMediaRow>()
     val files = ArrayList<SharedMediaRow>()
-    for (record in records) {
+    for (message in messages) {
+        val record = message.record
         val mine = MessageProjector.isMine(record, myAccountId)
         val references =
-            cachedReferences[record.messageIdHex]
-                ?: MediaReferenceParser.parseAllImetaTags(record.tags)
+            message.projected?.media
+                ?: MediaReferenceSupport.parseAllImetaTags(
+                    tags = record.tags,
+                    sourceEpoch = record.sourceEpoch ?: 0uL,
+                )
         references.forEachIndexed { index, reference ->
             when {
-                MediaReferenceParser.isImageMedia(reference) ->
+                MediaReferenceSupport.isImageMedia(reference) ->
                     images.add(
                         SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = false),
                     )
-                MediaReferenceParser.isVideoMedia(reference) ->
+                MediaReferenceSupport.isVideoMedia(reference) ->
                     videos.add(
                         SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = true),
                     )
-                MediaReferenceParser.isAudioMedia(reference) ->
+                MediaReferenceSupport.isAudioMedia(reference) ->
                     voice.add(
                         SharedMediaRow(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender),
                     )
@@ -259,7 +255,7 @@ private fun buildTiles(
     files.reverse()
     // URLs are sorted newest-first to match the lists; the inventory keeps
     // them in timeline order (oldest first).
-    val urls = MediaInventory.urls(records).asReversed()
+    val urls = MediaInventory.urls(messages.map { it.record }).asReversed()
     // Bare image-URL links aren't rendered in any grid/list yet, so they don't
     // count toward `hasOther` — otherwise a links-only conversation would show
     // the "View shared media" entry into a library with every tab empty.

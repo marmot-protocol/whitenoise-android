@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatFolderPreferences
@@ -99,7 +100,15 @@ class ChatFolderChipModelTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = 1uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun group(id: String) =
@@ -125,6 +134,8 @@ class ChatFolderChipModelTest {
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disappearingMessageSecs = 0uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
         )
 
     private fun encryptedMedia() =

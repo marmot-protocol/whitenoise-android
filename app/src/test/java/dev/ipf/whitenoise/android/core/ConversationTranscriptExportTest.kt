@@ -401,6 +401,8 @@ class ConversationTranscriptExportTest {
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
     private fun timelineRecord(
@@ -435,6 +437,9 @@ class ConversationTranscriptExportTest {
         deleted = false,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
     )
 }
 

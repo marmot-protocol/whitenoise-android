@@ -66,7 +66,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
@@ -217,7 +217,7 @@ internal fun FullScreenMediaViewer(
                 val owned = currentMine
                 scope.launch {
                     val ok =
-                        if (MediaReferenceParser.isVideoMedia(ref)) {
+                        if (MediaReferenceSupport.isVideoMedia(ref)) {
                             runCatching {
                                 val file = materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
                                 withContext(Dispatchers.IO) {
@@ -243,7 +243,7 @@ internal fun FullScreenMediaViewer(
                 val msgId = currentMessageIdHex
                 val owned = currentMine
                 scope.launch {
-                    if (MediaReferenceParser.isVideoMedia(ref)) {
+                    if (MediaReferenceSupport.isVideoMedia(ref)) {
                         runCatching {
                             materializeVideoAttachment(context, controller, msgId, attachmentIndex, ref, owned)
                         }.getOrNull()?.let { shareVideo(context, it, ref.fileName, ref.mediaType) }
@@ -265,7 +265,7 @@ internal fun FullScreenMediaViewer(
                 userScrollEnabled = viewerPagerScrollEnabled(scale),
             ) { page ->
                 val pageDescriptor = pages[clampViewerPageIndex(page, pages.size)]
-                if (MediaReferenceParser.isVideoMedia(pageDescriptor.reference)) {
+                if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
                         messageIdHex = pageDescriptor.messageIdHex,

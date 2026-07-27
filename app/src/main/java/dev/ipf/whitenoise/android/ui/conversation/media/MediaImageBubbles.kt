@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -203,13 +203,10 @@ internal fun MediaImageBubble(
             } else {
                 null
             }
-        // The imeta-tag parser falls back to sourceEpoch=0 (the wire format
-        // doesn't carry it). Calling downloadMedia with epoch=0 errors with
-        // "missing encrypted media secret for epoch 0". Wait for the typed
-        // reference upgrade via `refreshMediaReferences` — once it lands,
-        // `epoch` re-keys this effect with the real value. The spinner stays
-        // visible during the wait (bitmap=null, failed=false, startDownload).
-        // Skip the wait when we already hold the pending bytes (own upload window).
+        // A legacy compatibility record may lack a recoverable source epoch.
+        // Calling downloadMedia with epoch=0 would fail, so wait for a projected
+        // row instead. Own optimistic sends already hold their pending bytes and
+        // can render without invoking the native downloader.
         if (pendingBytes == null && epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
@@ -441,7 +438,7 @@ internal fun MediaVisualGridBubble(
     val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
         val entry = visible[tileIndex]
         val showOverflow = tileIndex == visible.lastIndex && overflow > 0
-        if (MediaReferenceParser.isVideoMedia(entry.value)) {
+        if (MediaReferenceSupport.isVideoMedia(entry.value)) {
             MediaVideoGridTile(
                 messageIdHex = record.messageIdHex,
                 attachmentIndex = entry.index,
@@ -522,8 +519,7 @@ internal fun MediaImageGridTile(
     uploading: Boolean = false,
 ) {
     // Two-bucket key model (mirrors `MediaImageBubble`):
-    //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state
-    //     so a typed-reference upgrade clears a failed-at-epoch-0 tile.
+    //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state.
     //   - `tileSlot` omits the epoch, scoped to user-choice state
     //     (startDownload) so a background ref upgrade can't re-gate a tile
     //     the user already consented to fetch.

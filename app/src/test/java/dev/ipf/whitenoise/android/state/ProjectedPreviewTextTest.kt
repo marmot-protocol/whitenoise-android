@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -207,6 +209,9 @@ class ProjectedPreviewTextTest {
         kind = kind,
         timelineAt = 10uL,
         deleted = deleted,
+        attachmentKind = null,
+        attachmentCount = 0u,
+        deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 
     private fun latest(
@@ -248,7 +253,15 @@ class ProjectedPreviewTextTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = 10uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun group(id: String) =
@@ -274,6 +287,8 @@ class ProjectedPreviewTextTest {
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disappearingMessageSecs = 0uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
         )
 
     private fun encryptedMedia() =
