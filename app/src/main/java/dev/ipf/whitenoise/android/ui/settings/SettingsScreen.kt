@@ -569,6 +569,7 @@ internal fun SettingsSwitchRow(
     checked: Boolean,
     enabled: Boolean = true,
     busy: Boolean = false,
+    switchModifier: Modifier = Modifier,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
@@ -590,6 +591,7 @@ internal fun SettingsSwitchRow(
             )
         } else {
             Switch(
+                modifier = switchModifier,
                 checked = checked,
                 enabled = enabled,
                 onCheckedChange = onCheckedChange,
