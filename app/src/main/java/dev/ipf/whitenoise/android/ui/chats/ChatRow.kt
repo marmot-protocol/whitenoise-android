@@ -297,6 +297,7 @@ internal fun ChatRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                     }
                 }

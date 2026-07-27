@@ -628,6 +628,9 @@ internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
     if (preview.deleted) return null
     if (preview.kind != 9uL) return null
     if (preview.plaintext.isNotBlank()) return null
+    // The engine's typed attachment projection already labels this preview —
+    // no local timeline read needed.
+    if (preview.attachmentKind != null) return null
     return preview.messageIdHex.takeIf { it.isNotBlank() }
 }
 

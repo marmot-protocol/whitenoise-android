@@ -73,6 +73,15 @@ class ProjectedPreviewTextTest {
     }
 
     @Test
+    fun projectedAttachmentKindSkipsTheLocalMediaResolve() {
+        val projected = row("group-a", attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u))
+        val unprojected = row("group-a", preview(plaintext = ""))
+
+        assertNull(chatRowNeedsMediaKindResolve(projected))
+        assertEquals("preview-message", chatRowNeedsMediaKindResolve(unprojected))
+    }
+
+    @Test
     fun liveChatBodyRendersVerbatim() {
         val item = item(preview = preview(plaintext = "hello *world*"))
 

@@ -398,9 +398,10 @@ internal fun ChatsScreen(
     val singleSelectedItem = selectedVisibleItems.singleOrNull()
     val singleSelectionMuted =
         singleSelectedItem?.let { item ->
-            appState.activeAccountRef?.let { accountRef ->
-                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
-            }
+            item.engineMuted() ||
+                appState.activeAccountRef?.let { accountRef ->
+                    ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
+                } == true
         } ?: false
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated

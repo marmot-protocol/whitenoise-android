@@ -3902,7 +3902,11 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMode(accountRef, groupIdHex, mode)
+        syncEngineMute(accountRef, groupIdHex)
     }
+
+    /** The engine's durable mute projection for the chat, from the live list. */
+    fun engineConversationMuted(groupIdHex: String): Boolean = chatsController?.items?.firstOrNull { it.group.groupIdHex == groupIdHex }?.engineMuted() == true
 
     fun setConversationNotifyForMode(
         groupIdHex: String,
