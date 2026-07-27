@@ -1,17 +1,23 @@
 package dev.ipf.whitenoise.android.core
 
-import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.REMOTE_PROFILE_IMAGE_MAX_BYTES
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+
+internal const val GROUP_AVATAR_MAX_PAYLOAD_BYTES = REMOTE_PROFILE_IMAGE_MAX_BYTES
+
+internal fun isGroupAvatarPayloadAccepted(bytes: ByteArray): Boolean = bytes.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES
 
 /**
  * Bounded decoded-bitmap cache for MDK group images. MDK remains the source of
@@ -24,14 +30,16 @@ internal object GroupAvatarImageLoader {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
-    private val loadPermits = Semaphore(permits = 4)
+
+    // MDK currently applies its generic encrypted-media network cap before
+    // returning these bytes. Serialize group-avatar fetches so a custom client
+    // cannot multiply that temporary allocation on Android.
+    private val loadPermits = Semaphore(permits = 1)
     private val cache =
-        object : LruCache<String, ImageBitmap>(CACHE_SIZE_BYTES) {
-            override fun sizeOf(
-                key: String,
-                value: ImageBitmap,
-            ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
-        }
+        ByteSizeLruCache<String, ImageBitmap>(
+            maxBytes = CACHE_SIZE_BYTES.toLong(),
+            sizeOf = { image -> image.asAndroidBitmap().byteCount.coerceAtLeast(1) },
+        )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
     private var generation = 0L
 
@@ -57,8 +65,13 @@ internal object GroupAvatarImageLoader {
                     val image =
                         runCatching {
                             loadPermits.withPermit {
+                                if (!isCurrentGeneration(launchedGeneration)) return@withPermit null
+                                val bytes = fetchBytes()
+                                if (!isCurrentGeneration(launchedGeneration) || !isGroupAvatarPayloadAccepted(bytes)) {
+                                    return@withPermit null
+                                }
                                 MediaPipeline
-                                    .decodeSampledBitmap(fetchBytes(), MAX_EDGE_PX)
+                                    .decodeSampledBitmap(bytes, MAX_EDGE_PX)
                                     ?.asImageBitmap()
                             }
                         }.getOrNull()
@@ -75,10 +88,16 @@ internal object GroupAvatarImageLoader {
         return request.await()
     }
 
+    private fun isCurrentGeneration(candidate: Long): Boolean =
+        synchronized(lock) {
+            candidate == generation
+        }
+
     fun clear() {
         synchronized(lock) {
             generation += 1
-            cache.evictAll()
+            scope.coroutineContext.cancelChildren()
+            cache.clear()
             inFlight.values.forEach { it.complete(null) }
             inFlight.clear()
         }

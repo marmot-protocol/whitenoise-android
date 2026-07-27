@@ -198,7 +198,7 @@ internal fun ImageSearchSheet(
                     // intact for downstream loggers + structured
                     // concurrency tracking.
                     throw e
-                } catch (_: Throwable) {
+                } catch (_: Exception) {
                     if (requestId == ticket) searchErrorRes = badResponseRes
                 } finally {
                     if (requestId == ticket) isSearching = false

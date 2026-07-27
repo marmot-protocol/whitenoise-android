@@ -28,6 +28,26 @@ internal data class ImageUploadDraft(
             dim = dim,
             thumbhash = thumbhash,
         )
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            (
+                other is ImageUploadDraft &&
+                    plaintext.contentEquals(other.plaintext) &&
+                    mediaType == other.mediaType &&
+                    sourceUrl == other.sourceUrl &&
+                    dim == other.dim &&
+                    thumbhash == other.thumbhash
+            )
+
+    override fun hashCode(): Int {
+        var result = plaintext.contentHashCode()
+        result = 31 * result + mediaType.hashCode()
+        result = 31 * result + (sourceUrl?.hashCode() ?: 0)
+        result = 31 * result + (dim?.hashCode() ?: 0)
+        result = 31 * result + (thumbhash?.hashCode() ?: 0)
+        return result
+    }
 }
 
 internal const val REMOVE_GROUP_IMAGE_MUTATION_KEY = "remove"
@@ -62,6 +82,27 @@ internal fun shouldCommitPrimaryGroupImageMutation(
     return requestedMutationKey != REMOVE_GROUP_IMAGE_MUTATION_KEY ||
         hasProjectedEncryptedImage ||
         pendingLegacyClearMutationKey != null
+}
+
+internal enum class GroupImageMutationFailure {
+    Primary,
+    UploadCleanup,
+    RemovalCleanup,
+}
+
+internal fun classifyGroupImageMutationFailure(
+    requestedMutationKey: String,
+    pendingLegacyClearMutationKey: String?,
+    attemptedLegacyClear: Boolean,
+): GroupImageMutationFailure {
+    if (!attemptedLegacyClear || pendingLegacyClearMutationKey != requestedMutationKey) {
+        return GroupImageMutationFailure.Primary
+    }
+    return if (requestedMutationKey == REMOVE_GROUP_IMAGE_MUTATION_KEY) {
+        GroupImageMutationFailure.RemovalCleanup
+    } else {
+        GroupImageMutationFailure.UploadCleanup
+    }
 }
 
 internal sealed class ImageUploadPreparationException : Exception() {

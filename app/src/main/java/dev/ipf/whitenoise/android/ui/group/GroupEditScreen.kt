@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
@@ -83,7 +84,9 @@ internal fun GroupEditScreen(
     val context = LocalContext.current
     val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
     val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
-    val groupAvatarImageAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
+    val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
+    val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
+    val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
     val hasGroupImage = groupAvatarUrl != null || controller.group.imageHashHex != null
     val saveEnabled =
         !saving &&
@@ -113,7 +116,7 @@ internal fun GroupEditScreen(
                 if (controller.updateGroupImage(draft)) showImageSearch = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Throwable) {
+            } catch (_: Exception) {
                 appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
             } finally {
                 imageSaving = false
@@ -268,11 +271,12 @@ internal fun GroupEditScreen(
         }
     }
 
-    if (avatarViewerOpen && groupAvatarUrl != null && groupAvatarImageAvailable) {
+    if (avatarViewerOpen && groupAvatarImageAvailable) {
         AvatarFullScreenViewer(
             title = controller.title(groupTitleCopy),
             seed = controller.group.groupIdHex,
             pictureUrl = groupAvatarUrl,
+            picture = encryptedGroupAvatar,
             onDismiss = { avatarViewerOpen = false },
             editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
             onEditPicture =

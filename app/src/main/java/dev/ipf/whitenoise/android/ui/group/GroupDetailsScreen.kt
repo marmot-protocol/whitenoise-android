@@ -1440,8 +1440,9 @@ internal fun GroupDetailsHeader(
     onAddDescription: (() -> Unit)? = null,
 ) {
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
-    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
-    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
+    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    val avatarImageAvailable = picture != null || remoteImageAvailable
+    var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(top = 8.dp).padding(horizontal = Dimens.spaceLg),
@@ -1506,11 +1507,12 @@ internal fun GroupDetailsHeader(
             }
         }
     }
-    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+    if (viewerOpen && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
             seed = seed,
             pictureUrl = safePictureUrl,
+            picture = picture,
             onDismiss = { viewerOpen = false },
         )
     }

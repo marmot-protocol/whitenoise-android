@@ -45,6 +45,22 @@ class GroupImageWorkflowTest {
     }
 
     @Test
+    fun uploadDraftEqualityUsesByteContent() {
+        val first =
+            ImageUploadDraft(
+                plaintext = byteArrayOf(1, 2, 3),
+                mediaType = "image/jpeg",
+                sourceUrl = "https://example.com/image.jpg",
+                dim = "320x240",
+                thumbhash = "hash",
+            )
+        val sameContent = first.copy(plaintext = first.plaintext.copyOf())
+
+        assertEquals(first, sameContent)
+        assertEquals(first.hashCode(), sameContent.hashCode())
+    }
+
+    @Test
     fun primaryMutationRetryDecisionDistinguishesReplacementAndRemoval() {
         val firstUpload = "upload:first"
 
@@ -86,6 +102,34 @@ class GroupImageWorkflowTest {
                 requestedMutationKey = REMOVE_GROUP_IMAGE_MUTATION_KEY,
                 pendingLegacyClearMutationKey = null,
                 hasProjectedEncryptedImage = false,
+            ),
+        )
+    }
+
+    @Test
+    fun cleanupFailureClassificationBelongsToTheCurrentMutation() {
+        assertEquals(
+            GroupImageMutationFailure.Primary,
+            classifyGroupImageMutationFailure(
+                requestedMutationKey = "upload:replacement",
+                pendingLegacyClearMutationKey = "upload:previous",
+                attemptedLegacyClear = false,
+            ),
+        )
+        assertEquals(
+            GroupImageMutationFailure.UploadCleanup,
+            classifyGroupImageMutationFailure(
+                requestedMutationKey = "upload:replacement",
+                pendingLegacyClearMutationKey = "upload:replacement",
+                attemptedLegacyClear = true,
+            ),
+        )
+        assertEquals(
+            GroupImageMutationFailure.RemovalCleanup,
+            classifyGroupImageMutationFailure(
+                requestedMutationKey = REMOVE_GROUP_IMAGE_MUTATION_KEY,
+                pendingLegacyClearMutationKey = REMOVE_GROUP_IMAGE_MUTATION_KEY,
+                attemptedLegacyClear = true,
             ),
         )
     }

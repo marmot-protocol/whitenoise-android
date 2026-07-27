@@ -797,49 +797,7 @@ object MediaPipeline {
                 }
             val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
 
-            // Flatten alpha onto opaque white before hashing AND compressing
-            // so the thumbhash describes the exact pixels we ship. JPEG drops
-            // alpha by white-compositing inside compress(); without this step,
-            // a transparent PNG source hashes its alpha-blended pixels while
-            // the JPEG bytes carry the white-composite version — receivers
-            // would render a placeholder that doesn't match the final image.
-            var opaque: Bitmap? = null
-            try {
-                opaque =
-                    if (scaled.hasAlpha()) {
-                        if (scaled.isMutable) {
-                            Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
-                            scaled
-                        } else {
-                            Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
-                                Canvas(it).apply {
-                                    drawColor(Color.WHITE)
-                                    drawBitmap(scaled, 0f, 0f, null)
-                                }
-                            }
-                        }
-                    } else {
-                        scaled
-                    }
-                val bitmap = opaque
-                val width = bitmap.width
-                val height = bitmap.height
-                // Failures degrade silently — a missing hash just means
-                // receivers don't get a placeholder; it's not a reason to
-                // drop the upload.
-                val thumbhash = runCatching { Thumbhash.encodeFromBitmap(bitmap) }.getOrNull()
-                ByteArrayOutputStream().use { out ->
-                    // compress() returns false on failure — don't ship partial bytes.
-                    if (bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
-                        DownscaledJpeg(out.toByteArray(), width, height, thumbhash)
-                    } else {
-                        null
-                    }
-                }
-            } finally {
-                if (opaque !== null && opaque !== scaled) opaque.recycle()
-                scaled.recycle()
-            }
+            finishDownscaledJpeg(scaled, quality)
         } catch (_: java.io.IOException) {
             null
         } catch (_: SecurityException) {
@@ -870,46 +828,58 @@ object MediaPipeline {
             val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
             val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
 
-            var opaque: Bitmap? = null
-            try {
-                opaque =
-                    if (scaled.hasAlpha()) {
-                        if (scaled.isMutable) {
-                            Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
-                            scaled
-                        } else {
-                            Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
-                                Canvas(it).apply {
-                                    drawColor(Color.WHITE)
-                                    drawBitmap(scaled, 0f, 0f, null)
-                                }
-                            }
-                        }
-                    } else {
-                        scaled
-                    }
-                val bitmap = opaque
-                val thumbhash = runCatching { Thumbhash.encodeFromBitmap(bitmap) }.getOrNull()
-                ByteArrayOutputStream().use { output ->
-                    if (bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
-                        DownscaledJpeg(
-                            bytes = output.toByteArray(),
-                            width = bitmap.width,
-                            height = bitmap.height,
-                            thumbhash = thumbhash,
-                        )
-                    } else {
-                        null
-                    }
-                }
-            } finally {
-                if (opaque !== null && opaque !== scaled) opaque.recycle()
-                scaled.recycle()
-            }
+            finishDownscaledJpeg(scaled, quality)
         } catch (_: OutOfMemoryError) {
             null
         } catch (_: RuntimeException) {
             null
+        }
+    }
+
+    /**
+     * Flattens alpha before both placeholder hashing and JPEG compression so
+     * the thumbhash describes the exact pixels receivers will render.
+     * Always recycles [scaled] and any temporary opaque copy.
+     */
+    private fun finishDownscaledJpeg(
+        scaled: Bitmap,
+        quality: Int,
+    ): DownscaledJpeg? {
+        var opaque: Bitmap? = null
+        return try {
+            opaque =
+                if (scaled.hasAlpha()) {
+                    if (scaled.isMutable) {
+                        Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
+                        scaled
+                    } else {
+                        Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
+                            Canvas(it).apply {
+                                drawColor(Color.WHITE)
+                                drawBitmap(scaled, 0f, 0f, null)
+                            }
+                        }
+                    }
+                } else {
+                    scaled
+                }
+            val bitmap = opaque
+            val thumbhash = runCatching { Thumbhash.encodeFromBitmap(bitmap) }.getOrNull()
+            ByteArrayOutputStream().use { output ->
+                if (bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
+                    DownscaledJpeg(
+                        bytes = output.toByteArray(),
+                        width = bitmap.width,
+                        height = bitmap.height,
+                        thumbhash = thumbhash,
+                    )
+                } else {
+                    null
+                }
+            }
+        } finally {
+            if (opaque !== null && opaque !== scaled) opaque.recycle()
+            scaled.recycle()
         }
     }
 

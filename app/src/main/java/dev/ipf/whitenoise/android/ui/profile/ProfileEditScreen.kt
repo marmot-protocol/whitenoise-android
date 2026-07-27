@@ -206,7 +206,7 @@ internal fun ProfileEditScreen(
                     showPictureSheet = false
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Throwable) {
+                } catch (_: Exception) {
                     appState.present(
                         if (prepared) {
                             R.string.toast_couldnt_upload_profile_image

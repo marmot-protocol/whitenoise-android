@@ -67,10 +67,12 @@ import dev.ipf.whitenoise.android.core.aggregateEdits
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
+import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import kotlinx.coroutines.CancellationException
@@ -6464,6 +6466,7 @@ class ConversationController(
         return withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            var attemptedLegacyClear = false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (shouldCommitPrimaryGroupImageMutation(
@@ -6493,6 +6496,7 @@ class ConversationController(
                     // a partial failure never leaves the group image-less.
                     if (!group.avatarUrl.isNullOrBlank() || pendingLegacyAvatarClearAfterImageMutationKey != null) {
                         pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
+                        attemptedLegacyClear = true
                         appState.marmotIo {
                             updateGroupAvatarUrl(account, group.groupIdHex, null, null, null)
                         }
@@ -6503,17 +6507,31 @@ class ConversationController(
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {
-                val message = mutationError(it)
-                lastMutationError = message
-                val title =
-                    if (pendingLegacyAvatarClearAfterImageMutationKey != null) {
-                        R.string.toast_group_image_uploaded_cleanup_failed
-                    } else {
-                        R.string.toast_couldnt_update_group
-                    }
-                appState.present(title, AppText.Plain(message), copyable = true)
+                presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
             }.getOrDefault(false)
         }
+    }
+
+    private fun presentGroupImageMutationFailure(
+        throwable: Throwable,
+        requestedMutationKey: String,
+        attemptedLegacyClear: Boolean,
+    ) {
+        val message = mutationError(throwable)
+        lastMutationError = message
+        val failure =
+            classifyGroupImageMutationFailure(
+                requestedMutationKey = requestedMutationKey,
+                pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
+                attemptedLegacyClear = attemptedLegacyClear,
+            )
+        val title =
+            if (failure == GroupImageMutationFailure.UploadCleanup) {
+                R.string.toast_group_image_uploaded_cleanup_failed
+            } else {
+                R.string.toast_couldnt_update_group
+            }
+        appState.present(title, AppText.Plain(message), copyable = true)
     }
 
     suspend fun inviteMembers(

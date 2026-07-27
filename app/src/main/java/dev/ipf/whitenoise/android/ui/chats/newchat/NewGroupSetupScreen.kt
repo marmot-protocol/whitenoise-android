@@ -27,11 +27,12 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -161,7 +162,7 @@ internal fun NewGroupSetupScreen(
                 showImagePicker = false
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Throwable) {
+            } catch (_: Exception) {
                 appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
             } finally {
                 imagePreparing = false
@@ -188,9 +189,11 @@ internal fun NewGroupSetupScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            Surface(
                 onClick = { create() },
-                containerColor =
+                enabled = canCreate,
+                shape = FloatingActionButtonDefaults.extendedFabShape,
+                color =
                     if (canCreate) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
@@ -202,14 +205,20 @@ internal fun NewGroupSetupScreen(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                     },
+                shadowElevation = 6.dp,
             ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                    }
+                    Spacer(Modifier.size(Dimens.spaceSm))
+                    Text(stringResource(R.string.create))
                 }
-                Spacer(Modifier.size(Dimens.spaceSm))
-                Text(stringResource(R.string.create))
             }
         },
     ) { padding ->
