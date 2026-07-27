@@ -139,6 +139,15 @@
             android:name=".amber.AmberSignerRelayActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <!-- The Google licenses activity is AppCompat-based; the app theme is a
+             platform Material theme, so it must carry its own AppCompat theme
+             or it crashes on launch. -->
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"
+            android:theme="@style/Theme.AppCompat.DayNight" />
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesActivity"
+            android:theme="@style/Theme.AppCompat.DayNight" />
         <receiver
             android:name=".amber.AmberSignerChoiceReceiver"
             android:exported="false" />

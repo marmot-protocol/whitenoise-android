@@ -416,8 +416,8 @@
     <string name="notifications_settings_subtitle">Local alerts and background connection</string>
     <string name="security_and_privacy">Security &amp; Privacy</string>
     <string name="security_privacy_settings_subtitle">Screen lock, keyboard privacy, telemetry</string>
-    <string name="require_app_unlock">Require unlock to open app</string>
-    <string name="require_app_unlock_subtitle">Ask for your device screen lock — fingerprint, face, PIN, pattern, or password — before showing White Noise.</string>
+    <string name="require_app_unlock">App lock</string>
+    <string name="require_app_unlock_subtitle">Unlock with your device screen lock</string>
     <string name="app_lock_screen_lock_required_hint">Set a screen lock in Android Settings first.</string>
     <string name="app_lock_delay_title">Lock when</string>
     <string name="app_lock_delay_immediately">Immediately</string>
@@ -432,10 +432,10 @@
     <string name="app_lock_auth_failed">That did not match. Try again.</string>
     <string name="app_lock_auth_cancelled">Unlock was cancelled. Your chats are still hidden.</string>
     <string name="toast_app_lock_screen_lock_required">Set a screen lock in Android Settings first.</string>
-    <string name="force_incognito_keyboard">Force incognito keyboard</string>
-    <string name="force_incognito_keyboard_subtitle">Prevents your keyboard from learning, suggesting, or syncing what you type in this app. Honored by most modern keyboards; some third-party keyboards may ignore this hint.</string>
-    <string name="allow_chat_screenshots">Hide app preview in Recents</string>
-    <string name="allow_chat_screenshots_subtitle">Hides chat previews in Recents and blocks screenshots and screen recordings in chats.</string>
+    <string name="force_incognito_keyboard">Incognito keyboard</string>
+    <string name="force_incognito_keyboard_subtitle">Asks your keyboard to turn off personalized learning</string>
+    <string name="allow_chat_screenshots">Screen security</string>
+    <string name="allow_chat_screenshots_subtitle">Blocks screenshots and hides previews in Recents</string>
     <string name="telemetry">Share anonymous app telemetry</string>
     <string name="telemetry_settings_subtitle">Share relay connection telemetry.</string>
     <string name="audit_logs">Audit logs</string>
@@ -454,6 +454,23 @@
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
+    <string name="device_privacy">Device privacy</string>
+    <string name="device_privacy_settings_subtitle">App lock, keyboard, telemetry, audit logs</string>
+    <string name="account_and_keys">Account &amp; keys</string>
+    <string name="account_keys_settings_subtitle">npub · backup · sign out</string>
+    <string name="composer">Composer</string>
+    <string name="help">Help</string>
+    <string name="help_settings_subtitle">Report a bug, about &amp; licenses</string>
+    <string name="report_a_bug">Report a bug</string>
+    <string name="report_a_bug_subtitle">Open a pre-filled report on GitHub</string>
+    <string name="about_and_licenses">About &amp; licenses</string>
+    <string name="about_and_licenses_subtitle">Version, licenses, privacy policy</string>
+    <string name="open_source_licenses">Open source licenses</string>
+    <string name="open_source_licenses_subtitle">Third-party software in White Noise</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_subtitle">How White Noise handles your data</string>
+    <string name="developer_tools_unlocked">Developer tools unlocked</string>
+    <string name="developer_tools_already_enabled">Developer tools are already on</string>
     <string name="group_system_show_details">Show details</string>
     <string name="group_system_hide_details">Hide details</string>
     <string name="local_notifications">Local notifications</string>
@@ -816,10 +833,15 @@
     <string name="donate_lightning_value" translatable="false">whitenoise@donate.ipf.dev</string>
     <string name="donate_bitcoin_silent_payment_value" translatable="false">sp1qqvp56mxcj9pz9xudvlch5g4ah5hrc8rj6neu25p34rc9gxhp38cwqqlmld28u57w2srgckr34dkyg3q02phu8tm05cyj483q026xedp0s5f5j40p</string>
     <string name="theme">Theme</string>
+    <string name="theme_mode">Theme mode</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_amoled">AMOLED</string>
+    <string name="theme_system_subtitle">Match system appearance</string>
+    <string name="theme_light_subtitle">Always use light</string>
+    <string name="theme_dark_subtitle">Always use dark</string>
+    <string name="amoled_mode_subtitle">Use a pure black background</string>
     <string name="language">Language</string>
     <string name="language_system">System language</string>
     <string name="language_english">English</string>
@@ -1201,4 +1223,6 @@
     <string name="mute_duration_always">Always</string>
     <string name="notify_for">Notify for</string>
     <string name="ok">OK</string>
+    <string name="support">Support</string>
+    <string name="app_font">App font</string>
 </resources>

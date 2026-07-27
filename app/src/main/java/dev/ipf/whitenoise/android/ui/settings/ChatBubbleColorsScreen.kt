@@ -52,7 +52,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
@@ -125,39 +125,51 @@ internal fun ChatBubbleColorsScreen(
                 Text(scopeSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
-                SectionCard(title = stringResource(R.string.bubble_color_preview)) {
-                    Text(
-                        stringResource(R.string.bubble_color_current_theme, stringResource(bubbleTheme.labelRes)),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    BubbleColorPreview(
-                        mineOverrideArgb = effectiveColor(BubbleSide.Mine),
-                        otherOverrideArgb = effectiveColor(BubbleSide.Other),
-                        amoled = bubbleTheme == BubbleTheme.Amoled,
-                    )
+                SettingsGroup(title = stringResource(R.string.bubble_color_preview)) {
+                    item {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                stringResource(R.string.bubble_color_current_theme, stringResource(bubbleTheme.labelRes)),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            BubbleColorPreview(
+                                mineOverrideArgb = effectiveColor(BubbleSide.Mine),
+                                otherOverrideArgb = effectiveColor(BubbleSide.Other),
+                                amoled = bubbleTheme == BubbleTheme.Amoled,
+                            )
+                        }
+                    }
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.bubble_my_messages)) {
-                    TonalSwatchPicker(
-                        selectedArgb = selectedColor(BubbleSide.Mine),
-                        onColorSelected = { updateColor(BubbleSide.Mine, it) },
-                        scopeKey = pickerScopeKey,
-                        theme = bubbleTheme,
-                        side = BubbleSide.Mine,
-                    )
+                SettingsGroup(title = stringResource(R.string.bubble_my_messages)) {
+                    item {
+                        Column(Modifier.padding(16.dp)) {
+                            TonalSwatchPicker(
+                                selectedArgb = selectedColor(BubbleSide.Mine),
+                                onColorSelected = { updateColor(BubbleSide.Mine, it) },
+                                scopeKey = pickerScopeKey,
+                                theme = bubbleTheme,
+                                side = BubbleSide.Mine,
+                            )
+                        }
+                    }
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.bubble_other_messages)) {
-                    TonalSwatchPicker(
-                        selectedArgb = selectedColor(BubbleSide.Other),
-                        onColorSelected = { updateColor(BubbleSide.Other, it) },
-                        scopeKey = pickerScopeKey,
-                        theme = bubbleTheme,
-                        side = BubbleSide.Other,
-                    )
+                SettingsGroup(title = stringResource(R.string.bubble_other_messages)) {
+                    item {
+                        Column(Modifier.padding(16.dp)) {
+                            TonalSwatchPicker(
+                                selectedArgb = selectedColor(BubbleSide.Other),
+                                onColorSelected = { updateColor(BubbleSide.Other, it) },
+                                scopeKey = pickerScopeKey,
+                                theme = bubbleTheme,
+                                side = BubbleSide.Other,
+                            )
+                        }
+                    }
                 }
             }
             item {

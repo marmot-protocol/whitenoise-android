@@ -18,7 +18,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,14 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.AppDivider
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,13 +98,12 @@ internal fun NotificationsScreen(
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = stringResource(R.string.notifications)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.local_notifications), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.local_notifications_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
+                SettingsGroup {
+                    item {
+                        NotificationSwitchRow(
+                            title = stringResource(R.string.local_notifications),
+                            subtitle = stringResource(R.string.local_notifications_subtitle),
+                            icon = Icons.Filled.Notifications,
                             checked = appState.localNotificationSettings?.localNotificationsEnabled == true,
                             enabled = appState.activeAccountRef != null,
                             onCheckedChange = { enabled ->
@@ -113,13 +116,11 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    AppDivider(Modifier.padding(vertical = 12.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.keep_connected), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.keep_connected_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
+                    item {
+                        NotificationSwitchRow(
+                            title = stringResource(R.string.keep_connected),
+                            subtitle = stringResource(R.string.keep_connected_subtitle),
+                            icon = Icons.Filled.Sync,
                             checked = appState.backgroundConnectionEnabled,
                             enabled = appState.activeAccountRef != null,
                             onCheckedChange = { enabled ->
@@ -132,12 +133,11 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    val nativePushAvailable = appState.isNativePushAvailable()
-                    AppDivider(Modifier.padding(vertical = 12.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.native_push), style = MaterialTheme.typography.bodyLarge)
-                            Text(
+                    item {
+                        val nativePushAvailable = appState.isNativePushAvailable()
+                        NotificationSwitchRow(
+                            title = stringResource(R.string.native_push),
+                            subtitle =
                                 stringResource(
                                     if (nativePushAvailable) {
                                         R.string.native_push_subtitle
@@ -145,10 +145,7 @@ internal fun NotificationsScreen(
                                         R.string.native_push_unavailable_subtitle
                                     },
                                 ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
+                            icon = Icons.Filled.NotificationsActive,
                             checked = nativePushAvailable && appState.localNotificationSettings?.nativePushEnabled == true,
                             enabled = nativePushAvailable && appState.activeAccountRef != null,
                             onCheckedChange = { enabled ->
@@ -161,36 +158,66 @@ internal fun NotificationsScreen(
                             },
                         )
                     }
-                    AppDivider(Modifier.padding(vertical = 12.dp))
-                    // Per-type controls (sound, vibration, importance, lockscreen,
-                    // DND bypass) live in the OS notification details — Android's
-                    // native per-channel UI. We deep-link there instead of
-                    // duplicating those toggles in-app. See #288.
-                    //
-                    // Use the same plain Row layout as the toggle rows above (not a
-                    // ListItem-based SettingsRow) so the leading edge lines up with
-                    // them; ListItem injects its own ~16.dp leading inset that left
-                    // the categories row indented further right than the settings
-                    // above it. See #499.
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { openAppNotificationSettings(context) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.notification_categories), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.notification_categories_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Icon(
-                            Icons.AutoMirrored.Filled.Forward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    // Per-type controls (sound, vibration, importance, lockscreen, DND
+                    // bypass) live in the OS notification details — we deep-link there
+                    // rather than duplicate them in-app (#288).
+                    item {
+                        NotificationCategoriesRow(onClick = { openAppNotificationSettings(context) })
                     }
                 }
             }
         }
+    }
+}
+
+// A toggle row sized to sit inside a segmented SettingsGroup item (the segment
+// Surface owns the shape; the row owns its own inset, like a ListItem).
+@Composable
+private fun NotificationSwitchRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun NotificationCategoriesRow(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.notification_categories), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                stringResource(R.string.notification_categories_subtitle),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.Forward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -16,15 +16,31 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -34,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.booleanResource
@@ -62,8 +80,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
-import dev.ipf.whitenoise.android.ui.common.SectionCard
-import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
+import dev.ipf.whitenoise.android.ui.common.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
@@ -84,7 +102,7 @@ internal enum class SettingsHomeSection {
 
 internal enum class SettingsHomeRow {
     Profile,
-    IdentityAndKeys,
+    AccountAndKeys,
     Relays,
     KeyPackages,
     Appearance,
@@ -92,9 +110,11 @@ internal enum class SettingsHomeRow {
     DataAndStorage,
     Notifications,
     TextToSpeech,
-    SecurityAndPrivacy,
+    DevicePrivacy,
+    Help,
 }
 
+@Stable
 internal data class SettingsHomeState(
     val sections: List<SettingsHomeSection>,
     val accountRows: List<SettingsHomeRow>,
@@ -119,7 +139,7 @@ internal fun settingsHomeState(
         accountRows =
             listOf(
                 SettingsHomeRow.Profile,
-                SettingsHomeRow.IdentityAndKeys,
+                SettingsHomeRow.AccountAndKeys,
                 SettingsHomeRow.Relays,
                 SettingsHomeRow.KeyPackages,
             ),
@@ -130,10 +150,22 @@ internal fun settingsHomeState(
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
-                SettingsHomeRow.SecurityAndPrivacy,
+                SettingsHomeRow.DevicePrivacy,
+                SettingsHomeRow.Help,
             ),
         showAccountHeader = hasActiveAccount,
     )
+
+// Parent of a settings detail for back navigation; null means the Settings
+// home. Kept pure so the back-stack shape (Developer → About → Help → home,
+// ChatBubbleColors → Appearance) is unit-testable without Compose.
+internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
+    when (detail) {
+        SettingsDetail.ChatBubbleColors -> SettingsDetail.Appearance
+        SettingsDetail.About -> SettingsDetail.Help
+        SettingsDetail.Developer -> SettingsDetail.About
+        else -> null
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,13 +183,12 @@ internal fun SettingsScreen(
     // claim back here — pop the detail when on a subscreen, otherwise
     // hand control to the chats list (mirroring the top-bar back arrow).
     BackHandler {
-        when {
-            // Font size is a level-2 subscreen reached from Appearance, so
-            // back returns there rather than jumping to the Settings home.
-            detail == SettingsDetail.FontSize || detail == SettingsDetail.ChatBubbleColors ->
-                onDetailChange(SettingsDetail.Appearance)
-            detail != null -> onDetailChange(null)
-            else -> onBackToChats()
+        // Always claim back: pop to the detail's parent, or hand control to
+        // the chats list when already on the Settings home (#121).
+        if (detail == null) {
+            onBackToChats()
+        } else {
+            onDetailChange(settingsDetailParent(detail))
         }
     }
 
@@ -166,27 +197,43 @@ internal fun SettingsScreen(
             AppearanceScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
-                onOpenFontSize = { onDetailChange(SettingsDetail.FontSize) },
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
             )
         SettingsDetail.ChatBubbleColors ->
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.FontSize -> FontSizeScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.SecurityPrivacy ->
-            SecurityPrivacyScreen(
+        SettingsDetail.DevicePrivacy ->
+            DevicePrivacyScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
-                onOpenDiagnostics = onOpenDiagnostics,
             )
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Help ->
+            HelpScreen(
+                onBack = { onDetailChange(null) },
+                onOpenAbout = { onDetailChange(SettingsDetail.About) },
+            )
+        SettingsDetail.About ->
+            AboutScreen(
+                appState = appState,
+                versionName = BuildConfig.VERSION_NAME,
+                mdkShortSha = BuildConfig.MDK_SHORT_SHA,
+                onBack = { onDetailChange(SettingsDetail.Help) },
+                onOpenDeveloper = { onDetailChange(SettingsDetail.Developer) },
+            )
+        SettingsDetail.Developer ->
+            DeveloperScreen(
+                appState = appState,
+                onBack = { onDetailChange(SettingsDetail.About) },
+                onOpenDiagnostics = onOpenDiagnostics,
+            )
         null ->
             SettingsHomeScreen(
                 appState = appState,
@@ -336,67 +383,57 @@ internal fun SettingsHomeContent(
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
         ) {
             state.sections.forEach { section ->
-                item {
+                item(key = section.name) {
                     when (section) {
                         SettingsHomeSection.Account -> {
-                            SectionCard(title = stringResource(R.string.account)) {
+                            SettingsGroup(title = stringResource(R.string.account), icon = Icons.Filled.Person) {
                                 if (state.showAccountHeader && account != null) {
-                                    SettingsAccountHeader(
-                                        title = account.title,
-                                        subtitle = account.subtitle,
-                                        seed = account.seed,
-                                        pictureUrl = account.pictureUrl,
-                                        onOpenAccountSelector = onOpenAccountSelector,
-                                        onOpenQr = onOpenQr,
-                                        onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
-                                    )
+                                    item {
+                                        SettingsAccountHeader(
+                                            title = account.title,
+                                            subtitle = account.subtitle,
+                                            seed = account.seed,
+                                            pictureUrl = account.pictureUrl,
+                                            onOpenAccountSelector = onOpenAccountSelector,
+                                            onOpenQr = onOpenQr,
+                                            onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
+                                        )
+                                    }
                                 }
-                                SettingsHomeRows(rows = state.accountRows, onOpenDetail = onOpenDetail)
+                                settingsHomeRows(rows = state.accountRows, onOpenDetail = onOpenDetail)
                             }
                         }
 
                         SettingsHomeSection.AppPreferences -> {
-                            SectionCard(title = stringResource(R.string.app_preferences)) {
-                                SettingsHomeRows(rows = state.preferenceRows, onOpenDetail = onOpenDetail)
+                            SettingsGroup(title = stringResource(R.string.app_preferences), icon = Icons.Filled.Tune) {
+                                settingsHomeRows(rows = state.preferenceRows, onOpenDetail = onOpenDetail)
                             }
                         }
 
                         SettingsHomeSection.Support -> {
-                            // Match the other settings sections' row-to-detail navigation shape.
-                            ElevatedCard(
-                                modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
-                                colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
-                            ) {
-                                ListItem(
-                                    modifier = Modifier.clickable { onChatWithSupport() },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    headlineContent = { Text(stringResource(R.string.chat_with_support)) },
-                                    supportingContent = {
-                                        Text(
-                                            stringResource(R.string.chat_with_support_subtitle),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                )
-                                ListItem(
-                                    modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    headlineContent = { Text(stringResource(R.string.support_the_project)) },
-                                    supportingContent = {
-                                        Text(
-                                            stringResource(R.string.support_the_project_subtitle),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                )
+                            SettingsGroup(title = stringResource(R.string.support), icon = Icons.Filled.SupportAgent) {
+                                item {
+                                    SettingsRow(
+                                        title = stringResource(R.string.chat_with_support),
+                                        subtitle = stringResource(R.string.chat_with_support_subtitle),
+                                        icon = Icons.AutoMirrored.Filled.Chat,
+                                        onClick = onChatWithSupport,
+                                    )
+                                }
+                                item {
+                                    SettingsRow(
+                                        title = stringResource(R.string.support_the_project),
+                                        subtitle = stringResource(R.string.support_the_project_subtitle),
+                                        icon = Icons.Filled.Favorite,
+                                        onClick = { onOpenDetail(SettingsDetail.Donate) },
+                                    )
+                                }
                             }
                         }
 
                         SettingsHomeSection.AppUpdates -> {
-                            SectionCard(title = stringResource(R.string.app_updates)) {
-                                AppUpdateSettingsRow(info = appUpdateInfo, onClick = onAppUpdateAction)
+                            SettingsGroup(title = stringResource(R.string.app_updates), icon = Icons.Filled.Update) {
+                                item { AppUpdateSettingsRow(info = appUpdateInfo, onClick = onAppUpdateAction) }
                             }
                         }
 
@@ -447,9 +484,8 @@ internal fun SettingsHomeContent(
     }
 }
 
-@Composable
-@Suppress("FunctionNaming", "CyclomaticComplexMethod")
-private fun SettingsHomeRows(
+@Suppress("CyclomaticComplexMethod")
+private fun SettingsGroupScope.settingsHomeRows(
     rows: List<SettingsHomeRow>,
     onOpenDetail: (SettingsDetail) -> Unit,
 ) {
@@ -457,7 +493,7 @@ private fun SettingsHomeRows(
         val detail =
             when (row) {
                 SettingsHomeRow.Profile -> SettingsDetail.Profile
-                SettingsHomeRow.IdentityAndKeys -> SettingsDetail.Identity
+                SettingsHomeRow.AccountAndKeys -> SettingsDetail.AccountKeys
                 SettingsHomeRow.Relays -> SettingsDetail.Relays
                 SettingsHomeRow.KeyPackages -> SettingsDetail.KeyPackages
                 SettingsHomeRow.Appearance -> SettingsDetail.Appearance
@@ -465,35 +501,55 @@ private fun SettingsHomeRows(
                 SettingsHomeRow.DataAndStorage -> SettingsDetail.Data
                 SettingsHomeRow.Notifications -> SettingsDetail.Notifications
                 SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
-                SettingsHomeRow.SecurityAndPrivacy -> SettingsDetail.SecurityPrivacy
+                SettingsHomeRow.DevicePrivacy -> SettingsDetail.DevicePrivacy
+                SettingsHomeRow.Help -> SettingsDetail.Help
             }
-        val title =
-            when (row) {
-                SettingsHomeRow.Profile -> stringResource(R.string.profile)
-                SettingsHomeRow.IdentityAndKeys -> stringResource(R.string.identity_and_keys)
-                SettingsHomeRow.Relays -> stringResource(R.string.relays)
-                SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages)
-                SettingsHomeRow.Appearance -> stringResource(R.string.appearance)
-                SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_title)
-                SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
-                SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
-                SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
-                SettingsHomeRow.SecurityAndPrivacy -> stringResource(R.string.security_and_privacy)
-            }
-        val subtitle =
-            when (row) {
-                SettingsHomeRow.Profile -> stringResource(R.string.profile_settings_subtitle)
-                SettingsHomeRow.IdentityAndKeys -> stringResource(R.string.identity_settings_subtitle)
-                SettingsHomeRow.Relays -> stringResource(R.string.relays_settings_subtitle)
-                SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages_settings_subtitle)
-                SettingsHomeRow.Appearance -> stringResource(R.string.appearance_settings_subtitle)
-                SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_settings_subtitle)
-                SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
-                SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
-                SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
-                SettingsHomeRow.SecurityAndPrivacy -> stringResource(R.string.security_privacy_settings_subtitle)
-            }
-        SettingsRow(title = title, subtitle = subtitle) { onOpenDetail(detail) }
+        item {
+            SettingsRow(
+                title =
+                    when (row) {
+                        SettingsHomeRow.Profile -> stringResource(R.string.profile)
+                        SettingsHomeRow.AccountAndKeys -> stringResource(R.string.account_and_keys)
+                        SettingsHomeRow.Relays -> stringResource(R.string.relays)
+                        SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages)
+                        SettingsHomeRow.Appearance -> stringResource(R.string.appearance)
+                        SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_title)
+                        SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage)
+                        SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
+                        SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
+                        SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy)
+                        SettingsHomeRow.Help -> stringResource(R.string.help)
+                    },
+                subtitle =
+                    when (row) {
+                        SettingsHomeRow.Profile -> stringResource(R.string.profile_settings_subtitle)
+                        SettingsHomeRow.AccountAndKeys -> stringResource(R.string.account_keys_settings_subtitle)
+                        SettingsHomeRow.Relays -> stringResource(R.string.relays_settings_subtitle)
+                        SettingsHomeRow.KeyPackages -> stringResource(R.string.key_packages_settings_subtitle)
+                        SettingsHomeRow.Appearance -> stringResource(R.string.appearance_settings_subtitle)
+                        SettingsHomeRow.ChatFolders -> stringResource(R.string.chat_folders_settings_subtitle)
+                        SettingsHomeRow.DataAndStorage -> stringResource(R.string.data_and_storage_settings_subtitle)
+                        SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
+                        SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
+                        SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy_settings_subtitle)
+                        SettingsHomeRow.Help -> stringResource(R.string.help_settings_subtitle)
+                    },
+                icon =
+                    when (row) {
+                        SettingsHomeRow.Profile -> Icons.Filled.AccountCircle
+                        SettingsHomeRow.AccountAndKeys -> Icons.Filled.Key
+                        SettingsHomeRow.Relays -> Icons.Filled.Hub
+                        SettingsHomeRow.KeyPackages -> Icons.Filled.Inventory2
+                        SettingsHomeRow.Appearance -> Icons.Filled.Palette
+                        SettingsHomeRow.ChatFolders -> Icons.Filled.Folder
+                        SettingsHomeRow.DataAndStorage -> Icons.Filled.Storage
+                        SettingsHomeRow.Notifications -> Icons.Filled.Notifications
+                        SettingsHomeRow.TextToSpeech -> Icons.Filled.RecordVoiceOver
+                        SettingsHomeRow.DevicePrivacy -> Icons.Filled.Shield
+                        SettingsHomeRow.Help -> Icons.Filled.Help
+                    },
+            ) { onOpenDetail(detail) }
+        }
     }
 }
 
@@ -562,6 +618,7 @@ internal fun SelectableSettingsRowWithSubtitle(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SettingsSwitchRow(
     title: String,
@@ -570,6 +627,7 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     busy: Boolean = false,
     switchModifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
@@ -578,6 +636,14 @@ internal fun SettingsSwitchRow(
             .settingsRowAmoledSurfaceBorder(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (icon != null) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) {
@@ -585,10 +651,7 @@ internal fun SettingsSwitchRow(
             }
         }
         if (busy) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-            )
+            LoadingIndicator(modifier = Modifier.size(24.dp))
         } else {
             Switch(
                 modifier = switchModifier,
@@ -604,6 +667,7 @@ internal fun SettingsSwitchRow(
 internal fun SettingsRow(
     title: String,
     subtitle: String,
+    icon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
     ListItem(
@@ -612,6 +676,7 @@ internal fun SettingsRow(
                 .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = icon?.let { { Icon(it, contentDescription = null) } },
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
     )
@@ -639,6 +704,7 @@ private fun AppUpdateSettingsRow(
     SettingsRow(
         title = stringResource(R.string.app_update_settings_title),
         subtitle = subtitle,
+        icon = Icons.Filled.Update,
         onClick = onClick,
     )
 }
