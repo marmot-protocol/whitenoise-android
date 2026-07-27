@@ -17,19 +17,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Publish
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -55,7 +56,7 @@ import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import kotlinx.coroutines.launch
@@ -202,7 +203,7 @@ internal fun KeyPackagesScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun KeyPackagesContent(
@@ -240,33 +241,13 @@ internal fun KeyPackagesContent(
                 when (section) {
                     KeyPackagesSection.Publishing -> {
                         item {
-                            SectionCard(title = stringResource(R.string.publishing)) {
-                                Text(
-                                    stringResource(R.string.key_package_publishing_help),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    OutlinedButton(
-                                        onClick = onRepublish,
-                                        enabled = state.actionsEnabled,
-                                        modifier = Modifier.weight(1f),
+                            SettingsGroup(title = stringResource(R.string.publishing), icon = Icons.Filled.Publish) {
+                                item {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.republish))
-                                    }
-                                    Button(
-                                        onClick = onPublishNew,
-                                        enabled = state.actionsEnabled,
-                                        modifier = Modifier.weight(1f),
-                                    ) {
-                                        Icon(Icons.Default.Add, contentDescription = null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.publish_new))
+                                        PublishingActions(state = state, onRepublish = onRepublish, onPublishNew = onPublishNew)
                                     }
                                 }
                             }
@@ -275,17 +256,21 @@ internal fun KeyPackagesContent(
 
                     KeyPackagesSection.Published -> {
                         item {
+                            // Match the SettingsGroup accent-label treatment so this
+                            // heading reads like the other group labels.
                             Row(
+                                modifier = Modifier.padding(start = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Text(
                                     stringResource(R.string.published),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 if (state.showLoadingIndicator) {
-                                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                    LoadingIndicator(modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -293,11 +278,14 @@ internal fun KeyPackagesContent(
 
                     KeyPackagesSection.Empty -> {
                         item {
-                            SectionCard(title = stringResource(R.string.no_key_packages_found)) {
-                                Text(
-                                    stringResource(R.string.no_key_packages_found_help),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            SettingsGroup(title = stringResource(R.string.no_key_packages_found)) {
+                                item {
+                                    Text(
+                                        stringResource(R.string.no_key_packages_found_help),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(16.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -318,6 +306,42 @@ internal fun KeyPackagesContent(
 }
 
 @Composable
+private fun PublishingActions(
+    state: KeyPackagesState,
+    onRepublish: () -> Unit,
+    onPublishNew: () -> Unit,
+) {
+    Text(
+        stringResource(R.string.key_package_publishing_help),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedButton(
+            onClick = onRepublish,
+            enabled = state.actionsEnabled,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.republish))
+        }
+        Button(
+            onClick = onPublishNew,
+            enabled = state.actionsEnabled,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.publish_new))
+        }
+    }
+}
+
+@Composable
 private fun KeyPackageCard(
     kp: AccountKeyPackageFfi,
     actionsEnabled: Boolean,
@@ -328,9 +352,12 @@ private fun KeyPackageCard(
     val unknownLabel = stringResource(R.string.unknown)
     val clipboard = LocalClipboardManager.current
     val copyKeyPackageLabel = stringResource(R.string.copy)
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
-        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+    // Each package renders as its own fully-rounded segment, matching the
+    // grouped-list language of the rest of Settings.
+    Surface(
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        color = sectionPanelColor(),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

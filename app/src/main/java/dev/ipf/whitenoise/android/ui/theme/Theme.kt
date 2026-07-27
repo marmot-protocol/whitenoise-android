@@ -15,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import dev.ipf.whitenoise.android.state.AppFont
 
 // Locked brand scheme — a monochrome-cyan palette over neutral surfaces. Every
 // role is defined explicitly so nothing falls back to the M3 baseline (which is
@@ -120,6 +121,7 @@ fun WhiteNoiseTheme(
     // already include the OS font scale, so it composes with the system
     // setting rather than replacing it.
     fontScale: Float = 1f,
+    appFont: AppFont = AppFont.Manrope,
     content: @Composable () -> Unit,
 ) {
     val baseColorScheme =
@@ -191,7 +193,7 @@ fun WhiteNoiseTheme(
             // Expressive spring-based motion for M3 components app-wide (M3E).
             motionScheme = MotionScheme.expressive(),
             shapes = ShapeScheme,
-            typography = remember(fontScale) { Typography.scaledBy(fontScale) },
+            typography = remember(fontScale, appFont) { Typography.withAppFont(appFont).scaledBy(fontScale) },
             content = content,
         )
     }

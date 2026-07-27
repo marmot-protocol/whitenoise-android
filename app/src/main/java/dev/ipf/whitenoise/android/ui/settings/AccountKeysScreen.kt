@@ -166,7 +166,7 @@ internal suspend fun exportIdentitySecretForSession(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun IdentityScreen(
+internal fun AccountKeysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
@@ -226,7 +226,7 @@ internal fun IdentityScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.identity)) },
+                title = { Text(stringResource(R.string.account_and_keys)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -541,7 +541,7 @@ internal fun IdentityScreen(
                         // screen's rememberCoroutineScope. signOutAndWipeActiveAccount
                         // flips activeAccountRef partway through and keeps suspending
                         // (push teardown, notification refresh); the account-change nav
-                        // reset in MainShell then pops IdentityScreen out of composition,
+                        // reset in MainShell then pops AccountKeysScreen out of composition,
                         // which would cancel a screen-scoped coroutine before the wipe
                         // finishes and before the outcome is presented (#547).
                         //

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +56,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -329,23 +332,13 @@ internal fun DiagnosticsContent(
 
                     DiagnosticsSection.RelayHealth -> {
                         item {
-                            SectionCard(title = stringResource(R.string.relay_health)) {
-                                if (state.showRelayHealthEmptyState) {
-                                    Text(
-                                        stringResource(R.string.no_relay_snapshot_yet),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Button(onClick = onRefresh) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.refresh))
-                                    }
-                                } else {
-                                    state.relayHealthValues.forEach { value ->
-                                        DiagnosticRow(
-                                            label = diagnosticValueLabel(value.key),
-                                            value = value.value.orEmpty(),
-                                        )
+                            SettingsGroup(title = stringResource(R.string.relay_health), icon = Icons.Filled.MonitorHeart) {
+                                item {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        RelayHealthBody(state = state, onRefresh = onRefresh)
                                     }
                                 }
                             }
@@ -354,12 +347,19 @@ internal fun DiagnosticsContent(
 
                     DiagnosticsSection.Runtime -> {
                         item {
-                            SectionCard(title = stringResource(R.string.runtime)) {
-                                state.runtimeValues.forEach { value ->
-                                    DiagnosticRow(
-                                        label = diagnosticValueLabel(value.key),
-                                        value = value.value ?: stringResource(R.string.none),
-                                    )
+                            SettingsGroup(title = stringResource(R.string.runtime), icon = Icons.Filled.Memory) {
+                                item {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        state.runtimeValues.forEach { value ->
+                                            DiagnosticRow(
+                                                label = diagnosticValueLabel(value.key),
+                                                value = value.value ?: stringResource(R.string.none),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -371,8 +371,10 @@ internal fun DiagnosticsContent(
                         item {
                             Text(
                                 stringResource(R.string.event_log),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 16.dp),
                             )
                         }
                         if (state.showEventLogEmptyState) {
@@ -398,6 +400,31 @@ internal fun DiagnosticsContent(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RelayHealthBody(
+    state: DiagnosticsState,
+    onRefresh: () -> Unit,
+) {
+    if (state.showRelayHealthEmptyState) {
+        Text(
+            stringResource(R.string.no_relay_snapshot_yet),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(onClick = onRefresh) {
+            Icon(Icons.Default.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.refresh))
+        }
+    } else {
+        state.relayHealthValues.forEach { value ->
+            DiagnosticRow(
+                label = diagnosticValueLabel(value.key),
+                value = value.value.orEmpty(),
+            )
         }
     }
 }

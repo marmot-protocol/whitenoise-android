@@ -1551,6 +1551,9 @@ class WhiteNoiseAppState private constructor(
     var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
         private set
 
+    var appFont by mutableStateOf(AppFont.fromPreference(preferences.getString(APP_FONT_KEY, null)))
+        private set
+
     private val accountScopedCaches = ScopedCacheRegistry()
     private val profilePresentationLock = Any()
     private val groupMemberSnapshotLock = Any()
@@ -3801,6 +3804,11 @@ class WhiteNoiseAppState private constructor(
     fun updateFontScale(scale: AppFontScale) {
         fontScale = scale
         preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply()
+    }
+
+    fun updateAppFont(font: AppFont) {
+        appFont = font
+        preferences.edit().putString(APP_FONT_KEY, font.preferenceValue).apply()
     }
 
     internal fun globalBubbleColorArgb(
@@ -6637,6 +6645,7 @@ class WhiteNoiseAppState private constructor(
         private const val APP_LOCK_DELAY_KEY = "app_lock_delay"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val FONT_SCALE_KEY = "font_scale"
+        private const val APP_FONT_KEY = "app_font"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
 
         // Per-account matrix prefs (issue #407), keyed by accountIdHex (or a

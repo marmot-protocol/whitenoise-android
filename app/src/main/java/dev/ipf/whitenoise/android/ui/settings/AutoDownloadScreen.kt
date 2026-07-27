@@ -1,38 +1,52 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.icu.text.ListFormatter
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 
 internal val MediaQuality.labelRes: Int
     @StringRes
@@ -56,10 +70,9 @@ internal val MediaQuality.subtitleRes: Int
 
 /**
  * Settings -> Data and storage -> the per-type, per-network media
- * auto-download matrix (issue #407). Renders four grouped lists (one per
- * network type), each with four [SettingsSwitchRow] toggles. Toggles persist
- * immediately via [WhiteNoiseAppState.setMediaAutoDownload]; there is no Save
- * button.
+ * auto-download matrix (issue #407). One row per network whose subtitle lists
+ * the enabled types; tapping opens a multi-select dialog that applies on OK
+ * via [WhiteNoiseAppState.setMediaAutoDownload].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +80,7 @@ internal fun AutoDownloadDataScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
+    var dialogNetwork by remember { mutableStateOf<MediaAutoDownloadNetwork?>(null) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -85,27 +99,119 @@ internal fun AutoDownloadDataScreen(
                     text = stringResource(R.string.media_auto_download_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
             item {
-                MediaQualitySettingsCard(appState)
-            }
-            MediaAutoDownloadNetwork.entries.forEach { network ->
-                item {
-                    SectionCard(title = stringResource(network.labelRes)) {
-                        MediaAutoDownloadType.entries.forEach { type ->
-                            SettingsSwitchRow(
-                                title = stringResource(type.labelRes),
-                                subtitle = null,
-                                checked = appState.mediaAutoDownloadMatrix.isEnabled(type, network),
-                                onCheckedChange = { appState.setMediaAutoDownload(type, network, it) },
+                SettingsGroup(title = stringResource(R.string.media_auto_download_title), icon = Icons.Filled.Download) {
+                    MediaAutoDownloadNetwork.entries.forEach { network ->
+                        item {
+                            SettingsRow(
+                                title = stringResource(network.labelRes),
+                                subtitle = enabledTypesLabel(appState, network),
+                                icon = network.rowIcon,
+                                onClick = { dialogNetwork = network },
                             )
                         }
                     }
                 }
             }
+            item {
+                MediaQualityGroup(appState)
+            }
+            item {
+                // Privacy floor + video/audio carve-out. The size knob and metadata
+                // strip are orthogonal: photos never send location/device metadata,
+                // including Original's source-byte path. Video and picked audio
+                // currently send as-is.
+                Text(
+                    text = stringResource(R.string.media_quality_footer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
         }
     }
+    dialogNetwork?.let { network ->
+        MediaTypesDialog(
+            appState = appState,
+            network = network,
+            onDismiss = { dialogNetwork = null },
+        )
+    }
+}
+
+// Locale-aware list of the types enabled for [network], or "none".
+@Composable
+private fun enabledTypesLabel(
+    appState: WhiteNoiseAppState,
+    network: MediaAutoDownloadNetwork,
+): String {
+    val enabled =
+        MediaAutoDownloadType.entries
+            .filter { appState.mediaAutoDownloadMatrix.isEnabled(it, network) }
+            .map { stringResource(it.labelRes) }
+    return if (enabled.isEmpty()) stringResource(R.string.none) else ListFormatter.getInstance().format(enabled)
+}
+
+// Multi-select checkbox dialog for one network; edits are local until OK.
+@Composable
+private fun MediaTypesDialog(
+    appState: WhiteNoiseAppState,
+    network: MediaAutoDownloadNetwork,
+    onDismiss: () -> Unit,
+) {
+    var pending by
+        remember(network) {
+            mutableStateOf(
+                MediaAutoDownloadType.entries
+                    .filter { appState.mediaAutoDownloadMatrix.isEnabled(it, network) }
+                    .toSet(),
+            )
+        }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(network.labelRes)) },
+        text = {
+            Column {
+                MediaAutoDownloadType.entries.forEach { type ->
+                    val checked = type in pending
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = checked,
+                                    role = Role.Checkbox,
+                                    onValueChange = { pending = if (it) pending + type else pending - type },
+                                ).padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = checked, onCheckedChange = null)
+                        Text(stringResource(type.labelRes), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    MediaAutoDownloadType.entries.forEach { type ->
+                        val want = type in pending
+                        if (want != appState.mediaAutoDownloadMatrix.isEnabled(type, network)) {
+                            appState.setMediaAutoDownload(type, network, want)
+                        }
+                    }
+                    onDismiss()
+                },
+            ) { Text(stringResource(android.R.string.ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 internal val MediaAutoDownloadNetwork.labelRes: Int
@@ -118,6 +224,15 @@ internal val MediaAutoDownloadNetwork.labelRes: Int
             MediaAutoDownloadNetwork.Metered -> R.string.network_metered
         }
 
+private val MediaAutoDownloadNetwork.rowIcon: ImageVector
+    get() =
+        when (this) {
+            MediaAutoDownloadNetwork.WiFi -> Icons.Filled.Wifi
+            MediaAutoDownloadNetwork.Mobile -> Icons.Filled.SignalCellularAlt
+            MediaAutoDownloadNetwork.Roaming -> Icons.Filled.Public
+            MediaAutoDownloadNetwork.Metered -> Icons.Filled.DataUsage
+        }
+
 internal val MediaAutoDownloadType.labelRes: Int
     @StringRes
     get() =
@@ -128,28 +243,36 @@ internal val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Document -> R.string.media_type_documents
         }
 
+// One picker row whose options open in a sheet, matching the Language pattern.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MediaQualitySettingsCard(appState: WhiteNoiseAppState) {
-    SectionCard(title = stringResource(R.string.media_quality_title)) {
-        Column(Modifier.selectableGroup()) {
-            MediaQuality.entries.forEach { quality ->
-                SelectableSettingsRowWithSubtitle(
-                    title = stringResource(quality.labelRes),
-                    subtitle = stringResource(quality.subtitleRes),
-                    selected = appState.mediaQuality == quality,
-                    onClick = { appState.updateMediaQuality(quality) },
-                )
+private fun MediaQualityGroup(appState: WhiteNoiseAppState) {
+    var showSheet by remember { mutableStateOf(false) }
+    SettingsGroup {
+        item {
+            SettingsRow(
+                title = stringResource(R.string.media_quality_title),
+                subtitle = stringResource(appState.mediaQuality.labelRes),
+                icon = Icons.Filled.HighQuality,
+                onClick = { showSheet = true },
+            )
+        }
+    }
+    if (showSheet) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(Modifier.selectableGroup().padding(bottom = 24.dp)) {
+                MediaQuality.entries.forEach { quality ->
+                    SelectableSettingsRowWithSubtitle(
+                        title = stringResource(quality.labelRes),
+                        subtitle = stringResource(quality.subtitleRes),
+                        selected = appState.mediaQuality == quality,
+                        onClick = {
+                            appState.updateMediaQuality(quality)
+                            showSheet = false
+                        },
+                    )
+                }
             }
         }
-        // Privacy floor + video/audio carve-out. The size knob and metadata
-        // strip are orthogonal: photos never send location/device metadata,
-        // including Original's source-byte path. Video and picked audio
-        // currently send as-is.
-        Text(
-            text = stringResource(R.string.media_quality_footer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
     }
 }

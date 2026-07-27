@@ -24,7 +24,7 @@ class SettingsHomeStateTest {
         assertEquals(
             listOf(
                 SettingsHomeRow.Profile,
-                SettingsHomeRow.IdentityAndKeys,
+                SettingsHomeRow.AccountAndKeys,
                 SettingsHomeRow.Relays,
                 SettingsHomeRow.KeyPackages,
             ),
@@ -37,7 +37,8 @@ class SettingsHomeStateTest {
                 SettingsHomeRow.DataAndStorage,
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
-                SettingsHomeRow.SecurityAndPrivacy,
+                SettingsHomeRow.DevicePrivacy,
+                SettingsHomeRow.Help,
             ),
             state.preferenceRows,
         )

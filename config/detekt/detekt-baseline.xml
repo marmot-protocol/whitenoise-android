@@ -26,6 +26,7 @@
     <ID>ComplexCondition:MessageTextSelection.kt:!moved &amp;&amp; selectedBoundsInWindow != null &amp;&amp; windowPosition != null &amp;&amp; !selectedBoundsInWindow.contains(windowPosition)</ID>
     <ID>ComplexCondition:Thumbhash.kt:Thumbhash$w &lt;= 0 || h &lt;= 0 || w &gt; MAX_EDGE_PX || h &gt; MAX_EDGE_PX</ID>
     <ID>ComplexCondition:VoicePlaybackControllerFocusTest.kt:VoicePlaybackControllerFocusTest.TrackingMediaPlayer$failVolumeChange || (failVolumeRestore &amp;&amp; leftVolume == 1f &amp;&amp; rightVolume == 1f)</ID>
+    <ID>CyclomaticComplexMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
     <ID>CyclomaticComplexMethod:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$suspend fun downloadVerifiedApk: Result&lt;Unit&gt;</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun sendNotificationReply: NotificationReplySendOutcome</ID>
     <ID>CyclomaticComplexMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun shouldInvokeDisappearingSecureDelete: Boolean</ID>
@@ -52,7 +53,6 @@
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
-    <ID>CyclomaticComplexMethod:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
     <ID>CyclomaticComplexMethod:EmojiPicker.kt:@Composable private fun EmojiPickerContent</ID>
@@ -61,8 +61,6 @@
     <ID>CyclomaticComplexMethod:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>CyclomaticComplexMethod:GroupSystemEvents.kt:GroupSystemEvents$fun summary: String</ID>
     <ID>CyclomaticComplexMethod:HostSafety.kt:HostSafety$private fun isPrivateIpv4: Boolean</ID>
-    <ID>CyclomaticComplexMethod:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun IdentityScreen</ID>
-    <ID>CyclomaticComplexMethod:KeyPackagesScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun KeyPackagesScreen</ID>
     <ID>CyclomaticComplexMethod:LocalNotificationFormatter.kt:LocalNotificationFormatter$fun content: LocalNotificationContent?</ID>
     <ID>CyclomaticComplexMethod:LocalNotificationPresenter.kt:LocalNotificationPresenter$@SuppressLint("MissingPermission") suspend fun show: Boolean</ID>
     <ID>CyclomaticComplexMethod:MainShell.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun MainShell</ID>
@@ -117,6 +115,17 @@
     <ID>CyclomaticComplexMethod:VoicePlaybackController.kt:VoicePlaybackController$private suspend fun playLocked: PlaybackStartResult</ID>
     <ID>CyclomaticComplexMethod:VoiceRecorder.kt:@Composable internal fun MicHoldButton</ID>
     <ID>CyclomaticComplexMethod:WhiteNoiseApp.kt:@Composable fun WhiteNoiseApp</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@Composable private fun EncryptedBackupPassphraseFields</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@Composable private fun EncryptedBackupStrengthMeter</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@Composable private fun WipeBullet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@Composable private fun WipeOutcomeStageRow</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun WipeOutcomeSheet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun WipeProgressSheet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EncryptedBackupSheet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutAndWipeSheet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutSheet</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
+    <ID>FunctionNaming:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable private fun WipeProgressStageRow</ID>
     <ID>FunctionNaming:AccountSelectorSheet.kt:@Composable fun SettingsAccountHeader</ID>
     <ID>FunctionNaming:AccountSelectorSheet.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AccountSelectorSheet</ID>
     <ID>FunctionNaming:AccountSelectorSheet.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountSelectorContent</ID>
@@ -133,12 +142,18 @@
     <ID>FunctionNaming:AppSelfUpdateDialog.kt:@Composable fun AppSelfUpdateDialog</ID>
     <ID>FunctionNaming:AppSelfUpdateDialog.kt:@Composable private fun AppSelfUpdateProgressDialog</ID>
     <ID>FunctionNaming:AppSheets.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun KeyboardPreservingBottomSheet</ID>
+    <ID>FunctionNaming:AppearanceScreen.kt:@Composable private fun EnterKeyBehaviorRow</ID>
+    <ID>FunctionNaming:AppearanceScreen.kt:@Composable private fun ThemeModeCard</ID>
     <ID>FunctionNaming:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AppearanceScreen</ID>
+    <ID>FunctionNaming:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AppFontPickerRow</ID>
+    <ID>FunctionNaming:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun FontSizePickerRow</ID>
+    <ID>FunctionNaming:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun LanguagePickerSection</ID>
     <ID>FunctionNaming:AttachmentSheet.kt:@Composable internal fun ComposerAttachmentSheetPane</ID>
     <ID>FunctionNaming:AttachmentSheet.kt:@Composable private fun AttachmentActionTile</ID>
     <ID>FunctionNaming:AuditRedactionSwitch.kt:@Composable internal fun AuditRedactionSwitch</ID>
-    <ID>FunctionNaming:AutoDownloadScreen.kt:@Composable private fun MediaQualitySettingsCard</ID>
+    <ID>FunctionNaming:AutoDownloadScreen.kt:@Composable private fun MediaTypesDialog</ID>
     <ID>FunctionNaming:AutoDownloadScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AutoDownloadDataScreen</ID>
+    <ID>FunctionNaming:AutoDownloadScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun MediaQualityGroup</ID>
     <ID>FunctionNaming:Avatar.kt:@Composable internal fun Avatar</ID>
     <ID>FunctionNaming:AvatarViewer.kt:@Composable internal fun AvatarFullScreenViewer</ID>
     <ID>FunctionNaming:AvatarViewer.kt:@Composable internal fun AvatarViewerFrame</ID>
@@ -164,7 +179,6 @@
     <ID>FunctionNaming:ChatListSelectionBar.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ChatListSelectionBar</ID>
     <ID>FunctionNaming:ChatListTopBar.kt:@Composable internal fun ChatListFilterChips</ID>
     <ID>FunctionNaming:ChatListTopBar.kt:@Composable internal fun ConversationSearchNavBar</ID>
-    <ID>FunctionNaming:ChatListTopBar.kt:@Composable private fun ChatListFilterChip</ID>
     <ID>FunctionNaming:ChatListTopBar.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ChatListTopBar</ID>
     <ID>FunctionNaming:ChatListTopBar.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationSearchTopBar</ID>
     <ID>FunctionNaming:ChatRow.kt:@Composable internal fun ChatListRow</ID>
@@ -189,7 +203,9 @@
     <ID>FunctionNaming:ConversationRows.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
     <ID>FunctionNaming:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>FunctionNaming:CopyableValueRow.kt:@Composable internal fun CopyableValueRow</ID>
-    <ID>FunctionNaming:DiagnosticsScreen.kt:@Composable internal fun DiagnosticRow</ID>
+    <ID>FunctionNaming:DeveloperScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun DeveloperScreen</ID>
+    <ID>FunctionNaming:DevicePrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DevicePrivacyScreen</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt:@Composable private fun RelayHealthBody</ID>
     <ID>FunctionNaming:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>FunctionNaming:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
     <ID>FunctionNaming:DisappearingMessages.kt:@Composable private fun DisappearingOptionRow</ID>
@@ -207,13 +223,11 @@
     <ID>FunctionNaming:EmojiPicker.kt:@Composable private fun EmojiSectionHeader</ID>
     <ID>FunctionNaming:EmojiPicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun EmojiPickerSheet</ID>
     <ID>FunctionNaming:FontSizeScreen.kt:@Composable internal fun FontSizePreviewBubble</ID>
-    <ID>FunctionNaming:FontSizeScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun FontSizeScreen</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable internal fun GroupDetailsHeader</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable internal fun GroupDetailsLocalDeleteControl</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupActionRow</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupMutationErrorBanner</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupSwitchActionRow</ID>
-    <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun NotificationModePickerDialog</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushDeliveryDebugSection</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushTokenDebugRows</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
@@ -223,21 +237,13 @@
     <ID>FunctionNaming:GroupMembers.kt:@Composable internal fun GroupMemberIdentityRows</ID>
     <ID>FunctionNaming:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SoleAdminDeletePicker</ID>
     <ID>FunctionNaming:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TransferAdminSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@Composable private fun EncryptedBackupPassphraseFields</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@Composable private fun EncryptedBackupStrengthMeter</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@Composable private fun WipeBullet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@Composable private fun WipeOutcomeStageRow</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun WipeOutcomeSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun WipeProgressSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EncryptedBackupSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutAndWipeSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutSheet</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun IdentityScreen</ID>
-    <ID>FunctionNaming:IdentityScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable private fun WipeProgressStageRow</ID>
+    <ID>FunctionNaming:HelpAboutScreens.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun HelpScreen</ID>
+    <ID>FunctionNaming:HelpAboutScreens.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AboutScreen</ID>
     <ID>FunctionNaming:IncognitoKeyboard.kt:@Composable fun IncognitoKeyboardScope</ID>
     <ID>FunctionNaming:InvitePreview.kt:@Composable internal fun InvitePreviewActionBar</ID>
     <ID>FunctionNaming:InvitePreview.kt:@Composable internal fun InvitePreviewPlaceholder</ID>
     <ID>FunctionNaming:KeyPackagesScreen.kt:@Composable private fun KeyPackageCard</ID>
+    <ID>FunctionNaming:KeyPackagesScreen.kt:@Composable private fun PublishingActions</ID>
     <ID>FunctionNaming:KeyPackagesScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun KeyPackagesScreen</ID>
     <ID>FunctionNaming:KeyboardSafePopup.kt:@Composable internal fun KeyboardSafePopup</ID>
     <ID>FunctionNaming:LocationBubble.kt:@Composable internal fun LocationMessageBubble</ID>
@@ -322,6 +328,8 @@
     <ID>FunctionNaming:NewChatFlow.kt:@Composable internal fun StartChatErrorCard</ID>
     <ID>FunctionNaming:NewChatFlow.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NewMessageScreen</ID>
     <ID>FunctionNaming:NewGroupSetupScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun NewGroupSetupScreen</ID>
+    <ID>FunctionNaming:NotificationsScreen.kt:@Composable private fun NotificationCategoriesRow</ID>
+    <ID>FunctionNaming:NotificationsScreen.kt:@Composable private fun NotificationSwitchRow</ID>
     <ID>FunctionNaming:NotificationsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun NotificationsScreen</ID>
     <ID>FunctionNaming:OnboardingScreen.kt:@Composable fun OnboardingContent</ID>
     <ID>FunctionNaming:OnboardingScreen.kt:@Composable internal fun OnboardingScreen</ID>
@@ -351,15 +359,15 @@
     <ID>FunctionNaming:ReplyPreviewCard.kt:@Composable internal fun ReplyPreviewCard</ID>
     <ID>FunctionNaming:SectionCard.kt:@Composable internal fun SectionCard</ID>
     <ID>FunctionNaming:SectionCard.kt:@Composable internal fun SectionCardWithAction</ID>
-    <ID>FunctionNaming:SecurityPrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SecurityPrivacyScreen</ID>
+    <ID>FunctionNaming:SettingsGroup.kt:@Composable internal fun SettingsGroup</ID>
+    <ID>FunctionNaming:SettingsGroup.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun GroupSwitchRow</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@Composable internal fun SelectableSettingsRow</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@Composable internal fun SelectableSettingsRowWithSubtitle</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@Composable internal fun SettingsRow</ID>
-    <ID>FunctionNaming:SettingsScreen.kt:@Composable internal fun SettingsSwitchRow</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@Composable private fun AppUpdateSettingsRow</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsTopBar</ID>
     <ID>FunctionNaming:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SettingsScreen</ID>
-    <ID>FunctionNaming:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SettingsHomeScreen</ID>
+    <ID>FunctionNaming:SettingsScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun SettingsSwitchRow</ID>
     <ID>FunctionNaming:SignInScreen.kt:@Composable internal fun IdentityEntryForm</ID>
     <ID>FunctionNaming:SignInScreen.kt:@Composable internal fun PublicIdentifierFieldTrailingAction</ID>
     <ID>FunctionNaming:SignInScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun SignInContent</ID>
@@ -390,6 +398,9 @@
     <ID>LargeClass:MarkdownInlineTextTest.kt:MarkdownInlineTextTest</ID>
     <ID>LargeClass:MediaPipeline.kt:MediaPipeline</ID>
     <ID>LargeClass:NotificationTargetTest.kt:NotificationTargetTest</ID>
+    <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EncryptedBackupSheet</ID>
+    <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutSheet</ID>
+    <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
     <ID>LongMethod:AccountSelectorSheet.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountSelectorContent</ID>
     <ID>LongMethod:AddIdentitySheet.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AddAccountSheetContent</ID>
     <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_reanchorsAfterOptimisticPromptOverride</ID>
@@ -401,7 +412,6 @@
     <ID>LongMethod:AppState.kt:WhiteNoiseAppState$internal suspend fun shouldInvokeDisappearingSecureDelete: Boolean</ID>
     <ID>LongMethod:AppState.kt:WhiteNoiseAppState$private suspend fun postNotificationUpdate</ID>
     <ID>LongMethod:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$private fun String.kotlinBlockFrom: String</ID>
-    <ID>LongMethod:AppearanceScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun AppearanceScreen</ID>
     <ID>LongMethod:AttachmentSheet.kt:@Composable internal fun ComposerAttachmentSheetPane</ID>
     <ID>LongMethod:AudioFocusOwner.kt:AudioFocusOwner$private fun acquireLocked: AcquisitionResult</ID>
     <ID>LongMethod:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
@@ -437,6 +447,7 @@
     <ID>LongMethod:ConversationScreen.kt:fun sendStagedAttachments</ID>
     <ID>LongMethod:ConversationScreen.kt:suspend fun readPickedDocuments: DocumentReadOutcome</ID>
     <ID>LongMethod:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$@Test fun documentEncodesTimelineMetadataInChronologicalOrder</ID>
+    <ID>LongMethod:DevicePrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DevicePrivacyScreen</ID>
     <ID>LongMethod:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>LongMethod:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
     <ID>LongMethod:DisappearingMessages.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DisappearingMessagesPickerDialog</ID>
@@ -455,9 +466,7 @@
     <ID>LongMethod:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>LongMethod:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TransferAdminSheet</ID>
     <ID>LongMethod:GroupSystemEvents.kt:GroupSystemEvents$fun summary: String</ID>
-    <ID>LongMethod:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun EncryptedBackupSheet</ID>
-    <ID>LongMethod:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SignOutSheet</ID>
-    <ID>LongMethod:IdentityScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun IdentityScreen</ID>
+    <ID>LongMethod:HelpAboutScreens.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AboutScreen</ID>
     <ID>LongMethod:KeyPackagesScreen.kt:@Composable private fun KeyPackageCard</ID>
     <ID>LongMethod:KeyPackagesScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun KeyPackagesScreen</ID>
     <ID>LongMethod:LocalNotificationPresenter.kt:LocalNotificationPresenter$@SuppressLint("MissingPermission") suspend fun show: Boolean</ID>
@@ -491,7 +500,6 @@
     <ID>LongMethod:MessageActions.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ForwardMessageSheet</ID>
     <ID>LongMethod:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
     <ID>LongMethod:MessageBubbleAmoledStyleTest.kt:MessageBubbleAmoledStyleTest$@Test fun messageBubbleFillColorPreservesThemeAndSemanticPrecedence</ID>
-    <ID>LongMethod:MessageBubbleFrameTest.kt:MessageBubbleFrameTest$@Test fun explicitAmoledColorReachesCaptionPlainAndReplyPathsWithoutChangingMentionAccent</ID>
     <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
     <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun MessageDeleteDialogContent</ID>
     <ID>LongMethod:MessageFullScreen.kt:@Composable internal fun MessageInfoSheet</ID>
@@ -511,10 +519,8 @@
     <ID>LongMethod:QrScannerSheet.kt:@androidx.annotation.OptIn(ExperimentalGetImage::class) private fun bindQrScannerCamera</ID>
     <ID>LongMethod:Reactions.kt:@Composable internal fun ReactionDetailsSheet</ID>
     <ID>LongMethod:Reactions.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun CustomizeReactionsDialog</ID>
-    <ID>LongMethod:RelaysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun RelaysScreen</ID>
     <ID>LongMethod:ReplyPreviewCard.kt:@Composable internal fun ReplyPreviewCard</ID>
-    <ID>LongMethod:SecurityPrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun SecurityPrivacyScreen</ID>
-    <ID>LongMethod:SettingsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable private fun SettingsHomeScreen</ID>
+    <ID>LongMethod:SettingsScreen.kt:@Suppress("CyclomaticComplexMethod") private fun SettingsGroupScope.settingsHomeRows</ID>
     <ID>LongMethod:SignInScreen.kt:@Composable internal fun IdentityEntryForm</ID>
     <ID>LongMethod:SignInScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun SignInContent</ID>
     <ID>LongMethod:SourceBlockTestHelpers.kt:internal fun String.kotlinBlockFrom: String</ID>
@@ -551,6 +557,10 @@
     <ID>LoopWithTooManyJumpStatements:RecipientSearch.kt:RecipientSearch$for</ID>
     <ID>LoopWithTooManyJumpStatements:VoicePlaybackController.kt:VoicePlaybackController$while</ID>
     <ID>LoopWithTooManyJumpStatements:VoiceRecorder.kt:while</ID>
+    <ID>MagicNumber:AccountKeysScreen.kt:0.15f</ID>
+    <ID>MagicNumber:AccountKeysScreen.kt:0.34f</ID>
+    <ID>MagicNumber:AccountKeysScreen.kt:0.67f</ID>
+    <ID>MagicNumber:AccountKeysScreen.kt:60_000</ID>
     <ID>MagicNumber:AppFontScale.kt:AppFontScale.ExtraLarge$1.3f</ID>
     <ID>MagicNumber:AppFontScale.kt:AppFontScale.Large$1.15f</ID>
     <ID>MagicNumber:AppFontScale.kt:AppFontScale.Small$0.85f</ID>
@@ -616,7 +626,6 @@
     <ID>MagicNumber:ConversationRows.kt:1000L</ID>
     <ID>MagicNumber:ConversationRows.kt:6L</ID>
     <ID>MagicNumber:ConversationScreen.kt:1_500L</ID>
-    <ID>MagicNumber:ConversationScreen.kt:24</ID>
     <ID>MagicNumber:ConversationScreen.kt:99</ID>
     <ID>MagicNumber:CopyBundles.kt:60_000L</ID>
     <ID>MagicNumber:DiagnosticsScreen.kt:1000L</ID>
@@ -639,7 +648,6 @@
     <ID>MagicNumber:EmojiPicker.kt:5</ID>
     <ID>MagicNumber:EmojiPicker.kt:6</ID>
     <ID>MagicNumber:EmojiPicker.kt:7</ID>
-    <ID>MagicNumber:EmojiPicker.kt:9</ID>
     <ID>MagicNumber:EncryptedBackupFormatter.kt:3</ID>
     <ID>MagicNumber:EncryptedBackupFormatter.kt:4</ID>
     <ID>MagicNumber:EncryptedBackupFormatter.kt:5</ID>
@@ -687,10 +695,6 @@
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$60</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$7L</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$86_400</ID>
-    <ID>MagicNumber:IdentityScreen.kt:0.15f</ID>
-    <ID>MagicNumber:IdentityScreen.kt:0.34f</ID>
-    <ID>MagicNumber:IdentityScreen.kt:0.67f</ID>
-    <ID>MagicNumber:IdentityScreen.kt:60_000</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:0.45f</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:0.58f</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:LocalNotificationPresenter$16</ID>
@@ -839,12 +843,16 @@
     <ID>MatchingDeclarationName:ChatListSelectionActions.kt:ChatListBulkArchiveAction</ID>
     <ID>MatchingDeclarationName:IncognitoKeyboard.kt:IncognitoKeyboardInterceptor : PlatformTextInputInterceptor</ID>
     <ID>MatchingDeclarationName:LocationShare.kt:SharedLocation</ID>
-    <ID>MatchingDeclarationName:MainShell.kt:ConversationOpenContext</ID>
     <ID>MatchingDeclarationName:MediaControls.kt:OpenAttachmentResult</ID>
     <ID>MatchingDeclarationName:MessageDeleteDialog.kt:MessageDeleteSupportingCopy</ID>
     <ID>MatchingDeclarationName:OnboardingScreen.kt:OnboardingAction</ID>
     <ID>MatchingDeclarationName:RecentMedia.kt:RecentMediaItem</ID>
     <ID>MatchingDeclarationName:UserShare.kt:SharedUser</ID>
+    <ID>MaxLineLength:AccountKeysScreen.kt:DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))</ID>
+    <ID>MaxLineLength:AccountKeysScreen.kt:DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))</ID>
+    <ID>MaxLineLength:AccountKeysScreen.kt:LazyColumn</ID>
+    <ID>MaxLineLength:AccountKeysScreen.kt:Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:AccountKeysScreen.kt:if (stage.hasIssues) R.string.wipe_outcome_local_wipe_incomplete else R.string.wipe_outcome_local_wipe_done</ID>
     <ID>MaxLineLength:AccountSelectorContentTest.kt:AccountSelectorContentTest$private fun string: String</ID>
     <ID>MaxLineLength:AccountSelectorSheet.kt:Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)</ID>
     <ID>MaxLineLength:AccountSelectorSheet.kt:Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)</ID>
@@ -867,7 +875,6 @@
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"active conversation=${groupIdHex?.take(8) ?: "&lt;none&gt;"} account=${activeConversationAccountRef?.take(8) ?: "&lt;none&gt;"}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appContext.getString(R.string.notification_group_renamed_body, actorName, diff.oldName, diff.newName)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }</ID>
@@ -896,7 +903,6 @@
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$runCatchingCancellable { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.VOICE).deleteRecursively() }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend fun accountIdHex: String?</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend fun refreshAppUpdateIfStale: AppUpdateInfo</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$systemText?.body</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$val systemText = if (skipEnrichmentForLock) null else notificationGroupSystemText(update, senderNameOverride)</ID>
@@ -907,16 +913,14 @@
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"paginate guard must serialize paginate against close and re-check the active timeline subscription identity"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"paginateOlderIfSubscriptionActive(subscription)" in loadOlder &amp;&amp; "subscription.paginateBackwards" !in loadOlder</ID>
-    <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"read-anchor effect must reuse the hoisted edit-filtered renderedTimeline instead of allocating a fresh filtered list on scroll"</ID>
-    <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)" in readAnchorEffect</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$assertTrue("live timeline updates must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelineChanges)</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$assertTrue("window replacement must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelinePage)</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$body.indexOf("deletedMessageIds = deletedMessageIds - target") &lt; body.indexOf("throwable.rethrowIfCancellation()")</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$close.indexOf("withContext(NonCancellable)") &lt; close.indexOf("timelineSubscriptionActiveCallMutex.withLock")</ID>
-    <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$val readAnchorEffect = source.substring(readAnchorEffectIndex, source.indexOf("DisposableEffect(chat.id)", readAnchorEffectIndex))</ID>
     <ID>MaxLineLength:AppText.kt:AppText.Resource$override fun resolve: String</ID>
     <ID>MaxLineLength:AppUpdateNavigationTest.kt:AppUpdateNavigationTest$Intent(AppUpdateNavigation.ACTION_OPEN_UPDATE, Uri.parse("https://zapstore.dev/apps/org.parres.darkmatter"))</ID>
-    <ID>MaxLineLength:AppearanceScreen.kt:LazyColumn</ID>
+    <ID>MaxLineLength:AppearanceScreen.kt:private</ID>
+    <ID>MaxLineLength:AppearanceScreen.kt:private fun currentLanguageLabelRes: Int</ID>
     <ID>MaxLineLength:AttachmentCachePublicationTest.kt:AttachmentCachePublicationTest$val unrelatedPermit = executor.submit&lt;AttachmentCachePublication.Permit?&gt; { AttachmentCachePublication.capturePermit(unrelatedKey) }</ID>
     <ID>MaxLineLength:AttachmentSheet.kt:internal</ID>
     <ID>MaxLineLength:AudioFocusOwnerHandoffTest.kt:AudioFocusOwnerHandoffTest$private fun focusListener: AudioManager.OnAudioFocusChangeListener</ID>
@@ -930,6 +934,7 @@
     <ID>MaxLineLength:AudioWaveformExtractorTest.kt:AudioWaveformExtractorTest$loud to AudioDecoderOutputInfo(offset = 0, size = 4, presentationTimeUs = 0, endOfStream = false)</ID>
     <ID>MaxLineLength:AudioWaveformExtractorTest.kt:AudioWaveformExtractorTest$quiet to AudioDecoderOutputInfo(offset = 0, size = 4, presentationTimeUs = 0, endOfStream = true)</ID>
     <ID>MaxLineLength:AutoDownloadScreen.kt:LazyColumn</ID>
+    <ID>MaxLineLength:AutoDownloadScreen.kt:SettingsGroup</ID>
     <ID>MaxLineLength:BackgroundConnectionPreferences.kt:BackgroundConnectionPreferences$private fun preferences</ID>
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$assertEquals(0xFF112233, BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine))</ID>
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$assertEquals(0xFF445566, BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Other))</ID>
@@ -939,6 +944,7 @@
     <ID>MaxLineLength:CancellationHandlingTest.kt:CancellationHandlingTest$assertTrue("forwardText must use cancellation-safe isSuccess handling", "runCatchingCancellable {" in forwardText &amp;&amp; ".isSuccess" in forwardText)</ID>
     <ID>MaxLineLength:ChatBubbleColorsScreen.kt:Text(scopeSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
     <ID>MaxLineLength:ChatBubbleColorsScreen.kt:color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline</ID>
+    <ID>MaxLineLength:ChatBubbleColorsScreen.kt:stringResource(R.string.bubble_color_current_theme, stringResource(bubbleTheme.labelRes))</ID>
     <ID>MaxLineLength:ChatListReturnHeadSnapState.kt:internal fun publishedConversationReturnHead: String?</ID>
     <ID>MaxLineLength:ChatListSelectionBarTest.kt:ChatListSelectionBarTest$)</ID>
     <ID>MaxLineLength:ChatListSelectionBarTest.kt:ChatListSelectionBarTest$private fun string: String</ID>
@@ -953,7 +959,6 @@
     <ID>MaxLineLength:ChatMutePreferences.kt:ChatMutePreferences$private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)</ID>
     <ID>MaxLineLength:ChatMutePreferences.kt:ChatMutePreferences.Companion$fun mutedKeysOf: Set&lt;String&gt;</ID>
     <ID>MaxLineLength:ChatMutePreferences.kt:ChatMutePreferences.Companion$fun readMutedSet: Set&lt;String&gt;</ID>
-    <ID>MaxLineLength:ChatMutePreferencesTest.kt:ChatMutePreferencesTest$assertTrue("mode and muted projections must publish together", "_state.value = ChatNotificationState(immutableModes)" in setMode)</ID>
     <ID>MaxLineLength:ChatRow.kt:Row</ID>
     <ID>MaxLineLength:ChatRow.kt:internal</ID>
     <ID>MaxLineLength:ChatsControllerListVisibilityTest.kt:ChatsControllerListVisibilityTest$"""if\s*\(\s*visible\s*&amp;&amp;\s*\(\s*pendingRecompute\s*\|\|\s*recomputeScheduled\s*\)\s*\)\s*\{\s*recompute\(\s*\)\s*}"""</ID>
@@ -1010,7 +1015,6 @@
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker candidates must use contactDisplayNameCached so private nicknames flow into Candidate.displayName and MentionComposer.filter"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker must not use chatMemberTitleCached for candidate displayName; that skips the local nickname"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationMentionPickerState.kt")</ID>
-    <ID>MaxLineLength:ConversationNotificationChannels.kt:ConversationNotificationChannels$fun</ID>
     <ID>MaxLineLength:ConversationNotificationChannelsTest.kt:ConversationNotificationChannelsTest$assertEquals(NotificationChannelSpec.DIRECT_MESSAGES, ConversationNotificationChannels.primaryMessageParent(isDm = true))</ID>
     <ID>MaxLineLength:ConversationNotificationChannelsTest.kt:ConversationNotificationChannelsTest$assertEquals(NotificationChannelSpec.GROUP_MESSAGES, ConversationNotificationChannels.primaryMessageParent(isDm = false))</ID>
     <ID>MaxLineLength:ConversationNotificationChannelsTest.kt:ConversationNotificationChannelsTest$assertNotEquals(id, ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-xyz"))</ID>
@@ -1023,7 +1027,6 @@
     <ID>MaxLineLength:ConversationNotificationChannelsTest.kt:ConversationNotificationChannelsTest$val groupChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("messages_group", shortcut))</ID>
     <ID>MaxLineLength:ConversationNotificationChannelsTest.kt:ConversationNotificationChannelsTest$val mentionChannel = manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("mentions", shortcut))</ID>
     <ID>MaxLineLength:ConversationNotificationSettings.kt:if (preferred.action != Settings.ACTION_APP_NOTIFICATION_SETTINGS &amp;&amp; context.tryStartActivity(appNotificationSettingsIntent(context))) return</ID>
-    <ID>MaxLineLength:ConversationNotificationSettingsTest.kt:ConversationNotificationSettingsTest$ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.DIRECT_MESSAGES.id, shortcutId)</ID>
     <ID>MaxLineLength:ConversationNotificationSettingsTest.kt:ConversationNotificationSettingsTest$assertNotNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.MENTIONS.id, shortcutId)))</ID>
     <ID>MaxLineLength:ConversationNotificationSettingsTest.kt:ConversationNotificationSettingsTest$val expectedChannelId = ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.GROUP_MESSAGES.id, shortcutId!!)</ID>
     <ID>MaxLineLength:ConversationRows.kt:if</ID>
@@ -1041,27 +1044,18 @@
     <ID>MaxLineLength:ConversationScreen.kt:forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText)</ID>
     <ID>MaxLineLength:ConversationScreen.kt:fun hasLocationGrant: Boolean</ID>
     <ID>MaxLineLength:ConversationScreen.kt:if</ID>
-    <ID>MaxLineLength:ConversationScreen.kt:if (unreadIncomingCount &gt; 99) "99+" else unreadIncomingCount.toString()</ID>
     <ID>MaxLineLength:ConversationScreen.kt:onSend = { text, onAccepted -&gt; appState.launchMutation { controller.send(text, onAccepted) } }</ID>
     <ID>MaxLineLength:ConversationScreen.kt:quickReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.saveQuickReactions(context, choices) }</ID>
-    <ID>MaxLineLength:ConversationScreen.kt:renderedMessageIds = renderedTimeline.map { it.record.messageIdHex }</ID>
     <ID>MaxLineLength:ConversationScreen.kt:stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)</ID>
     <ID>MaxLineLength:ConversationScreen.kt:val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)</ID>
     <ID>MaxLineLength:ConversationScreen.kt:val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false</ID>
     <ID>MaxLineLength:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net"))</ID>
     <ID>MaxLineLength:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())</ID>
     <ID>MaxLineLength:CopyBundles.kt:internal fun relativeTimeRefreshDelayMillis: Long</ID>
+    <ID>MaxLineLength:DevicePrivacyScreen.kt:LazyColumn</ID>
     <ID>MaxLineLength:DiagnosticFormatter.kt:DiagnosticFormatter$private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&amp;]+)")</ID>
     <ID>MaxLineLength:DiagnosticFormatterTest.kt:DiagnosticFormatterTest$assertTrue(described.startsWith("[alice] error: failed [redacted] token=[redacted] https://[redacted]@example.test"))</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:DiagnosticRow(stringResource(R.string.active_account), appState.activeAccountRef ?: stringResource(R.string.none))</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:Row</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:Text(stringResource(R.string.no_relay_snapshot_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:Text(stringResource(if (streaming) R.string.live else R.string.idle), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
     <ID>MaxLineLength:DiagnosticsScreen.kt:appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))</ID>
-    <ID>MaxLineLength:DiagnosticsScreen.kt:entries = (entries + DiagnosticLogEntry(text = "event stream failed: ${throwable.message ?: throwable.javaClass.simpleName}")).takeLast(500)</ID>
     <ID>MaxLineLength:DisappearingMessageSweep.kt:DisappearingMessageSweep$private fun ULong.saturatingPlus: ULong</ID>
     <ID>MaxLineLength:DisappearingMessageSweepTest.kt:DisappearingMessageSweepTest$mediaRecords = listOf(mediaRecord(messageIdHex = "message-a", attachmentIndex = 0u, ciphertextSha256 = "expired"))</ID>
     <ID>MaxLineLength:DisappearingMessages.kt:Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))</ID>
@@ -1083,7 +1077,6 @@
     <ID>MaxLineLength:EmojiPicker.kt:if (query.isBlank()) emptyList() else withContext(Dispatchers.Default) { EmojiData.search(browseEmoji, query) }</ID>
     <ID>MaxLineLength:EmojiPicker.kt:recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji).filter { it.isNotBlank() } }</ID>
     <ID>MaxLineLength:EnterKeyBehavior.kt:EnterKeyBehavior.Companion$fun fromPreference: EnterKeyBehavior</ID>
-    <ID>MaxLineLength:FontSizeScreen.kt:LazyColumn</ID>
     <ID>MaxLineLength:ForegroundStartDecisionTest.kt:ForegroundStartDecisionTest$assertEquals(false, isOneShotForegroundStart(syncNativePushRegistrationRequested = false, ForegroundStartTrigger.UserToggle))</ID>
     <ID>MaxLineLength:ForegroundStartDecisionTest.kt:ForegroundStartDecisionTest$assertEquals(false, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.PushWake, foregroundStartAccepted = true))</ID>
     <ID>MaxLineLength:ForegroundStartDecisionTest.kt:ForegroundStartDecisionTest$assertEquals(false, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.SystemWake, foregroundStartAccepted = false))</ID>
@@ -1105,7 +1098,6 @@
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)</ID>
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$assertTrue("mark-read mutations must remain main-confined", mainConfinedMutations.containsMatchIn(markReadWorker))</ID>
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$assertTrue("selectable message projections must be memoized", "val selectableMessageProjections =\n remember(" in block)</ID>
-    <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$assertTrue("selectable messages must be memoized", "val selectableMessages =\n remember(" in selectableBlock)</ID>
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$assertTrue(source.contains("mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens)"))</ID>
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$val block = source.substring(source.indexOf("val renderedTimeline ="), source.indexOf("LaunchedEffect(", source.indexOf("val renderedTimeline =")))</ID>
     <ID>MaxLineLength:FreshSweepCoverageTest.kt:FreshSweepCoverageTest$val conversationLeave = source.section("suspend fun leaveGroup(displayName", "fun dismissConversationNotifications")</ID>
@@ -1162,14 +1154,8 @@
     <ID>MaxLineLength:IdentityFormatterTest.kt:IdentityFormatterTest$assertEquals(expected, IdentityFormatter.relativeTime(instant.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))</ID>
     <ID>MaxLineLength:IdentityFormatterTest.kt:IdentityFormatterTest$assertEquals(expected, IdentityFormatter.relativeTime(longAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))</ID>
     <ID>MaxLineLength:IdentityFormatterTest.kt:IdentityFormatterTest$assertEquals(expected, IdentityFormatter.relativeTime(threeDaysAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))</ID>
-    <ID>MaxLineLength:IdentityScreen.kt:DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))</ID>
-    <ID>MaxLineLength:IdentityScreen.kt:DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))</ID>
-    <ID>MaxLineLength:IdentityScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:IdentityScreen.kt:Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:IdentityScreen.kt:if (stage.hasIssues) R.string.wipe_outcome_local_wipe_incomplete else R.string.wipe_outcome_local_wipe_done</ID>
     <ID>MaxLineLength:KeyPackagesScreen.kt:DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))</ID>
-    <ID>MaxLineLength:KeyPackagesScreen.kt:Row</ID>
-    <ID>MaxLineLength:KeyPackagesScreen.kt:Text(stringResource(R.string.published), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)</ID>
+    <ID>MaxLineLength:KeyPackagesScreen.kt:PublishingActions(state = state, onRepublish = onRepublish, onPublishNew = onPublishNew)</ID>
     <ID>MaxLineLength:KeyPackagesScreen.kt:formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at))</ID>
     <ID>MaxLineLength:KeyboardPreservingBottomSheetCoverageTest.kt:KeyboardPreservingBottomSheetCoverageTest$assertFalse("conversation sheet must not open a focus-stealing ModalBottomSheet", "ModalBottomSheet(" in body)</ID>
     <ID>MaxLineLength:KeyboardPreservingBottomSheetCoverageTest.kt:KeyboardPreservingBottomSheetCoverageTest$assertTrue("conversation sheet must use KeyboardPreservingBottomSheet", "KeyboardPreservingBottomSheet(" in body)</ID>
@@ -1227,7 +1213,6 @@
     <ID>MaxLineLength:MarkdownInlineTextTest.kt:MarkdownInlineTextTest$assertEquals("https://trusted.example/evil.exe", markdownSafeDisplayText("https://trusted.example/\u202Eevil.exe"))</ID>
     <ID>MaxLineLength:MarkdownInlineTextTest.kt:MarkdownInlineTextTest$assertEquals(CONFIRM_LINK_TAG_PREFIX + "mailto:user@example.com", (links[0].item as LinkAnnotation.Clickable).tag)</ID>
     <ID>MaxLineLength:MarkdownInlineTextTest.kt:MarkdownInlineTextTest$private fun build</ID>
-    <ID>MaxLineLength:MarkdownLinkCopyTest.kt:MarkdownLinkCopyTest$private fun autolinkDocument</ID>
     <ID>MaxLineLength:MarkdownLinkCopyTest.kt:MarkdownLinkCopyTest$val link = windowPosition?.let { markdownLinkDestinationAt(linkLayouts.values, it) }</ID>
     <ID>MaxLineLength:MarkdownPreviewTextTest.kt:MarkdownPreviewTextTest$)</ID>
     <ID>MaxLineLength:MarkdownPreviewTextTest.kt:MarkdownPreviewTextTest$List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { listItem(listOf(MarkdownBlockFfi.ThematicBreak)) }</ID>
@@ -1256,7 +1241,6 @@
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(content)))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(inline))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$assertEquals(MediaInventory.Source.LinkedUrl("https://cdn.example.com/cat.JPG?w=200"), inventory.images.single().source)</ID>
-    <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$inlines = listOf(MarkdownInlineFfi.Link(dest = url, title = null, children = listOf(MarkdownInlineFfi.Text(url))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$listOf(record(id = "album", attachments = listOf(attachment("image/png", "a.png"), attachment("image/png", "b.png"))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$val inventory = MediaInventory.build(listOf(record(id = "m", body = link("https://cdn.example.com/cat.JPG?w=200"))))</ID>
     <ID>MaxLineLength:MediaInventoryTest.kt:MediaInventoryTest$val inventory = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/article?file=cat.jpg"))))</ID>
@@ -1328,7 +1312,6 @@
     <ID>MaxLineLength:NewChatFlow.kt:context.startActivity(Intent.createChooser(inviteShareIntent(inviteMessage), inviteTitle))</ID>
     <ID>MaxLineLength:NewChatFlowTest.kt:NewChatFlowTest$defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net"))</ID>
     <ID>MaxLineLength:NewGroupSetupScreen.kt:fun createGroupErrorMessage: String</ID>
-    <ID>MaxLineLength:NewGroupSetupScreen.kt:val canCreate = canSubmitNewChatSheet(directMessage = false, busy = busy, pendingRecipient = "", groupName = groupName)</ID>
     <ID>MaxLineLength:Nip55SignerParsingTest.kt:Nip55SignerParsingTest$assertEquals("signer package mismatch", signerPackageEchoMismatchReason("com.evil.signer", "com.example.signer"))</ID>
     <ID>MaxLineLength:Nip55SignerProtocol.kt:Nip55$fun</ID>
     <ID>MaxLineLength:Nip55SignerProtocol.kt:Nip55$fun savedSignerPackage: String?</ID>
@@ -1372,11 +1355,6 @@
     <ID>MaxLineLength:NotificationTargetTest.kt:NotificationTargetTest$private fun testReplyCipher: NotificationReplyCipher</ID>
     <ID>MaxLineLength:NotificationTargetTest.kt:NotificationTargetTest$val secondRequest = NotificationReplyWorker.notificationReplyRequest(action, secondRequestId, secondEncryptedReply)</ID>
     <ID>MaxLineLength:NotificationsScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:NotificationsScreen.kt:Text(stringResource(R.string.keep_connected_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:NotificationsScreen.kt:Text(stringResource(R.string.local_notifications), style = MaterialTheme.typography.bodyLarge)</ID>
-    <ID>MaxLineLength:NotificationsScreen.kt:Text(stringResource(R.string.local_notifications_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:NotificationsScreen.kt:Text(stringResource(R.string.notification_categories), style = MaterialTheme.typography.bodyLarge)</ID>
-    <ID>MaxLineLength:NotificationsScreen.kt:Text(stringResource(R.string.notification_categories_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
     <ID>MaxLineLength:NotificationsScreen.kt:checked = nativePushAvailable &amp;&amp; appState.localNotificationSettings?.nativePushEnabled == true</ID>
     <ID>MaxLineLength:OnboardingScreen.kt:stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.onboarding_sign_up)</ID>
     <ID>MaxLineLength:OptimisticMessageReconciliationTest.kt:OptimisticMessageReconciliationTest$val optimisticMessages = linkedMapOf(key to timelineMessage(tempId, MessageStatus.Pending, plaintext = "confirmed retry"))</ID>
@@ -1414,23 +1392,17 @@
     <ID>MaxLineLength:Reactions.kt:val isMine = activeAccountId != null &amp;&amp; participant.sender.equals(activeAccountId, ignoreCase = true)</ID>
     <ID>MaxLineLength:Reactions.kt:var draft by remember(quickReactionEmojis) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(quickReactionEmojis)) }</ID>
     <ID>MaxLineLength:RecentEmojiPreferences.kt:RecentEmojiPreferences$fun resetQuickReactions: List&lt;String&gt;</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:Column</ID>
     <ID>MaxLineLength:RelaysScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:Row</ID>
     <ID>MaxLineLength:RelaysScreen.kt:Text("${list.relays.size}", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:onListsChange(appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists())</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:onListsChange(appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists())</ID>
     <ID>MaxLineLength:ReplyNavigationTest.kt:ReplyNavigationTest$assertEquals(ReplyNavigation.MaxOlderPages, ReplyNavigation.maxOlderPagesForRecord(message(tags = emptyList(), kind = 9uL)))</ID>
     <ID>MaxLineLength:SafeHttpsGet.kt:SafeHttpsGet$System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMillis(connectTimeoutMillis, readTimeoutMillis))</ID>
     <ID>MaxLineLength:SafeHttpsGet.kt:SniPinningSslSocketFactory$private fun pinned: Socket</ID>
     <ID>MaxLineLength:SafeHttpsGetTest.kt:SafeHttpsGetTest$Regex("""for\s*\(\s*address\s+in\s+addresses\s*\)\s*\{\s*if\s*\(\s*deadlineExceeded\(requestDeadlineNanos\)\s*\)\s*return\s+null""")</ID>
     <ID>MaxLineLength:ScopedCacheTest.kt:ScopedCacheTest$val collapseLongMessages = ScopedCache&lt;String, Boolean&gt;(registry, name = "collapse-long-messages", maxEntries = 4)</ID>
     <ID>MaxLineLength:SectionCard.kt:Column</ID>
-    <ID>MaxLineLength:SecurityPrivacyScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:SecurityPrivacyScreen.kt:SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }</ID>
-    <ID>MaxLineLength:SettingsScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:SettingsScreen.kt:SettingsRow</ID>
-    <ID>MaxLineLength:SettingsScreen.kt:SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }</ID>
-    <ID>MaxLineLength:SettingsScreen.kt:SettingsRow(stringResource(R.string.relays), stringResource(R.string.relays_settings_subtitle)) { onOpenDetail(SettingsDetail.Relays) }</ID>
     <ID>MaxLineLength:SignInScreen.kt:Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))</ID>
     <ID>MaxLineLength:SignInScreen.kt:Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))</ID>
     <ID>MaxLineLength:SignInScreen.kt:Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)</ID>
@@ -1438,6 +1410,7 @@
     <ID>MaxLineLength:StickyDayRibbonTest.kt:StickyDayRibbonTest$assertEquals(false, shouldShowStickyDayRibbon(isScrollInProgress = true, canScrollContent = false, label = "Today"))</ID>
     <ID>MaxLineLength:StickyDayRibbonTest.kt:StickyDayRibbonTest$assertEquals(true, shouldShowStickyDayRibbon(isScrollInProgress = true, canScrollContent = true, label = "Today"))</ID>
     <ID>MaxLineLength:TextToSpeechScreen.kt:!appState.ttsDiscoveryComplete -&gt; stringResource(R.string.tts_settings_explainer_discovering)</ID>
+    <ID>MaxLineLength:TextToSpeechScreen.kt:subtitle = rateOverride?.let(::ttsRateLabel) ?: stringResource(R.string.tts_settings_rate_system)</ID>
     <ID>MaxLineLength:TimelineProjectorTest.kt:TimelineProjectorTest$assertEquals(TimelineReplyDisplay(sender = "alice", body = "Parent message"), TimelineProjector.replyPreview(record))</ID>
     <ID>MaxLineLength:TimelineProjectorTest.kt:TimelineProjectorTest$reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())</ID>
     <ID>MaxLineLength:TtsEngineResolverTest.kt:TtsEngineResolverTest$val notInstalled = voice("offline-high", Locale.CANADA, quality = 500, features = setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))</ID>
@@ -1476,7 +1449,6 @@
     <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindGroupSystem = 1210uL</ID>
     <ID>MayBeConstant:MessageProjector.kt:MessageProjector$private val KindReaction = 7uL</ID>
     <ID>NestedBlockDepth:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
-    <ID>NestedBlockDepth:Controllers.kt:ConversationController$private suspend fun performMediaUpload</ID>
     <ID>NestedBlockDepth:MediaPipeline.kt:MediaPipeline$fun decodeSampledFromUri: Bitmap?</ID>
     <ID>NestedBlockDepth:MessageProjector.kt:MessageProjector$fun reactionTallies: List&lt;ReactionTally&gt;</ID>
     <ID>NestedBlockDepth:Thumbhash.kt:Thumbhash$internal fun decodeRgba: DecodedRgba?</ID>
@@ -1494,10 +1466,8 @@
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun notificationConversationTitle: String?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun notificationGroupSystemText: NotificationSystemText?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun notificationReplyCommitState: NotificationReplyCommitProbe</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun notificationSenderName: String?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun refreshAccountUnreadCount</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun sweepExpiredForGroup</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun syncNativePushRegistrationIfEnabledLocked</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun syncPushForAccount: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun deleteAuditLogs: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun deleteKeyPackage: Boolean</ID>
@@ -1529,7 +1499,6 @@
     <ID>ReturnCount:BubbleColors.kt:BubbleColorPreferences$internal fun chatKey: String?</ID>
     <ID>ReturnCount:BubbleColors.kt:internal fun contrastRatio: Double</ID>
     <ID>ReturnCount:ChatListHeadSnap.kt:internal fun canDecideConversationReturnHeadSnap: Boolean</ID>
-    <ID>ReturnCount:ChatListHeadSnap.kt:internal fun shouldSnapChatListForClippedHeadReorder: Boolean</ID>
     <ID>ReturnCount:ChatListHeadSnap.kt:internal fun shouldSnapChatListOnConversationReturn: Boolean</ID>
     <ID>ReturnCount:ChatListIdentifierSearch.kt:ChatListIdentifierSearch$fun classify: Identifier?</ID>
     <ID>ReturnCount:ChatListMessageSearch.kt:ChatListMessageSearch$fun buildSnippet: SnippetHighlight?</ID>
@@ -1823,6 +1792,7 @@
     <ID>TooGenericExceptionCaught:VoiceRecordingController.kt:VoiceRecordingController$t: Throwable</ID>
     <ID>TooGenericExceptionThrown:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$throw RuntimeException("simulated Binder rejection")</ID>
     <ID>TooGenericExceptionThrown:MediaPipelineVideoReadTest.kt:MediaPipelineVideoReadTest.ThrowingMetadataRetrieverShadow$throw RuntimeException("setDataSource failed")</ID>
+    <ID>TooManyFunctions:AccountKeysScreen.kt:dev.ipf.whitenoise.android.ui.settings.AccountKeysScreen.kt</ID>
     <ID>TooManyFunctions:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest</ID>
     <ID>TooManyFunctions:AppState.kt:WhiteNoiseAppState</ID>
     <ID>TooManyFunctions:AppState.kt:dev.ipf.whitenoise.android.state.AppState.kt</ID>
@@ -1840,7 +1810,6 @@
     <ID>TooManyFunctions:GroupSystemEvents.kt:GroupSystemEvents</ID>
     <ID>TooManyFunctions:HostSafety.kt:HostSafety</ID>
     <ID>TooManyFunctions:IdentityFormatter.kt:IdentityFormatter</ID>
-    <ID>TooManyFunctions:IdentityScreen.kt:dev.ipf.whitenoise.android.ui.settings.IdentityScreen.kt</ID>
     <ID>TooManyFunctions:LocalNotificationFormatter.kt:LocalNotificationFormatter</ID>
     <ID>TooManyFunctions:LocalNotificationPresenter.kt:LocalNotificationPresenter</ID>
     <ID>TooManyFunctions:MainActivity.kt:MainActivity : FragmentActivity</ID>
