@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -246,6 +248,8 @@ class ChatListTitleTest {
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
     private fun chatItem(
@@ -284,13 +288,24 @@ class ChatListTitleTest {
                 kind = 9uL,
                 timelineAt = 1uL,
                 deleted = false,
+                attachmentKind = null,
+                attachmentCount = 0u,
+                deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
             ),
         unreadCount = 0uL,
         hasUnread = false,
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = 1uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun member(

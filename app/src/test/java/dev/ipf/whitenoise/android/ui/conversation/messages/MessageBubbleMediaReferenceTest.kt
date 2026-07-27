@@ -4,8 +4,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,10 +20,10 @@ class MessageBubbleMediaReferenceTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun perMessageReferenceChangeRefreshesTheRememberedMedia() {
+    fun projectedReferenceChangeRefreshesTheRememberedMedia() {
         val first = listOf(reference("first.jpg"))
         val second = listOf(reference("second.jpg"))
-        val referencesByMessage = mutableStateOf(mapOf(MESSAGE_ID to first))
+        val projectedMedia = mutableStateOf<List<MediaAttachmentReferenceFfi>?>(first)
         var rendered: List<MediaAttachmentReferenceFfi>? = null
 
         composeRule.setContent {
@@ -30,19 +31,22 @@ class MessageBubbleMediaReferenceTest {
                 rememberMessageMediaReferences(
                     tags = emptyList(),
                     messageIdHex = MESSAGE_ID,
-                    perMessageMediaReferences = referencesByMessage.value[MESSAGE_ID],
+                    sourceEpoch = null,
+                    projectedMedia = projectedMedia.value,
                 )
         }
 
         composeRule.runOnIdle { assertSame(first, rendered) }
-        composeRule.runOnIdle { referencesByMessage.value = mapOf(MESSAGE_ID to second) }
+        composeRule.runOnIdle { projectedMedia.value = second }
         composeRule.runOnIdle { assertSame(second, rendered) }
     }
 
     @Test
-    fun unrelatedReferenceMapChangeDoesNotReparseTheStaleMessage() {
-        val tags = listOf(MediaReferenceParser.toImetaTag(reference("fallback.jpg")))
-        val referencesByMessage = mutableStateOf(emptyMap<String, List<MediaAttachmentReferenceFfi>>())
+    fun emptyProjectedMediaIsAuthoritativeOverCompatibilityTags() {
+        // Deliberately malformed: if the compatibility parser runs in a local
+        // JVM test it would attempt to load the native UniFFI library. An empty
+        // projected list must be returned directly instead.
+        val tags = listOf(MessageTagFfi(listOf("imeta", "invalid")))
         var rendered: List<MediaAttachmentReferenceFfi>? = null
 
         composeRule.setContent {
@@ -50,16 +54,12 @@ class MessageBubbleMediaReferenceTest {
                 rememberMessageMediaReferences(
                     tags = tags,
                     messageIdHex = MESSAGE_ID,
-                    perMessageMediaReferences = referencesByMessage.value[MESSAGE_ID],
+                    sourceEpoch = 77uL,
+                    projectedMedia = emptyList(),
                 )
         }
 
-        lateinit var firstParsed: List<MediaAttachmentReferenceFfi>
-        composeRule.runOnIdle { firstParsed = requireNotNull(rendered) }
-        composeRule.runOnIdle {
-            referencesByMessage.value = mapOf("another-message" to listOf(reference("other.jpg")))
-        }
-        composeRule.runOnIdle { assertSame(firstParsed, rendered) }
+        composeRule.runOnIdle { assertTrue(requireNotNull(rendered).isEmpty()) }
     }
 
     private fun reference(fileName: String) =

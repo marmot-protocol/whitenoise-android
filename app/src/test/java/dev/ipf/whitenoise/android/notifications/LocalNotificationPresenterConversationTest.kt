@@ -606,6 +606,8 @@ class LocalNotificationPresenterConversationTest {
                     welcomerAccountIdHex = null,
                     viaWelcomeMessageIdHex = null,
                     disappearingMessageSecs = 0uL,
+                    leaveRequestPending = false,
+                    leaveRequestedAtMs = null,
                 ),
             latest = null,
             otherMemberAccount = null,

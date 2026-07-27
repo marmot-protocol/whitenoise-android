@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -193,6 +195,9 @@ class MarkReadChatListRowMergeTest {
                     kind = 9uL,
                     timelineAt = lastMessageAt,
                     deleted = false,
+                    attachmentKind = null,
+                    attachmentCount = 0u,
+                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
                 )
             } else {
                 null
@@ -202,6 +207,14 @@ class MarkReadChatListRowMergeTest {
         firstUnreadMessageIdHex = messageId,
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = lastMessageAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 }

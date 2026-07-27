@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import kotlinx.coroutines.CompletableDeferred
@@ -208,7 +209,15 @@ class AccountUnreadTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun member(accountIdHex: String) =

@@ -277,5 +277,8 @@ class ReplyNavigationTest {
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
         deletedByMessageIdHex = null,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
     )
 }

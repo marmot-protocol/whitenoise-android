@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
@@ -149,12 +150,55 @@ class ChatListSortKeyTest {
         assertEquals(listOf("ffff-last-by-hex", "0000-first-by-hex"), sorted.map { it.id })
     }
 
+    @Test
+    fun allPrunedUnreadChatUsesDurableActivityTimestamp() {
+        val item =
+            item(
+                groupId = "pruned-unread",
+                groupName = "Pruned",
+                projectedActivitySortAt = 120uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(120uL, item.latestAt)
+    }
+
+    @Test
+    fun emptyConversationFallsBackToItsCreationTimestamp() {
+        val item =
+            item(
+                groupId = "fresh-empty",
+                groupName = "Fresh",
+                projectedActivitySortAt = 0uL,
+                projectedConversationCreatedAt = 250uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(250uL, item.latestAt)
+    }
+
+    @Test
+    fun projectionRebuildTimeIsTheFinalProjectedFallback() {
+        val item =
+            item(
+                groupId = "legacy-row",
+                groupName = "Legacy",
+                projectedActivitySortAt = 0uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(900uL, item.latestAt)
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private fun item(
         groupId: String,
         groupName: String,
         projectedTitle: String? = null,
+        projectedActivitySortAt: ULong? = null,
+        projectedConversationCreatedAt: ULong = 0uL,
+        projectedUpdatedAt: ULong = 0uL,
         otherMemberAccount: String? = null,
         memberCount: Int = 0,
         latestAt: ULong? = null,
@@ -165,13 +209,28 @@ class ChatListSortKeyTest {
             otherMemberAccount = otherMemberAccount,
             memberCount = memberCount,
             memberSnapshot = null,
-            projection = projectedTitle?.let { row(groupId, groupName, it) },
+            projection =
+                if (projectedTitle != null || projectedActivitySortAt != null) {
+                    row(
+                        groupId = groupId,
+                        groupName = groupName,
+                        title = projectedTitle.orEmpty(),
+                        activitySortAt = projectedActivitySortAt ?: 0uL,
+                        conversationCreatedAt = projectedConversationCreatedAt,
+                        updatedAt = projectedUpdatedAt,
+                    )
+                } else {
+                    null
+                },
         )
 
     private fun row(
         groupId: String,
         groupName: String,
         title: String,
+        activitySortAt: ULong = 0uL,
+        conversationCreatedAt: ULong = 0uL,
+        updatedAt: ULong = 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -189,7 +248,15 @@ class ChatListSortKeyTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
-        updatedAt = 0uL,
+        conversationCreatedAt = conversationCreatedAt,
+        activitySortAt = activitySortAt,
+        updatedAt = updatedAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun group(
@@ -217,6 +284,8 @@ class ChatListSortKeyTest {
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
     private fun message(

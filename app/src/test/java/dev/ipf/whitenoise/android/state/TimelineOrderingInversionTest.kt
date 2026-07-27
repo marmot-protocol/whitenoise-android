@@ -255,6 +255,9 @@ class TimelineOrderingInversionTest {
                 deleted = false,
                 deletedByMessageIdHex = null,
                 invalidationStatus = null,
+                sourceEpoch = null,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
             )
         return TimelineMessage(
             id = "msg:$id",

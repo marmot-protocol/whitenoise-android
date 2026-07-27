@@ -904,6 +904,8 @@ class GroupProjectorTest {
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
     private fun encryptedMedia() =

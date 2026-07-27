@@ -111,6 +111,8 @@ class ConversationSelfLeftStateTest {
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disappearingMessageSecs = 0uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
         )
 
     private fun member(

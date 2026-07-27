@@ -1284,7 +1284,7 @@ internal fun ConversationScreen(
                         nextIdx++
                     }
                     val nextMsg = controller.timeline.getOrNull(nextIdx)
-                    val refs = nextMsg?.let { controller.mediaReferences[it.record.messageIdHex] }
+                    val refs = nextMsg?.let(controller::mediaReferencesFor)
                     val audioEntry =
                         refs?.withIndex()?.firstOrNull { (_, r) ->
                             r.mediaType.startsWith("audio/", ignoreCase = true)
@@ -3006,7 +3006,7 @@ internal fun ConversationScreen(
                                     replyingTo = controller.replyingTo,
                                     replyingToMedia =
                                         controller.replyingTo
-                                            ?.let { controller.mediaReferences[it.messageIdHex] }
+                                            ?.let(controller::mediaReferencesFor)
                                             .orEmpty(),
                                     messageTextCopy = messageTextCopy,
                                     onCancelReply = { controller.replyingTo = null },
