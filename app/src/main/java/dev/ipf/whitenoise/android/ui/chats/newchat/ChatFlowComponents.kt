@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -115,6 +116,7 @@ internal fun ContactRow(
     subtitle: String?,
     avatarSeed: String,
     avatarUrl: String?,
+    avatarImage: ImageBitmap? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
@@ -141,7 +143,13 @@ internal fun ContactRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
     ) {
-        Avatar(title = title, seed = avatarSeed, size = 48.dp, pictureUrl = avatarUrl)
+        Avatar(
+            title = title,
+            seed = avatarSeed,
+            size = 48.dp,
+            pictureUrl = avatarUrl?.takeIf { avatarImage == null },
+            picture = avatarImage,
+        )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
             Text(
                 title,

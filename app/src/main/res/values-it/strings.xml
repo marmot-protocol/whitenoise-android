@@ -119,6 +119,7 @@
     <string name="group_empty_only_you_title">Questo gruppo contiene solo te</string>
     <string name="group_empty_invite_members">Invita persone quando sei pronto.</string>
     <string name="you_are_no_longer_a_member">Non puoi inviare messaggi a questo gruppo perché non ne fai più parte.</string>
+    <string name="group_unrecoverable_notice">Questo gruppo è temporaneamente bloccato mentre White Noise ne verifica e ripara lo stato.</string>
     <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
@@ -680,6 +681,7 @@
     <string name="toast_notification_conversation_unavailable">Quella conversazione non è più disponibile</string>
     <string name="attach_image">Allega immagine</string>
     <string name="toast_couldnt_decode_image">Impossibile decodificare l\'immagine</string>
+    <string name="toast_couldnt_prepare_image">Impossibile scaricare o preparare l’immagine.</string>
     <string name="toast_reattach_to_retry_media">Riallega per riprovare</string>
     <string name="media_uploading">Caricamento…</string>
     <string name="media_upload_failed">Caricamento non riuscito</string>
@@ -724,7 +726,9 @@
     <string name="group_image_search_action">Cerca</string>
     <string name="group_image_search_query_label">Ricerca immagine</string>
     <string name="group_image_search_query_hint">Cerca sul web…</string>
+    <string name="group_image_search_privacy">La ricerca web invia la query e l’indirizzo IP a DuckDuckGo e ai server delle immagini.</string>
     <string name="group_image_search_apply">Usa questa immagine</string>
+    <string name="group_image_choose_photo">Scegli dalle foto</string>
     <string name="group_image_search_enter_query">Inserisci un termine di ricerca.</string>
     <string name="group_image_search_unavailable">Ricerca immagini temporaneamente non disponibile.</string>
     <string name="group_image_search_bad_response">La ricerca immagini ha restituito una risposta imprevista.</string>
@@ -841,6 +845,10 @@
     <string name="profile_picture_paste_link">Incolla un link</string>
     <string name="profile_picture_remove">Rimuovi immagine</string>
     <string name="profile_picture_use_link">Usa questo link</string>
+    <string name="profile_banner">Banner del profilo</string>
+    <string name="profile_banner_hint">URL HTTPS pubblico facoltativo del banner</string>
+    <string name="profile_banner_invalid">Sono consentiti solo URL HTTPS pubblici di immagini.</string>
+    <string name="toast_couldnt_upload_profile_image">Impossibile caricare l’immagine del profilo.</string>
     <string name="profile_nip05_hint">nome@dominio</string>
     <string name="profile_nip05_invalid">Inserisci un indirizzo come name@example.com.</string>
     <string name="profile_lightning_hint">Indirizzo Lightning, es. you@walletprovider.com</string>
@@ -892,7 +900,7 @@
     <string name="sign_out_and_wipe_confirm_field_label">Conferma richiesta</string>
     <string name="sign_out_delete_key_packages_label">Elimina i pacchetti di chiavi dai relay</string>
     <string name="sign_out_delete_key_packages_help">Impedisce a sconosciuti di invitarti in nuovi gruppi mentre sei disconnesso.</string>
-    <string name="toast_signed_out_locally_relay_retry">Disconnesso localmente — la pulizia dei relay verrà ritentata al prossimo accesso.</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">Disconnesso localmente, ma la pulizia dei KeyPackage sui relay non è stata completata.</string>
     <string name="wipe_progress_title">Disconnessione e cancellazione…</string>
     <string name="wipe_stage_leaving_groups">Uscita dai gruppi…</string>
     <string name="wipe_stage_deleting_key_packages">Eliminazione dei pacchetti di chiavi…</string>

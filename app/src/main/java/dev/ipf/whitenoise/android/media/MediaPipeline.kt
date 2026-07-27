@@ -821,7 +821,7 @@ object MediaPipeline {
                     } else {
                         scaled
                     }
-                val bitmap = opaque ?: return null
+                val bitmap = opaque
                 val width = bitmap.width
                 val height = bitmap.height
                 // Failures degrade silently — a missing hash just means
@@ -845,6 +845,70 @@ object MediaPipeline {
         } catch (_: SecurityException) {
             null
         } catch (_: OutOfMemoryError) {
+            null
+        }
+    }
+
+    /**
+     * Byte-array counterpart to [readDownscaledJpeg] for a remotely selected
+     * group/profile image. Re-encoding has two useful properties here: it
+     * enforces the same bounded pixel envelope as local media picks and strips
+     * metadata from arbitrary web images before MDK encrypts/uploads them.
+     */
+    fun readDownscaledJpeg(
+        bytes: ByteArray,
+        maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
+        quality: Int = DEFAULT_JPEG_QUALITY,
+    ): DownscaledJpeg? {
+        if (bytes.isEmpty()) return null
+        return try {
+            val orientation = readExifOrientation(bytes)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val target = orientedDecodeTarget(bounds.outWidth, bounds.outHeight, maxEdgePx, orientation) ?: return null
+            val options = BitmapFactory.Options().apply { inSampleSize = target.sampleSize }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+            val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
+
+            var opaque: Bitmap? = null
+            try {
+                opaque =
+                    if (scaled.hasAlpha()) {
+                        if (scaled.isMutable) {
+                            Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
+                            scaled
+                        } else {
+                            Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
+                                Canvas(it).apply {
+                                    drawColor(Color.WHITE)
+                                    drawBitmap(scaled, 0f, 0f, null)
+                                }
+                            }
+                        }
+                    } else {
+                        scaled
+                    }
+                val bitmap = opaque
+                val thumbhash = runCatching { Thumbhash.encodeFromBitmap(bitmap) }.getOrNull()
+                ByteArrayOutputStream().use { output ->
+                    if (bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
+                        DownscaledJpeg(
+                            bytes = output.toByteArray(),
+                            width = bitmap.width,
+                            height = bitmap.height,
+                            thumbhash = thumbhash,
+                        )
+                    } else {
+                        null
+                    }
+                }
+            } finally {
+                if (opaque !== null && opaque !== scaled) opaque.recycle()
+                scaled.recycle()
+            }
+        } catch (_: OutOfMemoryError) {
+            null
+        } catch (_: RuntimeException) {
             null
         }
     }

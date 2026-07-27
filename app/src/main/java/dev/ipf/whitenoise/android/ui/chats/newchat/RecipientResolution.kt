@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.Nip05Resolver
+import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientReference
@@ -48,17 +49,18 @@ internal fun rememberRecipientResolution(
         resolving = true
         resolvedHex = null
         val hex =
-            when (val id = ChatListIdentifierSearch.classify(trimmed)) {
-                is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
-                is ChatListIdentifierSearch.Identifier.Nip05 -> {
-                    // Debounce so a mid-typed domain doesn't fire a lookup on
-                    // every keystroke; the effect re-keys and cancels the prior
-                    // attempt as typing continues.
-                    delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-                    Nip05Resolver.resolve(id.identifier)
+            NostrProfileReference.accountIdHex(trimmed)
+                ?: when (val id = ChatListIdentifierSearch.classify(trimmed)) {
+                    is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
+                    is ChatListIdentifierSearch.Identifier.Nip05 -> {
+                        // Debounce so a mid-typed domain doesn't fire a lookup on
+                        // every keystroke; the effect re-keys and cancels the prior
+                        // attempt as typing continues.
+                        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                        Nip05Resolver.resolve(id.identifier)
+                    }
+                    null -> appState.accountIdHex(trimmed)
                 }
-                null -> appState.accountIdHex(trimmed)
-            }
         resolvedHex = hex
         if (hex != null) appState.refreshProfile(hex)
         resolving = false
@@ -89,6 +91,7 @@ internal fun rememberRecipientResolution(
 internal fun isPlainNameQuery(query: String): Boolean {
     val trimmed = query.trim()
     if (trimmed.isEmpty()) return false
+    if (NostrProfileReference.accountIdHex(trimmed) != null) return false
     if (ChatListIdentifierSearch.classify(trimmed) != null) return false
     if (RecipientReference.normalize(trimmed) != null) return false
     return true

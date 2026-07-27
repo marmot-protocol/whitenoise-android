@@ -450,11 +450,11 @@ internal fun IdentityScreen(
                         when (appState.signOutActiveAccount(deleteKeyPackages)) {
                             SignOutCompletion.Complete -> appState.present(R.string.toast_signed_out)
                             // Local sign-out completed but the engine call
-                            // failed or reported relay cleanup failures.
-                            // Informational, not copyable (#966): the retry is
-                            // automatic on next sign-in, nothing to report.
-                            SignOutCompletion.RelayCleanupPending ->
-                                appState.present(R.string.toast_signed_out_locally_relay_retry)
+                            // failed or reported relay cleanup failures. This
+                            // is informational and not copyable (#966); MDK
+                            // does not retain a retry queue for the deletions.
+                            SignOutCompletion.RelayCleanupIncomplete ->
+                                appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
                             null -> Unit
                         }
                     } finally {

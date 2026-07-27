@@ -67,8 +67,12 @@ import dev.ipf.whitenoise.android.core.aggregateEdits
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
+import dev.ipf.whitenoise.android.media.mutationKey
+import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -323,6 +327,10 @@ internal fun chatListItemFromProjection(
             update =
                 baseGroup.copy(
                     name = row.groupName.ifBlank { baseGroup.name },
+                    avatarUrl = row.avatarUrl,
+                    avatarDim = baseGroup.avatarDim.takeIf { row.avatarUrl == baseGroup.avatarUrl },
+                    avatarThumbhash = baseGroup.avatarThumbhash.takeIf { row.avatarUrl == baseGroup.avatarUrl },
+                    imageHashHex = row.avatar?.imageHashHex,
                     archived = row.archived,
                     pendingConfirmation = row.pendingConfirmation,
                     selfMembership = row.selfMembership,
@@ -644,10 +652,10 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         admins = emptyList(),
         relays = emptyList(),
         nostrGroupIdHex = "",
-        avatarUrl = null,
+        avatarUrl = row.avatarUrl,
         avatarDim = null,
         avatarThumbhash = null,
-        imageHashHex = null,
+        imageHashHex = row.avatar?.imageHashHex,
         encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
@@ -3755,6 +3763,13 @@ class ConversationController(
     var group by mutableStateOf(initialGroup)
         private set
 
+    /**
+     * An encrypted image upload may succeed before clearing a legacy URL
+     * avatar fails. MDK gives URL avatars precedence, so retain this transient
+     * retry latch and avoid uploading the same bytes again on the next tap.
+     */
+    private var pendingLegacyAvatarClearAfterImageMutationKey: String? = null
+
     // Hex of the account active when this conversation opened. Captured like
     // conversationAccountRef so display/permission/"is me" helpers stay tied to
     // the conversation's account instead of reading the live active account
@@ -4137,7 +4152,7 @@ class ConversationController(
         get() = selfMembership.isSelfMember(members, conversationAccountIdHex)
 
     val canSendMessages: Boolean
-        get() = membersVerified && isSelfMember
+        get() = membersVerified && isSelfMember && !group.unrecoverable
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)
@@ -6440,6 +6455,60 @@ class ConversationController(
                 appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
+
+    internal suspend fun updateGroupImage(draft: ImageUploadDraft?): Boolean {
+        val requestedMutationKey =
+            draft?.let {
+                withContext(Dispatchers.Default) { it.mutationKey() }
+            } ?: REMOVE_GROUP_IMAGE_MUTATION_KEY
+        return withMutationLockResult(false) {
+            lastMutationError = null
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatchingCancellable {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    if (shouldCommitPrimaryGroupImageMutation(
+                            requestedMutationKey = requestedMutationKey,
+                            pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
+                            hasProjectedEncryptedImage = group.imageHashHex != null,
+                        )
+                    ) {
+                        if (draft != null) {
+                            appState.marmotIo {
+                                updateGroupImage(
+                                    account,
+                                    group.groupIdHex,
+                                    draft.plaintext,
+                                    draft.mediaType,
+                                )
+                            }
+                        } else {
+                            appState.marmotIo {
+                                clearGroupImage(account, group.groupIdHex)
+                            }
+                        }
+                    }
+
+                    // URL avatars win over encrypted images. Clear the legacy
+                    // component only after the encrypted mutation succeeds so
+                    // a partial failure never leaves the group image-less.
+                    if (!group.avatarUrl.isNullOrBlank() || pendingLegacyAvatarClearAfterImageMutationKey != null) {
+                        pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
+                        appState.marmotIo {
+                            updateGroupAvatarUrl(account, group.groupIdHex, null, null, null)
+                        }
+                        pendingLegacyAvatarClearAfterImageMutationKey = null
+                    }
+                }
+                refreshMembers(probeEviction = false)
+                appState.present(R.string.toast_group_updated)
+                true
+            }.onFailure {
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
+            }.getOrDefault(false)
+        }
+    }
 
     suspend fun inviteMembers(
         memberRefs: List<String>,

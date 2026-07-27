@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListAvatarFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -139,6 +140,31 @@ class ChatListProjectionReducerTest {
 
         assertTrue(item.group.archived)
         assertTrue(item.group.pendingConfirmation)
+    }
+
+    @Test
+    fun avatarProjectionOverridesAStaleGroupRecord() {
+        val item =
+            chatListItemFromProjection(
+                row(
+                    groupId = "g1",
+                    rawTitle = "Image group",
+                    avatarUrl = null,
+                    imageHashHex = "ab".repeat(32),
+                ),
+                group =
+                    group(name = "Image group").copy(
+                        avatarUrl = "https://example.com/stale.jpg",
+                        avatarDim = "100x100",
+                        avatarThumbhash = "stale",
+                        imageHashHex = null,
+                    ),
+            )
+
+        assertNull(item.group.avatarUrl)
+        assertNull(item.group.avatarDim)
+        assertNull(item.group.avatarThumbhash)
+        assertEquals("ab".repeat(32), item.group.imageHashHex)
     }
 
     @Test
@@ -437,6 +463,8 @@ class ChatListProjectionReducerTest {
         updatedAt: ULong = 1uL,
         unreadCount: ULong = 0uL,
         hasUnread: Boolean = false,
+        avatarUrl: String? = null,
+        imageHashHex: String? = null,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -446,8 +474,17 @@ class ChatListProjectionReducerTest {
         pendingConfirmation = pendingConfirmation,
         title = rawTitle,
         groupName = groupName,
-        avatarUrl = null,
-        avatar = null,
+        avatarUrl = avatarUrl,
+        avatar =
+            imageHashHex?.let {
+                ChatListAvatarFfi(
+                    imageHashHex = it,
+                    imageKeyHex = "redacted-test-key",
+                    imageNonceHex = "redacted-test-nonce",
+                    imageUploadKeyHex = "redacted-test-upload-key",
+                    mediaType = "image/jpeg",
+                )
+            },
         lastMessage = preview,
         unreadCount = unreadCount,
         hasUnread = hasUnread,

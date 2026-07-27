@@ -48,7 +48,7 @@ import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
@@ -202,12 +202,13 @@ internal fun ChatRow(
                             Modifier
                         },
                 ) {
-                    Avatar(
+                    GroupAvatar(
+                        appState = appState,
+                        group = item.group,
                         title = title,
                         seed = avatarAccount ?: item.group.groupIdHex,
                         size = 44.dp,
-                        // A group's own avatar URL wins over the member-derived avatar.
-                        pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                        fallbackPictureUrl = avatarAccount?.let { appState.avatarUrl(it) },
                     )
                     if (isMuted) {
                         Icon(

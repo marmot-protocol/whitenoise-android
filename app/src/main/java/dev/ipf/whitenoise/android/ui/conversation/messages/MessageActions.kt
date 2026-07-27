@@ -93,6 +93,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.AppDivider
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
@@ -606,6 +607,7 @@ internal fun ForwardMessageSheet(
                             subtitle = membersPreview,
                             avatarSeed = avatarAccount ?: item.group.groupIdHex,
                             avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                            avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
                             onClick = {
                                 if (isSelected) selected.remove(groupId) else selected.add(groupId)
                             },

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,13 +52,18 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import kotlinx.coroutines.CancellationException
 
 /**
  * Final step of the New Group flow: name the group, preview the invited
@@ -75,13 +81,23 @@ internal fun NewGroupSetupScreen(
     var groupName by rememberSaveable { mutableStateOf("") }
     var retentionSecs by rememberSaveable { mutableLongStateOf(0L) }
     var showRetentionPicker by remember { mutableStateOf(false) }
+    var showImagePicker by remember { mutableStateOf(false) }
+    var imageDraft by remember { mutableStateOf<ImageUploadDraft?>(null) }
+    var imagePreparing by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val imagePreview = rememberImageUploadPreview(imageDraft)
 
     fun createGroupErrorMessage(throwable: Throwable): String = groupCreateFailureDetail(throwable, appState::chatMemberTitle).resolve(context)
 
-    val canCreate = canSubmitNewChatSheet(directMessage = false, busy = busy, pendingRecipient = "", groupName = groupName)
+    val canCreate =
+        canSubmitNewChatSheet(
+            directMessage = false,
+            busy = busy || imagePreparing,
+            pendingRecipient = "",
+            groupName = groupName,
+        )
 
     fun create() {
         // canCreate is a composition-time snapshot; the direct `busy` state
@@ -99,7 +115,13 @@ internal fun NewGroupSetupScreen(
         appState.launchMutation {
             runCatching {
                 appState.marmotIo {
-                    createGroup(account, groupName.trim(), recipients, null)
+                    createGroupWithInitialImage(
+                        account,
+                        groupName.trim(),
+                        recipients,
+                        null,
+                        imageDraft?.initialGroupImage(),
+                    )
                 }
             }.onSuccess { groupIdHex ->
                 if (retentionSecs > 0L) {
@@ -123,6 +145,23 @@ internal fun NewGroupSetupScreen(
                 error = createGroupErrorMessage(it)
             }
             busy = false
+        }
+    }
+
+    fun prepareImage(load: suspend () -> ImageUploadDraft) {
+        if (imagePreparing || busy) return
+        imagePreparing = true
+        appState.launchMutation {
+            try {
+                imageDraft = load()
+                showImagePicker = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } finally {
+                imagePreparing = false
+            }
         }
     }
 
@@ -185,7 +224,7 @@ internal fun NewGroupSetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
                 ) {
                     val trimmedName = groupName.trim()
-                    if (trimmedName.isEmpty()) {
+                    if (trimmedName.isEmpty() && imagePreview == null) {
                         Box(
                             modifier =
                                 Modifier
@@ -201,7 +240,12 @@ internal fun NewGroupSetupScreen(
                             )
                         }
                     } else {
-                        Avatar(title = trimmedName, seed = trimmedName, size = 72.dp)
+                        Avatar(
+                            title = trimmedName.ifBlank { stringResource(R.string.new_group) },
+                            seed = trimmedName,
+                            size = 72.dp,
+                            picture = imagePreview,
+                        )
                     }
                     TextField(
                         value = groupName,
@@ -231,6 +275,22 @@ internal fun NewGroupSetupScreen(
                         )
                     }
                 }
+            }
+            item {
+                SettingsActionRow(
+                    icon = Icons.Default.Image,
+                    title = stringResource(R.string.group_image_search_title),
+                    value =
+                        stringResource(
+                            if (imageDraft == null) {
+                                R.string.group_image_search_set
+                            } else {
+                                R.string.group_image_search_edit
+                            },
+                        ),
+                    enabled = !busy && !imagePreparing,
+                    onClick = { showImagePicker = true },
+                )
             }
             item {
                 SettingsActionRow(
@@ -276,6 +336,32 @@ internal fun NewGroupSetupScreen(
                 showRetentionPicker = false
                 retentionSecs = secs
             },
+        )
+    }
+
+    if (showImagePicker) {
+        ImageSearchSheet(
+            initialUrl = imageDraft?.sourceUrl.orEmpty(),
+            hasCurrentImage = imageDraft != null,
+            header = stringResource(R.string.group_image_search_title),
+            title = groupName.trim(),
+            seed = groupName.trim(),
+            urlLabel = stringResource(R.string.group_avatar_url),
+            applyInFlight = imagePreparing,
+            onApply = { picked ->
+                if (picked == null) {
+                    imageDraft = null
+                    showImagePicker = false
+                } else {
+                    prepareImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
+                }
+            },
+            onPickPhoto = { uri ->
+                prepareImage {
+                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                }
+            },
+            onDismiss = { if (!imagePreparing) showImagePicker = false },
         )
     }
 }

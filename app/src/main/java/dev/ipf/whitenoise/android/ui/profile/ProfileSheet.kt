@@ -93,7 +93,9 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
+import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
@@ -665,6 +667,7 @@ private fun ProfileAddToGroupsSheet(
                         subtitle = stringResource(R.string.members_count, item.memberCount),
                         avatarSeed = item.group.groupIdHex,
                         avatarUrl = item.group.avatarUrl,
+                        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
                         enabled = !busy,
                         onClick = {
                             if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -862,11 +865,12 @@ private fun ProfileSharedGroupRow(
                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onOpen),
         leadingContent = {
-            Avatar(
+            GroupAvatar(
+                appState = appState,
+                group = item.group,
                 title = title,
                 seed = item.group.groupIdHex,
                 size = 40.dp,
-                pictureUrl = item.group.avatarUrl,
             )
         },
         headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },

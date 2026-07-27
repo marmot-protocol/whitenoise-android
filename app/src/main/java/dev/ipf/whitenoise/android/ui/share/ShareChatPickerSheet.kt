@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
@@ -314,6 +315,7 @@ private fun ShareTargetRow(
         subtitle = membersPreview,
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
         avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },
     )

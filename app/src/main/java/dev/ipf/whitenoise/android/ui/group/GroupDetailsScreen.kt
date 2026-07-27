@@ -78,6 +78,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -124,6 +125,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
 import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
@@ -694,6 +696,7 @@ internal fun GroupDetailsScreen(
                 .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
             GroupDetailsHeader(
                 title = controller.title(groupTitleCopy),
                 subtitle =
@@ -713,6 +716,7 @@ internal fun GroupDetailsScreen(
                 // to the group avatar; avatarAccount is null for groups).
                 seed = controller.avatarAccount ?: controller.group.groupIdHex,
                 pictureUrl = controller.avatarUrl,
+                picture = encryptedGroupAvatar,
                 archived = controller.group.archived,
                 onAddDescription =
                     if (canEdit && controller.group.description.isBlank()) {
@@ -1431,6 +1435,7 @@ internal fun GroupDetailsHeader(
     description: String,
     seed: String,
     pictureUrl: String?,
+    picture: ImageBitmap? = null,
     archived: Boolean,
     onAddDescription: (() -> Unit)? = null,
 ) {
@@ -1453,7 +1458,13 @@ internal fun GroupDetailsHeader(
                             role = Role.Button,
                         ) { viewerOpen = true },
             ) {
-                Avatar(title = title, seed = seed, size = 96.dp, pictureUrl = safePictureUrl)
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = 96.dp,
+                    pictureUrl = safePictureUrl?.takeIf { picture == null },
+                    picture = picture,
+                )
             }
             Text(
                 title,
