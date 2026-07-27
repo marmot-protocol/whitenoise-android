@@ -249,6 +249,9 @@ data class ChatListItem(
     /** The engine's durable mute projection — ORed with local preferences. */
     fun engineMuted(): Boolean = projection?.muted == true
 
+    /** Projected conversation kind first, name/headcount heuristic as fallback. */
+    fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, memberCount, group.name)
+
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",
@@ -741,7 +744,7 @@ internal fun profileAddableGroupItems(
             val snapshot = item.memberSnapshot ?: return@filter false
             !item.group.pendingConfirmation &&
                 !item.removedFromGroup(active) &&
-                !GroupProjector.isDm(item.memberCount, item.group.name) &&
+                !item.isDm() &&
                 GroupProjector.isAdminRef(item.group, active) &&
                 snapshot.containsAccount(active) &&
                 !snapshot.containsAccount(target)

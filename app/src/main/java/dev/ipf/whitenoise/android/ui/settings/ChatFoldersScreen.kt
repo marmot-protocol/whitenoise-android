@@ -253,7 +253,7 @@ private fun folderChatCount(
     return when (folder.systemKind) {
         SystemFolderKind.UNREAD -> active.count { it.hasUnread }
         SystemFolderKind.ARCHIVED -> appState.archivedChatListItems.size
-        SystemFolderKind.GROUPS -> active.count { !GroupProjector.isDm(it.memberCount, it.group.name) }
+        SystemFolderKind.GROUPS -> active.count { !it.isDm() }
         null -> {
             if (accountRef == null) {
                 0

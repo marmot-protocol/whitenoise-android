@@ -53,7 +53,7 @@ internal fun chatFolderChipModels(
                     }
                 }
                 SystemFolderKind.GROUPS -> {
-                    val groups = activeItems.count { !GroupProjector.isDm(it.memberCount, it.group.name) }
+                    val groups = activeItems.count { !it.isDm() }
                     if (groups == 0) null else ChatFolderChipModel(folder.id, folder.systemKind, "", trailingCount = 0)
                 }
                 null -> {

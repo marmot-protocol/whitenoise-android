@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 
 data class GroupTitleCopy(
     val inviteFromFormat: String,
@@ -132,6 +133,21 @@ object GroupProjector {
         memberCount: Int,
         name: String,
     ): Boolean = memberCount == 2 && isUnnamed(name)
+
+    /**
+     * The engine's projected conversation kind when it has decided, falling
+     * back to the name/headcount heuristic for UNKNOWN or unprojected rows.
+     */
+    fun isDm(
+        conversationKind: ChatConversationKindFfi?,
+        memberCount: Int,
+        name: String,
+    ): Boolean =
+        when (conversationKind) {
+            ChatConversationKindFfi.DIRECT -> true
+            ChatConversationKindFfi.GROUP -> false
+            ChatConversationKindFfi.UNKNOWN, null -> isDm(memberCount, name)
+        }
 
     /**
      * Whether a peer-supplied group [name] should be treated as absent — the

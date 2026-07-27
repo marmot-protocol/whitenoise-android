@@ -137,7 +137,7 @@ internal fun deriveRecipientCandidates(
     // Most-recent-first so recency wins the first-appearance ordering above.
     val items = appState.chatListItems.sortedByDescending { it.latestAt ?: 0uL }
     for (item in items) {
-        val dm = GroupProjector.isDm(item.memberCount, item.group.name)
+        val dm = item.isDm()
         val groupId = item.id.takeUnless { dm }
         // Group rosters give the members. A DM's roster, though, often holds only
         // the active account — the counterpart isn't an enumerable member — so

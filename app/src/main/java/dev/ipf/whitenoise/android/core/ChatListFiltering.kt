@@ -86,7 +86,7 @@ internal fun applyChatListSearchAndFilter(
             ChatListFilter.Unread -> source.filter { it.hasUnread }
             // A named two-member chat is a group, not a DM — classify by type,
             // not raw headcount, so it isn't wrongly hidden here.
-            ChatListFilter.Groups -> source.filter { !GroupProjector.isDm(it.memberCount, it.group.name) }
+            ChatListFilter.Groups -> source.filter { !it.isDm() }
         }
     val byFolder =
         if (customFolderChatIds == null) {

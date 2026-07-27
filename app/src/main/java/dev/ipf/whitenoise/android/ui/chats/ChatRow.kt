@@ -177,7 +177,7 @@ internal fun ChatRow(
         )
     val openableDmAvatarAccount =
         avatarAccount
-            ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
+            ?.takeIf { item.isDm() }
     val rowModifier =
         when {
             selectionMode ->

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -18,6 +19,16 @@ class GroupProjectorTest {
 
         assertEquals("alice", GroupProjector.memberRef(resolved))
         assertEquals("credential-b", GroupProjector.memberRef(unresolved))
+    }
+
+    @Test
+    fun projectedConversationKindOverridesTheHeuristic() {
+        // A decided engine kind wins even when the heuristic disagrees.
+        assertTrue(GroupProjector.isDm(ChatConversationKindFfi.DIRECT, memberCount = 5, name = "Named"))
+        assertFalse(GroupProjector.isDm(ChatConversationKindFfi.GROUP, memberCount = 2, name = ""))
+        // UNKNOWN and unprojected rows fall back to name/headcount.
+        assertTrue(GroupProjector.isDm(ChatConversationKindFfi.UNKNOWN, memberCount = 2, name = ""))
+        assertFalse(GroupProjector.isDm(null, memberCount = 3, name = ""))
     }
 
     @Test
