@@ -97,6 +97,7 @@ class MainActivity : FragmentActivity() {
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
                 fontScale = state.fontScale.factor,
+                appFont = state.appFont,
             ) {
                 WhiteNoiseApp(
                     appState = state,

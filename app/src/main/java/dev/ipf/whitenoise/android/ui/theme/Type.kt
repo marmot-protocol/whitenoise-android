@@ -4,10 +4,12 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppFont
 
 val Manrope =
     FontFamily(
@@ -15,6 +17,36 @@ val Manrope =
         Font(R.font.manrope_semibold, FontWeight.SemiBold),
         Font(R.font.manrope_bold, FontWeight.Bold),
     )
+
+// A variable font carries its whole weight axis in one file; instantiate the
+// weights the typography actually uses.
+private fun variableFamily(resId: Int): FontFamily =
+    FontFamily(
+        listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { weight ->
+            Font(
+                resId = resId,
+                weight = weight,
+                variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+            )
+        },
+    )
+
+private val Outfit = variableFamily(R.font.outfit_variable)
+private val Urbanist = variableFamily(R.font.urbanist_variable)
+private val Figtree = variableFamily(R.font.figtree_variable)
+
+/** The [FontFamily] a Settings font choice maps to; null keeps the Manrope default. */
+fun AppFont.fontFamilyOrNull(): FontFamily? =
+    when (this) {
+        AppFont.Manrope -> null
+        AppFont.System -> FontFamily.Default
+        AppFont.Outfit -> Outfit
+        AppFont.Urbanist -> Urbanist
+        AppFont.Figtree -> Figtree
+    }
+
+/** Re-bases the whole scale onto the chosen app font; Manrope is the built-in default. */
+fun Typography.withAppFont(font: AppFont): Typography = font.fontFamilyOrNull()?.let { applyFontFamily(it) } ?: this
 
 /** Applies [family] to every style of a [Typography] so the whole scale shares one font. */
 private fun Typography.applyFontFamily(family: FontFamily): Typography =

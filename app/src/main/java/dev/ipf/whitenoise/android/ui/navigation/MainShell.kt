@@ -708,9 +708,9 @@ internal fun MainShell(
                             },
                             onOpenDiagnostics = {
                                 // Preserve `settingsDetailName` so backing out of
-                                // Diagnostics returns to Security & Privacy (its only
-                                // entry point) rather than the Settings home, restoring
-                                // the breadcrumb the user walked in on (#412).
+                                // Diagnostics returns to Developer (its only entry point)
+                                // rather than the Settings home, restoring the breadcrumb
+                                // the user walked in on (#412).
                                 sectionName = MainSection.Diagnostics.name
                             },
                             onOpenSupportChat = { item ->
@@ -729,8 +729,8 @@ internal fun MainShell(
                             appState = appState,
                             onBack = {
                                 // Leave `settingsDetailName` alone — it still holds the
-                                // detail (Security & Privacy) the user opened Diagnostics
-                                // from, so Settings re-enters that screen directly (#412).
+                                // detail (Developer) the user opened Diagnostics from, so
+                                // Settings re-enters that screen directly (#412).
                                 sectionName = MainSection.Settings.name
                             },
                         )
