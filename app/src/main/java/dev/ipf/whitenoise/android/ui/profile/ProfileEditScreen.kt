@@ -113,7 +113,14 @@ internal fun ProfileEditScreen(
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
-    val saveEnabled = !busy && !pictureUploading && active != null && pictureValid && bannerValid && nip05Valid && lud16Valid
+    val saveEnabled =
+        !busy &&
+            !pictureUploading &&
+            active != null &&
+            pictureValid &&
+            bannerValid &&
+            nip05Valid &&
+            lud16Valid
 
     DisposableEffect(active?.accountIdHex) {
         onDispose { pictureUploadJob?.cancel() }

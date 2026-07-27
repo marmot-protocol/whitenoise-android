@@ -31,6 +31,10 @@ internal data class ImageUploadDraft(
 }
 
 internal const val REMOVE_GROUP_IMAGE_MUTATION_KEY = "remove"
+private const val UPLOAD_GROUP_IMAGE_MUTATION_KEY_PREFIX = "upload:"
+private const val MUTATION_KEY_FIELD_SEPARATOR: Byte = 0
+private const val HEX_CHARACTERS_PER_BYTE = 2
+private const val UNSIGNED_BYTE_MASK = 0xff
 
 /**
  * Stable identity for retrying the two-commit legacy-avatar migration. The
@@ -41,11 +45,11 @@ internal const val REMOVE_GROUP_IMAGE_MUTATION_KEY = "remove"
 internal fun ImageUploadDraft.mutationKey(): String {
     val digest = MessageDigest.getInstance("SHA-256")
     digest.update(mediaType.toByteArray(Charsets.UTF_8))
-    digest.update(0)
+    digest.update(MUTATION_KEY_FIELD_SEPARATOR)
     val hash = digest.digest(plaintext)
-    return buildString(7 + hash.size * 2) {
-        append("upload:")
-        hash.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+    return buildString(UPLOAD_GROUP_IMAGE_MUTATION_KEY_PREFIX.length + hash.size * HEX_CHARACTERS_PER_BYTE) {
+        append(UPLOAD_GROUP_IMAGE_MUTATION_KEY_PREFIX)
+        hash.forEach { byte -> append("%02x".format(byte.toInt() and UNSIGNED_BYTE_MASK)) }
     }
 }
 

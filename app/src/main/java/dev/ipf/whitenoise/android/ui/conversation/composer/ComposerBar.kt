@@ -173,30 +173,6 @@ internal fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-internal fun FrozenGroupComposerNotice(modifier: Modifier = Modifier) {
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
-    ) {
-        Text(
-            text = stringResource(R.string.group_unrecoverable_notice),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 /**
  * Inserts an emoji at the composer's current selection, replacing any selected
  * range and moving the caret just after the inserted glyph. Kept pure so the

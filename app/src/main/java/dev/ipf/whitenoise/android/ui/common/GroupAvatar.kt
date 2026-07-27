@@ -54,6 +54,7 @@ internal fun rememberEncryptedGroupAvatar(
  * optional DM-peer profile URL, matching AppGroupRecordFfi precedence.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun GroupAvatar(
     appState: WhiteNoiseAppState,
     group: AppGroupRecordFfi,
