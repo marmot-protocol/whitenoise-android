@@ -141,9 +141,9 @@ import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -152,6 +152,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
@@ -2602,6 +2603,7 @@ internal fun ConversationScreen(
             seededSelfMember = controller.seededSelfMember,
             seededMembershipKnown = controller.seededMembershipKnown,
             assumeMemberUntilVerified = notificationOpenRequestId != 0L,
+            unrecoverable = controller.group.unrecoverable,
         )
     val mentionPicker =
         rememberConversationMentionPickerState(
@@ -2713,14 +2715,16 @@ internal fun ConversationScreen(
                                         .clickable { showDetails = true }
                                         .semantics { contentDescription = openDetailsDescription },
                             ) {
-                                Avatar(
+                                GroupAvatar(
+                                    appState = appState,
+                                    group = controller.group,
                                     title = controller.title(groupTitleCopy),
                                     // For a 1:1 DM the seed must match the peer-derived
                                     // avatar so the initials fallback stays stable, just
                                     // like the chat-list row (#837).
                                     seed = controller.avatarAccount ?: controller.group.groupIdHex,
                                     size = 36.dp,
-                                    pictureUrl = controller.avatarUrl,
+                                    fallbackPictureUrl = controller.avatarAccount?.let(appState::avatarUrl),
                                 )
                                 Column {
                                     Text(
@@ -2983,6 +2987,7 @@ internal fun ConversationScreen(
                                         .height(64.dp),
                                 )
                             ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                            ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                             ComposerGate.INVITE ->
                                 InvitePreviewActionBar(
                                     mutationInFlight = controller.mutationInFlight,

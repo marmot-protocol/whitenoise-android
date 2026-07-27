@@ -116,6 +116,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
+import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
@@ -1943,6 +1944,7 @@ internal fun MessageBubble(
                                             .height(64.dp),
                                     )
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.FROZEN -> FrozenGroupComposerNotice()
                                 ComposerGate.INVITE ->
                                     InvitePreviewActionBar(
                                         mutationInFlight = inviteMutationInFlight,

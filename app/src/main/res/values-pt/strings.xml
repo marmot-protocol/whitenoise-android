@@ -119,6 +119,7 @@
     <string name="group_empty_only_you_title">Este grupo tem apenas você</string>
     <string name="group_empty_invite_members">Convide pessoas quando estiver pronto.</string>
     <string name="you_are_no_longer_a_member">Você não pode enviar mensagens neste grupo porque não é mais membro.</string>
+    <string name="group_unrecoverable_notice">Este grupo está temporariamente bloqueado enquanto o White Noise verifica e repara o seu estado.</string>
     <string name="chat_row_draft_prefix">Rascunho: </string>
     <string name="jump_to_newest">Ir para a mais recente</string>
     <string name="scroll_to_top">Rolar para o topo</string>
@@ -572,6 +573,7 @@
     <string name="toast_couldnt_update_chat">Não foi possível atualizar a conversa</string>
     <string name="toast_group_updated">Grupo atualizado</string>
     <string name="toast_couldnt_update_group">Não foi possível atualizar o grupo</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">A nova imagem foi carregada, mas não foi possível remover a imagem antiga do grupo. Tente novamente para concluir a atualização.</string>
     <string name="toast_invite_sent">Convite enviado</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Convite enviado, mas não foi possível adicionar o administrador</string>
     <string name="toast_couldnt_add_members">Não foi possível adicionar membros. Tente novamente.</string>
@@ -680,6 +682,7 @@
     <string name="toast_notification_conversation_unavailable">Essa conversa não está mais disponível</string>
     <string name="attach_image">Anexar imagem</string>
     <string name="toast_couldnt_decode_image">Não foi possível decodificar a imagem</string>
+    <string name="toast_couldnt_prepare_image">Não foi possível transferir ou preparar a imagem.</string>
     <string name="toast_reattach_to_retry_media">Anexe novamente para tentar de novo</string>
     <string name="media_uploading">Enviando…</string>
     <string name="media_upload_failed">Falha no envio</string>
@@ -724,7 +727,9 @@
     <string name="group_image_search_action">Pesquisar</string>
     <string name="group_image_search_query_label">Pesquisa de imagem</string>
     <string name="group_image_search_query_hint">Pesquisar na web…</string>
+    <string name="group_image_search_privacy">A pesquisa na web envia a consulta e o endereço IP para o DuckDuckGo e para os servidores de imagens.</string>
     <string name="group_image_search_apply">Usar esta imagem</string>
+    <string name="group_image_choose_photo">Escolher das fotografias</string>
     <string name="group_image_search_enter_query">Insira um termo de pesquisa.</string>
     <string name="group_image_search_unavailable">Pesquisa de imagens temporariamente indisponível.</string>
     <string name="group_image_search_bad_response">A pesquisa de imagens retornou uma resposta inesperada.</string>
@@ -841,6 +846,10 @@
     <string name="profile_picture_paste_link">Colar um link</string>
     <string name="profile_picture_remove">Remover foto</string>
     <string name="profile_picture_use_link">Usar este link</string>
+    <string name="profile_banner">Banner do perfil</string>
+    <string name="profile_banner_hint">URL HTTPS público opcional do banner</string>
+    <string name="profile_banner_invalid">Apenas são permitidos URL HTTPS públicos de imagens.</string>
+    <string name="toast_couldnt_upload_profile_image">Não foi possível carregar a imagem do perfil.</string>
     <string name="profile_nip05_hint">nome@domínio</string>
     <string name="profile_nip05_invalid">Insira um endereço como name@example.com.</string>
     <string name="profile_lightning_hint">Endereço Lightning, ex. you@walletprovider.com</string>
@@ -892,7 +901,7 @@
     <string name="sign_out_and_wipe_confirm_field_label">Confirmação necessária</string>
     <string name="sign_out_delete_key_packages_label">Excluir pacotes de chaves dos relays</string>
     <string name="sign_out_delete_key_packages_help">Impede que desconhecidos convidem você para novos grupos enquanto estiver desconectado.</string>
-    <string name="toast_signed_out_locally_relay_retry">Sessão encerrada localmente — a limpeza dos relays será tentada novamente no próximo acesso.</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">Sessão encerrada localmente, mas a limpeza dos KeyPackages nos relays não foi concluída.</string>
     <string name="wipe_progress_title">Saindo e apagando…</string>
     <string name="wipe_stage_leaving_groups">Saindo dos grupos…</string>
     <string name="wipe_stage_deleting_key_packages">Excluindo pacotes de chaves…</string>

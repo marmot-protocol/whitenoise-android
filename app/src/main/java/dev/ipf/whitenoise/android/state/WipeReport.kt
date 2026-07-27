@@ -105,7 +105,7 @@ internal fun shortWipeSubject(hex: String): String = if (hex.length <= 12) hex e
 /**
  * How a non-destructive sign-out ended (#349). Local sign-out always
  * completes; this only distinguishes whether the engine's relay-side
- * KeyPackage cleanup finished or is left for the next sign-in to retry.
+ * KeyPackage cleanup finished.
  */
 enum class SignOutCompletion {
     /** Engine sign-out succeeded with no relay cleanup failures. */
@@ -113,10 +113,10 @@ enum class SignOutCompletion {
 
     /**
      * The engine call failed outright, or reported per-relay KeyPackage
-     * cleanup failures. The session is still signed out locally; the engine
-     * retries relay cleanup on the next sign-in (darkmatter#477).
+     * cleanup failures. The session is still signed out locally, but MDK does
+     * not retain a remote-deletion retry queue after this call.
      */
-    RelayCleanupPending,
+    RelayCleanupIncomplete,
 }
 
 /**
@@ -125,7 +125,7 @@ enum class SignOutCompletion {
  */
 internal fun signOutCompletion(engineOutcome: SignOutOutcomeFfi?): SignOutCompletion =
     if (engineOutcome == null || engineOutcome.keyPackageFailures.isNotEmpty()) {
-        SignOutCompletion.RelayCleanupPending
+        SignOutCompletion.RelayCleanupIncomplete
     } else {
         SignOutCompletion.Complete
     }

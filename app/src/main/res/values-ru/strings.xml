@@ -131,6 +131,7 @@
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
     <string name="group_empty_invite_members">Пригласите людей, когда будете готовы.</string>
     <string name="you_are_no_longer_a_member">Вы не можете отправлять сообщения в эту группу, так как больше не являетесь её участником.</string>
+    <string name="group_unrecoverable_notice">Эта группа временно заморожена, пока White Noise проверяет и восстанавливает её состояние.</string>
     <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
@@ -592,6 +593,7 @@
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>
     <string name="toast_group_updated">Группа обновлена</string>
     <string name="toast_couldnt_update_group">Не удалось обновить группу</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">Новое изображение загружено, но удалить прежнее изображение группы не удалось. Повторите попытку, чтобы завершить обновление.</string>
     <string name="toast_invite_sent">Приглашение отправлено</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Приглашение отправлено, но не удалось добавить администратора</string>
     <string name="toast_couldnt_add_members">Не удалось добавить участников. Попробуйте снова.</string>
@@ -706,6 +708,7 @@
     <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
     <string name="attach_image">Прикрепить изображение</string>
     <string name="toast_couldnt_decode_image">Не удалось декодировать изображение</string>
+    <string name="toast_couldnt_prepare_image">Не удалось загрузить или подготовить изображение.</string>
     <string name="toast_reattach_to_retry_media">Прикрепите ещё раз для повтора</string>
     <string name="media_uploading">Отправка…</string>
     <string name="media_upload_failed">Не удалось загрузить</string>
@@ -750,7 +753,9 @@
     <string name="group_image_search_action">Найти</string>
     <string name="group_image_search_query_label">Поиск изображения</string>
     <string name="group_image_search_query_hint">Искать в интернете…</string>
+    <string name="group_image_search_privacy">Веб-поиск передаёт ваш запрос и IP-адрес DuckDuckGo и серверам изображений.</string>
     <string name="group_image_search_apply">Использовать это изображение</string>
+    <string name="group_image_choose_photo">Выбрать из фотографий</string>
     <string name="group_image_search_enter_query">Введите поисковый запрос.</string>
     <string name="group_image_search_unavailable">Поиск изображений временно недоступен.</string>
     <string name="group_image_search_bad_response">Поиск изображений вернул неожиданный ответ.</string>
@@ -871,6 +876,10 @@
     <string name="profile_picture_paste_link">Вставить ссылку</string>
     <string name="profile_picture_remove">Удалить фото</string>
     <string name="profile_picture_use_link">Использовать ссылку</string>
+    <string name="profile_banner">Баннер профиля</string>
+    <string name="profile_banner_hint">Необязательный публичный HTTPS-адрес баннера</string>
+    <string name="profile_banner_invalid">Разрешены только публичные HTTPS-адреса изображений.</string>
+    <string name="toast_couldnt_upload_profile_image">Не удалось загрузить изображение профиля.</string>
     <string name="profile_nip05_hint">имя@домен</string>
     <string name="profile_nip05_invalid">Введите адрес вида name@example.com.</string>
     <string name="profile_lightning_hint">Lightning-адрес, например you@walletprovider.com</string>
@@ -924,7 +933,7 @@
     <string name="sign_out_and_wipe_confirm_field_label">Подтверждение</string>
     <string name="sign_out_delete_key_packages_label">Удалить пакеты ключей с реле</string>
     <string name="sign_out_delete_key_packages_help">Не даёт незнакомцам приглашать вас в новые группы, пока вы вышли из аккаунта.</string>
-    <string name="toast_signed_out_locally_relay_retry">Выход выполнен локально — очистка реле будет повторена при следующем входе.</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">Локальный выход выполнен, но очистка пакетов ключей на реле завершилась не полностью.</string>
     <string name="wipe_progress_title">Выход и стирание…</string>
     <string name="wipe_stage_leaving_groups">Выход из групп…</string>
     <string name="wipe_stage_deleting_key_packages">Удаление пакетов ключей…</string>

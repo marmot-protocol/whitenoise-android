@@ -113,6 +113,7 @@
     <string name="group_empty_only_you_title">這個群組目前只有你</string>
     <string name="group_empty_invite_members">準備好後邀請其他人。</string>
     <string name="you_are_no_longer_a_member">你無法向此群組發送訊息，因為你已不再是成員。</string>
+    <string name="group_unrecoverable_notice">White Noise 正在驗證並修復此群組的狀態，因此群組暫時處於凍結狀態。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳至最新</string>
     <string name="scroll_to_top">捲動到頂部</string>
@@ -563,6 +564,7 @@
     <string name="toast_couldnt_update_chat">無法更新聊天</string>
     <string name="toast_group_updated">群組已更新</string>
     <string name="toast_couldnt_update_group">無法更新群組</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">新圖片已上傳，但無法清除舊的群組圖片。請重試以完成更新。</string>
     <string name="toast_invite_sent">邀請已傳送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀請已送出，但無法新增管理員</string>
     <string name="toast_couldnt_add_members">新增成員失敗。請再試一次。</string>
@@ -668,6 +670,7 @@
     <string name="toast_notification_conversation_unavailable">該對話已無法使用</string>
     <string name="attach_image">附加圖片</string>
     <string name="toast_couldnt_decode_image">無法解碼該圖片</string>
+    <string name="toast_couldnt_prepare_image">無法下載或處理該圖片。</string>
     <string name="toast_reattach_to_retry_media">重新附加以重試</string>
     <string name="media_uploading">上傳中…</string>
     <string name="media_upload_failed">上傳失敗</string>
@@ -712,7 +715,9 @@
     <string name="group_image_search_action">搜尋</string>
     <string name="group_image_search_query_label">圖片搜尋</string>
     <string name="group_image_search_query_hint">在網路上搜尋…</string>
+    <string name="group_image_search_privacy">網頁搜尋會將你的查詢和 IP 位址傳送給 DuckDuckGo 和圖片伺服器。</string>
     <string name="group_image_search_apply">使用此圖片</string>
+    <string name="group_image_choose_photo">從照片中選擇</string>
     <string name="group_image_search_enter_query">請輸入搜尋關鍵字。</string>
     <string name="group_image_search_unavailable">圖片搜尋暫時無法使用。</string>
     <string name="group_image_search_bad_response">圖片搜尋傳回意外的回應。</string>
@@ -824,6 +829,10 @@
     <string name="profile_picture_paste_link">貼上連結</string>
     <string name="profile_picture_remove">移除頭像</string>
     <string name="profile_picture_use_link">使用此連結</string>
+    <string name="profile_banner">個人檔案橫幅</string>
+    <string name="profile_banner_hint">可選的公開 HTTPS 橫幅網址</string>
+    <string name="profile_banner_invalid">僅允許公開的 HTTPS 圖片網址。</string>
+    <string name="toast_couldnt_upload_profile_image">無法上傳個人檔案圖片。</string>
     <string name="profile_nip05_hint">名稱@網域</string>
     <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
     <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>
@@ -874,7 +883,7 @@
     <string name="sign_out_and_wipe_confirm_field_label">確認操作</string>
     <string name="sign_out_delete_key_packages_label">從中繼刪除金鑰包</string>
     <string name="sign_out_delete_key_packages_help">防止陌生人在你登出期間邀請你加入新群組。</string>
-    <string name="toast_signed_out_locally_relay_retry">已在本機登出 — 中繼清理將於下次登入時重試。</string>
+    <string name="toast_signed_out_relay_cleanup_incomplete">已在本機登出，但中繼上的金鑰套件清理未完全完成。</string>
     <string name="wipe_progress_title">正在登出並清除…</string>
     <string name="wipe_stage_leaving_groups">正在退出群組…</string>
     <string name="wipe_stage_deleting_key_packages">正在刪除金鑰包…</string>

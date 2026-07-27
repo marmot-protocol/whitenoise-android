@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +44,7 @@ internal fun Avatar(
     seed: String,
     size: androidx.compose.ui.unit.Dp,
     pictureUrl: String? = null,
+    picture: ImageBitmap? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -53,18 +55,21 @@ internal fun Avatar(
     // is intentional: produceState keys restart the load coroutine, but the
     // state holder itself must also be recreated to re-seed from the new cache
     // key instead of displaying the old bitmap transiently.
-    val image by key(seed, pictureUrl) {
+    val loadedUrlImage by key(seed, pictureUrl, picture) {
         produceState(AvatarImageLoader.peek(pictureUrl)) {
-            if (value == null && pictureUrl != null) value = AvatarImageLoader.load(pictureUrl)
+            if (value == null && pictureUrl != null && picture == null) {
+                value = AvatarImageLoader.load(pictureUrl)
+            }
         }
     }
+    val image = picture ?: loadedUrlImage
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
     ) {
         if (image != null) {
             Image(
-                bitmap = image!!,
+                bitmap = image,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

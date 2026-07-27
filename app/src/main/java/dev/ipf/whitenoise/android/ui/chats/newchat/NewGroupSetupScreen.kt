@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,14 +23,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -47,17 +51,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
+import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
+import kotlinx.coroutines.CancellationException
 
 /**
  * Final step of the New Group flow: name the group, preview the invited
@@ -75,13 +86,23 @@ internal fun NewGroupSetupScreen(
     var groupName by rememberSaveable { mutableStateOf("") }
     var retentionSecs by rememberSaveable { mutableLongStateOf(0L) }
     var showRetentionPicker by remember { mutableStateOf(false) }
+    var showImagePicker by remember { mutableStateOf(false) }
+    var imageDraft by remember { mutableStateOf<ImageUploadDraft?>(null) }
+    var imagePreparing by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val imagePreview = rememberImageUploadPreview(imageDraft)
 
     fun createGroupErrorMessage(throwable: Throwable): String = groupCreateFailureDetail(throwable, appState::chatMemberTitle).resolve(context)
 
-    val canCreate = canSubmitNewChatSheet(directMessage = false, busy = busy, pendingRecipient = "", groupName = groupName)
+    val canCreate =
+        canSubmitNewChatSheet(
+            directMessage = false,
+            busy = busy || imagePreparing,
+            pendingRecipient = "",
+            groupName = groupName,
+        )
 
     fun create() {
         // canCreate is a composition-time snapshot; the direct `busy` state
@@ -99,7 +120,13 @@ internal fun NewGroupSetupScreen(
         appState.launchMutation {
             runCatching {
                 appState.marmotIo {
-                    createGroup(account, groupName.trim(), recipients, null)
+                    createGroupWithInitialImage(
+                        account,
+                        groupName.trim(),
+                        recipients,
+                        null,
+                        imageDraft?.initialGroupImage(),
+                    )
                 }
             }.onSuccess { groupIdHex ->
                 if (retentionSecs > 0L) {
@@ -126,6 +153,23 @@ internal fun NewGroupSetupScreen(
         }
     }
 
+    fun prepareImage(load: suspend () -> ImageUploadDraft) {
+        if (imagePreparing || busy) return
+        imagePreparing = true
+        appState.launchMutation {
+            try {
+                imageDraft = load()
+                showImagePicker = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } finally {
+                imagePreparing = false
+            }
+        }
+    }
+
     // Installed unconditionally: a disabled handler would let back fall
     // through to the Activity while the create is mid-flight.
     BackHandler {
@@ -145,9 +189,11 @@ internal fun NewGroupSetupScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            Surface(
                 onClick = { create() },
-                containerColor =
+                enabled = canCreate,
+                shape = FloatingActionButtonDefaults.extendedFabShape,
+                color =
                     if (canCreate) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
@@ -159,14 +205,20 @@ internal fun NewGroupSetupScreen(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                     },
+                shadowElevation = 6.dp,
             ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                    }
+                    Spacer(Modifier.size(Dimens.spaceSm))
+                    Text(stringResource(R.string.create))
                 }
-                Spacer(Modifier.size(Dimens.spaceSm))
-                Text(stringResource(R.string.create))
             }
         },
     ) { padding ->
@@ -185,23 +237,72 @@ internal fun NewGroupSetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
                 ) {
                     val trimmedName = groupName.trim()
-                    if (trimmedName.isEmpty()) {
+                    val editImageLabel =
+                        stringResource(
+                            if (imageDraft == null) {
+                                R.string.group_image_search_set
+                            } else {
+                                R.string.group_image_search_edit
+                            },
+                        )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier =
+                            Modifier
+                                .size(72.dp)
+                                .clickable(
+                                    enabled = !busy && !imagePreparing,
+                                    onClickLabel = editImageLabel,
+                                    role = Role.Button,
+                                ) { showImagePicker = true },
+                    ) {
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier =
                                 Modifier
                                     .size(72.dp)
+                                    .clip(CircleShape),
+                        ) {
+                            if (trimmedName.isEmpty() && imagePreview == null) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(72.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Group,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                Avatar(
+                                    title = trimmedName.ifBlank { stringResource(R.string.new_group) },
+                                    seed = trimmedName,
+                                    size = 72.dp,
+                                    picture = imagePreview,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 4.dp, y = 4.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                Icons.Default.Group,
+                                Icons.Default.PhotoCamera,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
-                    } else {
-                        Avatar(title = trimmedName, seed = trimmedName, size = 72.dp)
                     }
                     TextField(
                         value = groupName,
@@ -276,6 +377,32 @@ internal fun NewGroupSetupScreen(
                 showRetentionPicker = false
                 retentionSecs = secs
             },
+        )
+    }
+
+    if (showImagePicker) {
+        ImageSearchSheet(
+            initialUrl = imageDraft?.sourceUrl.orEmpty(),
+            hasCurrentImage = imageDraft != null,
+            header = stringResource(R.string.group_image_search_title),
+            title = groupName.trim(),
+            seed = groupName.trim(),
+            urlLabel = stringResource(R.string.group_avatar_url),
+            applyInFlight = imagePreparing,
+            onApply = { picked ->
+                if (picked == null) {
+                    imageDraft = null
+                    showImagePicker = false
+                } else {
+                    prepareImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
+                }
+            },
+            onPickPhoto = { uri ->
+                prepareImage {
+                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                }
+            },
+            onDismiss = { if (!imagePreparing) showImagePicker = false },
         )
     }
 }

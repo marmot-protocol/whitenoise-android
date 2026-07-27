@@ -65,6 +65,7 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
@@ -3238,6 +3239,7 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "clearCrossAccountCaches" }
         profileCacheEpoch.incrementAndGet()
         accountScopedCaches.clearAll()
+        GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
     }
@@ -3252,8 +3254,9 @@ class WhiteNoiseAppState private constructor(
      *
      * An engine failure (relay unreachable, runtime error) must not strand
      * the user in a session they asked to leave: local sign-out still
-     * completes and the result is [SignOutCompletion.RelayCleanupPending] so
-     * the caller can hint that relay cleanup retries on the next sign-in.
+     * completes and the result is [SignOutCompletion.RelayCleanupIncomplete]
+     * so the caller can report that the best-effort relay cleanup did not
+     * fully finish.
      * Returns null only when no account is active.
      */
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
@@ -3293,8 +3296,8 @@ class WhiteNoiseAppState private constructor(
             }.onFailure {
                 appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
                 // The engine never deactivated the account, so queue a push
-                // disable for the next foreground sync; the relay-side
-                // KeyPackage cleanup is the engine's to retry on next sign-in.
+                // disable for the next foreground sync. MDK's relay-side
+                // KeyPackage cleanup is final for this call and is not queued.
                 pushTokenStore.recordPendingDisable(signedOutRef)
             }.getOrNull()
         clearContactPrivateDetailsForAccount(signedOutRef)
