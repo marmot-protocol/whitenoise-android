@@ -40,6 +40,8 @@ import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
+import dev.ipf.marmotkit.PushRegistrationShareOutcomeFfi
+import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -590,6 +592,17 @@ internal fun nativePushEnablementConfirmed(
     allAccountsReady: Boolean,
     activeAccountRegistered: Boolean,
 ): Boolean = allAccountsReady && activeAccountRegistered
+
+internal enum class PushRegistrationSharingState {
+    Complete,
+    PendingDurableRetry,
+}
+
+internal fun pushRegistrationSharingState(outcome: PushRegistrationShareOutcomeFfi): PushRegistrationSharingState =
+    when (outcome.status) {
+        PushRegistrationShareStatusFfi.COMPLETE -> PushRegistrationSharingState.Complete
+        PushRegistrationShareStatusFfi.PENDING -> PushRegistrationSharingState.PendingDurableRetry
+    }
 
 /**
  * A live notification subscription is a healthy local broadcast receiver and
@@ -5172,7 +5185,9 @@ class WhiteNoiseAppState private constructor(
         for (account in pushTokenStore.pendingClears()) {
             val cleared =
                 runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
-                    .onFailure {
+                    .onSuccess { outcome ->
+                        logPushRegistrationShareOutcome("pending clear", account, outcome)
+                    }.onFailure {
                         appStateDebug { "pending clearPushRegistration retry failed: ${it.readableMessage()}" }
                     }.isSuccess
             if (cleared) {
@@ -5216,15 +5231,17 @@ class WhiteNoiseAppState private constructor(
             )
         if (perAccountSyncedFingerprints[account] == fingerprint) return true
         return runCatching {
-            marmotIo {
-                upsertPushRegistration(
-                    accountRef = account,
-                    platform = PushPlatformFfi.FCM,
-                    rawToken = token,
-                    serverPubkeyHex = config.serverPubkeyHex,
-                    relayHint = config.relayHint,
-                )
-            }
+            val syncResult =
+                marmotIo {
+                    upsertPushRegistration(
+                        accountRef = account,
+                        platform = PushPlatformFfi.FCM,
+                        rawToken = token,
+                        serverPubkeyHex = config.serverPubkeyHex,
+                        relayHint = config.relayHint,
+                    )
+                }
+            logPushRegistrationShareOutcome("upsert", account, syncResult.share)
             // Re-read settings: a concurrent `setNativePushEnabled(false)` or
             // sign-out could have flipped the flag (and cleared the cache)
             // while upsertPushRegistration was suspended. If push is no
@@ -5330,11 +5347,29 @@ class WhiteNoiseAppState private constructor(
     private suspend fun clearPushRegistrationForAccountLocked(account: String) {
         perAccountSyncedFingerprints.remove(account)
         runCatchingCancellable { marmotIo { clearPushRegistration(account) } }
-            .onSuccess { pushTokenStore.clearPending(account) }
-            .onFailure {
+            .onSuccess { outcome ->
+                // PENDING means MarmotKit durably retained the clear and will
+                // retry group sharing; it is a successful local clear, not a
+                // reason to restore or roll back the registration.
+                logPushRegistrationShareOutcome("clear", account, outcome)
+                pushTokenStore.clearPending(account)
+            }.onFailure {
                 pushTokenStore.recordPendingClear(account)
                 appStateDebug { "clearPushRegistration failed (queued for retry): ${it.readableMessage()}" }
             }
+    }
+
+    private fun logPushRegistrationShareOutcome(
+        operation: String,
+        account: String,
+        outcome: PushRegistrationShareOutcomeFfi,
+    ) {
+        val state = pushRegistrationSharingState(outcome)
+        appStateDebug {
+            "push registration $operation sharing=$state account=${account.take(8)} " +
+                "attempted=${outcome.attemptedGroups} succeeded=${outcome.succeededGroups} " +
+                "failed=${outcome.failedGroups} pending=${outcome.pendingGroups}"
+        }
     }
 
     private suspend fun fetchFcmTokenOrNull(): String? {

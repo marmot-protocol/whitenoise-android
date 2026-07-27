@@ -15,7 +15,7 @@ import dev.ipf.whitenoise.android.ui.markdownVisibleSiblings
  * voice notes, files, and URLs.
  *
  * Everything is derived from data already on the message record — the `imeta`
- * attachment tags ([MediaReferenceParser]) and the parsed markdown body
+ * MarmotKit-parsed attachment tags ([MediaReferenceSupport]) and the parsed markdown body
  * ([AppMessageRecordFfi.contentTokens]) — so there is no new FFI or transport.
  * The sweep is O(N) over the records and allocation-light; per-record parsing
  * is cached across rebuilds so a new message does not force old `imeta` tags
@@ -114,14 +114,22 @@ object MediaInventory {
         return IMAGE_URL_EXTENSION.containsMatchIn(path)
     }
 
-    fun build(records: List<AppMessageRecordFfi>): Inventory {
+    fun build(
+        records: List<AppMessageRecordFfi>,
+        projectedMediaByMessageId: Map<String, List<MediaAttachmentReferenceFfi>> = emptyMap(),
+    ): Inventory {
         val images = ArrayList<MediaEntry>()
         val videos = ArrayList<MediaEntry>()
         val voice = ArrayList<MediaEntry>()
         val files = ArrayList<MediaEntry>()
         val urls = ArrayList<UrlEntry>()
         for (record in records) {
-            val recordInventory = cachedRecordInventory(record)
+            val recordInventory =
+                if (projectedMediaByMessageId.containsKey(record.messageIdHex)) {
+                    buildRecordInventory(record, projectedMediaByMessageId.getValue(record.messageIdHex))
+                } else {
+                    cachedRecordInventory(record)
+                }
             for (entry in recordInventory.media) {
                 val kind = entry.kind
                 bucketFor(kind, images, videos, voice, files).add(entry)
@@ -144,7 +152,14 @@ object MediaInventory {
         synchronized(recordCache) {
             recordCache[key]?.let { return it }
         }
-        val computed = buildRecordInventory(record)
+        val computed =
+            buildRecordInventory(
+                record,
+                MediaReferenceSupport.parseAllImetaTags(
+                    tags = record.tags,
+                    sourceEpoch = record.sourceEpoch ?: 0uL,
+                ),
+            )
         synchronized(recordCache) {
             recordCache[key] = computed
         }
@@ -166,9 +181,12 @@ object MediaInventory {
         return computed
     }
 
-    private fun buildRecordInventory(record: AppMessageRecordFfi): RecordInventory {
+    private fun buildRecordInventory(
+        record: AppMessageRecordFfi,
+        attachmentReferences: List<MediaAttachmentReferenceFfi>,
+    ): RecordInventory {
         val media = ArrayList<MediaEntry>()
-        for (reference in MediaReferenceParser.parseAllImetaTags(record.tags)) {
+        for (reference in attachmentReferences) {
             val kind = classify(reference)
             media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, kind, Source.Attachment(reference)))
         }
@@ -194,9 +212,9 @@ object MediaInventory {
 
     private fun classify(reference: MediaAttachmentReferenceFfi): Kind =
         when {
-            MediaReferenceParser.isImageMedia(reference) -> Kind.IMAGE
-            MediaReferenceParser.isVideoMedia(reference) -> Kind.VIDEO
-            MediaReferenceParser.isAudioMedia(reference) -> Kind.VOICE
+            MediaReferenceSupport.isImageMedia(reference) -> Kind.IMAGE
+            MediaReferenceSupport.isVideoMedia(reference) -> Kind.VIDEO
+            MediaReferenceSupport.isAudioMedia(reference) -> Kind.VOICE
             else -> Kind.FILE
         }
 

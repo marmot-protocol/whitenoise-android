@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 
 data class ReactionTally(
     val emoji: String,
@@ -438,6 +439,19 @@ object MessageProjector {
             ?: copy.mediaAttachment
 
     fun mediaPreviewFallback(message: AppMessageRecordFfi): MediaPreviewFallback? =
+        mediaPreviewFallback(
+            message = message,
+            representative =
+                MediaReferenceSupport.parseImetaTag(
+                    tags = message.tags,
+                    sourceEpoch = message.sourceEpoch ?: 0uL,
+                ),
+        )
+
+    internal fun mediaPreviewFallback(
+        message: AppMessageRecordFfi,
+        representative: MediaAttachmentReferenceFfi?,
+    ): MediaPreviewFallback? =
         if (isMedia(message)) {
             // The representative attachment comes from the same per-tag parse
             // the renderer uses; when no tag validates, fields are read from
@@ -445,7 +459,6 @@ object MessageProjector {
             // label — a flattened scan could mix `m` from one album tag with
             // `filename` from another and describe an attachment that isn't
             // the one rendered.
-            val representative = MediaReferenceParser.parseImetaTag(message.tags)
             if (representative != null) {
                 MediaPreviewFallback(
                     filename = representative.fileName.trim().takeIf { it.isNotEmpty() },
@@ -466,9 +479,22 @@ object MessageProjector {
     // picture" rather than a generic placeholder. Classified from the same
     // single tag [mediaPreviewFallback] reads. None for non-media messages.
     fun mediaKind(message: AppMessageRecordFfi): ReplyMediaKind =
+        mediaKind(
+            message = message,
+            representative =
+                MediaReferenceSupport.parseImetaTag(
+                    tags = message.tags,
+                    sourceEpoch = message.sourceEpoch ?: 0uL,
+                ),
+        )
+
+    internal fun mediaKind(
+        message: AppMessageRecordFfi,
+        representative: MediaAttachmentReferenceFfi?,
+    ): ReplyMediaKind =
         if (isMedia(message)) {
             replyMediaKindFromMime(
-                MediaReferenceParser.parseImetaTag(message.tags)?.mediaType
+                representative?.mediaType
                     ?: firstImetaTagField(message, "m"),
             )
         } else {

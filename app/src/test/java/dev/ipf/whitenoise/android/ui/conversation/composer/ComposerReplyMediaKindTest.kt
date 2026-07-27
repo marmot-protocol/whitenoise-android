@@ -1,50 +1,29 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ComposerReplyMediaKindTest {
     @Test
-    fun fallsBackToLegacyImetaWhenTypedMediaIsUnavailable() {
-        val legacyVideoTag = MediaReferenceParser.toImetaTag(attachment("clip.mp4", "video/mp4"))
-
+    fun noTypedOrCompatibilityMediaReturnsNone() {
         assertEquals(
-            ReplyMediaKind.Video,
-            composerReplyMediaKind(mediaFallback = null, tags = listOf(legacyVideoTag)),
+            ReplyMediaKind.None,
+            composerReplyMediaKind(mediaFallback = null, tags = emptyList(), sourceEpoch = null),
         )
     }
 
     @Test
-    fun typedMediaTakesPriorityOverLegacyImeta() {
-        val legacyVideoTag = MediaReferenceParser.toImetaTag(attachment("clip.mp4", "video/mp4"))
-
+    fun typedMediaTakesPriorityWithoutParsingCompatibilityTags() {
         assertEquals(
             ReplyMediaKind.Document,
             composerReplyMediaKind(
                 mediaFallback = MediaPreviewFallback(filename = "archive.zip", kind = ReplyMediaKind.Document),
-                tags = listOf(legacyVideoTag),
+                tags = listOf(MessageTagFfi(listOf("imeta", "invalid"))),
+                sourceEpoch = 4uL,
             ),
         )
     }
-
-    private fun attachment(
-        fileName: String,
-        mediaType: String,
-    ) = MediaAttachmentReferenceFfi(
-        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/blob")),
-        ciphertextSha256 = "aa".repeat(32),
-        plaintextSha256 = "bb".repeat(32),
-        nonceHex = "cc".repeat(12),
-        fileName = fileName,
-        mediaType = mediaType,
-        version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
-        sourceEpoch = 1uL,
-        dim = null,
-        thumbhash = null,
-    )
 }

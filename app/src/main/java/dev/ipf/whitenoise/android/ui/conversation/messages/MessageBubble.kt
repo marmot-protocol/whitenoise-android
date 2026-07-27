@@ -97,7 +97,7 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipe
 import dev.ipf.whitenoise.android.core.TimelineProjector
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -289,10 +289,11 @@ internal fun MessageBubbleFrame(
 internal fun rememberMessageMediaReferences(
     tags: List<MessageTagFfi>,
     messageIdHex: String,
-    perMessageMediaReferences: List<MediaAttachmentReferenceFfi>?,
+    sourceEpoch: ULong?,
+    projectedMedia: List<MediaAttachmentReferenceFfi>?,
 ): List<MediaAttachmentReferenceFfi> =
-    remember(tags, messageIdHex, perMessageMediaReferences) {
-        perMessageMediaReferences ?: MediaReferenceParser.parseAllImetaTags(tags)
+    remember(tags, messageIdHex, sourceEpoch, projectedMedia) {
+        projectedMedia ?: MediaReferenceSupport.parseAllImetaTags(tags, sourceEpoch ?: 0uL)
     }
 
 internal fun messageBubbleLongPressPositionInWindow(
@@ -918,17 +919,12 @@ internal fun MessageBubble(
                     } else {
                         controller.replyPreview(item, messageTextCopy)
                     }
-                // Prefer the controller's listMedia cache — it carries
-                // the receive-side `sourceEpoch`, which the imeta-tag
-                // parser can't recover (no epoch field in the wire
-                // format). Fall back to the imeta parser for optimistic
-                // bridge records that haven't been projected yet.
-                val perMessageMediaReferences = controller.mediaReferences[record.messageIdHex]
                 val mediaReferences =
                     rememberMessageMediaReferences(
                         tags = record.tags,
                         messageIdHex = record.messageIdHex,
-                        perMessageMediaReferences = perMessageMediaReferences,
+                        sourceEpoch = record.sourceEpoch,
+                        projectedMedia = item.projected?.media,
                     )
 
                 fun saveAttachments() {
@@ -941,7 +937,7 @@ internal fun MessageBubble(
                             mediaReferences.forEachIndexed { attachmentIndex, reference ->
                                 val saved =
                                     runCatching {
-                                        if (MediaReferenceParser.isVideoMedia(reference)) {
+                                        if (MediaReferenceSupport.isVideoMedia(reference)) {
                                             val file =
                                                 materializeVideoAttachment(
                                                     context = context,
@@ -999,21 +995,21 @@ internal fun MessageBubble(
                     remember(mediaReferences) {
                         mediaReferences
                             .withIndex()
-                            .filter { (_, ref) -> MediaReferenceParser.isImageMedia(ref) }
+                            .filter { (_, ref) -> MediaReferenceSupport.isImageMedia(ref) }
                             .toList()
                     }
                 val audioAttachments =
                     remember(mediaReferences) {
                         mediaReferences
                             .withIndex()
-                            .filter { (_, ref) -> MediaReferenceParser.isAudioMedia(ref) }
+                            .filter { (_, ref) -> MediaReferenceSupport.isAudioMedia(ref) }
                             .toList()
                     }
                 val videoAttachments =
                     remember(mediaReferences) {
                         mediaReferences
                             .withIndex()
-                            .filter { (_, ref) -> MediaReferenceParser.isVideoMedia(ref) }
+                            .filter { (_, ref) -> MediaReferenceSupport.isVideoMedia(ref) }
                             .toList()
                     }
                 val fileAttachments =
@@ -1021,9 +1017,9 @@ internal fun MessageBubble(
                         mediaReferences
                             .withIndex()
                             .filter { (_, ref) ->
-                                !MediaReferenceParser.isImageMedia(ref) &&
-                                    !MediaReferenceParser.isAudioMedia(ref) &&
-                                    !MediaReferenceParser.isVideoMedia(ref)
+                                !MediaReferenceSupport.isImageMedia(ref) &&
+                                    !MediaReferenceSupport.isAudioMedia(ref) &&
+                                    !MediaReferenceSupport.isVideoMedia(ref)
                             }.toList()
                     }
                 val mediaPendingName =
@@ -1225,7 +1221,7 @@ internal fun MessageBubble(
                         if (visualAttachments.size == 1) {
                             val entry = visualAttachments.first()
                             Box {
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                                     MediaVideoBubble(
                                         messageIdHex = record.messageIdHex,
                                         attachmentIndex = entry.index,
@@ -1330,7 +1326,7 @@ internal fun MessageBubble(
                         if (pendingVisualRefs.size == 1) {
                             val entry = pendingVisualRefs.first()
                             Box {
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                if (MediaReferenceSupport.isVideoMedia(entry.value)) {
                                     MediaVideoBubble(
                                         messageIdHex = record.messageIdHex,
                                         attachmentIndex = entry.index,
@@ -1957,7 +1953,7 @@ internal fun MessageBubble(
                                             replyingTo = controller.replyingTo,
                                             replyingToMedia =
                                                 controller.replyingTo
-                                                    ?.let { controller.mediaReferences[it.messageIdHex] }
+                                                    ?.let(controller::mediaReferencesFor)
                                                     .orEmpty(),
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },

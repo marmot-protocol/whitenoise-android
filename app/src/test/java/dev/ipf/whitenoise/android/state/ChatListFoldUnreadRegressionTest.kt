@@ -492,6 +492,8 @@ class ChatListFoldUnreadRegressionTest {
         firstUnreadMessageIdHex = firstUnreadMessageIdHex,
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = lastMessageAt,
     )
 

@@ -311,6 +311,8 @@ class ChatListSortingTest {
         firstUnreadMessageIdHex = "message-$groupId",
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = latestAt,
     )
 
@@ -351,6 +353,8 @@ class ChatListSortingTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = lastReadTimelineAt,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = updatedAt,
     )
 

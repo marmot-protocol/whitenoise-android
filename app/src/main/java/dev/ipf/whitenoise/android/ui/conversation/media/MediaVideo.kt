@@ -141,7 +141,7 @@ internal fun MediaVideoGridTile(
     LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Re-probe the controller cache right before using the epoch-0 bypass;
+        // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
         // the remembered entry snapshot only decides initial UI/download policy.
         if (
             !mine &&
@@ -394,7 +394,7 @@ internal fun MediaVideoBubble(
     LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Re-probe the controller cache right before using the epoch-0 bypass;
+        // Re-probe the decrypted-byte cache right before using the epoch-0 bypass;
         // the remembered entry snapshot only decides initial UI/download policy.
         if (
             !mine &&

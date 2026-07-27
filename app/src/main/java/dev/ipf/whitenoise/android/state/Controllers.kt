@@ -70,7 +70,7 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.media.MediaReferenceParser
+import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
@@ -164,26 +164,23 @@ data class ChatListItem(
             }
 
     val latestAt: ULong?
-        // Prefer the last message's timeline timestamp. When a chat has no last
-        // message, fall back to the last *read* timeline position before the
-        // projection's `updatedAt`:
+        // Prefer MDK's durable semantic activity timestamp. It is advanced by
+        // real conversation activity and retained across secure pruning, while
+        // `updatedAt` is merely the projection rebuild time. This keeps an
+        // all-pruned unread chat in its original position instead of promoting
+        // it when the prune rebuilds the row (#866).
         //
-        //   - `lastReadTimelineAt` is sourced from the read state, not the
-        //     message store (see storage-sqlite chat_list
-        //     `rebuild_chat_list_row_for_group_tx`), so it survives a
-        //     disappearing-message prune that empties the chat. Keying on it
-        //     keeps an all-expired chat sorted where its last visible message
-        //     sat instead of jumping to the top (issue #849).
-        //   - `updatedAt` is a cache-version field bumped to `now` on *every*
-        //     row rebuild — including a prune — so it must not be the primary
-        //     sort fallback. It still backs a genuinely new chat that has no
-        //     message and no read state yet: there it equals the group-create
-        //     time, sorting the new DM/group to the top (issue #321).
+        // The remaining chain is defensive compatibility for synthetic/legacy
+        // rows whose semantic timestamps are zero. `conversationCreatedAt`
+        // preserves the correct position for a genuinely empty conversation;
+        // `updatedAt` remains the final projection fallback.
         //
-        // All three are the same unix-seconds unit as `timelineAt`.
+        // All values use the same unix-seconds unit as `timelineAt`.
         get() =
-            projection?.lastMessage?.timelineAt
+            projection?.activitySortAt?.takeIf { it > 0uL }
+                ?: projection?.lastMessage?.timelineAt
                 ?: projection?.lastReadTimelineAt
+                ?: projection?.conversationCreatedAt?.takeIf { it > 0uL }
                 ?: projection?.updatedAt
                 ?: latest?.recordedAt
 
@@ -828,6 +825,33 @@ data class TimelineMessage(
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
 )
+
+/**
+ * Whether two timeline records would render the same bubble. Ephemeral
+ * observation/order timestamps are deliberately ignored, while every
+ * user-visible projection — including typed media — participates.
+ */
+internal fun timelineRecordsRenderEqual(
+    a: TimelineMessageRecordFfi,
+    b: TimelineMessageRecordFfi,
+): Boolean =
+    a.messageIdHex == b.messageIdHex &&
+        a.sourceMessageIdHex == b.sourceMessageIdHex &&
+        a.direction == b.direction &&
+        a.groupIdHex == b.groupIdHex &&
+        a.sender == b.sender &&
+        a.plaintext == b.plaintext &&
+        a.kind == b.kind &&
+        a.tags == b.tags &&
+        a.replyToMessageIdHex == b.replyToMessageIdHex &&
+        a.replyPreview == b.replyPreview &&
+        a.mediaJson == b.mediaJson &&
+        a.media == b.media &&
+        a.agentTextStreamJson == b.agentTextStreamJson &&
+        a.deleted == b.deleted &&
+        a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
+        a.invalidationStatus == b.invalidationStatus &&
+        a.reactions == b.reactions
 
 /**
  * Local optimistic state for an in-flight edit of one's own message: the new
@@ -3715,40 +3739,6 @@ private const val TIMELINE_BATCH_CAP = 32
 // one frame without delaying the next paint.
 private const val TIMELINE_BATCH_DRAIN_MS = 6L
 
-// Upper bound on how many consecutive media-bearing batches may coalesce
-// their `listMedia` full-scan refresh into a single deferred pass (issue
-// #843). `refreshMediaReferences` is an O(all media in the group) scan +
-// full map rebuild; during initial sync or a burst of media-bearing commits
-// the batch loop would otherwise pay it once per batch. We defer the scan
-// while the immediately queued next update is also media-bearing and flush it
-// at the first non-media boundary, but this cap forces a flush anyway so a
-// media-heavy producer that never lets the channel drain can't starve the
-// media cache — newly-projected rows still resolve their real `sourceEpoch`
-// promptly instead of falling back to the imeta parser's epoch-0 (broken
-// decryption).
-private const val TIMELINE_MEDIA_REFRESH_COALESCE_CAP = 16
-
-/**
- * Decide whether a deferred [ConversationController.refreshMediaReferences]
- * full scan should run now, given how many media-bearing batches have
- * coalesced so far and whether the next queued subscription update also
- * touches media (issue #843).
- *
- * Pure so it can be unit-tested without driving the whole subscription
- * pipeline. Flush at the first non-media boundary so an isolated media batch
- * still refreshes promptly and media refreshes cannot starve behind an
- * unrelated text/reaction burst, or when the coalesce [cap] is reached so a
- * media-heavy producer can't starve the media cache indefinitely.
- */
-internal fun shouldFlushCoalescedMediaRefresh(
-    coalescedBatches: Int,
-    nextUpdateTouchesMedia: Boolean,
-    cap: Int = TIMELINE_MEDIA_REFRESH_COALESCE_CAP,
-): Boolean {
-    if (coalescedBatches <= 0) return false
-    return !nextUpdateTouchesMedia || coalescedBatches >= cap
-}
-
 // DEBUG-only bound on the send-latency trace map (issue #913). Small: at most a
 // handful of sends are in flight before their echo reconciles; the cap only
 // guards against a burst of never-echoed sends leaking entries.
@@ -3813,14 +3803,6 @@ class ConversationController(
     // solo group emptied it.
     val seededMembershipKnown: Boolean = membershipSeed.seededMembershipKnown
 
-    // Typed media references keyed by `messageIdHex`. Populated from Rust's
-    // `listMedia` FFI — the only place the receive-side `source_epoch` is
-    // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose
-    // it). Without this, `downloadMedia` would be called with the imeta-tag
-    // parser's `sourceEpoch = 0` fallback and the Rust core would error
-    // with `missing encrypted media secret for epoch 0`.
-    var mediaReferences: Map<String, List<MediaAttachmentReferenceFfi>> by mutableStateOf(emptyMap())
-        private set
     var membersVerified by mutableStateOf(membershipSeed.membersVerified)
         private set
 
@@ -4273,12 +4255,6 @@ class ConversationController(
                         persistedLastReadTimelineAt,
                     )
                 ) {
-                    // Refresh references before pruning so evictExpiredMediaCaches can
-                    // map a pruned attachment's ciphertext back to its in-memory (L1)
-                    // plaintext/thumbnail entries. The open-snapshot path may not have
-                    // loaded them yet when this first sweep runs, and listMedia must be
-                    // read before secureDeleteExpired removes the rows.
-                    refreshMediaReferences()
                     runCatchingCancellable {
                         appState.withGroupCommitLock(account, group.groupIdHex) {
                             appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
@@ -4436,7 +4412,6 @@ class ConversationController(
                                     replaceWindow = true,
                                     updatePagination = true,
                                 )
-                            refreshMediaReferences()
                             initializeReadState(account)
                             streamIds
                         }.orEmpty()
@@ -4661,20 +4636,10 @@ class ConversationController(
                 }
             }
         try {
-            // Number of media-bearing batches whose `listMedia` full-scan
-            // refresh has been deferred but not yet flushed. Carried across
-            // loop iterations so adjacent media batches in a sync burst
-            // coalesce into a single scan (issue #843).
-            var coalescedMediaBatches = 0
-            // An update peeked off the channel while probing whether a burst
-            // is still draining; seeds the next batch so nothing is dropped.
-            var carried: TimelineSubscriptionUpdateFfi? = null
             while (isActive) {
                 val first =
-                    carried
-                        ?: timelineUpdates.receiveCatching().getOrNull()
+                    timelineUpdates.receiveCatching().getOrNull()
                         ?: break
-                carried = null
                 // Drain any updates that arrived within roughly one
                 // 120Hz frame budget into a single batch. The runtime
                 // can emit several updates back-to-back during a
@@ -4723,31 +4688,6 @@ class ConversationController(
                                 }
                             }
                         streamIdsLaunched += streamIds
-                    }
-                }
-                // `refreshMediaReferences` is an O(all media) scan + full
-                // map rebuild. Gate on whether any update in the batch
-                // actually touched media so text-only / reaction-only
-                // bursts don't pay for it, then coalesce adjacent
-                // media-bearing batches: defer the scan while the next
-                // queued update also touches media, and run it once at the
-                // first non-media boundary or when the coalesce cap is hit.
-                // See issue #843.
-                if (batchTouchedMedia(batch)) coalescedMediaBatches += 1
-                if (coalescedMediaBatches > 0) {
-                    // Peek the next update to learn whether the media burst
-                    // is still draining. A peeked update is carried into the
-                    // next batch so this probe never drops it; a queued
-                    // non-media update ends the media burst and flushes now.
-                    carried = timelineUpdates.tryReceive().getOrNull()
-                    val nextUpdateTouchesMedia = carried?.let(::updateTouchesMedia) == true
-                    if (shouldFlushCoalescedMediaRefresh(
-                            coalescedBatches = coalescedMediaBatches,
-                            nextUpdateTouchesMedia = nextUpdateTouchesMedia,
-                        )
-                    ) {
-                        coalescedMediaBatches = 0
-                        refreshMediaReferences()
                     }
                 }
                 // Scroll-driven mark-read in the UI layer handles
@@ -5308,6 +5248,15 @@ class ConversationController(
                     publishTimelineFromIndexes()
                     return
                 }
+                // MarmotKit owns the encrypted-media wire format. Build the
+                // optimistic bridge tags through the same native API that
+                // validates and publishes the projected attachments.
+                val imetaTags =
+                    appState.marmotIo {
+                        references.map { reference ->
+                            buildMediaImetaTag(account, group.groupIdHex, reference)
+                        }
+                    }
                 val summary =
                     appState.withGroupCommitLock(account, group.groupIdHex) {
                         appState.marmotIo {
@@ -5398,7 +5347,8 @@ class ConversationController(
                                 // sent), not the "📎 filename" optimistic placeholder, so
                                 // the bridge bubble is identical to the projected one.
                                 plaintext = retained.caption.orEmpty(),
-                                tags = references.map { MediaReferenceParser.toImetaTag(it) },
+                                tags = imetaTags,
+                                sourceEpoch = references.firstOrNull()?.sourceEpoch,
                             )
                         messageById[confirmedId] = confirmedRecord
                         optimisticMessages["msg:$confirmedId"] =
@@ -5737,15 +5687,18 @@ class ConversationController(
         expiredCiphertextSha256: Set<String>,
     ) {
         if (expiredCiphertextSha256.isEmpty()) return
-        // Map expired hashes to cache keys via the loaded references. Covers the
-        // in-memory tiers (L1 plaintext + decoded thumbnails, keyed by cache key
-        // and session-scoped, so anything resident is in mediaReferences) and the
-        // on-disk entries for loaded messages — including untagged ones such as
-        // self-sent media seeded at send time before its ciphertext hash existed.
+        // Map expired hashes to cache keys via the loaded projected rows.
+        // TimelineMessageRecordFfi.media is authoritative and already carries
+        // each attachment's real source epoch, so this needs no group-wide
+        // listMedia scan or parallel controller cache.
         val loadedKeys =
-            mediaReferences.flatMap { (messageIdHex, refs) ->
-                refs.mapIndexedNotNull { index, ref ->
-                    if (ref.ciphertextSha256 in expiredCiphertextSha256) mediaCacheKey(account, messageIdHex, index) else null
+            timelineRecords.values.flatMap { record ->
+                record.media.mapIndexedNotNull { index, reference ->
+                    if (reference.ciphertextSha256 in expiredCiphertextSha256) {
+                        mediaCacheKey(account, record.messageIdHex, index)
+                    } else {
+                        null
+                    }
                 }
             }
         removeMediaMemoryCacheKeys(
@@ -5756,8 +5709,8 @@ class ConversationController(
         withContext(Dispatchers.IO) {
             loadedKeys.forEach { appState.diskMediaCache.remove(it) }
             // Plus any disk entry stamped with an expired ciphertext tag — the
-            // only path that reaches media whose message isn't currently loaded
-            // (no mediaReferences entry), including across process restarts. #674 review.
+            // only path that reaches media whose message isn't currently loaded,
+            // including across process restarts. #674 review.
             appState.diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
         }
     }
@@ -5802,13 +5755,13 @@ class ConversationController(
     // defense in depth; the bundled native Blossom client independently
     // re-resolves, rejects every non-public address, pins the vetted addresses
     // for the actual socket, and repeats that validation on each redirect hop.
-    // MediaReferenceParser also rewrites fetchable locators from the parsed
+    // MediaReferenceSupport also rewrites fetchable locators from the parsed
     // authority before native sees them, so Kotlin and native do not disagree
     // about the raw locator host.
     private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi): MediaAttachmentReferenceFfi {
         val safeReference =
             withContext(Dispatchers.IO) {
-                MediaReferenceParser.safeDownloadReference(reference) { host ->
+                MediaReferenceSupport.safeDownloadReference(reference) { host ->
                     runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
                 }
             }
@@ -6931,6 +6884,21 @@ class ConversationController(
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
     /**
+     * Resolve attachment references without duplicating MarmotKit's projection
+     * state. A projected list is authoritative even when empty; tag parsing is
+     * reserved for optimistic/compatibility records that do not have a
+     * projected row yet.
+     */
+    fun mediaReferencesFor(item: TimelineMessage): List<MediaAttachmentReferenceFfi> = item.projected?.media ?: mediaReferencesFor(item.record)
+
+    fun mediaReferencesFor(record: AppMessageRecordFfi): List<MediaAttachmentReferenceFfi> =
+        timelineRecords[record.messageIdHex]?.media
+            ?: MediaReferenceSupport.parseAllImetaTags(
+                tags = record.tags,
+                sourceEpoch = record.sourceEpoch ?: 0uL,
+            )
+
+    /**
      * Load a focus/navigation source id and return the rendered message the
      * reader should scroll to. Reaction notifications carry the kind-7 event id;
      * if that source is only found after pagination, re-resolve it to the
@@ -6981,14 +6949,6 @@ class ConversationController(
             applyTimelinePage(page, replaceWindow = true, updatePagination = true)
             protectedTimelineMessageIds.clear()
             protectedTimelineMessageIds.addAll(timelineRecords.keys)
-            // The cached `mediaReferences` map only carries entries for
-            // messages that have been listMedia-projected at some prior
-            // point. Older-page rows landing fresh here would otherwise
-            // fall back to the imeta-tag parser, which hard-codes
-            // `sourceEpoch = 0` and breaks decryption on every image. Gate
-            // on whether the page actually contains a media-bearing row so
-            // a text-only history pull doesn't trigger the unbounded scan.
-            if (pageContainsMedia(page)) refreshMediaReferences()
             // "Made progress" = the window grew OR shifted to include older
             // ids. paginateBackwards() returns a bounded/capped full window,
             // so size can stay constant while content still advances backward.
@@ -7020,7 +6980,6 @@ class ConversationController(
                 if (hasLoadedOlderPages) {
                     protectedTimelineMessageIds.addAll(timelineRecords.keys)
                 }
-                if (pageContainsMedia(page)) refreshMediaReferences()
                 timelineRecords.size > priorMessageIds.size ||
                     timelineRecords.keys.any { it !in priorMessageIds }
             }
@@ -7076,12 +7035,7 @@ class ConversationController(
             }
         hasLoadedOlderPages = false
         protectedTimelineMessageIds.clear()
-        val streamIds = applyTimelinePage(page, replaceWindow = true, updatePagination = true)
-        // Full-window replacement: re-seed the typed media cache too so any
-        // freshly-projected media in the new window resolves to its real
-        // `sourceEpoch` instead of the imeta-tag fallback of 0.
-        if (pageContainsMedia(page)) refreshMediaReferences()
-        return streamIds
+        return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
     }
 
     /**
@@ -7098,8 +7052,8 @@ class ConversationController(
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
-        val refs = MediaReferenceParser.parseAllImetaTags(target.tags)
-        val mediaFallback = typedReplyMediaFallback(mediaReferences[targetMessageId].orEmpty())
+        val refs = mediaReferencesFor(target)
+        val mediaFallback = typedReplyMediaFallback(refs)
         val mediaKind =
             mediaFallback?.kind
                 ?: replyMediaKindFromMime(refs.firstOrNull()?.mediaType)
@@ -7469,7 +7423,7 @@ class ConversationController(
         val previousItemId = existing?.let(::projectedItemId)
         if (
             existing != null &&
-            recordsRenderEqual(existing, record) &&
+            timelineRecordsRenderEqual(existing, record) &&
             previousItemId != null &&
             timelineItemsById.containsKey(previousItemId)
         ) {
@@ -8216,64 +8170,6 @@ class ConversationController(
         }
     }
 
-    /**
-     * Whether [page] holds at least one record carrying a media attachment.
-     * Used to gate the hot-path call to [refreshMediaReferences] so a
-     * text-only / reaction-only timeline update doesn't trigger a full
-     * `listMedia(group, null)` SQLite scan on every projection batch.
-     */
-    private fun pageContainsMedia(page: TimelinePageFfi): Boolean = page.messages.any(::recordCarriesMedia)
-
-    /**
-     * Whether any update in [batch] carries a media attachment for this group,
-     * i.e. whether the batch should count toward a coalesced
-     * [refreshMediaReferences] pass (issue #843). Projections for other groups
-     * never touch this conversation's media, so they don't count.
-     */
-    private fun batchTouchedMedia(batch: List<TimelineSubscriptionUpdateFfi>): Boolean = batch.any(::updateTouchesMedia)
-
-    private fun updateTouchesMedia(update: TimelineSubscriptionUpdateFfi): Boolean =
-        when (update) {
-            is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
-            is TimelineSubscriptionUpdateFfi.Projection ->
-                update.update.update.groupIdHex == group.groupIdHex &&
-                    changesContainMedia(update.update.update.changes)
-        }
-
-    private fun changesContainMedia(changes: List<TimelineMessageChangeFfi>): Boolean =
-        changes.any { change ->
-            change is TimelineMessageChangeFfi.Upsert && recordCarriesMedia(change.message)
-        }
-
-    /** Cheap structural check: a kind:9 record whose tag list includes an
-     *  `imeta` entry is a media-bearing message under encrypted-media-v1. */
-    private fun recordCarriesMedia(record: TimelineMessageRecordFfi): Boolean = record.kind == 9uL && record.tags.any { it.values.firstOrNull() == "imeta" }
-
-    /**
-     * Pull typed media references from Rust and cache them by `messageIdHex`.
-     * Required so `downloadMedia` is called with the real `sourceEpoch`; the
-     * imeta-tag parser fallback hard-codes `sourceEpoch = 0` (no field in the
-     * wire format) and would otherwise fail every receive-side decryption
-     * with `missing encrypted media secret for epoch 0`.
-     */
-    private suspend fun refreshMediaReferences() {
-        val account = conversationAccountRef ?: return
-        runCatchingCancellable {
-            appState.marmotIo { listMedia(account, group.groupIdHex, null) }
-        }.onSuccess { records ->
-            // Group by messageId (one message → N attachments); sort each
-            // bucket by attachmentIndex so the bubble renders in album order.
-            mediaReferences =
-                records
-                    .groupBy { it.messageIdHex }
-                    .mapValues { (_, group) ->
-                        group.sortedBy { it.attachmentIndex }.map { it.reference }
-                    }
-        }.onFailure {
-            Log.w("DMConversation", "listMedia failed for ${group.groupIdHex.take(8)}", it)
-        }
-    }
-
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = conversationAccountIdHex ?: return
         // Engine-confirmed removal (UseAfterEviction). Record the same
@@ -8645,36 +8541,6 @@ class ConversationController(
         val entry = sendTraceByTempId.remove(optimisticId) ?: return
         sendTrace(entry.sequence, "echo-reconcile", traceElapsedMs(entry.startMs))
     }
-
-    /**
-     * Whether two timeline records would render the same bubble. Compares
-     * the user-visible fields — id, body, tags (incl. imeta), reply preview,
-     * media descriptor, reactions, direction, sender — and ignores the
-     * ephemeral fields (`receivedAt`, `timelineAt`) that vary between the
-     * Rust core's duplicate emits of the same logical event. Used by the
-     * `upsertProjectedRecord` short-circuit to avoid the remove-then-
-     * reinsert flash on no-op upserts.
-     */
-    private fun recordsRenderEqual(
-        a: TimelineMessageRecordFfi,
-        b: TimelineMessageRecordFfi,
-    ): Boolean =
-        a.messageIdHex == b.messageIdHex &&
-            a.sourceMessageIdHex == b.sourceMessageIdHex &&
-            a.direction == b.direction &&
-            a.groupIdHex == b.groupIdHex &&
-            a.sender == b.sender &&
-            a.plaintext == b.plaintext &&
-            a.kind == b.kind &&
-            a.tags == b.tags &&
-            a.replyToMessageIdHex == b.replyToMessageIdHex &&
-            a.replyPreview == b.replyPreview &&
-            a.mediaJson == b.mediaJson &&
-            a.agentTextStreamJson == b.agentTextStreamJson &&
-            a.deleted == b.deleted &&
-            a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
-            a.invalidationStatus == b.invalidationStatus &&
-            a.reactions == b.reactions
 
     companion object {
         // Streaming-debug rows. Synthetic timeline ids carry this prefix so the

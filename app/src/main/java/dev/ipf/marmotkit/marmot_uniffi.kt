@@ -1097,6 +1097,8 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1317,6 +1319,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_record_host_performance(`ptr`: Pointer,`operation`: RustBuffer.ByValue,`durationMs`: Long,`outcome`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_register_external_signer(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`signer`: Pointer,
@@ -1745,6 +1749,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_react_to_message(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_record_host_performance(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_register_external_signer(
@@ -2152,6 +2158,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_react_to_message() != 39138.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_record_host_performance() != 50448.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile() != 33641.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2263,7 +2272,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe() != 44173.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start() != 20136.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start() != 2138.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream() != 35574.toShort()) {
@@ -5063,6 +5072,14 @@ public interface MarmotInterface {
     suspend fun `reactToMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `emoji`: kotlin.String): SendSummaryFfi
     
     /**
+     * Record one approved host-app milestone.
+     *
+     * The operation is a closed enum and the exported metrics carry no
+     * caller-supplied labels.
+     */
+    fun `recordHostPerformance`(`operation`: HostPerformanceOperationFfi, `durationMs`: kotlin.ULong, `outcome`: HostPerformanceOutcomeFfi)
+    
+    /**
      * Fetch and cache an account's own Nostr kind:0 profile from `relays`.
      * After this resolves, `user_profile` / `display_name` return the
      * freshly-fetched metadata (name, picture, etc.) for that account.
@@ -5304,8 +5321,16 @@ public interface MarmotInterface {
     suspend fun `signOutAndWipe`(`accountRef`: kotlin.String): WipeOutcomeFfi
     
     /**
-     * Bring the runtime online: reconcile known accounts, start workers,
-     * subscribe to transport events.
+     * Bring the runtime to local readiness.
+     *
+     * On success, persisted account state is hydrated and worker-routed local
+     * reads are available. Relay activation, group-subscription registration,
+     * shared-directory synchronization, and initial catch-up continue
+     * asynchronously. Hosts should render local projections immediately and
+     * represent network progress separately.
+     *
+     * The binding signature and result type are unchanged; this local-ready
+     * completion point is the behavioral contract for this implementation.
      */
     suspend fun `start`()
     
@@ -7028,6 +7053,23 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Record one approved host-app milestone.
+     *
+     * The operation is a closed enum and the exported metrics carry no
+     * caller-supplied labels.
+     */override fun `recordHostPerformance`(`operation`: HostPerformanceOperationFfi, `durationMs`: kotlin.ULong, `outcome`: HostPerformanceOutcomeFfi)
+        = 
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_record_host_performance(
+        it, FfiConverterTypeHostPerformanceOperationFfi.lower(`operation`),FfiConverterULong.lower(`durationMs`),FfiConverterTypeHostPerformanceOutcomeFfi.lower(`outcome`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * Fetch and cache an account's own Nostr kind:0 profile from `relays`.
      * After this resolves, `user_profile` / `display_name` return the
      * freshly-fetched metadata (name, picture, etc.) for that account.
@@ -7937,8 +7979,16 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Bring the runtime online: reconcile known accounts, start workers,
-     * subscribe to transport events.
+     * Bring the runtime to local readiness.
+     *
+     * On success, persisted account state is hydrated and worker-routed local
+     * reads are available. Relay activation, group-subscription registration,
+     * shared-directory synchronization, and initial catch-up continue
+     * asynchronously. Hosts should render local projections immediately and
+     * represent network progress separately.
+     *
+     * The binding signature and result type are unchanged; this local-ready
+     * completion point is the behavioral contract for this implementation.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -10536,6 +10586,8 @@ data class ChatListRowFfi (
     var `firstUnreadMessageIdHex`: kotlin.String?, 
     var `lastReadMessageIdHex`: kotlin.String?, 
     var `lastReadTimelineAt`: kotlin.ULong?, 
+    var `conversationCreatedAt`: kotlin.ULong, 
+    var `activitySortAt`: kotlin.ULong, 
     var `updatedAt`: kotlin.ULong, 
     /**
      * Whether the local account is still a member of this group, and if not,
@@ -10569,6 +10621,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
             FfiConverterTypeSelfMembershipFfi.read(buf),
         )
     }
@@ -10589,6 +10643,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.allocationSize(value.`firstUnreadMessageIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`lastReadMessageIdHex`) +
             FfiConverterOptionalULong.allocationSize(value.`lastReadTimelineAt`) +
+            FfiConverterULong.allocationSize(value.`conversationCreatedAt`) +
+            FfiConverterULong.allocationSize(value.`activitySortAt`) +
             FfiConverterULong.allocationSize(value.`updatedAt`) +
             FfiConverterTypeSelfMembershipFfi.allocationSize(value.`selfMembership`)
     )
@@ -10609,6 +10665,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.write(value.`firstUnreadMessageIdHex`, buf)
             FfiConverterOptionalString.write(value.`lastReadMessageIdHex`, buf)
             FfiConverterOptionalULong.write(value.`lastReadTimelineAt`, buf)
+            FfiConverterULong.write(value.`conversationCreatedAt`, buf)
+            FfiConverterULong.write(value.`activitySortAt`, buf)
             FfiConverterULong.write(value.`updatedAt`, buf)
             FfiConverterTypeSelfMembershipFfi.write(value.`selfMembership`, buf)
     }
@@ -14666,6 +14724,70 @@ public object FfiConverterTypeGroupEvolutionPhaseFfi: FfiConverterRustBuffer<Gro
     override fun allocationSize(value: GroupEvolutionPhaseFfi) = 4UL
 
     override fun write(value: GroupEvolutionPhaseFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class HostPerformanceOperationFfi {
+    
+    SPLASH_READY,
+    FOREGROUND_LOCAL_READY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHostPerformanceOperationFfi: FfiConverterRustBuffer<HostPerformanceOperationFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        HostPerformanceOperationFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: HostPerformanceOperationFfi) = 4UL
+
+    override fun write(value: HostPerformanceOperationFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class HostPerformanceOutcomeFfi {
+    
+    SUCCESS,
+    FAILURE;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHostPerformanceOutcomeFfi: FfiConverterRustBuffer<HostPerformanceOutcomeFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        HostPerformanceOutcomeFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: HostPerformanceOutcomeFfi) = 4UL
+
+    override fun write(value: HostPerformanceOutcomeFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

@@ -149,12 +149,27 @@ class ChatListSortKeyTest {
         assertEquals(listOf("ffff-last-by-hex", "0000-first-by-hex"), sorted.map { it.id })
     }
 
+    @Test
+    fun allPrunedUnreadChatUsesDurableActivityTimestamp() {
+        val item =
+            item(
+                groupId = "pruned-unread",
+                groupName = "Pruned",
+                projectedActivitySortAt = 120uL,
+                projectedUpdatedAt = 900uL,
+            )
+
+        assertEquals(120uL, item.latestAt)
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private fun item(
         groupId: String,
         groupName: String,
         projectedTitle: String? = null,
+        projectedActivitySortAt: ULong? = null,
+        projectedUpdatedAt: ULong = 0uL,
         otherMemberAccount: String? = null,
         memberCount: Int = 0,
         latestAt: ULong? = null,
@@ -165,13 +180,26 @@ class ChatListSortKeyTest {
             otherMemberAccount = otherMemberAccount,
             memberCount = memberCount,
             memberSnapshot = null,
-            projection = projectedTitle?.let { row(groupId, groupName, it) },
+            projection =
+                if (projectedTitle != null || projectedActivitySortAt != null) {
+                    row(
+                        groupId = groupId,
+                        groupName = groupName,
+                        title = projectedTitle.orEmpty(),
+                        activitySortAt = projectedActivitySortAt ?: 0uL,
+                        updatedAt = projectedUpdatedAt,
+                    )
+                } else {
+                    null
+                },
         )
 
     private fun row(
         groupId: String,
         groupName: String,
         title: String,
+        activitySortAt: ULong = 0uL,
+        updatedAt: ULong = 0uL,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -189,7 +217,9 @@ class ChatListSortKeyTest {
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
-        updatedAt = 0uL,
+        conversationCreatedAt = 0uL,
+        activitySortAt = activitySortAt,
+        updatedAt = updatedAt,
     )
 
     private fun group(

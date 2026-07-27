@@ -46,7 +46,7 @@ class MessageAttachmentSaveTest {
 
         assertTrue(
             "video saves must stream the materialized file instead of resolving another ByteArray",
-            "MediaReferenceParser.isVideoMedia(reference)" in saveBody &&
+            "MediaReferenceSupport.isVideoMedia(reference)" in saveBody &&
                 "materializeVideoAttachment(" in saveBody &&
                 "saveVideoToGallery(" in saveBody,
         )

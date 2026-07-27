@@ -20,14 +20,17 @@ class MediaInventoryTest {
 
     @Test
     fun classifiesAttachmentsByMimeIntoTypedBuckets() {
+        val projectedMedia =
+            mapOf(
+                "m1" to listOf(attachment("image/jpeg", "photo.jpg")),
+                "m2" to listOf(attachment("video/mp4", "clip.mp4")),
+                "m3" to listOf(attachment("audio/mp4", "voice.m4a")),
+                "m4" to listOf(attachment("application/pdf", "doc.pdf")),
+            )
         val inventory =
             MediaInventory.build(
-                listOf(
-                    record(id = "m1", attachments = listOf(attachment("image/jpeg", "photo.jpg"))),
-                    record(id = "m2", attachments = listOf(attachment("video/mp4", "clip.mp4"))),
-                    record(id = "m3", attachments = listOf(attachment("audio/mp4", "voice.m4a"))),
-                    record(id = "m4", attachments = listOf(attachment("application/pdf", "doc.pdf"))),
-                ),
+                records = projectedMedia.keys.map(::record),
+                projectedMediaByMessageId = projectedMedia,
             )
         assertEquals(listOf("m1"), inventory.images.map { it.messageIdHex })
         assertEquals(listOf("m2"), inventory.videos.map { it.messageIdHex })
@@ -38,9 +41,15 @@ class MediaInventoryTest {
 
     @Test
     fun albumMessageWithMultipleImetaTagsCountsEachAttachment() {
+        val projectedMedia =
+            listOf(
+                attachment("image/png", "a.png"),
+                attachment("image/png", "b.png"),
+            )
         val inventory =
             MediaInventory.build(
-                listOf(record(id = "album", attachments = listOf(attachment("image/png", "a.png"), attachment("image/png", "b.png")))),
+                records = listOf(record(id = "album")),
+                projectedMediaByMessageId = mapOf("album" to projectedMedia),
             )
         assertEquals(2, inventory.images.size)
         assertTrue(inventory.images.all { it.source is MediaInventory.Source.Attachment })
@@ -132,12 +141,15 @@ class MediaInventoryTest {
 
     @Test
     fun preservesTimelineOrderAcrossRecords() {
+        val projectedMedia =
+            mapOf(
+                "first" to listOf(attachment("image/jpeg", "1.jpg")),
+                "second" to listOf(attachment("image/jpeg", "2.jpg")),
+            )
         val inventory =
             MediaInventory.build(
-                listOf(
-                    record(id = "first", attachments = listOf(attachment("image/jpeg", "1.jpg"))),
-                    record(id = "second", attachments = listOf(attachment("image/jpeg", "2.jpg"))),
-                ),
+                records = listOf(record(id = "first"), record(id = "second")),
+                projectedMediaByMessageId = projectedMedia,
             )
         assertEquals(listOf("first", "second"), inventory.images.map { it.messageIdHex })
     }
@@ -229,8 +241,8 @@ class MediaInventoryTest {
             plaintext = "",
             contentTokens = body,
             kind = 9uL,
-            tags = attachments.map { MediaReferenceParser.toImetaTag(it) },
-            sourceEpoch = null,
+            tags = emptyList(),
+            sourceEpoch = attachments.firstOrNull()?.sourceEpoch,
             retentionSeconds = null,
             retentionExpiresAt = null,
             recordedAt = 0uL,

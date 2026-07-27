@@ -204,6 +204,8 @@ class MarkReadChatListProjectionTest {
         firstUnreadMessageIdHex = lastMessageId,
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 0uL,
         updatedAt = 100uL,
     )
 

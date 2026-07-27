@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -550,10 +553,10 @@ class MessageProjectorTest {
     }
 
     @Test
-    fun albumMediaLabelDescribesTheRepresentativeAttachmentNotAFlattenedScan() {
-        // First tag is malformed (only an `m` field): the renderer skips it,
-        // so the label must come from the first VALID attachment — not mix
-        // the malformed tag's media type with the valid tag's filename.
+    fun albumMediaLabelDescribesMarmotKitRepresentativeNotAFlattenedScan() {
+        // The first tag is malformed (only an `m` field). MarmotKit supplies
+        // the first valid attachment as the representative, so Android must
+        // use that typed reference instead of mixing fields across tags.
         val malformedVideoTag = MessageTagFfi(listOf("imeta", "m video/mp4"))
         val validImageTag =
             MessageTagFfi(
@@ -577,9 +580,27 @@ class MessageProjectorTest {
                 tags = listOf(malformedVideoTag, validImageTag),
             )
 
-        assertEquals(ReplyMediaKind.Photo, MessageProjector.mediaKind(message))
-        assertEquals("photo.jpg", MessageProjector.mediaPreviewFallback(message)?.filename)
+        val representative = mediaReference(fileName = "photo.jpg", mediaType = "image/jpeg")
+
+        assertEquals(ReplyMediaKind.Photo, MessageProjector.mediaKind(message, representative))
+        assertEquals("photo.jpg", MessageProjector.mediaPreviewFallback(message, representative)?.filename)
     }
+
+    private fun mediaReference(
+        fileName: String,
+        mediaType: String,
+    ) = MediaAttachmentReferenceFfi(
+        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://media.example/blob")),
+        ciphertextSha256 = "aa".repeat(32),
+        plaintextSha256 = "bb".repeat(32),
+        nonceHex = "cc".repeat(12),
+        fileName = fileName,
+        mediaType = mediaType,
+        version = EncryptedMediaVersionFfi.V1,
+        sourceEpoch = 1uL,
+        dim = null,
+        thumbhash = null,
+    )
 
     @Test
     fun unparseableAlbumFallsBackToTheFirstTagOnlyNeverAcrossTags() {
