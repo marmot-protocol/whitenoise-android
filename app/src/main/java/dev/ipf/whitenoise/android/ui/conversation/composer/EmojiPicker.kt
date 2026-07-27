@@ -216,6 +216,12 @@ internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
 
+private const val EMOJI_PICKER_COLUMN_COUNT = 10
+
+private val EmojiPickerGridRowSpacing = 2.dp
+
+private val EmojiSectionHeaderVerticalPadding = 4.dp
+
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
 private data class EmojiSearchSnapshot(
@@ -484,10 +490,10 @@ private fun EmojiPickerContent(
             }
             if (!searchOpen || searchQuery.isBlank()) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(9),
+                    columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
                     state = gridState,
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
                 ) {
                     if (messageReactions.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -626,10 +632,10 @@ private fun EmojiSearchResultsGrid(
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(9),
+        columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
         modifier = modifier,
         contentPadding = PaddingValues(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
     ) {
         items(results, key = { it.emoji }) { entry ->
             EmojiSearchResultCell(
@@ -785,7 +791,13 @@ private fun EmojiRailIconButton(
 private fun EmojiSectionHeader(title: String) {
     Text(
         text = title,
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    top = EmojiSectionHeaderVerticalPadding,
+                    bottom = EmojiSectionHeaderVerticalPadding,
+                ),
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
