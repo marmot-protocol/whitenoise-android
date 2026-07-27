@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -80,12 +81,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
@@ -215,6 +219,27 @@ internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
     }
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
+
+private const val EMOJI_PICKER_COLUMN_COUNT = 10
+
+private val EmojiPickerGridRowSpacing = 2.dp
+
+private val EmojiSectionHeaderVerticalPadding = 4.dp
+
+internal const val EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION = 0.85f
+
+internal fun emojiPickerCellTextMetrics(
+    cellSizeDp: Dp,
+    baseStyle: TextStyle,
+    densityFontScale: Float,
+): Pair<TextUnit, TextUnit> {
+    val maxGlyphDp = cellSizeDp * EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
+    val fittedFontSize =
+        minOf(maxGlyphDp.value, baseStyle.fontSize.value * densityFontScale).sp / densityFontScale
+    val fittedLineHeight =
+        minOf(maxGlyphDp.value, baseStyle.lineHeight.value * densityFontScale).sp / densityFontScale
+    return fittedFontSize to fittedLineHeight
+}
 
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
@@ -484,10 +509,10 @@ private fun EmojiPickerContent(
             }
             if (!searchOpen || searchQuery.isBlank()) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(9),
+                    columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
                     state = gridState,
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
                 ) {
                     if (messageReactions.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -626,10 +651,10 @@ private fun EmojiSearchResultsGrid(
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(9),
+        columns = GridCells.Fixed(EMOJI_PICKER_COLUMN_COUNT),
         modifier = modifier,
         contentPadding = PaddingValues(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(EmojiPickerGridRowSpacing),
     ) {
         items(results, key = { it.emoji }) { entry ->
             EmojiSearchResultCell(
@@ -645,7 +670,7 @@ private fun EmojiSearchResultCell(
     emoji: String,
     onClick: () -> Unit,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -654,7 +679,21 @@ private fun EmojiSearchResultCell(
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(emoji, style = MaterialTheme.typography.headlineMedium)
+        val fontScale = LocalDensity.current.fontScale
+        val baseStyle = MaterialTheme.typography.headlineMedium
+        val (fittedFontSize, fittedLineHeight) =
+            emojiPickerCellTextMetrics(
+                cellSizeDp = maxWidth,
+                baseStyle = baseStyle,
+                densityFontScale = fontScale,
+            )
+        Text(
+            emoji,
+            style = baseStyle,
+            fontSize = fittedFontSize,
+            lineHeight = fittedLineHeight,
+            maxLines = 1,
+        )
     }
 }
 
@@ -785,7 +824,13 @@ private fun EmojiRailIconButton(
 private fun EmojiSectionHeader(title: String) {
     Text(
         text = title,
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    top = EmojiSectionHeaderVerticalPadding,
+                    bottom = EmojiSectionHeaderVerticalPadding,
+                ),
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
