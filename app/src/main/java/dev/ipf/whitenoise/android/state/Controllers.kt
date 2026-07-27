@@ -237,6 +237,13 @@ data class ChatListItem(
     /** [hasUnread] with the removed-group suppression applied (#625). */
     fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
 
+    /** Delivery tick for the projected last message, or null for no tick. */
+    fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
+        projection?.lastMessage
+            ?.takeUnless { it.deleted }
+            ?.deliveryState
+            ?.outgoingIndicator()
+
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",
@@ -810,6 +817,19 @@ enum class OutgoingMessageIndicator {
     Sent,
     Failed,
 }
+
+/**
+ * Chat-list delivery tick for the row's projected last message. The engine
+ * scopes the state itself: NOT_APPLICABLE covers incoming messages, so no
+ * sender comparison is needed here.
+ */
+fun ChatListMessageDeliveryStateFfi.outgoingIndicator(): OutgoingMessageIndicator? =
+    when (this) {
+        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE -> null
+        ChatListMessageDeliveryStateFfi.PENDING -> OutgoingMessageIndicator.Sending
+        ChatListMessageDeliveryStateFfi.DELIVERED -> OutgoingMessageIndicator.Sent
+        ChatListMessageDeliveryStateFfi.FAILED -> OutgoingMessageIndicator.Failed
+    }
 
 fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
     when (this) {

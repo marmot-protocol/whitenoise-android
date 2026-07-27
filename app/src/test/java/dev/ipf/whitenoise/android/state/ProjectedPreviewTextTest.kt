@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -47,6 +48,25 @@ class ProjectedPreviewTextTest {
             item(preview = preview(plaintext = "look at this", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u))
 
         assertEquals("look at this", item.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun deliveryIndicatorMapsEngineStatesAndHidesInapplicable() {
+        assertEquals(OutgoingMessageIndicator.Sending, ChatListMessageDeliveryStateFfi.PENDING.outgoingIndicator())
+        assertEquals(OutgoingMessageIndicator.Sent, ChatListMessageDeliveryStateFfi.DELIVERED.outgoingIndicator())
+        assertEquals(OutgoingMessageIndicator.Failed, ChatListMessageDeliveryStateFfi.FAILED.outgoingIndicator())
+        assertNull(ChatListMessageDeliveryStateFfi.NOT_APPLICABLE.outgoingIndicator())
+    }
+
+    @Test
+    fun projectedDeliveryIndicatorSkipsDeletedLastMessages() {
+        val delivered =
+            item(preview = preview(plaintext = "x", deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED))
+        val deletedRow =
+            item(preview = preview(plaintext = "x", deleted = true, deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED))
+
+        assertEquals(OutgoingMessageIndicator.Sent, delivered.projectedDeliveryIndicator())
+        assertNull(deletedRow.projectedDeliveryIndicator())
     }
 
     @Test
@@ -222,6 +242,7 @@ class ProjectedPreviewTextTest {
         deleted: Boolean = false,
         attachmentKind: ChatListAttachmentKindFfi? = null,
         attachmentCount: UInt = 0u,
+        deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     ) = ChatListMessagePreviewFfi(
         messageIdHex = "preview-message",
         sender = "sender",
@@ -233,7 +254,7 @@ class ProjectedPreviewTextTest {
         deleted = deleted,
         attachmentKind = attachmentKind,
         attachmentCount = attachmentCount,
-        deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        deliveryState = deliveryState,
     )
 
     private fun latest(
