@@ -337,6 +337,15 @@ internal class ConversationScrollCoordinator(
     }
 }
 
+internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
+    programmaticJump(
+        targetMessageId = null,
+        reason = ConversationScrollReason.JumpToNewest,
+        resultingMode = ConversationScrollMode.FollowingTail,
+    ) {
+        animateScrollToItem(targetIndex)
+    }
+
 internal suspend fun ConversationScrollCoordinator.restoreViewport(
     snapshot: ConversationScrollBookmark,
     resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,

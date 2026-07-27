@@ -230,40 +230,28 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
-    fun partialJumpToNewestSettlesItsResolvedAnchorBeforeAReanchor() =
+    fun jumpToNewestAlwaysAnimatesToThePhysicalBottomAndFollowsTail() =
         runTest {
-            val writer = RecordingScrollWriter()
-            val coordinator =
-                ConversationScrollCoordinator(
-                    writer = writer,
-                    initialMode = ConversationScrollMode.ReadingHistory("stale", 9),
-                )
-            coordinator.settleReadingAt(anchor(messageId = "stale", listIndex = 7, pixelOffset = 9))
-            val reached = anchor(messageId = "read-anchor", listIndex = 30, pixelOffset = 14)
+            listOf(
+                ConversationScrollMode.FollowingTail,
+                ConversationScrollMode.ReadingHistory("read-anchor", 14),
+                ConversationScrollMode.ReadingHistory("missing-anchor", 14),
+                ConversationScrollMode.ReadingHistory(null, 14),
+            ).forEach { initialMode ->
+                val writer = RecordingScrollWriter()
+                val coordinator =
+                    ConversationScrollCoordinator(
+                        writer = writer,
+                        initialMode = initialMode,
+                    )
 
-            val jumped =
-                coordinator.programmaticJump(
-                    targetMessageId = "read-anchor",
-                    reason = ConversationScrollReason.JumpToNewest,
-                    settledReadingAnchor = { reached },
-                ) {
-                    animateScrollToItem(30)
-                }
-            coordinator.reanchorReadingHistory { saved ->
-                assertEquals("read-anchor", saved.messageId)
-                assertEquals("msg:read-anchor", saved.itemId)
-                44
+                val jumped = coordinator.jumpToNewest(targetIndex = 88)
+
+                assertTrue(jumped)
+                assertEquals(listOf(ScrollWrite.Animate(88, 0)), writer.writes)
+                assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+                assertTrue(coordinator.isFollowingTail)
             }
-
-            assertTrue(jumped)
-            assertEquals(
-                listOf(
-                    ScrollWrite.Animate(30, 0),
-                    ScrollWrite.Snap(44, 14),
-                ),
-                writer.writes,
-            )
-            assertEquals(ConversationScrollMode.ReadingHistory("read-anchor", 14), coordinator.mode)
         }
 
     @Test

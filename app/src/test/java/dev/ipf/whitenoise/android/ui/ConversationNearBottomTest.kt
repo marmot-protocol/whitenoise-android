@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,9 +10,21 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -19,8 +32,10 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollReason
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollAnchor
 import dev.ipf.whitenoise.android.ui.conversation.isNearBottom
+import dev.ipf.whitenoise.android.ui.conversation.jumpToNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationNearBottom
 import dev.ipf.whitenoise.android.ui.conversation.restoreViewport
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,8 +62,19 @@ class ConversationNearBottomTest {
         LazyColumn(modifier = modifier, state = listState) {
             item { Spacer(Modifier.height(1.dp)) }
             item { Spacer(Modifier.height(1.dp)) }
-            items((0 until timelineSize).toList()) {
-                Box(Modifier.fillMaxWidth().height(50.dp))
+            items((0 until timelineSize).toList()) { index ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .then(
+                            if (index == timelineSize - 1) {
+                                Modifier.testTag(TAIL_ROW_TAG)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
             }
             item { Spacer(Modifier.height(1.dp)) }
         }
@@ -84,6 +110,67 @@ class ConversationNearBottomTest {
                 "Jump FAB should show when scrolled up after timeline hydration",
                 nearBottomHolder[0]!!,
             )
+        }
+    }
+
+    @Test
+    fun jumpToNewestWithUnreadAndOffscreenReadAnchorReachesTailInOneTap() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val jumpToNewestLabel = context.getString(R.string.jump_to_newest)
+        val listState = LazyListState()
+        val timelineSize = 50
+        val bottomTimelineIndex = timelineSize + 2
+        val coordinatorHolder = arrayOf<ConversationScrollCoordinator?>(null)
+
+        composeRule.setContent {
+            val coordinator =
+                remember(listState) {
+                    ConversationScrollCoordinator(
+                        writer = LazyListConversationScrollWriter(listState),
+                        initialMode = ConversationScrollMode.ReadingHistory("read-anchor", 0),
+                    )
+                }
+            val scope = rememberCoroutineScope()
+            coordinatorHolder[0] = coordinator
+            val nearBottom =
+                rememberConversationNearBottom(
+                    listState = listState,
+                    renderedTimelineSize = timelineSize,
+                    hasOlderHeader = true,
+                )
+
+            Box {
+                TimelineHarness(
+                    listState = listState,
+                    timelineSize = timelineSize,
+                    modifier = Modifier.height(100.dp),
+                )
+                if (!nearBottom) {
+                    ConversationJumpToNewestButton(
+                        unreadIncomingCount = 3,
+                        onClick = {
+                            scope.launch {
+                                coordinator.jumpToNewest(bottomTimelineIndex)
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
+        composeRule.onNodeWithText("3").assertIsDisplayed()
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertTrue(coordinatorHolder[0]!!.isFollowingTail)
         }
     }
 
@@ -250,3 +337,5 @@ class ConversationNearBottomTest {
         composeRule.waitForIdle()
     }
 }
+
+private const val TAIL_ROW_TAG = "conversation-tail-row"
