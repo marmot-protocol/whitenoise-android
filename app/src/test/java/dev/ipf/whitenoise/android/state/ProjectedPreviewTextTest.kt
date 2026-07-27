@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -28,6 +29,25 @@ import org.junit.Test
  */
 class ProjectedPreviewTextTest {
     private val copy = MessageTextCopy.Default
+
+    @Test
+    fun projectedAttachmentKindLabelsABlankPreview() {
+        val single = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u))
+        val album = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 3u))
+        val mixed = item(preview = preview(plaintext = "", attachmentKind = ChatListAttachmentKindFfi.MIXED, attachmentCount = 2u))
+
+        assertEquals(copy.mediaPhoto, single.projectedPreviewText(copy))
+        assertEquals("${copy.mediaPhoto} (3)", album.projectedPreviewText(copy))
+        assertEquals("${copy.mediaAlbum} (2)", mixed.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun captionStillBeatsTheProjectedAttachmentLabel() {
+        val item =
+            item(preview = preview(plaintext = "look at this", attachmentKind = ChatListAttachmentKindFfi.PHOTO, attachmentCount = 1u))
+
+        assertEquals("look at this", item.projectedPreviewText(copy))
+    }
 
     @Test
     fun liveChatBodyRendersVerbatim() {
@@ -200,6 +220,8 @@ class ProjectedPreviewTextTest {
         plaintext: String,
         kind: ULong = 9uL,
         deleted: Boolean = false,
+        attachmentKind: ChatListAttachmentKindFfi? = null,
+        attachmentCount: UInt = 0u,
     ) = ChatListMessagePreviewFfi(
         messageIdHex = "preview-message",
         sender = "sender",
@@ -209,8 +231,8 @@ class ProjectedPreviewTextTest {
         kind = kind,
         timelineAt = 10uL,
         deleted = deleted,
-        attachmentKind = null,
-        attachmentCount = 0u,
+        attachmentKind = attachmentKind,
+        attachmentCount = attachmentCount,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 

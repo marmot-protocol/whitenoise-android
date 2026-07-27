@@ -256,6 +256,10 @@ data class ChatListItem(
             MessageProjector.isGroupSystemKind(preview.kind) ->
                 GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
             preview.plaintext.isNotBlank() -> preview.plaintext
+            // The engine's typed attachment projection beats the app-side
+            // fallback, which derives from tags and optimistic state.
+            preview.attachmentKind != null ->
+                copy.attachmentLabel(requireNotNull(preview.attachmentKind), preview.attachmentCount)
             resolvedMediaPreviewFallback != null -> resolvedMediaPreviewFallback.text(copy)
             else -> MessageProjector.previewText(latest, copy, copy.message)
         }
