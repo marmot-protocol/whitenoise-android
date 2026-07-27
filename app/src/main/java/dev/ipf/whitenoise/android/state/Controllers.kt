@@ -222,6 +222,9 @@ data class ChatListItem(
         // below (which stays as a fallback for the optimistic self-leave window
         // and rows whose projection hasn't landed yet).
         if (group.selfMembership.isNonMember() || projection?.selfMembership?.isNonMember() == true) return true
+        // A durably-queued leave reads as already-left: the user asked to go,
+        // and the engine retries the commit until the group agrees.
+        if (projection?.leaveRequestPending == true) return true
         if (removed) return true
         val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
         return !snapshot.containsAccount(active)
