@@ -237,24 +237,13 @@ internal class ConversationScrollCoordinator(
         targetMessageId: String?,
         reason: ConversationScrollReason,
         resultingMode: ConversationScrollMode? = null,
-        settledReadingAnchor: (() -> ConversationScrollAnchor)? = null,
         operation: suspend ConversationScrollCommandScope.() -> Unit,
-    ): Boolean {
-        val completed =
-            runCommand(
-                transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
-                resultingMode =
-                    if (settledReadingAnchor != null) {
-                        ConversationScrollMode.ReadingHistory(targetMessageId, 0)
-                    } else {
-                        resultingMode ?: settledMode
-                    },
-                operation = operation,
-            )
-        if (!completed) return false
-        settledReadingAnchor?.let { settleReadingAt(it()) }
-        return true
-    }
+    ): Boolean =
+        runCommand(
+            transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
+            resultingMode = resultingMode ?: settledMode,
+            operation = operation,
+        )
 
     private suspend fun runCommand(
         transientMode: ConversationScrollMode,
@@ -336,6 +325,15 @@ internal class ConversationScrollCoordinator(
         }
     }
 }
+
+internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int): Boolean =
+    programmaticJump(
+        targetMessageId = null,
+        reason = ConversationScrollReason.JumpToNewest,
+        resultingMode = ConversationScrollMode.FollowingTail,
+    ) {
+        animateScrollToItem(targetIndex)
+    }
 
 internal suspend fun ConversationScrollCoordinator.restoreViewport(
     snapshot: ConversationScrollBookmark,
