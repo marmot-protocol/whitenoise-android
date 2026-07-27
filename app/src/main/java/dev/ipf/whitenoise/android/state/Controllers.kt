@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
@@ -663,6 +664,8 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
 private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
@@ -4817,6 +4820,9 @@ class ConversationController(
                     kind = 9uL,
                     timelineAt = now,
                     deleted = false,
+                    attachmentKind = null,
+                    attachmentCount = 0u,
+                    deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
                 ),
             )?.let { previousRow ->
                 optimisticChatListPreviewRows[optimisticKey] = previousRow
@@ -7295,6 +7301,10 @@ class ConversationController(
             ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
             ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
             ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+            ChatListUpdateTriggerFfi.MANUAL_UNREAD_CHANGED,
+            ChatListUpdateTriggerFfi.MUTE_CHANGED,
+            ChatListUpdateTriggerFfi.CONVERSATION_KIND_CHANGED,
+            ChatListUpdateTriggerFfi.LATEST_MESSAGE_DELIVERY_CHANGED,
             ChatListUpdateTriggerFfi.REMOVED,
             -> Unit
         }

@@ -318,6 +318,9 @@ class AgentStreamPreviewTest {
             deleted = false,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
         )
 
     private fun timelineMessage(

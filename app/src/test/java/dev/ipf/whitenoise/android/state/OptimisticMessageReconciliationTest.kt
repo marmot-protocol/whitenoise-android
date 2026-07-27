@@ -613,6 +613,9 @@ class OptimisticMessageReconciliationTest {
             deleted = false,
             deletedByMessageIdHex = null,
             invalidationStatus = invalidationStatus,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
         )
 
     private fun timelineMessage(

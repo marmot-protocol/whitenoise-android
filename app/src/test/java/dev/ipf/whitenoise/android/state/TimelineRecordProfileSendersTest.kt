@@ -72,6 +72,9 @@ class TimelineRecordProfileSendersTest {
         deleted = false,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
     )
 
     @Test

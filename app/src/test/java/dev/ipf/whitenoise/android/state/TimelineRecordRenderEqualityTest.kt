@@ -50,6 +50,9 @@ class TimelineRecordRenderEqualityTest {
             deleted = false,
             deletedByMessageIdHex = null,
             invalidationStatus = null,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
         )
 
     private fun reference() =

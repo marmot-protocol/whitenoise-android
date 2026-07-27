@@ -303,5 +303,8 @@ class TimelineProjectorTest {
         deleted = deleted,
         deletedByMessageIdHex = deletedByMessageIdHex,
         invalidationStatus = invalidationStatus,
+        sourceEpoch = null,
+        retentionSeconds = null,
+        retentionExpiresAt = null,
     )
 }

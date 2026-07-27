@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -351,6 +353,9 @@ class ChatListSortingTest {
                 kind = 9uL,
                 timelineAt = latestAt,
                 deleted = false,
+                attachmentKind = null,
+                attachmentCount = 0u,
+                deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
             ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
@@ -360,6 +365,12 @@ class ChatListSortingTest {
         conversationCreatedAt = 0uL,
         activitySortAt = activitySortAt,
         updatedAt = latestAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun preview(
@@ -375,6 +386,9 @@ class ChatListSortingTest {
         kind = 9uL,
         timelineAt = latestAt,
         deleted = false,
+        attachmentKind = null,
+        attachmentCount = 0u,
+        deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 
     private fun noMessageRow(
@@ -403,6 +417,12 @@ class ChatListSortingTest {
         conversationCreatedAt = conversationCreatedAt,
         activitySortAt = 0uL,
         updatedAt = updatedAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        muted = false,
+        mutedUntilMs = null,
     )
 
     private fun group(
@@ -430,6 +450,8 @@ class ChatListSortingTest {
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
     )
 
     private fun encryptedMedia() =
