@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -63,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -224,28 +228,72 @@ internal fun NewGroupSetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
                 ) {
                     val trimmedName = groupName.trim()
-                    if (trimmedName.isEmpty() && imagePreview == null) {
+                    val editImageLabel =
+                        stringResource(
+                            if (imageDraft == null) {
+                                R.string.group_image_search_set
+                            } else {
+                                R.string.group_image_search_edit
+                            },
+                        )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier =
+                            Modifier
+                                .size(72.dp)
+                                .clickable(
+                                    enabled = !busy && !imagePreparing,
+                                    onClickLabel = editImageLabel,
+                                    role = Role.Button,
+                                ) { showImagePicker = true },
+                    ) {
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier =
                                 Modifier
                                     .size(72.dp)
+                                    .clip(CircleShape),
+                        ) {
+                            if (trimmedName.isEmpty() && imagePreview == null) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(72.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Group,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                Avatar(
+                                    title = trimmedName.ifBlank { stringResource(R.string.new_group) },
+                                    seed = trimmedName,
+                                    size = 72.dp,
+                                    picture = imagePreview,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 4.dp, y = 4.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                Icons.Default.Group,
+                                Icons.Default.PhotoCamera,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
-                    } else {
-                        Avatar(
-                            title = trimmedName.ifBlank { stringResource(R.string.new_group) },
-                            seed = trimmedName,
-                            size = 72.dp,
-                            picture = imagePreview,
-                        )
                     }
                     TextField(
                         value = groupName,
@@ -275,22 +323,6 @@ internal fun NewGroupSetupScreen(
                         )
                     }
                 }
-            }
-            item {
-                SettingsActionRow(
-                    icon = Icons.Default.Image,
-                    title = stringResource(R.string.group_image_search_title),
-                    value =
-                        stringResource(
-                            if (imageDraft == null) {
-                                R.string.group_image_search_set
-                            } else {
-                                R.string.group_image_search_edit
-                            },
-                        ),
-                    enabled = !busy && !imagePreparing,
-                    onClick = { showImagePicker = true },
-                )
             }
             item {
                 SettingsActionRow(
