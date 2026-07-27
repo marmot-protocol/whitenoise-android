@@ -573,6 +573,7 @@
     <string name="toast_couldnt_update_chat">Impossible de mettre à jour la discussion</string>
     <string name="toast_group_updated">Groupe mis à jour</string>
     <string name="toast_couldnt_update_group">Impossible de mettre à jour le groupe</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">La nouvelle image a été téléversée, mais l’ancienne image du groupe n’a pas pu être supprimée. Réessayez pour terminer la mise à jour.</string>
     <string name="toast_invite_sent">Invitation envoyée</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invitation envoyée, mais impossible d’ajouter l’administrateur</string>
     <string name="toast_couldnt_add_members">Impossible d’ajouter des membres. Veuillez réessayer.</string>

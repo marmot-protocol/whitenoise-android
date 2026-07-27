@@ -754,6 +754,7 @@
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
     <string name="toast_group_updated">Group updated</string>
     <string name="toast_couldnt_update_group">Couldn\'t update group</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">The new image was uploaded, but the old group image could not be cleared. Retry to finish the update.</string>
     <string name="toast_invite_sent">Invite sent</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>

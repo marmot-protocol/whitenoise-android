@@ -573,6 +573,7 @@
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>
     <string name="toast_group_updated">Gruppe aktualisiert</string>
     <string name="toast_couldnt_update_group">Gruppe konnte nicht aktualisiert werden</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">Das neue Bild wurde hochgeladen, aber das alte Gruppenbild konnte nicht entfernt werden. Versuche es erneut, um die Aktualisierung abzuschließen.</string>
     <string name="toast_invite_sent">Einladung gesendet</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Einladung gesendet, aber Adminrechte konnten nicht hinzugefügt werden</string>
     <string name="toast_couldnt_add_members">Mitglieder konnten nicht hinzugefügt werden. Bitte erneut versuchen.</string>

@@ -593,6 +593,7 @@
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>
     <string name="toast_group_updated">Группа обновлена</string>
     <string name="toast_couldnt_update_group">Не удалось обновить группу</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">Новое изображение загружено, но удалить прежнее изображение группы не удалось. Повторите попытку, чтобы завершить обновление.</string>
     <string name="toast_invite_sent">Приглашение отправлено</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Приглашение отправлено, но не удалось добавить администратора</string>
     <string name="toast_couldnt_add_members">Не удалось добавить участников. Попробуйте снова.</string>

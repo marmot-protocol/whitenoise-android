@@ -564,6 +564,7 @@
     <string name="toast_couldnt_update_chat">無法更新聊天</string>
     <string name="toast_group_updated">群組已更新</string>
     <string name="toast_couldnt_update_group">無法更新群組</string>
+    <string name="toast_group_image_uploaded_cleanup_failed">新圖片已上傳，但無法清除舊的群組圖片。請重試以完成更新。</string>
     <string name="toast_invite_sent">邀請已傳送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀請已送出，但無法新增管理員</string>
     <string name="toast_couldnt_add_members">新增成員失敗。請再試一次。</string>

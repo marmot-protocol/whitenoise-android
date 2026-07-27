@@ -6505,7 +6505,13 @@ class ConversationController(
             }.onFailure {
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
+                val title =
+                    if (pendingLegacyAvatarClearAfterImageMutationKey != null) {
+                        R.string.toast_group_image_uploaded_cleanup_failed
+                    } else {
+                        R.string.toast_couldnt_update_group
+                    }
+                appState.present(title, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
     }
