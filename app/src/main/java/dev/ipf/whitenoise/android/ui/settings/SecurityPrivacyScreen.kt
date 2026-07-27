@@ -36,7 +36,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppLockDelay
+import dev.ipf.whitenoise.android.state.AuditRedactionToggleDecision
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.auditRedactionToggleDecision
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import kotlinx.coroutines.delay
@@ -163,15 +165,18 @@ internal fun SecurityPrivacyScreen(
                             enabled = !auditLogsBusy,
                             busy = auditLogsBusy,
                             onCheckedChange = { redact ->
-                                if (!redact) {
-                                    fullAuditDataConfirmOpen = true
-                                } else {
-                                    auditLogsBusy = true
-                                    appState.launchMutation {
-                                        try {
-                                            appState.setRedactSensitiveAuditData(true)
-                                        } finally {
-                                            auditLogsBusy = false
+                                when (val decision = auditRedactionToggleDecision(redact)) {
+                                    AuditRedactionToggleDecision.RequireFullDataConfirmation -> {
+                                        fullAuditDataConfirmOpen = true
+                                    }
+                                    is AuditRedactionToggleDecision.ApplyImmediately -> {
+                                        auditLogsBusy = true
+                                        appState.launchMutation {
+                                            try {
+                                                appState.setRedactSensitiveAuditData(decision.redact)
+                                            } finally {
+                                                auditLogsBusy = false
+                                            }
                                         }
                                     }
                                 }
