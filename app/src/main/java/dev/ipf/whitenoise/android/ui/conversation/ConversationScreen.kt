@@ -40,11 +40,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -3461,76 +3459,14 @@ internal fun ConversationScreen(
                                     }
                                 }
                                 if (!nearBottom) {
-                                    val jumpToNewestLabel = stringResource(R.string.jump_to_newest)
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .size(42.dp)
-                                                .semantics { contentDescription = jumpToNewestLabel }
-                                                .clickable {
-                                                    scope.launch {
-                                                        val targetIndex =
-                                                            conversationJumpToNewestTargetListIndex(
-                                                                unreadIncomingCount = unreadIncomingCount,
-                                                                readAnchorMessageId = readAnchorMessageId,
-                                                                renderedMessageIds = renderedTimeline.map { it.record.messageIdHex },
-                                                                visibleListIndices =
-                                                                    listState.layoutInfo.visibleItemsInfo
-                                                                        .map { it.index }
-                                                                        .toSet(),
-                                                                olderHeaderCount = olderHeaderCount,
-                                                                bottomTimelineIndex = bottomTimelineIndex,
-                                                            )
-                                                        if (targetIndex == bottomTimelineIndex) {
-                                                            scrollCoordinator.programmaticJump(
-                                                                targetMessageId = null,
-                                                                reason = ConversationScrollReason.JumpToNewest,
-                                                                resultingMode = ConversationScrollMode.FollowingTail,
-                                                            ) {
-                                                                animateScrollToItem(targetIndex)
-                                                            }
-                                                        } else {
-                                                            val targetTimelineIndex = targetIndex - 1 - olderHeaderCount
-                                                            val targetMessageId =
-                                                                renderedTimeline
-                                                                    .getOrNull(targetTimelineIndex)
-                                                                    ?.record
-                                                                    ?.messageIdHex
-                                                            scrollCoordinator.programmaticJump(
-                                                                targetMessageId = targetMessageId,
-                                                                reason = ConversationScrollReason.JumpToNewest,
-                                                                settledReadingAnchor = ::currentScrollAnchor,
-                                                            ) {
-                                                                animateScrollToItem(targetIndex)
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            shadowElevation = 2.dp,
-                                            modifier = Modifier.size(34.dp),
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    Icons.Default.ArrowDownward,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                )
+                                    ConversationJumpToNewestButton(
+                                        unreadIncomingCount = unreadIncomingCount,
+                                        onClick = {
+                                            scope.launch {
+                                                scrollCoordinator.jumpToNewest(bottomTimelineIndex)
                                             }
-                                        }
-                                        if (unreadIncomingCount > 0) {
-                                            Badge(modifier = Modifier.align(Alignment.TopEnd)) {
-                                                Text(
-                                                    if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
-                                                )
-                                            }
-                                        }
-                                    }
+                                        },
+                                    )
                                 }
                             }
                         }
