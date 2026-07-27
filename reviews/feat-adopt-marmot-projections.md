@@ -1,113 +1,95 @@
 # Code Review: feat/adopt-marmot-projections (origin/master..HEAD)
 
+## Round 2 (adversarial)
+
 ## Summary
 
-This range adds seven small, well-isolated adoption surfaces on top of the new MDK chat-list/timeline projections: a disappearing-message bubble indicator, typed attachment chat-list previews, a chat-list delivery tick, engine-mirrored mute state, a mark-unread action, engine-driven DM classification, and pending-leave suppression. Each surface is unit-tested at the pure-function layer (`GroupProjector`, `TimelineProjector`, `ProjectedPreviewTextTest`, etc.), and the diffs are small and readable. The main problem is the mute-mirroring feature (979efd33): the new `ChatListItem.engineMuted()` read path was wired into exactly one consumer (the chat-list row/folder rendering in `ChatsScreen`), while three other "is this chat muted" call sites were left reading local-only state, producing a real, user-visible split-brain between what the row shows and what the per-conversation Notification Settings screen / selection-bar overflow menu let you do about it.
+All three round-1 issues are correctly and completely fixed by `8c3b8d31`: `syncEngineMute()` is now invoked from every local-mute mutator (including `setConversationNotifyMode`, which the unmute path in `GroupDetailsScreen` calls), `singleSelectionMuted` in `ChatsScreen` now ORs `item.engineMuted()`, and `ChatRow`'s preview `Text` has `Modifier.weight(1f, fill = false)`. The redundant-FFI-resolve suggestion from round 1 is also fixed (`chatRowNeedsMediaKindResolve` now bails when `attachmentKind != null`), with a new regression test. Digging further, though, the mute fix inherits a real staleness bug from the chat list's existing visibility-gated recompute, and the sibling mark-unread feature (added in this same range) has the identical "half-wired new signal" shape that round 1 flagged for mute — just for a different consumer.
 
 ## Issues
 
-### Correctness: Conversation Notification Settings can't clear an engine-only mute
+### Correctness: manually-marked-unread chats don't reach the per-account unread dot/aggregate
 
-**app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt:294, 495-501**
+**app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt:191-194, 240**
 
 > ```kotlin
-> val conversationMuted = conversationNotifyMode == ChatNotifyMode.NONE
+> val hasUnread: Boolean
+>     // A manual mark-unread renders the same badge as real unread; the
+>     // engine clears it when the conversation is read again.
+>     get() = projection?.hasUnread == true || projection?.manuallyMarkedUnread == true
 > ...
-> onToggleMute = { turnOn ->
->     if (turnOn) {
->         showMuteDurationDialog = true
->     } else {
->         // Unmute back to the All/Only-mentions preference the mute hid.
->         appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
->     }
-> },
+> fun effectiveUnreadCount(activeAccountIdHex: String?): ULong = if (removedFromGroup(activeAccountIdHex)) 0uL else unreadCount
 > ```
 
-`conversationMuted` (passed to `ConversationNotificationSettingsScreen` as `isMuted`) is derived purely from local `ChatMutePreferences` — it never reads `controller`'s engine-projected mute state the way `ChatsScreen`'s row rendering now does (`item.engineMuted() || isLocallyMuted(...)`, see `ChatsScreen.kt:744-471`). And the "turn mute off" branch calls `appState.setConversationNotifyMode(...)` directly, not `appState.setConversationMuted(groupIdHex, false)` (compare `AppState.kt:3915-3922`). `setConversationNotifyMode` only writes local prefs — it never calls the new `syncEngineMute()` (`AppState.kt:3940-3959`), so `clearChatMuted` is never invoked on the engine.
+`hasUnread` (and therefore `effectiveHasUnread`, used for row bolding, the selection bar's mark-read/unread gating, and the "Unread" system folder's `it.hasUnread` count in `ChatFoldersScreen.kt:255`) now correctly folds in `manuallyMarkedUnread`. But `effectiveUnreadCount` still returns the raw numeric `unreadCount` field only — it never looks at `manuallyMarkedUnread`. That numeric value is exactly what feeds the per-account aggregate:
 
-Concretely: once a conversation is muted via the engine (from this device's own `muteConversationFor`, or mirrored in from another device), this screen has no way to observe that mute (its toggle can show "off" while the chat-list row right behind it shows the muted bell icon), and even if the user does flip the switch off, the engine's durable mute is never cleared — so the row keeps showing muted, and any other device relying on the durable setting (the entire point of this feature, per the `syncEngineMute` doc comment) never learns the mute was lifted.
-
-### Correctness: selection-bar overflow "Mute/Unmute" reads stale (local-only) mute state
-
-**app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt:398-404**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AccountUnread.kt:108-114**
 
 > ```kotlin
-> val singleSelectionMuted =
->     singleSelectedItem?.let { item ->
->         appState.activeAccountRef?.let { accountRef ->
->             ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
->         }
->     } ?: false
+> internal fun accountUnreadCount(
+>     items: Iterable<ChatListItem>,
+>     activeAccountIdHex: String?,
+> ): ULong =
+>     items.fold(0uL) { total, item ->
+>         if (item.group.archived) total else total + item.effectiveUnreadCount(activeAccountIdHex)
+>     }
 > ```
 
-This value drives both the overflow menu's label/icon (`muted` in `ChatListSelectionBar.kt:116-134`, "Unmute" + bell vs. "Mute" + bell-off) and the actual toggle action (`val nextMuted = !singleSelectionMuted` at `ChatsScreen.kt:593`). It was not updated alongside the new `ChatListItem.engineMuted()` getter, unlike the row's own `isMuted` a few hundred lines down (`item.engineMuted() || isLocallyMuted(item.group.groupIdHex)`, `ChatsScreen.kt:471`).
+which is written straight into `accountUnreadCounts` from `ChatsController.recompute()` (`Controllers.kt:3423-3427`) and is the sole input to `WhiteNoiseAppState.accountShowsUnreadDot()` (`AppState.kt:2917`) — the function whose own doc comment says it's "shared by the active avatar, the secondary top-bar avatars, and the account switcher so no avatar can light for another account's unread," specifically to prevent this class of drift (#805).
 
-Net effect: long-press-select a chat whose bell-off badge is showing only because of the engine projection (not local prefs) and the overflow menu will offer "Mute" (not "Unmute") — there is no way to clear that mute from this menu; tapping it just re-mutes (already-true, harmless but confusing), while the row directly behind the selection bar visibly disagrees with what the menu is telling the user.
+Concretely: mark an already-read chat as unread via the new action. The chat list row goes bold, the chat shows up in the "Unread" folder, the selection bar offers "Mark as read" — but the account-switcher/top-bar avatar dot for that account never lights, because `unreadCount` (0, since there's no actual new message) is all the aggregate ever sums. This is the same "wired into some consumers, not others" shape round 1 found for mute, just on the new mark-unread signal. `AccountUnreadTest.kt` corroborates the gap: every test row hardcodes `manuallyMarkedUnread = false`, so nothing exercises this combination.
 
-### Correctness (lower confidence): chat-row delivery tick can push the preview text past the visible row width
+### Correctness (narrow window): the new engine-mute read in GroupDetailsScreen is sourced from data frozen for the entire time that screen is open
 
-**app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt:288-301**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:3908-3909**
 
 > ```kotlin
-> Row(verticalAlignment = Alignment.CenterVertically) {
->     if (draft == null && !item.group.pendingConfirmation) {
->         item.projectedDeliveryIndicator()?.let { indicator ->
->             OutgoingIndicatorIcon(indicator, tint = MaterialTheme.colorScheme.onSurfaceVariant)
->             Spacer(Modifier.width(3.dp))
->         }
->     }
->     Text(
->         text = preview,
->         maxLines = 1,
->         overflow = TextOverflow.Ellipsis,
->         ...
->     )
-> }
+> /** The engine's durable mute projection for the chat, from the live list. */
+> fun engineConversationMuted(groupIdHex: String): Boolean = chatsController?.items?.firstOrNull { it.group.groupIdHex == groupIdHex }?.engineMuted() == true
 > ```
 
-`Text` has no `Modifier.weight(1f, fill = false)`. Compose's `Row`/`Column` measures non-weighted siblings against the *same* incoming max-width constraint rather than the space left after earlier siblings — that's exactly why "icon + truncating text" rows conventionally give the text a weight modifier. Here, when the delivery icon renders (any outgoing last message: sending/sent/failed) next to a preview long enough to need the ellipsis, the `Text` is still measured as if it owned the full row width, so the icon+spacer (~20dp) get tacked on in addition rather than budgeted out of the available width — the combined row can end up wider than the row's actual slot, and the truncation no longer accounts for the space the tick icon occupies. Give the `Text` `Modifier.weight(1f, fill = false)` (matching the icon-then-text pattern used correctly elsewhere, e.g. `ChatRowTrailingContent`'s icon+badge Row, which never needs to truncate long content) so it's properly constrained to "row width minus icon".
+`chatsController.items` is exactly the list `ChatsController.recompute()` intentionally stops publishing to while `chatListVisible == false` (`Controllers.kt:3432-3435`: "Hidden behind an open conversation: keep folding updates into the backing maps... but defer the projection rebuild... until the list returns"). `MainShell.kt:237-239` sets `chatListVisible = (selectedChat == null)` — and `GroupDetailsScreen` (and the `ConversationNotificationSettingsScreen` it hosts) is only reachable from inside an open conversation (`ConversationScreen.kt:2571`), i.e. precisely when `chatListVisible` is `false`.
+
+So `conversationMuted` in `GroupDetailsScreen.kt:294-296` (`conversationNotifyMode == ChatNotifyMode.NONE || appState.engineConversationMuted(...)`) reads a snapshot of `items` that is frozen for the entire time this screen is visible. The initial value on entry is fine (the chat list was still updating up to the moment the conversation opened), but an engine-mirrored mute or unmute that arrives from another device *while the user is already inside this conversation* will not be reflected here — the toggle can keep showing the pre-entry state — until the user backs out to the chat list (which flushes the deferred recompute) and back in. This doesn't regress the round-1 fix for the common case (same-device mute/unmute still updates instantly through the local-prefs half of the `||`), but it does undercut the specific cross-device-convergence guarantee this screen was just wired up to show.
+
+Note `ChatsController` already has a read path that isn't gated by visibility — `chatItemForGroup(groupIdHex)` (`Controllers.kt:2715-2718`) projects straight off the backing `chatRowsByGroup` map, which keeps folding updates regardless of `chatListVisible`. It wouldn't fully solve this on its own (that map isn't Compose-observable, so nothing would trigger a recomposition when it changes while hidden), but it's a starting point if this window turns out to matter in practice.
 
 ## Suggestions
 
-### `conversationKind`-based DM classification wasn't threaded into the open-conversation controller
+### `syncEngineMute`'s fire-and-forget engine writes have no ordering protection
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt:4146-4147, 4176-4177**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:3944-3961**
+
+Each call to `setConversationMuted`/`muteConversationFor`/`setConversationNotifyMode` launches an independent `mutationsScope.launch { marmotIo { ... } }` job; `marmotIo` hops to `Dispatchers.IO` (`AppState.kt:2483-2486`), a thread pool with no ordering guarantee between two concurrently-launched coroutines. A rapid mute-then-unmute (or the reverse) issues two independent `setChatMuted`/`clearChatMuted` calls with no shared queue and no return-value reconciliation — unlike `mergeMarkReadChatListRow`'s monotonic-timestamp merge for read-state races, there's nothing here to make the *last* engine write win if the two calls complete out of order. Likely low-impact given local prefs stay the authoritative signal for this device, but the durable state other devices converge on could end up disagreeing with the user's actual last action.
+
+### Minor duplication: `resolveFolderChatIds` re-derives the local-mute check `isLocallyMuted` already provides
+
+**app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt:180-186, 213-216**
 
 > ```kotlin
-> val isDm: Boolean
->     get() = GroupProjector.isDm(memberCount, group.name)
+> val isLocallyMuted: (String) -> Boolean =
+>     remember(mutedConversations, appState.activeAccountRef) { ... }
 > ...
-> val isDirectConversation: Boolean
->     get() = GroupProjector.isDm(memberCount, group.name)
+> isMuted = { groupIdHex ->
+>     ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations ||
+>         groupIdHex in engineMutedChatIds
+> },
 > ```
 
-`ChatListItem.isDm()` (`Controllers.kt:257`) now prefers the engine's projected `conversationKind` over the name/headcount heuristic, but `ConversationController`'s `isDm`/`isDirectConversation` — used for the open conversation's top-bar subtitle gating and, more importantly, `deleteCapabilityFor`'s deletion-capability matrix — still use the old heuristic exclusively. If the engine's projection and the heuristic ever disagree for a given conversation (the whole reason this PR trusts the engine over the heuristic in the chat list), the chat list and the open conversation screen can now classify the same conversation differently, and delete permissions are computed from the *un*-upgraded classification. This may be intentional incremental scoping ("where rows are at hand" per the commit message), but it's worth confirming deliberately rather than leaving it as a silent gap.
+The folder-membership `isMuted` closure re-implements the exact composite-key lookup `isLocallyMuted` was just introduced for a few lines above, instead of calling `isLocallyMuted(groupIdHex) || groupIdHex in engineMutedChatIds`. Not a bug (both evaluate identically today), but the duplication is exactly the kind of drift risk that caused round 1's split-brain bug in the first place.
 
-### Local media-kind resolution no longer short-circuits when the engine already projects `attachmentKind`
+### Test gap: the round-1 fixes and the new mark-unread aggregate path have no direct assertions
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt:626-632, 3587-3600**
+Nothing in this range unit-tests `singleSelectionMuted`'s OR logic, `GroupDetailsScreen`'s `conversationMuted` OR logic, or the `ChatRow` weight-modifier layout fix — `ChatsScreenSelectionActionsCoverageTest` only regex-scrapes handler wiring (`controller.markUnread(item)` is called, `clearSelection()` runs), not the actual muted-state computation. Similarly, `AccountUnreadTest.kt` never sets `manuallyMarkedUnread = true` on a fixture row, which is exactly the gap that let the Issue above ship untested.
 
-> ```kotlin
-> internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
->     val preview = row.lastMessage ?: return null
->     if (preview.deleted) return null
->     if (preview.kind != 9uL) return null
->     if (preview.plaintext.isNotBlank()) return null
->     return preview.messageIdHex.takeIf { it.isNotBlank() }
-> }
-> ```
+### Carried forward from round 1 (still open, not in this round's fix list)
 
-`projectedPreviewText` now prefers `preview.attachmentKind` over `resolvedMediaPreviewFallback` (`Controllers.kt:278-282`), but this gate (which schedules an off-main `timelineMessages` FFI round-trip per qualifying row, `Controllers.kt:3587-3641`) doesn't check `preview.attachmentKind != null` before deciding a row "needs" resolving. For every blank-plaintext kind-9 row whose attachment kind the engine already projects — presumably the common case this whole feature targets — the app still performs a redundant local timeline fetch whose result `projectedPreviewText` will never use. Not a correctness bug (the app-side fallback is simply overridden), but a needless per-row FFI round trip that the new projection should let this gate skip.
-
-### `markUnread` reuses a merge function purpose-built for mark-*read* semantics
-
-**app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt:2771-2781, 3278-3292**
-
-`ChatsController.markUnread` folds `setChatManuallyUnread`'s return row through `applyChatListRow` → `mergeMarkReadChatListRow`. That merge function has a branch (`Controllers.kt:484-490`) that, when the returned row's `lastMessage` compares as older than the in-memory row's (e.g. a live subscription update lands during the FFI round trip), discards everything from the returned row except the read watermark — silently dropping the just-applied `manuallyMarkedUnread = true`. Narrow window, and `markAllRead` already has the same shape of race, but worth a comment (or a small dedicated merge) noting the mark-unread flag can be lost under that race rather than reusing read-specific merge logic implicitly.
+- `ConversationController.isDm`/`isDirectConversation` (`Controllers.kt:4149-4150, 4179-4180`) still use the un-upgraded `GroupProjector.isDm(memberCount, name)` heuristic, unlike every list-derived consumer (`ChatRow`, `ChatListFiltering`, `ChatFolderChipModel`, `ChatFoldersScreen`, `RecipientResolution`), which were all migrated to `item.isDm()` / the `conversationKind`-aware overload in this round.
+- `ChatsController.markUnread` still folds through `mergeMarkReadChatListRow`, which can drop a just-applied `manuallyMarkedUnread = true` under the same race described in round 1.
 
 ## What's Done Well
 
-- Every new pure-function surface (`retentionIndicatorVisible`, `GroupProjector.isDm` overload, `attachmentLabel`, `outgoingIndicator()`, `leaveRequestPending` suppression) ships with a focused unit test, including the deliberately-adversarial cases (explicit `0` retention, `UNKNOWN`/`null` conversation kind fallback, deleted last message suppressing the delivery tick).
-- The `MessageInlineFooter` layout change (retention icon insertion) correctly recomputes `timeIndex` from both optional leading elements instead of hardcoding an index, so the edited-label/retention-icon/time/status ordering stays correct in every combination.
-- Localization: both new strings (`media_album`, `media_counted_format`) landed in all nine locale files plus the default, and the `LocalizationResourceTest` false-positive-identical-value suppression list was updated with a clear rationale rather than just silenced.
-- `syncEngineMute`'s docstring is explicit that local preferences remain the source of truth for notification suppression and the engine write is convergence-only — a good design note that made the inconsistency in the Issues section easy to pin down precisely.
+- All three round-1 correctness issues are fixed at the root cause rather than patched around, and the fixes are minimal, symmetric diffs (`syncEngineMute` called from all four local-mute mutators; both `ChatsScreen` mute reads now OR the same `engineMuted()`).
+- `chatRowNeedsMediaKindResolve`'s new `attachmentKind != null` early-return ships with a dedicated regression test (`projectedAttachmentKindSkipsTheLocalMediaResolve`) proving the local timeline round trip is actually skipped, not just that the preview text is right.
+- The `isDm()` migration is thorough: every list-derived DM/group classification site in this diff (filtering, folder chip counts, folder screen counts, recipient resolution, avatar-open gating) was updated together, so there's no leftover split-brain between them — only the pre-existing `ConversationController` gap (already called out in round 1) remains.
+- Localization stayed in lock-step: `chat_row_action_mark_unread`, `media_album`, and `media_counted_format` all landed in every locale file plus the identical-value suppression list with a stated rationale, not a blanket exemption.

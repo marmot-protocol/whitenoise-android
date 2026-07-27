@@ -32,6 +32,18 @@ class AccountUnreadTest {
     }
 
     @Test
+    fun accountUnreadCount_manualUnreadLightsTheDotWithoutACount() {
+        val total =
+            accountUnreadCount(
+                rows = listOf(row("a", unreadCount = 0uL, manuallyMarkedUnread = true)),
+                activeAccountIdHex = "self",
+                membersByGroupId = emptyMap(),
+            )
+
+        assertEquals(1uL, total)
+    }
+
+    @Test
     fun accountUnreadCount_emptyRowsIsZero() {
         assertEquals(0uL, accountUnreadCount(emptyList()))
     }
@@ -192,6 +204,7 @@ class AccountUnreadTest {
         groupId: String,
         unreadCount: ULong,
         archived: Boolean = false,
+        manuallyMarkedUnread: Boolean = false,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -214,7 +227,7 @@ class AccountUnreadTest {
         updatedAt = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
-        manuallyMarkedUnread = false,
+        manuallyMarkedUnread = manuallyMarkedUnread,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,

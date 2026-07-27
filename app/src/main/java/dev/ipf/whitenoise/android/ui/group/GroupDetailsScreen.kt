@@ -291,9 +291,10 @@ internal fun GroupDetailsScreen(
         remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
             appState.conversationNotifyMode(controller.group.groupIdHex)
         }
-    val conversationMuted =
-        conversationNotifyMode == ChatNotifyMode.NONE ||
-            appState.engineConversationMuted(controller.group.groupIdHex)
+    val engineMuted =
+        controller.latestChatListRow?.muted
+            ?: appState.engineConversationMuted(controller.group.groupIdHex)
+    val conversationMuted = conversationNotifyMode == ChatNotifyMode.NONE || engineMuted
     // The All/Only-mentions preference behind the mute, and the timed-mute expiry,
     // resolved off the same state key so an elapsed mute settles once (not per frame).
     val conversationRestoreMode =

@@ -3825,6 +3825,15 @@ class ConversationController(
         private set
 
     /**
+     * Latest chat-list projection for this conversation, kept live even while
+     * the chat list itself is hidden (its controller freezes item recomputes
+     * off-screen). Read for row-scoped state a conversation surface needs
+     * fresh, like the engine's durable mute.
+     */
+    var latestChatListRow by mutableStateOf<ChatListRowFfi?>(null)
+        private set
+
+    /**
      * An encrypted image upload may succeed before clearing a legacy URL
      * avatar fails. MDK gives URL avatars precedence, so retain this transient
      * retry latch and avoid uploading the same bytes again on the next tap.
@@ -7333,6 +7342,7 @@ class ConversationController(
         row: ChatListRowFfi?,
     ) {
         val projected = row ?: return
+        latestChatListRow = projected
         when (trigger) {
             ChatListUpdateTriggerFfi.ARCHIVE_CHANGED,
             ChatListUpdateTriggerFfi.PENDING_CONFIRMATION_CHANGED,
