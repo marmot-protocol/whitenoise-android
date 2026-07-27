@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.icu.text.ListFormatter
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -141,7 +142,7 @@ internal fun AutoDownloadDataScreen(
     }
 }
 
-// Comma-joined labels of the types enabled for [network], or "none".
+// Locale-aware list of the types enabled for [network], or "none".
 @Composable
 private fun enabledTypesLabel(
     appState: WhiteNoiseAppState,
@@ -151,7 +152,7 @@ private fun enabledTypesLabel(
         MediaAutoDownloadType.entries
             .filter { appState.mediaAutoDownloadMatrix.isEnabled(it, network) }
             .map { stringResource(it.labelRes) }
-    return if (enabled.isEmpty()) stringResource(R.string.none) else enabled.joinToString(", ")
+    return if (enabled.isEmpty()) stringResource(R.string.none) else ListFormatter.getInstance().format(enabled)
 }
 
 // Multi-select checkbox dialog for one network; edits are local until OK.

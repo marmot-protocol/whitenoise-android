@@ -130,7 +130,7 @@ internal fun TextToSpeechScreen(
                                 title = stringResource(R.string.tts_settings_engine_title),
                                 subtitle =
                                     engineChoice.engines.firstOrNull { it.packageName == resolvedPackage }?.label
-                                        ?: stringResource(R.string.tts_settings_rate_system),
+                                        ?: stringResource(R.string.theme_system),
                                 icon = Icons.Filled.RecordVoiceOver,
                                 onClick = { engineSheetOpen = true },
                             )
