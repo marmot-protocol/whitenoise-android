@@ -47,7 +47,7 @@ class EmojiPickerRecentsBehaviorTest {
                 loadFromDisk = { listOf("👍", "😂", "🎉") },
                 saveToDisk = {},
             )
-        runBlocking { owner.hydrateFromDiskIfEmpty() }
+        runBlocking { owner.hydrateFromDisk() }
         composeRule.setContent {
             WhiteNoiseTheme {
                 ComposerEmojiPickerPane(
@@ -78,7 +78,7 @@ class EmojiPickerRecentsBehaviorTest {
                 loadFromDisk = { listOf("👍", "😂") },
                 saveToDisk = {},
             )
-        runBlocking { owner.hydrateFromDiskIfEmpty() }
+        runBlocking { owner.hydrateFromDisk() }
         composeRule.setContent {
             WhiteNoiseTheme {
                 ComposerEmojiPickerPane(
