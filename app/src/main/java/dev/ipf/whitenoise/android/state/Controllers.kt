@@ -244,6 +244,9 @@ data class ChatListItem(
             ?.deliveryState
             ?.outgoingIndicator()
 
+    /** The engine's durable mute projection — ORed with local preferences. */
+    fun engineMuted(): Boolean = projection?.muted == true
+
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",

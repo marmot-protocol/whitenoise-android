@@ -177,6 +177,14 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
+    val engineMutedChatIds =
+        remember(controller.items) {
+            controller.items
+                .asSequence()
+                .filter { it.engineMuted() }
+                .map { it.group.groupIdHex }
+                .toSet()
+        }
     val resolveFolderChatIds: (String) -> Set<String> =
         remember(
             folderStoreState,
@@ -196,7 +204,8 @@ internal fun ChatsScreen(
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
                             rule = appState.chatFolderPreferences.folderRule(accountRef, folderId),
                             isMuted = { groupIdHex ->
-                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
+                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations ||
+                                    groupIdHex in engineMutedChatIds
                             },
                             displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                         )
@@ -720,10 +729,13 @@ internal fun ChatsScreen(
                                         item = item,
                                         appState = appState,
                                         isMuted =
-                                            appState.activeAccountRef?.let { accountRef ->
-                                                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
-                                                    mutedConversations
-                                            } ?: false,
+                                            item.engineMuted() ||
+                                                (
+                                                    appState.activeAccountRef?.let { accountRef ->
+                                                        ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
+                                                            mutedConversations
+                                                    } ?: false
+                                                ),
                                         selectionMode = selectionMode,
                                         selected = item.id in selectedChatIds,
                                         bodyMatch = bodyMatch,

@@ -3918,6 +3918,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
+        syncEngineMute(accountRef, groupIdHex)
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -3927,6 +3928,34 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.muteFor(accountRef, groupIdHex, durationMillis)
+        syncEngineMute(accountRef, groupIdHex)
+    }
+
+    /**
+     * Mirror the app-side mute decision into the engine's durable notification
+     * settings, so the projected row (`muted`/`mutedUntilMs`) and any other
+     * device agree with this one. Local preferences stay the immediate source
+     * for notification suppression — this write is convergence, not gating.
+     */
+    private fun syncEngineMute(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        val muted = chatMutePreferences.isMuted(accountRef, groupIdHex)
+        val expiry = chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+        mutationsScope.launch {
+            runCatchingCancellable {
+                marmotIo {
+                    if (muted) {
+                        setChatMuted(accountRef, groupIdHex, expiry)
+                    } else {
+                        clearChatMuted(accountRef, groupIdHex)
+                    }
+                }
+            }.onFailure {
+                appStateDebug(it) { "engine mute sync failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+            }
+        }
     }
 
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
