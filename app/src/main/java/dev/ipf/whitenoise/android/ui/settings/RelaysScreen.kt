@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -47,7 +49,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
-import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,86 +91,122 @@ internal fun RelaysScreen(
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = stringResource(R.string.account_relay_lists)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        relayListKinds.forEach { option ->
-                            FilterChip(
-                                selected = selectedKind == option,
-                                onClick = { selectedKind = option },
-                                label = { Text(stringResource(option.labelRes)) },
+                SettingsGroup(title = stringResource(R.string.account_relay_lists), icon = Icons.Filled.Hub) {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            RelayListEditor(
+                                appState = appState,
+                                lists = lists,
+                                selectedKind = selectedKind,
+                                onSelectKind = { selectedKind = it },
+                                pendingUrl = pendingUrl,
+                                onPendingUrlChange = { pendingUrl = it },
+                                saving = saving,
+                                onSavingChange = { saving = it },
+                                onListsChange = { lists = it },
                             )
-                        }
-                    }
-
-                    val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
-                    if (currentRelays.isEmpty()) {
-                        Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    currentRelays.forEach { relay ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
-                            IconButton(
-                                onClick = {
-                                    saving = true
-                                    appState.launchMutation {
-                                        try {
-                                            lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()
-                                        } finally {
-                                            saving = false
-                                        }
-                                    }
-                                },
-                                enabled = !saving && currentRelays.size > 1,
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
-                            }
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = pendingUrl,
-                            onValueChange = { pendingUrl = it },
-                            label = { Text("wss://relay.example.com") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                            keyboardOptions =
-                                KeyboardOptions(
-                                    capitalization = KeyboardCapitalization.None,
-                                    autoCorrectEnabled = false,
-                                    keyboardType = KeyboardType.Uri,
-                                ),
-                        )
-                        IconButton(
-                            onClick = {
-                                val trimmed = pendingUrl.trim()
-                                saving = true
-                                appState.launchMutation {
-                                    try {
-                                        lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()
-                                        pendingUrl = ""
-                                    } finally {
-                                        saving = false
-                                    }
-                                }
-                            },
-                            modifier = Modifier.size(48.dp),
-                            enabled =
-                                pendingUrl.trim().let {
-                                    !saving &&
-                                        appState.activeAccountRef != null &&
-                                        isAcceptableRelayUrl(it) &&
-                                        !currentRelays.contains(it)
-                                },
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
                         }
                     }
                 }
             }
             item {
-                PublishedRelayLists(lists)
+                SettingsGroup(title = stringResource(R.string.published_relay_lists), icon = Icons.Filled.Public) {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            PublishedRelayLists(lists)
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+private fun RelayListEditor(
+    appState: WhiteNoiseAppState,
+    lists: AccountRelayListsFfi?,
+    selectedKind: RelayListKind,
+    onSelectKind: (RelayListKind) -> Unit,
+    pendingUrl: String,
+    onPendingUrlChange: (String) -> Unit,
+    saving: Boolean,
+    onSavingChange: (Boolean) -> Unit,
+    onListsChange: (AccountRelayListsFfi?) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        relayListKinds.forEach { option ->
+            FilterChip(
+                selected = selectedKind == option,
+                onClick = { onSelectKind(option) },
+                label = { Text(stringResource(option.labelRes)) },
+            )
+        }
+    }
+
+    val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
+    if (currentRelays.isEmpty()) {
+        Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    currentRelays.forEach { relay ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
+            IconButton(
+                onClick = {
+                    onSavingChange(true)
+                    appState.launchMutation {
+                        try {
+                            onListsChange(appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists())
+                        } finally {
+                            onSavingChange(false)
+                        }
+                    }
+                },
+                enabled = !saving && currentRelays.size > 1,
+            ) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
+            }
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = pendingUrl,
+            onValueChange = onPendingUrlChange,
+            label = { Text("wss://relay.example.com") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Uri,
+                ),
+        )
+        IconButton(
+            onClick = {
+                val trimmed = pendingUrl.trim()
+                onSavingChange(true)
+                appState.launchMutation {
+                    try {
+                        onListsChange(appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists())
+                        onPendingUrlChange("")
+                    } finally {
+                        onSavingChange(false)
+                    }
+                }
+            },
+            modifier = Modifier.size(48.dp),
+            enabled =
+                pendingUrl.trim().let {
+                    !saving &&
+                        appState.activeAccountRef != null &&
+                        isAcceptableRelayUrl(it) &&
+                        !currentRelays.contains(it)
+                },
+        ) {
+            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
         }
     }
 }
@@ -194,21 +232,19 @@ private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
 
 @Composable
 private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
-    SectionCard(title = stringResource(R.string.published_relay_lists)) {
-        if (lists == null) {
-            Text(stringResource(R.string.no_relay_projection), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@SectionCard
-        }
-        RelayListRow(stringResource(R.string.nip_65), lists.nip65)
-        RelayListRow(stringResource(R.string.inbox), lists.inbox)
-        if (lists.complete) {
-            Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Text(
-                stringResource(R.string.missing_relay_lists, missingRelayListLabels(lists.missing)),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
+    if (lists == null) {
+        Text(stringResource(R.string.no_relay_projection), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    RelayListRow(stringResource(R.string.nip_65), lists.nip65)
+    RelayListRow(stringResource(R.string.inbox), lists.inbox)
+    if (lists.complete) {
+        Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Text(
+            stringResource(R.string.missing_relay_lists, missingRelayListLabels(lists.missing)),
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 

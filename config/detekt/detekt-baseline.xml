@@ -205,6 +205,7 @@
     <ID>FunctionNaming:CopyableValueRow.kt:@Composable internal fun CopyableValueRow</ID>
     <ID>FunctionNaming:DeveloperScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun DeveloperScreen</ID>
     <ID>FunctionNaming:DevicePrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DevicePrivacyScreen</ID>
+    <ID>FunctionNaming:DiagnosticsScreen.kt:@Composable private fun RelayHealthBody</ID>
     <ID>FunctionNaming:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>FunctionNaming:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
     <ID>FunctionNaming:DisappearingMessages.kt:@Composable private fun DisappearingOptionRow</ID>
@@ -242,6 +243,7 @@
     <ID>FunctionNaming:InvitePreview.kt:@Composable internal fun InvitePreviewActionBar</ID>
     <ID>FunctionNaming:InvitePreview.kt:@Composable internal fun InvitePreviewPlaceholder</ID>
     <ID>FunctionNaming:KeyPackagesScreen.kt:@Composable private fun KeyPackageCard</ID>
+    <ID>FunctionNaming:KeyPackagesScreen.kt:@Composable private fun PublishingActions</ID>
     <ID>FunctionNaming:KeyPackagesScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun KeyPackagesScreen</ID>
     <ID>FunctionNaming:KeyboardSafePopup.kt:@Composable internal fun KeyboardSafePopup</ID>
     <ID>FunctionNaming:LocationBubble.kt:@Composable internal fun LocationMessageBubble</ID>
@@ -517,7 +519,6 @@
     <ID>LongMethod:QrScannerSheet.kt:@androidx.annotation.OptIn(ExperimentalGetImage::class) private fun bindQrScannerCamera</ID>
     <ID>LongMethod:Reactions.kt:@Composable internal fun ReactionDetailsSheet</ID>
     <ID>LongMethod:Reactions.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun CustomizeReactionsDialog</ID>
-    <ID>LongMethod:RelaysScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun RelaysScreen</ID>
     <ID>LongMethod:ReplyPreviewCard.kt:@Composable internal fun ReplyPreviewCard</ID>
     <ID>LongMethod:SettingsScreen.kt:@Suppress("CyclomaticComplexMethod") private fun SettingsGroupScope.settingsHomeRows</ID>
     <ID>LongMethod:SignInScreen.kt:@Composable internal fun IdentityEntryForm</ID>
@@ -1154,6 +1155,7 @@
     <ID>MaxLineLength:IdentityFormatterTest.kt:IdentityFormatterTest$assertEquals(expected, IdentityFormatter.relativeTime(longAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))</ID>
     <ID>MaxLineLength:IdentityFormatterTest.kt:IdentityFormatterTest$assertEquals(expected, IdentityFormatter.relativeTime(threeDaysAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))</ID>
     <ID>MaxLineLength:KeyPackagesScreen.kt:DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))</ID>
+    <ID>MaxLineLength:KeyPackagesScreen.kt:PublishingActions(state = state, onRepublish = onRepublish, onPublishNew = onPublishNew)</ID>
     <ID>MaxLineLength:KeyPackagesScreen.kt:formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at))</ID>
     <ID>MaxLineLength:KeyboardPreservingBottomSheetCoverageTest.kt:KeyboardPreservingBottomSheetCoverageTest$assertFalse("conversation sheet must not open a focus-stealing ModalBottomSheet", "ModalBottomSheet(" in body)</ID>
     <ID>MaxLineLength:KeyboardPreservingBottomSheetCoverageTest.kt:KeyboardPreservingBottomSheetCoverageTest$assertTrue("conversation sheet must use KeyboardPreservingBottomSheet", "KeyboardPreservingBottomSheet(" in body)</ID>
@@ -1390,11 +1392,11 @@
     <ID>MaxLineLength:Reactions.kt:val isMine = activeAccountId != null &amp;&amp; participant.sender.equals(activeAccountId, ignoreCase = true)</ID>
     <ID>MaxLineLength:Reactions.kt:var draft by remember(quickReactionEmojis) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(quickReactionEmojis)) }</ID>
     <ID>MaxLineLength:RecentEmojiPreferences.kt:RecentEmojiPreferences$fun resetQuickReactions: List&lt;String&gt;</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:Column</ID>
     <ID>MaxLineLength:RelaysScreen.kt:LazyColumn</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:Row</ID>
     <ID>MaxLineLength:RelaysScreen.kt:Text("${list.relays.size}", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()</ID>
-    <ID>MaxLineLength:RelaysScreen.kt:lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:onListsChange(appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists())</ID>
+    <ID>MaxLineLength:RelaysScreen.kt:onListsChange(appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists())</ID>
     <ID>MaxLineLength:ReplyNavigationTest.kt:ReplyNavigationTest$assertEquals(ReplyNavigation.MaxOlderPages, ReplyNavigation.maxOlderPagesForRecord(message(tags = emptyList(), kind = 9uL)))</ID>
     <ID>MaxLineLength:SafeHttpsGet.kt:SafeHttpsGet$System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMillis(connectTimeoutMillis, readTimeoutMillis))</ID>
     <ID>MaxLineLength:SafeHttpsGet.kt:SniPinningSslSocketFactory$private fun pinned: Socket</ID>
