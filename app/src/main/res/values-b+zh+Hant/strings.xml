@@ -971,6 +971,7 @@
     <string name="shared_media_save_failed">無法儲存檔案</string>
     <string name="shared_media_voice_failed">無法播放語音訊息</string>
     <string name="disappearing_messages">閱後即焚訊息</string>
+    <string name="disappearing_message">限時訊息</string>
     <string name="disappearing_off">關閉</string>
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_7_days">7 天</string>

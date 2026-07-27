@@ -993,6 +993,7 @@
     <string name="shared_media_save_failed">No se pudo guardar el archivo</string>
     <string name="shared_media_voice_failed">No se pudo reproducir el mensaje de voz</string>
     <string name="disappearing_messages">Mensajes temporales</string>
+    <string name="disappearing_message">Mensaje efímero</string>
     <string name="disappearing_off">Desactivado</string>
     <string name="disappearing_1_day">1 día</string>
     <string name="disappearing_7_days">7 días</string>

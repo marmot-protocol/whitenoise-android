@@ -9,9 +9,35 @@ import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineProjectorTest {
+    @Test
+    fun retentionIndicatorRequiresAPositiveDuration() {
+        assertTrue(retentionIndicatorVisible(60uL))
+        // An explicit zero means retention was disabled for the message.
+        assertFalse(retentionIndicatorVisible(0uL))
+        assertFalse(retentionIndicatorVisible(null))
+    }
+
+    @Test
+    fun projectedRecordCarriesRetentionMetadataThrough() {
+        val record =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(plaintext = "x").copy(
+                    sourceEpoch = 7uL,
+                    retentionSeconds = 3600uL,
+                    retentionExpiresAt = 999uL,
+                ),
+            )
+
+        assertEquals(7uL, record.sourceEpoch)
+        assertEquals(3600uL, record.retentionSeconds)
+        assertEquals(999uL, record.retentionExpiresAt)
+    }
+
     @Test
     fun projectedRecordProvidesBodyReplyPreviewAndReactionTallies() {
         val record =

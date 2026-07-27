@@ -1045,6 +1045,7 @@
     <string name="shared_media_save_failed">Couldn\'t save file</string>
     <string name="shared_media_voice_failed">Couldn\'t play voice message</string>
     <string name="disappearing_messages">Disappearing messages</string>
+    <string name="disappearing_message">Disappearing message</string>
     <string name="disappearing_off">Off</string>
     <string name="disappearing_1_day">1 day</string>
     <string name="disappearing_7_days">7 days</string>

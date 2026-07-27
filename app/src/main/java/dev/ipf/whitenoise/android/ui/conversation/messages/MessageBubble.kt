@@ -96,6 +96,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipe
+import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.BubbleSide
@@ -1247,6 +1248,7 @@ internal fun MessageBubble(
                                         timeText = rememberedMessageBubbleTime(record.recordedAt),
                                         showStatus = mine,
                                         status = item.status,
+                                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
                                     )
                                 }
                             }
@@ -1355,6 +1357,7 @@ internal fun MessageBubble(
                                     timeText = rememberedMessageBubbleTime(record.recordedAt),
                                     showStatus = true,
                                     status = item.status,
+                                    showRetention = retentionIndicatorVisible(record.retentionSeconds),
                                 )
                             }
                         } else {
@@ -1434,6 +1437,7 @@ internal fun MessageBubble(
                         color = timestampColor,
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,
+                        showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                         editedLabel = editedLabel,
                         onEditedClick =
                             if (editState != null && !textSelectionMode) {

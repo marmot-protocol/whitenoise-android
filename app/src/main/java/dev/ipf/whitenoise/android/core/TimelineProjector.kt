@@ -56,6 +56,13 @@ fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
     }
 }
 
+/**
+ * Whether a bubble shows the disappearing-message indicator. An explicit
+ * `0` means retention was disabled for this message, so only a positive
+ * duration counts.
+ */
+fun retentionIndicatorVisible(retentionSeconds: ULong?): Boolean = (retentionSeconds ?: 0uL) > 0uL
+
 object TimelineProjector {
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
         AppMessageRecordFfi(
@@ -67,9 +74,9 @@ object TimelineProjector {
             contentTokens = record.contentTokens,
             kind = record.kind,
             tags = record.tags,
-            sourceEpoch = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
+            sourceEpoch = record.sourceEpoch,
+            retentionSeconds = record.retentionSeconds,
+            retentionExpiresAt = record.retentionExpiresAt,
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
         )
