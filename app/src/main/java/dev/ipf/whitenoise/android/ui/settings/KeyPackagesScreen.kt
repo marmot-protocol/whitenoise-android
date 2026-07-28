@@ -101,6 +101,15 @@ internal fun keyPackagesState(
         packageCount = packageCount,
     )
 
+private const val NOSTR_EVENT_ID_HEX_LENGTH = 64
+
+internal fun AccountKeyPackageFfi.isRelayDeletionTarget(): Boolean =
+    relay &&
+        eventIdHex.length == NOSTR_EVENT_ID_HEX_LENGTH &&
+        eventIdHex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+
+internal fun List<AccountKeyPackageFfi>.relayBacked(): List<AccountKeyPackageFfi> = filter { it.relay }
+
 internal const val KEY_PACKAGES_CONTENT_TAG = "key-packages-content"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,7 +146,7 @@ internal fun KeyPackagesScreen(
                 loaded = loaded,
                 loading = loading,
                 working = working,
-                packageCount = packages.size,
+                packageCount = packages.relayBacked().size,
             ),
         packages = packages,
         onBack = onBack,
@@ -164,7 +173,9 @@ internal fun KeyPackagesScreen(
                 }
             }
         },
-        onDelete = { pendingDelete = it },
+        onDelete = { keyPackage ->
+            if (keyPackage.isRelayDeletionTarget()) pendingDelete = keyPackage
+        },
     )
 
     pendingDelete?.let { kp ->
@@ -183,7 +194,7 @@ internal fun KeyPackagesScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    val target = pendingDelete ?: return@Button
+                    val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@Button
                     pendingDelete = null
                     working = true
                     scope.launch {
@@ -291,7 +302,10 @@ internal fun KeyPackagesContent(
                     }
 
                     KeyPackagesSection.PackageList -> {
-                        itemsIndexed(packages, key = { index, kp -> "${kp.eventIdHex}:$index" }) { _, kp ->
+                        itemsIndexed(
+                            packages.relayBacked(),
+                            key = { index, kp -> "${kp.eventIdHex}:$index" },
+                        ) { _, kp ->
                             KeyPackageCard(
                                 kp = kp,
                                 actionsEnabled = state.packageActionsEnabled,
@@ -381,8 +395,10 @@ private fun KeyPackageCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                IconButton(onClick = onDelete, enabled = actionsEnabled) {
-                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_key_package))
+                if (kp.isRelayDeletionTarget()) {
+                    IconButton(onClick = onDelete, enabled = actionsEnabled) {
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_key_package))
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

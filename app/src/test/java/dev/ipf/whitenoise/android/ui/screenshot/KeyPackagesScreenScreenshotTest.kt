@@ -27,6 +27,34 @@ class KeyPackagesScreenScreenshotTest {
 
     @Test
     fun keyPackagesScreenDefaultDark() {
+        capture(packages = emptyList(), path = "src/test/snapshots/key_packages_screen_default_dark.png")
+    }
+
+    @Test
+    fun keyPackagesScreenWithRetainedLocalMaterialDark() {
+        val published =
+            keyPackage(
+                keyPackageRefHex = "34".repeat(32),
+                eventIdHex = "ab".repeat(32),
+                relay = true,
+            )
+        val retained =
+            keyPackage(
+                keyPackageRefHex = "56".repeat(32),
+                eventIdHex = "",
+                relay = false,
+            )
+
+        capture(
+            packages = listOf(retained, published),
+            path = "src/test/snapshots/key_packages_screen_retained_local_dark.png",
+        )
+    }
+
+    private fun capture(
+        packages: List<AccountKeyPackageFfi>,
+        path: String,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -37,9 +65,9 @@ class KeyPackagesScreenScreenshotTest {
                                 loaded = true,
                                 loading = false,
                                 working = false,
-                                packageCount = 0,
+                                packageCount = packages.count { it.relay },
                             ),
-                        packages = emptyList<AccountKeyPackageFfi>(),
+                        packages = packages,
                         onBack = {},
                         onRefresh = {},
                         onRepublish = {},
@@ -52,6 +80,23 @@ class KeyPackagesScreenScreenshotTest {
 
         composeRule
             .onNodeWithTag(KEY_PACKAGES_CONTENT_TAG)
-            .captureRoboImage("src/test/snapshots/key_packages_screen_default_dark.png")
+            .captureRoboImage(path)
     }
+
+    private fun keyPackage(
+        keyPackageRefHex: String,
+        eventIdHex: String,
+        relay: Boolean,
+    ) = AccountKeyPackageFfi(
+        accountRef = "account",
+        accountIdHex = "12".repeat(32),
+        keyPackageId = "stable-package-slot",
+        keyPackageRefHex = keyPackageRefHex,
+        eventIdHex = eventIdHex,
+        publishedAt = 1_700_000_000uL,
+        keyPackageBytes = 128uL,
+        sourceRelays = if (relay) listOf("wss://relay.example") else emptyList(),
+        local = true,
+        relay = relay,
+    )
 }
