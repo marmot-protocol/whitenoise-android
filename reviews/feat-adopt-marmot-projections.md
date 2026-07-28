@@ -1,83 +1,55 @@
 # Code Review: feat/adopt-marmot-projections (origin/master..HEAD)
 
-## Round 4 (adversarial)
+## Round 5 (adversarial, final)
 
 ## Summary
 
-`c4686c13` correctly fixes round 3's "shared aggregate double-duties as a count" finding: `accountUnreadCounts` is back to a pure message count (`effectiveUnreadCount`, not the old `effectiveUnreadContribution`), and manual-unread now lives in its own `accountManualUnreadRefs` sidecar Set that only `accountShowsUnreadDot()` reads. Badge purity is verified intact — `unreadCountForAccount()` never touches the new set. But the sidecar's own maintenance has two new problems: the bulk-refresh short-circuit meant to protect an already-known flag makes that same flag undiscoverable the first time for any account that hasn't been live/active this session, and the sidecar is written from three independent, unsynchronized call sites (two of them genuinely concurrent, on different threads), unlike the numeric aggregate it sits beside, which was deliberately built to avoid exactly that hazard. All previously-fixed issues (rounds 1-2) and previously-flagged open suggestions (rounds 2-3) were re-verified against the current code and hold unchanged.
+`022e5d9c` addresses both round-4 correctness findings and the round-4 hygiene suggestion, all scoped to `AppState.kt`'s manual-unread sidecar. Two of the three hold cleanly: the concurrent-write race is fully closed — `updateAccountManualUnread` and the new `retainManualUnreadRefs` are the only two places that ever assign `accountManualUnreadRefs` (confirmed by exhaustive grep), both now serialize through one `synchronized(manualUnreadLock)` block, and every call site (the controller's main-thread `recompute()`, the bulk fan-out, the per-notification hot path) routes through them — so the read-modify-write interleaving round 4 demonstrated is no longer reachable. `retainManualUnreadRefs` also closes the removal/sign-out hygiene gap exactly as suggested, symmetric with `accountUnreadCounts`'s own cleanup.
+
+The third fix — `manualUnreadBootstrapped` — closes round 4's literal repro (a cold process restart with a backgrounded account already present at start) but does so with a single process-wide one-shot `Boolean`, not a per-account state. That's a narrower version of the same conflation round 4 flagged: it treats "has this process done its first bulk fold" as a proxy for "has this specific account's rows ever been folded," and those two facts diverge whenever an account's own first fold is skipped or fails independently of the process's first pass. The flag also never resets — not on full sign-out, not anywhere else in the file (only three references total: the declaration, the read, and one unconditional write to `true`). This is a real, narrower-scope descendant of the same finding, not a new unrelated bug — see below for the exposure window and why it's smaller than round 4's original claim. All three round 2-4 deferred items (`ConversationController.isDm` heuristic, `syncEngineMute` ordering, `markUnread` merge race) remain present, unaffected — this commit only touches the manual-unread aggregation path.
 
 ## Issues
 
-### Correctness: a background account's manual-unread flag can never be discovered — the bulk refresh's own short-circuit gates the only code that would set it
+### Correctness: `manualUnreadBootstrapped` is a single process-wide flag, so a per-account failure during the one-shot pass permanently reopens the discoverability trap for that account alone
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2966-2984**
-
-> ```kotlin
-> val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
-> // The cheap engine total can't see the client's
-> // manual-unread flag, so an account we believe is
-> // manually flagged always takes the row fold —
-> // which also refreshes that flag from the rows.
-> summary.label to
->     if (rawCount == 0uL && summary.label !in accountManualUnreadRefs) {
->         0uL
->     } else {
->         refreshEffectiveAccountUnreadCount(summary, memberGate)
->             ?: rawCount
->             ?: previous[summary.label]
->             ?: 0uL
->     }
-> ```
-
-The comment's own premise — "an account we believe is manually flagged always takes the row fold" — is the bug. `refreshEffectiveAccountUnreadCount` (line 3029-3032) is the *only* code path that calls `updateAccountManualUnread`, and it is only reached when `summary.label` is **already** in `accountManualUnreadRefs`, or the engine's raw count is nonzero. A manually-marked-unread chat with no real messages — the defining case for this feature — produces `rawCount == 0`. So the very first time an account's manual flag needs to be *discovered* (not just re-confirmed), the check `summary.label !in accountManualUnreadRefs` is true (the set doesn't know it yet), the shortcut fires, `0uL` is assigned, and `refreshEffectiveAccountUnreadCount`/`updateAccountManualUnread` never runs. This is a chicken-and-egg trap: the code path that would tell us the account is flagged only runs once we already believe it's flagged.
-
-`accountManualUnreadRefs` is only ever seeded by two things: this same row-fold (which the shortcut now prevents from ever running for real), or `ChatsController.recompute()`'s live push (`Controllers.kt:3428-3431`) — and `chatsController` is a single instance bound to whichever account is currently active (`AppState.kt:1850`), so that push never fires for a background account.
-
-Concretely: sign in on two devices/sessions to account A (active) and account B (signed in but backgrounded). On device/session where B was previously active, mark a chat unread on B, then switch to A. `accountManualUnreadRefs["B"]` was correctly seeded to `true` at that point (self-heals fine within that process's lifetime). Now kill the app and restart cold. `refreshAccounts()` runs at bootstrap (`AppState.kt:2614`) with a fresh `accountManualUnreadRefs = emptySet()`. For B, `rawCount == 0` and `"B" !in accountManualUnreadRefs` (true, freshly empty) → shortcut fires, B is assigned `0uL`, and its manual flag is never re-derived. B's account-switcher dot stays dark for as long as B remains backgrounded — until B becomes active again (reinstating the live push) or a notification arrives for B specifically (triggering the per-notification hot path at `AppState.kt:3051-3059`, which does call through to the row-fold). This defeats the doc comment on `refreshEffectiveAccountUnreadCount` that this exact function exists so "cross-account indicators stay honest for background accounts too (`AppState.kt:3005`, #662)" — for manual-unread specifically, background accounts are exactly what's now broken.
-
-### Correctness: `accountManualUnreadRefs` is updated from three unsynchronized call sites, at least two of which run on different threads — lost updates are reachable within a single bulk refresh
-
-**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2935-2942, 2960-2984**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2989-3024**
 
 > ```kotlin
-> internal fun updateAccountManualUnread(
->     accountRef: String?,
->     hasManualUnread: Boolean,
-> ) {
->     val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
->     accountManualUnreadRefs =
->         if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
-> }
+> val cheapZero =
+>     rawCount == 0uL &&
+>         !manualBootstrap &&
+>         summary.label !in accountManualUnreadRefs
+> ...
+> accountUnreadCounts = merged
+> manualUnreadBootstrapped = true
+> // Removed accounts drop their manual flag alongside their count.
+> retainManualUnreadRefs(refreshedCounts.keys)
 > ```
 
-This is a plain read-modify-write on a shared `mutableStateOf<Set<String>>` — read the current set, compute a new one, assign. It has three call sites: `ChatsController.recompute()` on `Dispatchers.Main.immediate` (`Controllers.kt:3347,3428-3431`), and `refreshEffectiveAccountUnreadCount` on `Dispatchers.IO` (via `marmotIo`, `AppState.kt:2483-2486`) from both the bulk `refreshAccountUnreadCounts` (line 3029-3032, invoked from up to `ACCOUNT_UNREAD_ACCOUNT_FANOUT = 4` (`AppState.kt:6772`) truly-concurrent `async` blocks) and the single-account `refreshAccountUnreadCount` hot path (line 3057). None of the three coordinate with each other or with a version/timestamp check.
+`manualBootstrap` is captured once (`!manualUnreadBootstrapped`, line 2970) before the concurrent per-account fan-out, so on the very first call it correctly forces every signed-in account — including backgrounded ones — through the row fold at least once. But `updateAccountManualUnread` only runs if that per-account fold *succeeds*: it's called from inside the same `marmotIo { ... }` block (`AppState.kt:3057-3060`) that `chatList()`/`groupMembers()` can throw out of, and that block is wrapped in `runCatchingCancellable` (`AppState.kt:3040, 3063`), which swallows any non-cancellation `Throwable` into `Result.failure` (`Cancellation.kt:13-20`) with no rethrow and no distinction for "this was the one-shot bootstrap attempt." A transient failure for one account during that single forced pass — a network blip, a `chatList`/`groupMembers` FFI error — means that account's `updateAccountManualUnread` never runs this round, yet line 3022 unconditionally sets `manualUnreadBootstrapped = true` regardless of which individual folds actually succeeded. Every subsequent bulk refresh treats that account exactly as round 4 described: `rawCount == 0uL`, not yet in `accountManualUnreadRefs`, `manualBootstrap` now `false` → `cheapZero` fires → the row fold that would discover its manual flag never runs again.
 
-This doesn't require the notification-vs-switcher cross-path timing round 3 flagged for the sibling map — it's reachable from a single call to `refreshAccountUnreadCounts()` alone, whenever 2+ signed-in accounts both take the row-fold branch (e.g., both have real unread, or both are already flagged): each is a separate `async { accountGate.withPermit { ... } }` that runs genuinely concurrently (semaphore just bounds it to 4, doesn't serialize), and each calls `updateAccountManualUnread` directly from inside its own coroutine. If account A's read-compute-write of `accountManualUnreadRefs` interleaves with account B's (A reads `{}`, computes `{} + "A"`; B reads `{}` before A writes, computes `{} - "B"` = `{}`; A writes `{"A"}`; B writes `{}`), A's correctly-computed flag is silently dropped — the dot for A goes dark despite A having a genuinely manually-unread chat.
+The same unconditional, no-reset design also means the flag doesn't distinguish "this process has bootstrapped" from "this account has been discovered": it is never reset anywhere (confirmed — the only three references in the file are the `false` declaration at 2941, the read at 2970, and the `true` write at 3022; the full-sign-out early return at 2965-2969 doesn't touch it either). So an account that becomes part of the signed-in roster for the first time after this process's one bootstrap pass has already run inherits `manualBootstrap == false` on its very first appearance in `signingAccounts` — it gets no forced fold of its own, only the same `cheapZero` gate every other account uses post-bootstrap.
 
-Contrast this with how the sibling numeric aggregate in the *same function* avoids this exact hazard: each `async` block only returns a local `Pair<label, count>` (line 2972-2980), and the shared `accountUnreadCounts` is only ever mutated once, sequentially, after `awaitAll()` completes (line 2985-2996 builds `refreshedCounts` from the collected pairs before touching state). `updateAccountManualUnread` bypasses that pattern entirely by mutating the shared set directly from inside the still-concurrent `async` bodies.
+This is narrower than round 4's original finding, not equally severe — two things bound the blast radius, and both were already established by round 4's own writeup: becoming the active account re-triggers `ChatsController.recompute()`'s live push (`Controllers.kt:3428-3431`), which discovers the flag independent of this gate; and a targeted push notification runs `refreshAccountUnreadCount` (`AppState.kt:3079-3087`), which calls `refreshEffectiveAccountUnreadCount` unconditionally with no `cheapZero`-style shortcut at all. So the exposure window is specifically: an account that is signed in, currently backgrounded, has never yet been the active account in this process, and — because a manually-marked-unread chat with zero real messages is defined to generate no unread-driving notification — never receives the one push that would route through the always-correct hot path. That's a real window (it's exactly the account-switcher's own `LaunchedEffect(Unit) { appState.refreshAccounts() }` at `AccountSelectorSheet.kt:280-289` that would silently reconfirm the wrong state on every open), just smaller than "every backgrounded account, every cold start."
+
+A per-account bootstrapped set (e.g., track which account labels have completed at least one successful row fold, alongside `accountManualUnreadRefs` under the same lock, pruned the same way `retainManualUnreadRefs` prunes now) would tie the guard to the actual invariant — "has this account's rows ever been folded" — instead of "has the process's first call finished," and would cover a failed-then-retried account or a newly-added account without depending on it becoming active or getting notified first.
 
 ## Suggestions
 
-### `accountManualUnreadRefs` has no removal-time or full-sign-out cleanup, unlike `accountUnreadCounts`
+### Test gap persists: `refreshAccountUnreadCounts`, the bootstrap flag, and the lock are still untested
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2946-2947, 2992-2996**
+No test file references `refreshAccountUnreadCounts`, `refreshEffectiveAccountUnreadCount`, `manualUnreadBootstrapped`, or `manualUnreadLock` (checked `app/src/test` in full). `AccountUnreadTest.kt`'s cases still only exercise the pure row-folding functions (`accountUnreadCount`, `accountHasManualUnread`, `accountShowsUnreadDot`) in isolation, same as round 4 noted. Both this round's finding and the round-4 concurrency fix's correctness are unverifiable by the suite in either direction.
 
-`refreshAccountUnreadCounts` explicitly resets `accountUnreadCounts = emptyMap()` when no signing accounts remain (line 2947), and its merge step explicitly keeps only labels present in `refreshedCounts` — i.e., currently signed-in accounts — so a removed/signed-out account's entry is dropped (the comment at line 2989 says as much: "Accounts absent from refreshedCounts (removed) are still dropped"). `accountManualUnreadRefs` has no equivalent: nothing clears it on full sign-out, and nothing prunes an individual account's ref when that account is removed while flagged — the set can only grow or have entries explicitly cleared by `updateAccountManualUnread(ref, false)`, which never runs again for a ref that's no longer in `accounts`. In practice this looks self-healing if the same account signs back in later (the stale `true` entry just forces one extra row-fold instead of causing a wrong dot), so this reads as a hygiene/unbounded-growth gap rather than a demonstrated wrong-dot bug, but it's worth closing for symmetry with the map it sits beside.
+### Carried forward from rounds 2-4 (still open, confirmed present, unaffected by this commit)
 
-### Carried forward from rounds 2-3 (still open, confirmed present, unaffected by this commit)
-
-- `ConversationController.isDm` / `isDirectConversation` (`Controllers.kt:4163, 4193`) still call the un-upgraded `GroupProjector.isDm(memberCount, name)` two-arg heuristic rather than the `conversationKind`-aware overload every list-derived consumer uses.
+- `ConversationController.isDm` / `isDirectConversation` (`Controllers.kt:4163, 4193`) still call the un-upgraded `GroupProjector.isDm(memberCount, name)` two-arg heuristic rather than the `conversationKind`-aware overload every list-derived consumer uses (`GroupProjector.isDm(projection?.conversationKind, memberCount, group.name)`, e.g. `Controllers.kt:257`).
 - `ChatsController.markUnread` (`Controllers.kt:3281`) still folds through `mergeMarkReadChatListRow` (`Controllers.kt:460, 2782`), which can drop a just-applied `manuallyMarkedUnread = true` under the stale-comparison race described in round 2.
-- `syncEngineMute`'s fire-and-forget per-call `mutationsScope.launch` jobs (`AppState.kt:3969-3987`) still have no ordering protection between a rapid mute/unmute pair.
-- `ChatsScreen.kt:213-215`'s `resolveFolderChatIds` still re-derives the composite-key mute check (`ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations || groupIdHex in engineMutedChatIds`) instead of calling `isLocallyMuted(groupIdHex) || groupIdHex in engineMutedChatIds`.
-
-### Test gap: neither of this round's new issues would be caught by the existing suite
-
-`AccountUnreadTest.manualUnreadIsABooleanSidecarNotACount` only exercises the pure `accountHasManualUnread(rows, ...)` function in isolation — it proves the split is correct in principle but never touches `refreshAccountUnreadCounts`, the short-circuit, or any concurrent invocation. As round 3 noted, nothing in the suite exercises `refreshAccountUnreadCounts`/`refreshEffectiveAccountUnreadCount` at all, so both the bootstrap-discovery gap and the concurrent-write race have no coverage in either direction.
+- `syncEngineMute`'s fire-and-forget per-call `mutationsScope.launch` jobs (`AppState.kt:3997-4045`) still have no ordering protection between a rapid mute/unmute pair.
+- `ChatsScreen.kt:214-215`'s `resolveFolderChatIds` still re-derives the composite-key mute check instead of calling `isLocallyMuted(groupIdHex) || groupIdHex in engineMutedChatIds`.
 
 ## What's Done Well
 
-- Badge purity is fully restored: `effectiveUnreadContribution` is gone, `accountUnreadCounts` only ever accumulates `effectiveUnreadCount`, and `AccountUnreadTest.manualUnreadIsABooleanSidecarNotACount` directly asserts the split (`accountUnreadCount` stays `0`, `accountHasManualUnread` is the boolean signal) — round 3's "aggregate double-duties as a count" finding is closed at the root, not patched around.
-- The sidecar is a clean, minimally-invasive addition: a dedicated `Set<String>` with its own updater, read by exactly one consumer (`accountShowsUnreadDot`), rather than another special case threaded through the existing numeric map.
-- All five round-1/round-2 correctness fixes (`syncEngineMute` wiring, both `ChatsScreen` mute reads, `ChatRow`'s preview weight modifier, `chatRowNeedsMediaKindResolve`'s early return, `GroupDetailsScreen`'s move to `latestChatListRow`) were re-verified against the current code and hold exactly as previously described.
-- Every round 2-3 open suggestion was re-checked and confirmed still present, unchanged — nothing was silently dropped or regressed by this commit, which only touches the manual-unread aggregation path.
+- The concurrent-write race is closed correctly, not just narrowed: `accountManualUnreadRefs` has exactly two writers (`updateAccountManualUnread`, `retainManualUnreadRefs`), both now synchronize on the same `manualUnreadLock`, and every one of the three call sites round 4 identified as genuinely concurrent (main-thread `recompute()`, the four-way bulk fan-out, the per-notification hot path) goes through one of those two functions — verified by grepping every reference to the field, not just the call sites round 4 already knew about.
+- `retainManualUnreadRefs` closes the round-4 hygiene suggestion cleanly and symmetrically: called both on full sign-out (`emptySet()`, matching `accountUnreadCounts`'s own reset) and after every bulk merge (`refreshedCounts.keys`, matching the numeric map's "removed accounts are dropped" comment) — the sidecar no longer grows unboundedly or outlives a removed account.
+- The bootstrap fix fully resolves round 4's named repro (cold restart, backgrounded account already signed in at process start) — the residual gap above is a real but strictly narrower descendant, not a failure to address what round 4 actually demonstrated.
+- The `synchronized` pattern matches an already-established, already-tested idiom elsewhere in this codebase (`ChatMutePreferences`'s own `synchronized(mutationLock)`, asserted directly in `ChatMutePreferencesTest.kt:170`), so this isn't a novel concurrency primitive introduced just for this fix.
