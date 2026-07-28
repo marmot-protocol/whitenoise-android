@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoDelete
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,7 +99,7 @@ internal fun MessageInlineFooter(
             }
             if (showRetention) {
                 Icon(
-                    imageVector = Icons.Default.AutoDelete,
+                    imageVector = Icons.Default.Schedule,
                     contentDescription = stringResource(R.string.disappearing_message),
                     modifier = Modifier.size(12.dp),
                     tint = color.copy(alpha = 0.76f),
