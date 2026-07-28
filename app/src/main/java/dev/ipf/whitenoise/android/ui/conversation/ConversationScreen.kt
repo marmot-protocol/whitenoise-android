@@ -377,12 +377,19 @@ internal fun ConversationScreen(
                     },
             )
         }
+    val bottomChromeHeightObserver =
+        remember(chat.id) {
+            ConversationBottomChromeHeightObserver()
+        }
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
     // non-focusable (#284), so long-pressing several bubbles would otherwise
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
     var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
+    DismissMessageActionMenuOnScroll(listState) {
+        openActionMenuId = null
+    }
     // Partial text selection is independent from batch message selection. Only
     // one bubble can own the native SelectionContainer at a time.
     var textSelectionMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
@@ -2910,6 +2917,9 @@ internal fun ConversationScreen(
                 Modifier
                     .fillMaxWidth()
                     .onSizeChanged { size ->
+                        if (bottomChromeHeightObserver.onMeasured(size.height)) {
+                            reanchorNewestAfterBottomInputChange()
+                        }
                         val chromeBottom = chromeInsets.getBottom(density)
                         snackbarBottomInset.value =
                             with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
@@ -3310,6 +3320,16 @@ internal fun ConversationScreen(
                                             }
                                             TimelineRowKind.Bubble -> Unit
                                         }
+                                        val messageId = item.record.messageIdHex
+                                        val ownsActionMenu = openActionMenuId == messageId
+                                        DismissMessageActionMenuOnDispose(
+                                            messageId = messageId,
+                                            isOpen = ownsActionMenu,
+                                        ) {
+                                            if (openActionMenuId == messageId) {
+                                                openActionMenuId = null
+                                            }
+                                        }
                                         MessageBubble(
                                             item = item,
                                             controller = controller,
@@ -3348,10 +3368,14 @@ internal fun ConversationScreen(
                                             quickReactionEmojis = quickReactionEmojis,
                                             recentEmojis = recentEmojiRecentsOwner.recents,
                                             onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                            isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
+                                            isActionMenuOpen = ownsActionMenu,
                                             onActionMenuOpenChange = { open ->
                                                 if (open) clearTextSelection()
-                                                openActionMenuId = if (open) item.record.messageIdHex else null
+                                                if (open) {
+                                                    openActionMenuId = messageId
+                                                } else if (openActionMenuId == messageId) {
+                                                    openActionMenuId = null
+                                                }
                                             },
                                             // Lambdas, not method references: the Compose
                                             // compiler memoizes lambdas but allocates a fresh
