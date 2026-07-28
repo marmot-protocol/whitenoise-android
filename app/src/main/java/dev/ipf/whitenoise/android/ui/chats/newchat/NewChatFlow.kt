@@ -282,23 +282,20 @@ private fun NewMessageScreen(
     ) {
         if (creatingHex != null) return
         startChatError = null
-        val shouldCreate =
-            retryGroupIdHex != null ||
-                resolveNewMessageDirectChat(
-                    npub = npub,
-                    existingDmGroupIdHex = existingDmGroupIdHex,
-                    chatListItems = appState.chatListItems,
-                    activeAccountIdHex = activeHex,
-                    npubForHex = appState::npub,
-                    existingDirectChat = appState::existingDirectChat,
-                ).let { resolution ->
-                    resolution.item?.also { onOpenConversation(it, false) } == null &&
-                        resolution.createRequired
-                }
-        if (!shouldCreate) return
         creatingHex = hexForProgress
         appState.launchMutation {
             try {
+                if (retryGroupIdHex == null) {
+                    val resolution =
+                        resolveNewMessageDirectChat(
+                            npub = npub,
+                            existingDmGroupIdHex = existingDmGroupIdHex,
+                            provenanceDirectChat = appState::resolveProvenanceDirectChat,
+                            existingDirectChat = appState::existingDirectChat,
+                        )
+                    resolution.item?.let { onOpenConversation(it, false) }
+                    if (resolution.item != null || !resolution.createRequired) return@launchMutation
+                }
                 when (
                     val result =
                         attemptStartProfileChat(

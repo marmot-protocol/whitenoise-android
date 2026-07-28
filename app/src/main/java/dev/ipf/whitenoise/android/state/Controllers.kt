@@ -75,6 +75,8 @@ import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
+import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -2731,6 +2733,36 @@ class ChatsController(
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
         val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
         return row?.let { projectChatRow(it) }
+    }
+
+    /**
+     * Revalidate picker provenance against the current backing row and an
+     * authoritative local [groupDetails] read (#1701). Uses [chatRowsByGroup],
+     * not the debounced [items] snapshot.
+     */
+    internal suspend fun resolveProvenanceDirectChat(
+        provenanceGroupIdHex: String?,
+        targetReference: String,
+    ): NewMessageDirectChatResolution {
+        val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
+        val account = accountRef ?: return unavailable
+        val bindAccount = account
+        val epoch = bindEpoch
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+        val normalizedTarget = targetReference.trim()
+        return existingDirectChatFromProvenance(
+            provenanceGroupIdHex = provenanceGroupIdHex,
+            targetReference = targetReference,
+            activeAccountIdHex = activeAccountIdHex,
+            equivalentTarget = { other -> appState.npub(other).equals(normalizedTarget, ignoreCase = true) },
+            chatItemForGroup = ::chatItemForGroup,
+            authoritativeGroupDetails = { groupIdHex ->
+                runCatchingCancellable {
+                    appState.marmotIo { groupDetails(account, groupIdHex) }
+                }.getOrNull()?.let(::applyAuthoritativeGroupDetails)
+            },
+            accountStillBound = { accountRef == bindAccount && isActiveBindEpoch(epoch) },
+        )
     }
 
     // Lightweight membership probe over the raw rows — no per-row ChatListItem
