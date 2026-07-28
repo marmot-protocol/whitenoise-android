@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">Silenciar</string>
     <string name="chat_row_action_unmute">Dejar de silenciar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>
+    <string name="chat_row_action_mark_unread">Marcar como no leído</string>
     <string name="chat_row_action_delete_group">Eliminar grupo</string>
     <string name="delete_group_dialog_title">¿Eliminar grupo?</string>
     <string name="delete_group_dialog_message">¿Quitar este grupo de este dispositivo? Si aún eres miembro, primero saldrás del grupo.</string>
@@ -829,6 +830,8 @@
     <string name="voice_message_locked">Bloqueado</string>
     <string name="reply_you">Tú</string>
     <string name="reply_media_photo">Foto</string>
+    <string name="media_album">Álbum</string>
+    <string name="media_counted_format">%1$s (%2$d)</string>
     <string name="reply_media_video">Vídeo</string>
     <string name="reply_media_voice">Mensaje de voz</string>
     <string name="reply_media_document">Documento</string>
@@ -993,6 +996,7 @@
     <string name="shared_media_save_failed">No se pudo guardar el archivo</string>
     <string name="shared_media_voice_failed">No se pudo reproducir el mensaje de voz</string>
     <string name="disappearing_messages">Mensajes temporales</string>
+    <string name="disappearing_message">Mensaje temporal</string>
     <string name="disappearing_off">Desactivado</string>
     <string name="disappearing_1_day">1 día</string>
     <string name="disappearing_7_days">7 días</string>

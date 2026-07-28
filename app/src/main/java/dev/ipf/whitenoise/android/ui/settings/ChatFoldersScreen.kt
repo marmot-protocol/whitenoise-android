@@ -36,7 +36,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolder
@@ -253,7 +252,7 @@ private fun folderChatCount(
     return when (folder.systemKind) {
         SystemFolderKind.UNREAD -> active.count { it.hasUnread }
         SystemFolderKind.ARCHIVED -> appState.archivedChatListItems.size
-        SystemFolderKind.GROUPS -> active.count { !GroupProjector.isDm(it.memberCount, it.group.name) }
+        SystemFolderKind.GROUPS -> active.count { !it.isDm() }
         null -> {
             if (accountRef == null) {
                 0
@@ -263,6 +262,7 @@ private fun folderChatCount(
                         items = active,
                         manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
                         rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
                         isMuted = { ChatMutePreferences.compositeKey(accountRef, it) in mutedConversations },
                         displayTitle = displayTitle,
                     )

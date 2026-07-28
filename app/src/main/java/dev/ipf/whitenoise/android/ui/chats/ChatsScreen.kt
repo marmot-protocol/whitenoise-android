@@ -177,6 +177,21 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
+    val isLocallyMuted: (String) -> Boolean =
+        remember(mutedConversations, appState.activeAccountRef) {
+            { groupIdHex ->
+                appState.activeAccountRef
+                    ?.let { ChatMutePreferences.compositeKey(it, groupIdHex) in mutedConversations } == true
+            }
+        }
+    val engineMutedChatIds =
+        remember(controller.items) {
+            controller.items
+                .asSequence()
+                .filter { it.engineMuted() }
+                .map { it.group.groupIdHex }
+                .toSet()
+        }
     val resolveFolderChatIds: (String) -> Set<String> =
         remember(
             folderStoreState,
@@ -195,8 +210,10 @@ internal fun ChatsScreen(
                             items = controller.items,
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
                             rule = appState.chatFolderPreferences.folderRule(accountRef, folderId),
+                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
                             isMuted = { groupIdHex ->
-                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
+                                ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations ||
+                                    groupIdHex in engineMutedChatIds
                             },
                             displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                         )
@@ -382,9 +399,10 @@ internal fun ChatsScreen(
     val singleSelectedItem = selectedVisibleItems.singleOrNull()
     val singleSelectionMuted =
         singleSelectedItem?.let { item ->
-            appState.activeAccountRef?.let { accountRef ->
-                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
-            }
+            item.engineMuted() ||
+                appState.activeAccountRef?.let { accountRef ->
+                    ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
+                } == true
         } ?: false
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
@@ -469,6 +487,7 @@ internal fun ChatsScreen(
                 folders = accountFolders,
                 activeItems = controller.items,
                 archivedItems = controller.archivedItems,
+                activeAccountIdHex = appState.activeAccount?.accountIdHex,
                 membershipOf = resolveFolderChatIds,
             )
         }
@@ -522,6 +541,9 @@ internal fun ChatsScreen(
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
+                        showMarkUnread =
+                            singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
+                                singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
                         showMuteToggle = singleSelectedItem != null,
                         muted = singleSelectionMuted,
                         onClose = ::clearSelection,
@@ -563,6 +585,11 @@ internal fun ChatsScreen(
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
                             clearSelection()
                             appState.launchMutation { controller.markAllRead(item) }
+                        },
+                        onMarkUnread = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            clearSelection()
+                            appState.launchMutation { controller.markUnread(item) }
                         },
                         onMuteToggle = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
@@ -720,10 +747,7 @@ internal fun ChatsScreen(
                                         item = item,
                                         appState = appState,
                                         isMuted =
-                                            appState.activeAccountRef?.let { accountRef ->
-                                                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
-                                                    mutedConversations
-                                            } ?: false,
+                                            item.engineMuted() || isLocallyMuted(item.group.groupIdHex),
                                         selectionMode = selectionMode,
                                         selected = item.id in selectedChatIds,
                                         bodyMatch = bodyMatch,

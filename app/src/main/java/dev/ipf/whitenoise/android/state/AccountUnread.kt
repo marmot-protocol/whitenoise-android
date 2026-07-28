@@ -97,6 +97,36 @@ internal fun accountUnreadCount(
     }
 
 /**
+ * Whether any unarchived, still-membered row is manually marked unread. Kept
+ * separate from [accountUnreadCount]: the numeric aggregate feeds a literal
+ * message-count badge, while manual unread is a boolean attention signal that
+ * only the account dot consumes.
+ */
+internal fun accountHasManualUnread(
+    rows: Iterable<ChatListRowFfi>,
+    activeAccountIdHex: String?,
+    membersByGroupId: Map<String, List<AppGroupMemberRecordFfi>>,
+): Boolean =
+    rows.any { row ->
+        !row.archived &&
+            row.manuallyMarkedUnread &&
+            !row.selfMembership.isNonMember() &&
+            !row.leaveRequestPending &&
+            !accountMissingFromLoadedRoster(activeAccountIdHex, membersByGroupId[row.groupIdHex])
+    }
+
+/** [accountHasManualUnread] over projected items for the live controller. */
+internal fun accountHasManualUnread(
+    items: Iterable<ChatListItem>,
+    activeAccountIdHex: String?,
+): Boolean =
+    items.any { item ->
+        !item.group.archived &&
+            item.projection?.manuallyMarkedUnread == true &&
+            !item.removedFromGroup(activeAccountIdHex)
+    }
+
+/**
  * Aggregate unread messages from projected chat items, applying the
  * removed-group suppression ([ChatListItem.effectiveUnreadCount]) for the
  * active account so a group the user has left/been removed from no longer

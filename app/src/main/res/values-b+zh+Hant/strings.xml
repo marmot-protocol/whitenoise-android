@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">靜音</string>
     <string name="chat_row_action_unmute">取消靜音</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
+    <string name="chat_row_action_mark_unread">標示為未讀</string>
     <string name="chat_row_action_delete_group">刪除群組</string>
     <string name="delete_group_dialog_title">刪除群組？</string>
     <string name="delete_group_dialog_message">從此裝置移除此群組？如果你仍是成員，將先退出群組。</string>
@@ -812,6 +813,8 @@
     <string name="voice_message_locked">已鎖定</string>
     <string name="reply_you">你</string>
     <string name="reply_media_photo">相片</string>
+    <string name="media_album">相簿</string>
+    <string name="media_counted_format">%1$s（%2$d）</string>
     <string name="reply_media_video">影片</string>
     <string name="reply_media_voice">語音訊息</string>
     <string name="reply_media_document">文件</string>
@@ -971,6 +974,7 @@
     <string name="shared_media_save_failed">無法儲存檔案</string>
     <string name="shared_media_voice_failed">無法播放語音訊息</string>
     <string name="disappearing_messages">閱後即焚訊息</string>
+    <string name="disappearing_message">限時訊息</string>
     <string name="disappearing_off">關閉</string>
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_7_days">7 天</string>

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
@@ -26,6 +25,7 @@ internal fun chatFolderChipModels(
     folders: List<ChatFolder>,
     activeItems: List<ChatListItem>,
     archivedItems: List<ChatListItem>,
+    activeAccountIdHex: String?,
     membershipOf: (folderId: String) -> Set<String>,
 ): List<ChatFolderChipModel> =
     folders
@@ -33,7 +33,7 @@ internal fun chatFolderChipModels(
         .mapNotNull { folder ->
             when (folder.systemKind) {
                 SystemFolderKind.UNREAD -> {
-                    val unread = activeItems.count { it.hasUnread }
+                    val unread = activeItems.count { it.effectiveHasUnread(activeAccountIdHex) }
                     if (unread == 0) {
                         null
                     } else {
@@ -48,12 +48,12 @@ internal fun chatFolderChipModels(
                             folder.id,
                             folder.systemKind,
                             "",
-                            trailingCount = archivedItems.count { it.hasUnread },
+                            trailingCount = archivedItems.count { it.effectiveHasUnread(activeAccountIdHex) },
                         )
                     }
                 }
                 SystemFolderKind.GROUPS -> {
-                    val groups = activeItems.count { !GroupProjector.isDm(it.memberCount, it.group.name) }
+                    val groups = activeItems.count { !it.isDm() }
                     if (groups == 0) null else ChatFolderChipModel(folder.id, folder.systemKind, "", trailingCount = 0)
                 }
                 null -> {

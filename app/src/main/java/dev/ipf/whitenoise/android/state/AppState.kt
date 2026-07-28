@@ -2914,7 +2914,7 @@ class WhiteNoiseAppState private constructor(
      * the secondary top-bar avatars, and the account switcher so no avatar can
      * light for another account's unread.
      */
-    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts)
+    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts) || accountRef in accountManualUnreadRefs
 
     internal fun updateAccountUnreadCount(
         accountRef: String?,
@@ -2924,12 +2924,55 @@ class WhiteNoiseAppState private constructor(
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
 
+    /**
+     * Accounts with at least one manually-marked-unread chat. A boolean
+     * sidecar to [accountUnreadCounts]: the numeric map stays a real message
+     * count (it feeds literal count badges), while this set only lights dots.
+     */
+    internal var accountManualUnreadRefs by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    private val manualUnreadLock = Any()
+
+    // Accounts whose rows have actually been folded at least once this
+    // process (fold success or a live controller recompute). The cheap
+    // zero-count short-circuit is only trusted for these: the manual-unread
+    // flag lives in rows, so an account never yet folded — cold start, a
+    // fresh sign-in, or a transiently failed fold — must take the row fold.
+    private var manualUnreadFoldedRefs = setOf<String>()
+
+    internal fun updateAccountManualUnread(
+        accountRef: String?,
+        hasManualUnread: Boolean,
+    ) {
+        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
+        // Read-modify-write under a lock: writers race across the controller's
+        // main-thread recompute, the notification hot path, and the four-way
+        // concurrent bulk refresh.
+        synchronized(manualUnreadLock) {
+            manualUnreadFoldedRefs = manualUnreadFoldedRefs + ref
+            accountManualUnreadRefs =
+                if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
+        }
+    }
+
+    private fun manualUnreadFolded(ref: String) = synchronized(manualUnreadLock) { ref in manualUnreadFoldedRefs }
+
+    private fun retainManualUnreadRefs(current: Set<String>) {
+        synchronized(manualUnreadLock) {
+            manualUnreadFoldedRefs = manualUnreadFoldedRefs.intersect(current)
+            accountManualUnreadRefs = accountManualUnreadRefs.intersect(current)
+        }
+    }
+
     private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
             accountUnreadCounts = emptyMap()
+            retainManualUnreadRefs(emptySet())
             return
         }
+
         val previous = accountUnreadCounts
         val rawCountsByHex =
             runCatchingCancellable {
@@ -2948,8 +2991,16 @@ class WhiteNoiseAppState private constructor(
                         async {
                             accountGate.withPermit {
                                 val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+                                val cheapZero =
+                                    rawCount == 0uL &&
+                                        manualUnreadFolded(summary.label) &&
+                                        summary.label !in accountManualUnreadRefs
+                                // The cheap engine total can't see the client's
+                                // manual-unread flag, so an account we believe is
+                                // manually flagged always takes the row fold —
+                                // which also refreshes that flag from the rows.
                                 summary.label to
-                                    if (rawCount == 0uL) {
+                                    if (cheapZero) {
                                         0uL
                                     } else {
                                         refreshEffectiveAccountUnreadCount(summary, memberGate)
@@ -2973,6 +3024,8 @@ class WhiteNoiseAppState private constructor(
             if (previous[ref] != count && merged.containsKey(ref)) merged[ref] = count
         }
         accountUnreadCounts = merged
+        // Removed accounts drop their manual flag alongside their count.
+        retainManualUnreadRefs(refreshedCounts.keys)
     }
 
     /**
@@ -3005,6 +3058,10 @@ class WhiteNoiseAppState private constructor(
                     ) { groupIdHex ->
                         groupMembers(ref, groupIdHex)
                     }
+                updateAccountManualUnread(
+                    ref,
+                    accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
+                )
                 accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {
@@ -3902,7 +3959,11 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMode(accountRef, groupIdHex, mode)
+        syncEngineMute(accountRef, groupIdHex)
     }
+
+    /** The engine's durable mute projection for the chat, from the live list. */
+    fun engineConversationMuted(groupIdHex: String): Boolean = chatsController?.items?.firstOrNull { it.group.groupIdHex == groupIdHex }?.engineMuted() == true
 
     fun setConversationNotifyForMode(
         groupIdHex: String,
@@ -3918,6 +3979,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
+        syncEngineMute(accountRef, groupIdHex)
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -3927,6 +3989,41 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.muteFor(accountRef, groupIdHex, durationMillis)
+        syncEngineMute(accountRef, groupIdHex)
+    }
+
+    /**
+     * Mirror the app-side mute decision into the engine's durable notification
+     * settings, so the projected row (`muted`/`mutedUntilMs`) and any other
+     * device agree with this one. Local preferences stay the immediate source
+     * for notification suppression — this write is convergence, not gating.
+     */
+    private val engineMuteMutex = Mutex()
+
+    private fun syncEngineMute(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        mutationsScope.launch {
+            // Serialize writes and read the preferences inside the lock, so
+            // the last write always mirrors the newest local decision even
+            // when rapid toggles race their IO completions.
+            engineMuteMutex.withLock {
+                val muted = chatMutePreferences.isMuted(accountRef, groupIdHex)
+                val expiry = chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+                runCatchingCancellable {
+                    marmotIo {
+                        if (muted) {
+                            setChatMuted(accountRef, groupIdHex, expiry)
+                        } else {
+                            clearChatMuted(accountRef, groupIdHex)
+                        }
+                    }
+                }.onFailure {
+                    appStateDebug(it) { "engine mute sync failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+                }
+            }
+        }
     }
 
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */

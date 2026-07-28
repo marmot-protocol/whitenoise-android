@@ -72,6 +72,15 @@ class ChatListUnreadSuppressionTest {
     }
 
     @Test
+    fun durablyQueuedLeaveSuppressesLikeAnActualLeave() {
+        val item = item(unreadCount = 4uL, members = listOf("self", "peer"), leaveRequestPending = true)
+
+        assertTrue(item.removedFromGroup("self"))
+        assertEquals(0uL, item.effectiveUnreadCount("self"))
+        assertFalse(item.effectiveHasUnread("self"))
+    }
+
+    @Test
     fun nullOrBlankActiveAccountNeverSuppresses() {
         // Matching GroupProjector semantics: with no active account there is
         // no removal to establish — even an explicit removed marker must not
@@ -137,6 +146,7 @@ class ChatListUnreadSuppressionTest {
         members: List<String>?,
         removed: Boolean = false,
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+        leaveRequestPending: Boolean = false,
     ): ChatListItem =
         ChatListItem(
             group = group("group-a"),
@@ -144,7 +154,7 @@ class ChatListUnreadSuppressionTest {
             otherMemberAccount = null,
             memberCount = members?.size ?: 0,
             memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
-            projection = row("group-a", unreadCount, selfMembership),
+            projection = row("group-a", unreadCount, selfMembership, leaveRequestPending),
             removed = removed,
         )
 
@@ -159,6 +169,7 @@ class ChatListUnreadSuppressionTest {
         groupId: String,
         unreadCount: ULong,
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+        leaveRequestPending: Boolean = false,
     ) = ChatListRowFfi(
         selfMembership = selfMembership,
         unreadMentionCount = 0uL,
@@ -179,7 +190,7 @@ class ChatListUnreadSuppressionTest {
         conversationCreatedAt = 0uL,
         activitySortAt = 0uL,
         updatedAt = 0uL,
-        leaveRequestPending = false,
+        leaveRequestPending = leaveRequestPending,
         leaveRequestedAtMs = null,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.UNKNOWN,

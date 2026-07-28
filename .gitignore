@@ -25,3 +25,6 @@ app/google-services.json
 .kotlin/
 
 .env
+
+# Local review-agent reports, never shipped
+/reviews/

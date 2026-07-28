@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
@@ -137,7 +136,7 @@ internal fun deriveRecipientCandidates(
     // Most-recent-first so recency wins the first-appearance ordering above.
     val items = appState.chatListItems.sortedByDescending { it.latestAt ?: 0uL }
     for (item in items) {
-        val dm = GroupProjector.isDm(item.memberCount, item.group.name)
+        val dm = item.isDm()
         val groupId = item.id.takeUnless { dm }
         // Group rosters give the members. A DM's roster, though, often holds only
         // the active account — the counterpart isn't an enumerable member — so

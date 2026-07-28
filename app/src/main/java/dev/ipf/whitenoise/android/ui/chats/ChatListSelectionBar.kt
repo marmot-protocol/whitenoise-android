@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -39,6 +40,7 @@ internal fun ChatListSelectionBar(
     actionsEnabled: Boolean,
     allVisibleSelected: Boolean,
     showMarkRead: Boolean,
+    showMarkUnread: Boolean,
     showMuteToggle: Boolean,
     muted: Boolean,
     onClose: () -> Unit,
@@ -46,6 +48,7 @@ internal fun ChatListSelectionBar(
     onDelete: () -> Unit,
     onAddToFolder: () -> Unit,
     onMarkRead: () -> Unit,
+    onMarkUnread: () -> Unit,
     onMuteToggle: () -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
@@ -97,6 +100,16 @@ internal fun ChatListSelectionBar(
                         onClick = {
                             overflowOpen = false
                             onMarkRead()
+                        },
+                    )
+                }
+                if (showMarkUnread) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_row_action_mark_unread)) },
+                        leadingIcon = { Icon(Icons.Default.MarkChatUnread, contentDescription = null) },
+                        onClick = {
+                            overflowOpen = false
+                            onMarkUnread()
                         },
                     )
                 }

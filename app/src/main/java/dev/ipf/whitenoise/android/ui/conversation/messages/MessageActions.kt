@@ -415,6 +415,7 @@ private fun forwardFolderBulkRows(
                     items = targets,
                     manualChatIds = store.membershipFor(accountRef, folder.id),
                     rule = store.folderRule(accountRef, folder.id),
+                    activeAccountIdHex = appState.activeAccount?.accountIdHex,
                     isMuted = { groupIdHex ->
                         ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations
                     },
