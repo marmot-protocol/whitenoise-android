@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -145,6 +146,75 @@ internal fun profileSheetAdminActions(
         targetIsSelf = targetIsSelf,
         targetIsAdmin = targetIsAdmin,
     ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
+}
+
+internal fun adminActionRowTag(action: GroupMemberMenuAction): String = "profile-admin-action-${action.name}"
+
+internal fun runProfileSheetAdminMutation(
+    action: GroupMemberMenuAction,
+    isBusy: () -> Boolean,
+    onPendingActionChange: (GroupMemberMenuAction?) -> Unit,
+    clearLastMutationError: () -> Unit,
+    launchMutation: (suspend () -> Unit) -> Unit,
+    mutation: suspend () -> Unit,
+): Boolean {
+    if (isBusy()) return false
+    onPendingActionChange(action)
+    clearLastMutationError()
+    launchMutation {
+        try {
+            mutation()
+        } finally {
+            onPendingActionChange(null)
+        }
+    }
+    return true
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun ProfileSheetAdminActionRows(
+    actions: List<GroupMemberMenuAction>,
+    pendingAction: GroupMemberMenuAction?,
+    busy: Boolean,
+    onGrantAdmin: () -> Unit,
+    onRevokeAdmin: () -> Unit,
+    onRemoveMember: () -> Unit,
+) {
+    actions.forEach { action ->
+        when (action) {
+            GroupMemberMenuAction.GrantAdmin ->
+                SettingsActionRow(
+                    icon = Icons.Default.Shield,
+                    title = stringResource(R.string.make_admin),
+                    modifier = Modifier.testTag(adminActionRowTag(action)),
+                    enabled = !busy,
+                    inProgress = pendingAction == action,
+                    onClick = onGrantAdmin,
+                )
+            GroupMemberMenuAction.RevokeAdmin ->
+                SettingsActionRow(
+                    icon = Icons.Default.Shield,
+                    title = stringResource(R.string.remove_admin),
+                    modifier = Modifier.testTag(adminActionRowTag(action)),
+                    enabled = !busy,
+                    inProgress = pendingAction == action,
+                    onClick = onRevokeAdmin,
+                )
+            GroupMemberMenuAction.RemoveMember ->
+                DangerActionRow(
+                    icon = Icons.Default.Delete,
+                    title = stringResource(R.string.remove_member),
+                    modifier = Modifier.testTag(adminActionRowTag(action)),
+                    enabled = !busy,
+                    inProgress = pendingAction == action,
+                    onClick = onRemoveMember,
+                )
+            // Self is excluded on this surface, so StepDownAsAdmin never
+            // appears (it is filtered out by profileSheetAdminActions).
+            GroupMemberMenuAction.StepDownAsAdmin -> Unit
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -727,9 +797,9 @@ private fun ProfileAddToGroupsSheet(
  * Mutations run through [WhiteNoiseAppState.launchMutation] (process-lifetime
  * scope) — the same approach as GroupDetailsScreen's local runGroupMutation — so
  * the MLS commit + Nostr publish and the controller's own refreshMembers/toast
- * finish even if the sheet dismisses mid-flight. A local in-flight flag plus the
- * controller's [ConversationController.mutationInFlight] disable the buttons and
- * show a spinner while a mutation is running.
+ * finish even if the sheet dismisses mid-flight. The locally pending action plus
+ * the controller's [ConversationController.mutationInFlight] disable the buttons;
+ * only the locally started action shows an in-row spinner.
  */
 @Composable
 private fun ProfileSheetAdminActions(
@@ -756,23 +826,25 @@ private fun ProfileSheetAdminActions(
         )
     if (targetMember == null || actions.isEmpty()) return
 
-    // Local in-flight guard so the buttons disable immediately on tap; the
-    // controller's mutationInFlight covers mutations started elsewhere (e.g.
-    // the group details screen) for the same conversation.
-    var localMutating by remember(targetHex) { mutableStateOf(false) }
+    // The action-scoped local state both disables immediately and identifies the
+    // row that owns progress. mutationInFlight only disables for work started
+    // elsewhere; it must not assign that work to a row in this sheet.
+    var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
     var confirmRemove by remember(targetHex) { mutableStateOf(false) }
-    val busy = localMutating || controller.mutationInFlight
+    val busy = pendingAction != null || controller.mutationInFlight
 
-    fun runMutation(mutation: suspend () -> Boolean) {
-        localMutating = true
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            try {
-                mutation()
-            } finally {
-                localMutating = false
-            }
-        }
+    fun runMutation(
+        action: GroupMemberMenuAction,
+        mutation: suspend () -> Unit,
+    ) {
+        runProfileSheetAdminMutation(
+            action = action,
+            isBusy = { pendingAction != null || controller.mutationInFlight },
+            onPendingActionChange = { pendingAction = it },
+            clearLastMutationError = controller::clearLastMutationError,
+            launchMutation = appState::launchMutation,
+            mutation = mutation,
+        )
     }
 
     AppDivider()
@@ -791,37 +863,22 @@ private fun ProfileSheetAdminActions(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             )
         }
-        actions.forEach { action ->
-            when (action) {
-                GroupMemberMenuAction.GrantAdmin ->
-                    SettingsActionRow(
-                        icon = Icons.Default.Shield,
-                        title = stringResource(R.string.make_admin),
-                        enabled = !busy,
-                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = true) } },
-                    )
-                GroupMemberMenuAction.RevokeAdmin ->
-                    SettingsActionRow(
-                        icon = Icons.Default.Shield,
-                        title = stringResource(R.string.remove_admin),
-                        enabled = !busy,
-                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = false) } },
-                    )
-                GroupMemberMenuAction.RemoveMember ->
-                    DangerActionRow(
-                        icon = Icons.Default.Delete,
-                        title = stringResource(R.string.remove_member),
-                        enabled = !busy,
-                        onClick = { confirmRemove = true },
-                    )
-                // Self is excluded on this surface, so StepDownAsAdmin never
-                // appears (it is filtered out by profileSheetAdminActions).
-                GroupMemberMenuAction.StepDownAsAdmin -> Unit
-            }
-        }
-        if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        }
+        ProfileSheetAdminActionRows(
+            actions = actions,
+            pendingAction = pendingAction,
+            busy = busy,
+            onGrantAdmin = {
+                runMutation(GroupMemberMenuAction.GrantAdmin) {
+                    controller.setMemberAdmin(targetMember, admin = true)
+                }
+            },
+            onRevokeAdmin = {
+                runMutation(GroupMemberMenuAction.RevokeAdmin) {
+                    controller.setMemberAdmin(targetMember, admin = false)
+                }
+            },
+            onRemoveMember = { confirmRemove = true },
+        )
     }
 
     if (confirmRemove) {
@@ -835,7 +892,9 @@ private fun ProfileSheetAdminActions(
             confirmLabel = stringResource(R.string.remove_member),
             onConfirm = {
                 confirmRemove = false
-                runMutation { controller.removeMember(targetMember) }
+                runMutation(GroupMemberMenuAction.RemoveMember) {
+                    controller.removeMember(targetMember)
+                }
             },
             onDismiss = { confirmRemove = false },
             destructive = true,
