@@ -327,6 +327,9 @@ class ProfileStartGroupNavigationTest {
             disappearingMessageSecs = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            disbanding = false,
+            disbanded = false,
+            disbandRequest = null,
         )
 
     private fun encryptedMedia() =

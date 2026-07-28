@@ -691,6 +691,9 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = false,
+        disbandRequest = null,
     )
 
 private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
@@ -2427,6 +2430,17 @@ class ChatsController(
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
                                             foldChatRow(row, update.trigger)
+                                        }
+                                        is ChatListSubscriptionUpdateFfi.Snapshot -> {
+                                            chatsDebug {
+                                                "chat list snapshot account=${accountRef.take(8)} " +
+                                                    "trigger=${update.trigger} rows=${update.rows.size}"
+                                            }
+                                            // Contract: atomically replace the held rows and drop
+                                            // any prior row absent from the snapshot.
+                                            update.rows.forEach(::requestChatRowProfiles)
+                                            replaceChatRows(update.rows)
+                                            scheduleRecompute()
                                         }
                                         is ChatListSubscriptionUpdateFfi.RemoveRow -> {
                                             chatsDebug {
@@ -7416,6 +7430,7 @@ class ConversationController(
             ChatListUpdateTriggerFfi.MUTE_CHANGED,
             ChatListUpdateTriggerFfi.CONVERSATION_KIND_CHANGED,
             ChatListUpdateTriggerFfi.LATEST_MESSAGE_DELIVERY_CHANGED,
+            ChatListUpdateTriggerFfi.PIN_ORDER_CHANGED,
             ChatListUpdateTriggerFfi.REMOVED,
             -> Unit
         }
