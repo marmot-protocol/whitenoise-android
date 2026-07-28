@@ -877,6 +877,13 @@
     <string name="chat_folder_unread_only">Somente não lidas</string>
     <string name="chat_folder_unread_only_subtitle">Incluir somente conversas com mensagens não lidas</string>
     <string name="chat_folder_include_muted">Incluir conversas silenciadas</string>
+    <string name="chat_folder_groups_only">Somente grupos</string>
+    <string name="chat_folder_groups_only_subtitle">Incluir somente conversas em grupo</string>
+    <string name="chat_folder_archived_only">Somente arquivadas</string>
+    <string name="chat_folder_archived_only_subtitle">Incluir conversas arquivadas em vez das ativas</string>
+    <string name="chat_folder_restore_defaults">Restaurar pastas padrão</string>
+    <string name="chat_folder_restore_defaults_subtitle">Adicionar novamente as pastas padrão ausentes</string>
+    <string name="chat_folder_drag_to_reorder">Arraste para reordenar</string>
     <string name="chat_folder_manual_chats">Conversas incluídas</string>
     <string name="chat_folder_people">Pessoas</string>
     <string name="chat_folder_people_subtitle">Incluir qualquer conversa com essas pessoas</string>

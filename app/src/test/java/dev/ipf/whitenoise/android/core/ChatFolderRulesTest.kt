@@ -134,6 +134,43 @@ class ChatFolderRulesTest {
         assertEquals(emptySet<String>(), folderIds(items, rule = rule, isMuted = { true }))
     }
 
+    @Test
+    fun standaloneGroupsOnlyRuleMatchesEveryGroupChat() {
+        val rule = ChatFolderRule(groupsOnly = true)
+        val items = listOf(item("g1"), item("g2", dm = true))
+
+        assertEquals(setOf("g1"), folderIds(items, rule = rule))
+    }
+
+    @Test
+    fun groupsOnlyConstrainsKeywordAndMemberMatches() {
+        val rule = ChatFolderRule(keyword = "work", groupsOnly = true)
+        val items =
+            listOf(
+                item("g1", description = "work"),
+                item("g2", description = "work", dm = true),
+            )
+
+        assertEquals(setOf("g1"), folderIds(items, rule = rule))
+    }
+
+    @Test
+    fun archivedOnlyRuleFollowsTheRowsOwnArchivedFlag() {
+        val archivedRule = ChatFolderRule(archivedOnly = true)
+        val activeRule = ChatFolderRule(keyword = "work")
+        val items =
+            listOf(
+                item("g1", description = "work", archived = true),
+                item("g2", description = "work"),
+            )
+
+        // The pure archived rule (the Archived default) matches archived rows
+        // only; a rule without archivedOnly never picks up an archived row —
+        // regardless of which source list a caller hands in.
+        assertEquals(setOf("g1"), folderIds(items, rule = archivedRule))
+        assertEquals(setOf("g2"), folderIds(items, rule = activeRule))
+    }
+
     private fun folderIds(
         items: List<ChatListItem>,
         manual: Set<String> = emptySet(),
@@ -156,9 +193,11 @@ class ChatFolderRulesTest {
         otherMember: String? = null,
         unread: Boolean = false,
         description: String = "",
+        dm: Boolean = false,
+        archived: Boolean = false,
     ): ChatListItem =
         ChatListItem(
-            group = group(groupIdHex, description),
+            group = group(groupIdHex, description, archived),
             latest = null,
             otherMemberAccount = otherMember,
             memberCount = members?.size ?: 0,
@@ -168,18 +207,20 @@ class ChatFolderRulesTest {
                         roster.map { AppGroupMemberRecordFfi(memberIdHex = it, account = null, local = false) },
                     )
                 },
-            projection = row(groupIdHex, unread),
+            projection = row(groupIdHex, unread, dm, archived),
         )
 
     private fun row(
         groupIdHex: String,
         unread: Boolean,
+        dm: Boolean = false,
+        rowArchived: Boolean = false,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupIdHex,
-        archived = false,
+        archived = rowArchived,
         pendingConfirmation = false,
         title = "Group $groupIdHex",
         groupName = "",
@@ -197,7 +238,7 @@ class ChatFolderRulesTest {
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
         manuallyMarkedUnread = false,
-        conversationKind = ChatConversationKindFfi.UNKNOWN,
+        conversationKind = if (dm) ChatConversationKindFfi.DIRECT else ChatConversationKindFfi.GROUP,
         muted = false,
         mutedUntilMs = null,
     )
@@ -205,6 +246,7 @@ class ChatFolderRulesTest {
     private fun group(
         id: String,
         description: String,
+        archived: Boolean = false,
     ) = AppGroupRecordFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = id,
@@ -221,7 +263,7 @@ class ChatFolderRulesTest {
         avatarThumbhash = null,
         imageHashHex = null,
         encryptedMedia = encryptedMedia(),
-        archived = false,
+        archived = archived,
         pendingConfirmation = false,
         unrecoverable = false,
         welcomerAccountIdHex = null,

@@ -307,12 +307,16 @@ internal fun ChatListFilterChips(
         chips.forEach { chip ->
             ChatFolderChip(
                 selected = selectedFolderId == chip.folderId,
+                // A renamed default shows its stored name; the localized
+                // default label is only the un-renamed fallback.
                 label =
-                    when (chip.systemKind) {
-                        SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
-                        SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
-                        SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
-                        null -> chip.customLabel
+                    chip.customLabel.ifEmpty {
+                        when (chip.systemKind) {
+                            SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
+                            SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
+                            SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
+                            null -> ""
+                        }
                     },
                 onClick = { onSelect(chip.folderId) },
                 trailingCount = chip.trailingCount,

@@ -62,6 +62,8 @@ internal data class ChatFolderEditFormState(
     val keyword: String,
     val unreadOnly: Boolean,
     val includeMuted: Boolean,
+    val groupsOnly: Boolean,
+    val archivedOnly: Boolean,
     val manualChatSummary: String,
     val peopleSummary: String,
     val canSave: Boolean,
@@ -92,11 +94,16 @@ internal fun ChatFolderEditScreen(
             folderId?.let { id -> store.foldersFor(accountRef).firstOrNull { it.id == id } }
         }
     val existingRule = remember(folderId) { folderId?.let { store.folderRule(accountRef, it) } }
-    var name by remember { mutableStateOf(existing?.name.orEmpty()) }
+    // An un-renamed default stores "" and renders a localized label — prefill
+    // that label so editing it doesn't demand a name the user already sees.
+    val prefillName = existing?.let { chatFolderDisplayName(it) }.orEmpty()
+    var name by remember { mutableStateOf(prefillName) }
     var description by remember { mutableStateOf(existing?.description.orEmpty()) }
     var keyword by remember { mutableStateOf(existingRule?.keyword.orEmpty()) }
     var unreadOnly by remember { mutableStateOf(existingRule?.unreadOnly ?: false) }
     var includeMuted by remember { mutableStateOf(existingRule?.includeMuted ?: false) }
+    var groupsOnly by remember { mutableStateOf(existingRule?.groupsOnly ?: false) }
+    var archivedOnly by remember { mutableStateOf(existingRule?.archivedOnly ?: false) }
     var manualChatIds by
         remember {
             mutableStateOf(
@@ -113,9 +120,13 @@ internal fun ChatFolderEditScreen(
     fun save() {
         val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return
         val trimmedDescription = description.trim()
+        // An untouched prefill on an un-renamed default is not a rename:
+        // persisting it would freeze the localized label into the store and
+        // the folder would stop following locale changes.
+        val renamed = existing?.name.orEmpty().isNotEmpty() || trimmedName != prefillName
         val id =
             folderId?.also {
-                store.renameFolder(accountRef, it, trimmedName)
+                if (renamed) store.renameFolder(accountRef, it, trimmedName)
                 store.editFolderDescription(accountRef, it, trimmedDescription)
             } ?: store.createFolder(accountRef, trimmedName, trimmedDescription)?.id
         if (id != null) {
@@ -128,6 +139,8 @@ internal fun ChatFolderEditScreen(
                     unreadOnly = unreadOnly,
                     includeMuted = includeMuted,
                     keyword = keyword.trim().takeIf { it.isNotBlank() },
+                    groupsOnly = groupsOnly,
+                    archivedOnly = archivedOnly,
                 )
             store.setFolderRule(accountRef, id, rule.takeIf { it != ChatFolderRule() })
         }
@@ -173,6 +186,8 @@ internal fun ChatFolderEditScreen(
                 keyword = keyword,
                 unreadOnly = unreadOnly,
                 includeMuted = includeMuted,
+                groupsOnly = groupsOnly,
+                archivedOnly = archivedOnly,
                 manualChatSummary =
                     pluralStringResource(
                         R.plurals.chat_folder_chat_count,
@@ -187,6 +202,8 @@ internal fun ChatFolderEditScreen(
         onKeywordChange = { keyword = it },
         onUnreadOnlyChange = { unreadOnly = it },
         onIncludeMutedChange = { includeMuted = it },
+        onGroupsOnlyChange = { groupsOnly = it },
+        onArchivedOnlyChange = { archivedOnly = it },
         onOpenManualChats = { showChatPicker = true },
         onOpenPeople = { showMemberPicker = true },
         onSave = { save() },
@@ -229,6 +246,8 @@ internal fun ChatFolderEditContent(
     onKeywordChange: (String) -> Unit,
     onUnreadOnlyChange: (Boolean) -> Unit,
     onIncludeMutedChange: (Boolean) -> Unit,
+    onGroupsOnlyChange: (Boolean) -> Unit,
+    onArchivedOnlyChange: (Boolean) -> Unit,
     onOpenManualChats: () -> Unit,
     onOpenPeople: () -> Unit,
     onSave: () -> Unit,
@@ -330,6 +349,18 @@ internal fun ChatFolderEditContent(
                         subtitle = stringResource(R.string.chat_folder_unread_only_subtitle),
                         checked = state.unreadOnly,
                         onCheckedChange = onUnreadOnlyChange,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.chat_folder_groups_only),
+                        subtitle = stringResource(R.string.chat_folder_groups_only_subtitle),
+                        checked = state.groupsOnly,
+                        onCheckedChange = onGroupsOnlyChange,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.chat_folder_archived_only),
+                        subtitle = stringResource(R.string.chat_folder_archived_only_subtitle),
+                        checked = state.archivedOnly,
+                        onCheckedChange = onArchivedOnlyChange,
                     )
                     SettingsSwitchRow(
                         title = stringResource(R.string.chat_folder_include_muted),

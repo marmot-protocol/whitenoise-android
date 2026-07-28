@@ -49,6 +49,7 @@ class ChatFoldersScreenScreenshotTest {
                         onMove = { _, _ -> },
                         onEdit = {},
                         onDelete = {},
+                        onRestoreDefaults = {},
                     )
                 }
             }
@@ -66,7 +67,6 @@ class ChatFoldersScreenScreenshotTest {
                         name = "Unread",
                         systemKind = SystemFolderKind.UNREAD,
                         chatCount = 3,
-                        isCustom = false,
                         canMoveUp = false,
                         canMoveDown = true,
                     ),
@@ -75,7 +75,6 @@ class ChatFoldersScreenScreenshotTest {
                         name = "Archived",
                         systemKind = SystemFolderKind.ARCHIVED,
                         chatCount = 1,
-                        isCustom = false,
                         canMoveUp = true,
                         canMoveDown = true,
                     ),
@@ -84,7 +83,6 @@ class ChatFoldersScreenScreenshotTest {
                         name = "Groups",
                         systemKind = SystemFolderKind.GROUPS,
                         chatCount = 5,
-                        isCustom = false,
                         canMoveUp = true,
                         canMoveDown = true,
                     ),
@@ -93,7 +91,6 @@ class ChatFoldersScreenScreenshotTest {
                         name = "Work",
                         systemKind = null,
                         chatCount = 2,
-                        isCustom = true,
                         canMoveUp = true,
                         canMoveDown = false,
                     ),

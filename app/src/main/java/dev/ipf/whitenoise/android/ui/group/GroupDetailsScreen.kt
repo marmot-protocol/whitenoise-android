@@ -138,6 +138,7 @@ import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
+import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -828,7 +829,6 @@ internal fun GroupDetailsScreen(
                     val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
                     appState.chatFolderPreferences
                         .foldersFor(accountRef)
-                        .filterNot { it.isSystem }
                         .mapNotNull { folder ->
                             val manual =
                                 chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
@@ -855,7 +855,8 @@ internal fun GroupDetailsScreen(
                 value =
                     folderNames
                         .takeIf { it.isNotEmpty() }
-                        ?.joinToString(", ") { (folder, _) -> folder.name }
+                        ?.map { (folder, _) -> chatFolderDisplayName(folder) }
+                        ?.joinToString(", ")
                         ?: stringResource(R.string.chat_folders_none),
                 onClick = { showFolderPicker = true },
             )

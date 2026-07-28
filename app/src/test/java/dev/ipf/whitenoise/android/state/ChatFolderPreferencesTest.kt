@@ -37,7 +37,19 @@ class ChatFolderPreferencesTest {
             listOf(SystemFolderKind.UNREAD, SystemFolderKind.ARCHIVED, SystemFolderKind.GROUPS),
             folders.map { it.systemKind },
         )
-        assertTrue(folders.all { it.isSystem })
+        // Each default seeds with its old chip behavior expressed as a rule.
+        assertEquals(
+            ChatFolderRule(unreadOnly = true, includeMuted = true),
+            store.folderRule("acct-a", ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID),
+        )
+        assertEquals(
+            ChatFolderRule(archivedOnly = true, includeMuted = true),
+            store.folderRule("acct-a", ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID),
+        )
+        assertEquals(
+            ChatFolderRule(groupsOnly = true, includeMuted = true),
+            store.folderRule("acct-a", ChatFolderPreferences.SYSTEM_FOLDER_GROUPS_ID),
+        )
         // Seeding persists: a fresh store instance reads the same state back.
         val reloaded = ChatFolderPreferences(ApplicationProvider.getApplicationContext())
         assertEquals(folders, reloaded.foldersFor("acct-a"))
@@ -80,11 +92,90 @@ class ChatFolderPreferencesTest {
     }
 
     @Test
-    fun systemFoldersCannotBeDeletedOrLoseTheirKind() {
-        val system = store.foldersFor("acct-a").first()
+    fun seededDefaultsRenameRuleEditAndDeletePersistAcrossInstances() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        store.foldersFor("acct-a")
+        val unreadId = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        val groupsId = ChatFolderPreferences.SYSTEM_FOLDER_GROUPS_ID
 
-        assertFalse(store.deleteFolder("acct-a", system.id))
-        assertTrue(store.foldersFor("acct-a").any { it.id == system.id })
+        assertTrue(store.renameFolder("acct-a", unreadId, "Catch up"))
+        assertTrue(store.setFolderRule("acct-a", unreadId, ChatFolderRule(unreadOnly = true, keyword = "work")))
+        assertTrue(store.deleteFolder("acct-a", groupsId))
+
+        val reloaded = ChatFolderPreferences(context)
+        val folders = reloaded.foldersFor("acct-a")
+        assertEquals("Catch up", folders.first { it.id == unreadId }.name)
+        assertEquals(SystemFolderKind.UNREAD, folders.first { it.id == unreadId }.systemKind)
+        assertEquals(
+            ChatFolderRule(unreadOnly = true, keyword = "work"),
+            reloaded.folderRule("acct-a", unreadId),
+        )
+        assertTrue(folders.none { it.id == groupsId })
+    }
+
+    @Test
+    fun deletingEveryFolderIsAValidStateThatSurvivesReload() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        store.foldersFor("acct-a").forEach { assertTrue(store.deleteFolder("acct-a", it.id)) }
+
+        assertEquals(emptyList<ChatFolder>(), store.foldersFor("acct-a"))
+        // A stored empty list is user intent, not corruption — no reseeding
+        // on a fresh instance (a reload/app-update stand-in).
+        val reloaded = ChatFolderPreferences(context)
+        assertEquals(emptyList<ChatFolder>(), reloaded.foldersFor("acct-a"))
+    }
+
+    @Test
+    fun restoreDefaultsReAddsOnlyWhatIsMissingAndIsIdempotent() {
+        store.foldersFor("acct-a")
+        val unreadId = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        assertTrue(store.renameFolder("acct-a", ChatFolderPreferences.SYSTEM_FOLDER_GROUPS_ID, "Teams"))
+        assertTrue(store.deleteFolder("acct-a", unreadId))
+
+        assertTrue(store.restoreDefaultFolders("acct-a"))
+
+        val folders = store.foldersFor("acct-a")
+        // The restored default re-appears at the end with its default rule;
+        // the surviving (renamed) defaults are untouched.
+        assertEquals(unreadId, folders.last().id)
+        assertEquals(
+            ChatFolderRule(unreadOnly = true, includeMuted = true),
+            store.folderRule("acct-a", unreadId),
+        )
+        assertEquals("Teams", folders.first { it.systemKind == SystemFolderKind.GROUPS }.name)
+        // Nothing missing → nothing to do, and no duplicates ever.
+        assertFalse(store.restoreDefaultFolders("acct-a"))
+        assertEquals(folders, store.foldersFor("acct-a"))
+    }
+
+    @Test
+    fun legacyAccountsGainDefaultRulesExactlyOnce() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        // Hand-write a pre-rule account: seeded folders on disk, no rule keys,
+        // no version stamp — the shape existing installs carry.
+        val legacyFolders =
+            """[{"id":"system:unread","name":"","description":"","order":0,"systemKind":"UNREAD"},""" +
+                """{"id":"system:archived","name":"","description":"","order":1,"systemKind":"ARCHIVED"},""" +
+                """{"id":"system:groups","name":"","description":"","order":2,"systemKind":"GROUPS"}]"""
+        context
+            .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+            .edit()
+            .putString("cf:acct-legacy:folders", legacyFolders)
+            .commit()
+
+        val migrated = ChatFolderPreferences(context)
+        val unreadId = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        migrated.foldersFor("acct-legacy")
+        assertEquals(
+            ChatFolderRule(unreadOnly = true, includeMuted = true),
+            migrated.folderRule("acct-legacy", unreadId),
+        )
+
+        // Clearing a seeded rule afterwards is user intent — the one-time
+        // backfill must not resurrect it on the next load.
+        assertTrue(migrated.setFolderRule("acct-legacy", unreadId, null))
+        val reloaded = ChatFolderPreferences(context)
+        assertNull(reloaded.folderRule("acct-legacy", unreadId))
     }
 
     @Test
@@ -160,8 +251,9 @@ class ChatFolderPreferencesTest {
 
         assertTrue(store.clearAllForAccount("acct-a"))
 
-        // acct-a is reseeded fresh; acct-b is untouched.
-        assertTrue(store.foldersFor("acct-a").all { it.isSystem })
+        // acct-a is reseeded fresh (the wipe removed its seed marker too);
+        // acct-b is untouched.
+        assertTrue(store.foldersFor("acct-a").all { it.systemKind != null })
         assertTrue(store.foldersFor("acct-b").any { it.name == "Theirs" })
     }
 }
