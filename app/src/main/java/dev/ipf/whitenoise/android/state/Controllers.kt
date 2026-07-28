@@ -4488,6 +4488,12 @@ class ConversationController(
     ): DisappearingMessageSweep.LocalExpiryRow =
         DisappearingMessageSweep.LocalExpiryRow(
             timelineAtSeconds = record.recordedAt,
+            // The engine's authoritative per-message expiry wins over the
+            // send-time + retention arithmetic below when it is projected.
+            // Zero is not a real expiry (the engine emits null when retention
+            // is off); guard like message info does so a zero could never
+            // read as epoch-expired and hide the row instantly.
+            expiresAtLocalSeconds = record.retentionExpiresAt?.takeIf { it > 0uL },
             readAnchoredAtSeconds = readAnchoredAtSeconds[record.messageIdHex],
             deferSendTimeExpiry =
                 isDisappearingSendTimeExpiryDeferred(
@@ -8111,18 +8117,7 @@ class ConversationController(
                     !DisappearingMessageSweep.isLocallyExpired(
                         nowMillis = nowMillis,
                         disappearingMessageSecs = window,
-                        row =
-                            DisappearingMessageSweep.LocalExpiryRow(
-                                timelineAtSeconds = record.recordedAt,
-                                readAnchoredAtSeconds = readAnchoredAtSeconds[record.messageIdHex],
-                                deferSendTimeExpiry =
-                                    isDisappearingSendTimeExpiryDeferred(
-                                        record = record,
-                                        lastReadMessageId = lastReadMessageId,
-                                        lastReadTimelineAt = persistedLastReadTimelineAt,
-                                        messageOrder = messageOrder,
-                                    ),
-                            ),
+                        row = localExpiryRow(record, messageOrder),
                     )
                 }
             }

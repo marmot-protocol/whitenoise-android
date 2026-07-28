@@ -145,6 +145,21 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun localExpiryRowsFeedEngineAuthoritativeExpiry() {
+        // localExpiryRow is an expression-body function, so window the source
+        // instead of brace-matching a block body.
+        val source = controllersSource().readText()
+        val start = source.indexOf("fun localExpiryRow(")
+        require(start >= 0) { "Missing localExpiryRow" }
+
+        assertTrue(
+            "the loaded-row hide filter must prefer the engine's projected per-message expiry",
+            "expiresAtLocalSeconds = record.retentionExpiresAt" in
+                source.substring(start, (start + 800).coerceAtMost(source.length)),
+        )
+    }
+
+    @Test
     fun foregroundDisappearingSweepDelegatesToEngineSweep() {
         val body = controllerFunctionBody("runForegroundDisappearingMessageSweep")
 

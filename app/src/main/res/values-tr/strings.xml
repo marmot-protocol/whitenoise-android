@@ -678,6 +678,7 @@
     <string name="message_info_sender">Gönderen</string>
     <string name="message_info_message_id">Mesaj kimliği</string>
     <string name="message_info_status">Durum</string>
+    <string name="message_info_disappears_at">Kaybolur</string>
     <string name="message_info_created_at">Oluşturuldu</string>
     <string name="message_status_pending">Gönderiliyor…</string>
     <string name="message_status_sent">Gönderildi</string>

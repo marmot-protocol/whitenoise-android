@@ -339,6 +339,14 @@ internal fun MessageInfoSheet(
                 label = stringResource(R.string.message_info_status),
                 value = statusText,
             )
+            // The engine's authoritative per-message expiry; absent for
+            // messages outside a retention window.
+            record.retentionExpiresAt?.takeIf { it > 0uL }?.let { expiresAt ->
+                MessageInfoRow(
+                    label = stringResource(R.string.message_info_disappears_at),
+                    value = formatExactTimestamp(expiresAt, zone, locale),
+                )
+            }
             Spacer(Modifier.height(8.dp))
         }
     }

@@ -895,6 +895,7 @@
     <string name="message_info_sender">From</string>
     <string name="message_info_message_id">Message ID</string>
     <string name="message_info_status">Status</string>
+    <string name="message_info_disappears_at">Disappears</string>
     <string name="message_info_created_at">Created</string>
     <string name="message_status_pending">Sending…</string>
     <string name="message_status_sent">Sent</string>

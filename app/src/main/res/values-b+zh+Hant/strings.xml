@@ -666,6 +666,7 @@
     <string name="message_info_sender">傳送者</string>
     <string name="message_info_message_id">訊息 ID</string>
     <string name="message_info_status">狀態</string>
+    <string name="message_info_disappears_at">消失時間</string>
     <string name="message_info_created_at">已建立</string>
     <string name="message_status_pending">傳送中…</string>
     <string name="message_status_sent">已傳送</string>

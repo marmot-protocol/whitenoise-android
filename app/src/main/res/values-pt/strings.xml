@@ -678,6 +678,7 @@
     <string name="message_info_sender">De</string>
     <string name="message_info_message_id">ID da mensagem</string>
     <string name="message_info_status">Status</string>
+    <string name="message_info_disappears_at">Desaparece</string>
     <string name="message_info_created_at">Criada</string>
     <string name="message_status_pending">Enviando…</string>
     <string name="message_status_sent">Enviada</string>
