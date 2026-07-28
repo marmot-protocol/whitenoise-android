@@ -120,9 +120,13 @@ internal fun ChatFolderEditScreen(
     fun save() {
         val trimmedName = name.trim().takeIf { it.isNotEmpty() } ?: return
         val trimmedDescription = description.trim()
+        // An untouched prefill on an un-renamed default is not a rename:
+        // persisting it would freeze the localized label into the store and
+        // the folder would stop following locale changes.
+        val renamed = existing?.name.orEmpty().isNotEmpty() || trimmedName != prefillName
         val id =
             folderId?.also {
-                store.renameFolder(accountRef, it, trimmedName)
+                if (renamed) store.renameFolder(accountRef, it, trimmedName)
                 store.editFolderDescription(accountRef, it, trimmedDescription)
             } ?: store.createFolder(accountRef, trimmedName, trimmedDescription)?.id
         if (id != null) {
