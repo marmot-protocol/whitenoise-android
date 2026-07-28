@@ -616,22 +616,6 @@ internal fun MainShell(
         },
         onClosePicker = { chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap) },
     ) {
-        // An unresolved app-level share uses the same multi-select picker pattern as forwarding.
-        if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-            sharePickerRequest?.let { request ->
-                ShareChatPickerSheet(
-                    appState = appState,
-                    payload = request.payload,
-                    onDismiss = { sharePickerRequest = null },
-                    onStage = { groupIds ->
-                        val allChats = chatsController.items + chatsController.archivedItems
-                        stageShareToChats(request, groupIds, allChats)
-                        sharePickerRequest = null
-                    },
-                )
-            }
-        }
-
         val openChat = selectedChat
         when {
             openChat != null -> {
@@ -735,6 +719,23 @@ internal fun MainShell(
                             },
                         )
                 }
+        }
+
+        // Compose the inbound share picker after the foreground route so its Back
+        // handler wins over conversation/chat-list handlers (issue #1721).
+        if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+            sharePickerRequest?.let { request ->
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = request.payload,
+                    onDismiss = { sharePickerRequest = null },
+                    onStage = { groupIds ->
+                        val allChats = chatsController.items + chatsController.archivedItems
+                        stageShareToChats(request, groupIds, allChats)
+                        sharePickerRequest = null
+                    },
+                )
+            }
         }
     }
 }

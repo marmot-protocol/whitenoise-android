@@ -2,6 +2,9 @@
 
 package dev.ipf.whitenoise.android.ui.share
 
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,19 +25,26 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +66,17 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersP
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.launch
+
+internal fun runShareChatPickerDismissal(
+    clearFocus: () -> Unit,
+    hideKeyboard: () -> Unit,
+    hideSheet: () -> Unit,
+) {
+    clearFocus()
+    hideKeyboard()
+    hideSheet()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,14 +88,41 @@ internal fun ShareChatPickerSheet(
 ) {
     val pickerState = rememberShareChatPickerState(appState, payload)
     val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    var dismissing by remember { mutableStateOf(false) }
+    val dismissSheet: () -> Unit = {
+        if (!dismissing) {
+            dismissing = true
+            runShareChatPickerDismissal(
+                clearFocus = { focusManager.clearFocus(force = true) },
+                hideKeyboard = { keyboardController?.hide() },
+                hideSheet = {
+                    scope.launch {
+                        try {
+                            sheetState.hide()
+                            if (!sheetState.isVisible) currentOnDismiss()
+                        } finally {
+                            if (sheetState.isVisible) dismissing = false
+                        }
+                    }
+                },
+            )
+        }
+    }
     LaunchedEffect(pickerState.searchFocused) {
         if (pickerState.searchFocused) sheetState.expand()
     }
+    val useOverlayBack = pickerState.searchFocused || dismissing
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !useOverlayBack),
     ) {
+        ShareChatPickerBackHandler(enabled = useOverlayBack, onBack = dismissSheet)
         ShareChatPickerContent(
             pickerState = pickerState,
             sheetExpanded =
@@ -83,6 +131,22 @@ internal fun ShareChatPickerSheet(
             onDismiss = onDismiss,
             onStage = onStage,
         )
+    }
+}
+
+@Composable
+internal fun ShareChatPickerBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+) {
+    val currentOnBack by rememberUpdatedState(onBack)
+    BackHandler(enabled = enabled) { currentOnBack() }
+    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
+    DisposableEffect(backDispatcher, enabled) {
+        if (!enabled || backDispatcher == null) return@DisposableEffect onDispose {}
+        val callback = OnBackInvokedCallback { currentOnBack() }
+        backDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+        onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
     }
 }
 
