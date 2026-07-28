@@ -2,9 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.share
 
-import android.window.OnBackInvokedCallback
-import android.window.OnBackInvokedDispatcher
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,14 +21,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -44,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -115,14 +108,12 @@ internal fun ShareChatPickerSheet(
     LaunchedEffect(pickerState.searchFocused) {
         if (pickerState.searchFocused) sheetState.expand()
     }
-    val useOverlayBack = pickerState.searchFocused || dismissing
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    ShareChatPickerBackAwareSheet(
         sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !useOverlayBack),
+        overlayBack = pickerState.searchFocused,
+        onDismissRequest = onDismiss,
+        onBackCommit = dismissSheet,
     ) {
-        ShareChatPickerBackHandler(enabled = useOverlayBack, onBack = dismissSheet)
         ShareChatPickerContent(
             pickerState = pickerState,
             sheetExpanded =
@@ -131,22 +122,6 @@ internal fun ShareChatPickerSheet(
             onDismiss = onDismiss,
             onStage = onStage,
         )
-    }
-}
-
-@Composable
-internal fun ShareChatPickerBackHandler(
-    enabled: Boolean,
-    onBack: () -> Unit,
-) {
-    val currentOnBack by rememberUpdatedState(onBack)
-    BackHandler(enabled = enabled) { currentOnBack() }
-    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
-    DisposableEffect(backDispatcher, enabled) {
-        if (!enabled || backDispatcher == null) return@DisposableEffect onDispose {}
-        val callback = OnBackInvokedCallback { currentOnBack() }
-        backDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
-        onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
     }
 }
 
