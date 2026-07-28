@@ -1,12 +1,18 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotSelected
@@ -16,8 +22,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
@@ -138,14 +146,38 @@ class ChatRowSelectionIndicatorCoverageTest {
                         onClick = {},
                     ),
                 ) {
-                    ChatRowTrailingContent(
+                    ChatRowLayout(
+                        title = "Conversation",
                         selectionMode = selectionMode.value,
                         selected = selected.value,
                         timestampAt = timestampAt,
-                        pendingConfirmation = pendingConfirmation,
                         rowHasUnread = unreadCount > 0uL,
-                        rowUnreadCount = unreadCount,
-                        unreadMention = unreadMention,
+                        leadingContent = {
+                            Box(Modifier.size(44.dp))
+                        },
+                        supportingContent = {
+                            Text("Preview", maxLines = 1)
+                        },
+                        supportingMetadata =
+                            when {
+                                pendingConfirmation -> {
+                                    {
+                                        Badge { Text(invitedText) }
+                                    }
+                                }
+                                unreadCount > 0uL -> {
+                                    {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            if (unreadMention) MentionBadge()
+                                            UnreadCountBadge(unreadCount)
+                                        }
+                                    }
+                                }
+                                else -> null
+                            },
                     )
                 }
             }

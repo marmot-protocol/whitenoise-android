@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -195,9 +195,17 @@ internal fun ChatRow(
                 Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
             else -> Modifier.clickable(onClick = onClick)
         }
+    val pinned = item.pinned()
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || pinned
+    val actionColors = accountActionColors(appState)
     Box(modifier = rowModifier) {
-        ListItem(
+        ChatRowLayout(
             modifier = Modifier.fillMaxWidth(),
+            title = title,
+            timestampAt = timestampAt,
+            rowHasUnread = rowHasUnread,
+            selectionMode = selectionMode,
+            selected = selected,
             leadingContent = {
                 Box(
                     modifier =
@@ -235,10 +243,7 @@ internal fun ChatRow(
                     }
                 }
             },
-            headlineContent = {
-                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            supportingContent = {
+            supportingContent = supportingContent@{
                 val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
                 // Tokens only ever describe the last message's body, so they're
                 // ignored whenever the line shows something else (invite copy,
@@ -301,19 +306,21 @@ internal fun ChatRow(
                     )
                 }
             },
-            trailingContent = {
-                ChatRowTrailingContent(
-                    selectionMode = selectionMode,
-                    selected = selected,
-                    timestampAt = timestampAt,
-                    pendingConfirmation = item.group.pendingConfirmation,
-                    rowHasUnread = rowHasUnread,
-                    rowUnreadCount = rowUnreadCount,
-                    unreadMention = item.unreadMention,
-                    actionColors = accountActionColors(appState),
-                    pinned = item.pinned(),
-                )
-            },
+            supportingMetadata =
+                if (hasSupportingMetadata) {
+                    {
+                        ChatRowSupportingMetadata(
+                            pendingConfirmation = item.group.pendingConfirmation,
+                            rowHasUnread = rowHasUnread,
+                            rowUnreadCount = rowUnreadCount,
+                            unreadMention = item.unreadMention,
+                            actionColors = actionColors,
+                            pinned = pinned,
+                        )
+                    }
+                } else {
+                    null
+                },
         )
         if (selectionMode) {
             Box(
@@ -384,38 +391,66 @@ internal fun ChatRowPreviewLine(
     }
 }
 
-internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = selectionRowIcon(selected)
+internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indicator"
 
 @Composable
-internal fun ChatRowTrailingContent(
+internal fun ChatRowLayout(
+    title: String,
+    timestampAt: ULong,
+    rowHasUnread: Boolean,
     selectionMode: Boolean,
     selected: Boolean,
-    timestampAt: ULong,
-    pendingConfirmation: Boolean,
-    rowHasUnread: Boolean,
-    rowUnreadCount: ULong,
-    unreadMention: Boolean,
-    actionColors: dev.ipf.whitenoise.android.ui.common.AccountActionColors? = null,
-    pinned: Boolean = false,
+    leadingContent: @Composable () -> Unit,
+    supportingContent: @Composable () -> Unit,
+    supportingMetadata: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
-    if (selectionMode) {
-        Icon(
-            imageVector = chatRowSelectionIcon(selected),
-            // The clickable row already exposes selected semantics. Keeping the
-            // visual indicator decorative avoids a second TalkBack announcement.
-            contentDescription = null,
-            tint =
-                if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.size(24.dp),
+    ListItem(
+        modifier = modifier,
+        leadingContent = leadingContent,
+        headlineContent = {
+            ChatRowTitleLine(
+                title = title,
+                timestampAt = timestampAt,
+                rowHasUnread = rowHasUnread,
+                showTimestamp = !selectionMode,
+            )
+        },
+        supportingContent = {
+            ChatRowSupportingLine(
+                supportingContent = supportingContent,
+                supportingMetadata = supportingMetadata.takeUnless { selectionMode },
+            )
+        },
+        trailingContent =
+            if (selectionMode) {
+                {
+                    ChatRowSelectionIndicator(selected = selected)
+                }
+            } else {
+                null
+            },
+    )
+}
+
+@Composable
+private fun ChatRowTitleLine(
+    title: String,
+    timestampAt: ULong,
+    rowHasUnread: Boolean,
+    showTimestamp: Boolean,
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).alignByBaseline(),
         )
-    } else {
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (showTimestamp) {
+            Spacer(Modifier.width(8.dp))
             Text(
-                rememberedRelativeTime(timestampAt),
+                text = rememberedRelativeTime(timestampAt),
                 style = MaterialTheme.typography.labelSmall,
                 color =
                     if (rowHasUnread) {
@@ -423,24 +458,80 @@ internal fun ChatRowTrailingContent(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                maxLines = 1,
+                modifier = Modifier.alignByBaseline(),
             )
-            if (pendingConfirmation) {
-                Badge { Text(stringResource(R.string.invited)) }
-            } else if (rowHasUnread || pinned) {
-                // Surface the highest-signal unread: an @ badge beside the
-                // count when one of the unread messages mentions you (#611).
-                // A pinned chat keeps its glyph visible beside the badges.
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (pinned) PinnedBadge()
-                    if (rowHasUnread) {
-                        if (unreadMention) MentionBadge()
-                        UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
-                    }
-                }
+        }
+    }
+}
+
+@Composable
+private fun ChatRowSupportingLine(
+    supportingContent: @Composable () -> Unit,
+    supportingMetadata: (@Composable () -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            supportingContent()
+        }
+        if (supportingMetadata != null) {
+            Spacer(Modifier.width(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                supportingMetadata()
             }
         }
     }
 }
+
+@Composable
+private fun ChatRowSupportingMetadata(
+    pendingConfirmation: Boolean,
+    rowHasUnread: Boolean,
+    rowUnreadCount: ULong,
+    unreadMention: Boolean,
+    actionColors: dev.ipf.whitenoise.android.ui.common.AccountActionColors?,
+    pinned: Boolean,
+) {
+    if (pendingConfirmation) {
+        Badge { Text(stringResource(R.string.invited)) }
+    } else {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (pinned) PinnedBadge()
+            if (rowHasUnread) {
+                if (unreadMention) MentionBadge()
+                UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatRowSelectionIndicator(selected: Boolean) {
+    Icon(
+        imageVector = chatRowSelectionIcon(selected),
+        // The clickable row already exposes selected semantics. Keeping the
+        // visual indicator decorative avoids a second TalkBack announcement.
+        contentDescription = null,
+        tint =
+            if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        modifier =
+            Modifier
+                .size(24.dp)
+                .testTag(CHAT_ROW_SELECTION_INDICATOR_TAG),
+    )
+}
+
+internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = selectionRowIcon(selected)
 
 @Suppress("FunctionNaming")
 @Composable
