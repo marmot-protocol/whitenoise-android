@@ -21,6 +21,8 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.swipe
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -38,13 +40,17 @@ class FullSpectrumColorPickerTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private fun string(resId: Int): String = context.getString(resId)
+
     @Test
     fun hueSemanticsUpdatesColorWithoutTouch() {
         var latest = 0xFFFF0000L
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Hue")
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(120f))
             }
@@ -58,10 +64,10 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Hue")
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.RequestFocus)
         composeRule
-            .onNodeWithContentDescription("Hue")
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performKeyInput { pressKey(Key.DirectionRight) }
 
         composeRule.runOnIdle { assertEquals(0xFFFF0400L, latest) }
@@ -73,7 +79,7 @@ class FullSpectrumColorPickerTest {
 
         val stateDescription =
             composeRule
-                .onNodeWithContentDescription("Hue")
+                .onNodeWithContentDescription(string(R.string.color_picker_hue))
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.StateDescription]
 
@@ -86,7 +92,7 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Saturation")
+            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(0f))
             }
@@ -100,7 +106,7 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Brightness")
+            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(0.5f))
             }
@@ -113,14 +119,14 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = {})
 
         composeRule
-            .onNodeWithContentDescription("Hue")
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(360f))
             }
 
         val hueRange =
             composeRule
-                .onNodeWithContentDescription("Hue")
+                .onNodeWithContentDescription(string(R.string.color_picker_hue))
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.ProgressBarRangeInfo]
         assertEquals(360f, hueRange.current)
@@ -132,12 +138,12 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Saturation")
+            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(0f))
             }
         composeRule
-            .onNodeWithContentDescription("Saturation")
+            .onNodeWithContentDescription(string(R.string.color_picker_saturation))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(1f))
             }
@@ -151,12 +157,12 @@ class FullSpectrumColorPickerTest {
         setPickerContent(initialArgb = latest) { latest = it }
 
         composeRule
-            .onNodeWithContentDescription("Brightness")
+            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(0f))
             }
         composeRule
-            .onNodeWithContentDescription("Brightness")
+            .onNodeWithContentDescription(string(R.string.color_picker_brightness))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(1f))
             }
@@ -169,7 +175,7 @@ class FullSpectrumColorPickerTest {
         var latest = 0xFFFF0000L
         setPickerContent(initialArgb = latest) { latest = it }
 
-        composeRule.onNodeWithContentDescription("Brightness").performTouchInput {
+        composeRule.onNodeWithContentDescription(string(R.string.color_picker_brightness)).performTouchInput {
             click(Offset(width - 9f, centerY))
         }
 
@@ -181,7 +187,7 @@ class FullSpectrumColorPickerTest {
         val updates = mutableListOf<Long>()
         setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = updates::add)
 
-        composeRule.onNodeWithContentDescription("Hue").performTouchInput {
+        composeRule.onNodeWithContentDescription(string(R.string.color_picker_hue)).performTouchInput {
             swipe(
                 start = Offset(1f, centerY),
                 end = Offset(width - 1f, centerY),
@@ -211,18 +217,18 @@ class FullSpectrumColorPickerTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("More colors").performClick()
-        composeRule.onNodeWithText("Custom hex color").performTextReplacement("#00FF00")
+        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
+        composeRule.onNodeWithText(string(R.string.custom_hex_color)).performTextReplacement("#00FF00")
 
         val hueRange =
             composeRule
-                .onNodeWithContentDescription("Hue")
+                .onNodeWithContentDescription(string(R.string.color_picker_hue))
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.ProgressBarRangeInfo]
         assertEquals(ProgressBarRangeInfo(120f, 0f..360f, 359), hueRange)
 
         composeRule
-            .onNodeWithContentDescription("Hue")
+            .onNodeWithContentDescription(string(R.string.color_picker_hue))
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
                 assertTrue(setProgress(240f))
             }
@@ -244,10 +250,10 @@ class FullSpectrumColorPickerTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("More colors").performClick()
-        composeRule.onNodeWithText("Custom hex color").performTextReplacement("#XYZ")
-        composeRule.onNodeWithText("Apply color").assertIsNotEnabled()
-        composeRule.onNodeWithText("Enter a color like #336699.").assertExists()
+        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
+        composeRule.onNodeWithText(string(R.string.custom_hex_color)).performTextReplacement("#XYZ")
+        composeRule.onNodeWithText(string(R.string.apply_color)).assertIsNotEnabled()
+        composeRule.onNodeWithText(string(R.string.invalid_hex_color)).assertExists()
     }
 
     private fun setPickerContent(

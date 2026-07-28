@@ -10,7 +10,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.settings.TonalSwatchPicker
@@ -28,6 +30,10 @@ import org.robolectric.annotation.GraphicsMode
 class FullSpectrumColorPickerScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private fun string(resId: Int): String = context.getString(resId)
 
     @Test
     fun fullSpectrumPickerLight() = capture("full_spectrum_color_picker_light", dark = false, amoled = false)
@@ -65,7 +71,7 @@ class FullSpectrumColorPickerScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithContentDescription("More colors").performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.more_colors)).performClick()
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/$name.png")
