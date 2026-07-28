@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -55,32 +56,38 @@ class KeyPackagesScreenScreenshotTest {
         packages: List<AccountKeyPackageFfi>,
         path: String,
     ) {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    KeyPackagesContent(
-                        state =
-                            keyPackagesState(
-                                hasActiveAccount = true,
-                                loaded = true,
-                                loading = false,
-                                working = false,
-                                packageCount = packages.count { it.relay },
-                            ),
-                        packages = packages,
-                        onBack = {},
-                        onRefresh = {},
-                        onRepublish = {},
-                        onPublishNew = {},
-                        onDelete = {},
-                    )
+        val originalTimeZone = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        KeyPackagesContent(
+                            state =
+                                keyPackagesState(
+                                    hasActiveAccount = true,
+                                    loaded = true,
+                                    loading = false,
+                                    working = false,
+                                    packageCount = packages.count { it.relay },
+                                ),
+                            packages = packages,
+                            onBack = {},
+                            onRefresh = {},
+                            onRepublish = {},
+                            onPublishNew = {},
+                            onDelete = {},
+                        )
+                    }
                 }
             }
-        }
 
-        composeRule
-            .onNodeWithTag(KEY_PACKAGES_CONTENT_TAG)
-            .captureRoboImage(path)
+            composeRule
+                .onNodeWithTag(KEY_PACKAGES_CONTENT_TAG)
+                .captureRoboImage(path)
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+        }
     }
 
     private fun keyPackage(
