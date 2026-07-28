@@ -192,7 +192,7 @@ class TtsControllerTest {
         val controller =
             TtsController(
                 audioFocus = focus,
-                chunkText = { text, locale -> TtsChunker.chunk(text, locale, maxChunkLength = 4_000) },
+                maxChunkLength = 4_000,
                 speechRate = { rate },
             )
         controller.attachEngine(engine)
@@ -267,6 +267,61 @@ class TtsControllerTest {
     }
 
     @Test
+    fun everyFinalEnginePayloadStaysWithinMaxSpeechInputLength() {
+        val maxLen = 30
+        val displayName = "Alexandra"
+        val announcementPrefix = "$displayName: "
+        val longBody = "alpha beta gamma delta epsilon zeta eta theta iota"
+        val engine = FakeTtsSpeechEngine()
+        val controller =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = maxLen,
+            )
+        controller.attachEngine(engine)
+
+        controller.speak(
+            listOf(TtsSpeakableEntry("alice", "  $displayName  ", longBody)),
+            Locale.US,
+        )
+        val initialPayloads = engine.spoken.map { it.text }
+        assertTrue(
+            "initial playback must keep every engine payload within the limit",
+            initialPayloads.all { it.length <= maxLen },
+        )
+        assertEquals(longBody, bodyTextFromEnginePayloads(initialPayloads, displayName))
+        assertTrue(initialPayloads.size > 1)
+        assertTrue(initialPayloads.first().startsWith(announcementPrefix))
+
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", displayName, "First bit."),
+                TtsSpeakableEntry("alice", displayName, "Second bit."),
+            ),
+            Locale.US,
+        )
+        val naturalPayloads = engine.spoken.drop(initialPayloads.size).map { it.text }
+        assertEquals(listOf("$displayName: First bit.", "Second bit."), naturalPayloads)
+
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", displayName, "Skip me."),
+                TtsSpeakableEntry("alice", displayName, longBody),
+            ),
+            Locale.US,
+        )
+        val beforeJumpCount = engine.spoken.size
+        controller.skipNext()
+        val jumpPayloads = engine.spoken.drop(beforeJumpCount).map { it.text }
+        assertTrue(
+            "message jumps must keep every engine payload within the limit",
+            jumpPayloads.all { it.length <= maxLen },
+        )
+        assertEquals(longBody, bodyTextFromEnginePayloads(jumpPayloads, displayName))
+        assertTrue(jumpPayloads.first().startsWith(announcementPrefix))
+    }
+
+    @Test
     fun appendNeverResurrectsAnIdleSession() {
         val engine = FakeTtsSpeechEngine()
         val controller = controller(FakeTtsAudioFocus())
@@ -279,8 +334,18 @@ class TtsControllerTest {
     private fun controller(focus: FakeTtsAudioFocus): TtsController =
         TtsController(
             audioFocus = focus,
-            chunkText = { text, locale -> TtsChunker.chunk(text, locale, maxChunkLength = 4_000) },
+            maxChunkLength = 4_000,
         )
+
+    private fun bodyTextFromEnginePayloads(
+        payloads: List<String>,
+        displayName: String,
+    ): String {
+        val prefix = "$displayName: "
+        return payloads.joinToString(" ") { payload ->
+            if (payload.startsWith(prefix)) payload.removePrefix(prefix) else payload
+        }
+    }
 
     private data class Spoken(
         val text: String,

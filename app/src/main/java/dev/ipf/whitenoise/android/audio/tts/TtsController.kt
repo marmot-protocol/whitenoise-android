@@ -39,9 +39,7 @@ internal interface TtsAudioFocus {
  */
 class TtsController internal constructor(
     private val audioFocus: TtsAudioFocus,
-    private val chunkText: (String, Locale) -> List<TtsChunk> = { text, locale ->
-        TtsChunker.chunk(text, locale)
-    },
+    private val maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
     // Re-read per utterance so a rate change lands at the next sentence
     // boundary — quieter than re-queueing the current sentence.
     private val speechRate: () -> Float = { 1.0f },
@@ -227,16 +225,32 @@ class TtsController internal constructor(
 
     private fun TtsSpeakableEntry.toQueuedMessage(locale: Locale): TtsQueuedMessage? {
         val trimmed = text.trim()
-        val sentenceChunks = trimmed.takeIf(String::isNotEmpty)?.let { chunkText(it, locale) }.orEmpty()
+        val announcementName = senderDisplayName.trim()
+        val sentenceChunks =
+            trimmed
+                .takeIf(String::isNotEmpty)
+                ?.let { messageText ->
+                    TtsChunker.chunk(
+                        text = messageText,
+                        locale = locale,
+                        maxChunkLength = maxChunkLength,
+                        leadingChunkReserve = senderAnnouncementReserve(announcementName),
+                    )
+                }.orEmpty()
         return sentenceChunks.takeIf { it.isNotEmpty() }?.let { chunks ->
             TtsQueuedMessage(
                 senderKey = senderKey,
-                senderDisplayName = senderDisplayName,
+                senderDisplayName = announcementName,
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
                 chunks = chunks.map { chunk -> TtsChunk(text = chunk.text, index = 0) },
             )
         }
     }
+
+    private fun senderAnnouncementReserve(displayName: String): Int =
+        displayName
+            .takeIf(String::isNotEmpty)
+            ?.let { "$it: ".length } ?: 0
 }
 
 internal const val TTS_PREVIEW_MAX_LENGTH = 120

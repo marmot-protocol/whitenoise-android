@@ -66,6 +66,26 @@ class TtsChunkerTest {
     }
 
     @Test
+    fun leadingChunkReserveShrinksOnlyTheFirstOutputChunk() {
+        val text = "alpha beta gamma delta epsilon zeta eta theta"
+        val reserve = 10
+        val maxChunkLength = 20
+
+        val chunks =
+            TtsChunker.chunk(
+                text = text,
+                locale = Locale.US,
+                maxChunkLength = maxChunkLength,
+                leadingChunkReserve = reserve,
+            )
+
+        val firstChunkLimit = maxChunkLength - reserve
+        assertTrue(chunks.first().text.length <= firstChunkLimit)
+        assertTrue(chunks.drop(1).all { it.text.length <= maxChunkLength })
+        assertEquals(text, chunks.joinToString(" ", transform = TtsChunk::text))
+    }
+
+    @Test
     fun hardSplitDoesNotBisectUtf16SurrogatePairs() {
         val text = "ab😀cd"
 

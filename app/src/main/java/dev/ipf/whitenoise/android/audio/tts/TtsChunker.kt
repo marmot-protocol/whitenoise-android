@@ -26,8 +26,10 @@ object TtsChunker {
         text: String,
         locale: Locale,
         maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
+        leadingChunkReserve: Int = 0,
     ): List<TtsChunk> {
         require(maxChunkLength > 0) { "maxChunkLength must be positive" }
+        require(leadingChunkReserve >= 0) { "leadingChunkReserve must be non-negative" }
         if (text.isBlank()) return emptyList()
 
         val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
@@ -50,9 +52,15 @@ object TtsChunker {
         }
         pendingPrefix.trim().takeIf(String::isNotEmpty)?.let(sentences::add)
 
+        val firstChunkMaxLength = (maxChunkLength - leadingChunkReserve).coerceAtLeast(1)
+        var isFirstOutputChunk = true
         return sentences
-            .flatMap { sentence -> splitLongSentence(sentence, maxChunkLength) }
-            .filter(String::isNotBlank)
+            .flatMap { sentence ->
+                val limit = if (isFirstOutputChunk) firstChunkMaxLength else maxChunkLength
+                splitLongSentence(sentence, limit).also { parts ->
+                    if (parts.isNotEmpty()) isFirstOutputChunk = false
+                }
+            }.filter(String::isNotBlank)
             .mapIndexed { index, chunk -> TtsChunk(text = chunk, index = index) }
     }
 
