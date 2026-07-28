@@ -4174,11 +4174,13 @@ class ConversationController(
     val memberCount: Int
         get() = GroupProjector.uniqueMemberCount(members)
 
-    // A nameless two-member conversation, classified the same way the chat list
-    // and notifications do. The header title is already the counterparty's name,
-    // so the "2 members" subtitle is redundant noise here.
+    // Classified the same way the chat list does: the engine's projected
+    // conversation kind first (folded from the live chat-list row while this
+    // conversation is open), the nameless-two-member heuristic only for
+    // UNKNOWN and unprojected rows. The header title is already the
+    // counterparty's name, so the "2 members" subtitle is redundant noise here.
     val isDm: Boolean
-        get() = GroupProjector.isDm(memberCount, group.name)
+        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
 
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
@@ -4200,15 +4202,16 @@ class ConversationController(
         get() = GroupProjector.isAdminRef(group, conversationAccountIdHex)
 
     /**
-     * DM classification for the deletion-capability matrix. Uses the same
-     * headcount/name signals as the chat list. While the roster is still
-     * unverified this can transiently misclassify, but every path that grants
-     * delete-for-everyone also requires [canSendMessages] (which includes
-     * membersVerified), so no moderation capability is granted from an
-     * unverified roster.
+     * DM classification for the deletion-capability matrix. Prefers the
+     * engine's projected conversation kind, falling back to the same
+     * headcount/name signals as the chat list for UNKNOWN and unprojected
+     * rows. The fallback can transiently misclassify while the roster is
+     * still unverified, but every path that grants delete-for-everyone also
+     * requires [canSendMessages] (which includes membersVerified), so no
+     * moderation capability is granted from an unverified roster.
      */
     val isDirectConversation: Boolean
-        get() = GroupProjector.isDm(memberCount, group.name)
+        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
 
     /**
      * The authoritative deletion capability for [message], shared by the

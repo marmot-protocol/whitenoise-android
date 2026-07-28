@@ -162,6 +162,26 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun conversationClassificationPrefersProjectedKind() {
+        val source = controllersSource().readText()
+        val projectedIsDm =
+            Regex(
+                """val\s+isDm:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
+                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+            )
+        val projectedIsDirect =
+            Regex(
+                """val\s+isDirectConversation:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
+                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+            )
+
+        assertTrue(
+            "conversation-screen DM classification must prefer the engine's projected kind, heuristic only as fallback",
+            projectedIsDm.containsMatchIn(source) && projectedIsDirect.containsMatchIn(source),
+        )
+    }
+
+    @Test
     fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
         val body = controllerFunctionBody("deleteMessage")
         val authorizationGate = body.indexOf("!deleteCapabilityFor(message).canDeleteForEveryone")
