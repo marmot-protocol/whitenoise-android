@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
@@ -1164,8 +1165,6 @@ internal fun networkDisplayNameFallback(
 
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
-private const val TTS_PREVIEW_MAX_LENGTH = 120
-
 private data class AccountBubbleColorSlot(
     val accountRef: String,
     val theme: BubbleTheme,
@@ -1343,9 +1342,6 @@ class WhiteNoiseAppState private constructor(
     var ttsResolution by mutableStateOf<TtsResolutionResult?>(null)
         private set
 
-    var ttsNowPlayingPreview by mutableStateOf<String?>(null)
-        private set
-
     // The (account, conversation) pair that owns the current auto-read
     // session, or null when speech is manual or idle. Live continuation
     // appends only for the owner: a manual Speak aloud replaces the queue and
@@ -1363,30 +1359,35 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String? = accountRef?.let { "$it|${groupIdHex.lowercase()}" }
 
-    /** Starts read-aloud and remembers a truncated preview for the transport bar. */
+    /** Starts read-aloud for one or more speakable messages. */
     fun speakAloud(
-        text: String,
+        entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
     ): Boolean {
-        val started = ttsController.speak(text, locale)
+        val started = ttsController.speak(entries, locale)
         if (started) {
             // Only a speak that actually replaced the queue may end the
             // previous auto-read session: a failed start (blank text, no
             // engine) leaves the old queue playing and still owned.
             ttsAutoReadSessionKey = null
-            ttsNowPlayingPreview = text.take(TTS_PREVIEW_MAX_LENGTH)
         }
         return started
     }
 
+    /** Convenience for a single plain-text utterance without sender metadata. */
+    fun speakAloud(
+        text: String,
+        locale: java.util.Locale,
+    ): Boolean = speakAloud(listOf(TtsSpeakableEntry(senderKey = "", senderDisplayName = "", text = text)), locale)
+
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
     fun speakAloudAutoRead(
         groupIdHex: String,
-        text: String,
+        entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
     ): Boolean {
         val owner = ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex) ?: return false
-        val started = speakAloud(text, locale)
+        val started = speakAloud(entries, locale)
         if (started) ttsAutoReadSessionKey = owner
         return started
     }
@@ -1408,13 +1409,12 @@ class WhiteNoiseAppState private constructor(
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */
     fun appendSpeech(
-        text: String,
+        entry: TtsSpeakableEntry,
         locale: java.util.Locale,
-    ): Boolean = ttsController.appendSpeech(text, locale)
+    ): Boolean = ttsController.appendSpeech(entry, locale)
 
     fun stopSpeaking() {
         ttsController.stop()
-        ttsNowPlayingPreview = null
         ttsAutoReadSessionKey = null
     }
 

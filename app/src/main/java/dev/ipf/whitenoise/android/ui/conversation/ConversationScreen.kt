@@ -106,7 +106,6 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -454,7 +453,11 @@ internal fun ConversationScreen(
         if (!initialTimelineAnchored) return@LaunchedEffect
         val entries = autoReadBacklogEntries()
         if (entries.isNotEmpty()) {
-            appState.speakAloudAutoRead(controller.group.groupIdHex, ttsAutoReadScript(entries), Locale.getDefault())
+            appState.speakAloudAutoRead(
+                controller.group.groupIdHex,
+                entries,
+                Locale.getDefault(),
+            )
         }
     }
     // Live continuation: a speakable message arriving while speech is active
@@ -485,7 +488,14 @@ internal fun ConversationScreen(
                 val record = controller.timeline.lastOrNull()?.record ?: return@collect
                 if (record.messageIdHex != lastId) return@collect
                 val text = MessageProjector.copyableText(record, null) ?: return@collect
-                appState.appendSpeech("${appState.displayName(record.sender)}: $text", Locale.getDefault())
+                appState.appendSpeech(
+                    TtsSpeakableEntry(
+                        senderKey = record.sender,
+                        senderDisplayName = appState.displayName(record.sender),
+                        text = text,
+                    ),
+                    Locale.getDefault(),
+                )
             }
     }
     // Auto-read return-from-background: capture the actual timeline tail when
@@ -554,7 +564,7 @@ internal fun ConversationScreen(
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
         appState.speakAloudAutoRead(
             controller.group.groupIdHex,
-            ttsAutoReadScript(entries),
+            entries,
             Locale.getDefault(),
         )
     }
