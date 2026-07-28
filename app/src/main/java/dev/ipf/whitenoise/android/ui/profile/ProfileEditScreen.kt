@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -15,9 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -47,8 +52,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +67,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfilePseudonymGenerator
@@ -69,12 +78,141 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ProfilePublicWarning
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+internal enum class ProfileImageTarget { Picture, Banner }
+
+internal data class ProfileImageDrafts(
+    val picture: String = "",
+    val banner: String = "",
+) {
+    fun without(target: ProfileImageTarget): ProfileImageDrafts =
+        when (target) {
+            ProfileImageTarget.Picture -> copy(picture = "")
+            ProfileImageTarget.Banner -> copy(banner = "")
+        }
+
+    fun withUploadedImage(
+        target: ProfileImageTarget,
+        uploadedUrl: String,
+        capturedAccountRef: String,
+        activeAccountRef: String?,
+    ): ProfileImageDrafts {
+        if (capturedAccountRef != activeAccountRef) return this
+        return when (target) {
+            ProfileImageTarget.Picture -> copy(picture = uploadedUrl)
+            ProfileImageTarget.Banner -> copy(banner = uploadedUrl)
+        }
+    }
+}
+
+internal const val PROFILE_BANNER_CONTROL_TAG = "profile_banner_control"
+private const val PROFILE_BANNER_ASPECT_RATIO = 3f
+
+@Suppress("FunctionNaming", "LongMethod")
+@Composable
+internal fun ProfileBannerControl(
+    bannerUrl: String?,
+    isValid: Boolean,
+    isUploading: Boolean,
+    imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    onClick: () -> Unit,
+) {
+    var bannerImage by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
+    LaunchedEffect(bannerUrl) {
+        if (bannerImage == null && bannerUrl != null) bannerImage = imageLoader(bannerUrl)
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(PROFILE_BANNER_ASPECT_RATIO)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(
+                        enabled = !isUploading,
+                        onClickLabel = stringResource(R.string.profile_banner_edit),
+                        role = Role.Button,
+                        onClick = onClick,
+                    ).testTag(PROFILE_BANNER_CONTROL_TAG),
+            contentAlignment = Alignment.Center,
+        ) {
+            val image = bannerImage
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (bannerUrl != null && !isUploading) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(36.dp),
+                )
+            } else if (isUploading) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.profile_banner_uploading))
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                ) {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    Text(stringResource(R.string.profile_banner_placeholder))
+                }
+            }
+            if (!isUploading) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(Dimens.spaceSm)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+        if (!isValid) {
+            Text(
+                stringResource(R.string.profile_banner_invalid),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,8 +223,9 @@ internal fun ProfileEditScreen(
     val active = appState.activeAccount
     var displayName by remember(active?.accountIdHex) { mutableStateOf("") }
     var about by remember(active?.accountIdHex) { mutableStateOf("") }
-    var picture by remember(active?.accountIdHex) { mutableStateOf("") }
-    var banner by remember(active?.accountIdHex) { mutableStateOf("") }
+    var imageDrafts by remember(active?.accountIdHex) { mutableStateOf(ProfileImageDrafts()) }
+    val picture = imageDrafts.picture
+    val banner = imageDrafts.banner
     var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
     var lud16 by remember(active?.accountIdHex) { mutableStateOf("") }
     // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
@@ -98,16 +237,20 @@ internal fun ProfileEditScreen(
     var busy by remember { mutableStateOf(false) }
     var pictureUploading by remember(active?.accountIdHex) { mutableStateOf(false) }
     var pictureUploadJob by remember(active?.accountIdHex) { mutableStateOf<Job?>(null) }
+    var bannerUploading by remember(active?.accountIdHex) { mutableStateOf(false) }
+    var bannerUploadJob by remember(active?.accountIdHex) { mutableStateOf<Job?>(null) }
     // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
     // The picture URL no longer lives as a standalone editor row; it's edited
     // exclusively through this control so the editor reads like an app screen,
     // not a developer surface. See #286.
     var showPictureSheet by remember { mutableStateOf(false) }
+    var showBannerSheet by remember { mutableStateOf(false) }
     var fullPictureOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.imageUrl(picture)
+    val safeBannerUrl = ProfileSanitizer.imageUrl(banner)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
@@ -116,6 +259,7 @@ internal fun ProfileEditScreen(
     val saveEnabled =
         !busy &&
             !pictureUploading &&
+            !bannerUploading &&
             active != null &&
             pictureValid &&
             bannerValid &&
@@ -123,7 +267,10 @@ internal fun ProfileEditScreen(
             lud16Valid
 
     DisposableEffect(active?.accountIdHex) {
-        onDispose { pictureUploadJob?.cancel() }
+        onDispose {
+            pictureUploadJob?.cancel()
+            bannerUploadJob?.cancel()
+        }
     }
 
     fun saveProfile() {
@@ -179,11 +326,23 @@ internal fun ProfileEditScreen(
         }
     }
 
-    fun uploadPicture(prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft) {
+    @Suppress("LongMethod")
+    fun uploadProfileDraft(
+        target: ProfileImageTarget,
+        prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft,
+    ) {
         val accountRef = appState.activeAccountRef ?: return
-        if (pictureUploading || busy) return
-        pictureUploading = true
-        pictureUploadJob =
+        val alreadyUploading =
+            when (target) {
+                ProfileImageTarget.Picture -> pictureUploading
+                ProfileImageTarget.Banner -> bannerUploading
+            }
+        if (alreadyUploading || busy) return
+        when (target) {
+            ProfileImageTarget.Picture -> pictureUploading = true
+            ProfileImageTarget.Banner -> bannerUploading = true
+        }
+        val uploadJob =
             scope.launch {
                 var prepared = false
                 try {
@@ -201,25 +360,51 @@ internal fun ProfileEditScreen(
                     val safeUploaded =
                         ProfileSanitizer.imageUrl(uploaded)
                             ?: throw IllegalStateException("profile image upload returned an unsafe URL")
-                    if (appState.activeAccountRef != accountRef) return@launch
-                    picture = safeUploaded
-                    showPictureSheet = false
+                    val activeAccountRef = appState.activeAccountRef
+                    imageDrafts =
+                        imageDrafts.withUploadedImage(
+                            target = target,
+                            uploadedUrl = safeUploaded,
+                            capturedAccountRef = accountRef,
+                            activeAccountRef = activeAccountRef,
+                        )
+                    if (activeAccountRef != accountRef) return@launch
+                    when (target) {
+                        ProfileImageTarget.Picture -> showPictureSheet = false
+                        ProfileImageTarget.Banner -> showBannerSheet = false
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
                     appState.present(
                         if (prepared) {
-                            R.string.toast_couldnt_upload_profile_image
+                            when (target) {
+                                ProfileImageTarget.Picture -> R.string.toast_couldnt_upload_profile_image
+                                ProfileImageTarget.Banner -> R.string.toast_couldnt_upload_profile_banner
+                            }
                         } else {
                             R.string.toast_couldnt_prepare_image
                         },
                         copyable = true,
                     )
                 } finally {
-                    pictureUploading = false
-                    pictureUploadJob = null
+                    when (target) {
+                        ProfileImageTarget.Picture -> {
+                            pictureUploading = false
+                            pictureUploadJob = null
+                        }
+
+                        ProfileImageTarget.Banner -> {
+                            bannerUploading = false
+                            bannerUploadJob = null
+                        }
+                    }
                 }
             }
+        when (target) {
+            ProfileImageTarget.Picture -> pictureUploadJob = uploadJob
+            ProfileImageTarget.Banner -> bannerUploadJob = uploadJob
+        }
     }
 
     LaunchedEffect(active?.accountIdHex) {
@@ -227,8 +412,11 @@ internal fun ProfileEditScreen(
         if (profile != null) {
             displayName = profile.displayName ?: profile.name ?: ""
             about = profile.about ?: ""
-            picture = profile.picture ?: ""
-            banner = profile.banner ?: ""
+            imageDrafts =
+                ProfileImageDrafts(
+                    picture = profile.picture ?: "",
+                    banner = profile.banner ?: "",
+                )
             nip05 = profile.nip05 ?: ""
             lud16 = profile.lud16 ?: ""
         }
@@ -285,6 +473,12 @@ internal fun ProfileEditScreen(
                     if (active == null) {
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
+                        ProfileBannerControl(
+                            bannerUrl = safeBannerUrl,
+                            isValid = bannerValid,
+                            isUploading = bannerUploading,
+                            onClick = { showBannerSheet = true },
+                        )
                         // The avatar itself views the current picture. The small
                         // camera badge remains the direct edit affordance (#317),
                         // so viewing and editing no longer compete for the same tap.
@@ -453,23 +647,6 @@ internal fun ProfileEditScreen(
                     )
                     TextField(
                         colors = profileFieldColors,
-                        value = banner,
-                        onValueChange = { banner = it },
-                        label = { Text(stringResource(R.string.profile_banner)) },
-                        singleLine = true,
-                        isError = !bannerValid,
-                        supportingText = {
-                            Text(
-                                stringResource(
-                                    if (bannerValid) R.string.profile_banner_hint else R.string.profile_banner_invalid,
-                                ),
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
                         value = lud16,
                         onValueChange = {
                             lud16 = it
@@ -525,18 +702,52 @@ internal fun ProfileEditScreen(
             applyInFlight = pictureUploading,
             onApply = { picked ->
                 if (picked == null) {
-                    picture = ""
+                    imageDrafts = imageDrafts.without(ProfileImageTarget.Picture)
                     showPictureSheet = false
                 } else {
-                    uploadPicture { GroupImageDraftProcessor.fromRemoteUrl(picked) }
+                    uploadProfileDraft(target = ProfileImageTarget.Picture) {
+                        GroupImageDraftProcessor.fromRemoteUrl(picked)
+                    }
                 }
             },
             onPickPhoto = { uri ->
-                uploadPicture {
+                uploadProfileDraft(target = ProfileImageTarget.Picture) {
                     GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
                 }
             },
             onDismiss = { if (!pictureUploading) showPictureSheet = false },
+        )
+    }
+
+    if (showBannerSheet) {
+        ImageSearchSheet(
+            initialUrl = banner,
+            hasCurrentImage = banner.isNotBlank(),
+            header = stringResource(R.string.profile_banner_sheet_title),
+            title = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
+            seed = active?.accountIdHex.orEmpty(),
+            urlLabel = stringResource(R.string.profile_banner_url_label),
+            applyInFlight = bannerUploading,
+            onApply = { picked ->
+                if (picked == null) {
+                    imageDrafts = imageDrafts.without(ProfileImageTarget.Banner)
+                    showBannerSheet = false
+                } else {
+                    uploadProfileDraft(target = ProfileImageTarget.Banner) {
+                        GroupImageDraftProcessor.fromRemoteUrl(picked)
+                    }
+                }
+            },
+            onPickPhoto = { uri ->
+                uploadProfileDraft(target = ProfileImageTarget.Banner) {
+                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                }
+            },
+            onDismiss = { if (!bannerUploading) showBannerSheet = false },
+            previewPresentation = ImagePreviewPresentation.Banner,
+            choosePhotoLabel = stringResource(R.string.profile_banner_choose_photo),
+            removeImageLabel = stringResource(R.string.profile_banner_remove),
+            applyImageLabel = stringResource(R.string.profile_banner_apply),
         )
     }
 }

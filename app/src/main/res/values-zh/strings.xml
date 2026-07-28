@@ -850,6 +850,15 @@
     <string name="profile_picture_remove">移除头像</string>
     <string name="profile_picture_use_link">使用此链接</string>
     <string name="profile_banner">个人资料横幅</string>
+    <string name="profile_banner_edit">编辑个人资料横幅</string>
+    <string name="profile_banner_sheet_title">个人资料横幅</string>
+    <string name="profile_banner_placeholder">尚未设置横幅</string>
+    <string name="profile_banner_uploading">正在上传个人资料横幅…</string>
+    <string name="profile_banner_choose_photo">从照片中选择横幅</string>
+    <string name="profile_banner_url_label">公开的 HTTPS 横幅网址</string>
+    <string name="profile_banner_remove">移除横幅</string>
+    <string name="profile_banner_apply">使用此横幅</string>
+    <string name="toast_couldnt_upload_profile_banner">无法上传个人资料横幅。</string>
     <string name="profile_banner_hint">可选的公开 HTTPS 横幅网址</string>
     <string name="profile_banner_invalid">仅允许公开的 HTTPS 图片网址。</string>
     <string name="toast_couldnt_upload_profile_image">无法上传个人资料图片。</string>
