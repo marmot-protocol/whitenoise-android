@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -67,7 +68,10 @@ internal fun ChatBubbleColorsScreen(
     groupIdHex: String? = null,
 ) {
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
-    val pickerScopeKey = groupIdHex?.let { "chat:$it" } ?: "global"
+    val accountScope = appState.activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: "none"
+    val pickerScopeKey =
+        groupIdHex?.let { "account:$accountScope:chat:$it" }
+            ?: "account:$accountScope:global"
     val scopeSubtitle =
         stringResource(
             if (groupIdHex == null) {
@@ -151,7 +155,7 @@ internal fun ChatBubbleColorsScreen(
                                 onColorSelected = { updateColor(BubbleSide.Mine, it) },
                                 scopeKey = pickerScopeKey,
                                 theme = bubbleTheme,
-                                side = BubbleSide.Mine,
+                                slotKey = BubbleSide.Mine.name,
                             )
                         }
                     }
@@ -166,7 +170,7 @@ internal fun ChatBubbleColorsScreen(
                                 onColorSelected = { updateColor(BubbleSide.Other, it) },
                                 scopeKey = pickerScopeKey,
                                 theme = bubbleTheme,
-                                side = BubbleSide.Other,
+                                slotKey = BubbleSide.Other.name,
                             )
                         }
                     }
@@ -256,7 +260,8 @@ internal fun TonalSwatchPicker(
     onColorSelected: (Long) -> Unit,
     scopeKey: String,
     theme: BubbleTheme,
-    side: BubbleSide,
+    slotKey: String,
+    @StringRes swatchContentDescriptionRes: Int = R.string.bubble_color_swatch_content_description,
 ) {
     val scheme = MaterialTheme.colorScheme
     val presets =
@@ -270,8 +275,8 @@ internal fun TonalSwatchPicker(
                 surfaceArgb = scheme.surface.toArgb().toLong() and 0xFFFFFFFFL,
             )
         }
-    var customExpanded by rememberSaveable(scopeKey, theme, side) { mutableStateOf(false) }
-    var customHex by rememberSaveable(scopeKey, theme, side, selectedArgb) {
+    var customExpanded by rememberSaveable(scopeKey, theme, slotKey) { mutableStateOf(false) }
+    var customHex by rememberSaveable(scopeKey, theme, slotKey, selectedArgb) {
         mutableStateOf(selectedArgb?.let { "#%06X".format(Locale.ROOT, it and 0xFFFFFFL) } ?: "")
     }
     val parsedCustom = parseOpaqueColorHex(customHex)
@@ -288,7 +293,7 @@ internal fun TonalSwatchPicker(
                 val selected = selectedArgb == argb
                 val swatchDescription =
                     stringResource(
-                        R.string.bubble_color_swatch_content_description,
+                        swatchContentDescriptionRes,
                         "#%06X".format(Locale.ROOT, argb and 0xFFFFFFL),
                     )
                 Box(

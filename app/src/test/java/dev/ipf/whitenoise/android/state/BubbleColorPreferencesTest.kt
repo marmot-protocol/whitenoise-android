@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,24 +37,184 @@ class BubbleColorPreferencesTest {
     }
 
     @Test
-    fun globalColorsPersistIndependentlyPerThemeAndSide() {
-        assertNull(BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine))
+    fun legacyGlobalColorsPersistIndependentlyPerThemeAndSide() {
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine))
 
-        BubbleColorPreferences.writeGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine, 0xFF112233)
-        BubbleColorPreferences.writeGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Other, 0xFF445566)
+        BubbleColorPreferences.writeLegacyGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine, 0xFF112233)
+        BubbleColorPreferences.writeLegacyGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Other, 0xFF445566)
 
-        assertEquals(0xFF112233, BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine))
-        assertNull(BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Other))
-        assertNull(BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Mine))
-        assertEquals(0xFF445566, BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Other))
+        assertEquals(
+            0xFF112233,
+            BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine),
+        )
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Other))
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Mine))
+        assertEquals(
+            0xFF445566,
+            BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Other),
+        )
+    }
+
+    @Test
+    fun globalColorsAreLocalToAccountThemeAndSide() {
+        BubbleColorPreferences.writeGlobalColor(
+            preferences,
+            accountRef = "account-a",
+            theme = BubbleTheme.Light,
+            side = BubbleSide.Mine,
+            argb = 0xFF112233,
+        )
+
+        assertEquals(
+            0xFF112233,
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "account-a",
+                theme = BubbleTheme.Light,
+                side = BubbleSide.Mine,
+            ),
+        )
+        assertNull(
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "account-b",
+                theme = BubbleTheme.Light,
+                side = BubbleSide.Mine,
+            ),
+        )
+    }
+
+    @Test
+    fun legacyGlobalColorsMigrateToExistingAccountsWithoutOverwritingScopedValues() {
+        BubbleColorPreferences.writeLegacyGlobalColor(
+            preferences,
+            theme = BubbleTheme.Light,
+            side = BubbleSide.Mine,
+            argb = 0xFF112233,
+        )
+        BubbleColorPreferences.writeGlobalColor(
+            preferences,
+            accountRef = "account-b",
+            theme = BubbleTheme.Light,
+            side = BubbleSide.Mine,
+            argb = 0xFF445566,
+        )
+
+        assertTrue(
+            LegacyBubbleColorMigration.migrate(
+                preferences = preferences,
+                accountRefs = listOf(" account-a ", "account-b", "account-a", ""),
+            ),
+        )
+
+        assertEquals(
+            0xFF112233,
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "account-a",
+                theme = BubbleTheme.Light,
+                side = BubbleSide.Mine,
+            ),
+        )
+        assertEquals(
+            0xFF445566,
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "account-b",
+                theme = BubbleTheme.Light,
+                side = BubbleSide.Mine,
+            ),
+        )
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Light, BubbleSide.Mine))
+    }
+
+    @Test
+    fun legacyGlobalColorsAreConsumedWhenThereAreNoExistingAccounts() {
+        BubbleColorPreferences.writeLegacyGlobalColor(
+            preferences,
+            theme = BubbleTheme.Amoled,
+            side = BubbleSide.Other,
+            argb = 0xFF112233,
+        )
+
+        assertTrue(LegacyBubbleColorMigration.migrate(preferences, emptyList()))
+
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Amoled, BubbleSide.Other))
+        assertFalse(LegacyBubbleColorMigration.migrate(preferences, emptyList()))
+        assertNull(
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "created-later",
+                theme = BubbleTheme.Amoled,
+                side = BubbleSide.Other,
+            ),
+        )
     }
 
     @Test
     fun clearingGlobalColorRestoresAbsentSentinel() {
-        BubbleColorPreferences.writeGlobalColor(preferences, BubbleTheme.Amoled, BubbleSide.Mine, 0xFF010203)
-        BubbleColorPreferences.writeGlobalColor(preferences, BubbleTheme.Amoled, BubbleSide.Mine, null)
+        BubbleColorPreferences.writeGlobalColor(
+            preferences,
+            "account-a",
+            BubbleTheme.Amoled,
+            BubbleSide.Mine,
+            0xFF010203,
+        )
+        BubbleColorPreferences.writeGlobalColor(preferences, "account-a", BubbleTheme.Amoled, BubbleSide.Mine, null)
 
-        assertNull(BubbleColorPreferences.readGlobalColor(preferences, BubbleTheme.Amoled, BubbleSide.Mine))
+        assertNull(
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                "account-a",
+                BubbleTheme.Amoled,
+                BubbleSide.Mine,
+            ),
+        )
+    }
+
+    @Test
+    fun actionColorsPersistAndResetPerAccountAndTheme() {
+        ActionColorPreferences.writeColor(preferences, "account-a", BubbleTheme.Light, 0xFF112233)
+        ActionColorPreferences.writeColor(preferences, "account-b", BubbleTheme.Light, 0xFF445566)
+        ActionColorPreferences.writeColor(preferences, "account-a", BubbleTheme.Dark, 0xFF778899)
+
+        assertEquals(0xFF112233, ActionColorPreferences.readColor(preferences, "account-a", BubbleTheme.Light))
+        assertEquals(0xFF445566, ActionColorPreferences.readColor(preferences, "account-b", BubbleTheme.Light))
+        assertEquals(0xFF778899, ActionColorPreferences.readColor(preferences, "account-a", BubbleTheme.Dark))
+        assertNull(ActionColorPreferences.readColor(preferences, "account-b", BubbleTheme.Dark))
+
+        ActionColorPreferences.writeColor(preferences, "account-a", BubbleTheme.Light, null)
+
+        assertNull(ActionColorPreferences.readColor(preferences, "account-a", BubbleTheme.Light))
+        assertEquals(0xFF445566, ActionColorPreferences.readColor(preferences, "account-b", BubbleTheme.Light))
+    }
+
+    @Test
+    fun actionColorResolverUsesReadableForegroundAndFallsBackAsAPair() {
+        assertEquals(
+            ActionColorArgb(container = 0xFFFFFFFF, content = OPAQUE_BLACK_ARGB),
+            resolveActionColorArgb(
+                customArgb = 0xFFFFFFFF,
+                defaultContainerArgb = 0xFF112233,
+                defaultContentArgb = 0xFF445566,
+            ),
+        )
+        assertEquals(
+            ActionColorArgb(container = 0xFF000000, content = OPAQUE_WHITE_ARGB),
+            resolveActionColorArgb(
+                customArgb = 0xFF000000,
+                defaultContainerArgb = 0xFF112233,
+                defaultContentArgb = 0xFF445566,
+            ),
+        )
+        assertEquals(
+            ActionColorArgb(container = 0xFF112233, content = 0xFF445566),
+            resolveActionColorArgb(
+                customArgb = null,
+                defaultContainerArgb = 0xFF112233,
+                defaultContentArgb = 0xFF445566,
+            ),
+        )
     }
 
     @Test

@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
@@ -311,6 +312,7 @@ internal fun ChatRow(
                     rowHasUnread = rowHasUnread,
                     rowUnreadCount = rowUnreadCount,
                     unreadMention = item.unreadMention,
+                    actionColors = accountActionColors(appState),
                 )
             },
         )
@@ -341,6 +343,7 @@ internal fun ChatRowTrailingContent(
     rowHasUnread: Boolean,
     rowUnreadCount: ULong,
     unreadMention: Boolean,
+    actionColors: dev.ipf.whitenoise.android.ui.common.AccountActionColors? = null,
 ) {
     if (selectionMode) {
         Icon(
@@ -375,7 +378,7 @@ internal fun ChatRowTrailingContent(
                 // count when one of the unread messages mentions you (#611).
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (unreadMention) MentionBadge()
-                    UnreadCountBadge(rowUnreadCount)
+                    UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
                 }
             }
         }

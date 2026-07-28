@@ -42,6 +42,28 @@ class MessageBubbleFrameTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun customAmoledReplyAccentUsesCurrentBorderColorInsideBubbleAndAboveMedia() {
+        val presentation = customAmoledPresentation()
+
+        assertEquals(
+            CUSTOM_BACKGROUND,
+            replyPreviewAccentArgb(
+                insideBubble = true,
+                customBubbleColorActive = true,
+                presentation = presentation,
+            ),
+        )
+        assertEquals(
+            CUSTOM_BACKGROUND,
+            replyPreviewAccentArgb(
+                insideBubble = false,
+                customBubbleColorActive = true,
+                presentation = presentation,
+            ),
+        )
+    }
+
+    @Test
     fun customAmoledBorderKeepsBlackCaptionPlainAndReplyBubbleContent() {
         val captionContentArgb = AtomicInteger()
         val plainContentArgb = AtomicInteger()

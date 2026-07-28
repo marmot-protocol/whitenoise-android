@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -33,7 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material.icons.Icons
@@ -42,7 +40,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -57,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -165,12 +161,24 @@ internal fun messageBubbleBorder(
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
-        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         invalidated -> null
+        amoledAccent != null && customArgb != null -> BorderStroke(2.dp, colorFromArgb(customArgb))
+        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         amoledAccent != null -> BorderStroke(2.dp, customArgb?.let(::colorFromArgb) ?: amoledAccent)
         else -> null
     }
 }
+
+internal fun replyPreviewAccentArgb(
+    insideBubble: Boolean,
+    customBubbleColorActive: Boolean,
+    presentation: BubblePresentation,
+): Long? =
+    if (customBubbleColorActive) {
+        presentation.borderOverrideArgb ?: presentation.contentArgb.takeIf { insideBubble }
+    } else {
+        null
+    }
 
 @Composable
 internal fun messageBubblePresentation(
@@ -219,71 +227,6 @@ internal fun messageBubbleTimestampColor(
         amoledAccent != null -> amoledAccent
         mine && !deleted -> colorScheme.onPrimaryContainer
         else -> colorScheme.onSurfaceVariant
-    }
-}
-
-/** Shared frame for caption and plain-text bubbles so both render paths use
- * the same background/content pairing and semantic mention accent. */
-@Composable
-internal fun MessageBubbleFrame(
-    presentation: BubblePresentation,
-    highlighted: Boolean,
-    mine: Boolean,
-    invalidated: Boolean,
-    mentionedSelf: Boolean,
-    mentionedYouLabel: String,
-    modifier: Modifier = Modifier,
-    contentModifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val mentionRailModifier =
-        if (mentionedSelf) {
-            Modifier
-                .semantics { contentDescription = mentionedYouLabel }
-                .drawBehind {
-                    val railWidth = 3.dp.toPx()
-                    val inset = 4.dp.toPx()
-                    val radius =
-                        androidx.compose.ui.geometry
-                            .CornerRadius(railWidth / 2f, railWidth / 2f)
-                    drawRoundRect(
-                        color = colorFromArgb(presentation.mentionAccentArgb),
-                        topLeft =
-                            androidx.compose.ui.geometry
-                                .Offset(inset, inset),
-                        size =
-                            androidx.compose.ui.geometry.Size(
-                                railWidth,
-                                (size.height - inset * 2).coerceAtLeast(railWidth),
-                            ),
-                        cornerRadius = radius,
-                    )
-                }
-        } else {
-            Modifier
-        }
-    Surface(
-        modifier = modifier,
-        color = colorFromArgb(presentation.backgroundArgb),
-        contentColor = colorFromArgb(presentation.contentArgb),
-        shape = RoundedCornerShape(18.dp),
-        border =
-            messageBubbleBorder(
-                highlighted = highlighted,
-                mine = mine,
-                invalidated = invalidated,
-                customArgb = presentation.borderOverrideArgb,
-            ),
-        tonalElevation = if (mine) 1.dp else 0.dp,
-    ) {
-        Column(
-            modifier =
-                mentionRailModifier
-                    .then(contentModifier)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            content = content,
-        )
     }
 }
 
@@ -1748,7 +1691,13 @@ internal fun MessageBubble(
                 // standalone above the media (#527).
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
-                        val useCustomBubbleColors = insideBubble && customBubbleColorActive
+                        val useCustomFillColors = insideBubble && customBubbleColorActive
+                        val replyAccentArgb =
+                            replyPreviewAccentArgb(
+                                insideBubble = insideBubble,
+                                customBubbleColorActive = customBubbleColorActive,
+                                presentation = bubblePresentation,
+                            )
                         ReplyPreviewCard(
                             senderTitle = senderTitleForReply(preview.sender, appState),
                             isOwn = isOwnReplySender(preview.sender, appState),
@@ -1770,9 +1719,9 @@ internal fun MessageBubble(
                                 remember(appState, appState.profileRevisionForCompose) {
                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                 },
-                            containerColor = if (useCustomBubbleColors) Color.Transparent else null,
-                            contentColor = if (useCustomBubbleColors) bubbleContentColor else null,
-                            accentColor = if (useCustomBubbleColors) bubbleContentColor else null,
+                            containerColor = if (useCustomFillColors) Color.Transparent else null,
+                            contentColor = if (useCustomFillColors) bubbleContentColor else null,
+                            accentColor = replyAccentArgb?.let(::colorFromArgb),
                         )
                     }
                 }

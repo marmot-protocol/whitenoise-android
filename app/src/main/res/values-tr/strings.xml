@@ -1129,6 +1129,10 @@
     <string name="notification_channel_app_updates_description">Zapstore sürüm uyarıları</string>
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
+    <string name="action_color">Eylem rengi</string>
+    <string name="action_color_subtitle">Yeni mesaj, Gönder ve okunmamış göstergeleri için bir kimlik rengi seçin. Açık, koyu ve AMOLED renkleri ayrı kaydedilir.</string>
+    <string name="action_color_no_active_account">Eylem rengini ayarlamadan önce etkin bir hesap seçin.</string>
+    <string name="action_color_swatch_content_description">Eylem rengi %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Geçerli tema için varsayılanları seçin. Açık, koyu ve AMOLED renkleri ayrı kaydedilir.</string>
     <string name="chat_bubble_colors_chat_subtitle">Balon renklerini yalnızca bu konuşma için değiştirin. Görünüm varsayılanlarını devralmak için sıfırlayın.</string>
     <string name="bubble_color_preview">Önizleme</string>

@@ -122,6 +122,29 @@ class MessageBubbleAmoledStyleTest {
     }
 
     @Test
+    fun highlightedAmoledCustomBubbleRetainsItsCustomBorder() {
+        val customArgb = 0xFF336699L
+        var highlightedBorder: BorderStroke? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                val border =
+                    messageBubbleBorder(
+                        highlighted = true,
+                        mine = false,
+                        customArgb = customArgb,
+                    )
+                SideEffect { highlightedBorder = border }
+            }
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(2.dp, requireNotNull(highlightedBorder).width)
+            assertEquals(colorFromArgb(customArgb), borderColor(highlightedBorder))
+        }
+    }
+
+    @Test
     fun amoledInvalidatedBubbleSuppressesDirectionalAccent() {
         var sentBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)
         var receivedBorder: BorderStroke? = BorderStroke(2.dp, Color.Red)

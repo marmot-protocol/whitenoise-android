@@ -1131,6 +1131,10 @@
     <string name="notification_channel_app_updates_description">Alertes de versions Zapstore</string>
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
+    <string name="action_color">Couleur des actions</string>
+    <string name="action_color_subtitle">Choisissez une couleur d’identité pour Nouveau message, Envoyer et les indicateurs de messages non lus. Les couleurs claires, sombres et AMOLED sont enregistrées séparément.</string>
+    <string name="action_color_no_active_account">Sélectionnez un compte actif avant de définir sa couleur d’action.</string>
+    <string name="action_color_swatch_content_description">Couleur des actions %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Choisissez les valeurs par défaut du thème actuel. Les couleurs claire, sombre et AMOLED sont enregistrées séparément.</string>
     <string name="chat_bubble_colors_chat_subtitle">Remplacez les couleurs des bulles uniquement pour cette conversation. Réinitialisez pour reprendre les valeurs d’apparence.</string>
     <string name="bubble_color_preview">Aperçu</string>

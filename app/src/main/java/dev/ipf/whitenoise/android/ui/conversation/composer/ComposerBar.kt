@@ -81,6 +81,7 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
@@ -352,6 +353,7 @@ internal fun ComposerBar(
     // tap; defaults to a private instance for other call sites.
     attachmentSheetState: ComposerAttachmentSheetState = rememberComposerAttachmentSheetState(),
 ) {
+    val actionColors = accountActionColors(appState)
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
@@ -967,8 +969,8 @@ internal fun ComposerBar(
                         FloatingActionButton(
                             onClick = { voiceRecordingController.stop() },
                             modifier = Modifier.size(44.dp),
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = actionColors.container,
+                            contentColor = actionColors.content,
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
@@ -986,8 +988,8 @@ internal fun ComposerBar(
                     FloatingActionButton(
                         onClick = { submitMessage() },
                         modifier = Modifier.size(44.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = actionColors.container,
+                        contentColor = actionColors.content,
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,

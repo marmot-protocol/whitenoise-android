@@ -1129,6 +1129,10 @@
     <string name="notification_channel_app_updates_description">Benachrichtigungen zu Zapstore-Versionen</string>
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
+    <string name="action_color">Aktionsfarbe</string>
+    <string name="action_color_subtitle">Wähle eine Identitätsfarbe für „Neue Nachricht“, „Senden“ und Ungelesen-Markierungen. Farben für Hell, Dunkel und AMOLED werden getrennt gespeichert.</string>
+    <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine Aktionsfarbe festlegst.</string>
+    <string name="action_color_swatch_content_description">Aktionsfarbe %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Wähle Standardfarben für das aktuelle Design. Helle, dunkle und AMOLED-Farben werden getrennt gespeichert.</string>
     <string name="chat_bubble_colors_chat_subtitle">Überschreibe die Blasenfarben nur für diese Unterhaltung. Zurücksetzen übernimmt wieder die Darstellungsvorgaben.</string>
     <string name="bubble_color_preview">Vorschau</string>
