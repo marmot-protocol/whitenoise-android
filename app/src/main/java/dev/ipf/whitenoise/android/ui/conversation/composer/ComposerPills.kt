@@ -156,7 +156,7 @@ internal fun ComposerPill(
                     // state still drives buildAnnotatedString / the offset
                     // mapping out of bounds, rather than letting it throw.
                     runCatching {
-                        val visual = MentionComposer.visualText(text.text, mentionCandidateLookup)
+                        val visual = MentionComposer.editingVisualText(text.text, mentionCandidateLookup)
                         val visualLength = visual.text.length
                         val styled =
                             buildAnnotatedString {
