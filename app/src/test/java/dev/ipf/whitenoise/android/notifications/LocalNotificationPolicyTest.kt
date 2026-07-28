@@ -159,6 +159,51 @@ class LocalNotificationPolicyTest {
         )
     }
 
+    @Test
+    fun engineMutedConversationIsSuppressedEvenForMentions() {
+        // The engine's durable mute converges from other devices and is a full
+        // mute: it must win over a permissive local mode, mentions included.
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-group", accountRef = "account-a", isMention = true),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                engineMuted = true,
+            ),
+        )
+    }
+
+    @Test
+    fun engineUnmutedConversationKeepsLocalModeDecision() {
+        // Engine unmuted must not loosen a stricter local mode: NONE still
+        // suppresses, and ALL still posts.
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-group", accountRef = "account-a"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.NONE },
+                engineMuted = false,
+            ),
+        )
+        assertTrue(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "other-group", accountRef = "account-a"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                engineMuted = false,
+            ),
+        )
+    }
+
     // End-to-end lifecycle checks (issue #821): drive the suppression state
     // through the reported sequences and assert the post decision, so the policy
     // and the lifecycle transitions are pinned together.

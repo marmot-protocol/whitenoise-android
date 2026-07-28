@@ -30,7 +30,6 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MediaRecordFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -1218,21 +1217,38 @@ internal fun mediaCacheKey(
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
 
-internal fun mediaCacheKeysForCiphertextTags(
+/**
+ * True when [cacheKey] was minted by [mediaCacheKey] for this account+group.
+ * The retention sweep uses this to drop a pruned group's decrypted in-memory
+ * entries: the engine prunes atomically, so no pre-prune media rows survive
+ * to map ciphertext tags to exact keys, and the whole group slice goes.
+ * Case-insensitive: hex ids drift in casing across sources, matching the
+ * projector's comparisons and the chat list's lowercased row keys.
+ */
+internal fun mediaCacheKeyInGroup(
+    cacheKey: String,
     account: String,
     groupIdHex: String,
-    mediaRecords: Iterable<MediaRecordFfi>,
-    ciphertextTags: Set<String>,
-): Set<String> {
-    if (ciphertextTags.isEmpty()) return emptySet()
-    return mediaRecords
-        .mapNotNull { record ->
-            if (record.reference.ciphertextSha256 in ciphertextTags) {
-                mediaCacheKey(account, groupIdHex, record.messageIdHex, record.attachmentIndex.toInt())
-            } else {
-                null
-            }
-        }.toSet()
+): Boolean = cacheKey.startsWith("$account|$groupIdHex|", ignoreCase = true)
+
+/**
+ * The keys in this account+group's L1 slice whose message row is no longer
+ * loaded. The bounded timeline window trims old rows, so an expired-tag
+ * mapping for them is gone; the open conversation's sweep drops these
+ * fail-closed rather than let a pruned attachment's decrypted bytes outlive
+ * the prune, while loaded rows keep their entries (no on-screen refetch).
+ */
+internal fun staleGroupMediaCacheKeys(
+    cachedKeys: Collection<String>,
+    account: String,
+    groupIdHex: String,
+    loadedMessageIds: Set<String>,
+): List<String> {
+    val loadedLowercase = loadedMessageIds.mapTo(HashSet()) { it.lowercase() }
+    return cachedKeys.filter { key ->
+        mediaCacheKeyInGroup(key, account, groupIdHex) &&
+            key.split('|').getOrNull(2)?.lowercase() !in loadedLowercase
+    }
 }
 
 internal suspend fun removeMediaMemoryCacheKeys(
@@ -4158,11 +4174,13 @@ class ConversationController(
     val memberCount: Int
         get() = GroupProjector.uniqueMemberCount(members)
 
-    // A nameless two-member conversation, classified the same way the chat list
-    // and notifications do. The header title is already the counterparty's name,
-    // so the "2 members" subtitle is redundant noise here.
+    // Classified the same way the chat list does: the engine's projected
+    // conversation kind first (folded from the live chat-list row while this
+    // conversation is open), the nameless-two-member heuristic only for
+    // UNKNOWN and unprojected rows. The header title is already the
+    // counterparty's name, so the "2 members" subtitle is redundant noise here.
     val isDm: Boolean
-        get() = GroupProjector.isDm(memberCount, group.name)
+        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
 
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
@@ -4184,15 +4202,16 @@ class ConversationController(
         get() = GroupProjector.isAdminRef(group, conversationAccountIdHex)
 
     /**
-     * DM classification for the deletion-capability matrix. Uses the same
-     * headcount/name signals as the chat list. While the roster is still
-     * unverified this can transiently misclassify, but every path that grants
-     * delete-for-everyone also requires [canSendMessages] (which includes
-     * membersVerified), so no moderation capability is granted from an
-     * unverified roster.
+     * DM classification for the deletion-capability matrix. Prefers the
+     * engine's projected conversation kind, falling back to the same
+     * headcount/name signals as the chat list for UNKNOWN and unprojected
+     * rows. The fallback can transiently misclassify while the roster is
+     * still unverified, but every path that grants delete-for-everyone also
+     * requires [canSendMessages] (which includes membersVerified), so no
+     * moderation capability is granted from an unverified roster.
      */
     val isDirectConversation: Boolean
-        get() = GroupProjector.isDm(memberCount, group.name)
+        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
 
     /**
      * The authoritative deletion capability for [message], shared by the
@@ -4330,28 +4349,20 @@ class ConversationController(
             if (group.disappearingMessageSecs > 0uL) {
                 val nowMillis = System.currentTimeMillis()
                 lastForegroundSweepStartedAtMillis = nowMillis
-                if (
-                    appState.shouldInvokeDisappearingSecureDelete(
-                        account,
-                        group.groupIdHex,
-                        group.disappearingMessageSecs,
-                        nowMillis,
-                        persistedLastReadTimelineAt,
-                    )
-                ) {
-                    runCatchingCancellable {
-                        appState.withGroupCommitLock(account, group.groupIdHex) {
-                            appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
-                        }
-                    }.onSuccess { result ->
-                        // When the engine actually pruned rows, clear the
-                        // conversation's accumulating tray card so it can't keep
-                        // pointing at a now-vanished message. #333.
-                        if (result.prunedMessages > 0uL) {
-                            appState.dismissConversationNotifications(account, group.groupIdHex)
-                        }
-                        evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                // Engine-owned gate + prune: the account worker runs the
+                // skew/unread deferrals atomically with the prune, serialized
+                // against this conversation's own sends. Android applies the
+                // pruned outcome — tray-card dismissal (#333) and media-cache
+                // eviction (#334) — for this group here, with precise keys
+                // from the loaded timeline; any other pruned group of the
+                // account goes through the shared closed-conversation path.
+                val outcome =
+                    appState.runRetentionSweep(account, nowMillis, handledGroupIdHex = group.groupIdHex)
+                if (outcome != null) {
+                    if (outcome.prunedMessages > 0uL) {
+                        appState.dismissConversationNotifications(account, group.groupIdHex)
                     }
+                    evictExpiredMediaCaches(account, outcome.mediaCiphertextSha256.toSet())
                 }
                 publishTimelineFromIndexes()
             }
@@ -5400,10 +5411,15 @@ class ConversationController(
                         // Tag with the uploaded blob's ciphertext hash so the
                         // expiry sweep can wipe this self-sent entry from disk by
                         // hash even after a restart / when its row isn't loaded.
+                        // No hash → no durable copy: the expiry sweep evicts disk
+                        // strictly by tag, so an untagged entry would outlive its
+                        // retention window. L1 still serves this session.
                         val ciphertextTag = references.getOrNull(index)?.ciphertextSha256
-                        appState.launchMutation {
-                            withContext(Dispatchers.IO) {
-                                appState.diskMediaCache.put(confirmedKey, bytesToPersist, publicationToken, ciphertextTag)
+                        if (ciphertextTag != null) {
+                            appState.launchMutation {
+                                withContext(Dispatchers.IO) {
+                                    appState.diskMediaCache.put(confirmedKey, bytesToPersist, publicationToken, ciphertextTag)
+                                }
                             }
                         }
                     }
@@ -5788,8 +5804,27 @@ class ConversationController(
                     }
                 }
             }
+        // The bounded window can't map rows it has already trimmed: any L1
+        // key in this group's slice without a loaded or in-flight row is
+        // dropped fail-closed alongside the precise hits, so a pruned old
+        // attachment's decrypted bytes can't outlive the prune.
+        val loadedMessageIds =
+            buildSet {
+                addAll(timelineRecords.keys)
+                optimisticMessages.values.forEach { add(it.record.messageIdHex) }
+                addAll(optimisticMessages.keys)
+            }
+        val staleKeys =
+            withContext(Dispatchers.Main.immediate) {
+                staleGroupMediaCacheKeys(
+                    cachedKeys = appState.mediaMemoryCacheKeysSnapshot(),
+                    account = account,
+                    groupIdHex = group.groupIdHex,
+                    loadedMessageIds = loadedMessageIds,
+                )
+            }
         removeMediaMemoryCacheKeys(
-            cacheKeys = loadedKeys,
+            cacheKeys = loadedKeys + staleKeys,
             dispatcher = Dispatchers.Main.immediate,
             removeEntry = appState::removeMediaMemoryCacheEntry,
         )
@@ -6001,10 +6036,14 @@ class ConversationController(
             val publicationToken = appState.diskMediaCache.capturePublicationToken()
             // Tag with the uploaded blob's ciphertext hash (captured at upload)
             // so hash-based expiry eviction reaches this entry across sessions.
+            // No hash → no durable copy: disk expiry eviction is strictly
+            // tag-scoped, so an untagged entry would outlive its window.
             val ciphertextTag = retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256
-            appState.launchMutation {
-                withContext(Dispatchers.IO) {
-                    appState.diskMediaCache.put(cacheKey, bytesToPersist, publicationToken, ciphertextTag)
+            if (ciphertextTag != null) {
+                appState.launchMutation {
+                    withContext(Dispatchers.IO) {
+                        appState.diskMediaCache.put(cacheKey, bytesToPersist, publicationToken, ciphertextTag)
+                    }
                 }
             }
         }

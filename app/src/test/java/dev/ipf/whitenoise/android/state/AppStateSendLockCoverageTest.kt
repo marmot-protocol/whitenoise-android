@@ -114,30 +114,70 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun backgroundDisappearingSweepLocksSecureDelete() {
-        val body = appStateFunctionBody("sweepExpiredForGroup")
+    fun retentionSweepRoutesThroughEngineAccountWorker() {
+        val body = appStateFunctionBody("runRetentionSweep")
 
         assertTrue(
-            "background disappearing sweeps must serialize secureDeleteExpired through the per-group commit lock",
+            "the retention sweep core must be the engine's atomic gate+prune call",
             Regex(
-                """withGroupCommitLock\s*\(\s*accountRef\s*,\s*groupIdHex\s*\).*""" +
-                    """marmotIo\s*\{\s*secureDeleteExpired\s*\(\s*accountRef\s*,\s*groupIdHex\s*\)\s*\}""",
-                RegexOption.DOT_MATCHES_ALL,
+                """marmotIo\s*\{\s*sweepExpiredRetention\s*\(\s*accountRef\s*,\s*nowMillis\.toULong\(\)\s*\)\s*\}""",
             ).containsMatchIn(body),
+        )
+        assertFalse(
+            "the account worker already serializes the sweep against sends; an app-side commit lock would be redundant",
+            "withGroupCommitLock" in body,
         )
     }
 
     @Test
-    fun foregroundDisappearingSweepLocksSecureDelete() {
+    fun retentionSweepOutcomeKeepsDiskEvictionTagScoped() {
+        val body = appStateFunctionBody("processRetentionSweepOutcome")
+
+        assertTrue(
+            "pruned groups must dismiss tray cards only when rows were actually pruned",
+            Regex("""prunedMessages\s*>\s*0uL""").containsMatchIn(body),
+        )
+        assertTrue(
+            "disk eviction must stay ciphertext-tag scoped; only the in-memory tier may drop the whole group slice",
+            "removeByCiphertextTags(expiredCiphertextSha256)" in body &&
+                "diskMediaCache.remove(" !in body,
+        )
+    }
+
+    @Test
+    fun foregroundDisappearingSweepDelegatesToEngineSweep() {
         val body = controllerFunctionBody("runForegroundDisappearingMessageSweep")
 
         assertTrue(
-            "foreground disappearing sweeps must serialize secureDeleteExpired through the per-group commit lock",
+            "foreground sweeps must run the engine sweep with their own group's outcome handled in place",
             Regex(
-                """appState\.withGroupCommitLock\s*\(\s*account\s*,\s*group\.groupIdHex\s*\).*""" +
-                    """appState\.marmotIo\s*\{\s*secureDeleteExpired\s*\(\s*account\s*,\s*group\.groupIdHex\s*\)\s*\}""",
-                RegexOption.DOT_MATCHES_ALL,
+                """appState\.runRetentionSweep\s*\(\s*account\s*,\s*nowMillis\s*,\s*""" +
+                    """handledGroupIdHex\s*=\s*group\.groupIdHex\s*\)""",
             ).containsMatchIn(body),
+        )
+        assertFalse(
+            "the engine gate replaced the app-side scan; no commit lock or direct prune belongs here",
+            "withGroupCommitLock" in body || "secureDeleteExpired" in body,
+        )
+    }
+
+    @Test
+    fun conversationClassificationPrefersProjectedKind() {
+        val source = controllersSource().readText()
+        val projectedIsDm =
+            Regex(
+                """val\s+isDm:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
+                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+            )
+        val projectedIsDirect =
+            Regex(
+                """val\s+isDirectConversation:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
+                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+            )
+
+        assertTrue(
+            "conversation-screen DM classification must prefer the engine's projected kind, heuristic only as fallback",
+            projectedIsDm.containsMatchIn(source) && projectedIsDirect.containsMatchIn(source),
         )
     }
 
