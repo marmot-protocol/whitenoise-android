@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
+import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
@@ -511,6 +512,18 @@ internal fun MainShell(
     LaunchedEffect(selectedChat?.id) {
         appState.setActiveConversation(selectedChat?.group?.groupIdHex)
     }
+
+    // Upgrade a provisional open (targeted groupDetails read) to the
+    // authoritative chat-list row when it arrives — once, without re-navigation.
+    LaunchedEffect(
+        chatsController.materializedGroupsRevision,
+        selectedChat?.group?.groupIdHex,
+        selectedChat?.projection,
+    ) {
+        val open = selectedChat ?: return@LaunchedEffect
+        reconcileProvisionalOpenChat(open, chatsController)?.let { selectedChat = it }
+    }
+
     DisposableEffect(Unit) {
         onDispose { appState.clearActiveConversation() }
     }

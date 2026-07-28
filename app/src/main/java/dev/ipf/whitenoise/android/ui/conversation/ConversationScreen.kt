@@ -121,6 +121,7 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -2589,6 +2590,25 @@ internal fun ConversationScreen(
             disbanding = controller.group.disbanding,
             disbanded = controller.group.disbanded,
         )
+    LaunchedEffect(chat.id) {
+        if (!appState.hasActiveChatCreateOpenTiming()) return@LaunchedEffect
+        snapshotFlow {
+            conversationComposerGate(
+                pendingInvite = controller.group.pendingConfirmation,
+                membersVerified = controller.membersVerified,
+                isSelfMember = controller.isSelfMember,
+                seededSelfMember = controller.seededSelfMember,
+                seededMembershipKnown = controller.seededMembershipKnown,
+                assumeMemberUntilVerified = notificationOpenRequestId != 0L,
+                unrecoverable = controller.group.unrecoverable,
+                disbanding = controller.group.disbanding,
+                disbanded = controller.group.disbanded,
+            )
+        }.first { it == ComposerGate.COMPOSER }
+        withFrameNanos { }
+        appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_CONVERSATION_FRAME_READY)
+        appState.completeChatCreateOpenTiming(ChatCreateOpenTiming.STAGE_COMPOSER_READY)
+    }
     val mentionPicker =
         rememberConversationMentionPickerState(
             controller = controller,

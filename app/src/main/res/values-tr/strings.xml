@@ -613,6 +613,8 @@
     <string name="toast_couldnt_delete_audit_logs">Denetim günlükleri silinemedi</string>
     <string name="toast_no_audit_logs_to_delete">Silinecek denetim günlüğü yok</string>
     <string name="toast_chat_created">Sohbet oluşturuldu</string>
+    <string name="group_create_stage_creating">Grup oluşturuluyor…</string>
+    <string name="group_create_stage_applying_retention">Kaybolan mesajlar uygulanıyor…</string>
     <string name="toast_notification_permission_denied">Bildirim izni reddedildi</string>
     <string name="toast_signed_out">Çıkış yap</string>
     <string name="group_title_invite_from">%1$s tarafından davet</string>

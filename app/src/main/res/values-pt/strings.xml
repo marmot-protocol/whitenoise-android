@@ -613,6 +613,8 @@
     <string name="toast_couldnt_delete_audit_logs">Não foi possível excluir os logs de auditoria</string>
     <string name="toast_no_audit_logs_to_delete">Nenhum log de auditoria para excluir</string>
     <string name="toast_chat_created">Chat criado</string>
+    <string name="group_create_stage_creating">A criar grupo…</string>
+    <string name="group_create_stage_applying_retention">A aplicar mensagens temporárias…</string>
     <string name="toast_notification_permission_denied">Permissão de notificação negada</string>
     <string name="toast_signed_out">Sair</string>
     <string name="group_title_invite_from">Convite de %1$s</string>

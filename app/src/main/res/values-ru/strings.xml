@@ -633,6 +633,8 @@
     <string name="toast_couldnt_delete_audit_logs">Не удалось удалить журналы аудита</string>
     <string name="toast_no_audit_logs_to_delete">Нет журналов аудита для удаления</string>
     <string name="toast_chat_created">Чат создан</string>
+    <string name="group_create_stage_creating">Создание группы…</string>
+    <string name="group_create_stage_applying_retention">Применение исчезающих сообщений…</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
     <string name="toast_signed_out">Выйти</string>
     <string name="group_title_invite_from">Приглашение от %1$s</string>

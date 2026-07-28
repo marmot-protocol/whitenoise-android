@@ -604,6 +604,8 @@
     <string name="toast_couldnt_delete_audit_logs">無法刪除稽核日誌</string>
     <string name="toast_no_audit_logs_to_delete">沒有可刪除的稽核日誌</string>
     <string name="toast_chat_created">聊天已建立</string>
+    <string name="group_create_stage_creating">正在建立群組…</string>
+    <string name="group_create_stage_applying_retention">正在套用閱後即焚…</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
     <string name="toast_signed_out">登出</string>
     <string name="group_title_invite_from">來自 %1$s 的邀請</string>

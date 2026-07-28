@@ -5919,24 +5919,43 @@ class WhiteNoiseAppState private constructor(
         return marmotIo { createGroup(account, "", listOf(npub), null) }
     }
 
-    /**
-     * Suspend until the chat list materializes [groupIdHex] (a freshly created
-     * group surfaces a beat after `createGroup` returns, via the worker's
-     * recompute), or null if it doesn't within [timeoutMs].
-     */
-    suspend fun awaitChatListItem(
-        groupIdHex: String,
-        timeoutMs: Long = 5000,
-    ): ChatListItem? =
-        withTimeoutOrNull(timeoutMs) {
-            // Poll the cheap membership probe; only project the row into a
-            // ChatListItem once it's actually present, instead of re-projecting
-            // the entire chat list on every tick.
-            while (chatsController?.containsGroup(groupIdHex) != true) {
-                delay(50)
+    private var chatCreateOpenTiming: ChatCreateOpenTiming? = null
+
+    fun beginChatCreateOpenTiming() {
+        chatCreateOpenTiming =
+            ChatCreateOpenTiming.begin().also {
+                it.mark(ChatCreateOpenTiming.STAGE_CONFIRM_TAP)
             }
-            chatsController?.chatItemForGroup(groupIdHex)
-        }
+    }
+
+    fun markChatCreateOpenStage(stage: String) {
+        chatCreateOpenTiming?.mark(stage)
+    }
+
+    fun hasActiveChatCreateOpenTiming(): Boolean = chatCreateOpenTiming != null
+
+    fun completeChatCreateOpenTiming(stage: String) {
+        markChatCreateOpenStage(stage)
+        chatCreateOpenTiming = null
+    }
+
+    fun abandonChatCreateOpenTiming(stage: String) {
+        markChatCreateOpenStage(stage)
+        chatCreateOpenTiming = null
+    }
+
+    /**
+     * Targeted authoritative read for a freshly created group. Opens the
+     * conversation without polling the broad chat-list subscription (#1729).
+     */
+    suspend fun loadCreatedChatListItem(groupIdHex: String): ChatListItem {
+        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
+        markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
+        val details = marmotIo { groupDetails(account, groupIdHex) }
+        markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
+        val activeAccountIdHex = accounts.firstOrNull { it.label == account }?.accountIdHex
+        return chatListItemFromAuthoritativeGroupDetails(details, activeAccountIdHex)
+    }
 
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return

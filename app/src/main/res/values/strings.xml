@@ -818,6 +818,8 @@
     <string name="toast_couldnt_delete_audit_logs">Couldn\'t delete audit logs</string>
     <string name="toast_no_audit_logs_to_delete">No audit logs to delete</string>
     <string name="toast_chat_created">Chat created</string>
+    <string name="group_create_stage_creating">Creating group…</string>
+    <string name="group_create_stage_applying_retention">Applying disappearing messages…</string>
     <string name="toast_notification_permission_denied">Notification permission denied</string>
     <string name="toast_signed_out">Signed out</string>
     <string name="group_title_invite_from">Invite from %1$s</string>

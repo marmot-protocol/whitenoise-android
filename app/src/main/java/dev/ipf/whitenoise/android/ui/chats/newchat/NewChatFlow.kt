@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -63,6 +64,11 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+
+internal enum class NewGroupCreateStage {
+    Creating,
+    ApplyingRetention,
+}
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
@@ -118,47 +124,67 @@ internal fun startChatErrorUiState(
 
 /**
  * Shared direct-chat create/retry state machine used by every profile entry
- * point. Keeping creation and chat-list materialization together is important:
- * a successful MLS create must retry by group id rather than creating a second
- * direct chat when the projection is merely delayed.
+ * point. Keeping creation and the targeted authoritative read together is
+ * important: a successful MLS create must retry by group id rather than
+ * creating a second direct chat when projection is merely delayed (#1729).
  */
+@Suppress("TooGenericExceptionCaught")
 internal suspend fun attemptStartProfileChat(
     npub: String,
     progressHex: String,
     recipientName: String?,
     retryGroupIdHex: String? = null,
     createGroup: suspend (String) -> String,
-    awaitChatListItem: suspend (String) -> ChatListItem?,
+    loadCreatedChatListItem: suspend (String) -> ChatListItem,
     displayName: (String) -> String,
-): StartChatAttemptResult =
-    runCatchingCancellable {
-        val groupIdHex = retryGroupIdHex ?: createGroup(npub)
-        val item = awaitChatListItem(groupIdHex)
-        if (item != null) {
-            StartChatAttemptResult.Open(item)
-        } else {
+    markCreateOpenStage: (String) -> Unit = {},
+    abandonCreateOpenTiming: (String) -> Unit = {},
+): StartChatAttemptResult {
+    val groupIdHex: String =
+        try {
+            retryGroupIdHex
+                ?: run {
+                    markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_START)
+                    createGroup(npub).also { markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN) }
+                }
+        } catch (error: Throwable) {
+            if (error is kotlinx.coroutines.CancellationException) {
+                abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+                throw error
+            }
+            abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
+            return StartChatAttemptResult.Failed(
+                startChatErrorUiState(
+                    npub = npub,
+                    progressHex = progressHex,
+                    error = error,
+                    recipientName = recipientName,
+                    displayName = displayName,
+                ),
+            )
+        }
+    return try {
+        runCatchingCancellable {
+            StartChatAttemptResult.Open(loadCreatedChatListItem(groupIdHex))
+        }.getOrElse { error ->
+            abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
             StartChatAttemptResult.Failed(
                 StartChatErrorUiState(
                     npub = npub,
                     progressHex = progressHex,
-                    detail = AppText.Resource(R.string.error_chat_created_not_loaded),
-                    copyable = false,
+                    detail = startProfileChatFailureDetail(error, displayName),
+                    copyable = startProfileChatFailureCopyable(error),
+                    recipientName = recipientName,
                     title = AppText.Resource(R.string.couldnt_load_chats),
                     retryGroupIdHex = groupIdHex,
                 ),
             )
         }
-    }.getOrElse { error ->
-        StartChatAttemptResult.Failed(
-            startChatErrorUiState(
-                npub = npub,
-                progressHex = progressHex,
-                error = error,
-                recipientName = recipientName,
-                displayName = displayName,
-            ),
-        )
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+        throw cancelled
     }
+}
 
 internal fun inviteShareIntent(message: String): Intent =
     Intent(Intent.ACTION_SEND)
@@ -288,6 +314,7 @@ private fun NewMessageScreen(
             }
         }
         creatingHex = hexForProgress
+        appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
                 when (
@@ -298,8 +325,10 @@ private fun NewMessageScreen(
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
                             createGroup = appState::createProfileChatGroup,
-                            awaitChatListItem = appState::awaitChatListItem,
+                            loadCreatedChatListItem = appState::loadCreatedChatListItem,
                             displayName = appState::displayName,
+                            markCreateOpenStage = appState::markChatCreateOpenStage,
+                            abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
                     is StartChatAttemptResult.Open -> onOpenConversation(result.item, true)
