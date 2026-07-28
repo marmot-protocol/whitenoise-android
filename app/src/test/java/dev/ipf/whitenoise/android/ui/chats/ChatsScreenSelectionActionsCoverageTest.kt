@@ -64,6 +64,51 @@ class ChatsScreenSelectionActionsCoverageTest {
     }
 
     @Test
+    fun singleSelectionOverflowWiresPinAndManualOrder() {
+        val source = chatsScreenSource().readText()
+        val selectionBar =
+            source.requiredSection(
+                start = "ChatListSelectionBar(",
+                end = "\n                    )\n                } else {",
+            )
+        val pinHandler =
+            selectionBar.requiredSection(
+                start = "onPinToggle = {",
+                end = "\n                        onMovePinned = {",
+            )
+        val moveHandler =
+            selectionBar.requiredSection(
+                start = "onMovePinned = {",
+                end = "\n                        onSelectAll = {",
+            )
+
+        assertTrue(
+            "the engine only pins unarchived chats, so archived selections must not offer the toggle",
+            "showPinToggle = singleSelectedItem?.group?.archived == false" in selectionBar,
+        )
+        assertTrue(
+            "pin overflow must route to controller.setPinned",
+            "controller.setPinned(item, nextPinned)" in pinHandler,
+        )
+        assertTrue(
+            "pin overflow must exit selection mode",
+            "clearSelection()" in pinHandler,
+        )
+        assertTrue(
+            "manual order must route the full pinned set to controller.setPinnedOrder",
+            "controller.setPinnedOrder(reordered)" in moveHandler,
+        )
+        assertTrue(
+            "a move must stay inside the pinned block",
+            "if (target !in pinnedOrderedIds.indices) return@ChatListSelectionBar" in moveHandler,
+        )
+        assertTrue(
+            "move overflow must exit selection mode",
+            "clearSelection()" in moveHandler,
+        )
+    }
+
+    @Test
     fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
         val source = chatsScreenSource().readText()
         val selectionBar =
@@ -91,12 +136,31 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    @Test
+    fun groupDetailsGatesProtocolMutationsForTerminalGroups() {
+        val source = groupDetailsSource().readText()
+
+        assertTrue(
+            "disbanding/disbanded groups must not advertise protocol mutations; leave is engine-refused too",
+            "val groupTerminal = controller.group.disbanding || controller.group.disbanded" in source &&
+                "controller.isSelfAdmin && !groupTerminal" in source &&
+                "!mutationsBlocked && controller.membersLoaded && !groupTerminal" in source,
+        )
+    }
+
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing ChatsScreen.kt source file")
+
+    private fun groupDetailsSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing GroupDetailsScreen.kt source file")
 
     private fun String.requiredSection(
         start: String,

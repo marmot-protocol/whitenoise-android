@@ -141,6 +141,11 @@ class ChatFoldersScreenTest {
                     conversationKind = ChatConversationKindFfi.UNKNOWN,
                     muted = false,
                     mutedUntilMs = null,
+                    pinned = false,
+                    pinnedPosition = null,
+                    lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+                    disbanding = false,
+                    disbandRequest = null,
                 ),
         )
 
@@ -169,6 +174,9 @@ class ChatFoldersScreenTest {
             disappearingMessageSecs = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            disbanding = false,
+            disbanded = false,
+            disbandRequest = null,
         )
 
     private fun encryptedMedia() =

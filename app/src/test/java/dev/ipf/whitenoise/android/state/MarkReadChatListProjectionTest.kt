@@ -218,6 +218,11 @@ class MarkReadChatListProjectionTest {
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
     )
 
     private fun controllersSource(): File =

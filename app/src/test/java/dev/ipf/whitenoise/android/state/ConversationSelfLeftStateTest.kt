@@ -70,6 +70,7 @@ class ConversationSelfLeftStateTest {
     ): List<AppGroupMemberRecordFfi> =
         applyAuthoritativeGroupDetails(
             GroupDetailsFfi(
+                mlsState = testMlsState(),
                 group = group(admins = listOf(self)),
                 members =
                     listOf(
@@ -113,6 +114,9 @@ class ConversationSelfLeftStateTest {
             disappearingMessageSecs = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            disbanding = false,
+            disbanded = false,
+            disbandRequest = null,
         )
 
     private fun member(
@@ -148,3 +152,18 @@ class ConversationSelfLeftStateTest {
                 ),
         )
 }
+
+private fun testMlsState(groupIdHex: String = ""): dev.ipf.marmotkit.AppGroupMlsStateFfi =
+    dev.ipf.marmotkit.AppGroupMlsStateFfi(
+        groupIdHex = groupIdHex,
+        protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.CURRENT,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        epoch = 0uL,
+        memberCount = 0u,
+        unrecoverable = false,
+        requiredAppComponents = emptyList(),
+        disbandingEnabled = false,
+        disbanding = false,
+        disbandingBlockers = emptyList(),
+        disbandRequest = null,
+    )

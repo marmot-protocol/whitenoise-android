@@ -47,6 +47,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = { closes++ },
                     onArchive = { archives++ },
                     onDelete = { deletes++ },
@@ -54,6 +58,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = {},
                 )
@@ -92,6 +98,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -99,6 +109,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
                 )
@@ -129,6 +141,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -136,6 +152,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
                 )
@@ -164,6 +182,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -171,6 +193,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -196,6 +220,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = true,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -203,6 +231,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = { markRead++ },
                     onMarkUnread = {},
                     onMuteToggle = { muteToggle++ },
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -222,6 +252,53 @@ class ChatListSelectionBarTest {
     }
 
     @Test
+    fun pinnedSelectionOffersUnpinAndManualMoves() {
+        var pinToggles = 0
+        val moves = mutableListOf<Int>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionBar(
+                    count = 1,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMarkUnread = false,
+                    showMuteToggle = false,
+                    muted = false,
+                    showPinToggle = true,
+                    pinned = true,
+                    showMovePinnedUp = true,
+                    showMovePinnedDown = true,
+                    onClose = {},
+                    onArchive = {},
+                    onDelete = {},
+                    onAddToFolder = {},
+                    onMarkRead = {},
+                    onMarkUnread = {},
+                    onMuteToggle = {},
+                    onPinToggle = { pinToggles++ },
+                    onMovePinned = { moves += it },
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_unpin)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_pin)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_move_up)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_move_down)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.actions)).performClick()
+        composeRule.onNodeWithText(string(R.string.chat_row_action_unpin)).performClick()
+
+        assertEquals(listOf(-1, 1), moves)
+        assertEquals(1, pinToggles)
+    }
+
+    @Test
     fun multiSelectionOverflowHidesSingleChatActions() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -234,6 +311,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -241,6 +322,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -268,6 +351,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = false,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -275,6 +362,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -301,6 +390,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = true,
                     muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -308,6 +401,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
@@ -334,6 +429,10 @@ class ChatListSelectionBarTest {
                     showMarkUnread = false,
                     showMuteToggle = true,
                     muted = true,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
                     onClose = {},
                     onArchive = {},
                     onDelete = {},
@@ -341,6 +440,8 @@ class ChatListSelectionBarTest {
                     onMarkRead = {},
                     onMarkUnread = {},
                     onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
                 )
