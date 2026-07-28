@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mute">Отключить уведомления</string>
     <string name="chat_row_action_unmute">Включить уведомления</string>
+    <string name="chat_row_action_pin">Закрепить</string>
+    <string name="chat_row_action_unpin">Открепить</string>
+    <string name="chat_pinned_badge">Закреплено</string>
+    <string name="chat_row_action_move_up">Переместить вверх</string>
+    <string name="chat_row_action_move_down">Переместить вниз</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
     <string name="chat_row_action_mark_unread">Отметить непрочитанным</string>
     <string name="chat_row_action_delete_group">Удалить группу</string>

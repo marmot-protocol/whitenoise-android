@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_mute">Stummschalten</string>
     <string name="chat_row_action_unmute">Stummschaltung aufheben</string>
+    <string name="chat_row_action_pin">Anheften</string>
+    <string name="chat_row_action_unpin">Loslösen</string>
+    <string name="chat_pinned_badge">Angeheftet</string>
+    <string name="chat_row_action_move_up">Nach oben</string>
+    <string name="chat_row_action_move_down">Nach unten</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
     <string name="chat_row_action_mark_unread">Als ungelesen markieren</string>
     <string name="chat_row_action_delete_group">Gruppe löschen</string>

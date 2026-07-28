@@ -23,6 +23,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
@@ -252,6 +253,12 @@ data class ChatListItem(
     /** The engine's durable mute projection — ORed with local preferences. */
     fun engineMuted(): Boolean = projection?.muted == true
 
+    /** Engine-durable pin state; unprojected rows read as unpinned. */
+    fun pinned(): Boolean = projection?.pinned == true
+
+    /** Zero-based display position inside the pinned block, engine-normalized. */
+    fun pinnedPosition(): UInt? = projection?.pinnedPosition
+
     /** Projected conversation kind first, name/headcount heuristic as fallback. */
     fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, memberCount, group.name)
 
@@ -290,6 +297,11 @@ internal fun sortChatListItems(
 ): List<ChatListItem> =
     items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
+            // Pinned block above recency, in the engine's normalized manual
+            // order; unpinned rows tie on both keys and fall through to the
+            // draft-aware recency chain unchanged.
+            .thenByDescending { it.pinned() }
+            .thenBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
             .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtSeconds(it)) }
             .thenBy { chatListItemSortKey(it) },
     )
@@ -3324,6 +3336,60 @@ class ChatsController(
                 it,
             )
         }.getOrDefault(false)
+    }
+
+    /** Pin or unpin one chat; newly pinned chats enter at the top of the pinned block. */
+    suspend fun setPinned(
+        item: ChatListItem,
+        pinned: Boolean,
+    ): Boolean {
+        val account = accountRef ?: return false
+        return runCatchingCancellable {
+            val state = appState.marmotIo { setChatPinned(account, item.group.groupIdHex, pinned) }
+            applyPinState(state)
+            true
+        }.onFailure {
+            Log.w(
+                "DMChatsController",
+                "setPinned failed for group=${item.group.groupIdHex.take(8)}",
+                it,
+            )
+        }.getOrDefault(false)
+    }
+
+    /** Atomically replace the pinned block's manual order; ids must cover the pinned set exactly. */
+    suspend fun setPinnedOrder(orderedGroupIds: List<String>): Boolean {
+        val account = accountRef ?: return false
+        return runCatchingCancellable {
+            val state = appState.marmotIo { setPinnedChatOrder(account, orderedGroupIds) }
+            applyPinState(state)
+            true
+        }.onFailure {
+            Log.w("DMChatsController", "setPinnedOrder failed", it)
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Fold the engine's normalized pin order into the held rows so the list
+     * reorders immediately; the PIN_ORDER_CHANGED trigger (or a snapshot)
+     * re-delivers the same state authoritatively moments later.
+     */
+    private fun applyPinState(state: ChatPinStateFfi) {
+        val positionByGroup =
+            state.orderedGroupIds
+                .withIndex()
+                .associate { (index, id) -> id.lowercase() to index.toUInt() }
+        chatRowsByGroup.replaceAll { key, row ->
+            val position = positionByGroup[key]
+            if (position != null) {
+                row.copy(pinned = true, pinnedPosition = position)
+            } else if (row.pinned) {
+                row.copy(pinned = false, pinnedPosition = null)
+            } else {
+                row
+            }
+        }
+        scheduleRecompute()
     }
 
     private fun requestGroupProfiles(group: AppGroupRecordFfi) {

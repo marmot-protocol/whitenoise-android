@@ -83,6 +83,11 @@
     <string name="chat_row_action_mark_unread">Mark as unread</string>
     <string name="chat_row_action_mute">Mute</string>
     <string name="chat_row_action_unmute">Unmute</string>
+    <string name="chat_row_action_pin">Pin</string>
+    <string name="chat_row_action_unpin">Unpin</string>
+    <string name="chat_pinned_badge">Pinned</string>
+    <string name="chat_row_action_move_up">Move up</string>
+    <string name="chat_row_action_move_down">Move down</string>
     <string name="chat_row_action_delete_group">Delete group</string>
     <string name="delete_group_dialog_title">Delete group?</string>
     <string name="delete_group_dialog_message">Remove this group from this device? If you\'re still a member, you\'ll leave the group first.</string>

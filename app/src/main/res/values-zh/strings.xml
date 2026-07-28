@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mute">静音</string>
     <string name="chat_row_action_unmute">取消静音</string>
+    <string name="chat_row_action_pin">置顶</string>
+    <string name="chat_row_action_unpin">取消置顶</string>
+    <string name="chat_pinned_badge">已置顶</string>
+    <string name="chat_row_action_move_up">上移</string>
+    <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
     <string name="chat_row_action_mark_unread">标记为未读</string>
     <string name="chat_row_action_delete_group">删除群组</string>

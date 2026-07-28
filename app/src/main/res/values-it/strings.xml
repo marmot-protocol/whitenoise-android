@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">Ripristina</string>
     <string name="chat_row_action_mute">Silenzia</string>
     <string name="chat_row_action_unmute">Riattiva notifiche</string>
+    <string name="chat_row_action_pin">Fissa</string>
+    <string name="chat_row_action_unpin">Non fissare</string>
+    <string name="chat_pinned_badge">Fissata</string>
+    <string name="chat_row_action_move_up">Sposta su</string>
+    <string name="chat_row_action_move_down">Sposta giù</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
     <string name="chat_row_action_mark_unread">Segna come non letto</string>
     <string name="chat_row_action_delete_group">Elimina gruppo</string>

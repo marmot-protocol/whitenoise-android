@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">Désarchiver</string>
     <string name="chat_row_action_mute">Mettre en sourdine</string>
     <string name="chat_row_action_unmute">Réactiver le son</string>
+    <string name="chat_row_action_pin">Épingler</string>
+    <string name="chat_row_action_unpin">Désépingler</string>
+    <string name="chat_pinned_badge">Épinglé</string>
+    <string name="chat_row_action_move_up">Monter</string>
+    <string name="chat_row_action_move_down">Descendre</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
     <string name="chat_row_action_mark_unread">Marquer comme non lu</string>
     <string name="chat_row_action_delete_group">Supprimer le groupe</string>

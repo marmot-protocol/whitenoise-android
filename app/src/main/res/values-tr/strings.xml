@@ -44,6 +44,11 @@
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mute">Sessize al</string>
     <string name="chat_row_action_unmute">Sesi aç</string>
+    <string name="chat_row_action_pin">Sabitle</string>
+    <string name="chat_row_action_unpin">Sabitlemeyi kaldır</string>
+    <string name="chat_pinned_badge">Sabitlendi</string>
+    <string name="chat_row_action_move_up">Yukarı taşı</string>
+    <string name="chat_row_action_move_down">Aşağı taşı</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
     <string name="chat_row_action_mark_unread">Okunmadı olarak işaretle</string>
     <string name="chat_row_action_delete_group">Grubu sil</string>

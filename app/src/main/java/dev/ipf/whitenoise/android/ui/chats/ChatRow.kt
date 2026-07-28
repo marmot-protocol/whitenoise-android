@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -313,6 +314,7 @@ internal fun ChatRow(
                     rowUnreadCount = rowUnreadCount,
                     unreadMention = item.unreadMention,
                     actionColors = accountActionColors(appState),
+                    pinned = item.pinned(),
                 )
             },
         )
@@ -344,6 +346,7 @@ internal fun ChatRowTrailingContent(
     rowUnreadCount: ULong,
     unreadMention: Boolean,
     actionColors: dev.ipf.whitenoise.android.ui.common.AccountActionColors? = null,
+    pinned: Boolean = false,
 ) {
     if (selectionMode) {
         Icon(
@@ -373,16 +376,31 @@ internal fun ChatRowTrailingContent(
             )
             if (pendingConfirmation) {
                 Badge { Text(stringResource(R.string.invited)) }
-            } else if (rowHasUnread) {
+            } else if (rowHasUnread || pinned) {
                 // Surface the highest-signal unread: an @ badge beside the
                 // count when one of the unread messages mentions you (#611).
+                // A pinned chat keeps its glyph visible beside the badges.
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (unreadMention) MentionBadge()
-                    UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
+                    if (pinned) PinnedBadge()
+                    if (rowHasUnread) {
+                        if (unreadMention) MentionBadge()
+                        UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
+                    }
                 }
             }
         }
     }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun PinnedBadge(modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = Icons.Default.PushPin,
+        contentDescription = stringResource(R.string.chat_pinned_badge),
+        modifier = modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
