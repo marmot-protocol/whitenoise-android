@@ -68,7 +68,10 @@ internal fun ChatBubbleColorsScreen(
     groupIdHex: String? = null,
 ) {
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
-    val pickerScopeKey = groupIdHex?.let { "chat:$it" } ?: "global"
+    val accountScope = appState.activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: "none"
+    val pickerScopeKey =
+        groupIdHex?.let { "account:$accountScope:chat:$it" }
+            ?: "account:$accountScope:global"
     val scopeSubtitle =
         stringResource(
             if (groupIdHex == null) {

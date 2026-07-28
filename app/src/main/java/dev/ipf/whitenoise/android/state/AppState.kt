@@ -1582,8 +1582,20 @@ class WhiteNoiseAppState private constructor(
     private val profilePresentationLock = Any()
     private val groupMemberSnapshotLock = Any()
 
-    private val globalBubbleColors = mutableStateMapOf<AccountBubbleColorSlot, MutableState<Long?>>()
-    private val actionColors = mutableStateMapOf<AccountActionColorSlot, MutableState<Long?>>()
+    private val globalBubbleColors =
+        ScopedCache<AccountBubbleColorSlot, MutableState<Long?>>(
+            registry = accountScopedCaches,
+            name = "global-bubble-colors",
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
+        )
+    private val actionColors =
+        ScopedCache<AccountActionColorSlot, MutableState<Long?>>(
+            registry = accountScopedCaches,
+            name = "action-colors",
+            maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
+            observable = true,
+        )
     private val chatBubbleColors =
         ScopedCache<String, MutableState<Long?>>(
             registry = accountScopedCaches,

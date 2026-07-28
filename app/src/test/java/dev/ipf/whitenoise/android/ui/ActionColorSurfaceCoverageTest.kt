@@ -48,6 +48,20 @@ class ActionColorSurfaceCoverageTest {
         )
     }
 
+    @Test
+    fun colorPickerDraftStateIsScopedToTheActiveAccount() {
+        val bubbleColors = source("settings/ChatBubbleColorsScreen.kt")
+
+        assertTrue(
+            "Bubble picker draft state must include the represented local account",
+            "\"account:\$accountScope:global\"" in bubbleColors,
+        )
+        assertTrue(
+            "Per-chat picker draft state must retain both account and chat scope",
+            "\"account:\$accountScope:chat:\$it\"" in bubbleColors,
+        )
+    }
+
     private fun source(relativePath: String): String =
         sequenceOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/$relativePath"),

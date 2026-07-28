@@ -229,7 +229,7 @@ internal object LegacyBubbleColorMigration {
                 editor.remove(legacyKey)
             }
         }
-        return !hasLegacyValues || editor.commit()
+        return hasLegacyValues && editor.commit()
     }
 
     private fun copyToAccounts(
