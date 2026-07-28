@@ -23,6 +23,12 @@ internal enum class ComposerGate {
     FROZEN,
 
     /**
+     * A disband is converging or has landed. The engine gates all ordinary
+     * outbound group work either way, so the composer yields to a notice.
+     */
+    DISBANDED,
+
+    /**
      * Membership is not yet known locally: render NOTHING this frame and wait
      * for `refreshMembers()` rather than flash a wrong state. See [PENDING] use
      * in [conversationComposerGate].
@@ -64,8 +70,13 @@ internal fun conversationComposerGate(
     seededMembershipKnown: Boolean,
     assumeMemberUntilVerified: Boolean,
     unrecoverable: Boolean = false,
+    disbanding: Boolean = false,
+    disbanded: Boolean = false,
 ): ComposerGate =
     when {
+        // The most specific terminal state wins: a disbanded group is done by
+        // design, not broken.
+        disbanded || disbanding -> ComposerGate.DISBANDED
         unrecoverable -> ComposerGate.FROZEN
         pendingInvite -> ComposerGate.INVITE
         isSelfMember -> ComposerGate.COMPOSER

@@ -27,6 +27,8 @@ import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -225,6 +227,11 @@ data class ChatListItem(
         // A durably-queued leave reads as already-left: the user asked to go,
         // and the engine retries the commit until the group agrees.
         if (projection?.leaveRequestPending == true) return true
+        // A disbanded group is terminal for every member; while a disband
+        // converges the engine already gates ordinary work, so the row offers
+        // no member affordances either way.
+        if (projection?.lifecycleState == GroupLifecycleStateFfi.DISBANDED) return true
+        if (projection?.disbanding == true) return true
         if (removed) return true
         val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
         return !snapshot.containsAccount(active)
@@ -678,7 +685,7 @@ internal fun nextTimelineOrder(
     pending: Sequence<ULong>,
 ): ULong = (published + pending).maxOrNull()?.plus(1uL) ?: 1uL
 
-private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
+internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
     AppGroupRecordFfi(
         groupIdHex = row.groupIdHex,
         protocolProfile = AppProtocolProfileFfi.LEGACY,
@@ -703,9 +710,12 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
-        disbanding = false,
-        disbanded = false,
-        disbandRequest = null,
+        // The row projects the authoritative lifecycle; a cold open of a
+        // disbanding/disbanded chat must not flash an active composer while
+        // the full group record is still loading.
+        disbanding = row.disbanding,
+        disbanded = row.lifecycleState == GroupLifecycleStateFfi.DISBANDED,
+        disbandRequest = row.disbandRequest,
     )
 
 private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
@@ -4319,7 +4329,9 @@ class ConversationController(
         get() = selfMembership.isSelfMember(members, conversationAccountIdHex)
 
     val canSendMessages: Boolean
-        get() = membersVerified && isSelfMember && !group.unrecoverable
+        // The engine gates all ordinary outbound work while a disband
+        // converges and forever after it lands; mirror that on the composer.
+        get() = membersVerified && isSelfMember && !group.unrecoverable && !group.disbanding && !group.disbanded
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, memberCount)
@@ -6872,6 +6884,77 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message), copyable = true)
+            }.getOrDefault(false)
+        }
+
+    /**
+     * Engine-authoritative admin/lifecycle capabilities for the details
+     * screen: disband eligibility, blockers, and the in-flight request.
+     * Refreshed on screen entry and after each disband-family mutation.
+     */
+    var managementState by mutableStateOf<GroupManagementStateFfi?>(null)
+        private set
+
+    suspend fun refreshManagementState() {
+        val account = conversationAccountRef ?: return
+        runCatchingCancellable {
+            appState.marmotIo { groupManagementState(account, group.groupIdHex) }
+        }.onSuccess { managementState = it }
+            .onFailure {
+                Log.w("DMConversation", "management state refresh failed for ${group.groupIdHex.take(8)}", it)
+            }
+    }
+
+    /** Install and require the lifecycle component in one admin commit. */
+    suspend fun enableGroupDisbanding(): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatchingCancellable {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val result = appState.marmotIo { enableGroupDisbanding(account, group.groupIdHex) }
+                    applyMutationDetails(account, result.details)
+                }
+                refreshManagementState()
+                true
+            }.onFailure {
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_enable_disbanding, AppText.Plain(message), copyable = true)
+            }.getOrDefault(false)
+        }
+
+    /**
+     * Durably accept the irreversible disband. Completion converges through
+     * normal group-state updates; the request itself survives restarts.
+     */
+    suspend fun disbandGroup(): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatchingCancellable {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { disbandGroup(account, group.groupIdHex) }
+                }
+                refreshManagementState()
+                true
+            }.onFailure {
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_disband, AppText.Plain(message), copyable = true)
+            }.getOrDefault(false)
+        }
+
+    /** Clear a failed disband request so the action can be retried. */
+    suspend fun acknowledgeDisbandFailure(): Boolean =
+        withMutationLockResult(false) {
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatchingCancellable {
+                appState.marmotIo { acknowledgeDisbandFailure(account, group.groupIdHex) }
+                refreshManagementState()
+                true
+            }.onFailure {
+                Log.w("DMConversation", "acknowledge disband failure failed for ${group.groupIdHex.take(8)}", it)
             }.getOrDefault(false)
         }
 

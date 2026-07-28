@@ -679,6 +679,17 @@
     <string name="message_info_message_id">Mesaj kimliği</string>
     <string name="message_info_status">Durum</string>
     <string name="message_info_disappears_at">Kaybolur</string>
+    <string name="group_disband_enable_action">Dağıtmayı etkinleştir</string>
+    <string name="group_disband_action">Grubu dağıt</string>
+    <string name="group_disband_dialog_title">Bu grup dağıtılsın mı?</string>
+    <string name="group_disband_dialog_message">Grup herkes için kalıcı olarak sona erer. Ardından kimse mesaj gönderemez veya alamaz. Bu geri alınamaz.</string>
+    <string name="group_disband_confirm">Dağıt</string>
+    <string name="group_disband_pending">Grup dağıtılıyor…</string>
+    <string name="group_disband_failed">Dağıtma başarısız</string>
+    <string name="toast_couldnt_disband">Grup dağıtılamadı</string>
+    <string name="toast_couldnt_enable_disbanding">Dağıtma etkinleştirilemedi</string>
+    <string name="conversation_disbanding_notice">Bu grup dağıtılıyor</string>
+    <string name="conversation_disbanded_notice">Bu grup dağıtıldı</string>
     <string name="message_info_created_at">Oluşturuldu</string>
     <string name="message_status_pending">Gönderiliyor…</string>
     <string name="message_status_sent">Gönderildi</string>

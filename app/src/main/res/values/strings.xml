@@ -896,6 +896,17 @@
     <string name="message_info_message_id">Message ID</string>
     <string name="message_info_status">Status</string>
     <string name="message_info_disappears_at">Disappears</string>
+    <string name="group_disband_enable_action">Enable disbanding</string>
+    <string name="group_disband_action">Disband group</string>
+    <string name="group_disband_dialog_title">Disband this group?</string>
+    <string name="group_disband_dialog_message">This permanently ends the group for everyone. Nobody can send or receive new messages afterwards. This cannot be undone.</string>
+    <string name="group_disband_confirm">Disband</string>
+    <string name="group_disband_pending">Disbanding the group…</string>
+    <string name="group_disband_failed">Disbanding failed</string>
+    <string name="toast_couldnt_disband">Couldn\'t disband group</string>
+    <string name="toast_couldnt_enable_disbanding">Couldn\'t enable disbanding</string>
+    <string name="conversation_disbanding_notice">This group is being disbanded</string>
+    <string name="conversation_disbanded_notice">This group was disbanded</string>
     <string name="message_info_created_at">Created</string>
     <string name="message_status_pending">Sending…</string>
     <string name="message_status_sent">Sent</string>

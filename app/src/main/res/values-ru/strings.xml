@@ -705,6 +705,17 @@
     <string name="message_info_message_id">ID сообщения</string>
     <string name="message_info_status">Статус</string>
     <string name="message_info_disappears_at">Исчезает</string>
+    <string name="group_disband_enable_action">Разрешить роспуск</string>
+    <string name="group_disband_action">Распустить группу</string>
+    <string name="group_disband_dialog_title">Распустить эту группу?</string>
+    <string name="group_disband_dialog_message">Группа будет навсегда закрыта для всех. После этого никто не сможет отправлять и получать сообщения. Это действие необратимо.</string>
+    <string name="group_disband_confirm">Распустить</string>
+    <string name="group_disband_pending">Группа распускается…</string>
+    <string name="group_disband_failed">Не удалось распустить</string>
+    <string name="toast_couldnt_disband">Не удалось распустить группу</string>
+    <string name="toast_couldnt_enable_disbanding">Не удалось разрешить роспуск</string>
+    <string name="conversation_disbanding_notice">Эта группа распускается</string>
+    <string name="conversation_disbanded_notice">Эта группа была распущена</string>
     <string name="message_info_created_at">Создано</string>
     <string name="message_status_pending">Отправка…</string>
     <string name="message_status_sent">Отправлено</string>

@@ -667,6 +667,17 @@
     <string name="message_info_message_id">消息 ID</string>
     <string name="message_info_status">状态</string>
     <string name="message_info_disappears_at">消失时间</string>
+    <string name="group_disband_enable_action">启用解散</string>
+    <string name="group_disband_action">解散群组</string>
+    <string name="group_disband_dialog_title">解散此群组？</string>
+    <string name="group_disband_dialog_message">群组将对所有人永久结束。之后任何人都无法收发消息。此操作无法撤销。</string>
+    <string name="group_disband_confirm">解散</string>
+    <string name="group_disband_pending">正在解散群组…</string>
+    <string name="group_disband_failed">解散失败</string>
+    <string name="toast_couldnt_disband">无法解散群组</string>
+    <string name="toast_couldnt_enable_disbanding">无法启用解散</string>
+    <string name="conversation_disbanding_notice">此群组正在解散</string>
+    <string name="conversation_disbanded_notice">此群组已解散</string>
     <string name="message_info_created_at">已创建</string>
     <string name="message_status_pending">发送中…</string>
     <string name="message_status_sent">已发送</string>

@@ -679,6 +679,17 @@
     <string name="message_info_message_id">ID da mensagem</string>
     <string name="message_info_status">Status</string>
     <string name="message_info_disappears_at">Desaparece</string>
+    <string name="group_disband_enable_action">Ativar dissolução</string>
+    <string name="group_disband_action">Dissolver o grupo</string>
+    <string name="group_disband_dialog_title">Dissolver este grupo?</string>
+    <string name="group_disband_dialog_message">O grupo terminará permanentemente para todos. Depois ninguém poderá enviar ou receber mensagens. Isto não pode ser desfeito.</string>
+    <string name="group_disband_confirm">Dissolver</string>
+    <string name="group_disband_pending">A dissolver o grupo…</string>
+    <string name="group_disband_failed">Falha ao dissolver</string>
+    <string name="toast_couldnt_disband">Não foi possível dissolver o grupo</string>
+    <string name="toast_couldnt_enable_disbanding">Não foi possível ativar a dissolução</string>
+    <string name="conversation_disbanding_notice">Este grupo está a ser dissolvido</string>
+    <string name="conversation_disbanded_notice">Este grupo foi dissolvido</string>
     <string name="message_info_created_at">Criada</string>
     <string name="message_status_pending">Enviando…</string>
     <string name="message_status_sent">Enviada</string>
