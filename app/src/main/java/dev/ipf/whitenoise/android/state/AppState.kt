@@ -6212,7 +6212,10 @@ class WhiteNoiseAppState private constructor(
         ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
             ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
 
-    private fun shouldPostNotification(update: NotificationUpdateFfi): Boolean =
+    private fun shouldPostNotification(
+        update: NotificationUpdateFfi,
+        engineMuted: Boolean,
+    ): Boolean =
         LocalNotificationPolicy.shouldPost(
             update = update,
             appInForeground = appInForeground,
@@ -6220,7 +6223,34 @@ class WhiteNoiseAppState private constructor(
             activeConversationAccountRef = activeConversationAccountRef,
             appLockScreenVisible = appLockScreenVisible,
             conversationNotifyMode = chatMutePreferences::mode,
+            engineMuted = engineMuted,
         )
+
+    /**
+     * Durable engine mute for the update's conversation, resolved once per
+     * update in [processNotificationUpdate] and threaded through pre-warm,
+     * the post decision, and the presenter's sync post-time re-check (which
+     * cannot suspend). Prefers the active account's loaded projection;
+     * otherwise reads the engine's chat list directly, which also covers the
+     * cold FCM process with no UI-owned controllers. Fail-open on errors: a
+     * spurious notification from a muted chat beats a silently swallowed
+     * real one.
+     */
+    private suspend fun engineNotificationMuted(update: NotificationUpdateFfi): Boolean {
+        // Hex ids compare case-insensitively (projector idiom): a casing
+        // drift here would silently fail open as a missed mute.
+        if (activeAccountRef == update.accountRef) {
+            chatsController
+                ?.items
+                ?.firstOrNull { it.group.groupIdHex.equals(update.groupIdHex, ignoreCase = true) }
+                ?.let { return it.engineMuted() }
+        }
+        return runCatchingCancellable {
+            marmotIo { chatList(update.accountRef, includeArchived = true) }
+                .firstOrNull { it.groupIdHex.equals(update.groupIdHex, ignoreCase = true) }
+                ?.muted == true
+        }.getOrDefault(false)
+    }
 
     /**
      * Starts sender and conversation image work as soon as the app-state
@@ -6231,11 +6261,14 @@ class WhiteNoiseAppState private constructor(
      * reads. Every remote-image launch re-checks the app lock after the preceding
      * suspending local lookup.
      */
-    private suspend fun preWarmNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
+    private suspend fun preWarmNotificationAvatars(
+        update: NotificationUpdateFfi,
+        engineMuted: Boolean,
+    ): PreWarmedNotificationAvatars {
         val eligible =
             shouldPreWarmNotificationAvatars(
                 update = update,
-                shouldPost = shouldPostNotification(update),
+                shouldPost = shouldPostNotification(update, engineMuted),
                 canPost = localNotificationPresenter.canPostNotifications(),
             )
         if (!eligible) return PreWarmedNotificationAvatars(senderAvatarUrl = null, groupAvatarUrl = null)
@@ -6302,14 +6335,16 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
         postEpoch: Long,
+        engineMuted: Boolean,
     ) {
         val activeConversation = activeConversationGroupIdHex
-        val shouldPost = shouldPostNotification(update)
+        val shouldPost = shouldPostNotification(update, engineMuted)
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
                 "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
                 "activeAccount=${activeConversationAccountRef?.take(8) ?: "<none>"} " +
-                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible post=$shouldPost"
+                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible " +
+                "engineMuted=$engineMuted post=$shouldPost"
         }
         if (shouldPost) {
             val skipEnrichmentForLock = appLockScreenVisible
@@ -6387,7 +6422,7 @@ class WhiteNoiseAppState private constructor(
                 isPostStillAllowed = {
                     !networkNotificationRecoverySuppressed &&
                         notificationPostEpoch.isCurrent(postEpoch) &&
-                        shouldPostNotification(update)
+                        shouldPostNotification(update, engineMuted)
                 },
             )
         }
@@ -6452,9 +6487,13 @@ class WhiteNoiseAppState private constructor(
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         applyNotificationDisplayNameHint(update)
         val postEpoch = notificationPostEpoch.capture()
+        // One durable-mute read per update: pre-warm, the post decision, and
+        // the presenter's post-time re-check all reuse it, so a burst costs
+        // one engine chat-list read per notification, not one per stage.
+        val engineMuted = engineNotificationMuted(update)
         postAfterNotificationAvatarPreWarm(
-            preWarm = { preWarmNotificationAvatars(update) },
-            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
+            preWarm = { preWarmNotificationAvatars(update, engineMuted) },
+            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) },
         )
     }
 
