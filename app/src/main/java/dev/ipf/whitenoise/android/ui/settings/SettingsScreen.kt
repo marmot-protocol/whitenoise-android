@@ -161,11 +161,28 @@ internal fun settingsHomeState(
 // ChatBubbleColors → Appearance) is unit-testable without Compose.
 internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
-        SettingsDetail.ChatBubbleColors -> SettingsDetail.Appearance
+        SettingsDetail.ActionColor,
+        SettingsDetail.ChatBubbleColors,
+        -> SettingsDetail.Appearance
         SettingsDetail.About -> SettingsDetail.Help
         SettingsDetail.Developer -> SettingsDetail.About
         else -> null
     }
+
+@Composable
+private fun settingsBackHandler(
+    detail: SettingsDetail?,
+    onBackToChats: () -> Unit,
+    onDetailChange: (SettingsDetail?) -> Unit,
+) {
+    BackHandler {
+        if (detail == null) {
+            onBackToChats()
+        } else {
+            onDetailChange(settingsDetailParent(detail))
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -182,23 +199,18 @@ internal fun SettingsScreen(
     // back fell through to the Activity and exited the app. Always
     // claim back here — pop the detail when on a subscreen, otherwise
     // hand control to the chats list (mirroring the top-bar back arrow).
-    BackHandler {
-        // Always claim back: pop to the detail's parent, or hand control to
-        // the chats list when already on the Settings home (#121).
-        if (detail == null) {
-            onBackToChats()
-        } else {
-            onDetailChange(settingsDetailParent(detail))
-        }
-    }
+    settingsBackHandler(detail, onBackToChats, onDetailChange)
 
     when (detail) {
         SettingsDetail.Appearance ->
             AppearanceScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
+                onOpenActionColor = { onDetailChange(SettingsDetail.ActionColor) },
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
             )
+        SettingsDetail.ActionColor ->
+            ActionColorScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.ChatBubbleColors ->
             ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })

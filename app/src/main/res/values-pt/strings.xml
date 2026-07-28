@@ -1131,6 +1131,10 @@
     <string name="notification_channel_app_updates_description">Alertas de versões do Zapstore</string>
 
     <string name="chat_bubble_colors">Cores dos balões</string>
+    <string name="action_color">Cor das ações</string>
+    <string name="action_color_subtitle">Escolha uma cor de identidade para Nova mensagem, Enviar e os indicadores de não lidas. As cores clara, escura e AMOLED são salvas separadamente.</string>
+    <string name="action_color_no_active_account">Selecione uma conta ativa antes de definir sua cor de ações.</string>
+    <string name="action_color_swatch_content_description">Cor das ações %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Escolha os padrões do tema atual. As configurações dos temas Claro, Escuro e AMOLED são salvas separadamente.</string>
     <string name="chat_bubble_colors_chat_subtitle">Substitua as cores dos balões apenas para esta conversa. Redefina para herdar os padrões de Aparência.</string>
     <string name="bubble_color_preview">Pré-visualização</string>

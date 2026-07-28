@@ -36,25 +36,97 @@ internal enum class BubbleSide {
     Other,
 }
 
+internal object ActionColorPreferences {
+    private const val PREFIX = "action_color:"
+
+    fun readColor(
+        preferences: SharedPreferences,
+        accountRef: String?,
+        theme: BubbleTheme,
+    ): Long? {
+        val key = key(accountRef, theme) ?: return null
+        return if (preferences.contains(key)) {
+            normalizeOpaqueArgb(preferences.getLong(key, 0L))
+        } else {
+            null
+        }
+    }
+
+    fun writeColor(
+        preferences: SharedPreferences,
+        accountRef: String?,
+        theme: BubbleTheme,
+        argb: Long?,
+    ) {
+        val key = key(accountRef, theme) ?: return
+        val normalized = normalizeOpaqueArgb(argb)
+        preferences
+            .edit()
+            .apply {
+                if (normalized == null) remove(key) else putLong(key, normalized)
+            }.apply()
+    }
+
+    private fun key(
+        accountRef: String?,
+        theme: BubbleTheme,
+    ): String? {
+        val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        return "$PREFIX$account:${theme.name.lowercase(Locale.ROOT)}"
+    }
+}
+
+internal data class ActionColorArgb(
+    val container: Long,
+    val content: Long,
+)
+
+internal fun resolveActionColorArgb(
+    customArgb: Long?,
+    defaultContainerArgb: Long,
+    defaultContentArgb: Long,
+): ActionColorArgb =
+    customArgb
+        ?.let { custom -> readableTextArgb(custom)?.let { content -> ActionColorArgb(custom, content) } }
+        ?: ActionColorArgb(defaultContainerArgb, defaultContentArgb)
+
 /** Local-only appearance preferences. Chat keys are account-scoped so two local
  * identities can style the same Marmot group independently. */
 internal object BubbleColorPreferences {
     private const val GLOBAL_PREFIX = "bubble_color_global:"
     private const val CHAT_PREFIX = "bubble_color_chat:"
 
-    fun readGlobalColor(
+    fun readLegacyGlobalColor(
         preferences: SharedPreferences,
         theme: BubbleTheme,
         side: BubbleSide,
-    ): Long? = readOpaqueArgb(preferences, globalKey(theme, side))
+    ): Long? = readOpaqueArgb(preferences, legacyGlobalKey(theme, side))
 
-    fun writeGlobalColor(
+    fun writeLegacyGlobalColor(
         preferences: SharedPreferences,
         theme: BubbleTheme,
         side: BubbleSide,
         argb: Long?,
     ) {
-        writeOpaqueArgb(preferences, globalKey(theme, side), argb)
+        writeOpaqueArgb(preferences, legacyGlobalKey(theme, side), argb)
+    }
+
+    fun readGlobalColor(
+        preferences: SharedPreferences,
+        accountRef: String?,
+        theme: BubbleTheme,
+        side: BubbleSide,
+    ): Long? = globalKey(accountRef, theme, side)?.let { readOpaqueArgb(preferences, it) }
+
+    fun writeGlobalColor(
+        preferences: SharedPreferences,
+        accountRef: String?,
+        theme: BubbleTheme,
+        side: BubbleSide,
+        argb: Long?,
+    ) {
+        val key = globalKey(accountRef, theme, side) ?: return
+        writeOpaqueArgb(preferences, key, argb)
     }
 
     fun readChatColor(
@@ -89,10 +161,19 @@ internal object BubbleColorPreferences {
         return "$CHAT_PREFIX$account:$group:${side.preferenceSuffix}"
     }
 
-    private fun globalKey(
+    internal fun legacyGlobalKey(
         theme: BubbleTheme,
         side: BubbleSide,
     ): String = "$GLOBAL_PREFIX${theme.preferenceSuffix}:${side.preferenceSuffix}"
+
+    internal fun globalKey(
+        accountRef: String?,
+        theme: BubbleTheme,
+        side: BubbleSide,
+    ): String? {
+        val account = accountRef?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return "$GLOBAL_PREFIX$account:${theme.preferenceSuffix}:${side.preferenceSuffix}"
+    }
 
     private fun readOpaqueArgb(
         preferences: SharedPreferences,
@@ -122,6 +203,50 @@ internal object BubbleColorPreferences {
 
     private val BubbleSide.preferenceSuffix: String
         get() = name.lowercase(Locale.ROOT)
+}
+
+internal object LegacyBubbleColorMigration {
+    fun migrate(
+        preferences: SharedPreferences,
+        accountRefs: Collection<String>,
+    ): Boolean {
+        val accounts =
+            accountRefs
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .distinct()
+        val editor = preferences.edit()
+        var hasLegacyValues = false
+
+        for (theme in BubbleTheme.entries) {
+            for (side in BubbleSide.entries) {
+                val legacyKey = BubbleColorPreferences.legacyGlobalKey(theme, side)
+                if (!preferences.contains(legacyKey)) continue
+                hasLegacyValues = true
+                BubbleColorPreferences
+                    .readLegacyGlobalColor(preferences, theme, side)
+                    ?.let { copyToAccounts(preferences, editor, accounts, theme, side, it) }
+                editor.remove(legacyKey)
+            }
+        }
+        return !hasLegacyValues || editor.commit()
+    }
+
+    private fun copyToAccounts(
+        preferences: SharedPreferences,
+        editor: SharedPreferences.Editor,
+        accounts: List<String>,
+        theme: BubbleTheme,
+        side: BubbleSide,
+        legacyColor: Long,
+    ) {
+        for (account in accounts) {
+            val key = checkNotNull(BubbleColorPreferences.globalKey(account, theme, side))
+            if (!preferences.contains(key)) {
+                editor.putLong(key, legacyColor)
+            }
+        }
+    }
 }
 
 internal fun resolveBubbleColorArgb(

@@ -1109,6 +1109,10 @@
     <string name="notification_channel_app_updates_description">Zapstore 版本提醒</string>
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
+    <string name="action_color">操作顏色</string>
+    <string name="action_color_subtitle">為「新訊息」、「傳送」和未讀指示器選擇身分顏色。淺色、深色和 AMOLED 顏色會分別儲存。</string>
+    <string name="action_color_no_active_account">設定操作顏色前，請先選擇一個使用中的帳戶。</string>
+    <string name="action_color_swatch_content_description">操作顏色 %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">為目前主題選擇預設值。淺色、深色和 AMOLED 顏色會分別儲存。</string>
     <string name="chat_bubble_colors_chat_subtitle">僅為目前對話覆寫氣泡顏色。重設後將沿用「外觀」預設值。</string>
     <string name="bubble_color_preview">預覽</string>

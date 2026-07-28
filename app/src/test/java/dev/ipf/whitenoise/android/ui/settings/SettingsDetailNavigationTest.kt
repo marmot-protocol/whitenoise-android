@@ -16,6 +16,7 @@ class SettingsDetailNavigationTest {
 
     @Test
     fun appearanceSubscreensReturnToAppearance() {
+        assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ActionColor))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
     }
 

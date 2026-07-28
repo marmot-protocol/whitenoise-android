@@ -1164,6 +1164,17 @@ private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 private const val TTS_PREVIEW_MAX_LENGTH = 120
 
+private data class AccountBubbleColorSlot(
+    val accountRef: String,
+    val theme: BubbleTheme,
+    val side: BubbleSide,
+)
+
+private data class AccountActionColorSlot(
+    val accountRef: String,
+    val theme: BubbleTheme,
+)
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1571,14 +1582,8 @@ class WhiteNoiseAppState private constructor(
     private val profilePresentationLock = Any()
     private val groupMemberSnapshotLock = Any()
 
-    private val globalBubbleColors =
-        mutableStateMapOf<Pair<BubbleTheme, BubbleSide>, Long?>().apply {
-            BubbleTheme.entries.forEach { theme ->
-                BubbleSide.entries.forEach { side ->
-                    this[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
-                }
-            }
-        }
+    private val globalBubbleColors = mutableStateMapOf<AccountBubbleColorSlot, MutableState<Long?>>()
+    private val actionColors = mutableStateMapOf<AccountActionColorSlot, MutableState<Long?>>()
     private val chatBubbleColors =
         ScopedCache<String, MutableState<Long?>>(
             registry = accountScopedCaches,
@@ -2901,6 +2906,19 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun refreshAccounts() {
         val refreshedAccounts = marmotIo { listAccounts() }
+        val bubbleColorMigrationSucceeded =
+            withContext(Dispatchers.IO) {
+                LegacyBubbleColorMigration.migrate(
+                    preferences = preferences,
+                    accountRefs = refreshedAccounts.map(AccountSummaryFfi::label),
+                )
+            }
+        if (bubbleColorMigrationSucceeded) {
+            // A getter may have cached null while bootstrap was still loading
+            // accounts. Re-read migrated slots now so the copied color appears
+            // in this process instead of waiting for a restart.
+            globalBubbleColors.clear()
+        }
         accounts = refreshedAccounts
         releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
         refreshAccountUnreadCounts(refreshedAccounts)
@@ -3884,7 +3902,14 @@ class WhiteNoiseAppState private constructor(
     internal fun globalBubbleColorArgb(
         theme: BubbleTheme,
         side: BubbleSide,
-    ): Long? = globalBubbleColors[theme to side]
+    ): Long? {
+        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        val slot = AccountBubbleColorSlot(account, theme, side)
+        return globalBubbleColors
+            .getOrPut(slot) {
+                mutableStateOf(BubbleColorPreferences.readGlobalColor(preferences, account, theme, side))
+            }.value
+    }
 
     internal fun chatBubbleColorArgb(
         groupIdHex: String,
@@ -3908,8 +3933,36 @@ class WhiteNoiseAppState private constructor(
         side: BubbleSide,
         argb: Long?,
     ) {
-        BubbleColorPreferences.writeGlobalColor(preferences, theme, side, argb)
-        globalBubbleColors[theme to side] = BubbleColorPreferences.readGlobalColor(preferences, theme, side)
+        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return
+        BubbleColorPreferences.writeGlobalColor(preferences, account, theme, side, argb)
+        val color = BubbleColorPreferences.readGlobalColor(preferences, account, theme, side)
+        globalBubbleColors
+            .getOrPut(AccountBubbleColorSlot(account, theme, side)) { mutableStateOf(color) }
+            .value = color
+    }
+
+    internal fun actionColorArgb(
+        theme: BubbleTheme,
+        accountRef: String? = activeAccountRef,
+    ): Long? {
+        val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        val slot = AccountActionColorSlot(account, theme)
+        return actionColors
+            .getOrPut(slot) {
+                mutableStateOf(ActionColorPreferences.readColor(preferences, account, theme))
+            }.value
+    }
+
+    internal fun updateActionColor(
+        theme: BubbleTheme,
+        argb: Long?,
+    ) {
+        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return
+        ActionColorPreferences.writeColor(preferences, account, theme, argb)
+        val color = ActionColorPreferences.readColor(preferences, account, theme)
+        actionColors
+            .getOrPut(AccountActionColorSlot(account, theme)) { mutableStateOf(color) }
+            .value = color
     }
 
     internal fun updateChatBubbleColor(
