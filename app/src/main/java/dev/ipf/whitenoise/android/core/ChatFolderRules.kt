@@ -31,6 +31,7 @@ internal fun chatFolderChatIds(
     items: List<ChatListItem>,
     manualChatIds: Set<String>,
     rule: ChatFolderRule?,
+    activeAccountIdHex: String?,
     isMuted: (groupIdHex: String) -> Boolean,
     displayTitle: (ChatListItem) -> String,
 ): Set<String> {
@@ -47,7 +48,7 @@ internal fun chatFolderChatIds(
         )
     return manualChatIds +
         items
-            .filter { chatFolderRuleMatches(criteria, it, isMuted, displayTitle) }
+            .filter { chatFolderRuleMatches(criteria, it, activeAccountIdHex, isMuted, displayTitle) }
             .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
 }
 
@@ -61,6 +62,7 @@ private data class FolderRuleCriteria(
 private fun chatFolderRuleMatches(
     criteria: FolderRuleCriteria,
     item: ChatListItem,
+    activeAccountIdHex: String?,
     isMuted: (groupIdHex: String) -> Boolean,
     displayTitle: (ChatListItem) -> String,
 ): Boolean {
@@ -74,7 +76,7 @@ private fun chatFolderRuleMatches(
                 chatMatchesKeyword(item, criteria.ciKeyword, displayTitle)
         }
     return base &&
-        (!criteria.rule.unreadOnly || item.hasUnread) &&
+        (!criteria.rule.unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
         (criteria.rule.includeMuted || !isMuted(item.group.groupIdHex))
 }
 

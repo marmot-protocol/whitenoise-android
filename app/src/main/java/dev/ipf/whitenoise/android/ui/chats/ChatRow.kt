@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -54,6 +56,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
+import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -174,7 +177,7 @@ internal fun ChatRow(
         )
     val openableDmAvatarAccount =
         avatarAccount
-            ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
+            ?.takeIf { item.isDm() }
     val rowModifier =
         when {
             selectionMode ->
@@ -282,12 +285,21 @@ internal fun ChatRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    Text(
-                        text = preview,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (draft == null && !item.group.pendingConfirmation) {
+                            item.projectedDeliveryIndicator()?.let { indicator ->
+                                OutgoingIndicatorIcon(indicator, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(3.dp))
+                            }
+                        }
+                        Text(
+                            text = preview,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
                 }
             },
             trailingContent = {

@@ -26,7 +26,15 @@ internal fun OutgoingMessageStatusIcon(
     status: MessageStatus,
     tint: Color,
 ) {
-    val indicator = status.outgoingIndicator() ?: return
+    OutgoingIndicatorIcon(status.outgoingIndicator() ?: return, tint)
+}
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun OutgoingIndicatorIcon(
+    indicator: OutgoingMessageIndicator,
+    tint: Color,
+) {
     when (indicator) {
         OutgoingMessageIndicator.Sending ->
             Icon(

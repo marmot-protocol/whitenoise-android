@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">Отключить уведомления</string>
     <string name="chat_row_action_unmute">Включить уведомления</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
+    <string name="chat_row_action_mark_unread">Отметить непрочитанным</string>
     <string name="chat_row_action_delete_group">Удалить группу</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
     <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>
@@ -859,6 +860,8 @@
     <string name="voice_message_locked">Закреплено</string>
     <string name="reply_you">Вы</string>
     <string name="reply_media_photo">Фото</string>
+    <string name="media_album">Альбом</string>
+    <string name="media_counted_format">%1$s (%2$d)</string>
     <string name="reply_media_video">Видео</string>
     <string name="reply_media_voice">Голосовое сообщение</string>
     <string name="reply_media_document">Документ</string>
@@ -1033,6 +1036,7 @@
     <string name="shared_media_save_failed">Не удалось сохранить файл</string>
     <string name="shared_media_voice_failed">Не удалось воспроизвести голосовое сообщение</string>
     <string name="disappearing_messages">Исчезающие сообщения</string>
+    <string name="disappearing_message">Исчезающее сообщение</string>
     <string name="disappearing_off">Выключено</string>
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_7_days">7 дней</string>

@@ -45,6 +45,8 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         mediaVideo = stringResource(R.string.reply_media_video),
         mediaVoice = stringResource(R.string.reply_media_voice),
         mediaDocument = stringResource(R.string.reply_media_document),
+        mediaAlbum = stringResource(R.string.media_album),
+        mediaCountedFormat = stringResource(R.string.media_counted_format),
         message = stringResource(R.string.generic_message),
         groupSystem = rememberGroupSystemCopy(),
     )

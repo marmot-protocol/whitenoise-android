@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -16,6 +17,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -28,6 +30,56 @@ import org.junit.Test
  */
 class ProjectedPreviewTextTest {
     private val copy = MessageTextCopy.Default
+
+    @Test
+    fun projectedAttachmentKindLabelsABlankPreview() {
+        val single = item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u))
+        val album = item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 3u))
+        val mixed = item(preview = attachmentPreview(ChatListAttachmentKindFfi.MIXED, count = 2u))
+
+        assertEquals(copy.mediaPhoto, single.projectedPreviewText(copy))
+        assertEquals("${copy.mediaPhoto} (3)", album.projectedPreviewText(copy))
+        assertEquals("${copy.mediaAlbum} (2)", mixed.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun captionStillBeatsTheProjectedAttachmentLabel() {
+        val item =
+            item(preview = attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u, plaintext = "look at this"))
+
+        assertEquals("look at this", item.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun deliveryIndicatorMapsEngineStatesAndHidesInapplicable() {
+        assertEquals(OutgoingMessageIndicator.Sending, ChatListMessageDeliveryStateFfi.PENDING.outgoingIndicator())
+        assertEquals(OutgoingMessageIndicator.Sent, ChatListMessageDeliveryStateFfi.DELIVERED.outgoingIndicator())
+        assertEquals(OutgoingMessageIndicator.Failed, ChatListMessageDeliveryStateFfi.FAILED.outgoingIndicator())
+        assertNull(ChatListMessageDeliveryStateFfi.NOT_APPLICABLE.outgoingIndicator())
+    }
+
+    @Test
+    fun projectedDeliveryIndicatorSkipsDeletedLastMessages() {
+        val delivered =
+            item(preview = preview(plaintext = "x", deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED))
+        val deletedRow =
+            item(
+                preview =
+                    preview(plaintext = "x", deleted = true, deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED),
+            )
+
+        assertEquals(OutgoingMessageIndicator.Sent, delivered.projectedDeliveryIndicator())
+        assertNull(deletedRow.projectedDeliveryIndicator())
+    }
+
+    @Test
+    fun projectedAttachmentKindSkipsTheLocalMediaResolve() {
+        val projected = row("group-a", attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u))
+        val unprojected = row("group-a", preview(plaintext = ""))
+
+        assertNull(chatRowNeedsMediaKindResolve(projected))
+        assertEquals("preview-message", chatRowNeedsMediaKindResolve(unprojected))
+    }
 
     @Test
     fun liveChatBodyRendersVerbatim() {
@@ -196,10 +248,19 @@ class ProjectedPreviewTextTest {
             resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         )
 
+    private fun attachmentPreview(
+        kind: ChatListAttachmentKindFfi,
+        count: UInt,
+        plaintext: String = "",
+    ) = preview(plaintext = plaintext, attachmentKind = kind, attachmentCount = count)
+
     private fun preview(
         plaintext: String,
         kind: ULong = 9uL,
         deleted: Boolean = false,
+        attachmentKind: ChatListAttachmentKindFfi? = null,
+        attachmentCount: UInt = 0u,
+        deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     ) = ChatListMessagePreviewFfi(
         messageIdHex = "preview-message",
         sender = "sender",
@@ -209,9 +270,9 @@ class ProjectedPreviewTextTest {
         kind = kind,
         timelineAt = 10uL,
         deleted = deleted,
-        attachmentKind = null,
-        attachmentCount = 0u,
-        deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        attachmentKind = attachmentKind,
+        attachmentCount = attachmentCount,
+        deliveryState = deliveryState,
     )
 
     private fun latest(

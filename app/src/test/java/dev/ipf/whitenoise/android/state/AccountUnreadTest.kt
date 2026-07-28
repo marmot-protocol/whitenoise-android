@@ -32,6 +32,18 @@ class AccountUnreadTest {
     }
 
     @Test
+    fun manualUnreadIsABooleanSidecarNotACount() {
+        val flagged = listOf(row("a", unreadCount = 0uL, manuallyMarkedUnread = true))
+        val plain = listOf(row("a", unreadCount = 0uL))
+
+        // The numeric aggregate stays a literal message count (it feeds count
+        // badges); the manual flag only feeds the boolean attention signal.
+        assertEquals(0uL, accountUnreadCount(flagged, "self", emptyMap()))
+        assertTrue(accountHasManualUnread(flagged, "self", emptyMap()))
+        assertFalse(accountHasManualUnread(plain, "self", emptyMap()))
+    }
+
+    @Test
     fun accountUnreadCount_emptyRowsIsZero() {
         assertEquals(0uL, accountUnreadCount(emptyList()))
     }
@@ -192,6 +204,7 @@ class AccountUnreadTest {
         groupId: String,
         unreadCount: ULong,
         archived: Boolean = false,
+        manuallyMarkedUnread: Boolean = false,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -214,7 +227,7 @@ class AccountUnreadTest {
         updatedAt = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
-        manuallyMarkedUnread = false,
+        manuallyMarkedUnread = manuallyMarkedUnread,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,

@@ -45,6 +45,7 @@
     <string name="chat_row_action_mute">Sessize al</string>
     <string name="chat_row_action_unmute">Sesi aç</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
+    <string name="chat_row_action_mark_unread">Okunmadı olarak işaretle</string>
     <string name="chat_row_action_delete_group">Grubu sil</string>
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
     <string name="delete_group_dialog_message">Bu grup bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce gruptan çıkarsınız.</string>
@@ -827,6 +828,8 @@
     <string name="voice_message_locked">Kilitli</string>
     <string name="reply_you">Sen</string>
     <string name="reply_media_photo">Fotoğraf</string>
+    <string name="media_album">Albüm</string>
+    <string name="media_counted_format">%1$s (%2$d)</string>
     <string name="reply_media_video">Video</string>
     <string name="reply_media_voice">Sesli mesaj</string>
     <string name="reply_media_document">Belge</string>
@@ -991,6 +994,7 @@
     <string name="shared_media_save_failed">Dosya kaydedilemedi</string>
     <string name="shared_media_voice_failed">Sesli mesaj oynatılamadı</string>
     <string name="disappearing_messages">Kaybolan mesajlar</string>
+    <string name="disappearing_message">Kaybolan mesaj</string>
     <string name="disappearing_off">Kapalı</string>
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_7_days">7 gün</string>

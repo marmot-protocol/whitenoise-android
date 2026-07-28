@@ -189,7 +189,9 @@ data class ChatListItem(
         get() = projection?.unreadCount ?: 0uL
 
     val hasUnread: Boolean
-        get() = projection?.hasUnread ?: false
+        // A manual mark-unread renders the same badge as real unread; the
+        // engine clears it when the conversation is read again.
+        get() = projection?.hasUnread == true || projection?.manuallyMarkedUnread == true
 
     /** At least one unread message in this chat mentions the active account. */
     val unreadMention: Boolean
@@ -220,6 +222,9 @@ data class ChatListItem(
         // below (which stays as a fallback for the optimistic self-leave window
         // and rows whose projection hasn't landed yet).
         if (group.selfMembership.isNonMember() || projection?.selfMembership?.isNonMember() == true) return true
+        // A durably-queued leave reads as already-left: the user asked to go,
+        // and the engine retries the commit until the group agrees.
+        if (projection?.leaveRequestPending == true) return true
         if (removed) return true
         val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
         return !snapshot.containsAccount(active)
@@ -236,6 +241,20 @@ data class ChatListItem(
 
     /** [hasUnread] with the removed-group suppression applied (#625). */
     fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
+
+    /** Delivery tick for the projected last message, or null for no tick. */
+    fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
+        projection
+            ?.lastMessage
+            ?.takeUnless { it.deleted }
+            ?.deliveryState
+            ?.outgoingIndicator()
+
+    /** The engine's durable mute projection — ORed with local preferences. */
+    fun engineMuted(): Boolean = projection?.muted == true
+
+    /** Projected conversation kind first, name/headcount heuristic as fallback. */
+    fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, memberCount, group.name)
 
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -256,6 +275,10 @@ data class ChatListItem(
             MessageProjector.isGroupSystemKind(preview.kind) ->
                 GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
             preview.plaintext.isNotBlank() -> preview.plaintext
+            // The engine's typed attachment projection beats the app-side
+            // fallback, which derives from tags and optimistic state.
+            preview.attachmentKind != null ->
+                copy.attachmentLabel(requireNotNull(preview.attachmentKind), preview.attachmentCount)
             resolvedMediaPreviewFallback != null -> resolvedMediaPreviewFallback.text(copy)
             else -> MessageProjector.previewText(latest, copy, copy.message)
         }
@@ -605,6 +628,9 @@ internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
     if (preview.deleted) return null
     if (preview.kind != 9uL) return null
     if (preview.plaintext.isNotBlank()) return null
+    // The engine's typed attachment projection already labels this preview —
+    // no local timeline read needed.
+    if (preview.attachmentKind != null) return null
     return preview.messageIdHex.takeIf { it.isNotBlank() }
 }
 
@@ -725,7 +751,7 @@ internal fun profileAddableGroupItems(
             val snapshot = item.memberSnapshot ?: return@filter false
             !item.group.pendingConfirmation &&
                 !item.removedFromGroup(active) &&
-                !GroupProjector.isDm(item.memberCount, item.group.name) &&
+                !item.isDm() &&
                 GroupProjector.isAdminRef(item.group, active) &&
                 snapshot.containsAccount(active) &&
                 !snapshot.containsAccount(target)
@@ -806,6 +832,19 @@ enum class OutgoingMessageIndicator {
     Sent,
     Failed,
 }
+
+/**
+ * Chat-list delivery tick for the row's projected last message. The engine
+ * scopes the state itself: NOT_APPLICABLE covers incoming messages, so no
+ * sender comparison is needed here.
+ */
+fun ChatListMessageDeliveryStateFfi.outgoingIndicator(): OutgoingMessageIndicator? =
+    when (this) {
+        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE -> null
+        ChatListMessageDeliveryStateFfi.PENDING -> OutgoingMessageIndicator.Sending
+        ChatListMessageDeliveryStateFfi.DELIVERED -> OutgoingMessageIndicator.Sent
+        ChatListMessageDeliveryStateFfi.FAILED -> OutgoingMessageIndicator.Failed
+    }
 
 fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
     when (this) {
@@ -3238,6 +3277,25 @@ class ChatsController(
         }.getOrDefault(false)
     }
 
+    /** Flag the chat unread until it is next read; the engine owns the clear. */
+    suspend fun markUnread(item: ChatListItem): Boolean {
+        // A left/removed/leave-pending chat offers no unread affordances.
+        val account =
+            accountRef?.takeUnless { item.removedFromGroup(appState.activeAccount?.accountIdHex) } ?: return false
+        return runCatchingCancellable {
+            val row = appState.marmotIo { setChatManuallyUnread(account, item.group.groupIdHex, true) }
+            row?.let(::applyChatListRow)
+            true
+        }.onFailure {
+            // Same quiet posture as markAllRead: log-only, no toast.
+            Log.w(
+                "DMChatsController",
+                "markUnread failed for group=${item.group.groupIdHex.take(8)}",
+                it,
+            )
+        }.getOrDefault(false)
+    }
+
     private fun requestGroupProfiles(group: AppGroupRecordFfi) {
         appState.requestProfiles(
             listOfNotNull(group.welcomerAccountIdHex) + group.admins,
@@ -3368,6 +3426,10 @@ class ChatsController(
             appState.updateAccountUnreadCount(
                 unreadAccountRef,
                 accountUnreadCount(projected, unreadAccountIdHex),
+            )
+            appState.updateAccountManualUnread(
+                unreadAccountRef,
+                accountHasManualUnread(projected, unreadAccountIdHex),
             )
         }
         // Hidden behind an open conversation: keep folding updates into the
@@ -3766,6 +3828,15 @@ class ConversationController(
     private val copy: ConversationControllerCopy = ConversationControllerCopy(),
 ) {
     var group by mutableStateOf(initialGroup)
+        private set
+
+    /**
+     * Latest chat-list projection for this conversation, kept live even while
+     * the chat list itself is hidden (its controller freezes item recomputes
+     * off-screen). Read for row-scoped state a conversation surface needs
+     * fresh, like the engine's durable mute.
+     */
+    var latestChatListRow by mutableStateOf<ChatListRowFfi?>(null)
         private set
 
     /**
@@ -7277,6 +7348,7 @@ class ConversationController(
         row: ChatListRowFfi?,
     ) {
         val projected = row ?: return
+        latestChatListRow = projected
         when (trigger) {
             ChatListUpdateTriggerFfi.ARCHIVE_CHANGED,
             ChatListUpdateTriggerFfi.PENDING_CONFIRMATION_CHANGED,

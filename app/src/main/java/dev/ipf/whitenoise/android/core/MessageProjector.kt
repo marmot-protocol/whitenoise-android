@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -55,6 +56,8 @@ data class MessageTextCopy(
     val mediaVideo: String = "Video",
     val mediaVoice: String = "Voice message",
     val mediaDocument: String = "File",
+    val mediaAlbum: String = "Album",
+    val mediaCountedFormat: String = "%1\$s (%2\$d)",
     val message: String,
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
@@ -68,6 +71,22 @@ data class MessageTextCopy(
             ReplyMediaKind.Document -> mediaDocument
             ReplyMediaKind.None -> mediaAttachment
         }
+
+    /** Preview label for a projected last-message attachment set. */
+    fun attachmentLabel(
+        kind: ChatListAttachmentKindFfi,
+        count: UInt,
+    ): String {
+        val label =
+            when (kind) {
+                ChatListAttachmentKindFfi.PHOTO -> mediaPhoto
+                ChatListAttachmentKindFfi.VIDEO -> mediaVideo
+                ChatListAttachmentKindFfi.AUDIO -> mediaVoice
+                ChatListAttachmentKindFfi.FILE -> mediaDocument
+                ChatListAttachmentKindFfi.MIXED -> mediaAlbum
+            }
+        return if (count > 1u) String.format(mediaCountedFormat, label, count.toLong()) else label
+    }
 
     companion object {
         val Default =
