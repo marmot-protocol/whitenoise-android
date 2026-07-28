@@ -535,10 +535,6 @@ class LocalizationResourceTest {
                 // in some locales ("Images" in French, "Videos" in German).
                 "shared_media_tab_images",
                 "shared_media_tab_videos",
-                // "Album" is a loan word spelled identically in DE/FR/IT, and the
-                // counted-preview format is punctuation-only in most locales.
-                "media_album",
-                "media_counted_format",
                 // Call quick-action labels: "Audio"/"Video" are loan words
                 // spelled identically in several locales (DE/ES/FR/IT).
                 "quick_action_audio",
@@ -583,6 +579,10 @@ class LocalizationResourceTest {
                     setOf(
                         // "Name" is the German word for "name".
                         "profile_contact_name_hint",
+                        // "Album" is the German word for "album", and the
+                        // counted-preview format is punctuation-only here.
+                        "media_album",
+                        "media_counted_format",
                         "chat_folder_name_label",
                     ),
                 "values-es" to
@@ -590,6 +590,8 @@ class LocalizationResourceTest {
                         // "chat"/"chats" are common loan words in Spanish.
                         "archived_chats_count",
                         "chat_folder_chat_count",
+                        // The counted-preview format is punctuation-only here.
+                        "media_counted_format",
                     ),
                 "values-fr" to
                     setOf(
@@ -602,12 +604,35 @@ class LocalizationResourceTest {
                         "attach_contact",
                         // "Description" is spelled identically in French.
                         "chat_folder_description_label",
+                        // "Album" is spelled identically in French, and the
+                        // counted-preview format is punctuation-only here.
+                        "media_album",
+                        "media_counted_format",
                     ),
                 "values-it" to
                     setOf(
                         // "chat" is a common loan word in Italian.
                         "archived_chats_count",
                         "chat_folder_chat_count",
+                        // "Album" is spelled identically in Italian, and the
+                        // counted-preview format is punctuation-only here.
+                        "media_album",
+                        "media_counted_format",
+                    ),
+                "values-pt" to
+                    setOf(
+                        // The counted-preview format is punctuation-only here.
+                        "media_counted_format",
+                    ),
+                "values-ru" to
+                    setOf(
+                        // The counted-preview format is punctuation-only here.
+                        "media_counted_format",
+                    ),
+                "values-tr" to
+                    setOf(
+                        // The counted-preview format is punctuation-only here.
+                        "media_counted_format",
                     ),
             )
     }

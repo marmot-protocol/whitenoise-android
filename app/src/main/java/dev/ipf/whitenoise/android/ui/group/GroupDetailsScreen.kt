@@ -839,6 +839,7 @@ internal fun GroupDetailsScreen(
                                         manualChatIds =
                                             appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
                                         rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
                                         isMuted = {
                                             ChatMutePreferences.compositeKey(accountRef, it) in
                                                 chatNotificationState.mutedConversations

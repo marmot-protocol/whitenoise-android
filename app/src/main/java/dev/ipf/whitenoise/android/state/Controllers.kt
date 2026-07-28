@@ -3279,7 +3279,9 @@ class ChatsController(
 
     /** Flag the chat unread until it is next read; the engine owns the clear. */
     suspend fun markUnread(item: ChatListItem): Boolean {
-        val account = accountRef ?: return false
+        // A left/removed/leave-pending chat offers no unread affordances.
+        val account =
+            accountRef?.takeUnless { item.removedFromGroup(appState.activeAccount?.accountIdHex) } ?: return false
         return runCatchingCancellable {
             val row = appState.marmotIo { setChatManuallyUnread(account, item.group.groupIdHex, true) }
             row?.let(::applyChatListRow)

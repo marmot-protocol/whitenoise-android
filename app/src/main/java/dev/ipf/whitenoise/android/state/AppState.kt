@@ -3998,23 +3998,30 @@ class WhiteNoiseAppState private constructor(
      * device agree with this one. Local preferences stay the immediate source
      * for notification suppression — this write is convergence, not gating.
      */
+    private val engineMuteMutex = Mutex()
+
     private fun syncEngineMute(
         accountRef: String,
         groupIdHex: String,
     ) {
-        val muted = chatMutePreferences.isMuted(accountRef, groupIdHex)
-        val expiry = chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
         mutationsScope.launch {
-            runCatchingCancellable {
-                marmotIo {
-                    if (muted) {
-                        setChatMuted(accountRef, groupIdHex, expiry)
-                    } else {
-                        clearChatMuted(accountRef, groupIdHex)
+            // Serialize writes and read the preferences inside the lock, so
+            // the last write always mirrors the newest local decision even
+            // when rapid toggles race their IO completions.
+            engineMuteMutex.withLock {
+                val muted = chatMutePreferences.isMuted(accountRef, groupIdHex)
+                val expiry = chatMutePreferences.muteExpiryMillis(accountRef, groupIdHex)
+                runCatchingCancellable {
+                    marmotIo {
+                        if (muted) {
+                            setChatMuted(accountRef, groupIdHex, expiry)
+                        } else {
+                            clearChatMuted(accountRef, groupIdHex)
+                        }
                     }
+                }.onFailure {
+                    appStateDebug(it) { "engine mute sync failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
                 }
-            }.onFailure {
-                appStateDebug(it) { "engine mute sync failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
             }
         }
     }

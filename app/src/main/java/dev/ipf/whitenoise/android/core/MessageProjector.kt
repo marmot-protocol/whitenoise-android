@@ -85,7 +85,7 @@ data class MessageTextCopy(
                 ChatListAttachmentKindFfi.FILE -> mediaDocument
                 ChatListAttachmentKindFfi.MIXED -> mediaAlbum
             }
-        return if (count > 1u) String.format(mediaCountedFormat, label, count.toInt()) else label
+        return if (count > 1u) String.format(mediaCountedFormat, label, count.toLong()) else label
     }
 
     companion object {

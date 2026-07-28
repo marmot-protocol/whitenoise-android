@@ -262,6 +262,7 @@ private fun folderChatCount(
                         items = active,
                         manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
                         rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
                         isMuted = { ChatMutePreferences.compositeKey(accountRef, it) in mutedConversations },
                         displayTitle = displayTitle,
                     )

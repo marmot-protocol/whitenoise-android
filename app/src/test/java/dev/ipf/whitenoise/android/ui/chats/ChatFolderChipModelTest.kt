@@ -21,6 +21,7 @@ class ChatFolderChipModelTest {
                 folders = ChatFolderPreferences.systemFolders(),
                 activeItems = listOf(item("g1", unread = true, members = 3), item("g2", unread = false, members = 2)),
                 archivedItems = emptyList(),
+                activeAccountIdHex = null,
                 membershipOf = { emptySet() },
             )
 
@@ -44,6 +45,7 @@ class ChatFolderChipModelTest {
                 folders = listOf(emptyCustom.copy(order = 1), custom.copy(order = 0)),
                 activeItems = listOf(item("g1", unread = false, members = 2)),
                 archivedItems = emptyList(),
+                activeAccountIdHex = null,
                 membershipOf = { folderId -> if (folderId == "f1") setOf("g1") else emptySet() },
             )
 
@@ -57,6 +59,7 @@ class ChatFolderChipModelTest {
             chatFolderChipModels(
                 folders = ChatFolderPreferences.systemFolders(),
                 activeItems = emptyList(),
+                activeAccountIdHex = null,
                 archivedItems = listOf(item("g3", unread = true, members = 2), item("g4", unread = false, members = 2)),
                 membershipOf = { emptySet() },
             )

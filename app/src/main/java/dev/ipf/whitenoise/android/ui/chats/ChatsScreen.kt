@@ -210,6 +210,7 @@ internal fun ChatsScreen(
                             items = controller.items,
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
                             rule = appState.chatFolderPreferences.folderRule(accountRef, folderId),
+                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
                             isMuted = { groupIdHex ->
                                 ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations ||
                                     groupIdHex in engineMutedChatIds
@@ -486,6 +487,7 @@ internal fun ChatsScreen(
                 folders = accountFolders,
                 activeItems = controller.items,
                 archivedItems = controller.archivedItems,
+                activeAccountIdHex = appState.activeAccount?.accountIdHex,
                 membershipOf = resolveFolderChatIds,
             )
         }
@@ -540,7 +542,7 @@ internal fun ChatsScreen(
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
                         showMarkUnread =
-                            singleSelectedItem != null &&
+                            singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
                                 singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
                         showMuteToggle = singleSelectedItem != null,
                         muted = singleSelectionMuted,

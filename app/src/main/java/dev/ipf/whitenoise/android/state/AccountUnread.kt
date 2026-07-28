@@ -110,6 +110,8 @@ internal fun accountHasManualUnread(
     rows.any { row ->
         !row.archived &&
             row.manuallyMarkedUnread &&
+            !row.selfMembership.isNonMember() &&
+            !row.leaveRequestPending &&
             !accountMissingFromLoadedRoster(activeAccountIdHex, membersByGroupId[row.groupIdHex])
     }
 

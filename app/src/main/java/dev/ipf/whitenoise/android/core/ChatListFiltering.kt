@@ -83,7 +83,7 @@ internal fun applyChatListSearchAndFilter(
             // Archived swaps the source list upstream, so there's nothing extra
             // to filter here — show every archived chat.
             ChatListFilter.All, ChatListFilter.Archived -> source
-            ChatListFilter.Unread -> source.filter { it.hasUnread }
+            ChatListFilter.Unread -> source.filter { it.effectiveHasUnread(appState.activeAccount?.accountIdHex) }
             // A named two-member chat is a group, not a DM — classify by type,
             // not raw headcount, so it isn't wrongly hidden here.
             ChatListFilter.Groups -> source.filter { !it.isDm() }

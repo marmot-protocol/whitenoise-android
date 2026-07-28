@@ -25,6 +25,7 @@ internal fun chatFolderChipModels(
     folders: List<ChatFolder>,
     activeItems: List<ChatListItem>,
     archivedItems: List<ChatListItem>,
+    activeAccountIdHex: String?,
     membershipOf: (folderId: String) -> Set<String>,
 ): List<ChatFolderChipModel> =
     folders
@@ -32,7 +33,7 @@ internal fun chatFolderChipModels(
         .mapNotNull { folder ->
             when (folder.systemKind) {
                 SystemFolderKind.UNREAD -> {
-                    val unread = activeItems.count { it.hasUnread }
+                    val unread = activeItems.count { it.effectiveHasUnread(activeAccountIdHex) }
                     if (unread == 0) {
                         null
                     } else {
@@ -47,7 +48,7 @@ internal fun chatFolderChipModels(
                             folder.id,
                             folder.systemKind,
                             "",
-                            trailingCount = archivedItems.count { it.hasUnread },
+                            trailingCount = archivedItems.count { it.effectiveHasUnread(activeAccountIdHex) },
                         )
                     }
                 }

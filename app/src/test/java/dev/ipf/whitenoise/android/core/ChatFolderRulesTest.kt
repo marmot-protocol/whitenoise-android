@@ -140,7 +140,15 @@ class ChatFolderRulesTest {
         rule: ChatFolderRule?,
         isMuted: (String) -> Boolean = { false },
         displayTitle: (ChatListItem) -> String = { "" },
-    ): Set<String> = chatFolderChatIds(items, manual, rule, isMuted, displayTitle)
+    ): Set<String> =
+        chatFolderChatIds(
+            items = items,
+            manualChatIds = manual,
+            rule = rule,
+            activeAccountIdHex = null,
+            isMuted = isMuted,
+            displayTitle = displayTitle,
+        )
 
     private fun item(
         groupIdHex: String,
