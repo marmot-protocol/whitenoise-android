@@ -278,15 +278,24 @@ private fun NewMessageScreen(
         hexForProgress: String,
         recipientName: String? = null,
         retryGroupIdHex: String? = null,
+        existingDmGroupIdHex: String? = null,
     ) {
         if (creatingHex != null) return
         startChatError = null
-        if (retryGroupIdHex == null) {
-            appState.existingDirectChat(npub)?.let {
-                onOpenConversation(it, false)
-                return
-            }
-        }
+        val shouldCreate =
+            retryGroupIdHex != null ||
+                resolveNewMessageDirectChat(
+                    npub = npub,
+                    existingDmGroupIdHex = existingDmGroupIdHex,
+                    chatListItems = appState.chatListItems,
+                    activeAccountIdHex = activeHex,
+                    npubForHex = appState::npub,
+                    existingDirectChat = appState::existingDirectChat,
+                ).let { resolution ->
+                    resolution.item?.also { onOpenConversation(it, false) } == null &&
+                        resolution.createRequired
+                }
+        if (!shouldCreate) return
         creatingHex = hexForProgress
         appState.launchMutation {
             try {
@@ -454,6 +463,7 @@ private fun NewMessageScreen(
                                     npub = candidate.npub,
                                     hexForProgress = candidate.accountIdHex,
                                     recipientName = appState.displayName(candidate.accountIdHex),
+                                    existingDmGroupIdHex = candidate.existingDmGroupIdHex,
                                 )
                             },
                             onLongClick = { appState.presentProfile(candidate.npub) },
