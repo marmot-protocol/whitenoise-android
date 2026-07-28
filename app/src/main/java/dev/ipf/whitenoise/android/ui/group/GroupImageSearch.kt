@@ -351,7 +351,7 @@ internal fun ImageSearchSheet(
                     enabled = !applyInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (pendingAction == GroupImageAction.PickPhoto) {
+                    if (applyInFlight && pendingAction == GroupImageAction.PickPhoto) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
@@ -460,7 +460,7 @@ internal fun ImageSearchSheet(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
                 ) {
-                    if (pendingAction == GroupImageAction.Remove) {
+                    if (applyInFlight && pendingAction == GroupImageAction.Remove) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
@@ -502,7 +502,7 @@ internal fun ImageSearchSheet(
                     // makes accidental avatar loss one mistap away.
                     enabled = previewUrl != null && !applyInFlight,
                 ) {
-                    if (pendingAction == GroupImageAction.Apply) {
+                    if (applyInFlight && pendingAction == GroupImageAction.Apply) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,

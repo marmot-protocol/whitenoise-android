@@ -94,6 +94,28 @@ class ProfileBannerControlTest {
     }
 
     @Test
+    fun replacingExistingBannerKeepsProgressVisibleOverThePreview() {
+        var isUploading by mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileBannerControl(
+                    bannerUrl = "https://example.com/banner.jpg",
+                    isValid = true,
+                    isUploading = isUploading,
+                    imageLoader = { ImageBitmap(3, 1) },
+                    onClick = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { isUploading = true }
+
+        composeRule.onNodeWithText(app.getString(R.string.profile_banner_uploading)).assertIsDisplayed()
+        composeRule.onNodeWithTag(PROFILE_BANNER_CONTROL_TAG).assertIsNotEnabled()
+    }
+
+    @Test
     fun existingBannerUsesTheWidePreviewInsteadOfTheEmptyPlaceholder() {
         composeRule.setContent {
             WhiteNoiseTheme {

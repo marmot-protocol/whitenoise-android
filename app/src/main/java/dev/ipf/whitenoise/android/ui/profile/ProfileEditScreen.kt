@@ -155,22 +155,14 @@ internal fun ProfileBannerControl(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            } else if (bannerUrl != null && !isUploading) {
+            } else if (bannerUrl != null) {
                 Icon(
                     Icons.Default.Image,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(36.dp),
                 )
-            } else if (isUploading) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text(stringResource(R.string.profile_banner_uploading))
-                }
-            } else {
+            } else if (!isUploading) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
@@ -183,7 +175,30 @@ internal fun ProfileBannerControl(
                     Text(stringResource(R.string.profile_banner_placeholder))
                 }
             }
-            if (!isUploading) {
+            if (isUploading) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White,
+                        )
+                        Text(
+                            stringResource(R.string.profile_banner_uploading),
+                            color = Color.White,
+                        )
+                    }
+                }
+            } else {
                 Box(
                     modifier =
                         Modifier
