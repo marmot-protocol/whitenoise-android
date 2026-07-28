@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.Surface
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -27,16 +29,42 @@ class ChatFoldersContentTest {
     private val app = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun reorderButtonsExposeContentDescriptionsAndRespectEnabledState() {
+    fun rowExposesAccessibilityMoveActionsRespectingListBounds() {
+        var moved: Pair<String, Int>? = null
         render(
             folders =
                 listOf(
                     folderRow(id = "unread", name = "Unread", canMoveUp = false, canMoveDown = true),
                 ),
+            onMove = { id, delta -> moved = id to delta },
         )
 
-        composeRule.onNodeWithContentDescription(app.getString(R.string.chat_folder_move_up)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.chat_folder_move_down)).assertIsEnabled()
+        // The drag gesture's TalkBack fallback: only the in-bounds direction
+        // is offered, and invoking it moves the row.
+        val actions =
+            composeRule
+                .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+        assertEquals(listOf(app.getString(R.string.chat_folder_move_down)), actions.map { it.label })
+
+        composeRule.runOnUiThread { actions.single().action() }
+        assertEquals("unread" to 1, moved)
+    }
+
+    @Test
+    fun dragHandleIsExposedOnEveryRow() {
+        render(
+            folders =
+                listOf(
+                    folderRow(id = "unread", name = "Unread"),
+                    folderRow(id = "work", name = "Work", systemKind = null),
+                ),
+        )
+
+        composeRule
+            .onAllNodesWithContentDescription(app.getString(R.string.chat_folder_drag_to_reorder))
+            .assertCountEquals(2)
     }
 
     @Test
@@ -87,21 +115,6 @@ class ChatFoldersContentTest {
 
         composeRule.onNodeWithText(app.getString(R.string.chat_folder_restore_defaults)).performClick()
         assertEquals(true, restored)
-    }
-
-    @Test
-    fun moveCallbacksReceiveFolderId() {
-        var moved: Pair<String, Int>? = null
-        render(
-            folders =
-                listOf(
-                    folderRow(id = "unread", name = "Unread", canMoveUp = false, canMoveDown = true),
-                ),
-            onMove = { id, delta -> moved = id to delta },
-        )
-
-        composeRule.onNodeWithContentDescription(app.getString(R.string.chat_folder_move_down)).performClick()
-        assertEquals("unread" to 1, moved)
     }
 
     private fun folderRow(

@@ -54,6 +54,7 @@
     <string name="chat_folder_archived_only_subtitle">Include archived chats instead of active ones</string>
     <string name="chat_folder_restore_defaults">Restore default folders</string>
     <string name="chat_folder_restore_defaults_subtitle">Re-add any missing default folders</string>
+    <string name="chat_folder_drag_to_reorder">Drag to reorder</string>
     <string name="chat_folder_manual_chats">Included chats</string>
     <string name="chat_folder_people">People</string>
     <string name="chat_folder_people_subtitle">Include any chat with these people</string>

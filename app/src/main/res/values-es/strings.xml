@@ -883,6 +883,7 @@
     <string name="chat_folder_archived_only_subtitle">Incluir chats archivados en lugar de activos</string>
     <string name="chat_folder_restore_defaults">Restaurar carpetas predeterminadas</string>
     <string name="chat_folder_restore_defaults_subtitle">Volver a añadir las carpetas predeterminadas que falten</string>
+    <string name="chat_folder_drag_to_reorder">Arrastra para reordenar</string>
     <string name="chat_folder_manual_chats">Chats incluidos</string>
     <string name="chat_folder_people">Personas</string>
     <string name="chat_folder_people_subtitle">Incluir cualquier chat con estas personas</string>

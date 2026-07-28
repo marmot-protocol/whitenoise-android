@@ -881,6 +881,7 @@
     <string name="chat_folder_archived_only_subtitle">Aktif sohbetler yerine arşivlenmiş sohbetleri dahil et</string>
     <string name="chat_folder_restore_defaults">Varsayılan klasörleri geri yükle</string>
     <string name="chat_folder_restore_defaults_subtitle">Eksik varsayılan klasörleri yeniden ekle</string>
+    <string name="chat_folder_drag_to_reorder">Yeniden sıralamak için sürükle</string>
     <string name="chat_folder_manual_chats">Dahil edilen sohbetler</string>
     <string name="chat_folder_people">Kişiler</string>
     <string name="chat_folder_people_subtitle">Bu kişilerin olduğu her sohbeti dahil et</string>

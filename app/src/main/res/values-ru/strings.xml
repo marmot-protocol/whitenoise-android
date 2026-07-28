@@ -913,6 +913,7 @@
     <string name="chat_folder_archived_only_subtitle">Включать архивные чаты вместо активных</string>
     <string name="chat_folder_restore_defaults">Восстановить папки по умолчанию</string>
     <string name="chat_folder_restore_defaults_subtitle">Снова добавить отсутствующие папки по умолчанию</string>
+    <string name="chat_folder_drag_to_reorder">Перетащите, чтобы изменить порядок</string>
     <string name="chat_folder_manual_chats">Включённые чаты</string>
     <string name="chat_folder_people">Люди</string>
     <string name="chat_folder_people_subtitle">Включать любой чат с этими людьми</string>

@@ -881,6 +881,7 @@
     <string name="chat_folder_archived_only_subtitle">Archivierte statt aktiver Chats aufnehmen</string>
     <string name="chat_folder_restore_defaults">Standardordner wiederherstellen</string>
     <string name="chat_folder_restore_defaults_subtitle">Fehlende Standardordner erneut hinzufügen</string>
+    <string name="chat_folder_drag_to_reorder">Zum Neuordnen ziehen</string>
     <string name="chat_folder_manual_chats">Enthaltene Chats</string>
     <string name="chat_folder_people">Personen</string>
     <string name="chat_folder_people_subtitle">Jeden Chat mit diesen Personen aufnehmen</string>
