@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.updates.AppUpdateWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,10 @@ import kotlinx.coroutines.SupervisorJob
 class WhiteNoiseApplication : Application() {
     val appState: WhiteNoiseAppState by lazy {
         WhiteNoiseAppState(this)
+    }
+
+    val recentEmojiRecentsOwner by lazy {
+        createRecentEmojiRecentsOwner()
     }
 
     /**

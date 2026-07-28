@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
@@ -267,6 +268,7 @@ private fun ReactionParticipantRow(
 @Composable
 internal fun CustomizeReactionsDialog(
     quickReactionEmojis: List<String>,
+    recentEmojis: List<String>,
     onDismiss: () -> Unit,
     onSave: (List<String>) -> Unit,
     onReset: () -> Unit,
@@ -363,12 +365,13 @@ internal fun CustomizeReactionsDialog(
         if (editingIndex != null) {
             EmojiPickerSheet(
                 onDismissRequest = { editingIndex = null },
+                recentEmojis = recentEmojis,
                 onEmojiPicked = { emoji ->
                     val index = editingIndex ?: return@EmojiPickerSheet
                     draft = draft.toMutableList().also { it[index] = emoji }
                     editingIndex = null
                 },
-                recordRecentPicks = false,
+                purpose = EmojiPickerPurpose.CONFIGURE_QUICK_REACTION,
             )
         }
     }

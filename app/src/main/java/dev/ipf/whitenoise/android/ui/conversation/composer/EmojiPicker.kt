@@ -95,7 +95,6 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
-import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -103,12 +102,19 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal enum class EmojiPickerPurpose {
+    USE,
+    CONFIGURE_QUICK_REACTION,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EmojiPickerSheet(
     onDismissRequest: () -> Unit,
     onEmojiPicked: (String) -> Unit,
-    recordRecentPicks: Boolean = true,
+    purpose: EmojiPickerPurpose = EmojiPickerPurpose.USE,
+    recentEmojis: List<String> = emptyList(),
+    onEmojiUsed: (String) -> Unit = {},
     restoreExpanded: Boolean = false,
     messageReactionEmojis: List<String> = emptyList(),
     onCustomizeReactions: ((Boolean) -> Unit)? = null,
@@ -142,7 +148,9 @@ internal fun EmojiPickerSheet(
         ) {
             EmojiPickerContent(
                 onEmojiPicked = onEmojiPicked,
-                recordRecentPicks = recordRecentPicks,
+                purpose = purpose,
+                recentEmojis = recentEmojis,
+                onEmojiUsed = onEmojiUsed,
                 messageReactionEmojis = messageReactionEmojis,
                 onCustomizeReactions =
                     onCustomizeReactions?.let { customize ->
@@ -177,6 +185,8 @@ internal fun EmojiPickerSheet(
 internal fun ComposerEmojiPickerPane(
     height: Dp,
     alpha: Float,
+    recentEmojis: List<String>,
+    onEmojiUsed: (String) -> Unit,
     onEmojiPicked: (String) -> Unit,
     onBackspace: () -> Unit,
     onSearchActiveChange: (Boolean) -> Unit,
@@ -195,7 +205,9 @@ internal fun ComposerEmojiPickerPane(
     ) {
         EmojiPickerContent(
             onEmojiPicked = onEmojiPicked,
-            recordRecentPicks = false,
+            purpose = EmojiPickerPurpose.USE,
+            recentEmojis = recentEmojis,
+            onEmojiUsed = onEmojiUsed,
             onBackspace = onBackspace,
             searchStartsOpen = false,
             onSearchActiveChange = onSearchActiveChange,
@@ -361,7 +373,9 @@ internal fun composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight: Dp): Bo
 private fun EmojiPickerContent(
     onEmojiPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
-    recordRecentPicks: Boolean = true,
+    purpose: EmojiPickerPurpose = EmojiPickerPurpose.USE,
+    recentEmojis: List<String> = emptyList(),
+    onEmojiUsed: (String) -> Unit = {},
     messageReactionEmojis: List<String> = emptyList(),
     onBackspace: (() -> Unit)? = null,
     onCustomizeReactions: (() -> Unit)? = null,
@@ -394,10 +408,7 @@ private fun EmojiPickerContent(
         remember(messageReactionEmojis) {
             messageReactionEmojis.filter { it.isNotBlank() }.distinct()
         }
-    var recents by remember(context) { mutableStateOf(emptyList<String>()) }
-    LaunchedEffect(context) {
-        recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
-    }
+    val recents = remember(recentEmojis) { recentEmojis.filter { it.isNotBlank() } }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     var activeCategory by remember(recents.isNotEmpty()) { mutableStateOf(if (recents.isNotEmpty()) -1 else 0) }
@@ -444,10 +455,8 @@ private fun EmojiPickerContent(
     }
 
     fun pick(emoji: String) {
-        if (recordRecentPicks) {
-            scope.launch {
-                recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji).filter { it.isNotBlank() } }
-            }
+        if (purpose == EmojiPickerPurpose.USE) {
+            onEmojiUsed(emoji)
         }
         onEmojiPicked(emoji)
     }
