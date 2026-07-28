@@ -23,8 +23,9 @@ import java.util.concurrent.TimeUnit
  * the user reopens that chat. This worker closes that gap: WorkManager runs it
  * on a coarse cadence independent of any open conversation (and survives
  * process death / device reboot), and it delegates the actual work to
- * [WhiteNoiseAppState.sweepExpiredDisappearingMessages], which mirrors the
- * foreground sweep per group.
+ * [WhiteNoiseAppState.sweepExpiredDisappearingMessages], which runs the
+ * engine-owned account sweep and applies the Android-owned consequences per
+ * pruned group.
  *
  * The cadence is intentionally coarse ([SWEEP_INTERVAL_HOURS]) so the sweep
  * never becomes a hot loop or a battery drain — the engine owns the precise
