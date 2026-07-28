@@ -32,7 +32,7 @@ class ProfileBannerPickerWiringTest {
         )
         assertFalse(
             "the developer-facing standalone banner URL field must be removed",
-            "value = imageDrafts.banner" in body,
+            "value = banner" in body,
         )
     }
 
