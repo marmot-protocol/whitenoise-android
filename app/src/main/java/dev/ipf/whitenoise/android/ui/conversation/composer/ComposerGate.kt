@@ -59,8 +59,9 @@ internal enum class ComposerGate {
  *     a member opening cold without reintroducing the #545 composer-flash for a
  *     left group.
  *
- * This drives only the INITIAL VISUAL state; it does not affect send-gating,
- * which stays guarded by `canSendMessages` / [canAcceptTextSend] (issue #264).
+ * This drives only the INITIAL VISUAL state. [canAcceptTextSend] separately
+ * allows a positively seeded current member to hand text off during refresh,
+ * while stricter mutations remain guarded by verified membership.
  */
 internal fun conversationComposerGate(
     pendingInvite: Boolean,
