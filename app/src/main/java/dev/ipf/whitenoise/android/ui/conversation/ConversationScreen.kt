@@ -2953,8 +2953,9 @@ internal fun ConversationScreen(
                     // only for a known not-member, and NOTHING while membership is
                     // genuinely unknown (cold open with no seeding snapshot), where
                     // it upgrades on the confirmed result. The controller's
-                    // `canSendMessages` guard still keeps any actual mutation safe
-                    // until membership is verified.
+                    // Text handoff may proceed for a positively seeded current
+                    // member; destructive/admin mutations still require verified
+                    // membership through `canSendMessages`.
                     else ->
                         when (composerGate) {
                             // Reserve the composer's resting height while membership

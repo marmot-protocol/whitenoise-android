@@ -1010,15 +1010,28 @@ data class ReactionParticipant(
  * — the two must never disagree, otherwise the input clears while the message
  * is silently dropped (issue #264).
  *
- * `accountRef` null → no active account bound yet; blank text → nothing to send;
- * `canSend` false → membership not yet verified (the composer is intentionally
- * shown during the `refreshMembers()` load window) or the user is not a member.
+ * A verified current member can send normally. During the `refreshMembers()`
+ * window, a positive membership seed can also accept the text so the visible
+ * composer does not reject the handoff solely because verification is still in
+ * flight. Frozen, disbanding, disbanded, and non-member groups stay blocked.
  */
 internal fun canAcceptTextSend(
     accountRef: String?,
     trimmed: String,
-    canSend: Boolean,
-): Boolean = accountRef != null && trimmed.isNotEmpty() && canSend
+    membersVerified: Boolean,
+    isSelfMember: Boolean,
+    seededSelfMember: Boolean,
+    unrecoverable: Boolean,
+    disbanding: Boolean,
+    disbanded: Boolean,
+): Boolean =
+    accountRef != null &&
+        trimmed.isNotEmpty() &&
+        !unrecoverable &&
+        !disbanding &&
+        !disbanded &&
+        isSelfMember &&
+        (membersVerified || seededSelfMember)
 
 /**
  * How many times a text/reply send retries the FFI publish before surfacing a
@@ -4904,8 +4917,8 @@ class ConversationController(
      * has been committed to the projection and published — i.e. the send has
      * actually started. The caller uses it to clear the input/draft and scroll
      * to newest. It is deliberately NOT invoked when a guard rejects the send
-     * (no account yet, blank text, or membership not yet verified) so the UI
-     * keeps the user's text instead of clearing it into the void (issue #264).
+     * (no account yet, blank text, unknown/non-member state, or a terminal group)
+     * so the UI keeps the user's text instead of clearing it into the void.
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
      */
@@ -4915,12 +4928,22 @@ class ConversationController(
     ) {
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
-        if (!canAcceptTextSend(accountRef, trimmed, canSendMessages)) {
-            // The only guard a user with non-blank text can realistically hit is
-            // membership not yet verified (the composer is shown during the
-            // `refreshMembers()` load window). Surface it instead of dropping
-            // the message silently — the input is preserved by not calling
-            // onAccepted, and the toast tells the user to retry in a moment.
+        if (
+            !canAcceptTextSend(
+                accountRef = accountRef,
+                trimmed = trimmed,
+                membersVerified = membersVerified,
+                isSelfMember = isSelfMember,
+                seededSelfMember = seededSelfMember,
+                unrecoverable = group.unrecoverable,
+                disbanding = group.disbanding,
+                disbanded = group.disbanded,
+            )
+        ) {
+            // A positive seeded member is accepted during refresh above. A
+            // visible composer can still reach this guard from a genuinely
+            // unknown notification-open state; preserve the draft and surface
+            // that the handoff has not started instead of dropping it silently.
             if (accountRef != null && trimmed.isNotEmpty()) {
                 appState.present(R.string.toast_send_not_ready)
             }
