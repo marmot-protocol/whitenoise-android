@@ -2218,7 +2218,11 @@ class ChatsController(
         private set
     var archivedItems by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
-    var isLoading by mutableStateOf(false)
+    // Starts true: a new controller has no snapshot yet. ChatsScreen must not
+    // paint authoritative EmptyChats until bind() finishes the first local
+    // snapshot (issue #1697).
+
+    var isLoading by mutableStateOf(true)
         private set
     var error by mutableStateOf<String?>(null)
         private set
@@ -2345,6 +2349,7 @@ class ChatsController(
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
+        isLoading = accountRef != null
         resetBackingState()
         bindEpoch += 1L
         recompute()
@@ -2358,7 +2363,6 @@ class ChatsController(
             }
             return
         }
-        isLoading = true
         try {
             // Converge this (just-bound) account's store before we snapshot it.
             // One SQLite store exists per account-device identity, so on a
