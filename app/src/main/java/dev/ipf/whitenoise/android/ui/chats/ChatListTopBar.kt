@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,6 +123,7 @@ internal fun ChatListTopBar(
                         // itself has unread, same shared decision the other
                         // avatars use — not "some other account has unread" (#805).
                         showUnreadDot = appState.accountShowsUnreadDot(active?.label),
+                        unreadDotColor = accountActionColors(appState, active?.label).container,
                     )
                 }
             }

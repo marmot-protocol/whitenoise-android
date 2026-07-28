@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -646,7 +647,12 @@ internal fun ChatsScreen(
         },
         floatingActionButton = {
             if (!searchOpen && !selectionMode) {
-                FloatingActionButton(onClick = { showNewChatFlow = true }) {
+                val actionColors = accountActionColors(appState)
+                FloatingActionButton(
+                    onClick = { showNewChatFlow = true },
+                    containerColor = actionColors.container,
+                    contentColor = actionColors.content,
+                ) {
                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.new_message))
                 }
             }

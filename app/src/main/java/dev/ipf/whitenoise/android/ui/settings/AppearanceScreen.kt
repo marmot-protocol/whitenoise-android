@@ -130,6 +130,7 @@ private val AppThemeMode.cardSubtitleRes: Int
 internal fun AppearanceScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    onOpenActionColor: () -> Unit,
     onOpenChatBubbleColors: () -> Unit,
 ) {
     Scaffold(
@@ -149,31 +150,7 @@ internal fun AppearanceScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                // Four equally-weighted modes: a separate AMOLED toggle read as
-                // combinable with Light, which is not a real state.
-                SettingsGroup(
-                    modifier = Modifier.selectableGroup(),
-                    title = stringResource(R.string.theme_mode),
-                    icon = Icons.Filled.Palette,
-                ) {
-                    AppThemeMode.entries.forEach { mode ->
-                        item {
-                            ThemeModeCard(
-                                mode = mode,
-                                selected = appState.themeMode == mode,
-                                onClick = { appState.updateThemeMode(mode) },
-                            )
-                        }
-                    }
-                    item {
-                        SettingsRow(
-                            title = stringResource(R.string.chat_bubble_colors),
-                            subtitle = stringResource(R.string.chat_bubble_colors_global_subtitle),
-                            icon = Icons.Filled.ColorLens,
-                            onClick = onOpenChatBubbleColors,
-                        )
-                    }
-                }
+                ThemeAndColorSettings(appState, onOpenActionColor, onOpenChatBubbleColors)
             }
             item {
                 // Standalone settings share one label-less group: their row titles
@@ -185,6 +162,48 @@ internal fun AppearanceScreen(
                     item { EnterKeyBehaviorRow(appState) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ThemeAndColorSettings(
+    appState: WhiteNoiseAppState,
+    onOpenActionColor: () -> Unit,
+    onOpenChatBubbleColors: () -> Unit,
+) {
+    // Four equally-weighted modes: a separate AMOLED toggle read as
+    // combinable with Light, which is not a real state.
+    SettingsGroup(
+        modifier = Modifier.selectableGroup(),
+        title = stringResource(R.string.theme_mode),
+        icon = Icons.Filled.Palette,
+    ) {
+        AppThemeMode.entries.forEach { mode ->
+            item {
+                ThemeModeCard(
+                    mode = mode,
+                    selected = appState.themeMode == mode,
+                    onClick = { appState.updateThemeMode(mode) },
+                )
+            }
+        }
+        item {
+            SettingsRow(
+                title = stringResource(R.string.action_color),
+                subtitle = stringResource(R.string.action_color_subtitle),
+                icon = Icons.Filled.ColorLens,
+                onClick = onOpenActionColor,
+            )
+        }
+        item {
+            SettingsRow(
+                title = stringResource(R.string.chat_bubble_colors),
+                subtitle = stringResource(R.string.chat_bubble_colors_global_subtitle),
+                icon = Icons.Filled.ColorLens,
+                onClick = onOpenChatBubbleColors,
+            )
         }
     }
 }

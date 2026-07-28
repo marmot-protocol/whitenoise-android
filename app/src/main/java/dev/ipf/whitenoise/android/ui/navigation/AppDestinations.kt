@@ -11,6 +11,7 @@ internal enum class MainSection {
 
 internal enum class SettingsDetail {
     Appearance,
+    ActionColor,
     ChatBubbleColors,
     Data,
     Profile,

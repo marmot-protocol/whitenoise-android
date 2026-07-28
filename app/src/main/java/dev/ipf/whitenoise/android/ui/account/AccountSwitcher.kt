@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
 @Composable
 fun AccountAvatarButton(
@@ -45,6 +47,7 @@ fun AccountAvatarButton(
     // per-account aggregate the other-account avatars use. Hidden when the
     // active account has no unread (the caller passes false).
     showUnreadDot: Boolean = false,
+    unreadDotColor: Color? = null,
 ) {
     val openSettingsDescription = stringResource(R.string.open_settings)
     val accountUnreadDescription =
@@ -81,7 +84,7 @@ fun AccountAvatarButton(
                             // a separate marker against a busy avatar.
                             .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
+                            .background(unreadDotColor ?: MaterialTheme.colorScheme.primary),
                 )
             }
         }
@@ -124,11 +127,13 @@ internal fun OtherAccountAvatarsRow(
         horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
     ) {
         shown.forEach { account ->
+            val actionColors = accountActionColors(appState, account.label)
             OtherAccountAvatar(
                 title = appState.displayName(account.accountIdHex),
                 seed = account.accountIdHex,
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
                 showUnreadDot = appState.accountShowsUnreadDot(account.label),
+                unreadDotColor = actionColors.container,
                 onClick = { onSwitchAccount(account.label) },
                 onLongClick = onOpenSwitcher,
             )
@@ -146,6 +151,7 @@ private fun OtherAccountAvatar(
     seed: String,
     pictureUrl: String?,
     showUnreadDot: Boolean,
+    unreadDotColor: Color,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -177,7 +183,7 @@ private fun OtherAccountAvatar(
                         .size(10.dp)
                         .border(TOP_BAR_OTHER_ACCOUNT_RING, MaterialTheme.colorScheme.surface, CircleShape)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(unreadDotColor),
             )
         }
     }

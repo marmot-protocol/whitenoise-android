@@ -91,6 +91,62 @@ class WhiteNoiseAppStatePreferencesTest {
     }
 
     @Test
+    fun globalBubbleColorReadsAndWritesUseTheActiveAccountScope() {
+        BubbleColorPreferences.writeGlobalColor(
+            preferences,
+            accountRef = "account-a",
+            theme = BubbleTheme.Dark,
+            side = BubbleSide.Mine,
+            argb = 0xFF112233,
+        )
+        val appState =
+            WhiteNoiseAppState(
+                context = RuntimeEnvironment.getApplication().applicationContext,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { null },
+                accounts = listOf(account("account-a", "self-a"), account("account-b", "self-b")),
+                activeAccountRef = "account-a",
+            )
+
+        assertEquals(0xFF112233, appState.globalBubbleColorArgb(BubbleTheme.Dark, BubbleSide.Mine))
+
+        appState.updateGlobalBubbleColor(BubbleTheme.Dark, BubbleSide.Mine, 0xFF445566)
+
+        assertEquals(
+            0xFF445566,
+            BubbleColorPreferences.readGlobalColor(
+                preferences,
+                accountRef = "account-a",
+                theme = BubbleTheme.Dark,
+                side = BubbleSide.Mine,
+            ),
+        )
+        assertNull(BubbleColorPreferences.readLegacyGlobalColor(preferences, BubbleTheme.Dark, BubbleSide.Mine))
+    }
+
+    @Test
+    fun actionColorReadsRepresentedAccountsAndWritesTheActiveAccount() {
+        ActionColorPreferences.writeColor(preferences, "account-a", BubbleTheme.Dark, 0xFF112233)
+        ActionColorPreferences.writeColor(preferences, "account-b", BubbleTheme.Dark, 0xFF445566)
+        val appState =
+            WhiteNoiseAppState(
+                context = RuntimeEnvironment.getApplication().applicationContext,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { null },
+                accounts = listOf(account("account-a", "self-a"), account("account-b", "self-b")),
+                activeAccountRef = "account-a",
+            )
+
+        assertEquals(0xFF112233, appState.actionColorArgb(BubbleTheme.Dark))
+        assertEquals(0xFF445566, appState.actionColorArgb(BubbleTheme.Dark, accountRef = "account-b"))
+
+        appState.updateActionColor(BubbleTheme.Dark, 0xFF778899)
+
+        assertEquals(0xFF778899, ActionColorPreferences.readColor(preferences, "account-a", BubbleTheme.Dark))
+        assertEquals(0xFF445566, ActionColorPreferences.readColor(preferences, "account-b", BubbleTheme.Dark))
+    }
+
+    @Test
     fun contactNicknameDefaultsAbsent() {
         assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "account-a", "contact-a"))
     }
@@ -244,4 +300,13 @@ class WhiteNoiseAppStatePreferencesTest {
             signedOut = false,
             running = true,
         )
+}
+
+private class EmptyDraftPersistence : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }

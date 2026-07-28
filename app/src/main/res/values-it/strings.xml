@@ -1131,6 +1131,10 @@
     <string name="notification_channel_app_updates_description">Avvisi sulle versioni di Zapstore</string>
 
     <string name="chat_bubble_colors">Colori dei fumetti</string>
+    <string name="action_color">Colore delle azioni</string>
+    <string name="action_color_subtitle">Scegli un colore dell’identità per Nuovo messaggio, Invia e gli indicatori dei messaggi non letti. I colori chiaro, scuro e AMOLED vengono salvati separatamente.</string>
+    <string name="action_color_no_active_account">Seleziona un account attivo prima di impostarne il colore delle azioni.</string>
+    <string name="action_color_swatch_content_description">Colore delle azioni %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Scegli i valori predefiniti per il tema corrente. I colori chiaro, scuro e AMOLED vengono salvati separatamente.</string>
     <string name="chat_bubble_colors_chat_subtitle">Sostituisci i colori dei fumetti solo per questa conversazione. Reimposta per ereditare i valori di Aspetto.</string>
     <string name="bubble_color_preview">Anteprima</string>

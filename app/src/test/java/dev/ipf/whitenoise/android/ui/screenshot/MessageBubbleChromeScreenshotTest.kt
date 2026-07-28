@@ -20,9 +20,13 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
+import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleTimestampColor
+import dev.ipf.whitenoise.android.ui.conversation.messages.replyPreviewAccentArgb
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.settings.FontSizePreviewBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -70,6 +74,8 @@ class MessageBubbleChromeScreenshotTest {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             DirectionalBubble(text = "Outgoing message", time = "12:35", mine = true)
                         }
+                        CustomAmoledReplyBubble(highlighted = false)
+                        CustomAmoledReplyBubble(highlighted = true)
                     }
                 }
             }
@@ -131,6 +137,42 @@ class MessageBubbleChromeScreenshotTest {
 }
 
 @Composable
+private fun CustomAmoledReplyBubble(highlighted: Boolean) {
+    val presentation =
+        messageBubblePresentation(
+            invalidated = false,
+            deleted = false,
+            mine = false,
+            customArgb = CUSTOM_AMOLED_ARGB,
+        )
+    MessageBubbleFrame(
+        presentation = presentation,
+        highlighted = highlighted,
+        mine = false,
+        invalidated = false,
+        mentionedSelf = false,
+        mentionedYouLabel = "Mentioned you",
+    ) {
+        ReplyPreviewCard(
+            senderTitle = "Alex",
+            isOwn = false,
+            body = if (highlighted) "Highlighted target" else "Current custom accent",
+            mediaKind = ReplyMediaKind.None,
+            onClick = null,
+            onDismiss = null,
+            containerColor = Color.Transparent,
+            contentColor = colorFromArgb(presentation.contentArgb),
+            accentColor =
+                replyPreviewAccentArgb(
+                    insideBubble = true,
+                    customBubbleColorActive = true,
+                    presentation = presentation,
+                )?.let(::colorFromArgb),
+        )
+    }
+}
+
+@Composable
 private fun DirectionalBubble(
     text: String,
     time: String,
@@ -152,3 +194,5 @@ private fun DirectionalBubble(
         }
     }
 }
+
+private const val CUSTOM_AMOLED_ARGB = 0xFFFFC107L

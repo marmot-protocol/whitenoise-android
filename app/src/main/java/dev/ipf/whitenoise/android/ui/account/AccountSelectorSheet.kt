@@ -58,9 +58,11 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.settingsRowAmoledSurfaceBorder
@@ -176,6 +178,7 @@ internal fun AccountSelectorContent(
     shortNpub: (String) -> String,
     avatarUrl: (String) -> String?,
     unreadCountForAccount: (String) -> ULong,
+    actionColorsForAccount: @Composable (String) -> AccountActionColors? = { null },
     onSwitchAccount: (String) -> Unit,
     onAddAccount: () -> Unit,
     modifier: Modifier = Modifier,
@@ -193,6 +196,7 @@ internal fun AccountSelectorContent(
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(state.accounts, key = { it.label }) { account ->
                     val unreadCount = unreadCountForAccount(account.label)
+                    val actionColors = actionColorsForAccount(account.label)
                     ListItem(
                         modifier =
                             Modifier
@@ -230,7 +234,7 @@ internal fun AccountSelectorContent(
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (unreadCount > 0uL) {
-                                    UnreadCountBadge(unreadCount)
+                                    UnreadCountBadge(unreadCount, actionColors = actionColors)
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 if (account.isReadOnly) {
@@ -305,6 +309,7 @@ internal fun AccountSelectorSheet(
             shortNpub = appState::shortNpub,
             avatarUrl = appState::avatarUrl,
             unreadCountForAccount = appState::unreadCountForAccount,
+            actionColorsForAccount = { accountRef -> accountActionColors(appState, accountRef) },
             onSwitchAccount = { accountLabel ->
                 // Run on the process-lifetime mutation scope, not this sheet's
                 // composition. setActiveAccount flips activeAccountRef partway
