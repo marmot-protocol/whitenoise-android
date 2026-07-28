@@ -58,9 +58,28 @@ class KeyPackagesContentTest {
     }
 
     @Test
-    fun relayRecordWithoutAValidEventIdIsPresentedButNotDeletable() {
-        val valid = keyPackage(keyPackageId = "valid-relay-package", eventIdHex = "cd".repeat(32), relay = true)
-        val malformed = keyPackage(keyPackageId = "malformed-relay-package", eventIdHex = "", relay = true)
+    fun relayRecordWithoutEventIdIsPresentedButNotDeletable() {
+        assertMalformedEventIdIsPresentedButNotDeletable("")
+    }
+
+    @Test
+    fun relayRecordWithNonHexEventIdIsPresentedButNotDeletable() {
+        assertMalformedEventIdIsPresentedButNotDeletable("gg".repeat(32))
+    }
+
+    @Test
+    fun relayRecordWithShortEventIdIsPresentedButNotDeletable() {
+        assertMalformedEventIdIsPresentedButNotDeletable("ab".repeat(31))
+    }
+
+    @Test
+    fun relayRecordWithLongEventIdIsPresentedButNotDeletable() {
+        assertMalformedEventIdIsPresentedButNotDeletable("ab".repeat(33))
+    }
+
+    private fun assertMalformedEventIdIsPresentedButNotDeletable(eventIdHex: String) {
+        val valid = keyPackage(keyPackageId = "valid-relay-package", eventIdHex = "ef".repeat(32), relay = true)
+        val malformed = keyPackage(keyPackageId = "malformed-relay-package", eventIdHex = eventIdHex, relay = true)
         var deleteTarget: AccountKeyPackageFfi? = null
 
         render(listOf(malformed, valid), onDelete = { deleteTarget = it })
