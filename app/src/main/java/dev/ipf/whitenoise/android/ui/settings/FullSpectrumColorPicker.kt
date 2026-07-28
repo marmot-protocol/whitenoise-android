@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HsvColor
@@ -167,6 +168,7 @@ private fun ColorChannel(
                     }.focusable()
                     .semantics {
                         contentDescription = label
+                        stateDescription = valueLabel
                         progressBarRangeInfo = ProgressBarRangeInfo(coercedValue, valueRange, steps)
                         setProgress { target ->
                             currentOnValueChange(target.coerceIn(valueRange.start, valueRange.endInclusive))

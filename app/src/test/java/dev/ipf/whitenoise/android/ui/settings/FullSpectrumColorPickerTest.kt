@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -14,9 +15,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.swipe
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
@@ -47,6 +50,34 @@ class FullSpectrumColorPickerTest {
             }
 
         composeRule.runOnIdle { assertEquals(0xFF00FF00L, latest) }
+    }
+
+    @Test
+    fun hueKeyboardInputUpdatesColor() {
+        var latest = 0xFFFF0000L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Hue")
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        composeRule
+            .onNodeWithContentDescription("Hue")
+            .performKeyInput { pressKey(Key.DirectionRight) }
+
+        composeRule.runOnIdle { assertEquals(0xFFFF0400L, latest) }
+    }
+
+    @Test
+    fun hueSemanticsReportsDisplayedValue() {
+        setPickerContent(initialArgb = 0xFF00FF00L, onColorChanged = {})
+
+        val stateDescription =
+            composeRule
+                .onNodeWithContentDescription("Hue")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.StateDescription]
+
+        assertEquals("120°", stateDescription)
     }
 
     @Test
