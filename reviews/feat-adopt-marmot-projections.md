@@ -1,21 +1,25 @@
 # Code Review: feat/adopt-marmot-projections (origin/master..HEAD)
 
-## Round 3 (adversarial)
+## Round 4 (adversarial)
 
 ## Summary
 
-All five previously-flagged correctness issues hold under re-verification: `syncEngineMute()` still fires from every local-mute mutator, `ChatsScreen`'s two mute reads still OR `engineMuted()`, `ChatRow`'s preview `Text` still carries `Modifier.weight(1f, fill = false)`, `chatRowNeedsMediaKindResolve` still bails on a projected `attachmentKind`, and `GroupDetailsScreen` no longer reads the visibility-frozen `chatsController.items` — it now prefers `ConversationController.latestChatListRow`, which is correctly scoped per-group (`projection.groupIdHex == group.groupIdHex` gates every update) and correctly reset per conversation (a fresh `ConversationController` is `remember`'d per `openChat.id`). That part of round 2's fix is solid. But the sibling fix in the same commit (`4d3c44f2`) — routing `manuallyMarkedUnread` into the per-account unread aggregate so the account dot lights — has two new problems: the aggregate it patched is shared with a numeric badge that now shows a wrong number, and a separate, untouched refresh path silently reverts the fix for the very case it was built for.
+`c4686c13` correctly fixes round 3's "shared aggregate double-duties as a count" finding: `accountUnreadCounts` is back to a pure message count (`effectiveUnreadCount`, not the old `effectiveUnreadContribution`), and manual-unread now lives in its own `accountManualUnreadRefs` sidecar Set that only `accountShowsUnreadDot()` reads. Badge purity is verified intact — `unreadCountForAccount()` never touches the new set. But the sidecar's own maintenance has two new problems: the bulk-refresh short-circuit meant to protect an already-known flag makes that same flag undiscoverable the first time for any account that hasn't been live/active this session, and the sidecar is written from three independent, unsynchronized call sites (two of them genuinely concurrent, on different threads), unlike the numeric aggregate it sits beside, which was deliberately built to avoid exactly that hazard. All previously-fixed issues (rounds 1-2) and previously-flagged open suggestions (rounds 2-3) were re-verified against the current code and hold unchanged.
 
 ## Issues
 
-### Correctness: the manual-unread account dot doesn't survive `refreshAccountUnreadCounts()` — opening the account switcher can turn it back off
+### Correctness: a background account's manual-unread flag can never be discovered — the bulk refresh's own short-circuit gates the only code that would set it
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2950-2959**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2966-2984**
 
 > ```kotlin
 > val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+> // The cheap engine total can't see the client's
+> // manual-unread flag, so an account we believe is
+> // manually flagged always takes the row fold —
+> // which also refreshes that flag from the rows.
 > summary.label to
->     if (rawCount == 0uL) {
+>     if (rawCount == 0uL && summary.label !in accountManualUnreadRefs) {
 >         0uL
 >     } else {
 >         refreshEffectiveAccountUnreadCount(summary, memberGate)
@@ -25,48 +29,55 @@ All five previously-flagged correctness issues hold under re-verification: `sync
 >     }
 > ```
 
-`rawCount` comes from the engine's own `accountUnreadSummary()` FFI call, whose `unreadCount` field is documented as "Total unread messages across all unarchived conversations" (`app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt:9814-9827`) — a real per-message tally with no notion of the client-only `manuallyMarkedUnread` flag. When that raw total is `0` (the exact case a manually-marked-unread chat with no new messages produces), this code hard-codes the account's contribution to `0` and never calls `refreshEffectiveAccountUnreadCount` — the only function that reads chat-list rows and could apply `ChatListItem.effectiveUnreadContribution` (the very fix this round shipped, `AccountUnread.kt:122-126`).
+The comment's own premise — "an account we believe is manually flagged always takes the row fold" — is the bug. `refreshEffectiveAccountUnreadCount` (line 3029-3032) is the *only* code path that calls `updateAccountManualUnread`, and it is only reached when `summary.label` is **already** in `accountManualUnreadRefs`, or the engine's raw count is nonzero. A manually-marked-unread chat with no real messages — the defining case for this feature — produces `rawCount == 0`. So the very first time an account's manual flag needs to be *discovered* (not just re-confirmed), the check `summary.label !in accountManualUnreadRefs` is true (the set doesn't know it yet), the shortcut fires, `0uL` is assigned, and `refreshEffectiveAccountUnreadCount`/`updateAccountManualUnread` never runs. This is a chicken-and-egg trap: the code path that would tell us the account is flagged only runs once we already believe it's flagged.
 
-Concretely: mark an already-read chat unread. `ChatsController.recompute()` (`Controllers.kt:3423-3427`) immediately computes `accountUnreadCounts[account] = 1` via the live path and the dot lights — correct, per the round-2 fix. Then open the account switcher: `AccountSelectorSheet`'s `LaunchedEffect(Unit)` unconditionally calls `appState.refreshAccounts()` (`AccountSelectorSheet.kt:280-289`), which calls `refreshAccountUnreadCounts()`. For that account, `rawCount` is `0` (no real unread messages), so the shortcut above assigns `0` — and since nothing else touched `accountUnreadCounts` during the suspension, the "don't clobber a fresher concurrent update" guard a few lines down (`AppState.kt:2966-2974`, `previous[ref] != count`) doesn't fire, because nothing changed. The final `accountUnreadCounts = merged` (line 2975) commits the `0`, and the dot goes dark — while the chat itself is still sitting there manually marked unread and bold in the list (`ChatRow` reads `effectiveHasUnread` directly off the live item, unaffected by this aggregate). This isn't a hypothetical race; opening the switcher is the sheet's own first action on every open, and this refresh path was never touched by the round-3 fix, so it's still running the pre-fix logic.
+`accountManualUnreadRefs` is only ever seeded by two things: this same row-fold (which the shortcut now prevents from ever running for real), or `ChatsController.recompute()`'s live push (`Controllers.kt:3428-3431`) — and `chatsController` is a single instance bound to whichever account is currently active (`AppState.kt:1850`), so that push never fires for a background account.
 
-This is the same "wired into some consumers, not others" shape rounds 1-2 flagged for mute and mark-unread respectively, one layer deeper: the live recompute path and the bulk-refresh path are two independent implementations of "this account's unread aggregate," and only one of them learned about manual-unread this round.
+Concretely: sign in on two devices/sessions to account A (active) and account B (signed in but backgrounded). On device/session where B was previously active, mark a chat unread on B, then switch to A. `accountManualUnreadRefs["B"]` was correctly seeded to `true` at that point (self-heals fine within that process's lifetime). Now kill the app and restart cold. `refreshAccounts()` runs at bootstrap (`AppState.kt:2614`) with a fresh `accountManualUnreadRefs = emptySet()`. For B, `rawCount == 0` and `"B" !in accountManualUnreadRefs` (true, freshly empty) → shortcut fires, B is assigned `0uL`, and its manual flag is never re-derived. B's account-switcher dot stays dark for as long as B remains backgrounded — until B becomes active again (reinstating the live push) or a notification arrives for B specifically (triggering the per-notification hot path at `AppState.kt:3051-3059`, which does call through to the row-fold). This defeats the doc comment on `refreshEffectiveAccountUnreadCount` that this exact function exists so "cross-account indicators stay honest for background accounts too (`AppState.kt:3005`, #662)" — for manual-unread specifically, background accounts are exactly what's now broken.
 
-### Correctness: the same aggregate now double-duties as a message *count*, so `effectiveUnreadContribution` inflates a real number
+### Correctness: `accountManualUnreadRefs` is updated from three unsynchronized call sites, at least two of which run on different threads — lost updates are reachable within a single bulk refresh
 
-**app/src/main/java/dev/ipf/whitenoise/android/state/AccountUnread.kt:117-126**
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2935-2942, 2960-2984**
 
 > ```kotlin
-> internal fun ChatListItem.effectiveUnreadContribution(activeAccountIdHex: String?): ULong =
->     maxOf(
->         effectiveUnreadCount(activeAccountIdHex),
->         if (effectiveHasUnread(activeAccountIdHex)) 1uL else 0uL,
->     )
+> internal fun updateAccountManualUnread(
+>     accountRef: String?,
+>     hasManualUnread: Boolean,
+> ) {
+>     val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
+>     accountManualUnreadRefs =
+>         if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
+> }
 > ```
 
-This value flows into `accountUnreadCounts` (`Controllers.kt:3423-3427`), which feeds *two* different consumers with different semantics:
+This is a plain read-modify-write on a shared `mutableStateOf<Set<String>>` — read the current set, compute a new one, assign. It has three call sites: `ChatsController.recompute()` on `Dispatchers.Main.immediate` (`Controllers.kt:3347,3428-3431`), and `refreshEffectiveAccountUnreadCount` on `Dispatchers.IO` (via `marmotIo`, `AppState.kt:2483-2486`) from both the bulk `refreshAccountUnreadCounts` (line 3029-3032, invoked from up to `ACCOUNT_UNREAD_ACCOUNT_FANOUT = 4` (`AppState.kt:6772`) truly-concurrent `async` blocks) and the single-account `refreshAccountUnreadCount` hot path (line 3057). None of the three coordinate with each other or with a version/timestamp check.
 
-- `accountShowsUnreadDot()` (`AppState.kt:2917`) — a boolean "> 0", for which this fix is exactly correct.
-- `unreadCountForAccount()` (`AppState.kt:2909`) → `AccountSelectorSheet.kt:195,232-233` → `UnreadCountBadge(unreadCount)` (`ui/common/Badges.kt:16-30`), which renders a literal number and an accessibility string pulled from `R.plurals.unread_messages_count` — `"%1$d unread message(s)"` (`app/src/main/res/values/strings.xml:876-879`).
+This doesn't require the notification-vs-switcher cross-path timing round 3 flagged for the sibling map — it's reachable from a single call to `refreshAccountUnreadCounts()` alone, whenever 2+ signed-in accounts both take the row-fold branch (e.g., both have real unread, or both are already flagged): each is a separate `async { accountGate.withPermit { ... } }` that runs genuinely concurrently (semaphore just bounds it to 4, doesn't serialize), and each calls `updateAccountManualUnread` directly from inside its own coroutine. If account A's read-compute-write of `accountManualUnreadRefs` interleaves with account B's (A reads `{}`, computes `{} + "A"`; B reads `{}` before A writes, computes `{} - "B"` = `{}`; A writes `{"A"}`; B writes `{}`), A's correctly-computed flag is silently dropped — the dot for A goes dark despite A having a genuinely manually-unread chat.
 
-Marking a read chat unread now adds `+1` to a number that's user-facing as "N unread messages" even though zero messages are actually unread. With one real unread chat (say 3 messages) and one manually-marked chat (0 messages), the account switcher shows "4 unread messages" — overcounting by exactly the number of manually-marked chats with no backlog. `AccountUnreadTest.accountUnreadCount_manualUnreadLightsTheDotWithoutACount` (`AccountUnreadTest.kt`) names the intent precisely — "lights the dot *without* a count" — but the fix landed at the shared-aggregate level, not at the dot-specific call site, so the "without a count" half of that intent isn't actually true for the other consumer of the same map.
-
-Both issues share one root cause: `accountUnreadCounts` is being asked to serve as both a boolean "does this account need attention" signal and a numeric "how many messages" count, and manual-unread only cleanly fits the first. A dot-only boolean (e.g., a parallel `Set<String>`/map of "has manual-or-real unread" computed alongside the numeric total, or computing the dot from `effectiveHasUnread` directly rather than from a `> 0` count) would let `accountUnreadCounts` stay a true message count for the badge, and would sidestep the `rawCount == 0` shortcut entirely since the dot would no longer depend on that numeric field at all.
+Contrast this with how the sibling numeric aggregate in the *same function* avoids this exact hazard: each `async` block only returns a local `Pair<label, count>` (line 2972-2980), and the shared `accountUnreadCounts` is only ever mutated once, sequentially, after `awaitAll()` completes (line 2985-2996 builds `refreshedCounts` from the collected pairs before touching state). `updateAccountManualUnread` bypasses that pattern entirely by mutating the shared set directly from inside the still-concurrent `async` bodies.
 
 ## Suggestions
 
-### Carried forward from round 2 (still open)
+### `accountManualUnreadRefs` has no removal-time or full-sign-out cleanup, unlike `accountUnreadCounts`
 
-- `ConversationController.isDm` / `isDirectConversation` (`Controllers.kt:4158-4159, 4188-4189`) still use the un-upgraded `GroupProjector.isDm(memberCount, name)` heuristic, unlike every list-derived consumer, which is now uniformly on `item.isDm()`/the `conversationKind`-aware overload (confirmed: `ChatFolderChipModel.kt` was migrated this round too).
-- `ChatsController.markUnread` (`Controllers.kt:3277-3293`) still folds through `mergeMarkReadChatListRow` (`applyChatListRow`, `Controllers.kt:2774-2782`), which can drop a just-applied `manuallyMarkedUnread = true` under the same stale-comparison race described in round 2.
-- `syncEngineMute`'s fire-and-forget per-call `mutationsScope.launch` jobs (`AppState.kt:3944-3963`) still have no ordering protection between a rapid mute/unmute pair.
-- `ChatsScreen.kt:195-216`'s `resolveFolderChatIds` still re-derives the composite-key mute check `isLocallyMuted` already provides, instead of calling it.
+**app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt:2946-2947, 2992-2996**
+
+`refreshAccountUnreadCounts` explicitly resets `accountUnreadCounts = emptyMap()` when no signing accounts remain (line 2947), and its merge step explicitly keeps only labels present in `refreshedCounts` — i.e., currently signed-in accounts — so a removed/signed-out account's entry is dropped (the comment at line 2989 says as much: "Accounts absent from refreshedCounts (removed) are still dropped"). `accountManualUnreadRefs` has no equivalent: nothing clears it on full sign-out, and nothing prunes an individual account's ref when that account is removed while flagged — the set can only grow or have entries explicitly cleared by `updateAccountManualUnread(ref, false)`, which never runs again for a ref that's no longer in `accounts`. In practice this looks self-healing if the same account signs back in later (the stale `true` entry just forces one extra row-fold instead of causing a wrong dot), so this reads as a hygiene/unbounded-growth gap rather than a demonstrated wrong-dot bug, but it's worth closing for symmetry with the map it sits beside.
+
+### Carried forward from rounds 2-3 (still open, confirmed present, unaffected by this commit)
+
+- `ConversationController.isDm` / `isDirectConversation` (`Controllers.kt:4163, 4193`) still call the un-upgraded `GroupProjector.isDm(memberCount, name)` two-arg heuristic rather than the `conversationKind`-aware overload every list-derived consumer uses.
+- `ChatsController.markUnread` (`Controllers.kt:3281`) still folds through `mergeMarkReadChatListRow` (`Controllers.kt:460, 2782`), which can drop a just-applied `manuallyMarkedUnread = true` under the stale-comparison race described in round 2.
+- `syncEngineMute`'s fire-and-forget per-call `mutationsScope.launch` jobs (`AppState.kt:3969-3987`) still have no ordering protection between a rapid mute/unmute pair.
+- `ChatsScreen.kt:213-215`'s `resolveFolderChatIds` still re-derives the composite-key mute check (`ChatMutePreferences.compositeKey(accountRef, groupIdHex) in mutedConversations || groupIdHex in engineMutedChatIds`) instead of calling `isLocallyMuted(groupIdHex) || groupIdHex in engineMutedChatIds`.
 
 ### Test gap: neither of this round's new issues would be caught by the existing suite
 
-`AccountUnreadTest.kt`'s new case only exercises the pure `accountUnreadCount(rows, ...)` function in isolation, asserting the aggregate value is `1` — which is correct for the dot but is exactly the value that turns out wrong for the badge. Nothing in the suite exercises `refreshAccountUnreadCounts`/`refreshEffectiveAccountUnreadCount` at all (no test file references either function), so the raw-count short-circuit regression has no coverage in either direction.
+`AccountUnreadTest.manualUnreadIsABooleanSidecarNotACount` only exercises the pure `accountHasManualUnread(rows, ...)` function in isolation — it proves the split is correct in principle but never touches `refreshAccountUnreadCounts`, the short-circuit, or any concurrent invocation. As round 3 noted, nothing in the suite exercises `refreshAccountUnreadCounts`/`refreshEffectiveAccountUnreadCount` at all, so both the bootstrap-discovery gap and the concurrent-write race have no coverage in either direction.
 
 ## What's Done Well
 
-- `latestChatListRow` is a clean, minimal fix: scoped to the conversation's own `groupIdHex` at the subscription-pipeline call site (`Controllers.kt:4757` `if (projection.groupIdHex == group.groupIdHex)`), rebuilt fresh per conversation via the existing `remember(openChat.id, ...)` keying in `MainShell.kt`, and read as a plain reactive `val` in `GroupDetailsScreen` rather than trapped in a stale `remember` block — no cross-conversation leakage, no stuck-stale-forever failure mode.
-- All five round-1/round-2 fixes were re-verified against the current code (not just trusted from the prior write-up) and hold exactly as described.
-- The `isDm()` migration picked up one more site this round (`ChatFolderChipModel.kt`), continuing to close the gap round 2 noted, with only the `ConversationController` pair left.
+- Badge purity is fully restored: `effectiveUnreadContribution` is gone, `accountUnreadCounts` only ever accumulates `effectiveUnreadCount`, and `AccountUnreadTest.manualUnreadIsABooleanSidecarNotACount` directly asserts the split (`accountUnreadCount` stays `0`, `accountHasManualUnread` is the boolean signal) — round 3's "aggregate double-duties as a count" finding is closed at the root, not patched around.
+- The sidecar is a clean, minimally-invasive addition: a dedicated `Set<String>` with its own updater, read by exactly one consumer (`accountShowsUnreadDot`), rather than another special case threaded through the existing numeric map.
+- All five round-1/round-2 correctness fixes (`syncEngineMute` wiring, both `ChatsScreen` mute reads, `ChatRow`'s preview weight modifier, `chatRowNeedsMediaKindResolve`'s early return, `GroupDetailsScreen`'s move to `latestChatListRow`) were re-verified against the current code and hold exactly as previously described.
+- Every round 2-3 open suggestion was re-checked and confirmed still present, unchanged — nothing was silently dropped or regressed by this commit, which only touches the manual-unread aggregation path.

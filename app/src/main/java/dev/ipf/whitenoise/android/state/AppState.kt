@@ -2932,21 +2932,42 @@ class WhiteNoiseAppState private constructor(
     internal var accountManualUnreadRefs by mutableStateOf<Set<String>>(emptySet())
         private set
 
+    private val manualUnreadLock = Any()
+
+    // First bulk refresh after process start must take the row fold even for
+    // zero-count accounts: the manual-unread flag lives only in rows, and the
+    // in-memory set starts empty, so the cheap short-circuit would never
+    // discover a background account's flag.
+    private var manualUnreadBootstrapped = false
+
     internal fun updateAccountManualUnread(
         accountRef: String?,
         hasManualUnread: Boolean,
     ) {
         val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
-        accountManualUnreadRefs =
-            if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
+        // Read-modify-write under a lock: writers race across the controller's
+        // main-thread recompute, the notification hot path, and the four-way
+        // concurrent bulk refresh.
+        synchronized(manualUnreadLock) {
+            accountManualUnreadRefs =
+                if (hasManualUnread) accountManualUnreadRefs + ref else accountManualUnreadRefs - ref
+        }
+    }
+
+    private fun retainManualUnreadRefs(current: Set<String>) {
+        synchronized(manualUnreadLock) {
+            accountManualUnreadRefs = accountManualUnreadRefs.intersect(current)
+        }
     }
 
     private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
         val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
         if (signingAccounts.isEmpty()) {
             accountUnreadCounts = emptyMap()
+            retainManualUnreadRefs(emptySet())
             return
         }
+        val manualBootstrap = !manualUnreadBootstrapped
         val previous = accountUnreadCounts
         val rawCountsByHex =
             runCatchingCancellable {
@@ -2965,12 +2986,16 @@ class WhiteNoiseAppState private constructor(
                         async {
                             accountGate.withPermit {
                                 val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+                                val cheapZero =
+                                    rawCount == 0uL &&
+                                        !manualBootstrap &&
+                                        summary.label !in accountManualUnreadRefs
                                 // The cheap engine total can't see the client's
                                 // manual-unread flag, so an account we believe is
                                 // manually flagged always takes the row fold —
                                 // which also refreshes that flag from the rows.
                                 summary.label to
-                                    if (rawCount == 0uL && summary.label !in accountManualUnreadRefs) {
+                                    if (cheapZero) {
                                         0uL
                                     } else {
                                         refreshEffectiveAccountUnreadCount(summary, memberGate)
@@ -2994,6 +3019,9 @@ class WhiteNoiseAppState private constructor(
             if (previous[ref] != count && merged.containsKey(ref)) merged[ref] = count
         }
         accountUnreadCounts = merged
+        manualUnreadBootstrapped = true
+        // Removed accounts drop their manual flag alongside their count.
+        retainManualUnreadRefs(refreshedCounts.keys)
     }
 
     /**
