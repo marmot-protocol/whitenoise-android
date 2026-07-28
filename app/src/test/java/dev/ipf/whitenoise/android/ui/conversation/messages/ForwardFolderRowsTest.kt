@@ -8,7 +8,7 @@ class ForwardFolderRowsTest {
     private fun folder(
         id: String,
         name: String,
-    ) = ChatFolder(id = id, name = name, description = "", order = 0, isSystem = false, systemKind = null)
+    ) = ChatFolder(id = id, name = name, description = "", order = 0, systemKind = null)
 
     private val rows =
         listOf(

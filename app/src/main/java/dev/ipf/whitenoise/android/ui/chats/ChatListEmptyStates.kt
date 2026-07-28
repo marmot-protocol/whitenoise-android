@@ -25,13 +25,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ChatListFilter
-import kotlinx.coroutines.flow.filter
 
 @Composable
 internal fun ChatListNoResults(
     query: String,
-    filter: ChatListFilter,
+    unreadFolderSelected: Boolean,
 ) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(
@@ -47,7 +45,7 @@ internal fun ChatListNoResults(
             val copy =
                 when {
                     query.isNotEmpty() -> stringResource(R.string.chat_list_no_results_for, query)
-                    filter == ChatListFilter.Unread -> stringResource(R.string.chat_list_no_unread)
+                    unreadFolderSelected -> stringResource(R.string.chat_list_no_unread)
                     else -> stringResource(R.string.no_chats_yet)
                 }
             Text(

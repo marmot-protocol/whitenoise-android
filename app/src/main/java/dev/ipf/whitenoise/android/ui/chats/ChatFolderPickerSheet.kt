@@ -26,16 +26,18 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /**
- * Folder assignment sheet for one or many chats: every custom folder as a
- * tri-state checkbox (on = every target chat is a manual member, mixed =
- * some are), plus a New-folder entry that hands off to the create form with
- * the targets preselected. Toggling edits MANUAL membership only — that is
- * the one thing this surface controls; rule-matched chats keep following
- * their rule regardless of what is toggled here.
+ * Folder assignment sheet for one or many chats: every folder — seeded
+ * defaults included — as a tri-state checkbox (on = every target chat is a
+ * manual member, mixed = some are), plus a New-folder entry that hands off
+ * to the create form with the targets preselected. Toggling edits MANUAL
+ * membership only — that is the one thing this surface controls;
+ * rule-matched chats keep following their rule regardless of what is
+ * toggled here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,9 +52,9 @@ internal fun ChatFolderPickerSheet(
     val accountRef = appState.activeAccountRef
     val store = appState.chatFolderPreferences
     val storeState by store.state.collectAsState()
-    val customFolders =
+    val folders =
         remember(storeState, accountRef) {
-            accountRef?.let(store::foldersFor).orEmpty().filterNot { it.isSystem }
+            accountRef?.let(store::foldersFor).orEmpty()
         }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,7 +66,7 @@ internal fun ChatFolderPickerSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
-            customFolders.forEach { folder ->
+            folders.forEach { folder ->
                 val membership =
                     accountRef?.let { store.membershipFor(it, folder.id) }.orEmpty()
                 val checkboxState = chatFolderTriState(targetChatIds, membership)
@@ -78,7 +80,9 @@ internal fun ChatFolderPickerSheet(
                         },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     leadingContent = { TriStateCheckbox(state = checkboxState, onClick = null) },
-                    headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = {
+                        Text(chatFolderDisplayName(folder), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
                     supportingContent =
                         if (folder.id in ruleMatchedFolderIds) {
                             // The checkbox reflects manual membership only; a

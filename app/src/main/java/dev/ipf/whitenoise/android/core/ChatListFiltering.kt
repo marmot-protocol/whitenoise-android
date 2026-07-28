@@ -53,10 +53,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.flow.filter
 import java.util.Locale
 
-/** Chat-list filter state. `Archived` swaps the source list to archived chats
- *  rather than predicate-filtering the active one. */
-internal enum class ChatListFilter { All, Unread, Groups, Archived }
-
 internal fun localeInvariantFold(value: String): String = value.lowercase(Locale.ROOT)
 
 // At least as long as the truncated id prefix shown in group details, so a
@@ -69,30 +65,19 @@ internal fun looksLikeGroupIdNeedle(ciNeedle: String): Boolean =
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
-    filter: ChatListFilter,
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
     bodyMatchGroupIds: Set<String> = emptySet(),
-    // Non-null when a custom folder chip is selected: the manual-membership
-    // chat ids (lowercased) that folder contains. System folders keep riding
-    // the legacy enum branches above.
-    customFolderChatIds: Set<String>? = null,
+    // Non-null when a folder chip is selected: the effective chat ids
+    // (lowercased, manual plus rule matches) that folder contains. Every
+    // folder — seeded defaults included — filters through this one path.
+    folderChatIds: Set<String>? = null,
 ): List<ChatListItem> {
-    val byFilter =
-        when (filter) {
-            // Archived swaps the source list upstream, so there's nothing extra
-            // to filter here — show every archived chat.
-            ChatListFilter.All, ChatListFilter.Archived -> source
-            ChatListFilter.Unread -> source.filter { it.effectiveHasUnread(appState.activeAccount?.accountIdHex) }
-            // A named two-member chat is a group, not a DM — classify by type,
-            // not raw headcount, so it isn't wrongly hidden here.
-            ChatListFilter.Groups -> source.filter { !it.isDm() }
-        }
     val byFolder =
-        if (customFolderChatIds == null) {
-            byFilter
+        if (folderChatIds == null) {
+            source
         } else {
-            byFilter.filter { it.group.groupIdHex.lowercase() in customFolderChatIds }
+            source.filter { it.group.groupIdHex.lowercase() in folderChatIds }
         }
     val needle = rawQuery.trim()
     if (needle.isEmpty()) return byFolder
@@ -133,7 +118,7 @@ internal fun applyChatListSearchAndFilter(
         // preview line. The matched message id + highlighted snippet ride a
         // separate map keyed by group id; here we only need to know the chat
         // qualifies so it joins the result set. Body matches still pass
-        // through the chip filter above, so an Unread/Groups filter narrows
+        // through the folder filter above, so a selected folder narrows
         // them the same way it narrows title/preview hits.
         item.group.groupIdHex in bodyMatchGroupIds
     }

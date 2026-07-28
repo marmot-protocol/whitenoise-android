@@ -408,7 +408,10 @@ private fun forwardFolderBulkRows(
     val mutedConversations = appState.chatMutePreferences.state.value.mutedConversations
     return store
         .foldersFor(accountRef)
-        .filterNot { it.isSystem }
+        // These rows render and query-match the stored name, so folders
+        // without one (un-renamed defaults) have nothing to show here; a
+        // renamed default participates like any other folder.
+        .filter { it.name.isNotBlank() }
         .map { folder ->
             folder to
                 chatFolderChatIds(

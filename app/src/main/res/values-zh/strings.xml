@@ -860,6 +860,13 @@
     <string name="chat_folder_unread_only">仅未读</string>
     <string name="chat_folder_unread_only_subtitle">仅包含有未读消息的聊天</string>
     <string name="chat_folder_include_muted">包含已静音的聊天</string>
+    <string name="chat_folder_groups_only">仅群组</string>
+    <string name="chat_folder_groups_only_subtitle">仅包含群组聊天</string>
+    <string name="chat_folder_archived_only">仅已归档</string>
+    <string name="chat_folder_archived_only_subtitle">包含已归档的聊天而非活跃聊天</string>
+    <string name="chat_folder_restore_defaults">恢复默认文件夹</string>
+    <string name="chat_folder_restore_defaults_subtitle">重新添加缺失的默认文件夹</string>
+    <string name="chat_folder_drag_to_reorder">拖动以重新排序</string>
     <string name="chat_folder_manual_chats">已包含的聊天</string>
     <string name="chat_folder_people">人员</string>
     <string name="chat_folder_people_subtitle">包含与这些人的任何聊天</string>
