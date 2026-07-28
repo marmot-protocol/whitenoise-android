@@ -1126,6 +1126,9 @@
     <string name="custom_hex_color">自訂十六進位顏色</string>
     <string name="invalid_hex_color">請輸入類似 #336699 的顏色。</string>
     <string name="apply_color">套用顏色</string>
+    <string name="color_picker_hue">色相</string>
+    <string name="color_picker_saturation">飽和度</string>
+    <string name="color_picker_brightness">亮度</string>
     <string name="reset_to_default">恢復預設值</string>
 
     <string name="tts_warning_title">外部文字轉語音引擎</string>

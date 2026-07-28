@@ -1148,6 +1148,9 @@
     <string name="custom_hex_color">Colore esadecimale personalizzato</string>
     <string name="invalid_hex_color">Inserisci un colore come #336699.</string>
     <string name="apply_color">Applica colore</string>
+    <string name="color_picker_hue">Tonalità</string>
+    <string name="color_picker_saturation">Saturazione</string>
+    <string name="color_picker_brightness">Luminosità</string>
     <string name="reset_to_default">Ripristina predefiniti</string>
 
     <string name="tts_warning_title">Motore di sintesi vocale esterno</string>

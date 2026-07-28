@@ -1,0 +1,239 @@
+package dev.ipf.whitenoise.android.ui.settings
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import dev.ipf.whitenoise.android.state.BubbleSide
+import dev.ipf.whitenoise.android.state.BubbleTheme
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class FullSpectrumColorPickerTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun hueSemanticsUpdatesColorWithoutTouch() {
+        var latest = 0xFFFF0000L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Hue")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(120f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0xFF00FF00L, latest) }
+    }
+
+    @Test
+    fun saturationSemanticsUpdatesColorWithoutTouch() {
+        var latest = 0xFFFF0000L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Saturation")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(0f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0xFFFFFFFFL, latest) }
+    }
+
+    @Test
+    fun brightnessSemanticsUpdatesColorWithoutTouch() {
+        var latest = 0xFFFF0000L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Brightness")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(0.5f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0xFF800000L, latest) }
+    }
+
+    @Test
+    fun hueMaximumKeepsIndicatorAtMaximum() {
+        setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = {})
+
+        composeRule
+            .onNodeWithContentDescription("Hue")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(360f))
+            }
+
+        val hueRange =
+            composeRule
+                .onNodeWithContentDescription("Hue")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(360f, hueRange.current)
+    }
+
+    @Test
+    fun saturationRoundTripPreservesHueAtWhite() {
+        var latest = 0xFF00FF00L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Saturation")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(0f))
+            }
+        composeRule
+            .onNodeWithContentDescription("Saturation")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(1f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0xFF00FF00L, latest) }
+    }
+
+    @Test
+    fun brightnessRoundTripPreservesHueAndSaturationAtBlack() {
+        var latest = 0xFF0000FFL
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule
+            .onNodeWithContentDescription("Brightness")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(0f))
+            }
+        composeRule
+            .onNodeWithContentDescription("Brightness")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(1f))
+            }
+
+        composeRule.runOnIdle { assertEquals(0xFF0000FFL, latest) }
+    }
+
+    @Test
+    fun tappingVisibleMaximumThumbKeepsMaximumValue() {
+        var latest = 0xFFFF0000L
+        setPickerContent(initialArgb = latest) { latest = it }
+
+        composeRule.onNodeWithContentDescription("Brightness").performTouchInput {
+            click(Offset(width - 9f, centerY))
+        }
+
+        composeRule.runOnIdle { assertEquals(0xFFFF0000L, latest) }
+    }
+
+    @Test
+    fun draggingHueStreamsLiveColorUpdates() {
+        val updates = mutableListOf<Long>()
+        setPickerContent(initialArgb = 0xFFFF0000L, onColorChanged = updates::add)
+
+        composeRule.onNodeWithContentDescription("Hue").performTouchInput {
+            swipe(
+                start = Offset(1f, centerY),
+                end = Offset(width - 1f, centerY),
+                durationMillis = 500,
+            )
+        }
+
+        composeRule.runOnIdle { assertTrue("drag should stream intermediate colors", updates.size > 2) }
+    }
+
+    @Test
+    fun exactHexMovesPickerAndVisualAdjustmentUpdatesHex() {
+        var latest = 0xFFFF0000L
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                var selectedArgb by remember { mutableLongStateOf(latest) }
+                TonalSwatchPicker(
+                    selectedArgb = selectedArgb,
+                    onColorSelected = {
+                        latest = it
+                        selectedArgb = it
+                    },
+                    scopeKey = "global",
+                    theme = BubbleTheme.Light,
+                    slotKey = BubbleSide.Mine.name,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("More colors").performClick()
+        composeRule.onNodeWithText("Custom hex color").performTextReplacement("#00FF00")
+
+        val hueRange =
+            composeRule
+                .onNodeWithContentDescription("Hue")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(ProgressBarRangeInfo(120f, 0f..360f, 359), hueRange)
+
+        composeRule
+            .onNodeWithContentDescription("Hue")
+            .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                assertTrue(setProgress(240f))
+            }
+        composeRule.onNodeWithText("#0000FF").assertExists()
+        composeRule.runOnIdle { assertEquals(0xFF0000FFL, latest) }
+    }
+
+    @Test
+    fun invalidExactHexCannotApply() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TonalSwatchPicker(
+                    selectedArgb = 0xFFFF0000L,
+                    onColorSelected = {},
+                    scopeKey = "global",
+                    theme = BubbleTheme.Light,
+                    slotKey = BubbleSide.Mine.name,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("More colors").performClick()
+        composeRule.onNodeWithText("Custom hex color").performTextReplacement("#XYZ")
+        composeRule.onNodeWithText("Apply color").assertIsNotEnabled()
+        composeRule.onNodeWithText("Enter a color like #336699.").assertExists()
+    }
+
+    private fun setPickerContent(
+        initialArgb: Long,
+        onColorChanged: (Long) -> Unit,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                var argb by remember { mutableLongStateOf(initialArgb) }
+                FullSpectrumColorPicker(
+                    argb = argb,
+                    onColorChanged = {
+                        argb = it
+                        onColorChanged(it)
+                    },
+                )
+            }
+        }
+    }
+}

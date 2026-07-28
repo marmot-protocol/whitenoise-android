@@ -1148,6 +1148,9 @@
     <string name="custom_hex_color">Cor hexadecimal personalizada</string>
     <string name="invalid_hex_color">Insira uma cor como #336699.</string>
     <string name="apply_color">Aplicar cor</string>
+    <string name="color_picker_hue">Matiz</string>
+    <string name="color_picker_saturation">Saturação</string>
+    <string name="color_picker_brightness">Brilho</string>
     <string name="reset_to_default">Redefinir padrões</string>
 
     <string name="tts_warning_title">Motor de texto para fala externo</string>
