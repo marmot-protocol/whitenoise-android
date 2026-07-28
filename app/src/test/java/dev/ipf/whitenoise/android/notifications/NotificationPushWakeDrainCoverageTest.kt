@@ -81,8 +81,10 @@ class NotificationPushWakeDrainCoverageTest {
                 "processNotificationUpdate(update)" in listener &&
                     "postAfterNotificationAvatarPreWarm(" in updateProcessing &&
                     "val postEpoch = notificationPostEpoch.capture()" in updateProcessing &&
-                    "preWarm = { preWarmNotificationAvatars(update) }" in updateProcessing &&
-                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) }" in updateProcessing,
+                    "val engineMuted = engineNotificationMuted(update)" in updateProcessing &&
+                    "preWarm = { preWarmNotificationAvatars(update, engineMuted) }" in updateProcessing &&
+                    "post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) }" in
+                    updateProcessing,
             )
         }
 

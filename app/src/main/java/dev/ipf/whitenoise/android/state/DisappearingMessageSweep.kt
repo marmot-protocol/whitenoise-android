@@ -1,54 +1,21 @@
 package dev.ipf.whitenoise.android.state
 
 /**
- * Pure selection + skew helpers for the disappearing-message background sweep
- * (#745). The actual prune/secure-delete is owned by the engine
- * (`secureDeleteExpired`); these side-effect-free helpers pin the Android-side
- * decisions so they can be unit-tested without an engine, an Android context,
- * or WorkManager:
+ * Pure scheduling + local-hide helpers for the disappearing-message sweeps
+ * (#745). Gate and prune are engine-owned: `sweepExpiredRetention` runs the
+ * clock-skew, unread-anchor, and scan-cap deferrals atomically with the
+ * prune. These side-effect-free helpers pin what stays Android's call so it
+ * can be unit-tested without an engine, an Android context, or WorkManager:
  *
- *  - which groups the sweep should touch (only those with a retention window
- *    set — a group with the timer off is a no-op), and
- *  - the device-clock cutoff (with a small skew tolerance) the background sweep
- *    uses before invoking the engine's raw-current-time prune.
+ *  - when a loaded row should hide locally while the engine's prune is still
+ *    pending ([isLocallyExpired], #797 read anchors), and
+ *  - when the open conversation's sweep loop should wake next
+ *    ([nextForegroundSweepDelayMillis], [shouldRunForegroundSweepAfterWake]).
  *
  * Keeping these out of the worker mirrors the `decideForegroundStart` pattern
  * (see [dev.ipf.whitenoise.android.notifications.decideForegroundStart]).
  */
 object DisappearingMessageSweep {
-    /**
-     * Skew tolerance applied to the device clock when deciding what counts as
-     * "expired". The engine owns the authoritative prune, but a coarse sweep
-     * should never be more eager than a device whose clock runs fast: subtract
-     * this margin so a message within the skew window of its expiry survives to
-     * the next sweep rather than vanishing early. Mirrors the coarse-cadence
-     * intent of the in-conversation sweep.
-     */
-    const val CLOCK_SKEW_TOLERANCE_MS: Long = 5_000L
-
-    /** Page size for the bounded local timeline scan that gates the raw engine prune. */
-    val TIMELINE_SCAN_PAGE_LIMIT: UInt = 200u
-
-    /**
-     * Hard cap on pages the gating scan may fetch per group. The scan seeds
-     * its cursor at the raw cutoff (see [TIMELINE_SCAN_SEED_MESSAGE_ID]), so
-     * one page normally decides; this backstop keeps a pathological history
-     * from pinning an IO thread, mirroring `SEARCH_MAX_PAGES`. Exhausting it
-     * defers the group (never invokes the raw prune unproven). See #979.
-     */
-    const val TIMELINE_SCAN_MAX_PAGES: Int = 20
-
-    /**
-     * Compound-cursor id for seeding the gating scan's first page at the raw
-     * cutoff instead of the newest message (#979). The engine requires
-     * `before` and `beforeMessageId` together, and its cursor predicate is
-     * `timelineAt < before OR (timelineAt == before AND messageIdHex < beforeMessageId)`;
-     * the all-zeros id sorts before every real 32-byte message id, so
-     * `(rawCutoffSeconds, this)` is an exclusive `timelineAt < rawCutoffSeconds`
-     * bound — exactly the rows [classifyScanPage] can classify.
-     */
-    val TIMELINE_SCAN_SEED_MESSAGE_ID: String = "0".repeat(64)
-
     /** Inputs for read-anchored local expiry (#797). */
     data class LocalExpiryRow(
         val timelineAtSeconds: ULong,
@@ -56,94 +23,6 @@ object DisappearingMessageSweep {
         val readAnchoredAtSeconds: ULong? = null,
         val deferSendTimeExpiry: Boolean = false,
     )
-
-    /** One row in the background-prune gating scan. */
-    data class TimelineScanRow(
-        val timelineAtSeconds: ULong,
-        val direction: String,
-    )
-
-    /** Outcome of classifying one scanned timeline page against the cutoffs. */
-    enum class TimelineScanPageDecision {
-        /** A row sits in the skew window; defer the whole group this pass. */
-        DeferSkewWindow,
-
-        /** A raw prune would delete an unread received row before its read anchor. */
-        DeferUnreadReceived,
-
-        /** A row is expired beyond skew (and none is in the window); prune. */
-        InvokeSecureDelete,
-
-        /** No row decides either way; keep paging (or give up at the caps). */
-        KeepScanning,
-    }
-
-    /**
-     * Classify one page of timeline rows for the background-prune gate. The
-     * skew-window check deliberately wins over expired-beyond-skew when both
-     * appear on the same page: the raw engine prune has no cutoff parameter,
-     * so invoking it would also delete the near-boundary row the #745 skew
-     * tolerance exists to protect.
-     */
-    fun classifyScanPage(
-        timelineAtSeconds: Iterable<ULong>,
-        rawCutoffSeconds: ULong,
-        skewCutoffSeconds: ULong,
-    ): TimelineScanPageDecision =
-        classifyScanPage(
-            rows = timelineAtSeconds.map { TimelineScanRow(it, direction = "sent") },
-            rawCutoffSeconds = rawCutoffSeconds,
-            skewCutoffSeconds = skewCutoffSeconds,
-            lastReadTimelineAt = null,
-        )
-
-    /**
-     * Classify one page for the background-prune gate, deferring send-time
-     * expiry for received rows the user has not read yet (#797).
-     */
-    fun classifyScanPage(
-        rows: Iterable<TimelineScanRow>,
-        rawCutoffSeconds: ULong,
-        skewCutoffSeconds: ULong,
-        lastReadTimelineAt: ULong?,
-    ): TimelineScanPageDecision {
-        val scannedRows = rows.toList()
-        return when {
-            scannedRows.any {
-                isWithinSkewWindow(
-                    timelineAtSeconds = it.timelineAtSeconds,
-                    rawCutoffSeconds = rawCutoffSeconds,
-                    skewCutoffSeconds = skewCutoffSeconds,
-                )
-            } -> TimelineScanPageDecision.DeferSkewWindow
-            scannedRows.any {
-                it.timelineAtSeconds < rawCutoffSeconds &&
-                    isSendTimeExpiryDeferredForBackgroundScan(
-                        direction = it.direction,
-                        timelineAtSeconds = it.timelineAtSeconds,
-                        lastReadTimelineAt = lastReadTimelineAt,
-                    )
-            } -> TimelineScanPageDecision.DeferUnreadReceived
-            scannedRows.any {
-                isExpiredBeyondSkew(it.timelineAtSeconds, skewCutoffSeconds)
-            } -> TimelineScanPageDecision.InvokeSecureDelete
-            else -> TimelineScanPageDecision.KeepScanning
-        }
-    }
-
-    /**
-     * True when a received row is still unread on the persisted watermark, so
-     * its send-time expiry must not hide or prune it yet (#797).
-     */
-    fun isSendTimeExpiryDeferredForBackgroundScan(
-        direction: String,
-        timelineAtSeconds: ULong,
-        lastReadTimelineAt: ULong?,
-    ): Boolean {
-        if (direction != "received") return false
-        if (lastReadTimelineAt != null) return timelineAtSeconds > lastReadTimelineAt
-        return true
-    }
 
     /**
      * Slow-path cap for the in-conversation sweep when no loaded row is about
@@ -210,60 +89,12 @@ object DisappearingMessageSweep {
     }
 
     /**
-     * The device-clock instant the sweep should treat as "now" when reasoning
-     * about expiry, pulled back by [CLOCK_SKEW_TOLERANCE_MS] and floored at zero
-     * so an absurdly early clock can't produce a negative cutoff.
-     */
-    fun expiryCutoffMillis(nowMillis: Long): Long = (nowMillis - CLOCK_SKEW_TOLERANCE_MS).coerceAtLeast(0L)
-
-    /**
-     * Engine-equivalent cutoff before skew is applied: messages strictly before
-     * this second are what `secureDeleteExpired` would prune if invoked now.
-     */
-    fun rawExpiryCutoffSeconds(
-        nowMillis: Long,
-        disappearingMessageSecs: ULong,
-    ): ULong? = expiryCutoffSeconds(nowMillis, disappearingMessageSecs, skewToleranceMillis = 0L)
-
-    /**
-     * Skew-safe cutoff: the background sweep should only let the engine prune
-     * messages strictly before this second. The FFI call has no cutoff parameter,
-     * so callers use this with [isWithinSkewWindow] to defer near-boundary groups
-     * before invoking the raw-current-time engine prune.
-     */
-    fun expiryCutoffSeconds(
-        nowMillis: Long,
-        disappearingMessageSecs: ULong,
-    ): ULong? = expiryCutoffSeconds(nowMillis, disappearingMessageSecs, CLOCK_SKEW_TOLERANCE_MS)
-
-    /** True when [timelineAtSeconds] is safely older than the skew-adjusted cutoff. */
-    fun isExpiredBeyondSkew(
-        timelineAtSeconds: ULong,
-        skewCutoffSeconds: ULong,
-    ): Boolean = skewCutoffSeconds > 0uL && timelineAtSeconds < skewCutoffSeconds
-
-    /**
-     * True when the raw engine call would prune [timelineAtSeconds] but the
-     * skew-adjusted cutoff says to wait. If any local row is in this window,
-     * the background pass defers the whole group to avoid deleting a
-     * near-boundary message early.
-     */
-    fun isWithinSkewWindow(
-        timelineAtSeconds: ULong,
-        rawCutoffSeconds: ULong,
-        skewCutoffSeconds: ULong,
-    ): Boolean =
-        rawCutoffSeconds > skewCutoffSeconds &&
-            timelineAtSeconds >= skewCutoffSeconds &&
-            timelineAtSeconds < rawCutoffSeconds
-
-    /**
      * Delay until the next foreground conversation sweep should run. Unlike the
      * coarse background pass, an open chat must re-publish at the first loaded
      * row's local expiry boundary so the bubble disappears while the user is
      * watching. Rows that are already past that boundary get a short retry delay:
      * the local filter has hidden them, but the engine's strict cutoff may need
-     * the next wall-clock second before `secureDeleteExpired` physically prunes
+     * the next wall-clock second before the engine sweep physically prunes
      * and reports their media tags.
      */
     fun nextForegroundSweepDelayMillis(
@@ -360,20 +191,6 @@ object DisappearingMessageSweep {
             )
         }
     }
-
-    private fun expiryCutoffSeconds(
-        nowMillis: Long,
-        disappearingMessageSecs: ULong,
-        skewToleranceMillis: Long,
-    ): ULong? {
-        if (!shouldSweepGroup(disappearingMessageSecs)) return null
-        val safeNowMillis = nowMillis.coerceAtLeast(0L)
-        val effectiveNowMillis = (safeNowMillis - skewToleranceMillis.coerceAtLeast(0L)).coerceAtLeast(0L)
-        val effectiveNowSeconds = (effectiveNowMillis / MILLIS_PER_SECOND).toULong()
-        return effectiveNowSeconds.saturatingMinus(disappearingMessageSecs)
-    }
-
-    private fun ULong.saturatingMinus(value: ULong): ULong = if (this > value) this - value else 0uL
 
     private fun ULong.saturatingPlus(value: ULong): ULong = if (ULong.MAX_VALUE - this < value) ULong.MAX_VALUE else this + value
 }

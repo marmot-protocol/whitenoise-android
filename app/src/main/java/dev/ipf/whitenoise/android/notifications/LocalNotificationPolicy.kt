@@ -11,8 +11,14 @@ object LocalNotificationPolicy {
         activeConversationAccountRef: String?,
         appLockScreenVisible: Boolean,
         conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+        engineMuted: Boolean = false,
     ): Boolean {
         if (appLockScreenVisible) return false
+        // The engine's durable mute converges across a user's devices, so a
+        // conversation muted elsewhere stays quiet here even before local
+        // preferences learn about it. It is a full mute: the most restrictive
+        // of it and the local notify mode wins (mentions included).
+        if (engineMuted) return false
         when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
             ChatNotifyMode.ALL -> Unit
             ChatNotifyMode.MENTIONS_ONLY -> if (!update.isMention) return false

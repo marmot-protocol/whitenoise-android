@@ -45,6 +45,8 @@ import dev.ipf.marmotkit.PushRegistrationShareStatusFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
+import dev.ipf.marmotkit.RetentionSweepStatusFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -1272,6 +1274,12 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)
         mediaThumbnailCache.remove(cacheKey)
+    }
+
+    /** Every key currently resident in either in-memory tier, for group-scoped eviction. */
+    internal fun mediaMemoryCacheKeysSnapshot(): Set<String> {
+        assertMainThread { "mediaMemoryCacheKeysSnapshot" }
+        return (mediaPlaintextCache.keysSnapshot() + mediaThumbnailCache.keysSnapshot()).toSet()
     }
 
     /**
@@ -4608,20 +4616,17 @@ class WhiteNoiseAppState private constructor(
      * its decrypted L2 media still secure-deleted, and a stale tray card still
      * cleared — without waiting for the user to reopen the chat.
      *
-     * For each group with a retention window set it performs the same work as
-     * the foreground sweep: `secureDeleteExpired` (engine prune + plaintext
-     * scrub), evict the on-disk media cache by the pruned ciphertext tags
-     * (#334 — works regardless of load state), and dismiss the conversation's
-     * notification when rows were actually pruned. Groups with the timer off
-     * are skipped per [DisappearingMessageSweep.shouldSweepGroup]. The FFI
-     * prune call uses the engine's raw current-time cutoff, so Android first
-     * scans the local timeline with [DisappearingMessageSweep.expiryCutoffSeconds]
-     * and defers any group with a raw-expired row still inside the skew window.
+     * The sweep core is engine-owned: one `sweepExpiredRetention` call per
+     * account covers every retention-enabled group with the same clock-skew,
+     * unread-anchor, and scan-cap deferrals Android used to gate app-side,
+     * run atomically with the prune on the account's serialized command
+     * worker. Android keeps only what it owns per pruned group: tray-card
+     * dismissal (#333) and decrypted media-cache eviction (#334).
      *
-     * Best-effort and per-group isolated: a failure on one account/group is
-     * logged (cancellation re-thrown) and the sweep moves on, so one bad group
-     * can't starve the rest. Bootstraps the runtime first so the worker can run
-     * after a process death with no UI attached.
+     * Best-effort and per-account isolated: a failure on one account is
+     * logged (cancellation re-thrown) and the sweep moves on, so one bad
+     * account can't starve the rest. Bootstraps the runtime first so the
+     * worker can run after a process death with no UI attached.
      */
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
@@ -4629,210 +4634,80 @@ class WhiteNoiseAppState private constructor(
         val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
         for (account in signedInAccounts) {
             currentCoroutineContext().ensureActive()
-            sweepExpiredForAccount(account.label)
-        }
-    }
-
-    private suspend fun sweepExpiredForAccount(accountRef: String) {
-        val rows =
-            runCatchingCancellable { marmotIo { chatList(accountRef, includeArchived = true) } }
-                .onFailure {
-                    appStateDebug(it) { "sweep chat-list load failed account=${accountRef.take(8)}: ${it.readableMessage()}" }
-                }.getOrNull()
-                ?: return
-        for (row in rows) {
-            currentCoroutineContext().ensureActive()
-            val groupIdHex = row.groupIdHex.takeIf { it.isNotBlank() } ?: continue
-            sweepExpiredForGroup(accountRef, groupIdHex, row)
-        }
-    }
-
-    private suspend fun sweepExpiredForGroup(
-        accountRef: String,
-        groupIdHex: String,
-        chatRow: ChatListRowFfi,
-    ) {
-        val retentionSecs =
-            runCatchingCancellable { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
-                .onFailure {
-                    appStateDebug(it) { "sweep retention read failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
-                }.getOrNull()
-                ?: return
-        // No-op for groups with the timer off (acceptance criterion).
-        if (!DisappearingMessageSweep.shouldSweepGroup(retentionSecs)) return
-        if (
-            !shouldInvokeDisappearingSecureDelete(
-                accountRef,
-                groupIdHex,
-                retentionSecs,
-                System.currentTimeMillis(),
-                chatRow.lastReadTimelineAt,
-            )
-        ) {
-            return
-        }
-        runCatchingCancellable {
-            withGroupCommitLock(accountRef, groupIdHex) {
-                val mediaBeforePrune =
-                    runCatchingCancellable { marmotIo { listMedia(accountRef, groupIdHex, null) } }
-                        .onFailure {
-                            appStateDebug(it) {
-                                "sweep media snapshot failed group=${groupIdHex.take(8)}: ${it.readableMessage()}"
-                            }
-                        }.getOrDefault(emptyList())
-                val result = marmotIo { secureDeleteExpired(accountRef, groupIdHex) }
-                result to mediaBeforePrune
-            }
-        }.onSuccess { (result, mediaBeforePrune) ->
-            val expiredCiphertextSha256 = result.mediaCiphertextSha256.toSet()
-            // Match the foreground sweep: when the engine actually pruned
-            // rows, clear the conversation's tray card so it can't keep
-            // pointing at a now-vanished message, and wipe the pruned
-            // attachments' decrypted bytes from every Android-owned cache tier.
-            if (result.prunedMessages > 0uL) {
-                dismissConversationNotifications(accountRef, groupIdHex)
-            }
-            evictExpiredMediaCaches(
-                expiredCiphertextSha256 = expiredCiphertextSha256,
-                cacheKeys =
-                    mediaCacheKeysForCiphertextTags(
-                        account = accountRef,
-                        groupIdHex = groupIdHex,
-                        mediaRecords = mediaBeforePrune,
-                        ciphertextTags = expiredCiphertextSha256,
-                    ),
-            )
-        }.onFailure {
-            appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+            runRetentionSweep(account.label, System.currentTimeMillis())
         }
     }
 
     /**
-     * Gate the raw engine prune so foreground/background sweeps honor the #745
-     * clock-skew tolerance and #797 read anchors in the real deletion path.
-     * `secureDeleteExpired` does not
-     * accept a cutoff parameter; it would prune everything before
-     * `now - retention`. Before invoking it, scan the local timeline and defer
-     * the group if any row falls in the interval that the raw engine cutoff
-     * would delete but the skew-adjusted cutoff would keep, or if it would
-     * delete an unread received row before the user has had a chance to anchor
-     * its local expiry clock.
-     *
-     * The scan's first cursor is seeded at the raw cutoff (#979): both
-     * classifications only match rows with `timelineAt < rawCutoffSeconds`, so
-     * paging from the newest message would walk the entire un-expired history
-     * per group per pass just to reach the boundary. The seed makes the first
-     * page hold the newest classifiable rows. A skew-window row — being newer
-     * than every expired-beyond-skew row — can never hide on a later page than
-     * the rows that would trigger the prune. Unread received rows can be older
-     * than a read/sent expired row, so once a prunable row is seen the scan keeps
-     * paging until it proves no unread received row is still in the raw-prune
-     * range. A page cap backstops pathological histories; exhausting it defers
-     * the group.
+     * Run the engine-owned retention sweep for one account and apply the
+     * Android-owned consequences for every pruned group. A group matching
+     * [handledGroupIdHex] is skipped and its outcome returned instead, so an
+     * open conversation's controller can process its own group against the
+     * loaded timeline's precise cache keys. Returns null when the sweep
+     * failed or no group matched [handledGroupIdHex].
      */
-    internal suspend fun shouldInvokeDisappearingSecureDelete(
+    internal suspend fun runRetentionSweep(
         accountRef: String,
-        groupIdHex: String,
-        retentionSecs: ULong,
         nowMillis: Long,
-        lastReadTimelineAt: ULong?,
-    ): Boolean {
-        val rawCutoffSeconds = DisappearingMessageSweep.rawExpiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
-        val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
-        if (rawCutoffSeconds == 0uL) return false
-
-        // The engine requires the (before, beforeMessageId) pair together; the
-        // all-zeros seed id sorts before every real message id, making this an
-        // exclusive `timelineAt < rawCutoffSeconds` first page.
-        var before: ULong = rawCutoffSeconds
-        var beforeMessageId: String = DisappearingMessageSweep.TIMELINE_SCAN_SEED_MESSAGE_ID
-        var pagesScanned = 0
-        var sawPrunableExpiredRow = false
-        while (pagesScanned < DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES) {
-            currentCoroutineContext().ensureActive()
-            val page =
-                runCatchingCancellable {
-                    marmotIo {
-                        timelineMessages(
-                            accountRef,
-                            TimelineMessageQueryFfi(
-                                groupIdHex = groupIdHex,
-                                search = null,
-                                before = before,
-                                beforeMessageId = beforeMessageId,
-                                after = null,
-                                afterMessageId = null,
-                                limit = DisappearingMessageSweep.TIMELINE_SCAN_PAGE_LIMIT,
-                            ),
-                        )
-                    }
-                }.onFailure {
-                    appStateDebug(it) {
-                        "sweep timeline scan failed group=${groupIdHex.take(8)}: ${it.readableMessage()}"
-                    }
+        handledGroupIdHex: String? = null,
+    ): RetentionSweepGroupOutcomeFfi? {
+        val report =
+            runCatchingCancellable { marmotIo { sweepExpiredRetention(accountRef, nowMillis.toULong()) } }
+                .onFailure {
+                    appStateDebug(it) { "retention sweep failed acct=${accountRef.take(8)}: ${it.readableMessage()}" }
                 }.getOrNull()
-                    ?: return false
-
-            when (
-                DisappearingMessageSweep.classifyScanPage(
-                    rows =
-                        page.messages.map {
-                            DisappearingMessageSweep.TimelineScanRow(
-                                timelineAtSeconds = it.timelineAt,
-                                direction = it.direction,
-                            )
-                        },
-                    rawCutoffSeconds = rawCutoffSeconds,
-                    skewCutoffSeconds = skewCutoffSeconds,
-                    lastReadTimelineAt = lastReadTimelineAt,
-                )
+                ?: return null
+        var handledOutcome: RetentionSweepGroupOutcomeFfi? = null
+        for (outcome in report.groups) {
+            currentCoroutineContext().ensureActive()
+            // Keep the old per-group signal: a persistently deferring or
+            // failing group must not be silent just because the account call
+            // succeeded.
+            if (outcome.status != RetentionSweepStatusFfi.PRUNED &&
+                outcome.status != RetentionSweepStatusFfi.NO_EXPIRED_MESSAGES
             ) {
-                DisappearingMessageSweep.TimelineScanPageDecision.DeferSkewWindow -> {
-                    appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
-                    return false
+                appStateDebug {
+                    val kind = outcome.failureKind?.let { " kind=$it" }.orEmpty()
+                    "retention sweep ${outcome.status} group=${outcome.groupIdHex.take(8)}$kind"
                 }
-                DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived -> {
-                    appStateDebug { "sweep deferred for unread received expiry group=${groupIdHex.take(8)}" }
-                    return false
-                }
-                DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete -> sawPrunableExpiredRow = true
-                DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning -> Unit
             }
-
-            if (page.messages.isEmpty()) return false
-            if (!page.hasMoreBefore) return sawPrunableExpiredRow
-            val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
-            if (lastReadTimelineAt != null && oldest.timelineAt <= lastReadTimelineAt) return sawPrunableExpiredRow
-            val nextBefore = oldest.timelineAt
-            val nextBeforeMessageId = oldest.messageIdHex
-            if (before == nextBefore && beforeMessageId == nextBeforeMessageId) return false
-            before = nextBefore
-            beforeMessageId = nextBeforeMessageId
-            pagesScanned++
+            // Case-insensitive like every other hex-id comparison here: a
+            // casing drift must not reroute the open group to the fail-closed
+            // whole-slice path.
+            if (handledGroupIdHex != null && outcome.groupIdHex.equals(handledGroupIdHex, ignoreCase = true)) {
+                handledOutcome = outcome
+                continue
+            }
+            processRetentionSweepOutcome(accountRef, outcome)
         }
-        // Cap exhausted without proving the skew window empty: defer to the
-        // next sweep pass rather than risk the raw prune early-deleting a
-        // near-boundary row.
-        return false
+        return handledOutcome
     }
 
-    private suspend fun evictExpiredMediaCaches(
-        expiredCiphertextSha256: Set<String>,
-        cacheKeys: Set<String>,
+    private suspend fun processRetentionSweepOutcome(
+        accountRef: String,
+        outcome: RetentionSweepGroupOutcomeFfi,
     ) {
-        if (expiredCiphertextSha256.isEmpty() && cacheKeys.isEmpty()) return
-        // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap. Keep
-        // the in-memory L1 removals main-confined even though disk eviction is IO.
-        removeMediaMemoryCacheKeys(
-            cacheKeys = cacheKeys,
-            dispatcher = Dispatchers.Main.immediate,
-            removeEntry = ::removeMediaMemoryCacheEntry,
-        )
+        // When the engine actually pruned rows, clear the conversation's tray
+        // card so it can't keep pointing at a now-vanished message.
+        if (outcome.prunedMessages > 0uL) {
+            dismissConversationNotifications(accountRef, outcome.groupIdHex)
+        }
+        val expiredCiphertextSha256 = outcome.mediaCiphertextSha256.toSet()
+        if (expiredCiphertextSha256.isEmpty()) return
+        // The engine ran gate and prune atomically, so no pre-prune media rows
+        // exist to map ciphertext tags to exact cache keys. Fail closed for
+        // the in-memory tier: drop the group's whole L1 slice — decrypted
+        // bytes must not outlive the retention window, and a closed
+        // conversation re-hydrates lazily from disk. The disk tier evicts
+        // precisely by its persisted ciphertext tag, independent of load
+        // state.
+        withContext(Dispatchers.Main.immediate) {
+            mediaMemoryCacheKeysSnapshot()
+                .filter { mediaCacheKeyInGroup(it, accountRef, outcome.groupIdHex) }
+                .forEach(::removeMediaMemoryCacheEntry)
+        }
         withContext(Dispatchers.IO) {
-            cacheKeys.forEach { diskMediaCache.remove(it) }
-            if (expiredCiphertextSha256.isNotEmpty()) {
-                diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
-            }
+            diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
         }
     }
 
@@ -6337,7 +6212,10 @@ class WhiteNoiseAppState private constructor(
         ProfileSanitizer.imageUrl(loadUserProfile(update.sender.accountIdHex)?.picture)
             ?: ProfileSanitizer.imageUrl(update.sender.pictureUrl)
 
-    private fun shouldPostNotification(update: NotificationUpdateFfi): Boolean =
+    private fun shouldPostNotification(
+        update: NotificationUpdateFfi,
+        engineMuted: Boolean,
+    ): Boolean =
         LocalNotificationPolicy.shouldPost(
             update = update,
             appInForeground = appInForeground,
@@ -6345,7 +6223,34 @@ class WhiteNoiseAppState private constructor(
             activeConversationAccountRef = activeConversationAccountRef,
             appLockScreenVisible = appLockScreenVisible,
             conversationNotifyMode = chatMutePreferences::mode,
+            engineMuted = engineMuted,
         )
+
+    /**
+     * Durable engine mute for the update's conversation, resolved once per
+     * update in [processNotificationUpdate] and threaded through pre-warm,
+     * the post decision, and the presenter's sync post-time re-check (which
+     * cannot suspend). Prefers the active account's loaded projection;
+     * otherwise reads the engine's chat list directly, which also covers the
+     * cold FCM process with no UI-owned controllers. Fail-open on errors: a
+     * spurious notification from a muted chat beats a silently swallowed
+     * real one.
+     */
+    private suspend fun engineNotificationMuted(update: NotificationUpdateFfi): Boolean {
+        // Hex ids compare case-insensitively (projector idiom): a casing
+        // drift here would silently fail open as a missed mute.
+        if (activeAccountRef == update.accountRef) {
+            chatsController
+                ?.items
+                ?.firstOrNull { it.group.groupIdHex.equals(update.groupIdHex, ignoreCase = true) }
+                ?.let { return it.engineMuted() }
+        }
+        return runCatchingCancellable {
+            marmotIo { chatList(update.accountRef, includeArchived = true) }
+                .firstOrNull { it.groupIdHex.equals(update.groupIdHex, ignoreCase = true) }
+                ?.muted == true
+        }.getOrDefault(false)
+    }
 
     /**
      * Starts sender and conversation image work as soon as the app-state
@@ -6356,11 +6261,14 @@ class WhiteNoiseAppState private constructor(
      * reads. Every remote-image launch re-checks the app lock after the preceding
      * suspending local lookup.
      */
-    private suspend fun preWarmNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
+    private suspend fun preWarmNotificationAvatars(
+        update: NotificationUpdateFfi,
+        engineMuted: Boolean,
+    ): PreWarmedNotificationAvatars {
         val eligible =
             shouldPreWarmNotificationAvatars(
                 update = update,
-                shouldPost = shouldPostNotification(update),
+                shouldPost = shouldPostNotification(update, engineMuted),
                 canPost = localNotificationPresenter.canPostNotifications(),
             )
         if (!eligible) return PreWarmedNotificationAvatars(senderAvatarUrl = null, groupAvatarUrl = null)
@@ -6427,14 +6335,16 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         preWarmedAvatars: PreWarmedNotificationAvatars,
         postEpoch: Long,
+        engineMuted: Boolean,
     ) {
         val activeConversation = activeConversationGroupIdHex
-        val shouldPost = shouldPostNotification(update)
+        val shouldPost = shouldPostNotification(update, engineMuted)
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
                 "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
                 "activeAccount=${activeConversationAccountRef?.take(8) ?: "<none>"} " +
-                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible post=$shouldPost"
+                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible " +
+                "engineMuted=$engineMuted post=$shouldPost"
         }
         if (shouldPost) {
             val skipEnrichmentForLock = appLockScreenVisible
@@ -6512,7 +6422,7 @@ class WhiteNoiseAppState private constructor(
                 isPostStillAllowed = {
                     !networkNotificationRecoverySuppressed &&
                         notificationPostEpoch.isCurrent(postEpoch) &&
-                        shouldPostNotification(update)
+                        shouldPostNotification(update, engineMuted)
                 },
             )
         }
@@ -6577,9 +6487,13 @@ class WhiteNoiseAppState private constructor(
     private suspend fun processNotificationUpdate(update: NotificationUpdateFfi) {
         applyNotificationDisplayNameHint(update)
         val postEpoch = notificationPostEpoch.capture()
+        // One durable-mute read per update: pre-warm, the post decision, and
+        // the presenter's post-time re-check all reuse it, so a burst costs
+        // one engine chat-list read per notification, not one per stage.
+        val engineMuted = engineNotificationMuted(update)
         postAfterNotificationAvatarPreWarm(
-            preWarm = { preWarmNotificationAvatars(update) },
-            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch) },
+            preWarm = { preWarmNotificationAvatars(update, engineMuted) },
+            post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) },
         )
     }
 
