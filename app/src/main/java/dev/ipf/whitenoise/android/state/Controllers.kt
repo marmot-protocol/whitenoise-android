@@ -2360,19 +2360,8 @@ class ChatsController(
         }
         isLoading = true
         try {
-            // Converge this (just-bound) account's store before we snapshot it.
-            // One SQLite store exists per account-device identity, so on a
-            // multi-account device an inactive account never ingests a sibling
-            // account's group rename / avatar / membership commit until its own
-            // worker catches up. Without this, switching to a second account in
-            // a shared group shows the pre-rename title (#252) — the projection
-            // we're about to read is stale, not wrong. catchUpAccounts pumps
-            // every running worker, so the snapshot below sees the converged
-            // state instead of us caching the change Android-side. Best-effort
-            // (swallows failures internally) so an offline/slow relay can't
-            // block the chat list from rendering its last-known projection.
-            appState.catchUpAccounts()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+            var catchUpStarted = false
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
@@ -2409,6 +2398,19 @@ class ChatsController(
                     isLoading = false
                     error = null
                     recompute()
+
+                    // The per-account SQLite projection is the local-ready
+                    // boundary. Give it one complete draw before asking relays
+                    // to converge the already-active subscriptions: offline or
+                    // slow catch-up must never hold a black switch screen. A
+                    // later stream update folds fresh rename/avatar/membership
+                    // state into these same maps (#252, #1698).
+                    if (!catchUpStarted) {
+                        awaitRenderedChatListFrame()
+                        appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
+                        catchUpStarted = true
+                        appState.launchCatchUpAccounts()
+                    }
 
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
@@ -2508,6 +2510,24 @@ class ChatsController(
                 }
             }
             chatsDebug { "unbind account=${accountRef.take(8)} (chat-list + chats subscriptions closed)" }
+        }
+    }
+
+    private suspend fun awaitRenderedChatListFrame() {
+        // Choreographer callbacks run before traversal. Two callbacks guarantee
+        // the published local snapshot gets one complete draw before catch-up.
+        repeat(2) {
+            suspendCancellableCoroutine { continuation ->
+                val choreographer = Choreographer.getInstance()
+                val callback =
+                    Choreographer.FrameCallback {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+                continuation.invokeOnCancellation {
+                    choreographer.removeFrameCallback(callback)
+                }
+                choreographer.postFrameCallback(callback)
+            }
         }
     }
 

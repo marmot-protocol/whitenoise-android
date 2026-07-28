@@ -312,15 +312,16 @@ internal fun AccountSelectorSheet(
             actionColorsForAccount = { accountRef -> accountActionColors(appState, accountRef) },
             onSwitchAccount = { accountLabel ->
                 // Run on the process-lifetime mutation scope, not this sheet's
-                // composition. setActiveAccount flips activeAccountRef partway
-                // through and keeps suspending; the nav reset then disposes the
-                // sheet before the switch cleanup finishes (#547).
+                // composition. Dismiss/reset at setActiveAccount's local-ready
+                // boundary; its profile/privacy/notification/push work keeps
+                // running after the sheet is disposed (#547, #1698).
                 appState.launchMutation {
-                    appState.setActiveAccount(accountLabel)
-                    onDismiss()
-                    // Land on the newly-active account's chat list instead of
-                    // leaving the user on Settings (#316).
-                    onAccountSwitched()
+                    appState.setActiveAccount(accountLabel) {
+                        onDismiss()
+                        // Land on the newly-active account's chat list instead of
+                        // leaving the user on Settings (#316).
+                        onAccountSwitched()
+                    }
                 }
             },
             onAddAccount = onAddAccount,
