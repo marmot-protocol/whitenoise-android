@@ -44,7 +44,7 @@ class ChatFoldersContentTest {
         var editedId: String? = null
         var deletedId: String? = null
         render(
-            folders = listOf(folderRow(id = "work", name = "Work", isCustom = true)),
+            folders = listOf(folderRow(id = "work", name = "Work", systemKind = null)),
             onEdit = { editedId = it },
             onDelete = { deletedId = it },
         )
@@ -59,12 +59,34 @@ class ChatFoldersContentTest {
     }
 
     @Test
-    fun systemFolderRowDoesNotExposeEditOrDeleteActions() {
-        render(folders = listOf(folderRow(id = "unread", name = "Unread")))
+    fun defaultFolderRowExposesTheSameEditAndDeleteActions() {
+        var editedId: String? = null
+        var deletedId: String? = null
+        render(
+            folders = listOf(folderRow(id = "unread", name = "Unread")),
+            onEdit = { editedId = it },
+            onDelete = { deletedId = it },
+        )
 
-        composeRule.onNodeWithContentDescription(app.getString(R.string.actions)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.edit)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(app.getString(R.string.delete)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.actions)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.edit)).performClick()
+        assertEquals("unread", editedId)
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.actions)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.delete)).performClick()
+        assertEquals("unread", deletedId)
+    }
+
+    @Test
+    fun restoreDefaultsRowInvokesTheCallback() {
+        var restored = false
+        render(
+            folders = listOf(folderRow(id = "work", name = "Work", systemKind = null)),
+            onRestoreDefaults = { restored = true },
+        )
+
+        composeRule.onNodeWithText(app.getString(R.string.chat_folder_restore_defaults)).performClick()
+        assertEquals(true, restored)
     }
 
     @Test
@@ -86,15 +108,14 @@ class ChatFoldersContentTest {
         id: String,
         name: String,
         chatCount: Int = 2,
-        isCustom: Boolean = false,
+        systemKind: SystemFolderKind? = SystemFolderKind.UNREAD,
         canMoveUp: Boolean = true,
         canMoveDown: Boolean = true,
     ) = ChatFolderManageItem(
         id = id,
         name = name,
-        systemKind = if (isCustom) null else SystemFolderKind.UNREAD,
+        systemKind = systemKind,
         chatCount = chatCount,
-        isCustom = isCustom,
         canMoveUp = canMoveUp,
         canMoveDown = canMoveDown,
     )
@@ -106,6 +127,7 @@ class ChatFoldersContentTest {
         onDelete: (String) -> Unit = {},
         onCreate: () -> Unit = {},
         onBack: () -> Unit = {},
+        onRestoreDefaults: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -117,6 +139,7 @@ class ChatFoldersContentTest {
                         onMove = onMove,
                         onEdit = onEdit,
                         onDelete = onDelete,
+                        onRestoreDefaults = onRestoreDefaults,
                     )
                 }
             }

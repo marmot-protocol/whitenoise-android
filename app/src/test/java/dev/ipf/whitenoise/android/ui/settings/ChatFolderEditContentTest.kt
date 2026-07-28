@@ -69,6 +69,8 @@ class ChatFolderEditContentTest {
                 editState(
                     name = "Work",
                     unreadOnly = true,
+                    groupsOnly = true,
+                    archivedOnly = false,
                     includeMuted = false,
                 ),
         )
@@ -82,11 +84,22 @@ class ChatFolderEditContentTest {
         composeRule.onAllNodes(isToggleable())[0].assertIsOn()
         composeRule
             .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+            .performScrollToNode(hasText(app.getString(R.string.chat_folder_groups_only)))
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_folder_groups_only))
+            .assertIsDisplayed()
+        composeRule.onAllNodes(isToggleable())[1].assertIsOn()
+        composeRule
+            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+            .performScrollToNode(hasText(app.getString(R.string.chat_folder_archived_only)))
+        composeRule.onAllNodes(isToggleable())[2].assertIsOff()
+        composeRule
+            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
             .performScrollToNode(hasText(app.getString(R.string.chat_folder_include_muted)))
         composeRule
             .onNodeWithText(app.getString(R.string.chat_folder_include_muted))
             .assertIsDisplayed()
-        composeRule.onAllNodes(isToggleable())[1].assertIsOff()
+        composeRule.onAllNodes(isToggleable())[3].assertIsOff()
     }
 
     @Test
@@ -137,6 +150,8 @@ class ChatFolderEditContentTest {
         keyword: String = "",
         unreadOnly: Boolean = false,
         includeMuted: Boolean = false,
+        groupsOnly: Boolean = false,
+        archivedOnly: Boolean = false,
         manualChatCount: Int = 0,
         peopleSummary: String = app.getString(R.string.chat_folder_people_subtitle),
         isNew: Boolean = true,
@@ -147,6 +162,8 @@ class ChatFolderEditContentTest {
         keyword = keyword,
         unreadOnly = unreadOnly,
         includeMuted = includeMuted,
+        groupsOnly = groupsOnly,
+        archivedOnly = archivedOnly,
         manualChatSummary =
             app.resources.getQuantityString(
                 R.plurals.chat_folder_chat_count,
@@ -164,6 +181,8 @@ class ChatFolderEditContentTest {
         onKeywordChange: (String) -> Unit = {},
         onUnreadOnlyChange: (Boolean) -> Unit = {},
         onIncludeMutedChange: (Boolean) -> Unit = {},
+        onGroupsOnlyChange: (Boolean) -> Unit = {},
+        onArchivedOnlyChange: (Boolean) -> Unit = {},
         onOpenManualChats: () -> Unit = {},
         onOpenPeople: () -> Unit = {},
         onSave: () -> Unit = {},
@@ -179,6 +198,8 @@ class ChatFolderEditContentTest {
                         onKeywordChange = onKeywordChange,
                         onUnreadOnlyChange = onUnreadOnlyChange,
                         onIncludeMutedChange = onIncludeMutedChange,
+                        onGroupsOnlyChange = onGroupsOnlyChange,
+                        onArchivedOnlyChange = onArchivedOnlyChange,
                         onOpenManualChats = onOpenManualChats,
                         onOpenPeople = onOpenPeople,
                         onSave = onSave,

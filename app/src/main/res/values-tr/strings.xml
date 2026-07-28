@@ -875,6 +875,12 @@
     <string name="chat_folder_unread_only">Yalnızca okunmamış</string>
     <string name="chat_folder_unread_only_subtitle">Yalnızca okunmamış mesajı olan sohbetleri dahil et</string>
     <string name="chat_folder_include_muted">Sessize alınmış sohbetleri dahil et</string>
+    <string name="chat_folder_groups_only">Yalnızca gruplar</string>
+    <string name="chat_folder_groups_only_subtitle">Yalnızca grup sohbetlerini dahil et</string>
+    <string name="chat_folder_archived_only">Yalnızca arşivlenmiş</string>
+    <string name="chat_folder_archived_only_subtitle">Aktif sohbetler yerine arşivlenmiş sohbetleri dahil et</string>
+    <string name="chat_folder_restore_defaults">Varsayılan klasörleri geri yükle</string>
+    <string name="chat_folder_restore_defaults_subtitle">Eksik varsayılan klasörleri yeniden ekle</string>
     <string name="chat_folder_manual_chats">Dahil edilen sohbetler</string>
     <string name="chat_folder_people">Kişiler</string>
     <string name="chat_folder_people_subtitle">Bu kişilerin olduğu her sohbeti dahil et</string>

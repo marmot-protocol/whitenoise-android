@@ -877,6 +877,12 @@
     <string name="chat_folder_unread_only">Non lues uniquement</string>
     <string name="chat_folder_unread_only_subtitle">Inclure uniquement les discussions avec des messages non lus</string>
     <string name="chat_folder_include_muted">Inclure les discussions en sourdine</string>
+    <string name="chat_folder_groups_only">Groupes uniquement</string>
+    <string name="chat_folder_groups_only_subtitle">Inclure uniquement les discussions de groupe</string>
+    <string name="chat_folder_archived_only">Archivées uniquement</string>
+    <string name="chat_folder_archived_only_subtitle">Inclure les discussions archivées au lieu des actives</string>
+    <string name="chat_folder_restore_defaults">Restaurer les dossiers par défaut</string>
+    <string name="chat_folder_restore_defaults_subtitle">Rajouter les dossiers par défaut manquants</string>
     <string name="chat_folder_manual_chats">Discussions incluses</string>
     <string name="chat_folder_people">Personnes</string>
     <string name="chat_folder_people_subtitle">Inclure toute discussion avec ces personnes</string>

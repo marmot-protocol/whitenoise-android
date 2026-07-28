@@ -9,15 +9,20 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-/** The three pre-folder filter chips, absorbed as non-deletable system folders. */
+/** The three pre-folder filter chips, seeded as default folders. */
 enum class SystemFolderKind { UNREAD, ARCHIVED, GROUPS }
 
+/**
+ * [systemKind] marks a folder seeded from a default template. It carries no
+ * capability lock — seeded folders rename, delete, reorder, and re-rule like
+ * any other — it only names which localized label an un-renamed default
+ * shows, and which defaults a Restore action still needs to re-add.
+ */
 data class ChatFolder(
     val id: String,
     val name: String,
     val description: String,
     val order: Int,
-    val isSystem: Boolean,
     val systemKind: SystemFolderKind?,
 )
 
@@ -32,6 +37,8 @@ data class ChatFolderRule(
     val unreadOnly: Boolean = false,
     val includeMuted: Boolean = false,
     val keyword: String? = null,
+    val groupsOnly: Boolean = false,
+    val archivedOnly: Boolean = false,
 )
 
 /** One account's folder state: ordered folders, manual memberships, rules. */
@@ -89,7 +96,6 @@ class ChatFolderPreferences(
                     name = trimmedName,
                     description = description.trim(),
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
-                    isSystem = false,
                     systemKind = null,
                 )
             persistFolders(account, current.copy(folders = current.folders + folder))
@@ -101,7 +107,10 @@ class ChatFolderPreferences(
         accountRef: String,
         folderId: String,
         name: String,
-    ): Boolean = updateFolder(accountRef, folderId) { it.copy(name = name.trim()) }
+    ): Boolean {
+        val trimmed = name.trim().takeIf { it.isNotEmpty() } ?: return false
+        return updateFolder(accountRef, folderId) { it.copy(name = trimmed) }
+    }
 
     fun editFolderDescription(
         accountRef: String,
@@ -109,7 +118,7 @@ class ChatFolderPreferences(
         description: String,
     ): Boolean = updateFolder(accountRef, folderId) { it.copy(description = description.trim()) }
 
-    /** System folders are not deletable: they are the absorbed filter chips. */
+    /** Deletes any folder, seeded defaults included — deletion is durable. */
     fun deleteFolder(
         accountRef: String,
         folderId: String,
@@ -117,8 +126,7 @@ class ChatFolderPreferences(
         val account = normalizedAccount(accountRef) ?: return false
         return synchronized(mutationLock) {
             val current = loadAccount(account)
-            val folder = current.folders.firstOrNull { it.id == folderId } ?: return@synchronized false
-            if (folder.isSystem) return@synchronized false
+            if (current.folders.none { it.id == folderId }) return@synchronized false
             // Purge the folder's own keys directly: persistFolders only visits
             // memberships still present in the map, so a deleted folder's
             // membership key would otherwise stay on disk forever.
@@ -201,13 +209,7 @@ class ChatFolderPreferences(
             if (rule == null) {
                 edit.remove(ruleKey(account, folderId))
             } else {
-                val json =
-                    JSONObject()
-                        .put(RULE_MEMBERS, JSONArray(rule.includeMemberPubkeys.toList()))
-                        .put(RULE_UNREAD_ONLY, rule.unreadOnly)
-                        .put(RULE_INCLUDE_MUTED, rule.includeMuted)
-                rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
-                edit.putString(ruleKey(account, folderId), json.toString())
+                edit.putString(ruleKey(account, folderId), ruleJson(rule).toString())
             }
             edit.apply()
             val rules = if (rule == null) current.rules - folderId else current.rules + (folderId to rule)
@@ -241,10 +243,41 @@ class ChatFolderPreferences(
             val current = loadAccount(account)
             val existing = current.folders.firstOrNull { it.id == folderId } ?: return@synchronized false
             val updated = transform(existing)
-            if (updated == existing || updated.name.isEmpty()) return@synchronized false
+            if (updated == existing) return@synchronized false
             persistFolders(
                 account,
                 current.copy(folders = current.folders.map { if (it.id == folderId) updated else it }),
+            )
+            true
+        }
+    }
+
+    /**
+     * Re-adds whichever seeded defaults the account no longer has, with their
+     * default rules, at the end of the current order. Explicit user action
+     * only — a deliberately deleted default must never come back on its own.
+     * Idempotent: defaults that still exist are left untouched.
+     */
+    fun restoreDefaultFolders(accountRef: String): Boolean {
+        val account = normalizedAccount(accountRef) ?: return false
+        return synchronized(mutationLock) {
+            val current = loadAccount(account)
+            val presentIds = current.folders.mapTo(HashSet()) { it.id }
+            val missing = systemFolders().filterNot { it.id in presentIds }
+            if (missing.isEmpty()) return@synchronized false
+            val nextOrder = (current.folders.maxOfOrNull { it.order } ?: -1) + 1
+            val restored = missing.mapIndexed { index, seed -> seed.copy(order = nextOrder + index) }
+            val edit = preferences.edit()
+            val restoredRules =
+                restored.associate { folder ->
+                    val rule = defaultRuleFor(folder.systemKind!!)
+                    edit.putString(ruleKey(account, folder.id), ruleJson(rule).toString())
+                    folder.id to rule
+                }
+            edit.apply()
+            persistFolders(
+                account,
+                current.copy(folders = current.folders + restored, rules = current.rules + restoredRules),
             )
             true
         }
@@ -254,15 +287,12 @@ class ChatFolderPreferences(
     private fun loadAccount(account: String): ChatFolderAccountState {
         _state.value[account]?.let { return it }
         val storedFolders = preferences.getString(foldersKey(account), null)
+        // A stored empty list is a real user state (every folder deleted) and
+        // must survive reloads — only a never-seeded account (no key) or an
+        // unparseable blob seeds the defaults.
         val folders =
-            if (storedFolders == null) {
-                // First read for this account: absorb the three legacy filter
-                // chips as system folders, exactly once, so ordering and
-                // hide-when-empty become uniform without behavior change.
-                systemFolders().also { seeded -> persistFolderList(account, seeded) }
-            } else {
-                parseFolders(storedFolders)
-            }
+            (storedFolders?.let(::parseFolders) ?: seedDefaults(account))
+                .also { migrateSeededRules(account, it) }
         val membership =
             folders.associate { folder ->
                 folder.id to
@@ -280,6 +310,38 @@ class ChatFolderPreferences(
         return loaded
     }
 
+    private fun seedDefaults(account: String): List<ChatFolder> {
+        val seeded = systemFolders()
+        persistFolderList(account, seeded)
+        val edit = preferences.edit()
+        seeded.forEach { folder ->
+            edit.putString(ruleKey(account, folder.id), ruleJson(defaultRuleFor(folder.systemKind!!)).toString())
+        }
+        edit.putInt(versionKey(account), STORE_VERSION).apply()
+        return seeded
+    }
+
+    /**
+     * One-time upgrade for accounts written before defaults carried rules:
+     * their behavior lived in hardcoded kind branches, so each seeded folder
+     * without a stored rule gets its default rule persisted. Guarded by a
+     * version stamp — a user later clearing a seeded folder's rule must not
+     * see this resurrect it.
+     */
+    private fun migrateSeededRules(
+        account: String,
+        folders: List<ChatFolder>,
+    ) {
+        if (preferences.getInt(versionKey(account), 1) >= STORE_VERSION) return
+        val edit = preferences.edit()
+        folders
+            .filter { it.systemKind != null && !preferences.contains(ruleKey(account, it.id)) }
+            .forEach { folder ->
+                edit.putString(ruleKey(account, folder.id), ruleJson(defaultRuleFor(folder.systemKind!!)).toString())
+            }
+        edit.putInt(versionKey(account), STORE_VERSION).apply()
+    }
+
     private fun readRule(
         account: String,
         folderId: String,
@@ -292,8 +354,22 @@ class ChatFolderPreferences(
                 unreadOnly = json.optBoolean(RULE_UNREAD_ONLY, false),
                 includeMuted = json.optBoolean(RULE_INCLUDE_MUTED, false),
                 keyword = json.optString(RULE_KEYWORD).takeIf { it.isNotBlank() },
+                groupsOnly = json.optBoolean(RULE_GROUPS_ONLY, false),
+                archivedOnly = json.optBoolean(RULE_ARCHIVED_ONLY, false),
             )
         }.getOrNull()
+    }
+
+    private fun ruleJson(rule: ChatFolderRule): JSONObject {
+        val json =
+            JSONObject()
+                .put(RULE_MEMBERS, JSONArray(rule.includeMemberPubkeys.toList()))
+                .put(RULE_UNREAD_ONLY, rule.unreadOnly)
+                .put(RULE_INCLUDE_MUTED, rule.includeMuted)
+                .put(RULE_GROUPS_ONLY, rule.groupsOnly)
+                .put(RULE_ARCHIVED_ONLY, rule.archivedOnly)
+        rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
+        return json
     }
 
     private fun persistFolders(
@@ -334,7 +410,10 @@ class ChatFolderPreferences(
         preferences.edit().putString(foldersKey(account), json.toString()).apply()
     }
 
-    private fun parseFolders(raw: String): List<ChatFolder> =
+    // Null only when the blob is unparseable JSON — the caller then reseeds.
+    // A parsed empty list is respected: deleting every folder is a valid
+    // state, not corruption to repair.
+    private fun parseFolders(raw: String): List<ChatFolder>? =
         runCatching {
             val array = JSONArray(raw)
             (0 until array.length()).mapNotNull { index ->
@@ -350,13 +429,11 @@ class ChatFolderPreferences(
                     name = json.optString(FIELD_NAME),
                     description = json.optString(FIELD_DESCRIPTION),
                     order = json.optInt(FIELD_ORDER, 0),
-                    isSystem = kind != null,
                     systemKind = kind,
                 )
             }
-        }.getOrDefault(emptyList())
-            .sortedBy { it.order }
-            .ifEmpty { systemFolders() }
+        }.getOrNull()
+            ?.sortedBy { it.order }
 
     private fun normalizedAccount(accountRef: String): String? = accountRef.trim().takeIf { it.isNotEmpty() }
 
@@ -371,6 +448,12 @@ class ChatFolderPreferences(
         private const val RULE_UNREAD_ONLY = "unreadOnly"
         private const val RULE_INCLUDE_MUTED = "includeMuted"
         private const val RULE_KEYWORD = "keyword"
+        private const val RULE_GROUPS_ONLY = "groupsOnly"
+        private const val RULE_ARCHIVED_ONLY = "archivedOnly"
+
+        // Bumped when defaults became first-class folders carrying real rules,
+        // so the rule backfill for older accounts runs exactly once.
+        private const val STORE_VERSION = 2
 
         // Stable ids so the chip row and future deep links can reference the
         // absorbed system folders without a per-account lookup.
@@ -389,9 +472,19 @@ class ChatFolderPreferences(
             id: String,
             order: Int,
             kind: SystemFolderKind,
-        ): ChatFolder = ChatFolder(id, name = "", description = "", order = order, isSystem = true, systemKind = kind)
+        ): ChatFolder = ChatFolder(id, name = "", description = "", order = order, systemKind = kind)
+
+        /** The rule a default is seeded with — its old hardcoded chip behavior, expressed as a rule. */
+        internal fun defaultRuleFor(kind: SystemFolderKind): ChatFolderRule =
+            when (kind) {
+                SystemFolderKind.UNREAD -> ChatFolderRule(unreadOnly = true, includeMuted = true)
+                SystemFolderKind.ARCHIVED -> ChatFolderRule(archivedOnly = true, includeMuted = true)
+                SystemFolderKind.GROUPS -> ChatFolderRule(groupsOnly = true, includeMuted = true)
+            }
 
         private fun accountKeyPrefix(account: String): String = "cf:$account:"
+
+        private fun versionKey(account: String): String = "${accountKeyPrefix(account)}v"
 
         private fun foldersKey(account: String): String = "${accountKeyPrefix(account)}folders"
 

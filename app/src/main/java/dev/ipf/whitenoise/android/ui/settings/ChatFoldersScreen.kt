@@ -53,7 +53,6 @@ internal data class ChatFolderManageItem(
     val name: String,
     val systemKind: SystemFolderKind?,
     val chatCount: Int,
-    val isCustom: Boolean,
     val canMoveUp: Boolean,
     val canMoveDown: Boolean,
 )
@@ -67,9 +66,10 @@ internal fun chatFoldersState(folders: List<ChatFolderManageItem>): ChatFoldersS
 internal const val CHAT_FOLDERS_CONTENT_TAG = "chat-folders-content"
 
 /**
- * Settings detail screen managing chat folders: every folder (system and
- * custom) with its live chat count and reorder controls; custom folders are
- * also editable and deletable. Creating or editing swaps in
+ * Settings detail screen managing chat folders: every folder — seeded
+ * defaults and custom alike — with its live chat count and reorder, edit,
+ * and delete controls. Deleted defaults stay deleted; an explicit Restore
+ * action re-adds whichever are missing. Creating or editing swaps in
  * [ChatFolderEditScreen] in place, so the Settings navigation state never
  * has to know about the form.
  */
@@ -131,7 +131,6 @@ internal fun ChatFoldersScreen(
                         mutedConversations = mutedConversations,
                         displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                     ),
-                isCustom = !folder.isSystem,
                 canMoveUp = folders.firstOrNull()?.id != folder.id,
                 canMoveDown = folders.lastOrNull()?.id != folder.id,
             )
@@ -146,12 +145,13 @@ internal fun ChatFoldersScreen(
         },
         onEdit = { id -> editorOpenFor = ChatFolderEditorTarget(folderId = id) },
         onDelete = { id -> pendingDelete = folders.firstOrNull { it.id == id } },
+        onRestoreDefaults = { accountRef?.let(store::restoreDefaultFolders) },
     )
 
     pendingDelete?.let { folder ->
         ConfirmDialog(
             title = stringResource(R.string.chat_folder_delete_title),
-            message = stringResource(R.string.chat_folder_delete_message, folder.name),
+            message = stringResource(R.string.chat_folder_delete_message, chatFolderDisplayName(folder)),
             confirmLabel = stringResource(R.string.delete),
             destructive = true,
             onConfirm = {
@@ -173,6 +173,7 @@ internal fun ChatFoldersContent(
     onMove: (String, Int) -> Unit,
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onRestoreDefaults: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -207,11 +208,18 @@ internal fun ChatFoldersContent(
                             folder = folder,
                             onMoveUp = { onMove(folder.id, -1) },
                             onMoveDown = { onMove(folder.id, +1) },
-                            onEdit = if (folder.isCustom) ({ onEdit(folder.id) }) else null,
-                            onDelete = if (folder.isCustom) ({ onDelete(folder.id) }) else null,
+                            onEdit = { onEdit(folder.id) },
+                            onDelete = { onDelete(folder.id) },
                         )
                     }
                 }
+            }
+            item {
+                SettingsRow(
+                    title = stringResource(R.string.chat_folder_restore_defaults),
+                    subtitle = stringResource(R.string.chat_folder_restore_defaults_subtitle),
+                    onClick = onRestoreDefaults,
+                )
             }
         }
     }
@@ -240,7 +248,8 @@ private fun chatFolderDisplayName(
     }
 
 // Counts what selecting the folder's chip would show, so this stays in
-// lockstep with the chip row's hide-when-empty and filtering decisions.
+// lockstep with the chip row's hide-when-empty and filtering decisions:
+// every folder's count derives from its rule, defaults included.
 private fun folderChatCount(
     folder: ChatFolder,
     appState: WhiteNoiseAppState,
@@ -248,28 +257,20 @@ private fun folderChatCount(
     mutedConversations: Set<String>,
     displayTitle: (ChatListItem) -> String,
 ): Int {
-    val active = appState.chatListItems
-    return when (folder.systemKind) {
-        SystemFolderKind.UNREAD -> active.count { it.hasUnread }
-        SystemFolderKind.ARCHIVED -> appState.archivedChatListItems.size
-        SystemFolderKind.GROUPS -> active.count { !it.isDm() }
-        null -> {
-            if (accountRef == null) {
-                0
-            } else {
-                val ids =
-                    chatFolderChatIds(
-                        items = active,
-                        manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                        isMuted = { ChatMutePreferences.compositeKey(accountRef, it) in mutedConversations },
-                        displayTitle = displayTitle,
-                    )
-                active.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
-            }
-        }
-    }
+    if (accountRef == null) return 0
+    val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
+    val archivedSource = rule?.archivedOnly == true
+    val source = if (archivedSource) appState.archivedChatListItems else appState.chatListItems
+    val ids =
+        chatFolderChatIds(
+            items = source,
+            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+            rule = rule,
+            activeAccountIdHex = appState.activeAccount?.accountIdHex,
+            isMuted = { ChatMutePreferences.compositeKey(accountRef, it) in mutedConversations },
+            displayTitle = displayTitle,
+        )
+    return source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
 }
 
 @Composable
@@ -278,8 +279,8 @@ private fun ChatFolderManageRow(
     folder: ChatFolderManageItem,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onEdit: (() -> Unit)?,
-    onDelete: (() -> Unit)?,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     var menuOpen by remember(folder.id) { mutableStateOf(false) }
 
@@ -303,26 +304,24 @@ private fun ChatFolderManageRow(
                         contentDescription = stringResource(R.string.chat_folder_move_down),
                     )
                 }
-                if (onEdit != null && onDelete != null) {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.edit)) },
-                            onClick = {
-                                menuOpen = false
-                                onEdit()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
-                            },
-                        )
-                    }
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.edit)) },
+                        onClick = {
+                            menuOpen = false
+                            onEdit()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete)) },
+                        onClick = {
+                            menuOpen = false
+                            onDelete()
+                        },
+                    )
                 }
             }
         },

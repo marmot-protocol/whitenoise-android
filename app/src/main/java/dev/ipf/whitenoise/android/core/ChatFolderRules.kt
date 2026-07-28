@@ -20,9 +20,15 @@ import java.util.Locale
  *     applies; [displayTitle] must supply the same title the row renders,
  *   - the two criteria are additive: matching either puts the chat in,
  *   - [ChatFolderRule.unreadOnly] constrains matches to chats with unread
- *     messages (the same [ChatListItem.hasUnread] the Unread system folder
- *     filters by); with no member or keyword criterion it stands alone as
- *     a pure unread rule,
+ *     messages; [ChatFolderRule.groupsOnly] constrains matches to group
+ *     (non-DM) chats. With no member or keyword criterion these stand alone
+ *     as pure category rules — the Unread and Groups defaults are exactly
+ *     that,
+ *   - [ChatFolderRule.archivedOnly] selects which side of the archive split
+ *     the rule matches: an archived-only folder matches only archived chats
+ *     (the Archived default is a pure archived rule), every other folder
+ *     only active ones. Callers still choose which source list to render,
+ *     but the match itself follows the row's own archived flag,
  *   - [ChatFolderRule.includeMuted] false (the default) drops muted chats
  *     from rule matches; manual members are the user's explicit choice and
  *     are never filtered here.
@@ -67,17 +73,21 @@ private fun chatFolderRuleMatches(
     displayTitle: (ChatListItem) -> String,
 ): Boolean {
     // With no member or keyword criterion the rule matches every chat only
-    // when unreadOnly narrows it — an empty rule must not swallow the list.
+    // when a category constraint narrows it (or archived-only already picked
+    // the source list) — an empty rule must not swallow the list.
+    val rule = criteria.rule
     val base =
         if (criteria.memberHexes.isEmpty() && criteria.ciKeyword == null) {
-            criteria.rule.unreadOnly
+            rule.unreadOnly || rule.groupsOnly || rule.archivedOnly
         } else {
             chatHasAnyMember(item, criteria.memberHexes) ||
                 chatMatchesKeyword(item, criteria.ciKeyword, displayTitle)
         }
     return base &&
-        (!criteria.rule.unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
-        (criteria.rule.includeMuted || !isMuted(item.group.groupIdHex))
+        rule.archivedOnly == item.group.archived &&
+        (!rule.unreadOnly || item.effectiveHasUnread(activeAccountIdHex)) &&
+        (!rule.groupsOnly || !item.isDm()) &&
+        (rule.includeMuted || !isMuted(item.group.groupIdHex))
 }
 
 // Matches against the roster snapshot the chat-list row already carries. A

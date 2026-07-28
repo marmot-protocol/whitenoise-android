@@ -48,6 +48,12 @@
     <string name="chat_folder_unread_only">Unread only</string>
     <string name="chat_folder_unread_only_subtitle">Only include chats with unread messages</string>
     <string name="chat_folder_include_muted">Include muted chats</string>
+    <string name="chat_folder_groups_only">Groups only</string>
+    <string name="chat_folder_groups_only_subtitle">Only include group chats</string>
+    <string name="chat_folder_archived_only">Archived only</string>
+    <string name="chat_folder_archived_only_subtitle">Include archived chats instead of active ones</string>
+    <string name="chat_folder_restore_defaults">Restore default folders</string>
+    <string name="chat_folder_restore_defaults_subtitle">Re-add any missing default folders</string>
     <string name="chat_folder_manual_chats">Included chats</string>
     <string name="chat_folder_people">People</string>
     <string name="chat_folder_people_subtitle">Include any chat with these people</string>
