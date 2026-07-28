@@ -44,6 +44,33 @@ class ConversationComposerGateTest {
     }
 
     @Test
+    fun disbandTerminalityOutranksEveryOtherGate() {
+        // Converging and landed disbands both yield the notice, and the
+        // terminal state wins even over a frozen local copy or a pending
+        // invite — the group ended by design.
+        listOf(
+            true to false,
+            false to true,
+            true to true,
+        ).forEach { (disbanding, disbanded) ->
+            assertEquals(
+                ComposerGate.DISBANDED,
+                conversationComposerGate(
+                    pendingInvite = true,
+                    membersVerified = true,
+                    isSelfMember = true,
+                    seededSelfMember = true,
+                    seededMembershipKnown = true,
+                    assumeMemberUntilVerified = true,
+                    unrecoverable = true,
+                    disbanding = disbanding,
+                    disbanded = disbanded,
+                ),
+            )
+        }
+    }
+
+    @Test
     fun pendingInviteShowsInviteActionsBeforeMembershipGate() {
         assertEquals(
             ComposerGate.INVITE,

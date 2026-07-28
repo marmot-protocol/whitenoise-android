@@ -262,6 +262,13 @@ internal fun GroupDetailsScreen(
     LaunchedEffect(Unit) {
         if (autoOpenAddMember) onAutoOpenAddMemberConsumed()
     }
+    // Disband eligibility, blockers, and any in-flight request are
+    // engine-authoritative; fetch on entry and again whenever the group
+    // record moves, so a remote admin's enable/disband lands here without
+    // reopening the screen.
+    LaunchedEffect(controller, controller.group) {
+        controller.refreshManagementState()
+    }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var pushDebugInfo by remember(controller.group.groupIdHex) { mutableStateOf<GroupPushDebugInfoFfi?>(null) }
@@ -689,7 +696,12 @@ internal fun GroupDetailsScreen(
             )
         },
     ) { padding ->
-        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
+        // The engine rejects all ordinary outbound group work while a disband
+        // converges and forever after it lands; don't advertise actions that
+        // can only fail. Local-only actions (archive, local delete) keep the
+        // plain in-flight gate.
+        val groupTerminal = controller.group.disbanding || controller.group.disbanded
+        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
         Column(
@@ -1225,9 +1237,35 @@ internal fun GroupDetailsScreen(
                 DangerActionRow(
                     icon = Icons.AutoMirrored.Filled.Logout,
                     title = stringResource(R.string.leave_group),
-                    enabled = !mutationsBlocked && controller.membersLoaded,
+                    // The engine refuses Leave for disbanding/terminal groups;
+                    // local delete below is the exit for a dead group.
+                    enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
                     inProgress = activeMutation?.action == GroupMutationAction.Leave,
                     onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                )
+                GroupDetailsDisbandControls(
+                    management = controller.managementState,
+                    enabled = !mutationsBlocked,
+                    enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                    disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                    onEnable = {
+                        runGroupMutation(
+                            action = GroupMutationAction.EnableDisbanding,
+                            mutation = { controller.enableGroupDisbanding() },
+                        )
+                    },
+                    onDisbandConfirmed = {
+                        runGroupMutation(
+                            action = GroupMutationAction.Disband,
+                            mutation = { controller.disbandGroup() },
+                        )
+                    },
+                    onAcknowledgeFailure = {
+                        runGroupMutation(
+                            action = GroupMutationAction.Disband,
+                            mutation = { controller.acknowledgeDisbandFailure() },
+                        )
+                    },
                 )
             }
             GroupDetailsLocalDeleteControl(
@@ -1801,6 +1839,8 @@ private enum class GroupMutationAction {
     Archive,
     Delete,
     Leave,
+    EnableDisbanding,
+    Disband,
 }
 
 private data class ActiveGroupMutation(

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
@@ -10,7 +12,9 @@ import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +47,10 @@ internal fun ChatListSelectionBar(
     showMarkUnread: Boolean,
     showMuteToggle: Boolean,
     muted: Boolean,
+    showPinToggle: Boolean,
+    pinned: Boolean,
+    showMovePinnedUp: Boolean,
+    showMovePinnedDown: Boolean,
     onClose: () -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
@@ -50,6 +58,8 @@ internal fun ChatListSelectionBar(
     onMarkRead: () -> Unit,
     onMarkUnread: () -> Unit,
     onMuteToggle: () -> Unit,
+    onPinToggle: () -> Unit,
+    onMovePinned: (Int) -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
 ) {
@@ -113,6 +123,15 @@ internal fun ChatListSelectionBar(
                         },
                     )
                 }
+                PinnedSelectionMenuItems(
+                    showPinToggle = showPinToggle,
+                    pinned = pinned,
+                    showMovePinnedUp = showMovePinnedUp,
+                    showMovePinnedDown = showMovePinnedDown,
+                    onPinToggle = onPinToggle,
+                    onMovePinned = onMovePinned,
+                    onDismiss = { overflowOpen = false },
+                )
                 if (showMuteToggle) {
                     DropdownMenuItem(
                         text = {
@@ -166,4 +185,58 @@ internal fun ChatListSelectionBar(
             }
         },
     )
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun PinnedSelectionMenuItems(
+    showPinToggle: Boolean,
+    pinned: Boolean,
+    showMovePinnedUp: Boolean,
+    showMovePinnedDown: Boolean,
+    onPinToggle: () -> Unit,
+    onMovePinned: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (showPinToggle) {
+        DropdownMenuItem(
+            text = {
+                Text(
+                    stringResource(
+                        if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin,
+                    ),
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    if (pinned) Icons.Outlined.PushPin else Icons.Filled.PushPin,
+                    contentDescription = null,
+                )
+            },
+            onClick = {
+                onDismiss()
+                onPinToggle()
+            },
+        )
+    }
+    if (showMovePinnedUp) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.chat_row_action_move_up)) },
+            leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMovePinned(-1)
+            },
+        )
+    }
+    if (showMovePinnedDown) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.chat_row_action_move_down)) },
+            leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMovePinned(1)
+            },
+        )
+    }
 }

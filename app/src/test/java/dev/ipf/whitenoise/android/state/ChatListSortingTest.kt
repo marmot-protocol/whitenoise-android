@@ -17,6 +17,24 @@ import org.junit.Test
 
 class ChatListSortingTest {
     @Test
+    fun pinnedChatsRideAboveRecencyInEngineManualOrder() {
+        val pinnedSecond = item("pinned-second", latestAt = 9_000uL, pinned = true, pinnedPosition = 1u)
+        val pinnedFirst = item("pinned-first", latestAt = 100uL, pinned = true, pinnedPosition = 0u)
+        val recent = item("recent", latestAt = 50_000uL)
+        val invited = item("invited", latestAt = 10uL, pending = true)
+
+        val sorted = sortChatListItems(listOf(recent, pinnedSecond, pinnedFirst, invited))
+
+        // Pending invites stay on top, the pinned block follows in the
+        // engine's manual order regardless of recency, unpinned rows keep
+        // the recency chain.
+        assertEquals(
+            listOf("invited", "pinned-first", "pinned-second", "recent"),
+            sorted.map { it.id },
+        )
+    }
+
+    @Test
     fun chatsWithoutMessagesSortAfterChatsWithMessages() {
         val withLatest = item("with-latest", latestAt = 25uL)
         val withoutLatest = item("without-latest", latestAt = null)
@@ -316,6 +334,8 @@ class ChatListSortingTest {
         id: String,
         latestAt: ULong?,
         pending: Boolean = false,
+        pinned: Boolean = false,
+        pinnedPosition: UInt? = null,
     ): ChatListItem =
         ChatListItem(
             group = group(id, pending = pending),
@@ -323,6 +343,18 @@ class ChatListSortingTest {
             otherMemberAccount = null,
             memberCount = 0,
             memberSnapshot = null,
+            projection =
+                if (pinned) {
+                    row(
+                        groupId = id,
+                        title = id,
+                        preview = "",
+                        latestAt = latestAt ?: 0uL,
+                        unreadCount = 0uL,
+                    ).copy(pinned = true, pinnedPosition = pinnedPosition)
+                } else {
+                    null
+                },
         )
 
     private fun row(
@@ -371,6 +403,11 @@ class ChatListSortingTest {
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
     )
 
     private fun preview(
@@ -423,6 +460,11 @@ class ChatListSortingTest {
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
     )
 
     private fun group(
@@ -452,6 +494,9 @@ class ChatListSortingTest {
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = false,
+        disbandRequest = null,
     )
 
     private fun encryptedMedia() =

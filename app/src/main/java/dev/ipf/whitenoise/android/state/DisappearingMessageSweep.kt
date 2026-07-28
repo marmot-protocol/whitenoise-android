@@ -60,11 +60,12 @@ object DisappearingMessageSweep {
         )
 
     /**
-     * Read-anchored local expiry (#797). Prefers engine-owned
-     * [LocalExpiryRow.expiresAtLocalSeconds] when present, then a session
-     * read/display anchor, then send-time expiry unless
-     * [LocalExpiryRow.deferSendTimeExpiry] suspends it for unread received
-     * rows.
+     * Read-anchored local expiry (#797). A session read/display anchor wins
+     * first and [LocalExpiryRow.deferSendTimeExpiry] still suspends unread
+     * received rows — the engine's [LocalExpiryRow.expiresAtLocalSeconds] is
+     * send-time based (source-epoch recorded-at + retention), so it replaces
+     * only the send-time arithmetic, pinning the retention that was in force
+     * when the message was sent rather than the group's current window.
      */
     fun isLocallyExpired(
         nowMillis: Long,
@@ -82,9 +83,9 @@ object DisappearingMessageSweep {
         disappearingMessageSecs: ULong,
         row: LocalExpiryRow,
     ): ULong? {
-        row.expiresAtLocalSeconds?.let { return it }
         row.readAnchoredAtSeconds?.let { return it.saturatingPlus(disappearingMessageSecs) }
         if (row.deferSendTimeExpiry) return null
+        row.expiresAtLocalSeconds?.let { return it }
         return row.timelineAtSeconds.saturatingPlus(disappearingMessageSecs)
     }
 

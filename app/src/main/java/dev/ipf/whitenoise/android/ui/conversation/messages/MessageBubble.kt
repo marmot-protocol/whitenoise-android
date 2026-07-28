@@ -112,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
@@ -317,6 +318,7 @@ internal fun MessageBubble(
     onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    groupDisbanded: Boolean = false,
     inviteMutationInFlight: Boolean,
     onJoinInvite: () -> Unit,
     onDeclineInvite: () -> Unit,
@@ -1896,6 +1898,7 @@ internal fun MessageBubble(
                                     )
                                 ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                                 ComposerGate.FROZEN -> FrozenGroupComposerNotice()
+                                ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
                                 ComposerGate.INVITE ->
                                     InvitePreviewActionBar(
                                         mutationInFlight = inviteMutationInFlight,

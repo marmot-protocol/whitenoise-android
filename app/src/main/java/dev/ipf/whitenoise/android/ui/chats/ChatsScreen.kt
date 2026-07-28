@@ -399,6 +399,24 @@ internal fun ChatsScreen(
             chatListBulkArchiveAction(selectedVisibleItems.map { it.group.archived })
         }
     val singleSelectedItem = selectedVisibleItems.singleOrNull()
+    // Engine-normalized manual order of the pinned block, for the selection
+    // bar's move actions. Ids keep the projection's casing — they round-trip
+    // straight back into setPinnedChatOrder, which must receive the pinned
+    // set exactly. Active items suffice: the engine only pins unarchived
+    // chats and clears a pin on archive, so no archived row can be pinned.
+    val pinnedOrderedIds =
+        remember(controller.items) {
+            controller.items
+                .filter { it.pinned() }
+                .sortedBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
+                .map { it.projection?.groupIdHex ?: it.group.groupIdHex }
+        }
+    val singleSelectedPinnedIndex =
+        singleSelectedItem
+            ?.takeIf { it.pinned() }
+            ?.let { item ->
+                pinnedOrderedIds.indexOfFirst { it.equals(item.group.groupIdHex, ignoreCase = true) }
+            }?.takeIf { it >= 0 }
     val singleSelectionMuted =
         singleSelectedItem?.let { item ->
             item.engineMuted() ||
@@ -551,6 +569,15 @@ internal fun ChatsScreen(
                                 singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
                         showMuteToggle = singleSelectedItem != null,
                         muted = singleSelectionMuted,
+                        // The engine only pins unarchived chats, so an archived
+                        // selection gets no pin affordance instead of a
+                        // silently failing one.
+                        showPinToggle = singleSelectedItem?.group?.archived == false,
+                        pinned = singleSelectedItem?.pinned() == true,
+                        showMovePinnedUp = (singleSelectedPinnedIndex ?: 0) > 0,
+                        showMovePinnedDown =
+                            singleSelectedPinnedIndex != null &&
+                                singleSelectedPinnedIndex < pinnedOrderedIds.lastIndex,
                         onClose = ::clearSelection,
                         onArchive = {
                             val selected = selectedVisibleItems
@@ -604,6 +631,24 @@ internal fun ChatsScreen(
                                 item.group.groupIdHex,
                                 nextMuted,
                             )
+                        },
+                        onPinToggle = {
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            val nextPinned = !item.pinned()
+                            clearSelection()
+                            appState.launchMutation { controller.setPinned(item, nextPinned) }
+                        },
+                        onMovePinned = { delta ->
+                            val index = singleSelectedPinnedIndex ?: return@ChatListSelectionBar
+                            val target = index + delta
+                            if (target !in pinnedOrderedIds.indices) return@ChatListSelectionBar
+                            val reordered =
+                                pinnedOrderedIds.toMutableList().also { ids ->
+                                    val id = ids.removeAt(index)
+                                    ids.add(target, id)
+                                }
+                            clearSelection()
+                            appState.launchMutation { controller.setPinnedOrder(reordered) }
                         },
                         onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
                         onDeselectAll = { selectedChatIds.clear() },

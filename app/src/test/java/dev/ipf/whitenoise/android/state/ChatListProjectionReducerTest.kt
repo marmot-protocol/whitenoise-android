@@ -505,6 +505,11 @@ class ChatListProjectionReducerTest {
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
     )
 
     private fun noMessageRow(
@@ -542,6 +547,9 @@ class ChatListProjectionReducerTest {
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = false,
+        disbandRequest = null,
     )
 
     private fun member(

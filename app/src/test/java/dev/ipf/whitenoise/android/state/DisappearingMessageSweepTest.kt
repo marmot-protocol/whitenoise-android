@@ -251,17 +251,70 @@ class DisappearingMessageSweepTest {
     }
 
     @Test
-    fun expiresAtLocalSecondsOverrideReadAnchor() {
+    fun readAnchorOutranksEngineSendTimeExpiry() {
+        // The engine's expires_at is send-time based; a session read anchor
+        // must keep the #797 display window even when the engine value has
+        // already passed.
         val row =
             DisappearingMessageSweep.LocalExpiryRow(
                 timelineAtSeconds = 100uL,
                 readAnchoredAtSeconds = 1_000uL,
-                expiresAtLocalSeconds = 1_010uL,
+                expiresAtLocalSeconds = 160uL,
+            )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_060_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+    }
+
+    @Test
+    fun unreadDeferralOutranksEngineSendTimeExpiry() {
+        val row =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = 100uL,
+                expiresAtLocalSeconds = 160uL,
+                deferSendTimeExpiry = true,
+            )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 10_000_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+    }
+
+    @Test
+    fun engineExpiryPinsSourceEpochRetentionOverTheCurrentWindow() {
+        // A message sent under a 60s timer keeps its original expiry even
+        // after the group's window widens: the engine value replaces the
+        // send-time arithmetic.
+        val row =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = 100uL,
+                expiresAtLocalSeconds = 160uL,
             )
         assertTrue(
             DisappearingMessageSweep.isLocallyExpired(
-                nowMillis = 1_010_000L,
-                disappearingMessageSecs = 60uL,
+                nowMillis = 160_000L,
+                disappearingMessageSecs = 3_600uL,
+                row = row,
+            ),
+        )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 159_000L,
+                disappearingMessageSecs = 3_600uL,
                 row = row,
             ),
         )

@@ -150,6 +150,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
@@ -2585,6 +2586,8 @@ internal fun ConversationScreen(
             seededMembershipKnown = controller.seededMembershipKnown,
             assumeMemberUntilVerified = notificationOpenRequestId != 0L,
             unrecoverable = controller.group.unrecoverable,
+            disbanding = controller.group.disbanding,
+            disbanded = controller.group.disbanded,
         )
     val mentionPicker =
         rememberConversationMentionPickerState(
@@ -2972,6 +2975,8 @@ internal fun ConversationScreen(
                                 )
                             ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                             ComposerGate.FROZEN -> FrozenGroupComposerNotice()
+                            ComposerGate.DISBANDED ->
+                                DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
                             ComposerGate.INVITE ->
                                 InvitePreviewActionBar(
                                     mutationInFlight = controller.mutationInFlight,
@@ -3386,6 +3391,7 @@ internal fun ConversationScreen(
                                             onQuickReactionsReset = { resetQuickReactionEmojis() },
                                             onReplyPreviewClick = { navigateToReplyTarget(it) },
                                             composerGate = composerGate,
+                                            groupDisbanded = controller.group.disbanded,
                                             inviteMutationInFlight = controller.mutationInFlight,
                                             onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
                                             onDeclineInvite = {

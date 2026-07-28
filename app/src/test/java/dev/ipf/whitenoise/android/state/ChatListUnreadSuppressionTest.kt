@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,6 +82,44 @@ class ChatListUnreadSuppressionTest {
     }
 
     @Test
+    fun disbandedLifecycleSuppressesLikeARemoval() {
+        val item =
+            item(
+                unreadCount = 4uL,
+                members = listOf("self", "peer"),
+                lifecycleState = GroupLifecycleStateFfi.DISBANDED,
+            )
+
+        assertTrue(item.removedFromGroup("self"))
+        assertEquals(0uL, item.effectiveUnreadCount("self"))
+        assertFalse(item.effectiveHasUnread("self"))
+    }
+
+    @Test
+    fun convergingDisbandSuppressesWhileTheEngineGatesTheGroup() {
+        val item = item(unreadCount = 4uL, members = listOf("self", "peer"), disbanding = true)
+
+        assertTrue(item.removedFromGroup("self"))
+        assertEquals(0uL, item.effectiveUnreadCount("self"))
+        assertFalse(item.effectiveHasUnread("self"))
+    }
+
+    @Test
+    fun coldOpenFallbackRecordCarriesTheRowsDisbandState() {
+        // A projection-only cold open (full group record still loading) must
+        // not flash an active composer for a disbanding/disbanded chat.
+        val disbanding = emptyGroupRecord(row("group-a", 0uL).copy(disbanding = true))
+        assertTrue(disbanding.disbanding)
+        assertFalse(disbanding.disbanded)
+
+        val disbanded =
+            emptyGroupRecord(
+                row("group-a", 0uL).copy(lifecycleState = GroupLifecycleStateFfi.DISBANDED),
+            )
+        assertTrue(disbanded.disbanded)
+    }
+
+    @Test
     fun nullOrBlankActiveAccountNeverSuppresses() {
         // Matching GroupProjector semantics: with no active account there is
         // no removal to establish — even an explicit removed marker must not
@@ -147,6 +186,8 @@ class ChatListUnreadSuppressionTest {
         removed: Boolean = false,
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
         leaveRequestPending: Boolean = false,
+        lifecycleState: GroupLifecycleStateFfi = GroupLifecycleStateFfi.STABLE,
+        disbanding: Boolean = false,
     ): ChatListItem =
         ChatListItem(
             group = group("group-a"),
@@ -154,7 +195,9 @@ class ChatListUnreadSuppressionTest {
             otherMemberAccount = null,
             memberCount = members?.size ?: 0,
             memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
-            projection = row("group-a", unreadCount, selfMembership, leaveRequestPending),
+            projection =
+                row("group-a", unreadCount, selfMembership, leaveRequestPending)
+                    .copy(lifecycleState = lifecycleState, disbanding = disbanding),
             removed = removed,
         )
 
@@ -196,6 +239,11 @@ class ChatListUnreadSuppressionTest {
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
     )
 
     private fun group(id: String) =
@@ -223,6 +271,9 @@ class ChatListUnreadSuppressionTest {
             disappearingMessageSecs = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            disbanding = false,
+            disbanded = false,
+            disbandRequest = null,
         )
 
     private fun encryptedMedia() =

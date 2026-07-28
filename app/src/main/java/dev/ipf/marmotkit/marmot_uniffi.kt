@@ -1109,6 +1109,16 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1209,6 +1219,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_unread_summary(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_acknowledge_disband_failure(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
@@ -1251,6 +1263,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_disband_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1258,6 +1272,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_enable_group_disbanding(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_export_encrypted_secret_key(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1393,6 +1409,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`mutedUntilMs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_pinned(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`pinned`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -1401,6 +1419,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_periodic_maintenance_policy(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`policy`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_pinned_chat_order(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`orderedGroupIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
@@ -1649,6 +1669,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_acknowledge_disband_failure(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_settings(
@@ -1691,6 +1713,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin_detailed(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_disband_group(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_display_name(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
@@ -1698,6 +1722,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key(
     ): Short
@@ -1833,6 +1859,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_muted(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_pinned(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_local_notifications_enabled(
@@ -1840,6 +1868,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_periodic_maintenance_policy(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_pinned_chat_order(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config(
     ): Short
@@ -1945,10 +1975,10 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_stream_id_hex() != 57056.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next() != 4327.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next() != 41564.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next_update() != 33027.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next_update() != 32887.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_chatlistsubscription_snapshot() != 64263.toShort()) {
@@ -2006,6 +2036,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary() != 15239.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_acknowledge_disband_failure() != 63327.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files() != 25846.toShort()) {
@@ -2071,6 +2104,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_demote_admin_detailed() != 49488.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_disband_group() != 1732.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_display_name() != 65469.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2081,6 +2117,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_edit_message() != 43927.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding() != 25467.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 16556.toShort()) {
@@ -2284,6 +2323,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_chat_muted() != 63462.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_chat_pinned() != 60031.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived() != 17316.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2294,6 +2336,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_periodic_maintenance_policy() != 1720.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_pinned_chat_order() != 64195.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config() != 6820.toShort()) {
@@ -3174,8 +3219,27 @@ public object FfiConverterTypeAgentStreamSubscription: FfiConverter<AgentStreamS
 
 public interface ChatListSubscriptionInterface {
     
+    /**
+     * Legacy row-only update stream.
+     *
+     * Atomic replacement snapshots are flattened into every visible row in
+     * authoritative order so existing clients can observe changed pin fields.
+     * This can yield many rows for one pin or archive operation and cannot
+     * express the replacement boundary or removals. New clients that need
+     * correct manual ordering and archive removals should use `next_update`.
+     *
+     * `next` and `next_update` consume the same stream and must not be mixed
+     * for the lifetime of one subscription.
+     */
     suspend fun `next`(): ChatListRowFfi?
     
+    /**
+     * Typed update stream, including atomic full-list replacement snapshots.
+     *
+     * Do not mix this with `next` on the same subscription: both consume the
+     * same underlying stream, while `next` may also hold flattened snapshot
+     * rows in its compatibility buffer.
+     */
     suspend fun `nextUpdate`(): ChatListSubscriptionUpdateFfi?
     
     fun `snapshot`(): List<ChatListRowFfi>
@@ -3265,6 +3329,18 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
     }
 
     
+    /**
+     * Legacy row-only update stream.
+     *
+     * Atomic replacement snapshots are flattened into every visible row in
+     * authoritative order so existing clients can observe changed pin fields.
+     * This can yield many rows for one pin or archive operation and cannot
+     * express the replacement boundary or removals. New clients that need
+     * correct manual ordering and archive removals should use `next_update`.
+     *
+     * `next` and `next_update` consume the same stream and must not be mixed
+     * for the lifetime of one subscription.
+     */
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : ChatListRowFfi? {
         return uniffiRustCallAsync(
@@ -3285,6 +3361,13 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
     }
 
     
+    /**
+     * Typed update stream, including atomic full-list replacement snapshots.
+     *
+     * Do not mix this with `next` on the same subscription: both consume the
+     * same underlying stream, while `next` may also hold flattened snapshot
+     * rows in its compatibility buffer.
+     */
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `nextUpdate`() : ChatListSubscriptionUpdateFfi? {
         return uniffiRustCallAsync(
@@ -4769,6 +4852,8 @@ public interface MarmotInterface {
      */
     fun `accountUnreadSummary`(): List<AccountUnreadFfi>
     
+    suspend fun `acknowledgeDisbandFailure`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.Boolean
+    
     /**
      * Local JSONL audit logs available for explicit forensic upload.
      */
@@ -4892,6 +4977,12 @@ public interface MarmotInterface {
     suspend fun `demoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): GroupMutationResultFfi
     
     /**
+     * Durably accept an irreversible disband request. Completion is observed
+     * through normal group state updates after bounded convergence.
+     */
+    suspend fun `disbandGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): DisbandRequestFfi
+    
+    /**
      * Best-effort cached display name for an account id. Returns the Nostr
      * kind:0 display_name/name when the runtime has projected one, or the
      * local account label if the id refers to one of our own accounts.
@@ -4928,6 +5019,11 @@ public interface MarmotInterface {
      * projection and resolve the latest text per target message id.
      */
     suspend fun `editMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `content`: kotlin.String): SendSummaryFfi
+    
+    /**
+     * Install lifecycle-v1 and require it in one admin Commit.
+     */
+    suspend fun `enableGroupDisbanding`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupMutationResultFfi
     
     /**
      * Export the active account's private key as a password-encrypted NIP-49
@@ -5316,6 +5412,12 @@ public interface MarmotInterface {
     fun `setChatMuted`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `mutedUntilMs`: kotlin.Long?): ChatNotificationSettingsFfi
     
     /**
+     * Pin or unpin one local chat. Newly pinned chats enter at the top of the
+     * manually ordered pinned section.
+     */
+    fun `setChatPinned`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `pinned`: kotlin.Boolean): ChatPinStateFfi
+    
+    /**
      * Flag a group archived (or restore it). Local-only projection state —
      * it does not change membership or publish anything. The chats list
      * filters archived groups unless `include_archived` is set.
@@ -5327,6 +5429,12 @@ public interface MarmotInterface {
     suspend fun `setNativePushEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi
     
     suspend fun `setPeriodicMaintenancePolicy`(`accountRef`: kotlin.String, `policy`: PeriodicMaintenancePolicyFfi)
+    
+    /**
+     * Atomically replace the order of the current pinned set. The input must
+     * contain every currently pinned group exactly once.
+     */
+    fun `setPinnedChatOrder`(`accountRef`: kotlin.String, `orderedGroupIds`: List<kotlin.String>): ChatPinStateFfi
     
     /**
      * Supply non-persisted OTLP runtime metadata: optional metrics URL
@@ -5791,6 +5899,27 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
     
+
+    
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `acknowledgeDisbandFailure`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_acknowledge_disband_failure(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
 
     
     /**
@@ -6267,6 +6396,31 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Durably accept an irreversible disband request. Completion is observed
+     * through normal group state updates after bounded convergence.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `disbandGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : DisbandRequestFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_disband_group(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeDisbandRequestFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Best-effort cached display name for an account id. Returns the Nostr
      * kind:0 display_name/name when the runtime has projected one, or the
      * local account label if the id refers to one of our own accounts.
@@ -6365,6 +6519,30 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeSendSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Install lifecycle-v1 and require it in one admin Commit.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `enableGroupDisbanding`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : GroupMutationResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_enable_group_disbanding(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeGroupMutationResultFfi.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -7863,6 +8041,23 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Pin or unpin one local chat. Newly pinned chats enter at the top of the
+     * manually ordered pinned section.
+     */
+    @Throws(MarmotKitException::class)override fun `setChatPinned`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `pinned`: kotlin.Boolean): ChatPinStateFfi {
+            return FfiConverterTypeChatPinStateFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_chat_pinned(
+        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterBoolean.lower(`pinned`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Flag a group archived (or restore it). Local-only projection state —
      * it does not change membership or publish anything. The chats list
      * filters archived groups unless `include_archived` is set.
@@ -7942,6 +8137,23 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Atomically replace the order of the current pinned set. The input must
+     * contain every currently pinned group exactly once.
+     */
+    @Throws(MarmotKitException::class)override fun `setPinnedChatOrder`(`accountRef`: kotlin.String, `orderedGroupIds`: List<kotlin.String>): ChatPinStateFfi {
+            return FfiConverterTypeChatPinStateFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_pinned_chat_order(
+        it, FfiConverterString.lower(`accountRef`),FfiConverterSequenceString.lower(`orderedGroupIds`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -10023,10 +10235,19 @@ public object FfiConverterTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<Ap
 data class AppGroupMlsStateFfi (
     var `groupIdHex`: kotlin.String, 
     var `protocolProfile`: AppProtocolProfileFfi, 
+    var `lifecycleState`: GroupLifecycleStateFfi, 
     var `epoch`: kotlin.ULong, 
     var `memberCount`: kotlin.UInt, 
     var `unrecoverable`: kotlin.Boolean, 
-    var `requiredAppComponents`: List<kotlin.UShort>
+    var `requiredAppComponents`: List<kotlin.UShort>, 
+    var `disbandingEnabled`: kotlin.Boolean, 
+    /**
+     * True while application messages and all other ordinary outbound group
+     * work are gated pending terminal convergence.
+     */
+    var `disbanding`: kotlin.Boolean, 
+    var `disbandingBlockers`: List<kotlin.String>, 
+    var `disbandRequest`: DisbandRequestFfi?
 ) {
     
     companion object
@@ -10040,29 +10261,44 @@ public object FfiConverterTypeAppGroupMlsStateFfi: FfiConverterRustBuffer<AppGro
         return AppGroupMlsStateFfi(
             FfiConverterString.read(buf),
             FfiConverterTypeAppProtocolProfileFfi.read(buf),
+            FfiConverterTypeGroupLifecycleStateFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceUShort.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalTypeDisbandRequestFfi.read(buf),
         )
     }
 
     override fun allocationSize(value: AppGroupMlsStateFfi) = (
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterTypeAppProtocolProfileFfi.allocationSize(value.`protocolProfile`) +
+            FfiConverterTypeGroupLifecycleStateFfi.allocationSize(value.`lifecycleState`) +
             FfiConverterULong.allocationSize(value.`epoch`) +
             FfiConverterUInt.allocationSize(value.`memberCount`) +
             FfiConverterBoolean.allocationSize(value.`unrecoverable`) +
-            FfiConverterSequenceUShort.allocationSize(value.`requiredAppComponents`)
+            FfiConverterSequenceUShort.allocationSize(value.`requiredAppComponents`) +
+            FfiConverterBoolean.allocationSize(value.`disbandingEnabled`) +
+            FfiConverterBoolean.allocationSize(value.`disbanding`) +
+            FfiConverterSequenceString.allocationSize(value.`disbandingBlockers`) +
+            FfiConverterOptionalTypeDisbandRequestFfi.allocationSize(value.`disbandRequest`)
     )
 
     override fun write(value: AppGroupMlsStateFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterTypeAppProtocolProfileFfi.write(value.`protocolProfile`, buf)
+            FfiConverterTypeGroupLifecycleStateFfi.write(value.`lifecycleState`, buf)
             FfiConverterULong.write(value.`epoch`, buf)
             FfiConverterUInt.write(value.`memberCount`, buf)
             FfiConverterBoolean.write(value.`unrecoverable`, buf)
             FfiConverterSequenceUShort.write(value.`requiredAppComponents`, buf)
+            FfiConverterBoolean.write(value.`disbandingEnabled`, buf)
+            FfiConverterBoolean.write(value.`disbanding`, buf)
+            FfiConverterSequenceString.write(value.`disbandingBlockers`, buf)
+            FfiConverterOptionalTypeDisbandRequestFfi.write(value.`disbandRequest`, buf)
     }
 }
 
@@ -10126,6 +10362,21 @@ data class AppGroupRecordFfi (
      * epoch; `null` when no leave is pending.
      */
     var `leaveRequestedAtMs`: kotlin.ULong?, 
+    /**
+     * Hide/disable the message composer while this is true. It includes both
+     * this account's durable request and another admin's authenticated
+     * terminal candidate awaiting convergence.
+     */
+    var `disbanding`: kotlin.Boolean, 
+    /**
+     * This account's durable request outcome, if any. Another admin's pending
+     * candidate can make `disbanding` true while this remains `null`.
+     */
+    var `disbandRequest`: DisbandRequestFfi?, 
+    /**
+     * Hide the composer permanently for this group id when terminal.
+     */
+    var `disbanded`: kotlin.Boolean, 
     var `welcomerAccountIdHex`: kotlin.String?, 
     var `viaWelcomeMessageIdHex`: kotlin.String?
 ) {
@@ -10160,6 +10411,9 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterTypeSelfMembershipFfi.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeDisbandRequestFfi.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
         )
@@ -10187,6 +10441,9 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterTypeSelfMembershipFfi.allocationSize(value.`selfMembership`) +
             FfiConverterBoolean.allocationSize(value.`leaveRequestPending`) +
             FfiConverterOptionalULong.allocationSize(value.`leaveRequestedAtMs`) +
+            FfiConverterBoolean.allocationSize(value.`disbanding`) +
+            FfiConverterOptionalTypeDisbandRequestFfi.allocationSize(value.`disbandRequest`) +
+            FfiConverterBoolean.allocationSize(value.`disbanded`) +
             FfiConverterOptionalString.allocationSize(value.`welcomerAccountIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`viaWelcomeMessageIdHex`)
     )
@@ -10213,6 +10470,9 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterTypeSelfMembershipFfi.write(value.`selfMembership`, buf)
             FfiConverterBoolean.write(value.`leaveRequestPending`, buf)
             FfiConverterOptionalULong.write(value.`leaveRequestedAtMs`, buf)
+            FfiConverterBoolean.write(value.`disbanding`, buf)
+            FfiConverterOptionalTypeDisbandRequestFfi.write(value.`disbandRequest`, buf)
+            FfiConverterBoolean.write(value.`disbanded`, buf)
             FfiConverterOptionalString.write(value.`welcomerAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`viaWelcomeMessageIdHex`, buf)
     }
@@ -10770,8 +11030,20 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
 
 data class ChatListRowFfi (
     var `groupIdHex`: kotlin.String, 
+    var `pinned`: kotlin.Boolean, 
+    var `pinnedPosition`: kotlin.UInt?, 
     var `archived`: kotlin.Boolean, 
     var `pendingConfirmation`: kotlin.Boolean, 
+    var `lifecycleState`: GroupLifecycleStateFfi, 
+    /**
+     * Hide/disable the message composer while terminal convergence is in
+     * progress. This also covers another admin's inbound candidate.
+     */
+    var `disbanding`: kotlin.Boolean, 
+    /**
+     * This account's durable request outcome, if any.
+     */
+    var `disbandRequest`: DisbandRequestFfi?, 
     var `title`: kotlin.String, 
     var `groupName`: kotlin.String, 
     var `avatarUrl`: kotlin.String?, 
@@ -10852,7 +11124,12 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
         return ChatListRowFfi(
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalUInt.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterTypeGroupLifecycleStateFfi.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeDisbandRequestFfi.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -10880,8 +11157,13 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
 
     override fun allocationSize(value: ChatListRowFfi) = (
             FfiConverterString.allocationSize(value.`groupIdHex`) +
+            FfiConverterBoolean.allocationSize(value.`pinned`) +
+            FfiConverterOptionalUInt.allocationSize(value.`pinnedPosition`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
+            FfiConverterTypeGroupLifecycleStateFfi.allocationSize(value.`lifecycleState`) +
+            FfiConverterBoolean.allocationSize(value.`disbanding`) +
+            FfiConverterOptionalTypeDisbandRequestFfi.allocationSize(value.`disbandRequest`) +
             FfiConverterString.allocationSize(value.`title`) +
             FfiConverterString.allocationSize(value.`groupName`) +
             FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
@@ -10908,8 +11190,13 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
 
     override fun write(value: ChatListRowFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`groupIdHex`, buf)
+            FfiConverterBoolean.write(value.`pinned`, buf)
+            FfiConverterOptionalUInt.write(value.`pinnedPosition`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
+            FfiConverterTypeGroupLifecycleStateFfi.write(value.`lifecycleState`, buf)
+            FfiConverterBoolean.write(value.`disbanding`, buf)
+            FfiConverterOptionalTypeDisbandRequestFfi.write(value.`disbandRequest`, buf)
             FfiConverterString.write(value.`title`, buf)
             FfiConverterString.write(value.`groupName`, buf)
             FfiConverterOptionalString.write(value.`avatarUrl`, buf)
@@ -10985,9 +11272,44 @@ public object FfiConverterTypeChatNotificationSettingsFfi: FfiConverterRustBuffe
 
 
 
+/**
+ * Authoritative device-local order of every currently pinned chat.
+ */
+data class ChatPinStateFfi (
+    /**
+     * Group ids in normalized zero-based display order.
+     */
+    var `orderedGroupIds`: List<kotlin.String>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeChatPinStateFfi: FfiConverterRustBuffer<ChatPinStateFfi> {
+    override fun read(buf: ByteBuffer): ChatPinStateFfi {
+        return ChatPinStateFfi(
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ChatPinStateFfi) = (
+            FfiConverterSequenceString.allocationSize(value.`orderedGroupIds`)
+    )
+
+    override fun write(value: ChatPinStateFfi, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`orderedGroupIds`, buf)
+    }
+}
+
+
+
 data class GroupDetailsFfi (
     var `group`: AppGroupRecordFfi, 
-    var `members`: List<GroupMemberDetailsFfi>
+    var `members`: List<GroupMemberDetailsFfi>, 
+    var `mlsState`: AppGroupMlsStateFfi
 ) {
     
     companion object
@@ -11001,17 +11323,20 @@ public object FfiConverterTypeGroupDetailsFfi: FfiConverterRustBuffer<GroupDetai
         return GroupDetailsFfi(
             FfiConverterTypeAppGroupRecordFfi.read(buf),
             FfiConverterSequenceTypeGroupMemberDetailsFfi.read(buf),
+            FfiConverterTypeAppGroupMlsStateFfi.read(buf),
         )
     }
 
     override fun allocationSize(value: GroupDetailsFfi) = (
             FfiConverterTypeAppGroupRecordFfi.allocationSize(value.`group`) +
-            FfiConverterSequenceTypeGroupMemberDetailsFfi.allocationSize(value.`members`)
+            FfiConverterSequenceTypeGroupMemberDetailsFfi.allocationSize(value.`members`) +
+            FfiConverterTypeAppGroupMlsStateFfi.allocationSize(value.`mlsState`)
     )
 
     override fun write(value: GroupDetailsFfi, buf: ByteBuffer) {
             FfiConverterTypeAppGroupRecordFfi.write(value.`group`, buf)
             FfiConverterSequenceTypeGroupMemberDetailsFfi.write(value.`members`, buf)
+            FfiConverterTypeAppGroupMlsStateFfi.write(value.`mlsState`, buf)
     }
 }
 
@@ -11196,10 +11521,15 @@ data class GroupManagementStateFfi (
      *
      * When this is `false`, the reason is one of
      * `requires_self_demote_before_leave` (demote first) or
-     * `leave_request_pending` (already leaving) — or the account is not a member
-     * at all. Check those before reporting an error to the user.
+     * `leave_request_pending` (already leaving), or `disbanding` / terminal
+     * `lifecycle_state` (ordinary group actions are unavailable) — or the
+     * account is not a member at all. Check those before reporting an error.
      */
     var `canLeave`: kotlin.Boolean, 
+    /**
+     * Whether an admin must self-demote before leaving. Disbanding and a
+     * terminal lifecycle take precedence and keep this false.
+     */
     var `requiresSelfDemoteBeforeLeave`: kotlin.Boolean, 
     /**
      * A leave is already in flight for this group; `Marmot::leave_group` would
@@ -11212,6 +11542,17 @@ data class GroupManagementStateFfi (
      * epoch; `null` when no leave is pending.
      */
     var `leaveRequestedAtMs`: kotlin.ULong?, 
+    var `lifecycleState`: GroupLifecycleStateFfi, 
+    var `disbandingEnabled`: kotlin.Boolean, 
+    /**
+     * Whether terminal convergence currently blocks all ordinary outbound
+     * group work. Hosts should hide the message composer while true.
+     */
+    var `disbanding`: kotlin.Boolean, 
+    var `canEnableDisbanding`: kotlin.Boolean, 
+    var `canDisband`: kotlin.Boolean, 
+    var `disbandingBlockers`: List<kotlin.String>, 
+    var `disbandRequest`: DisbandRequestFfi?, 
     var `memberActions`: List<GroupMemberActionStateFfi>
 ) {
     
@@ -11232,6 +11573,13 @@ public object FfiConverterTypeGroupManagementStateFfi: FfiConverterRustBuffer<Gr
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalULong.read(buf),
+            FfiConverterTypeGroupLifecycleStateFfi.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalTypeDisbandRequestFfi.read(buf),
             FfiConverterSequenceTypeGroupMemberActionStateFfi.read(buf),
         )
     }
@@ -11245,6 +11593,13 @@ public object FfiConverterTypeGroupManagementStateFfi: FfiConverterRustBuffer<Gr
             FfiConverterBoolean.allocationSize(value.`requiresSelfDemoteBeforeLeave`) +
             FfiConverterBoolean.allocationSize(value.`leaveRequestPending`) +
             FfiConverterOptionalULong.allocationSize(value.`leaveRequestedAtMs`) +
+            FfiConverterTypeGroupLifecycleStateFfi.allocationSize(value.`lifecycleState`) +
+            FfiConverterBoolean.allocationSize(value.`disbandingEnabled`) +
+            FfiConverterBoolean.allocationSize(value.`disbanding`) +
+            FfiConverterBoolean.allocationSize(value.`canEnableDisbanding`) +
+            FfiConverterBoolean.allocationSize(value.`canDisband`) +
+            FfiConverterSequenceString.allocationSize(value.`disbandingBlockers`) +
+            FfiConverterOptionalTypeDisbandRequestFfi.allocationSize(value.`disbandRequest`) +
             FfiConverterSequenceTypeGroupMemberActionStateFfi.allocationSize(value.`memberActions`)
     )
 
@@ -11257,6 +11612,13 @@ public object FfiConverterTypeGroupManagementStateFfi: FfiConverterRustBuffer<Gr
             FfiConverterBoolean.write(value.`requiresSelfDemoteBeforeLeave`, buf)
             FfiConverterBoolean.write(value.`leaveRequestPending`, buf)
             FfiConverterOptionalULong.write(value.`leaveRequestedAtMs`, buf)
+            FfiConverterTypeGroupLifecycleStateFfi.write(value.`lifecycleState`, buf)
+            FfiConverterBoolean.write(value.`disbandingEnabled`, buf)
+            FfiConverterBoolean.write(value.`disbanding`, buf)
+            FfiConverterBoolean.write(value.`canEnableDisbanding`, buf)
+            FfiConverterBoolean.write(value.`canDisband`, buf)
+            FfiConverterSequenceString.write(value.`disbandingBlockers`, buf)
+            FfiConverterOptionalTypeDisbandRequestFfi.write(value.`disbandRequest`, buf)
             FfiConverterSequenceTypeGroupMemberActionStateFfi.write(value.`memberActions`, buf)
     }
 }
@@ -14705,6 +15067,18 @@ sealed class ChatListSubscriptionUpdateFfi {
         companion object
     }
     
+    /**
+     * Full replacement for the subscribed visible chat list.
+     *
+     * Swift and Kotlin hosts must atomically replace their locally held rows
+     * with `rows` and drop any prior row absent from this value.
+     */
+    data class Snapshot(
+        val `trigger`: ChatListUpdateTriggerFfi, 
+        val `rows`: List<ChatListRowFfi>) : ChatListSubscriptionUpdateFfi() {
+        companion object
+    }
+    
 
     
     companion object
@@ -14723,6 +15097,10 @@ public object FfiConverterTypeChatListSubscriptionUpdateFfi : FfiConverterRustBu
             2 -> ChatListSubscriptionUpdateFfi.RemoveRow(
                 FfiConverterTypeChatListUpdateTriggerFfi.read(buf),
                 FfiConverterString.read(buf),
+                )
+            3 -> ChatListSubscriptionUpdateFfi.Snapshot(
+                FfiConverterTypeChatListUpdateTriggerFfi.read(buf),
+                FfiConverterSequenceTypeChatListRowFfi.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -14745,6 +15123,14 @@ public object FfiConverterTypeChatListSubscriptionUpdateFfi : FfiConverterRustBu
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
             )
         }
+        is ChatListSubscriptionUpdateFfi.Snapshot -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeChatListUpdateTriggerFfi.allocationSize(value.`trigger`)
+                + FfiConverterSequenceTypeChatListRowFfi.allocationSize(value.`rows`)
+            )
+        }
     }
 
     override fun write(value: ChatListSubscriptionUpdateFfi, buf: ByteBuffer) {
@@ -14759,6 +15145,12 @@ public object FfiConverterTypeChatListSubscriptionUpdateFfi : FfiConverterRustBu
                 buf.putInt(2)
                 FfiConverterTypeChatListUpdateTriggerFfi.write(value.`trigger`, buf)
                 FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is ChatListSubscriptionUpdateFfi.Snapshot -> {
+                buf.putInt(3)
+                FfiConverterTypeChatListUpdateTriggerFfi.write(value.`trigger`, buf)
+                FfiConverterSequenceTypeChatListRowFfi.write(value.`rows`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -14783,6 +15175,7 @@ enum class ChatListUpdateTriggerFfi {
     MUTE_CHANGED,
     CONVERSATION_KIND_CHANGED,
     LATEST_MESSAGE_DELIVERY_CHANGED,
+    PIN_ORDER_CHANGED,
     SNAPSHOT_REFRESH,
     REMOVED;
     companion object
@@ -14851,6 +15244,112 @@ public object FfiConverterTypeCursorPersistenceFfi: FfiConverterRustBuffer<Curso
 
     override fun write(value: CursorPersistenceFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class DisbandFailureReasonFfi {
+    
+    NO_LONGER_ADMIN,
+    NO_LONGER_MEMBER;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDisbandFailureReasonFfi: FfiConverterRustBuffer<DisbandFailureReasonFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        DisbandFailureReasonFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: DisbandFailureReasonFfi) = 4UL
+
+    override fun write(value: DisbandFailureReasonFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+sealed class DisbandRequestFfi {
+    
+    data class Pending(
+        val `requestedAtMs`: kotlin.ULong) : DisbandRequestFfi() {
+        companion object
+    }
+    
+    data class Failed(
+        val `requestedAtMs`: kotlin.ULong, 
+        val `reason`: DisbandFailureReasonFfi) : DisbandRequestFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDisbandRequestFfi : FfiConverterRustBuffer<DisbandRequestFfi>{
+    override fun read(buf: ByteBuffer): DisbandRequestFfi {
+        return when(buf.getInt()) {
+            1 -> DisbandRequestFfi.Pending(
+                FfiConverterULong.read(buf),
+                )
+            2 -> DisbandRequestFfi.Failed(
+                FfiConverterULong.read(buf),
+                FfiConverterTypeDisbandFailureReasonFfi.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: DisbandRequestFfi) = when(value) {
+        is DisbandRequestFfi.Pending -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`requestedAtMs`)
+            )
+        }
+        is DisbandRequestFfi.Failed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`requestedAtMs`)
+                + FfiConverterTypeDisbandFailureReasonFfi.allocationSize(value.`reason`)
+            )
+        }
+    }
+
+    override fun write(value: DisbandRequestFfi, buf: ByteBuffer) {
+        when(value) {
+            is DisbandRequestFfi.Pending -> {
+                buf.putInt(1)
+                FfiConverterULong.write(value.`requestedAtMs`, buf)
+                Unit
+            }
+            is DisbandRequestFfi.Failed -> {
+                buf.putInt(2)
+                FfiConverterULong.write(value.`requestedAtMs`, buf)
+                FfiConverterTypeDisbandFailureReasonFfi.write(value.`reason`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 
@@ -15267,6 +15766,42 @@ public object FfiConverterTypeGroupEvolutionPhaseFfi: FfiConverterRustBuffer<Gro
     override fun allocationSize(value: GroupEvolutionPhaseFfi) = 4UL
 
     override fun write(value: GroupEvolutionPhaseFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class GroupLifecycleStateFfi {
+    
+    STABLE,
+    PENDING_PUBLISH,
+    MERGING,
+    RECOVERING,
+    UNRECOVERABLE,
+    DISBANDED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeGroupLifecycleStateFfi: FfiConverterRustBuffer<GroupLifecycleStateFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        GroupLifecycleStateFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: GroupLifecycleStateFfi) = 4UL
+
+    override fun write(value: GroupLifecycleStateFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -16478,6 +17013,14 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = "groupIdHex=${ `groupIdHex` }"
     }
     
+    class InvalidChatPin(
+        
+        val `details`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "details=${ `details` }"
+    }
+    
     /**
      * Host-supplied draft attachment metadata is malformed.
      */
@@ -16604,6 +17147,32 @@ sealed class MarmotKitException: kotlin.Exception() {
     }
     
     class WouldRemoveLastAdmin(
+        
+        val `groupIdHex`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "groupIdHex=${ `groupIdHex` }"
+    }
+    
+    class DisbandingUnsupportedMembers(
+        
+        val `groupIdHex`: kotlin.String, 
+        
+        val `memberIdsHex`: List<kotlin.String>
+        ) : MarmotKitException() {
+        override val message
+            get() = "groupIdHex=${ `groupIdHex` }, memberIdsHex=${ `memberIdsHex` }"
+    }
+    
+    class DisbandingNotEnabled(
+        
+        val `groupIdHex`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "groupIdHex=${ `groupIdHex` }"
+    }
+    
+    class GroupDisbanding(
         
         val `groupIdHex`: kotlin.String
         ) : MarmotKitException() {
@@ -16791,78 +17360,91 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             3 -> MarmotKitException.UnknownGroup(
                 FfiConverterString.read(buf),
                 )
-            4 -> MarmotKitException.InvalidMessageDraft(
+            4 -> MarmotKitException.InvalidChatPin(
                 FfiConverterString.read(buf),
                 )
-            5 -> MarmotKitException.InvalidMediaReference(
+            5 -> MarmotKitException.InvalidMessageDraft(
                 FfiConverterString.read(buf),
                 )
-            6 -> MarmotKitException.InvalidHex(
+            6 -> MarmotKitException.InvalidMediaReference(
                 FfiConverterString.read(buf),
                 )
-            7 -> MarmotKitException.InvalidIdentity(
+            7 -> MarmotKitException.InvalidHex(
                 FfiConverterString.read(buf),
                 )
-            8 -> MarmotKitException.InvalidKeyPackageEvent(
+            8 -> MarmotKitException.InvalidIdentity(
                 FfiConverterString.read(buf),
                 )
-            9 -> MarmotKitException.MissingKeyPackage(
+            9 -> MarmotKitException.InvalidKeyPackageEvent(
                 FfiConverterString.read(buf),
                 )
-            10 -> MarmotKitException.Publish(
+            10 -> MarmotKitException.MissingKeyPackage(
                 FfiConverterString.read(buf),
                 )
-            11 -> MarmotKitException.TransportClosed()
-            12 -> MarmotKitException.RuntimeStopping()
-            13 -> MarmotKitException.AccountCatchUp(
+            11 -> MarmotKitException.Publish(
                 FfiConverterString.read(buf),
                 )
-            14 -> MarmotKitException.NotGroupAdmin(
+            12 -> MarmotKitException.TransportClosed()
+            13 -> MarmotKitException.RuntimeStopping()
+            14 -> MarmotKitException.AccountCatchUp(
                 FfiConverterString.read(buf),
                 )
-            15 -> MarmotKitException.AdminCannotSelfRemove(
+            15 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            16 -> MarmotKitException.LeaveAlreadyRequested(
+            16 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            17 -> MarmotKitException.WouldRemoveLastAdmin(
+            17 -> MarmotKitException.LeaveAlreadyRequested(
                 FfiConverterString.read(buf),
                 )
-            18 -> MarmotKitException.MemberNotInGroup(
+            18 -> MarmotKitException.WouldRemoveLastAdmin(
+                FfiConverterString.read(buf),
+                )
+            19 -> MarmotKitException.DisbandingUnsupportedMembers(
+                FfiConverterString.read(buf),
+                FfiConverterSequenceString.read(buf),
+                )
+            20 -> MarmotKitException.DisbandingNotEnabled(
+                FfiConverterString.read(buf),
+                )
+            21 -> MarmotKitException.GroupDisbanding(
+                FfiConverterString.read(buf),
+                )
+            22 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            19 -> MarmotKitException.AlreadyAdmin(
+            23 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            20 -> MarmotKitException.NotAdmin(
+            24 -> MarmotKitException.NotAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            21 -> MarmotKitException.StorageBusy(
+            25 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            22 -> MarmotKitException.SecretNotFound(
+            26 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            23 -> MarmotKitException.KeystoreUnavailable(
+            27 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            24 -> MarmotKitException.EmptyPassphrase()
-            25 -> MarmotKitException.EncryptionFailed(
+            28 -> MarmotKitException.EmptyPassphrase()
+            29 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            26 -> MarmotKitException.Io(
+            30 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            27 -> MarmotKitException.ExternalSignerUnavailable(
+            31 -> MarmotKitException.ExternalSignerUnavailable(
                 FfiConverterString.read(buf),
                 )
-            28 -> MarmotKitException.ExternalSignerMismatch()
-            29 -> MarmotKitException.ExternalSignerRejected()
-            30 -> MarmotKitException.Runtime(
+            32 -> MarmotKitException.ExternalSignerMismatch()
+            33 -> MarmotKitException.ExternalSignerRejected()
+            34 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -16885,6 +17467,11 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
+            )
+            is MarmotKitException.InvalidChatPin -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`details`)
             )
             is MarmotKitException.InvalidMessageDraft -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -16950,6 +17537,22 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
             )
             is MarmotKitException.WouldRemoveLastAdmin -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+            )
+            is MarmotKitException.DisbandingUnsupportedMembers -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+                + FfiConverterSequenceString.allocationSize(value.`memberIdsHex`)
+            )
+            is MarmotKitException.DisbandingNotEnabled -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+            )
+            is MarmotKitException.GroupDisbanding -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
@@ -17039,136 +17642,157 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidMessageDraft -> {
+            is MarmotKitException.InvalidChatPin -> {
                 buf.putInt(4)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidMediaReference -> {
+            is MarmotKitException.InvalidMessageDraft -> {
                 buf.putInt(5)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidHex -> {
+            is MarmotKitException.InvalidMediaReference -> {
                 buf.putInt(6)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidIdentity -> {
+            is MarmotKitException.InvalidHex -> {
                 buf.putInt(7)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidKeyPackageEvent -> {
+            is MarmotKitException.InvalidIdentity -> {
                 buf.putInt(8)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.MissingKeyPackage -> {
+            is MarmotKitException.InvalidKeyPackageEvent -> {
                 buf.putInt(9)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.MissingKeyPackage -> {
+                buf.putInt(10)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.Publish -> {
-                buf.putInt(10)
+                buf.putInt(11)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.TransportClosed -> {
-                buf.putInt(11)
-                Unit
-            }
-            is MarmotKitException.RuntimeStopping -> {
                 buf.putInt(12)
                 Unit
             }
-            is MarmotKitException.AccountCatchUp -> {
+            is MarmotKitException.RuntimeStopping -> {
                 buf.putInt(13)
+                Unit
+            }
+            is MarmotKitException.AccountCatchUp -> {
+                buf.putInt(14)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(14)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(15)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.LeaveAlreadyRequested -> {
+            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(16)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.WouldRemoveLastAdmin -> {
+            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(17)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.MemberNotInGroup -> {
+            is MarmotKitException.WouldRemoveLastAdmin -> {
                 buf.putInt(18)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.DisbandingUnsupportedMembers -> {
+                buf.putInt(19)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
+                Unit
+            }
+            is MarmotKitException.DisbandingNotEnabled -> {
+                buf.putInt(20)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.GroupDisbanding -> {
+                buf.putInt(21)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.MemberNotInGroup -> {
+                buf.putInt(22)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.AlreadyAdmin -> {
-                buf.putInt(19)
+                buf.putInt(23)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.NotAdmin -> {
-                buf.putInt(20)
+                buf.putInt(24)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.StorageBusy -> {
-                buf.putInt(21)
-                FfiConverterString.write(value.`details`, buf)
-                Unit
-            }
-            is MarmotKitException.SecretNotFound -> {
-                buf.putInt(22)
-                FfiConverterString.write(value.`details`, buf)
-                Unit
-            }
-            is MarmotKitException.KeystoreUnavailable -> {
-                buf.putInt(23)
-                FfiConverterString.write(value.`details`, buf)
-                Unit
-            }
-            is MarmotKitException.EmptyPassphrase -> {
-                buf.putInt(24)
-                Unit
-            }
-            is MarmotKitException.EncryptionFailed -> {
                 buf.putInt(25)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Io -> {
+            is MarmotKitException.SecretNotFound -> {
                 buf.putInt(26)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.ExternalSignerUnavailable -> {
+            is MarmotKitException.KeystoreUnavailable -> {
                 buf.putInt(27)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.EmptyPassphrase -> {
+                buf.putInt(28)
+                Unit
+            }
+            is MarmotKitException.EncryptionFailed -> {
+                buf.putInt(29)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.Io -> {
+                buf.putInt(30)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.ExternalSignerUnavailable -> {
+                buf.putInt(31)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(28)
+                buf.putInt(32)
                 Unit
             }
             is MarmotKitException.ExternalSignerRejected -> {
-                buf.putInt(29)
+                buf.putInt(33)
                 Unit
             }
             is MarmotKitException.Runtime -> {
-                buf.putInt(30)
+                buf.putInt(34)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
@@ -18660,6 +19284,38 @@ public object FfiConverterOptionalTypeChatListSubscriptionUpdateFfi: FfiConverte
         } else {
             buf.put(1)
             FfiConverterTypeChatListSubscriptionUpdateFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeDisbandRequestFfi: FfiConverterRustBuffer<DisbandRequestFfi?> {
+    override fun read(buf: ByteBuffer): DisbandRequestFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeDisbandRequestFfi.read(buf)
+    }
+
+    override fun allocationSize(value: DisbandRequestFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeDisbandRequestFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: DisbandRequestFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeDisbandRequestFfi.write(value, buf)
         }
     }
 }
