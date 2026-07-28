@@ -455,6 +455,7 @@
     <string name="published">Pubblicato</string>
     <string name="no_key_packages_found">Nessun pacchetto chiavi trovato</string>
     <string name="no_key_packages_found_help">Niente è memorizzato localmente e la lista di relay di questo account non ha restituito eventi di pacchetti di chiavi. Prova &quot;Pubblica nuovo&quot;.</string>
+    <string name="retained_key_packages_not_published_help">Il materiale locale conservato del pacchetto di chiavi viene gestito automaticamente e non pubblicato sui relay.</string>
     <string name="delete_key_package_question">Eliminare il pacchetto chiavi?</string>
     <string name="delete_key_package_help">Pubblica un evento di eliminazione per questo pacchetto di chiavi e lo cancella dalla cache locale.</string>
     <string name="event_value">Evento: %1$s</string>

@@ -455,6 +455,7 @@
     <string name="published">Yayınlandı</string>
     <string name="no_key_packages_found">Anahtar paketi bulunamadı</string>
     <string name="no_key_packages_found_help">Yerelde hiçbir şey önbelleğe alınmadı ve bu hesabın röle listesinden anahtar paketi olayı dönmedi. &quot;Yeni yayınla&quot;yı deneyin.</string>
+    <string name="retained_key_packages_not_published_help">Saklanan yerel anahtar paketi materyali otomatik olarak yönetilir ve rölelere yayınlanmaz.</string>
     <string name="delete_key_package_question">Anahtar paketi silinsin mi?</string>
     <string name="delete_key_package_help">Bu anahtar paketi için bir silme olayı yayınlar ve bunu yerel önbellekten temizler.</string>
     <string name="event_value">Etkinlik: %1$s</string>

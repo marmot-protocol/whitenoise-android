@@ -226,6 +226,15 @@ internal fun KeyPackagesContent(
     onPublishNew: () -> Unit,
     onDelete: (AccountKeyPackageFfi) -> Unit,
 ) {
+    val hasRetainedLocalMaterial = packages.any { it.local && !it.relay }
+    val emptyTitleRes = if (hasRetainedLocalMaterial) R.string.not_published else R.string.no_key_packages_found
+    val emptyHelpRes =
+        if (hasRetainedLocalMaterial) {
+            R.string.retained_key_packages_not_published_help
+        } else {
+            R.string.no_key_packages_found_help
+        }
+
     Scaffold(
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
         topBar = {
@@ -289,10 +298,10 @@ internal fun KeyPackagesContent(
 
                     KeyPackagesSection.Empty -> {
                         item {
-                            SettingsGroup(title = stringResource(R.string.no_key_packages_found)) {
+                            SettingsGroup(title = stringResource(emptyTitleRes)) {
                                 item {
                                     Text(
-                                        stringResource(R.string.no_key_packages_found_help),
+                                        stringResource(emptyHelpRes),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(16.dp),
                                     )

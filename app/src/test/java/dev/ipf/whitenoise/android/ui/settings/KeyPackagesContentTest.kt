@@ -58,6 +58,28 @@ class KeyPackagesContentTest {
     }
 
     @Test
+    fun retainedOnlyInventoryIsDistinguishedFromAnEmptyInventory() {
+        val retained =
+            keyPackage(
+                keyPackageId = "retained-package-slot",
+                eventIdHex = "",
+                relay = false,
+            )
+
+        render(listOf(retained))
+
+        composeRule.onNodeWithText(app.getString(R.string.not_published)).assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.no_key_packages_found)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.no_key_packages_found_help)).assertDoesNotExist()
+        composeRule
+            .onNodeWithText(app.getString(R.string.retained_key_packages_not_published_help))
+            .assertExists()
+        composeRule
+            .onAllNodesWithContentDescription(app.getString(R.string.delete_key_package))
+            .assertCountEquals(0)
+    }
+
+    @Test
     fun relayRecordWithoutEventIdIsPresentedButNotDeletable() {
         assertMalformedEventIdIsPresentedButNotDeletable("")
     }
