@@ -33,6 +33,8 @@ object RecipientSearch {
         val displayName: String,
         val npub: String,
         val source: Source? = null,
+        /** Existing unnamed DM group to open locally when [source] is [InDm]. */
+        val existingDmGroupIdHex: String? = null,
     )
 
     /**

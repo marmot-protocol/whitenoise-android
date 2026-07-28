@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +18,6 @@ import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_DEBOUNCE_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import java.util.Locale
 
 /**
  * Resolve an identifier input (npub / profile link / NIP-05 / bare hex) to a
@@ -111,56 +107,13 @@ internal fun isPlainNameQuery(query: String): Boolean {
 internal fun deriveRecipientCandidates(
     appState: WhiteNoiseAppState,
     activeAccountIdHex: String?,
-): List<RecipientSearch.Candidate> {
-    val active = activeAccountIdHex?.trim()?.lowercase(Locale.ROOT)
-    // Order is fixed by first appearance while walking the recency-sorted chat
-    // list, so a LinkedHashSet preserves the recency order for the browse list.
-    val order = LinkedHashSet<String>()
-    val inDm = HashSet<String>()
-    val groupIdsByHex = HashMap<String, MutableSet<String>>()
-
-    fun note(
-        rawHex: String?,
-        dm: Boolean,
-        groupId: String?,
-    ) {
-        val hex = rawHex?.trim()?.lowercase(Locale.ROOT) ?: return
-        if (hex.isEmpty()) return
-        if (active != null && hex == active) return
-        order.add(hex)
-        if (dm) inDm.add(hex)
-        if (groupId != null) {
-            groupIdsByHex.getOrPut(hex) { LinkedHashSet() }.add(groupId)
-        }
-    }
-    // Most-recent-first so recency wins the first-appearance ordering above.
-    val items = appState.chatListItems.sortedByDescending { it.latestAt ?: 0uL }
-    for (item in items) {
-        val dm = item.isDm()
-        val groupId = item.id.takeUnless { dm }
-        // Group rosters give the members. A DM's roster, though, often holds only
-        // the active account — the counterpart isn't an enumerable member — so
-        // also take the resolved DM counterpart and the latest message's sender
-        // (the recent-sender source) to surface DM partners.
-        item.memberSnapshot?.members?.forEach { note(it.memberIdHex, dm = dm, groupId = groupId) }
-        note(item.otherMemberAccount, dm = dm, groupId = groupId)
-        note(item.latest?.sender, dm = dm, groupId = groupId)
-        note(item.group.welcomerAccountIdHex, dm = dm, groupId = groupId)
-    }
-    return order.map { hex ->
-        val source =
-            when {
-                hex in inDm -> RecipientSearch.Source.InDm
-                else -> RecipientSearch.Source.InGroups(groupIdsByHex[hex]?.size ?: 0)
-            }
-        RecipientSearch.Candidate(
-            accountIdHex = hex,
-            displayName = appState.displayName(hex),
-            npub = appState.npub(hex),
-            source = source,
-        )
-    }
-}
+): List<RecipientSearch.Candidate> =
+    deriveRecipientCandidates(
+        chatListItems = appState.chatListItems,
+        activeAccountIdHex = activeAccountIdHex,
+        displayName = appState::displayName,
+        npub = appState::npub,
+    )
 
 internal fun canSubmitNewChatSheet(
     directMessage: Boolean,
