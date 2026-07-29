@@ -64,6 +64,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
 import java.util.Locale
 
+private const val BUBBLE_COLOR_RGB_MASK = 0xFFFFFFL
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChatBubbleColorsScreen(
@@ -271,7 +273,7 @@ internal fun TonalSwatchPicker(
     val presets = remember { tonalBubbleColorPresets() }
     var customExpanded by rememberSaveable(scopeKey, theme, slotKey) { mutableStateOf(false) }
     var customHex by rememberSaveable(scopeKey, theme, slotKey, selectedArgb) {
-        mutableStateOf(selectedArgb?.let { "#%06X".format(Locale.ROOT, it and 0xFFFFFFL) } ?: "")
+        mutableStateOf(selectedArgb?.let { "#%06X".format(Locale.ROOT, it and BUBBLE_COLOR_RGB_MASK) } ?: "")
     }
     val parsedCustom = parseOpaqueColorHex(customHex)
     val contrastSafeCustom = parsedCustom?.takeIf { readableTextArgb(it) != null }
@@ -288,7 +290,7 @@ internal fun TonalSwatchPicker(
                 val swatchDescription =
                     stringResource(
                         swatchContentDescriptionRes,
-                        "#%06X".format(Locale.ROOT, argb and 0xFFFFFFL),
+                        "#%06X".format(Locale.ROOT, argb and BUBBLE_COLOR_RGB_MASK),
                     )
                 Box(
                     Modifier
@@ -343,6 +345,16 @@ internal fun TonalSwatchPicker(
             }
         }
         if (customExpanded) {
+            val pickerArgb = parsedCustom ?: selectedArgb ?: presets.firstOrNull() ?: 0xFF06B6D4L
+            FullSpectrumColorPicker(
+                argb = pickerArgb,
+                onColorChanged = { argb ->
+                    if (readableTextArgb(argb) != null) {
+                        customHex = "#%06X".format(Locale.ROOT, argb and BUBBLE_COLOR_RGB_MASK)
+                        onColorSelected(argb)
+                    }
+                },
+            )
             OutlinedTextField(
                 value = customHex,
                 onValueChange = { customHex = it.take(7) },

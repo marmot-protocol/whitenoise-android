@@ -1177,6 +1177,9 @@
     <string name="custom_hex_color">Couleur hexadécimale personnalisée</string>
     <string name="invalid_hex_color">Saisissez une couleur comme #336699.</string>
     <string name="apply_color">Appliquer la couleur</string>
+    <string name="color_picker_hue">Teinte</string>
+    <string name="color_picker_saturation">Saturation</string>
+    <string name="color_picker_brightness">Luminosité</string>
     <string name="reset_to_default">Rétablir les valeurs</string>
 
     <string name="tts_warning_title">Moteur de synthèse vocale externe</string>

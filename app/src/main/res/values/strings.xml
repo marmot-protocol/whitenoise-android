@@ -1229,6 +1229,9 @@
     <string name="custom_hex_color">Custom hex color</string>
     <string name="invalid_hex_color">Enter a color like #336699.</string>
     <string name="apply_color">Apply color</string>
+    <string name="color_picker_hue">Hue</string>
+    <string name="color_picker_saturation">Saturation</string>
+    <string name="color_picker_brightness">Brightness</string>
     <string name="reset_to_default">Reset to default</string>
 
     <string name="tts_warning_title">External text-to-speech engine</string>

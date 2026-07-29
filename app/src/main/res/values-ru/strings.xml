@@ -1219,6 +1219,9 @@
     <string name="custom_hex_color">Свой шестнадцатеричный цвет</string>
     <string name="invalid_hex_color">Введите цвет, например #336699.</string>
     <string name="apply_color">Применить цвет</string>
+    <string name="color_picker_hue">Оттенок</string>
+    <string name="color_picker_saturation">Насыщенность</string>
+    <string name="color_picker_brightness">Яркость</string>
     <string name="reset_to_default">Сбросить</string>
 
     <string name="tts_warning_title">Внешний движок синтеза речи</string>

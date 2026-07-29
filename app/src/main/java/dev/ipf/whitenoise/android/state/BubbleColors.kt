@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.SharedPreferences
+import android.graphics.Color
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -9,6 +10,7 @@ import kotlin.math.pow
 internal const val WCAG_AA_NORMAL_TEXT_CONTRAST = 4.5
 internal const val OPAQUE_BLACK_ARGB = 0xFF000000L
 internal const val OPAQUE_WHITE_ARGB = 0xFFFFFFFFL
+private const val ARGB_MASK = 0xFFFFFFFFL
 
 internal enum class BubbleTheme {
     Light,
@@ -258,6 +260,31 @@ internal fun parseOpaqueColorHex(input: String): Long? {
     val rgb = input.trim().removePrefix("#")
     if (rgb.length != 6 || rgb.any { it.digitToIntOrNull(16) == null }) return null
     return OPAQUE_BLACK_ARGB or rgb.toLong(16)
+}
+
+internal data class HsvColor(
+    val hue: Float,
+    val saturation: Float,
+    val value: Float,
+) {
+    fun toOpaqueArgb(): Long {
+        val normalizedHue = ((hue % 360f) + 360f) % 360f
+        return Color
+            .HSVToColor(
+                floatArrayOf(
+                    normalizedHue,
+                    saturation.coerceIn(0f, 1f),
+                    value.coerceIn(0f, 1f),
+                ),
+            ).toLong() and ARGB_MASK
+    }
+}
+
+internal fun opaqueArgbToHsv(argb: Long): HsvColor {
+    val opaqueArgb = requireNotNull(normalizeOpaqueArgb(argb)) { "Expected an opaque ARGB color" }
+    val channels = FloatArray(3)
+    Color.colorToHSV(opaqueArgb.toInt(), channels)
+    return HsvColor(hue = channels[0], saturation = channels[1], value = channels[2])
 }
 
 /**
