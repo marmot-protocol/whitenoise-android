@@ -100,6 +100,7 @@ class NotificationPreviewTextTest {
                                         ),
                                     ),
                                 ),
+                            blankLinesBefore = ByteArray(0),
                         )
                     },
                     mentionDisplayName = { bech32 -> "Alice".takeIf { bech32 == knownNpub } },
@@ -133,6 +134,7 @@ class NotificationPreviewTextTest {
                                         ),
                                     ),
                                 ),
+                            blankLinesBefore = ByteArray(0),
                         )
                     },
                     mentionDisplayName = {
@@ -157,7 +159,13 @@ class NotificationPreviewTextTest {
             val emptyDocument =
                 resolveNotificationPreviewText(
                     raw = "not blank",
-                    parseMarkdown = { MarkdownDocumentFfi(truncated = false, blocks = emptyList()) },
+                    parseMarkdown = {
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        )
+                    },
                     mentionDisplayName = { error("empty document should not resolve mentions") },
                 )
 

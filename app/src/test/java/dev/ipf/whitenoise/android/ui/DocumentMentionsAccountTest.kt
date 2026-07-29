@@ -26,7 +26,12 @@ class DocumentMentionsAccountTest {
 
     private fun mention(npub: String) = MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub))
 
-    private fun docOf(vararg inlines: MarkdownInlineFfi) = MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines.toList())))
+    private fun docOf(vararg inlines: MarkdownInlineFfi) =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines.toList())),
+            blankLinesBefore = ByteArray(0),
+        )
 
     @Test
     fun mentionOfSelfMatches() {
@@ -71,8 +76,9 @@ class DocumentMentionsAccountTest {
         val quote =
             MarkdownBlockFfi.BlockQuote(
                 listOf(MarkdownBlockFfi.Paragraph(listOf(mention(aliceNpub)))),
+                blankLinesBefore = ByteArray(0),
             )
-        val doc = MarkdownDocumentFfi(truncated = false, blocks = listOf(quote))
+        val doc = MarkdownDocumentFfi(truncated = false, blocks = listOf(quote), blankLinesBefore = ByteArray(0))
         assertTrue(documentMentionsAccount(doc, aliceHex, resolve))
     }
 

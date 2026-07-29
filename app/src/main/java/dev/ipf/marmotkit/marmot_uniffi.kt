@@ -1133,6 +1133,10 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1248,6 +1252,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_chat_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_classify_relay_endpoints(`ptr`: Pointer,`endpoints`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_clear_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1393,6 +1399,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_resume_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_retired_relay_hosts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_retry_group_convergence(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1715,6 +1723,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_chat_notification_settings(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_classify_relay_endpoints(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_clear_chat_muted(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_clear_group_image(
@@ -1858,6 +1868,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_resume_maintenance(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_retired_relay_hosts(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_retry_group_convergence(
     ): Short
@@ -2104,6 +2116,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_chat_notification_settings() != 6301.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_classify_relay_endpoints() != 44316.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_clear_chat_muted() != 45980.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2122,7 +2137,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_create_group_with_initial_image() != 19722.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_create_identity() != 64408.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_create_identity() != 49801.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_decline_group_invite() != 24239.toShort()) {
@@ -2318,6 +2333,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_resume_maintenance() != 1654.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retired_relay_hosts() != 13548.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_group_convergence() != 64264.toShort()) {
@@ -4958,6 +4976,14 @@ public interface MarmotInterface {
     fun `chatNotificationSettings`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatNotificationSettingsFfi
     
     /**
+     * Classify relay URLs using the same policy enforced at the dial boundary.
+     *
+     * Results preserve input order and cardinality so clients can batch the
+     * NIP-65 and inbox lists and associate every decision with its source URL.
+     */
+    fun `classifyRelayEndpoints`(`endpoints`: List<kotlin.String>): List<RelayEndpointClassificationFfi>
+    
+    /**
      * Clear either a finite or indefinite MDK chat mute.
      */
     fun `clearChatMuted`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatNotificationSettingsFfi
@@ -4992,7 +5018,8 @@ public interface MarmotInterface {
     
     /**
      * Create a brand-new Nostr identity, store its secret in the platform
-     * keychain, and publish initial relay lists + key package.
+     * keychain, and publish initial relay lists, an empty follow list, and a
+     * key package.
      */
     suspend fun `createIdentity`(`defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
     
@@ -5375,6 +5402,11 @@ public interface MarmotInterface {
     suspend fun `republishKeyPackage`(`accountRef`: kotlin.String): kotlin.ULong
     
     suspend fun `resumeMaintenance`(`accountRef`: kotlin.String)
+    
+    /**
+     * Hostnames the relay plane will never dial or adopt.
+     */
+    fun `retiredRelayHosts`(): List<kotlin.String>
     
     /**
      * Re-attempt publishing a group's pending (committed-but-undelivered)
@@ -6181,6 +6213,24 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Classify relay URLs using the same policy enforced at the dial boundary.
+     *
+     * Results preserve input order and cardinality so clients can batch the
+     * NIP-65 and inbox lists and associate every decision with its source URL.
+     */override fun `classifyRelayEndpoints`(`endpoints`: List<kotlin.String>): List<RelayEndpointClassificationFfi> {
+            return FfiConverterSequenceTypeRelayEndpointClassificationFfi.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_classify_relay_endpoints(
+        it, FfiConverterSequenceString.lower(`endpoints`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Clear either a finite or indefinite MDK chat mute.
      */
     @Throws(MarmotKitException::class)override fun `clearChatMuted`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatNotificationSettingsFfi {
@@ -6321,7 +6371,8 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Create a brand-new Nostr identity, store its secret in the platform
-     * keychain, and publish initial relay lists + key package.
+     * keychain, and publish initial relay lists, an empty follow list, and a
+     * key package.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -7803,6 +7854,21 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Hostnames the relay plane will never dial or adopt.
+     */override fun `retiredRelayHosts`(): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_retired_relay_hosts(
+        it, _status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -12820,7 +12886,12 @@ data class MarkdownDocumentFfi (
      * True when the input exceeded the FFI Markdown safety cap and `blocks`
      * were parsed from a UTF-8-boundary prefix.
      */
-    var `truncated`: kotlin.Boolean
+    var `truncated`: kotlin.Boolean, 
+    /**
+     * Blank source lines before each corresponding block, clamped by
+     * `marmot-markdown` to its documented maximum.
+     */
+    var `blankLinesBefore`: kotlin.ByteArray
 ) {
     
     companion object
@@ -12834,17 +12905,20 @@ public object FfiConverterTypeMarkdownDocumentFfi: FfiConverterRustBuffer<Markdo
         return MarkdownDocumentFfi(
             FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterByteArray.read(buf),
         )
     }
 
     override fun allocationSize(value: MarkdownDocumentFfi) = (
             FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`) +
-            FfiConverterBoolean.allocationSize(value.`truncated`)
+            FfiConverterBoolean.allocationSize(value.`truncated`) +
+            FfiConverterByteArray.allocationSize(value.`blankLinesBefore`)
     )
 
     override fun write(value: MarkdownDocumentFfi, buf: ByteBuffer) {
             FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
             FfiConverterBoolean.write(value.`truncated`, buf)
+            FfiConverterByteArray.write(value.`blankLinesBefore`, buf)
     }
 }
 
@@ -12856,7 +12930,11 @@ data class MarkdownListItemFfi (
      * `None` for plain bullets/ordered items, `Some(false)` for `[ ]`,
      * `Some(true)` for `[x]`.
      */
-    var `checked`: kotlin.Boolean?
+    var `checked`: kotlin.Boolean?, 
+    /**
+     * Blank source lines before each corresponding child block.
+     */
+    var `blankLinesBefore`: kotlin.ByteArray
 ) {
     
     companion object
@@ -12870,17 +12948,20 @@ public object FfiConverterTypeMarkdownListItemFfi: FfiConverterRustBuffer<Markdo
         return MarkdownListItemFfi(
             FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterByteArray.read(buf),
         )
     }
 
     override fun allocationSize(value: MarkdownListItemFfi) = (
             FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`) +
-            FfiConverterOptionalBoolean.allocationSize(value.`checked`)
+            FfiConverterOptionalBoolean.allocationSize(value.`checked`) +
+            FfiConverterByteArray.allocationSize(value.`blankLinesBefore`)
     )
 
     override fun write(value: MarkdownListItemFfi, buf: ByteBuffer) {
             FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
             FfiConverterOptionalBoolean.write(value.`checked`, buf)
+            FfiConverterByteArray.write(value.`blankLinesBefore`, buf)
     }
 }
 
@@ -13958,6 +14039,45 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterOptionalULong.write(value.`retentionExpiresAt`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
+    }
+}
+
+
+
+/**
+ * Policy classification for one caller-supplied relay endpoint.
+ */
+data class RelayEndpointClassificationFfi (
+    var `endpoint`: kotlin.String, 
+    var `normalizedEndpoint`: kotlin.String?, 
+    var `policy`: RelayEndpointPolicyFfi
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRelayEndpointClassificationFfi: FfiConverterRustBuffer<RelayEndpointClassificationFfi> {
+    override fun read(buf: ByteBuffer): RelayEndpointClassificationFfi {
+        return RelayEndpointClassificationFfi(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeRelayEndpointPolicyFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RelayEndpointClassificationFfi) = (
+            FfiConverterString.allocationSize(value.`endpoint`) +
+            FfiConverterOptionalString.allocationSize(value.`normalizedEndpoint`) +
+            FfiConverterTypeRelayEndpointPolicyFfi.allocationSize(value.`policy`)
+    )
+
+    override fun write(value: RelayEndpointClassificationFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`endpoint`, buf)
+            FfiConverterOptionalString.write(value.`normalizedEndpoint`, buf)
+            FfiConverterTypeRelayEndpointPolicyFfi.write(value.`policy`, buf)
     }
 }
 
@@ -15083,10 +15203,10 @@ public object FfiConverterTypeTransportFanoutStatusFfi: FfiConverterRustBuffer<T
  * `radius` is social distance from the searcher: 0 is the searcher, 1 a
  * direct follow. Render it as provenance ("via someone you follow").
  *
- * `255` is the exception and means *off-graph*: the searcher has no social
- * graph of their own, so this person was found through a configured fallback
- * rather than through anyone they know. Present those as discovery, never as
- * a connection -- they are not a distance from the user at all.
+ * `255` is the exception and means *off-graph*: this person came from a
+ * configured fallback or a discovery provider rather than through anyone the user
+ * knows. Present those as discovery, never as a connection -- they are not a
+ * distance from the user at all.
  */
 data class UserDirectorySearchResultFfi (
     var `accountIdHex`: kotlin.String, 
@@ -15094,6 +15214,10 @@ data class UserDirectorySearchResultFfi (
     var `radius`: kotlin.UByte, 
     var `matchedField`: MatchedFieldFfi, 
     var `matchQuality`: MatchQualityFfi, 
+    /**
+     * Rank supplied by an off-graph discovery provider.
+     */
+    var `providerRank`: kotlin.Double?, 
     var `profile`: UserProfileMetadataFfi?
 ) {
     
@@ -15111,6 +15235,7 @@ public object FfiConverterTypeUserDirectorySearchResultFfi: FfiConverterRustBuff
             FfiConverterUByte.read(buf),
             FfiConverterTypeMatchedFieldFfi.read(buf),
             FfiConverterTypeMatchQualityFfi.read(buf),
+            FfiConverterOptionalDouble.read(buf),
             FfiConverterOptionalTypeUserProfileMetadataFfi.read(buf),
         )
     }
@@ -15121,6 +15246,7 @@ public object FfiConverterTypeUserDirectorySearchResultFfi: FfiConverterRustBuff
             FfiConverterUByte.allocationSize(value.`radius`) +
             FfiConverterTypeMatchedFieldFfi.allocationSize(value.`matchedField`) +
             FfiConverterTypeMatchQualityFfi.allocationSize(value.`matchQuality`) +
+            FfiConverterOptionalDouble.allocationSize(value.`providerRank`) +
             FfiConverterOptionalTypeUserProfileMetadataFfi.allocationSize(value.`profile`)
     )
 
@@ -15130,6 +15256,7 @@ public object FfiConverterTypeUserDirectorySearchResultFfi: FfiConverterRustBuff
             FfiConverterUByte.write(value.`radius`, buf)
             FfiConverterTypeMatchedFieldFfi.write(value.`matchedField`, buf)
             FfiConverterTypeMatchQualityFfi.write(value.`matchQuality`, buf)
+            FfiConverterOptionalDouble.write(value.`providerRank`, buf)
             FfiConverterOptionalTypeUserProfileMetadataFfi.write(value.`profile`, buf)
     }
 }
@@ -15195,8 +15322,9 @@ data class UserSearchUpdateFfi (
     var `trigger`: SearchUpdateTriggerFfi, 
     /**
      * Matches found by this step, pre-sorted within the batch. Ordering
-     * *across* updates is the radius order they arrive in, so a host that
-     * renders one flat list should re-sort the aggregate.
+     * *across* graph updates is radius order; an optional discovery batch
+     * follows graph traversal and may contain results retaining graph
+     * provenance. A host rendering one flat list should re-sort the aggregate.
      */
     var `newResults`: List<UserDirectorySearchResultFfi>, 
     /**
@@ -16701,7 +16829,11 @@ sealed class MarkdownBlockFfi {
     }
     
     data class BlockQuote(
-        val `blocks`: List<MarkdownBlockFfi>) : MarkdownBlockFfi() {
+        val `blocks`: List<MarkdownBlockFfi>, 
+        /**
+         * Blank source lines before each corresponding child block.
+         */
+        val `blankLinesBefore`: kotlin.ByteArray) : MarkdownBlockFfi() {
         companion object
     }
     
@@ -16754,6 +16886,7 @@ public object FfiConverterTypeMarkdownBlockFfi : FfiConverterRustBuffer<Markdown
                 )
             5 -> MarkdownBlockFfi.BlockQuote(
                 FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
+                FfiConverterByteArray.read(buf),
                 )
             6 -> MarkdownBlockFfi.ListBlock(
                 FfiConverterTypeMarkdownListKindFfi.read(buf),
@@ -16808,6 +16941,7 @@ public object FfiConverterTypeMarkdownBlockFfi : FfiConverterRustBuffer<Markdown
             (
                 4UL
                 + FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`)
+                + FfiConverterByteArray.allocationSize(value.`blankLinesBefore`)
             )
         }
         is MarkdownBlockFfi.ListBlock -> {
@@ -16864,6 +16998,7 @@ public object FfiConverterTypeMarkdownBlockFfi : FfiConverterRustBuffer<Markdown
             is MarkdownBlockFfi.BlockQuote -> {
                 buf.putInt(5)
                 FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
+                FfiConverterByteArray.write(value.`blankLinesBefore`, buf)
                 Unit
             }
             is MarkdownBlockFfi.ListBlock -> {
@@ -18912,6 +19047,43 @@ public object FfiConverterTypePushRegistrationShareStatusFfi: FfiConverterRustBu
 
 
 
+/**
+ * Stable relay-policy result for settings and remediation UI.
+ */
+
+enum class RelayEndpointPolicyFfi {
+    
+    ALLOWED,
+    RETIRED,
+    INVALID,
+    UNSAFE;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRelayEndpointPolicyFfi: FfiConverterRustBuffer<RelayEndpointPolicyFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        RelayEndpointPolicyFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RelayEndpointPolicyFfi) = 4UL
+
+    override fun write(value: RelayEndpointPolicyFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 enum class RetentionSweepStatusFfi {
     
@@ -18963,6 +19135,13 @@ sealed class SearchUpdateTriggerFfi {
         val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
         companion object
     }
+    
+    /**
+     * Results from the optional off-graph discovery tier. Each result still
+     * carries its own graph or discovery provenance.
+     */
+    object DiscoveryResultsFound : SearchUpdateTriggerFfi()
+    
     
     data class RadiusCompleted(
         val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
@@ -19019,17 +19198,18 @@ public object FfiConverterTypeSearchUpdateTriggerFfi : FfiConverterRustBuffer<Se
             2 -> SearchUpdateTriggerFfi.ResultsFound(
                 FfiConverterUByte.read(buf),
                 )
-            3 -> SearchUpdateTriggerFfi.RadiusCompleted(
+            3 -> SearchUpdateTriggerFfi.DiscoveryResultsFound
+            4 -> SearchUpdateTriggerFfi.RadiusCompleted(
                 FfiConverterUByte.read(buf),
                 )
-            4 -> SearchUpdateTriggerFfi.RadiusTimeout(
+            5 -> SearchUpdateTriggerFfi.RadiusTimeout(
                 FfiConverterUByte.read(buf),
                 )
-            5 -> SearchUpdateTriggerFfi.RadiusTruncated(
+            6 -> SearchUpdateTriggerFfi.RadiusTruncated(
                 FfiConverterUByte.read(buf),
                 )
-            6 -> SearchUpdateTriggerFfi.SearchCompleted
-            7 -> SearchUpdateTriggerFfi.Error(
+            7 -> SearchUpdateTriggerFfi.SearchCompleted
+            8 -> SearchUpdateTriggerFfi.Error(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -19049,6 +19229,12 @@ public object FfiConverterTypeSearchUpdateTriggerFfi : FfiConverterRustBuffer<Se
             (
                 4UL
                 + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.DiscoveryResultsFound -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
             )
         }
         is SearchUpdateTriggerFfi.RadiusCompleted -> {
@@ -19099,27 +19285,31 @@ public object FfiConverterTypeSearchUpdateTriggerFfi : FfiConverterRustBuffer<Se
                 FfiConverterUByte.write(value.`radius`, buf)
                 Unit
             }
-            is SearchUpdateTriggerFfi.RadiusCompleted -> {
+            is SearchUpdateTriggerFfi.DiscoveryResultsFound -> {
                 buf.putInt(3)
-                FfiConverterUByte.write(value.`radius`, buf)
                 Unit
             }
-            is SearchUpdateTriggerFfi.RadiusTimeout -> {
+            is SearchUpdateTriggerFfi.RadiusCompleted -> {
                 buf.putInt(4)
                 FfiConverterUByte.write(value.`radius`, buf)
                 Unit
             }
-            is SearchUpdateTriggerFfi.RadiusTruncated -> {
+            is SearchUpdateTriggerFfi.RadiusTimeout -> {
                 buf.putInt(5)
                 FfiConverterUByte.write(value.`radius`, buf)
                 Unit
             }
-            is SearchUpdateTriggerFfi.SearchCompleted -> {
+            is SearchUpdateTriggerFfi.RadiusTruncated -> {
                 buf.putInt(6)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.SearchCompleted -> {
+                buf.putInt(7)
                 Unit
             }
             is SearchUpdateTriggerFfi.Error -> {
-                buf.putInt(7)
+                buf.putInt(8)
                 FfiConverterString.write(value.`message`, buf)
                 Unit
             }
@@ -21310,6 +21500,34 @@ public object FfiConverterSequenceTypeNotificationUpdateFfi: FfiConverterRustBuf
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeNotificationUpdateFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeRelayEndpointClassificationFfi: FfiConverterRustBuffer<List<RelayEndpointClassificationFfi>> {
+    override fun read(buf: ByteBuffer): List<RelayEndpointClassificationFfi> {
+        val len = buf.getInt()
+        return List<RelayEndpointClassificationFfi>(len) {
+            FfiConverterTypeRelayEndpointClassificationFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<RelayEndpointClassificationFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeRelayEndpointClassificationFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<RelayEndpointClassificationFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeRelayEndpointClassificationFfi.write(it, buf)
         }
     }
 }

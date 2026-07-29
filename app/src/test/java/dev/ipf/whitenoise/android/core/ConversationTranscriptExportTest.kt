@@ -425,7 +425,7 @@ class ConversationTranscriptExportTest {
         groupIdHex = "aa".repeat(32),
         sender = sender,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = kind,
         tags = tags,
         timelineAt = timelineAt,

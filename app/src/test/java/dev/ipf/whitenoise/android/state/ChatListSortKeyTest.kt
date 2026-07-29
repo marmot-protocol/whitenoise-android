@@ -305,7 +305,12 @@ class ChatListSortKeyTest {
         groupIdHex = groupId,
         sender = "sender",
         plaintext = "hello",
-        contentTokens = dev.ipf.marmotkit.MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens =
+            dev.ipf.marmotkit.MarkdownDocumentFfi(
+                truncated = false,
+                blocks = emptyList(),
+                blankLinesBefore = ByteArray(0),
+            ),
         kind = 9uL,
         tags = emptyList(),
         sourceEpoch = null,

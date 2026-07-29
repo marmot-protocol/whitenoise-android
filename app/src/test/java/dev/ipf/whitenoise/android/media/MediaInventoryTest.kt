@@ -113,6 +113,7 @@ class MediaInventoryTest {
                                 ),
                         ),
                     ),
+                blankLinesBefore = ByteArray(0),
             )
 
         assertTrue(MediaInventory.urls(listOf(record(id = "m", body = body))).isEmpty())
@@ -185,8 +186,8 @@ class MediaInventoryTest {
     @Test
     fun deeplyNestedBlockQuotesDoNotOverflowTheStack() {
         var block: MarkdownBlockFfi = MarkdownBlockFfi.Paragraph(inlines = emptyList())
-        repeat(10_000) { block = MarkdownBlockFfi.BlockQuote(listOf(block)) }
-        val body = MarkdownDocumentFfi(truncated = false, blocks = listOf(block))
+        repeat(10_000) { block = MarkdownBlockFfi.BlockQuote(listOf(block), blankLinesBefore = ByteArray(0)) }
+        val body = MarkdownDocumentFfi(truncated = false, blocks = listOf(block), blankLinesBefore = ByteArray(0))
 
         val inventory = MediaInventory.build(listOf(record(id = "deep-quotes", body = body)))
 
@@ -198,7 +199,11 @@ class MediaInventoryTest {
         var inline: MarkdownInlineFfi = MarkdownInlineFfi.Text("x")
         repeat(10_000) { inline = MarkdownInlineFfi.Emph(listOf(inline)) }
         val body =
-            MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(inline))))
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(inline))),
+                blankLinesBefore = ByteArray(0),
+            )
 
         val inventory = MediaInventory.build(listOf(record(id = "deep-emph", body = body)))
 
@@ -241,10 +246,15 @@ class MediaInventoryTest {
                             ),
                     ),
                 ),
+            blankLinesBefore = ByteArray(0),
         )
 
     private fun text(content: String): MarkdownDocumentFfi =
-        MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(content)))))
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(content)))),
+            blankLinesBefore = ByteArray(0),
+        )
 
     private fun record(
         id: String,

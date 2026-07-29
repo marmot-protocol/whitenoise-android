@@ -396,7 +396,12 @@ internal fun chatListItemFromProjection(
                     // ChatsController), not this synthesized record. Parsing
                     // here would force an FFI hop into a pure projection
                     // helper.
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = preview.kind,
                     tags = emptyList(),
                     sourceEpoch = null,
@@ -3890,7 +3895,7 @@ internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): Mark
         marmotIo { parseMarkdown(text) }
     } catch (throwable: Throwable) {
         rethrowIfCancellation(throwable)
-        MarkdownDocumentFfi(truncated = false, blocks = emptyList())
+        MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
     }
 
 private fun AppGroupRecordFfi.debugSummary(): String =
@@ -8764,7 +8769,12 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = inferStreamSender(streamId),
                 plaintext = event.detail,
-                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                contentTokens =
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks = emptyList(),
+                        blankLinesBefore = ByteArray(0),
+                    ),
                 kind = STREAM_DEBUG_KIND,
                 tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
                 sourceEpoch = null,
@@ -8834,7 +8844,12 @@ class ConversationController(
                     groupIdHex = group.groupIdHex,
                     sender = inferStreamSender(streamId),
                     plaintext = "",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
                     sourceEpoch = null,
@@ -8850,7 +8865,12 @@ class ConversationController(
                 // chunks, failure copy), reset to empty — carrying forward a
                 // previous revision's tokens would render stale markdown
                 // against the new text. Empty falls back to plain rendering.
-                contentTokens = tokens ?: MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                contentTokens =
+                    tokens ?: MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks = emptyList(),
+                        blankLinesBefore = ByteArray(0),
+                    ),
             )
         val updated =
             TimelineMessage(

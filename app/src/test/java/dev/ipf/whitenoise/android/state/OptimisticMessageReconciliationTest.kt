@@ -487,7 +487,12 @@ class OptimisticMessageReconciliationTest {
                 groupIdHex = "group",
                 sender = "alice",
                 plaintext = "hi @npub1abc",
-                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                contentTokens =
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks = emptyList(),
+                        blankLinesBefore = ByteArray(0),
+                    ),
                 kind = 9uL,
                 tags = listOf(dev.ipf.marmotkit.MessageTagFfi(listOf("p", "deadbeef"))),
                 sourceEpoch = null,
@@ -512,7 +517,12 @@ class OptimisticMessageReconciliationTest {
                     groupIdHex = "group",
                     sender = "alice",
                     plaintext = "📎 $filename",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 9uL,
                     tags =
                         listOf(
@@ -543,7 +553,12 @@ class OptimisticMessageReconciliationTest {
                     groupIdHex = "group",
                     sender = "alice",
                     plaintext = "",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 9uL,
                     tags =
                         listOf(
@@ -568,7 +583,12 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = "",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags =
                 listOf(
@@ -598,7 +618,12 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = sender,
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags = emptyList(),
             timelineAt = recordedAt,
@@ -645,7 +670,12 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = sender,
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags = emptyList(),
             sourceEpoch = null,

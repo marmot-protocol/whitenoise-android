@@ -191,7 +191,12 @@ class MarkReadChatListRowMergeTest {
                     sender = "sender",
                     senderDisplayName = "Sender",
                     plaintext = "hello",
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 9uL,
                     timelineAt = lastMessageAt,
                     deleted = false,

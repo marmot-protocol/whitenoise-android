@@ -278,6 +278,7 @@ class MarkdownLinkCopyTest {
         MarkdownDocumentFfi(
             truncated = false,
             blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(inline))),
+            blankLinesBefore = ByteArray(0),
         )
 
     private data class LongPressResult(
