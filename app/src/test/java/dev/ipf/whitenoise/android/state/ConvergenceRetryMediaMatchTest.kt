@@ -126,7 +126,12 @@ class ConvergenceRetryMediaMatchTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags = tags,
             sourceEpoch = null,
@@ -176,7 +181,12 @@ class ConvergenceRetryMediaMatchTest {
             groupIdHex = groupIdHex,
             sender = "alice",
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags = tags,
             timelineAt = timelineAt,

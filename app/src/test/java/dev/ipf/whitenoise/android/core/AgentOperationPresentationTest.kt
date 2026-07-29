@@ -109,7 +109,7 @@ class AgentOperationPresentationTest {
         groupIdHex = "group",
         sender = "agent",
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = 1202uL,
         tags = tags,
         sourceEpoch = null,

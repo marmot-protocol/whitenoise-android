@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageEditsTest {
-    private val empty = MarkdownDocumentFfi(truncated = false, blocks = emptyList())
+    private val empty = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
 
     private fun chat(
         id: String,
