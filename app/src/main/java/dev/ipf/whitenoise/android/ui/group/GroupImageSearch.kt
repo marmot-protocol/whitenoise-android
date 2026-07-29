@@ -62,10 +62,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -92,7 +94,99 @@ import kotlinx.coroutines.launch
 
 /** Which `ImageSearchSheet` button is currently driving an in-flight
  *  mutation, so the sheet can place the spinner on it. */
-private enum class GroupImageAction { Apply, Remove }
+private enum class GroupImageAction { Apply, Remove, PickPhoto }
+
+internal enum class ImagePreviewPresentation { Avatar, Banner }
+
+internal const val IMAGE_SEARCH_BANNER_PREVIEW_TAG = "image_search_banner_preview"
+private const val IMAGE_SEARCH_BANNER_ASPECT_RATIO = 3f
+
+@Suppress("FunctionNaming", "LongMethod")
+@Composable
+internal fun ImageSearchPreview(
+    title: String,
+    header: String,
+    seed: String,
+    previewUrl: String?,
+    subtitle: String,
+    presentation: ImagePreviewPresentation,
+    imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+) {
+    when (presentation) {
+        ImagePreviewPresentation.Avatar ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = 64.dp,
+                    pictureUrl = previewUrl,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        title.ifBlank { header },
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+        ImagePreviewPresentation.Banner -> {
+            var image by remember(previewUrl) { mutableStateOf(AvatarImageLoader.peek(previewUrl)) }
+            LaunchedEffect(previewUrl) {
+                if (image == null && previewUrl != null) image = imageLoader(previewUrl)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(IMAGE_SEARCH_BANNER_ASPECT_RATIO)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .testTag(IMAGE_SEARCH_BANNER_PREVIEW_TAG),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val previewImage = image
+                    if (previewImage != null) {
+                        Image(
+                            bitmap = previewImage,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Image,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                }
+                Text(
+                    title.ifBlank { header },
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 /**
  * Bottom sheet that lets an admin pick a new group avatar.
@@ -120,19 +214,24 @@ internal fun ImageSearchSheet(
     onApply: (String?) -> Unit,
     onPickPhoto: ((Uri) -> Unit)? = null,
     onDismiss: () -> Unit,
+    previewPresentation: ImagePreviewPresentation = ImagePreviewPresentation.Avatar,
+    choosePhotoLabel: String? = null,
+    removeImageLabel: String? = null,
+    applyImageLabel: String? = null,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
 ) {
+    // Tracks which button initiated the current in-flight mutation, so the
+    // spinner lands on that button while every competing action is disabled.
+    var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) onPickPhoto?.invoke(uri)
+            if (uri != null) {
+                pendingAction = GroupImageAction.PickPhoto
+                onPickPhoto?.invoke(uri)
+            }
         }
-    // Tracks which button initiated the current in-flight mutation, so the
-    // spinner lands on THAT button and the other one just greys out. Local
-    // to the sheet because the caller's `applyInFlight` is a binary
-    // "anything running" flag. Reset to null when the mutation completes
-    // (success closes the sheet via the caller; failure keeps the sheet
-    // open and unlocks the buttons for a retry).
-    var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
+    // Reset when the caller reports completion. Success closes the sheet;
+    // failure keeps it open and unlocks every action for a retry.
     LaunchedEffect(applyInFlight) {
         if (!applyInFlight) pendingAction = null
     }
@@ -164,6 +263,9 @@ internal fun ImageSearchSheet(
     val missingTokenRes = R.string.group_image_search_unavailable
     val badResponseRes = R.string.group_image_search_bad_response
     val noResultsRes = R.string.group_image_search_no_results
+    val resolvedChoosePhotoLabel = choosePhotoLabel ?: stringResource(R.string.group_image_choose_photo)
+    val resolvedRemoveImageLabel = removeImageLabel ?: stringResource(R.string.group_image_search_remove)
+    val resolvedApplyImageLabel = applyImageLabel ?: stringResource(R.string.group_image_search_apply)
 
     DisposableEffect(Unit) {
         onDispose { searchJob?.cancel() }
@@ -225,39 +327,20 @@ internal fun ImageSearchSheet(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
-            // Live preview row: avatar bubble seeded from the current draft
-            // URL, plus the entity's name so the user knows what they're
-            // editing.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = 64.dp,
-                    pictureUrl = previewUrl,
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        title.ifBlank { header },
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val subtitleRes =
-                        when {
-                            trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
-                            previewUrl == null -> R.string.group_image_search_preview_subtitle_invalid
-                            else -> R.string.group_image_search_preview_subtitle_ready
-                        }
-                    Text(
-                        stringResource(subtitleRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            val subtitleRes =
+                when {
+                    trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
+                    previewUrl == null -> R.string.group_image_search_preview_subtitle_invalid
+                    else -> R.string.group_image_search_preview_subtitle_ready
                 }
-            }
+            ImageSearchPreview(
+                title = title,
+                header = header,
+                seed = seed,
+                previewUrl = previewUrl,
+                subtitle = stringResource(subtitleRes),
+                presentation = previewPresentation,
+            )
             if (onPickPhoto != null) {
                 Button(
                     onClick = {
@@ -268,9 +351,17 @@ internal fun ImageSearchSheet(
                     enabled = !applyInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                    if (applyInFlight && pendingAction == GroupImageAction.PickPhoto) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                    }
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.group_image_choose_photo))
+                    Text(resolvedChoosePhotoLabel)
                 }
             }
             OutlinedTextField(
@@ -369,7 +460,7 @@ internal fun ImageSearchSheet(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
                 ) {
-                    if (pendingAction == GroupImageAction.Remove) {
+                    if (applyInFlight && pendingAction == GroupImageAction.Remove) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
@@ -379,7 +470,7 @@ internal fun ImageSearchSheet(
                         Icon(Icons.Default.Delete, contentDescription = null)
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.group_image_search_remove))
+                    Text(resolvedRemoveImageLabel)
                 }
             }
             Row(
@@ -411,14 +502,14 @@ internal fun ImageSearchSheet(
                     // makes accidental avatar loss one mistap away.
                     enabled = previewUrl != null && !applyInFlight,
                 ) {
-                    if (pendingAction == GroupImageAction.Apply) {
+                    if (applyInFlight && pendingAction == GroupImageAction.Apply) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text(stringResource(R.string.group_image_search_apply))
+                        Text(resolvedApplyImageLabel)
                     }
                 }
             }

@@ -868,6 +868,15 @@
     <string name="profile_picture_remove">Bild entfernen</string>
     <string name="profile_picture_use_link">Diesen Link verwenden</string>
     <string name="profile_banner">Profilbanner</string>
+    <string name="profile_banner_edit">Profilbanner bearbeiten</string>
+    <string name="profile_banner_sheet_title">Profilbanner</string>
+    <string name="profile_banner_placeholder">Noch kein Banner festgelegt</string>
+    <string name="profile_banner_uploading">Profilbanner wird hochgeladen…</string>
+    <string name="profile_banner_choose_photo">Banner aus Fotos auswählen</string>
+    <string name="profile_banner_url_label">Öffentliche HTTPS-URL des Banners</string>
+    <string name="profile_banner_remove">Banner entfernen</string>
+    <string name="profile_banner_apply">Dieses Banner verwenden</string>
+    <string name="toast_couldnt_upload_profile_banner">Das Profilbanner konnte nicht hochgeladen werden.</string>
     <string name="profile_banner_hint">Optionale öffentliche HTTPS-URL des Banners</string>
     <string name="profile_banner_invalid">Nur öffentliche HTTPS-Bild-URLs sind erlaubt.</string>
     <string name="toast_couldnt_upload_profile_image">Das Profilbild konnte nicht hochgeladen werden.</string>

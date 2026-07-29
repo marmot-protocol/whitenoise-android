@@ -853,6 +853,15 @@
     <string name="profile_picture_remove">移除頭像</string>
     <string name="profile_picture_use_link">使用此連結</string>
     <string name="profile_banner">個人檔案橫幅</string>
+    <string name="profile_banner_edit">編輯個人檔案橫幅</string>
+    <string name="profile_banner_sheet_title">個人檔案橫幅</string>
+    <string name="profile_banner_placeholder">尚未設定橫幅</string>
+    <string name="profile_banner_uploading">正在上傳個人檔案橫幅…</string>
+    <string name="profile_banner_choose_photo">從照片中選擇橫幅</string>
+    <string name="profile_banner_url_label">公開的 HTTPS 橫幅網址</string>
+    <string name="profile_banner_remove">移除橫幅</string>
+    <string name="profile_banner_apply">使用此橫幅</string>
+    <string name="toast_couldnt_upload_profile_banner">無法上傳個人檔案橫幅。</string>
     <string name="profile_banner_hint">可選的公開 HTTPS 橫幅網址</string>
     <string name="profile_banner_invalid">僅允許公開的 HTTPS 圖片網址。</string>
     <string name="toast_couldnt_upload_profile_image">無法上傳個人檔案圖片。</string>
