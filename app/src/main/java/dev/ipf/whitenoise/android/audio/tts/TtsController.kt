@@ -39,9 +39,7 @@ internal interface TtsAudioFocus {
  */
 class TtsController internal constructor(
     private val audioFocus: TtsAudioFocus,
-    private val chunkText: (String, Locale) -> List<TtsChunk> = { text, locale ->
-        TtsChunker.chunk(text, locale)
-    },
+    private val maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
     // Re-read per utterance so a rate change lands at the next sentence
     // boundary — quieter than re-queueing the current sentence.
     private val speechRate: () -> Float = { 1.0f },
@@ -84,29 +82,41 @@ class TtsController internal constructor(
     fun speak(
         text: String,
         locale: Locale,
+    ): Boolean = speak(listOf(TtsSpeakableEntry(senderKey = "", senderDisplayName = "", text = text)), locale)
+
+    @Synchronized
+    fun speak(
+        entries: List<TtsSpeakableEntry>,
+        locale: Locale,
     ): Boolean {
         val activeEngine = engine ?: return false
-        val chunks = chunkText(text, locale)
-        if (chunks.isEmpty()) return false
+        val messages = entries.toQueuedMessages(locale)
+        if (messages.isEmpty()) return false
         if (!acquireAudioFocus()) return false
 
         val languageStatus = activeEngine.setLanguage(locale)
         if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
-            queue.failBeforePlayback(TtsError.Synthesis, chunkCount = chunks.size)
+            val chunkCount = messages.sumOf { it.chunks.size }
+            queue.failBeforePlayback(
+                TtsError.Synthesis,
+                chunkCount = chunkCount,
+                messageCount = messages.size,
+                messagePreview = messages.first().preview,
+            )
             return false
         }
-        queue.start(chunks)
+        queue.start(messages)
         return state.value !is TtsState.Error
     }
 
-    /** Appends more sentences to an active read-aloud session (auto-read). */
+    /** Appends more messages to an active read-aloud session (auto-read). */
     @Synchronized
     fun appendSpeech(
-        text: String,
+        entry: TtsSpeakableEntry,
         locale: Locale,
     ): Boolean {
-        val chunks = if (engine == null) emptyList() else chunkText(text, locale)
-        return chunks.isNotEmpty() && queue.append(chunks)
+        val message = entry.toQueuedMessage(locale)
+        return message != null && queue.append(listOf(message))
     }
 
     /**
@@ -209,4 +219,38 @@ class TtsController internal constructor(
             is TtsState.Idle -> engine?.stop()
         }
     }
+
+    private fun List<TtsSpeakableEntry>.toQueuedMessages(locale: Locale): List<TtsQueuedMessage> =
+        boundedSpeakableEntries(this).mapNotNull { it.toQueuedMessage(locale) }
+
+    private fun TtsSpeakableEntry.toQueuedMessage(locale: Locale): TtsQueuedMessage? {
+        val trimmed = text.trim()
+        val announcementName = senderDisplayName.trim()
+        val sentenceChunks =
+            trimmed
+                .takeIf(String::isNotEmpty)
+                ?.let { messageText ->
+                    TtsChunker.chunk(
+                        text = messageText,
+                        locale = locale,
+                        maxChunkLength = maxChunkLength,
+                        leadingChunkReserve = senderAnnouncementReserve(announcementName),
+                    )
+                }.orEmpty()
+        return sentenceChunks.takeIf { it.isNotEmpty() }?.let { chunks ->
+            TtsQueuedMessage(
+                senderKey = senderKey,
+                senderDisplayName = announcementName,
+                preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
+                chunks = chunks.map { chunk -> TtsChunk(text = chunk.text, index = 0) },
+            )
+        }
+    }
+
+    private fun senderAnnouncementReserve(displayName: String): Int =
+        displayName
+            .takeIf(String::isNotEmpty)
+            ?.let { "$it: ".length } ?: 0
 }
+
+internal const val TTS_PREVIEW_MAX_LENGTH = 120

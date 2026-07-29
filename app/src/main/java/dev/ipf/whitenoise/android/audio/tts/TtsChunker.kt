@@ -26,8 +26,13 @@ object TtsChunker {
         text: String,
         locale: Locale,
         maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
+        leadingChunkReserve: Int = 0,
     ): List<TtsChunk> {
         require(maxChunkLength > 0) { "maxChunkLength must be positive" }
+        require(leadingChunkReserve >= 0) { "leadingChunkReserve must be non-negative" }
+        require(leadingChunkReserve < maxChunkLength) {
+            "leadingChunkReserve must be less than maxChunkLength"
+        }
         if (text.isBlank()) return emptyList()
 
         val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
@@ -50,9 +55,15 @@ object TtsChunker {
         }
         pendingPrefix.trim().takeIf(String::isNotEmpty)?.let(sentences::add)
 
+        val firstChunkMaxLength = maxChunkLength - leadingChunkReserve
         return sentences
-            .flatMap { sentence -> splitLongSentence(sentence, maxChunkLength) }
-            .filter(String::isNotBlank)
+            .flatMapIndexed { sentenceIndex, sentence ->
+                splitLongSentence(
+                    sentence = sentence,
+                    maxChunkLength = maxChunkLength,
+                    firstChunkMaxLength = if (sentenceIndex == 0) firstChunkMaxLength else maxChunkLength,
+                )
+            }.filter(String::isNotBlank)
             .mapIndexed { index, chunk -> TtsChunk(text = chunk, index = index) }
     }
 
@@ -64,21 +75,24 @@ object TtsChunker {
     private fun splitLongSentence(
         sentence: String,
         maxChunkLength: Int,
+        firstChunkMaxLength: Int = maxChunkLength,
     ): List<String> {
         var remaining = sentence.trim()
-        if (remaining.length <= maxChunkLength) return listOf(remaining)
+        if (remaining.length <= firstChunkMaxLength) return listOf(remaining)
 
         val chunks = mutableListOf<String>()
-        while (remaining.length > maxChunkLength) {
+        var chunkLimit = firstChunkMaxLength
+        while (remaining.length > chunkLimit) {
             val whitespaceBoundary =
-                (maxChunkLength downTo 1).firstOrNull { index -> remaining[index].isWhitespace() }
-            val end = whitespaceBoundary ?: safeHardSplitIndex(remaining, maxChunkLength)
+                (chunkLimit downTo 1).firstOrNull { index -> remaining[index].isWhitespace() }
+            val end = whitespaceBoundary ?: safeHardSplitIndex(remaining, chunkLimit)
             remaining
                 .substring(0, end)
                 .trimEnd()
                 .takeIf(String::isNotEmpty)
                 ?.let(chunks::add)
             remaining = remaining.substring(end).trimStart()
+            chunkLimit = maxChunkLength
         }
         remaining.takeIf(String::isNotBlank)?.let(chunks::add)
         return chunks
