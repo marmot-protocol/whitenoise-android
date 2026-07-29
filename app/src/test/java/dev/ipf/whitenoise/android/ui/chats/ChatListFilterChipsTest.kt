@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -169,6 +171,34 @@ class ChatListFilterChipsTest {
     }
 
     @Test
+    fun filterChipsExposeCheckboxRole() {
+        render(
+            chips =
+                listOf(
+                    chip(folderId = WORK_ID, label = "Work"),
+                ),
+            selectedFolderId = WORK_ID,
+        )
+
+        assertFilterChipRole(CHAT_LIST_FILTER_CHIP_ALL_TAG)
+        assertFilterChipRole(chatListFilterChipTag(WORK_ID))
+    }
+
+    @Test
+    fun folderChipIncludesLocalizedCountInAccessibleDescriptionWhenNonZero() {
+        render(
+            chips =
+                listOf(
+                    chip(folderId = WORK_ID, label = "Work", trailingCount = 3),
+                ),
+        )
+
+        val expectedCount =
+            app.resources.getQuantityString(R.plurals.chat_folder_chat_count, 3, 3)
+        assertFolderChipAccessibleLabel(WORK_ID, "Work, $expectedCount")
+    }
+
+    @Test
     fun allChipExposesAccessibleShortTapThatClearsSelection() {
         var selected: String? = WORK_ID
         render(
@@ -188,12 +218,23 @@ class ChatListFilterChipsTest {
         folderId: String,
         label: String,
         systemKind: SystemFolderKind? = null,
+        trailingCount: Int = 0,
     ) = ChatFolderChipModel(
         folderId = folderId,
         systemKind = systemKind,
         customLabel = label,
-        trailingCount = 0,
+        trailingCount = trailingCount,
     )
+
+    private fun assertFilterChipRole(tag: String) {
+        val role =
+            composeRule
+                .onNodeWithTag(tag, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(SemanticsProperties.Role)
+        assertEquals(Role.Checkbox, role)
+    }
 
     private fun assertFolderChipAccessibleLabel(
         folderId: String,

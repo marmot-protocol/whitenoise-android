@@ -45,6 +45,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -380,7 +381,7 @@ private fun ChatFolderChip(
         } else {
             null
         }
-    val editLabel = stringResource(R.string.edit)
+    val accessibleDescription = chatFolderChipAccessibleDescription(label, trailingCount)
     val interactionSource = remember { MutableInteractionSource() }
     val gestureModifier =
         if (onLongClick == null) {
@@ -393,7 +394,7 @@ private fun ChatFolderChip(
                         onLongPress = {},
                     )
                 }.semantics {
-                    role = Role.Button
+                    role = Role.Checkbox
                     onClick(action = {
                         onClick()
                         true
@@ -405,8 +406,8 @@ private fun ChatFolderChip(
                 indication = null,
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onLongClickLabel = editLabel,
-                role = Role.Button,
+                onLongClickLabel = stringResource(R.string.edit),
+                role = Role.Checkbox,
             )
         }
     Box {
@@ -424,9 +425,26 @@ private fun ChatFolderChip(
                     .matchParentSize()
                     .then(gestureModifier)
                     .semantics(mergeDescendants = true) {
-                        contentDescription = label
+                        contentDescription = accessibleDescription
                         this.selected = selected
                     },
         )
     }
 }
+
+@Composable
+private fun chatFolderChipAccessibleDescription(
+    label: String,
+    trailingCount: Int,
+): String =
+    if (trailingCount > 0) {
+        val countLabel =
+            pluralStringResource(
+                R.plurals.chat_folder_chat_count,
+                trailingCount,
+                trailingCount,
+            )
+        "$label, $countLabel"
+    } else {
+        label
+    }
