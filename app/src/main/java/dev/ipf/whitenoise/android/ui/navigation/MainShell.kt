@@ -651,6 +651,10 @@ internal fun MainShell(
                         }
                     },
                     onBack = {
+                        // Flush the hidden list before exposing it, so the first
+                        // drawn return frame already has the optimistic preview
+                        // in its final recency slot (#900).
+                        chatsController.setChatListVisible(true)
                         selectedChat = null
                         selectedChatOpenContext = ConversationOpenContext()
                         selectedChatJustCreated = false

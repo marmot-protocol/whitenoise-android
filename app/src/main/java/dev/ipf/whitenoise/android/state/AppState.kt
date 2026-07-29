@@ -2278,10 +2278,18 @@ class WhiteNoiseAppState private constructor(
             ?.applyLocalGroupDetails(record, members)
     }
 
-    fun applyOptimisticSentPreview(
+    internal fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
-    ): ChatListRowFfi? = chatsController?.applyOptimisticSentPreview(groupIdHex, preview)
+    ): Boolean = chatsController?.applyOptimisticSentPreview(groupIdHex, preview) == true
+
+    internal fun commitOptimisticSentPreview(
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+        confirmedMessageIdHex: String,
+    ) {
+        chatsController?.commitOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, confirmedMessageIdHex)
+    }
 
     /**
      * Apply the authoritative chat-list row returned by [markTimelineMessageRead].
@@ -2298,12 +2306,11 @@ class WhiteNoiseAppState private constructor(
             ?.applyChatListRow(projected)
     }
 
-    fun rollbackOptimisticSentPreview(
+    internal fun rollbackOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
-        previousRow: ChatListRowFfi?,
     ) {
-        chatsController?.rollbackOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, previousRow)
+        chatsController?.rollbackOptimisticSentPreview(groupIdHex, optimisticMessageIdHex)
     }
 
     // A self-leave stops that group's subscription, so the engine pushes no
