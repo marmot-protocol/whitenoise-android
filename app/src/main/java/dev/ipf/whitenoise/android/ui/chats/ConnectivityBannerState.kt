@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -25,7 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -97,18 +101,17 @@ internal const val CONNECTIVITY_BANNER_FLASH_MILLIS = 1_500L
 // pool state), refreshed on this cadence while the banner can render.
 internal const val CONNECTIVITY_RELAY_POLL_MILLIS = 2_000L
 
+internal const val CHAT_LIST_INLINE_CONNECTIVITY_TAG = "chat-list-inline-connectivity"
+
+internal const val CHAT_LIST_OFFLINE_BANNER_TAG = "chat-list-offline-banner"
+
 /**
- * Slim transient strip under the chat-list top bar: an actionable offline
- * message, an informational connecting line, and a brief connected flash —
- * never a permanent status widget.
+ * Owns relay polling and the debounced connectivity state machine for the
+ * chat list. Hoist once per screen and pass the displayed state to the inline
+ * indicator and the offline strip.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Suppress("FunctionNaming", "LongMethod")
 @Composable
-internal fun ChatListConnectivityBanner(
-    appState: WhiteNoiseAppState,
-    modifier: Modifier = Modifier,
-) {
+internal fun rememberChatListConnectivityState(appState: WhiteNoiseAppState): ConnectivityBannerState {
     var displayed by remember { mutableStateOf(ConnectivityBannerState.Hidden) }
     LaunchedEffect(appState) {
         while (true) {
@@ -132,12 +135,78 @@ internal fun ChatListConnectivityBanner(
             }
         }
     }
+    return displayed
+}
 
+/**
+ * Connecting and JustConnected render inline beside the active account avatar;
+ * steady-state connected and offline render nothing here.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListInlineConnectivityIndicator(
+    state: ConnectivityBannerState,
+    modifier: Modifier = Modifier,
+) {
     AnimatedVisibility(
-        visible = displayed != ConnectivityBannerState.Hidden,
+        visible = state == ConnectivityBannerState.Connecting || state == ConnectivityBannerState.JustConnected,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier.testTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(end = 8.dp),
+        ) {
+            when (state) {
+                ConnectivityBannerState.Connecting ->
+                    LoadingIndicator(modifier = Modifier.size(18.dp))
+                ConnectivityBannerState.JustConnected ->
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                ConnectivityBannerState.Hidden,
+                ConnectivityBannerState.Offline,
+                -> Unit
+            }
+            Text(
+                text =
+                    when (state) {
+                        ConnectivityBannerState.Connecting -> stringResource(R.string.connectivity_connecting)
+                        ConnectivityBannerState.JustConnected -> stringResource(R.string.connectivity_connected)
+                        ConnectivityBannerState.Hidden,
+                        ConnectivityBannerState.Offline,
+                        -> ""
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * Actionable full-width offline strip under the chat-list top bar. Connecting
+ * and JustConnected render inline in [ChatListTopBar] instead.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListConnectivityBanner(
+    displayed: ConnectivityBannerState,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = displayed == ConnectivityBannerState.Offline,
         enter = expandVertically(),
         exit = shrinkVertically(),
-        modifier = modifier,
+        modifier = modifier.testTag(CHAT_LIST_OFFLINE_BANNER_TAG),
     ) {
         Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -145,35 +214,14 @@ internal fun ChatListConnectivityBanner(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
-                when (displayed) {
-                    ConnectivityBannerState.Offline ->
-                        Icon(
-                            Icons.Default.CloudOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    ConnectivityBannerState.Connecting ->
-                        // Expressive loader (the morphing shape), matching the
-                        // sign-in screen's loading state rather than a plain ring.
-                        LoadingIndicator(modifier = Modifier.size(18.dp))
-                    ConnectivityBannerState.JustConnected ->
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    ConnectivityBannerState.Hidden -> Unit
-                }
+                Icon(
+                    Icons.Default.CloudOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp),
+                )
                 Text(
-                    text =
-                        when (displayed) {
-                            ConnectivityBannerState.Offline -> stringResource(R.string.connectivity_offline)
-                            ConnectivityBannerState.Connecting -> stringResource(R.string.connectivity_connecting)
-                            ConnectivityBannerState.JustConnected -> stringResource(R.string.connectivity_connected)
-                            ConnectivityBannerState.Hidden -> ""
-                        },
+                    text = stringResource(R.string.connectivity_offline),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
