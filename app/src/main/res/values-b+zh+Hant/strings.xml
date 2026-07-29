@@ -446,6 +446,7 @@
     <string name="published">已發表</string>
     <string name="no_key_packages_found">找不到金鑰套件</string>
     <string name="no_key_packages_found_help">本機沒有快取內容，此帳戶的中繼清單也沒有傳回金鑰包事件。請嘗試「發布新的」。</string>
+    <string name="retained_key_packages_not_published_help">保留的本機金鑰套件資料會自動管理，不會發布到中繼。</string>
     <string name="delete_key_package_question">刪除密鑰包？</string>
     <string name="delete_key_package_help">發布此密鑰包的刪除事件，並將其從本機快取中清除。</string>
     <string name="event_value">事件：%1$s</string>

@@ -657,6 +657,7 @@
     <string name="published">Published</string>
     <string name="no_key_packages_found">No key packages found</string>
     <string name="no_key_packages_found_help">Nothing cached locally and no key package events were returned from this account\'s relay list. Try &quot;Publish New&quot;.</string>
+    <string name="retained_key_packages_not_published_help">Retained local key package material is managed automatically and is not published to relays.</string>
     <string name="delete_key_package_question">Delete key package?</string>
     <string name="delete_key_package_help">Publishes a deletion event for this key package and clears it from the local cache.</string>
     <string name="event_value">Event: %1$s</string>

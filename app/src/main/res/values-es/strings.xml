@@ -455,6 +455,7 @@
     <string name="published">Publicado</string>
     <string name="no_key_packages_found">No se encontraron paquetes de llaves</string>
     <string name="no_key_packages_found_help">No hay nada en caché local y la lista de relés de esta cuenta no devolvió eventos de paquetes de claves. Prueba &quot;Publicar nuevo&quot;.</string>
+    <string name="retained_key_packages_not_published_help">El material local retenido del paquete de claves se gestiona automáticamente y no se publica en relés.</string>
     <string name="delete_key_package_question">¿Eliminar paquete de claves?</string>
     <string name="delete_key_package_help">Publica un evento de eliminación para este paquete de claves y lo borra del caché local.</string>
     <string name="event_value">Evento: %1$s</string>

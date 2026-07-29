@@ -446,6 +446,7 @@
     <string name="published">已发表</string>
     <string name="no_key_packages_found">未发现密钥包</string>
     <string name="no_key_packages_found_help">本地没有缓存内容，此账户的中继列表也没有返回密钥包事件。请尝试“发布新的”。</string>
+    <string name="retained_key_packages_not_published_help">保留的本地密钥包材料会自动管理，不会发布到中继。</string>
     <string name="delete_key_package_question">删除密钥包？</string>
     <string name="delete_key_package_help">发布此密钥包的删除事件，并将其从本地缓存中清除。</string>
     <string name="event_value">事件：%1$s</string>
