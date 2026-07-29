@@ -135,6 +135,7 @@ internal fun ChatsScreen(
     // create form pre-populated with them when New folder is picked there.
     var folderPickerChatIds by remember { mutableStateOf<List<String>?>(null) }
     var folderEditorChatIds by remember { mutableStateOf<Set<String>?>(null) }
+    var editingFolderId by remember { mutableStateOf<String?>(null) }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
@@ -545,18 +546,22 @@ internal fun ChatsScreen(
         return
     }
 
-    // New-folder handoff from the assignment sheet: the create form takes the
-    // screen over (same swap the new-chat flow uses) with the selection
-    // preloaded as manual members.
+    // Folder editor handoff: create-from-selection (folderId = null) or
+    // long-press edit on a chip (folderId set). Same in-place swap as the
+    // new-chat flow so filter/search/list state survives close/save.
     val folderEditorTargets = folderEditorChatIds
     val folderEditorAccountRef = appState.activeAccountRef
-    if (folderEditorTargets != null && folderEditorAccountRef != null) {
+    val folderEditId = editingFolderId
+    if (folderEditorAccountRef != null && (folderEditorTargets != null || folderEditId != null)) {
         ChatFolderEditScreen(
             appState = appState,
             accountRef = folderEditorAccountRef,
-            folderId = null,
-            onClose = { folderEditorChatIds = null },
-            initialManualChatIds = folderEditorTargets,
+            folderId = folderEditId,
+            onClose = {
+                folderEditorChatIds = null
+                editingFolderId = null
+            },
+            initialManualChatIds = folderEditorTargets.orEmpty(),
         )
         return
     }
@@ -730,6 +735,7 @@ internal fun ChatsScreen(
                     chips = folderChipModels,
                     selectedFolderId = selectedFolderId,
                     onSelect = { selectedFolderId = it },
+                    onEditFolder = { editingFolderId = it },
                 )
             }
             // Pasted-identifier resolution result (#344). Sits above the list so

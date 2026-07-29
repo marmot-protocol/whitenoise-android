@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -32,15 +36,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +64,10 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+
+internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chat-list-filter-chip-all"
+
+internal fun chatListFilterChipTag(folderId: String): String = "chat-list-filter-chip-$folderId"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,6 +317,7 @@ internal fun ChatListFilterChips(
     chips: List<ChatFolderChipModel>,
     selectedFolderId: String?,
     onSelect: (String?) -> Unit,
+    onEditFolder: (String) -> Unit = {},
 ) {
     Row(
         modifier =
@@ -316,6 +333,7 @@ internal fun ChatListFilterChips(
             selected = selectedFolderId == null,
             label = stringResource(R.string.chat_list_filter_all),
             onClick = { onSelect(null) },
+            modifier = Modifier.testTag(CHAT_LIST_FILTER_CHIP_ALL_TAG),
         )
         chips.forEach { chip ->
             ChatFolderChip(
@@ -332,34 +350,83 @@ internal fun ChatListFilterChips(
                         }
                     },
                 onClick = { onSelect(chip.folderId) },
+                onLongClick = { onEditFolder(chip.folderId) },
                 trailingCount = chip.trailingCount,
+                modifier = Modifier.testTag(chatListFilterChipTag(chip.folderId)),
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Suppress("FunctionNaming")
 @Composable
 private fun ChatFolderChip(
     selected: Boolean,
     label: String,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     trailingCount: Int = 0,
+    modifier: Modifier = Modifier,
 ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        trailingIcon =
-            if (trailingCount > 0) {
-                {
-                    Text(
-                        text = if (trailingCount > 99) "99+" else trailingCount.toString(),
-                        style = MaterialTheme.typography.labelSmall,
+    val trailingIcon: (@Composable () -> Unit)? =
+        if (trailingCount > 0) {
+            {
+                Text(
+                    text = if (trailingCount > 99) "99+" else trailingCount.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        } else {
+            null
+        }
+    val editLabel = stringResource(R.string.edit)
+    val interactionSource = remember { MutableInteractionSource() }
+    val gestureModifier =
+        if (onLongClick == null) {
+            // All: short-tap filters; long-press is swallowed with no edit
+            // semantics so TalkBack never advertises a folder editor.
+            Modifier
+                .pointerInput(onClick) {
+                    detectTapGestures(
+                        onTap = { onClick() },
+                        onLongPress = {},
                     )
+                }.semantics {
+                    role = Role.Button
+                    onClick(action = {
+                        onClick()
+                        true
+                    })
                 }
-            } else {
-                null
-            },
-    )
+        } else {
+            Modifier.combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = editLabel,
+                role = Role.Button,
+            )
+        }
+    Box {
+        FilterChip(
+            selected = selected,
+            onClick = {},
+            label = { Text(label) },
+            trailingIcon = trailingIcon,
+            interactionSource = interactionSource,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        Box(
+            modifier =
+                modifier
+                    .matchParentSize()
+                    .then(gestureModifier)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = label
+                        this.selected = selected
+                    },
+        )
+    }
 }
