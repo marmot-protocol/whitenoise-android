@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -50,6 +53,7 @@ import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
@@ -287,21 +291,14 @@ internal fun ChatRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (draft == null && !item.group.pendingConfirmation) {
-                            item.projectedDeliveryIndicator()?.let { indicator ->
-                                OutgoingIndicatorIcon(indicator, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.width(3.dp))
-                            }
-                        }
-                        Text(
-                            text = preview,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
+                    ChatRowPreviewLine(
+                        preview = preview,
+                        fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                        deliveryIndicator =
+                            item
+                                .projectedDeliveryIndicator()
+                                ?.takeIf { draft == null && !item.group.pendingConfirmation },
+                    )
                 }
             },
             trailingContent = {
@@ -330,6 +327,59 @@ internal fun ChatRow(
                         },
                     ),
             )
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatRowPreviewLine(
+    preview: AnnotatedString,
+    fontStyle: FontStyle,
+    deliveryIndicator: OutgoingMessageIndicator?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = preview,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontStyle = fontStyle,
+            modifier = Modifier.weight(1f),
+        )
+        if (deliveryIndicator != null) {
+            val statusDescription =
+                stringResource(
+                    when (deliveryIndicator) {
+                        OutgoingMessageIndicator.Sending -> R.string.sending
+                        OutgoingMessageIndicator.Sent -> R.string.sent
+                        OutgoingMessageIndicator.Failed -> R.string.send_failed
+                    },
+                )
+            Spacer(Modifier.width(3.dp))
+            Box(
+                modifier =
+                    Modifier
+                        .size(14.dp)
+                        .semantics { contentDescription = statusDescription },
+                contentAlignment = Alignment.Center,
+            ) {
+                Crossfade(
+                    targetState = deliveryIndicator,
+                    animationSpec = tween(durationMillis = 150),
+                    label = "chat row delivery indicator",
+                ) { indicator ->
+                    Box(Modifier.clearAndSetSemantics {}) {
+                        OutgoingIndicatorIcon(
+                            indicator = indicator,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
