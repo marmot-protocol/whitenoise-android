@@ -259,6 +259,20 @@ class BubbleColorPreferencesTest {
     }
 
     @Test
+    fun hsvPickerModelRoundTripsOpaqueRgbColors() {
+        listOf(0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFF123456, 0xFFFFFFFF, 0xFF000000).forEach { argb ->
+            assertEquals(argb, opaqueArgbToHsv(argb).toOpaqueArgb())
+        }
+    }
+
+    @Test
+    fun hsvPickerModelWrapsHueAndClampsChannels() {
+        assertEquals(0xFFFF0000, HsvColor(hue = 360f, saturation = 1f, value = 1f).toOpaqueArgb())
+        assertEquals(0xFFFFFFFF, HsvColor(hue = -120f, saturation = -1f, value = 2f).toOpaqueArgb())
+        assertEquals(0xFF000000, HsvColor(hue = 120f, saturation = 1f, value = -1f).toOpaqueArgb())
+    }
+
+    @Test
     fun readableTextAlwaysMeetsWcagAaForOpaqueCustomColors() {
         listOf(0xFF000000, 0xFFFFFFFF, 0xFF777777, 0xFF06B6D4).forEach { background ->
             val foreground = readableTextArgb(background)

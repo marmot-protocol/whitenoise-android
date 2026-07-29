@@ -1175,6 +1175,9 @@
     <string name="custom_hex_color">Benutzerdefinierte Hex-Farbe</string>
     <string name="invalid_hex_color">Gib eine Farbe wie #336699 ein.</string>
     <string name="apply_color">Farbe anwenden</string>
+    <string name="color_picker_hue">Farbton</string>
+    <string name="color_picker_saturation">Sättigung</string>
+    <string name="color_picker_brightness">Helligkeit</string>
     <string name="reset_to_default">Auf Standard zurücksetzen</string>
 
     <string name="tts_warning_title">Externe Sprachausgabe</string>

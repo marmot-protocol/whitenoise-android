@@ -1175,6 +1175,9 @@
     <string name="custom_hex_color">Özel onaltılık renk</string>
     <string name="invalid_hex_color">#336699 gibi bir renk girin.</string>
     <string name="apply_color">Rengi uygula</string>
+    <string name="color_picker_hue">Ton</string>
+    <string name="color_picker_saturation">Doygunluk</string>
+    <string name="color_picker_brightness">Parlaklık</string>
     <string name="reset_to_default">Varsayılana sıfırla</string>
 
     <string name="tts_warning_title">Harici metin okuma motoru</string>

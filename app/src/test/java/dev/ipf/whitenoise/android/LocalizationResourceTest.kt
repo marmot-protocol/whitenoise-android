@@ -498,6 +498,8 @@ class LocalizationResourceTest {
                 "notification_channel_messages",
                 // "Mentions" is the same word in French as in English.
                 "notification_channel_mentions",
+                // "Saturation" is the standard HSV term in both French and English.
+                "color_picker_saturation",
                 "notification_sender_in_group",
                 "notifications",
                 "online",

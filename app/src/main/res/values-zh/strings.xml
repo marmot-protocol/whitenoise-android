@@ -1155,6 +1155,9 @@
     <string name="custom_hex_color">自定义十六进制颜色</string>
     <string name="invalid_hex_color">请输入类似 #336699 的颜色。</string>
     <string name="apply_color">应用颜色</string>
+    <string name="color_picker_hue">色相</string>
+    <string name="color_picker_saturation">饱和度</string>
+    <string name="color_picker_brightness">亮度</string>
     <string name="reset_to_default">恢复默认值</string>
 
     <string name="tts_warning_title">外部文字转语音引擎</string>
