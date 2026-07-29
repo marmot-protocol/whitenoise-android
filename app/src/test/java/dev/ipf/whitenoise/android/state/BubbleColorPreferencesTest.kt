@@ -270,19 +270,39 @@ class BubbleColorPreferencesTest {
     }
 
     @Test
-    fun tonalPresetsStayCuratedAndReadableWithDuplicateMaterialRole() {
-        val presets =
-            tonalBubbleColorPresets(
-                primaryContainerArgb = 0xFF06B6D4,
-                secondaryContainerArgb = 0xFF1E3A40,
-                tertiaryContainerArgb = 0xFF1E3A40,
-                errorContainerArgb = 0xFF5C1A1A,
-                inversePrimaryArgb = 0xFF67E8F9,
-                surfaceArgb = OPAQUE_BLACK_ARGB,
-            )
+    fun tonalPresetsIncludePureBlackAndWhite() {
+        val presets = tonalBubbleColorPresets()
+
+        assertTrue(presets.contains(OPAQUE_BLACK_ARGB))
+        assertTrue(presets.contains(OPAQUE_WHITE_ARGB))
+    }
+
+    @Test
+    fun tonalPresetsMatchDocumentedGoldenPaletteContract() {
+        val presets = tonalBubbleColorPresets()
 
         assertTrue("expected 8-12 presets, got ${presets.size}", presets.size in 8..12)
-        assertEquals(presets.size, presets.distinct().size)
-        assertTrue(presets.all { readableTextArgb(it) != null })
+        assertEquals(
+            listOf(
+                OPAQUE_BLACK_ARGB,
+                OPAQUE_WHITE_ARGB,
+                0xFFB91C1CL,
+                0xFFC2410CL,
+                0xFFA16207L,
+                0xFF15803DL,
+                0xFF0E7490L,
+                0xFF1D4ED8L,
+                0xFF6D28D9L,
+                0xFFBE185DL,
+            ),
+            presets,
+        )
+        presets.forEach { background ->
+            val foreground = readableTextArgb(background)
+            assertTrue(
+                "foreground ${foreground?.toString(16)} on ${background.toString(16)} must meet WCAG AA",
+                foreground != null && contrastRatio(foreground, background) >= WCAG_AA_NORMAL_TEXT_CONTRAST,
+            )
+        }
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Button
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -49,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
+import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
+import dev.ipf.whitenoise.android.state.OPAQUE_WHITE_ARGB
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
 import dev.ipf.whitenoise.android.state.readableTextArgb
@@ -264,17 +268,7 @@ internal fun TonalSwatchPicker(
     @StringRes swatchContentDescriptionRes: Int = R.string.bubble_color_swatch_content_description,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val presets =
-        remember(scheme) {
-            tonalBubbleColorPresets(
-                primaryContainerArgb = scheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                secondaryContainerArgb = scheme.secondaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                tertiaryContainerArgb = scheme.tertiaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                errorContainerArgb = scheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                inversePrimaryArgb = scheme.inversePrimary.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceArgb = scheme.surface.toArgb().toLong() and 0xFFFFFFFFL,
-            )
-        }
+    val presets = remember { tonalBubbleColorPresets() }
     var customExpanded by rememberSaveable(scopeKey, theme, slotKey) { mutableStateOf(false) }
     var customHex by rememberSaveable(scopeKey, theme, slotKey, selectedArgb) {
         mutableStateOf(selectedArgb?.let { "#%06X".format(Locale.ROOT, it and 0xFFFFFFL) } ?: "")
@@ -302,7 +296,7 @@ internal fun TonalSwatchPicker(
                         .clip(CircleShape)
                         .border(
                             width = if (selected) 3.dp else 1.dp,
-                            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                            color = swatchBorderColor(argb, selected, scheme),
                             shape = CircleShape,
                         ).clickable { onColorSelected(argb) }
                         .semantics {
@@ -319,7 +313,7 @@ internal fun TonalSwatchPicker(
                 }
             }
             val customSelected = selectedArgb != null && selectedArgb !in presets
-            val customContentArgb = selectedArgb?.let(::readableTextArgb)
+            val customContentArgb = selectedArgb?.takeIf { customSelected }?.let(::readableTextArgb)
             Box(
                 Modifier
                     .size(48.dp)
@@ -371,5 +365,18 @@ internal fun TonalSwatchPicker(
                 Text(stringResource(R.string.apply_color))
             }
         }
+    }
+}
+
+@Composable
+private fun swatchBorderColor(
+    argb: Long,
+    selected: Boolean,
+    scheme: ColorScheme,
+): Color {
+    if (selected) return scheme.onSurface
+    return when (argb) {
+        OPAQUE_BLACK_ARGB, OPAQUE_WHITE_ARGB -> scheme.onSurfaceVariant
+        else -> scheme.outline
     }
 }

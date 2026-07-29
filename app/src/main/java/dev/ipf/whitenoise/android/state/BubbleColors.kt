@@ -5,7 +5,6 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToInt
 
 internal const val WCAG_AA_NORMAL_TEXT_CONTRAST = 4.5
 internal const val OPAQUE_BLACK_ARGB = 0xFF000000L
@@ -262,55 +261,26 @@ internal fun parseOpaqueColorHex(input: String): Long? {
 }
 
 /**
- * Builds a compact palette from Material semantic roles without depending on
- * surface-container roles, which all collapse to black in the AMOLED theme.
- * Interleaving the surface blends keeps every role represented before the cap.
+ * Fixed quick-swatch palette spanning distinct hue and luminance bands. Black
+ * and white anchors are always included; every entry passes [readableTextArgb].
+ * Theme Material roles are intentionally not blended here — surface-container
+ * roles collapse on AMOLED and produced near-duplicate swatches (#1699).
  */
-internal fun tonalBubbleColorPresets(
-    primaryContainerArgb: Long,
-    secondaryContainerArgb: Long,
-    tertiaryContainerArgb: Long,
-    errorContainerArgb: Long,
-    inversePrimaryArgb: Long,
-    surfaceArgb: Long,
-): List<Long> {
-    val surface = normalizeOpaqueArgb(surfaceArgb) ?: return emptyList()
-    val roles =
-        listOf(
-            primaryContainerArgb,
-            secondaryContainerArgb,
-            tertiaryContainerArgb,
-            errorContainerArgb,
-            inversePrimaryArgb,
-        ).mapNotNull(::normalizeOpaqueArgb)
+private val GOLDEN_BUBBLE_COLOR_PRESETS =
+    listOf(
+        OPAQUE_BLACK_ARGB,
+        OPAQUE_WHITE_ARGB,
+        0xFFB91C1CL,
+        0xFFC2410CL,
+        0xFFA16207L,
+        0xFF15803DL,
+        0xFF0E7490L,
+        0xFF1D4ED8L,
+        0xFF6D28D9L,
+        0xFFBE185DL,
+    )
 
-    return TONAL_PRESET_SURFACE_FRACTIONS
-        .flatMap { surfaceFraction ->
-            roles.map { role -> blendOpaqueArgb(role, surface, surfaceFraction) }
-        }.distinct()
-        .filter { readableTextArgb(it) != null }
-        .take(MAX_TONAL_BUBBLE_PRESETS)
-}
-
-private val TONAL_PRESET_SURFACE_FRACTIONS = listOf(0.30, 0.48, 0.64)
-private const val MAX_TONAL_BUBBLE_PRESETS = 12
-
-private fun blendOpaqueArgb(
-    fromArgb: Long,
-    towardArgb: Long,
-    towardFraction: Double,
-): Long {
-    fun blendedChannel(shift: Int): Long {
-        val from = (fromArgb shr shift) and 0xFF
-        val toward = (towardArgb shr shift) and 0xFF
-        return (from + (toward - from) * towardFraction).roundToInt().toLong()
-    }
-
-    return OPAQUE_BLACK_ARGB or
-        (blendedChannel(16) shl 16) or
-        (blendedChannel(8) shl 8) or
-        blendedChannel(0)
-}
+internal fun tonalBubbleColorPresets(): List<Long> = GOLDEN_BUBBLE_COLOR_PRESETS
 
 internal fun readableTextArgb(backgroundArgb: Long): Long? {
     val background = normalizeOpaqueArgb(backgroundArgb) ?: return null
