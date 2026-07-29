@@ -772,8 +772,8 @@
     <plurals name="media_selected_count">
         <item quantity="other">已選擇 %1$d 張圖片</item>
     </plurals>
-    <string name="message_invalidated">此訊息未送達群組</string>
-    <string name="message_invalidated_preview">未送達群組</string>
+    <string name="message_partial_visibility_warning">可能並非所有人都能看到</string>
+    <string name="message_noncanonical_history_warning">未在群組目前的訊息記錄中確認</string>
     <string name="group_avatar_url">頭像 URL</string>
     <string name="relative_time_future">未來</string>
     <string name="relative_time_now">現在</string>

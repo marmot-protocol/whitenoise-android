@@ -42,6 +42,26 @@ class MessageBubbleFrameTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun replyPreviewShowsBodyAndConvergenceWarning() {
+        composeRule.setContent {
+            MaterialTheme {
+                ReplyPreviewCard(
+                    senderTitle = "Alice",
+                    isOwn = false,
+                    body = "Quoted message",
+                    warning = "May not be visible to everyone",
+                    mediaKind = ReplyMediaKind.None,
+                    onClick = null,
+                    onDismiss = null,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Quoted message").assertIsDisplayed()
+        composeRule.onNodeWithText("May not be visible to everyone").assertIsDisplayed()
+    }
+
+    @Test
     fun customAmoledReplyAccentUsesCurrentBorderColorInsideBubbleAndAboveMedia() {
         val presentation = customAmoledPresentation()
 
@@ -76,7 +96,6 @@ class MessageBubbleFrameTest {
                         presentation = presentation,
                         highlighted = false,
                         mine = false,
-                        invalidated = false,
                         mentionedSelf = true,
                         mentionedYouLabel = "Mentioned you",
                         modifier = Modifier.size(width = 120.dp, height = 60.dp).testTag(CAPTION_TAG),
@@ -90,7 +109,6 @@ class MessageBubbleFrameTest {
                         presentation = presentation,
                         highlighted = false,
                         mine = false,
-                        invalidated = false,
                         mentionedSelf = false,
                         mentionedYouLabel = "Mentioned you",
                         modifier = Modifier.size(width = 120.dp, height = 60.dp).testTag(PLAIN_TAG),
@@ -161,15 +179,12 @@ class MessageBubbleFrameTest {
 
     private fun customAmoledPresentation() =
         resolveBubblePresentationArgb(
-            invalidated = false,
             deleted = false,
             amoled = true,
             mine = false,
             customArgb = CUSTOM_BACKGROUND,
             tokens =
                 BubblePresentationTokens(
-                    errorBackgroundArgb = 0xFFFFDAD6,
-                    errorContentArgb = 0xFF410002,
                     surfaceBackgroundArgb = 0xFFE1E3E4,
                     surfaceContentArgb = OPAQUE_WHITE,
                     mineBackgroundArgb = 0xFFB5EFFF,
@@ -184,10 +199,9 @@ class MessageBubbleFrameTest {
             MaterialTheme {
                 Column(Modifier.width(220.dp).testTag(MEDIA_REPLY_COLUMN_TAG)) {
                     MessageBubbleFrame(
-                        presentation = messageBubblePresentation(invalidated = false, deleted = false, mine = false),
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
                         highlighted = false,
                         mine = false,
-                        invalidated = false,
                         mentionedSelf = false,
                         mentionedYouLabel = "Mentioned you",
                         modifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),

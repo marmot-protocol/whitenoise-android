@@ -27,7 +27,6 @@ internal fun MessageBubbleFrame(
     presentation: BubblePresentation,
     highlighted: Boolean,
     mine: Boolean,
-    invalidated: Boolean,
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
@@ -38,7 +37,6 @@ internal fun MessageBubbleFrame(
         messageTargetHighlightModifier(
             highlighted = highlighted,
             customBorderArgb = presentation.borderOverrideArgb,
-            invalidated = invalidated,
             color = MaterialTheme.colorScheme.tertiary,
         )
     val mentionModifier =
@@ -53,7 +51,7 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted, mine, invalidated, presentation.borderOverrideArgb),
+        border = messageBubbleBorder(highlighted, mine, presentation.borderOverrideArgb),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
@@ -70,10 +68,9 @@ internal fun MessageBubbleFrame(
 private fun messageTargetHighlightModifier(
     highlighted: Boolean,
     customBorderArgb: Long?,
-    invalidated: Boolean,
     color: Color,
 ): Modifier =
-    if (highlighted && customBorderArgb != null && !invalidated) {
+    if (highlighted && customBorderArgb != null) {
         Modifier.drawWithContent {
             drawContent()
             val inset = 4.dp.toPx()

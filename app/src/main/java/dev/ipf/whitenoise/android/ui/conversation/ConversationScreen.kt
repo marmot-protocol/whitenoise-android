@@ -3051,6 +3051,9 @@ internal fun ConversationScreen(
                                         controller.replyingTo
                                             ?.let(controller::mediaReferencesFor)
                                             .orEmpty(),
+                                    replyingToDisplay =
+                                        controller.replyingTo
+                                            ?.let { controller.replyTargetPreview(it, messageTextCopy) },
                                     messageTextCopy = messageTextCopy,
                                     onCancelReply = { controller.replyingTo = null },
                                     onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },

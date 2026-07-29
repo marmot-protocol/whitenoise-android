@@ -14,8 +14,6 @@ internal data class BubblePresentation(
 )
 
 internal data class BubblePresentationTokens(
-    val errorBackgroundArgb: Long,
-    val errorContentArgb: Long,
     val surfaceBackgroundArgb: Long,
     val surfaceContentArgb: Long,
     val mineBackgroundArgb: Long,
@@ -23,10 +21,9 @@ internal data class BubblePresentationTokens(
     val mentionAccentArgb: Long,
 )
 
-/** Keeps invalidation/tombstone semantics fixed while routing ordinary AMOLED
+/** Keeps tombstone semantics fixed while routing ordinary AMOLED
  * customization through the bubble border instead of its black fill. */
 internal fun resolveBubblePresentationArgb(
-    invalidated: Boolean,
     deleted: Boolean,
     amoled: Boolean,
     mine: Boolean,
@@ -34,7 +31,6 @@ internal fun resolveBubblePresentationArgb(
     tokens: BubblePresentationTokens,
 ): BubblePresentation =
     when {
-        invalidated -> BubblePresentation(tokens.errorBackgroundArgb, tokens.errorContentArgb, tokens.mentionAccentArgb)
         deleted && amoled -> BubblePresentation(OPAQUE_BLACK_ARGB, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
         deleted -> BubblePresentation(tokens.surfaceBackgroundArgb, tokens.surfaceContentArgb, tokens.mentionAccentArgb)
         amoled ->

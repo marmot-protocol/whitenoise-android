@@ -12,8 +12,6 @@ import org.junit.Test
 class BubblePresentationTest {
     private val tokens =
         BubblePresentationTokens(
-            errorBackgroundArgb = 0xFFFFDAD6,
-            errorContentArgb = 0xFF410002,
             surfaceBackgroundArgb = 0xFFE1E3E4,
             surfaceContentArgb = 0xFF444748,
             mineBackgroundArgb = 0xFFB5EFFF,
@@ -22,22 +20,10 @@ class BubblePresentationTest {
         )
 
     @Test
-    fun semanticBubblesIgnoreCustomColors() {
-        assertEquals(
-            BubblePresentation(0xFFFFDAD6, 0xFF410002, 0xFF006780),
-            resolveBubblePresentationArgb(
-                invalidated = true,
-                deleted = false,
-                amoled = false,
-                mine = true,
-                customArgb = 0xFFFF0000,
-                tokens = tokens,
-            ),
-        )
+    fun deletedBubbleIgnoresCustomColors() {
         assertEquals(
             BubblePresentation(OPAQUE_BLACK_ARGB, 0xFF444748, 0xFF006780),
             resolveBubblePresentationArgb(
-                invalidated = false,
                 deleted = true,
                 amoled = true,
                 mine = false,
@@ -49,8 +35,8 @@ class BubblePresentationTest {
 
     @Test
     fun amoledCustomColorKeepsBlackBackgroundAndThemeContent() {
-        val defaultPresentation = resolveBubblePresentationArgb(false, false, true, true, null, tokens)
-        val customPresentation = resolveBubblePresentationArgb(false, false, true, true, 0xFF336699, tokens)
+        val defaultPresentation = resolveBubblePresentationArgb(false, true, true, null, tokens)
+        val customPresentation = resolveBubblePresentationArgb(false, true, true, 0xFF336699, tokens)
 
         assertEquals(OPAQUE_BLACK_ARGB, defaultPresentation.backgroundArgb)
         assertNull(defaultPresentation.borderOverrideArgb)
@@ -61,7 +47,7 @@ class BubblePresentationTest {
 
     @Test
     fun customColorGetsWcagReadableContentColor() {
-        val presentation = resolveBubblePresentationArgb(false, false, false, false, 0xFF777777, tokens)
+        val presentation = resolveBubblePresentationArgb(false, false, false, 0xFF777777, tokens)
 
         assertTrue(contrastRatio(presentation.contentArgb, presentation.backgroundArgb) >= WCAG_AA_NORMAL_TEXT_CONTRAST)
         assertNull(presentation.borderOverrideArgb)
@@ -69,7 +55,7 @@ class BubblePresentationTest {
 
     @Test
     fun customColorKeepsSemanticMentionAccent() {
-        val presentation = resolveBubblePresentationArgb(false, false, false, false, 0xFF336699, tokens)
+        val presentation = resolveBubblePresentationArgb(false, false, false, 0xFF336699, tokens)
 
         assertEquals(0xFF006780, presentation.mentionAccentArgb)
     }
@@ -83,11 +69,11 @@ class BubblePresentationTest {
     fun standardColorsKeepMaterialPairedContentTokens() {
         assertEquals(
             BubblePresentation(0xFFB5EFFF, 0xFF001F28, 0xFF006780),
-            resolveBubblePresentationArgb(false, false, false, true, null, tokens),
+            resolveBubblePresentationArgb(false, false, true, null, tokens),
         )
         assertEquals(
             BubblePresentation(0xFFE1E3E4, 0xFF444748, 0xFF006780),
-            resolveBubblePresentationArgb(false, false, false, false, null, tokens),
+            resolveBubblePresentationArgb(false, false, false, null, tokens),
         )
     }
 }

@@ -7472,8 +7472,18 @@ class ConversationController(
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
+        return replyTargetPreview(target, copy)
+    }
+
+    fun replyTargetPreview(
+        target: AppMessageRecordFfi,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): TimelineReplyDisplay {
         val refs = mediaReferencesFor(target)
         val mediaFallback = typedReplyMediaFallback(refs)
+        timelineRecords[target.messageIdHex]?.let { projectedTarget ->
+            return TimelineProjector.replyTargetPreview(projectedTarget, mediaFallback, copy)
+        }
         val mediaKind =
             mediaFallback?.kind
                 ?: replyMediaKindFromMime(refs.firstOrNull()?.mediaType)

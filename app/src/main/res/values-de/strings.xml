@@ -785,8 +785,8 @@
         <item quantity="one">%1$d Bild ausgewählt</item>
         <item quantity="other">%1$d Bilder ausgewählt</item>
     </plurals>
-    <string name="message_invalidated">Diese Nachricht hat die Gruppe nicht erreicht</string>
-    <string name="message_invalidated_preview">Hat die Gruppe nicht erreicht</string>
+    <string name="message_partial_visibility_warning">Möglicherweise nicht für alle sichtbar</string>
+    <string name="message_noncanonical_history_warning">Im aktuellen Gruppenverlauf nicht bestätigt</string>
     <string name="group_avatar_url">Avatar-URL</string>
     <string name="relative_time_future">Zukunft</string>
     <string name="relative_time_now">jetzt</string>
