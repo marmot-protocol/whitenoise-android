@@ -78,6 +78,7 @@ internal fun ShareChatPickerSheet(
     payload: SharePayload,
     onDismiss: () -> Unit,
     onStage: (List<String>) -> Unit,
+    overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
 ) {
     val pickerState = rememberShareChatPickerState(appState, payload)
     val sheetState = rememberModalBottomSheetState()
@@ -113,6 +114,7 @@ internal fun ShareChatPickerSheet(
         overlayBack = pickerState.searchFocused,
         onDismissRequest = onDismiss,
         onBackCommit = dismissSheet,
+        overlayBackRegistrar = overlayBackRegistrar,
     ) {
         ShareChatPickerContent(
             pickerState = pickerState,

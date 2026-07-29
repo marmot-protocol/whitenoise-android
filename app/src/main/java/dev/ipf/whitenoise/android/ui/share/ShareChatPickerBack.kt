@@ -32,6 +32,13 @@ import kotlin.coroutines.cancellation.CancellationException
 private const val PREDICTIVE_BACK_MIN_SCALE = 0.9f
 private val PredictiveBackTransformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
 
+internal fun interface ShareChatPickerOverlayBackRegistrar {
+    fun register(
+        priority: Int,
+        callback: OnBackAnimationCallback,
+    ): () -> Unit
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ShareChatPickerBackAwareSheet(
@@ -39,6 +46,7 @@ internal fun ShareChatPickerBackAwareSheet(
     overlayBack: Boolean,
     onDismissRequest: () -> Unit,
     onBackCommit: () -> Unit,
+    overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     content: @Composable () -> Unit,
 ) {
     var predictiveBackProgress by remember { mutableFloatStateOf(0f) }
@@ -60,6 +68,7 @@ internal fun ShareChatPickerBackAwareSheet(
                 onProgress = onProgress,
                 onCommit = onBackCommit,
                 onCancel = onCancel,
+                registrar = overlayBackRegistrar,
             )
         } else {
             ShareChatPickerPredictiveBackHandler(
@@ -127,24 +136,36 @@ private fun ShareChatPickerOverlayBackHandler(
     onProgress: (Float) -> Unit,
     onCommit: () -> Unit,
     onCancel: () -> Unit,
+    registrar: ShareChatPickerOverlayBackRegistrar?,
 ) {
     val currentOnCommit by rememberUpdatedState(onCommit)
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOnCancel by rememberUpdatedState(onCancel)
     val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
-    DisposableEffect(backDispatcher) {
-        if (backDispatcher == null) return@DisposableEffect onDispose {}
+    DisposableEffect(backDispatcher, registrar) {
         val callback =
             shareChatPickerOverlayBackAnimationCallback(
                 onProgress = { currentOnProgress(it) },
                 onCommit = { currentOnCommit() },
                 onCancel = { currentOnCancel() },
             )
-        backDispatcher.registerOnBackInvokedCallback(
-            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
-            callback,
-        )
-        onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
+        val unregister =
+            when {
+                registrar != null ->
+                    registrar.register(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+                backDispatcher != null -> {
+                    backDispatcher.registerOnBackInvokedCallback(
+                        OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                        callback,
+                    )
+                    val unregisterCallback: () -> Unit = {
+                        backDispatcher.unregisterOnBackInvokedCallback(callback)
+                    }
+                    unregisterCallback
+                }
+                else -> null
+            }
+        onDispose { unregister?.invoke() }
     }
     // Non-gesture dispatchers still need committed Back; platform gestures invoke the overlay first.
     BackHandler { currentOnCommit() }

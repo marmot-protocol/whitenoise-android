@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.share
 
 import android.content.Context
 import android.window.BackEvent
+import android.window.OnBackAnimationCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
@@ -15,6 +17,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -40,9 +43,9 @@ import org.robolectric.shadows.ShadowDialog
 
 /**
  * Behavioral Back coverage for the inbound share recipient sheet (issue #1721).
- * Composes production [ShareChatPickerSheet] with [ModalBottomSheet], drives the
- * same platform dispatcher callback used in production, and verifies request
- * clearing plus route isolation.
+ * Composes production [ShareChatPickerSheet] with [ModalBottomSheet], exercises
+ * committed and predictive Back through production callback seams,
+ * and verifies request clearing plus route isolation.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,8 +83,10 @@ class ShareChatPickerSheetBackTest {
 
         composeRule.onNodeWithText(searchLabel).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(shareToLabel).performClick()
+        composeRule.onNodeWithText(searchLabel).assertIsFocused()
+        ShadowDialog.getLatestDialog().currentFocus?.clearFocus()
         composeRule.waitForIdle()
+        composeRule.onNodeWithText(searchLabel).assertIsNotFocused()
 
         pressCommittedBack()
 
@@ -112,11 +117,19 @@ class ShareChatPickerSheetBackTest {
     @Test
     fun overlayPriorityBackWinsOverUnderlyingRouteHandler() {
         val tracker = mountSharePicker()
+        composeRule.onNodeWithText(searchLabel).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(searchLabel).assertIsFocused()
+        assertEquals(OnBackInvokedDispatcher.PRIORITY_OVERLAY, tracker.overlayBackPriority)
 
-        pressCommittedBack()
+        checkNotNull(tracker.overlayBackCallback).onBackInvoked()
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
 
         assertEquals(1, tracker.dismissCount)
         assertEquals("Back must not reach the underlying route", 0, tracker.routeBackCount)
+        assertEquals(null, tracker.overlayBackCallback)
+        composeRule.onNodeWithText(searchLabel).assertIsNotDisplayed()
     }
 
     @Test
@@ -253,6 +266,12 @@ class ShareChatPickerSheetBackTest {
                             tracker.showPicker = false
                         },
                         onStage = { tracker.stageCount++ },
+                        overlayBackRegistrar =
+                            ShareChatPickerOverlayBackRegistrar { priority, callback ->
+                                tracker.overlayBackPriority = priority
+                                tracker.overlayBackCallback = callback
+                                { tracker.overlayBackCallback = null }
+                            },
                     )
                 }
             }
@@ -322,6 +341,8 @@ class ShareChatPickerSheetBackTest {
         var dismissCount by mutableIntStateOf(0)
         var routeBackCount by mutableIntStateOf(0)
         var stageCount by mutableIntStateOf(0)
+        var overlayBackPriority: Int? = null
+        var overlayBackCallback: OnBackAnimationCallback? = null
     }
 
     private class InMemoryDraftPersistence : DraftPersistence {
