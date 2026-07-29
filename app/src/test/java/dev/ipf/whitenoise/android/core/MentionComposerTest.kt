@@ -433,6 +433,28 @@ class MentionComposerTest {
     }
 
     @Test
+    fun editingVisualTextKeepsTerminalPastedNpubUntransformed() {
+        val text = "hello @$aliceNpub"
+        val visual = MentionComposer.editingVisualText(text, candidates)
+
+        assertEquals(text, visual.text)
+        assertTrue(visual.ranges.isEmpty())
+        assertEquals(text.length, visual.originalToTransformed(text.length))
+        assertEquals(text.length, visual.transformedToOriginal(text.length))
+    }
+
+    @Test
+    fun editingVisualTextStillTransformsChipsBeforeTerminalPastedNpub() {
+        val text = "@$aliceNpub and @$bobNpub"
+        val visual = MentionComposer.editingVisualText(text, candidates)
+
+        assertEquals("@Alice and @$bobNpub", visual.text)
+        assertEquals(1, visual.ranges.size)
+        assertEquals("@Alice", visual.text.substring(visual.ranges.single().transformed))
+        assertEquals(text.length, visual.transformedToOriginal(visual.text.length))
+    }
+
+    @Test
     fun visualTextFallsBackToShortNpubForUnresolvedChip() {
         val text = "hey @$aliceNpub"
         val visual = MentionComposer.visualText(text, emptyList())
