@@ -20,9 +20,11 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.canStartNewGroupCreateAttempt
 import dev.ipf.whitenoise.android.ui.chats.newchat.canSubmitNewChatSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.groupContainsResolvedMember
 import dev.ipf.whitenoise.android.ui.chats.newchat.newChatMemberRefs
+import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupSetupUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewAllowsSubmit
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewState
@@ -37,6 +39,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NewChatFlowTest {
+    @Test
+    fun newGroupSetupAfterCanonicalCreateFailureShowsRetryOpenSurface() {
+        val retryState =
+            newGroupSetupUiState(
+                retryGroupIdHex = "created-group",
+                canCreate = false,
+                busy = false,
+            )
+
+        assertEquals(R.string.retry, retryState.fabLabelResId)
+        assertEquals(R.string.error_chat_created_not_loaded, retryState.statusResId)
+        assertFalse(retryState.detailsEditable)
+        assertTrue(retryState.submitEnabled)
+
+        val createState =
+            newGroupSetupUiState(
+                retryGroupIdHex = null,
+                canCreate = true,
+                busy = false,
+            )
+        assertEquals(R.string.create, createState.fabLabelResId)
+        assertEquals(null, createState.statusResId)
+        assertTrue(createState.detailsEditable)
+    }
+
+    @Test
+    fun canonicalGroupRetryCanStartWithoutCreateFormEligibility() {
+        assertTrue(
+            canStartNewGroupCreateAttempt(
+                busy = false,
+                canCreate = false,
+                retryGroupIdHex = "created-group",
+            ),
+        )
+        assertFalse(
+            canStartNewGroupCreateAttempt(
+                busy = true,
+                canCreate = false,
+                retryGroupIdHex = "created-group",
+            ),
+        )
+    }
+
     @Test
     fun groupCreateRequiresNameButNoRecipients() {
         assertTrue(
@@ -242,7 +287,7 @@ class NewChatFlowTest {
     }
 
     @Test
-    fun sharedStartChatAttemptCreatesAndOpensMaterializedChat() =
+    fun sharedStartChatAttemptCreatesAndOpensFromAuthoritativeRead() =
         runTest {
             val expected = chatListItem(group("Support"), otherMemberAccount = "support", members = emptyList())
             var createdFor: String? = null
@@ -256,7 +301,7 @@ class NewChatFlowTest {
                         createdFor = it
                         "created-group"
                     },
-                    awaitChatListItem = {
+                    loadCreatedChatListItem = {
                         assertEquals("created-group", it)
                         expected
                     },
@@ -271,6 +316,7 @@ class NewChatFlowTest {
     fun sharedStartChatAttemptRetriesCreatedGroupWithoutCreatingDuplicate() =
         runTest {
             var createCalled = false
+            val expected = chatListItem(group("Support"), otherMemberAccount = "support", members = emptyList())
 
             val result =
                 attemptStartProfileChat(
@@ -282,17 +328,33 @@ class NewChatFlowTest {
                         createCalled = true
                         "duplicate-group"
                     },
-                    awaitChatListItem = {
+                    loadCreatedChatListItem = {
                         assertEquals("created-group", it)
-                        null
+                        expected
                     },
                     displayName = { it },
                 )
 
             assertFalse(createCalled)
+            assertEquals(StartChatAttemptResult.Open(expected), result)
+        }
+
+    @Test
+    fun sharedStartChatAttemptOffersRetryByGroupIdAfterAuthoritativeReadFails() =
+        runTest {
+            val result =
+                attemptStartProfileChat(
+                    npub = "npub1support",
+                    progressHex = "support",
+                    recipientName = "White Noise support",
+                    retryGroupIdHex = "created-group",
+                    createGroup = { error("must not create again") },
+                    loadCreatedChatListItem = { throw MarmotKitException.Runtime("sqlite busy") },
+                    displayName = { it },
+                )
+
             val failure = result as StartChatAttemptResult.Failed
             assertEquals("created-group", failure.error.retryGroupIdHex)
-            assertEquals(AppText.Resource(R.string.error_chat_created_not_loaded), failure.error.detail)
         }
 
     @Test
@@ -304,7 +366,7 @@ class NewChatFlowTest {
                     progressHex = "support",
                     recipientName = "White Noise support",
                     createGroup = { throw MarmotKitException.MissingKeyPackage("support") },
-                    awaitChatListItem = { error("must not await a failed create") },
+                    loadCreatedChatListItem = { error("must not load a failed create") },
                     displayName = { "White Noise support" },
                 )
 

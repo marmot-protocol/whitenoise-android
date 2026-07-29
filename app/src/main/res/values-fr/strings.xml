@@ -614,6 +614,8 @@
     <string name="toast_couldnt_delete_audit_logs">Impossible de supprimer les journaux d’audit</string>
     <string name="toast_no_audit_logs_to_delete">Aucun journal d’audit à supprimer</string>
     <string name="toast_chat_created">Chat créé</string>
+    <string name="group_create_stage_creating">Création du groupe…</string>
+    <string name="group_create_stage_applying_retention">Application des messages éphémères…</string>
     <string name="toast_notification_permission_denied">Autorisation de notification refusée</string>
     <string name="toast_signed_out">Déconnexion</string>
     <string name="group_title_invite_from">Invitation de %1$s</string>
