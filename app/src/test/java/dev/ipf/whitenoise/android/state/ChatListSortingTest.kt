@@ -100,6 +100,34 @@ class ChatListSortingTest {
     }
 
     @Test
+    fun sameSecondDraftTieFallsBackToTitleInsteadOfMessageActivitySequence() {
+        val alpha =
+            item("alpha", latestAt = 10uL, activitySequence = 1uL)
+                .copy(group = group("alpha").copy(name = "Alpha"))
+        val zulu =
+            item("zulu", latestAt = 20uL, activitySequence = 2uL)
+                .copy(group = group("zulu").copy(name = "Zulu"))
+
+        val sorted = sortChatListItems(listOf(zulu, alpha)) { 90uL }
+
+        assertEquals(listOf("alpha", "zulu"), sorted.map { it.id })
+    }
+
+    @Test
+    fun draftAndMessageRecencyTieFallsBackToTitleInsteadOfMessageActivitySequence() {
+        val alpha =
+            item("alpha", latestAt = 10uL, activitySequence = 1uL)
+                .copy(group = group("alpha").copy(name = "Alpha"))
+        val zulu =
+            item("zulu", latestAt = 90uL, activitySequence = 2uL)
+                .copy(group = group("zulu").copy(name = "Zulu"))
+
+        val sorted = sortChatListItems(listOf(zulu, alpha)) { item -> if (item.id == "alpha") 90uL else null }
+
+        assertEquals(listOf("alpha", "zulu"), sorted.map { it.id })
+    }
+
+    @Test
     fun pendingInvitesSortBeforeExistingChats() {
         val sorted =
             sortChatListItems(
@@ -336,6 +364,7 @@ class ChatListSortingTest {
         pending: Boolean = false,
         pinned: Boolean = false,
         pinnedPosition: UInt? = null,
+        activitySequence: ULong = 0uL,
     ): ChatListItem =
         ChatListItem(
             group = group(id, pending = pending),
@@ -355,6 +384,7 @@ class ChatListSortingTest {
                 } else {
                     null
                 },
+            activitySequence = activitySequence,
         )
 
     private fun row(

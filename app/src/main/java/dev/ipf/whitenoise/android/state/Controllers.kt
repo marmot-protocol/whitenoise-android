@@ -307,32 +307,62 @@ data class ChatListItem(
 internal fun sortChatListItems(
     items: List<ChatListItem>,
     draftedAtSeconds: (ChatListItem) -> ULong? = { null },
-): List<ChatListItem> =
-    items.sortedWith(
+): List<ChatListItem> {
+    val draftedAtById = items.associate { item -> item.id to draftedAtSeconds(item) }
+    val recencyTiesWithDraft =
+        items
+            .filter { item -> chatListItemRecencyComesFromDraft(item, draftedAtById[item.id]) }
+            .mapTo(mutableSetOf()) { item -> chatListItemRecencyTie(item, draftedAtById[item.id]) }
+    return items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
             // Pinned block above recency, in the engine's normalized manual
             // order; unpinned rows tie on both keys and fall through to the
             // draft-aware recency chain unchanged.
             .thenByDescending { it.pinned() }
             .thenBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
-            .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtSeconds(it)) }
             // MDK activity timestamps use whole seconds. Preserve arrival order
             // inside a same-second tie so a locally accepted send is already in
-            // its final slot on the first frame after returning to the list.
-            .thenByDescending { it.activitySequence }
-            .thenBy { chatListItemSortKey(it) },
+            // its final slot on the first frame after returning to the list. If
+            // a draft supplies a tied recency, the entire tie falls back to the
+            // stable title key instead of mixing unrelated message sequences.
+            .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtById[it.id]) }
+            .thenByDescending { item ->
+                val recencyTie = chatListItemRecencyTie(item, draftedAtById[item.id])
+                if (recencyTie in recencyTiesWithDraft) 0uL else item.activitySequence
+            }.thenBy { chatListItemSortKey(it) },
     )
+}
 
 // A chat with an unsent draft rises to reflect when drafting began, but only
 // when that is newer than the chat's last activity — a stale draft never
 // outranks a fresher incoming message. Same unix-seconds unit as [latestAt].
 internal fun chatListItemDraftSortAt(
     latestAt: ULong?,
-    draftedAtSeconds: ULong?,
-): ULong {
-    val base = latestAt ?: 0uL
-    return if (draftedAtSeconds != null && draftedAtSeconds > base) draftedAtSeconds else base
-}
+    draftedAt: ULong?,
+): ULong = maxOf(latestAt ?: 0uL, draftedAt ?: 0uL)
+
+private fun chatListItemRecencyComesFromDraft(
+    item: ChatListItem,
+    draftedAt: ULong?,
+): Boolean = draftedAt != null && draftedAt > (item.latestAt ?: 0uL)
+
+private data class ChatListItemRecencyTie(
+    val pendingConfirmation: Boolean,
+    val pinned: Boolean,
+    val pinnedPosition: UInt?,
+    val recency: ULong,
+)
+
+private fun chatListItemRecencyTie(
+    item: ChatListItem,
+    draftedAt: ULong?,
+): ChatListItemRecencyTie =
+    ChatListItemRecencyTie(
+        pendingConfirmation = item.group.pendingConfirmation,
+        pinned = item.pinned(),
+        pinnedPosition = item.pinnedPosition(),
+        recency = chatListItemDraftSortAt(item.latestAt, draftedAt),
+    )
 
 /**
  * Sort tie-breaker key. Mirrors the gating that the UI uses to derive a
@@ -2350,6 +2380,13 @@ private data class OptimisticChatListPreviewState(
     var baselineActivitySequence: ULong,
     val entries: LinkedHashMap<String, OptimisticChatListPreviewEntry> = linkedMapOf(),
     val confirmedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
+    val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
+)
+
+private data class ChatListLastMessageActivity(
+    val activitySortAt: ULong,
+    val timelineAt: ULong?,
+    val messageIdHex: String?,
 )
 
 private data class OptimisticChatListPreviewMatch(
@@ -2421,13 +2458,62 @@ class ChatsController private constructor(
         return nextActivitySequence
     }
 
-    private fun chatListActivityChanged(
+    private fun chatListActivityAdvanced(
         previous: ChatListRowFfi,
         current: ChatListRowFfi,
-    ): Boolean =
-        previous.activitySortAt != current.activitySortAt ||
-            previous.lastMessage?.messageIdHex != current.lastMessage?.messageIdHex ||
-            previous.lastMessage?.timelineAt != current.lastMessage?.timelineAt
+    ): Boolean = compareChatListActivity(previous, current) > 0
+
+    private fun compareChatListActivity(
+        previous: ChatListRowFfi,
+        current: ChatListRowFfi,
+    ): Int {
+        val lastMessageCompare = compareChatListLastMessageActivity(previous, current)
+        return if (lastMessageCompare != 0) {
+            lastMessageCompare
+        } else {
+            current.activitySortAt.compareTo(previous.activitySortAt)
+        }
+    }
+
+    private fun compareChatListLastMessageActivity(
+        previous: ChatListRowFfi,
+        current: ChatListRowFfi,
+    ): Int {
+        val currentLast = current.lastMessage
+        val previousLast = previous.lastMessage
+        return when {
+            currentLast == null && previousLast == null -> 0
+            currentLast == null -> -1
+            previousLast == null -> 1
+            else ->
+                compareTimelineAtMessageIdHex(
+                    currentLast.timelineAt,
+                    currentLast.messageIdHex,
+                    previousLast.timelineAt,
+                    previousLast.messageIdHex,
+                )
+        }
+    }
+
+    private fun rememberBaselineActivitySequence(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+        activitySequence: ULong,
+    ) {
+        val activity = chatListLastMessageActivity(row)
+        state.baselineActivitySequenceByLastMessage.remove(activity)
+        state.baselineActivitySequenceByLastMessage[activity] = activitySequence
+        while (state.baselineActivitySequenceByLastMessage.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+            state.baselineActivitySequenceByLastMessage.remove(state.baselineActivitySequenceByLastMessage.keys.first())
+        }
+    }
+
+    private fun chatListLastMessageActivity(row: ChatListRowFfi): ChatListLastMessageActivity =
+        ChatListLastMessageActivity(
+            activitySortAt = row.activitySortAt,
+            timelineAt = row.lastMessage?.timelineAt,
+            messageIdHex = row.lastMessage?.messageIdHex,
+        )
 
     private fun representsSameChatListActivity(
         optimistic: ChatListMessagePreviewFfi,
@@ -2460,11 +2546,21 @@ class ChatsController private constructor(
         }
     }
 
+    private fun optimisticMatchPrecedesBaseline(
+        match: OptimisticChatListPreviewMatch,
+        baselineActivitySequence: ULong,
+        activityCompare: Int,
+    ): Boolean = match.activitySequence < baselineActivitySequence || activityCompare < 0
+
     private fun foldOptimisticChatListBaseline(
         state: OptimisticChatListPreviewState,
         row: ChatListRowFfi,
+        acceptBackwardActivity: Boolean = false,
     ) {
-        val match = matchingOptimisticPreview(state, row)
+        val activityCompare = compareChatListActivity(state.baselineRow, row)
+        val match =
+            matchingOptimisticPreview(state, row)
+                ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
         val pendingEntryKey = match?.entryKey?.takeIf { state.entries[it]?.confirmedMessageIdHex == null }
         if (pendingEntryKey != null) {
             // The stream can expose the locally committed row before send()
@@ -2473,6 +2569,7 @@ class ChatsController private constructor(
             state.entries[pendingEntryKey] = state.entries.getValue(pendingEntryKey).copy(pendingAuthoritativeRow = row)
             return
         }
+        var acceptRow = true
         if (match != null) {
             // A coalesced snapshot can skip every earlier successful send.
             // Once it confirms this entry, all older full previews are
@@ -2482,16 +2579,42 @@ class ChatsController private constructor(
             // The echo keeps the order assigned when the local send was
             // accepted. If a later authoritative activity already owns the
             // row, consuming this stale echo must not move the row backward.
-            if (match.activitySequence < state.baselineActivitySequence) return
-            state.baselineActivitySequence = match.activitySequence
-        } else if (chatListActivityChanged(state.baselineRow, row)) {
-            state.baselineActivitySequence = nextChatActivitySequence()
-            state.entries.entries.removeAll { (_, entry) ->
-                entry.confirmedMessageIdHex != null &&
-                    entry.activitySequence < state.baselineActivitySequence
+            val staleMatch = optimisticMatchPrecedesBaseline(match, state.baselineActivitySequence, activityCompare)
+            if (staleMatch && !acceptBackwardActivity) {
+                acceptRow = false
+            } else {
+                state.baselineActivitySequence = match.activitySequence
+                rememberBaselineActivitySequence(state, row, match.activitySequence)
+            }
+        } else {
+            val knownActivitySequence =
+                state.baselineActivitySequenceByLastMessage[chatListLastMessageActivity(row)]
+            if (knownActivitySequence != null) {
+                if (knownActivitySequence < state.baselineActivitySequence && !acceptBackwardActivity) {
+                    acceptRow = false
+                } else {
+                    state.baselineActivitySequence = knownActivitySequence
+                    rememberBaselineActivitySequence(state, row, knownActivitySequence)
+                }
+            } else if (activityCompare > 0) {
+                state.baselineActivitySequence = nextChatActivitySequence()
+                rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
+                state.entries.entries.removeAll { (_, entry) ->
+                    entry.confirmedMessageIdHex != null &&
+                        entry.activitySequence < state.baselineActivitySequence
+                }
+            } else if (activityCompare < 0) {
+                if (acceptBackwardActivity) {
+                    state.baselineActivitySequence = 0uL
+                    rememberBaselineActivitySequence(state, row, 0uL)
+                } else {
+                    acceptRow = false
+                }
+            } else {
+                rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
             }
         }
-        state.baselineRow = row
+        if (acceptRow) state.baselineRow = row
     }
 
     private fun materializeOptimisticChatListPreview(
@@ -2867,10 +2990,13 @@ class ChatsController private constructor(
         } else {
             val state =
                 optimisticChatListPreviewByGroup.getOrPut(rowKey) {
+                    val baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL
                     OptimisticChatListPreviewState(
                         baselineRow = row,
-                        baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL,
-                    )
+                        baselineActivitySequence = baselineActivitySequence,
+                    ).also { state ->
+                        rememberBaselineActivitySequence(state, row, baselineActivitySequence)
+                    }
                 }
             state.entries[preview.messageIdHex] =
                 OptimisticChatListPreviewEntry(
@@ -2892,7 +3018,7 @@ class ChatsController private constructor(
         val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
         val entry = state.entries[optimisticMessageIdHex] ?: return
         state.confirmedActivitySequenceById[confirmedMessageIdHex] = entry.activitySequence
-        while (state.confirmedActivitySequenceById.size > MAX_CONFIRMED_CHAT_LIST_PREVIEW_IDS) {
+        while (state.confirmedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
             state.confirmedActivitySequenceById.remove(state.confirmedActivitySequenceById.keys.first())
         }
         state.entries[optimisticMessageIdHex] =
@@ -3158,11 +3284,15 @@ class ChatsController private constructor(
         val membershipChanged = current == null
         if (state == null) {
             chatRowsByGroup[key] = folded
-            if (current == null || chatListActivityChanged(current, folded)) {
+            if (current == null || chatListActivityAdvanced(current, folded)) {
                 activitySequenceByGroup[key] = nextChatActivitySequence()
             }
         } else {
-            foldOptimisticChatListBaseline(state, folded)
+            foldOptimisticChatListBaseline(
+                state,
+                folded,
+                acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+            )
             materializeOptimisticChatListPreview(key, state)
         }
         if (membershipChanged) noteMaterializedGroupMembershipChanged()
@@ -3212,12 +3342,12 @@ class ChatsController private constructor(
                 val sequence =
                     when {
                         previous == null && wasMaterialized -> nextChatActivitySequence()
-                        previous != null && chatListActivityChanged(previous, row) -> nextChatActivitySequence()
+                        previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
                         else -> previousSequences[key] ?: 0uL
                     }
                 activitySequenceByGroup[key] = sequence
             } else {
-                foldOptimisticChatListBaseline(state, row)
+                foldOptimisticChatListBaseline(state, row, acceptBackwardActivity = true)
                 materializeOptimisticChatListPreview(key, state)
             }
         }
@@ -4320,7 +4450,7 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
-private const val MAX_CONFIRMED_CHAT_LIST_PREVIEW_IDS = 64
+private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS = 24
 
 // Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number

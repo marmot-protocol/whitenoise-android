@@ -15,6 +15,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -121,6 +122,39 @@ class OptimisticSentPreviewOrderingTest {
                 ?.lastMessage
                 ?.messageIdHex,
         )
+    }
+
+    @Test
+    fun deletingAnInterveningNewerMessageRestoresThePendingPreview() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "last chat-b", 10uL))
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 30uL).copy(
+                lastMessage =
+                    preview(
+                        "incoming-b",
+                        "newer B",
+                        30uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 10uL).copy(activitySortAt = 30uL, updatedAt = 30uL),
+            ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+        )
+        controller.setChatListVisible(true)
+
+        val chatB = controller.items.single { it.id == "chat-b" }
+        val visiblePreview = chatB.projection?.lastMessage
+        assertEquals("temp-b", visiblePreview?.messageIdHex)
+        assertEquals("last chat-b", visiblePreview?.plaintext)
+        assertEquals(ChatListMessageDeliveryStateFfi.PENDING, visiblePreview?.deliveryState)
     }
 
     @Test
@@ -436,7 +470,7 @@ class OptimisticSentPreviewOrderingTest {
         assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
 
         controller.setChatListVisible(false)
-        controller.applyChatListRow(
+        val authoritativeRow =
             row("chat-b", "Zulu", 20uL).copy(
                 lastMessage =
                     preview(
@@ -445,45 +479,32 @@ class OptimisticSentPreviewOrderingTest {
                         20uL,
                         ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
                     ),
-            ),
-        )
+            )
+        controller.applyChatListRow(authoritativeRow)
         controller.commitOptimisticSentPreview("chat-b", "temp-b", "z-authoritative-b")
+        controller.applyChatListRow(authoritativeRow.copy(activitySortAt = 10uL, updatedAt = 10uL))
         controller.setChatListVisible(true)
 
         assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
-        assertEquals(
-            "z-authoritative-b",
-            controller.items
-                .first()
-                .projection
-                ?.lastMessage
-                ?.messageIdHex,
-        )
+        val projection = controller.items.first().projection
+        assertEquals("z-authoritative-b", projection?.lastMessage?.messageIdHex)
+        assertEquals(20uL, projection?.activitySortAt)
     }
 
     @Test
-    fun newerAuthoritativeRowIsNotClobberedByLateRollback() {
+    fun staleLowerActivitySortAtIsNotRestoredByLateRollback() {
         val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
 
         controller.setChatListVisible(false)
         controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
-        controller.applyChatListRow(
-            row("chat-b", "Zulu", 30uL).copy(
-                lastMessage =
-                    preview(
-                        "z-authoritative-b",
-                        "authoritative B",
-                        30uL,
-                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
-                    ),
-            ),
-        )
+        controller.applyChatListRow(row("chat-b", "Zulu", 10uL).copy(activitySortAt = 30uL, updatedAt = 30uL))
+        controller.applyChatListRow(row("chat-b", "Zulu", 10uL))
         controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
         controller.setChatListVisible(true)
 
         assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
         assertEquals(
-            "z-authoritative-b",
+            "message-chat-b",
             controller.items
                 .first()
                 .projection
@@ -725,6 +746,17 @@ private fun replaceRows(
         .getDeclaredMethod("replaceChatRows", List::class.java)
         .apply { isAccessible = true }
         .invoke(controller, rows)
+}
+
+private fun applySubscriptionChatListRow(
+    controller: ChatsController,
+    row: ChatListRowFfi,
+    trigger: ChatListUpdateTriggerFfi,
+) {
+    ChatsController::class.java
+        .getDeclaredMethod("foldChatRow", ChatListRowFfi::class.java, ChatListUpdateTriggerFfi::class.java)
+        .apply { isAccessible = true }
+        .invoke(controller, row, trigger)
 }
 
 private fun removeAndRestoreChatRow(
