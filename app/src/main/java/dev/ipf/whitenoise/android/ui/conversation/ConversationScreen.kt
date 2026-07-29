@@ -101,11 +101,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -133,6 +135,7 @@ import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
@@ -423,12 +426,27 @@ internal fun ConversationScreen(
     var initialTimelineAnchored by
         remember(controller, notificationOpenRequestId) { mutableStateOf(false) }
 
+    suspend fun ttsEntry(record: AppMessageRecordFfi): TtsSpeakableEntry? =
+        projectTtsSpeakableEntry(
+            message = record,
+            editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
+            senderDisplayName = appState.displayName(record.sender),
+            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+            mentionDisplayName = appState::mentionDisplayName,
+            isGroupMember =
+                if (controller.membersLoaded) {
+                    { bech32 -> appState.isRosterMember(bech32, controller.members) }
+                } else {
+                    null
+                },
+        )
+
     // The current unread backlog as speakable entries, oldest-first and bounded
     // so an inflated unread count can't narrate ancient history. Anchored on
     // the unread cursor — the last-read position — so it never skips
     // loaded-but-unspoken messages; shared by the open-time and
     // return-from-background paths.
-    fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
+    suspend fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
         val ready =
             appState.ttsHasUsableEngine &&
                 appState.isConversationAutoRead(controller.group.groupIdHex) &&
@@ -442,15 +460,7 @@ internal fun ConversationScreen(
                 // Bound BEFORE mapping so the cost scales with the speak cap,
                 // not the unread count; 2x slack absorbs filtered-out entries.
                 .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                .mapNotNull { message ->
-                    val record = message.record
-                    val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
-                    TtsSpeakableEntry(
-                        senderKey = record.sender,
-                        senderDisplayName = appState.displayName(record.sender),
-                        text = text,
-                    )
-                }
+                .mapNotNull { message -> ttsEntry(message.record) }
         }
     }
     // Auto-read (#1483): once the timeline is anchored, read the unread backlog.
@@ -492,15 +502,8 @@ internal fun ConversationScreen(
                 if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
                 val record = controller.timeline.lastOrNull()?.record ?: return@collect
                 if (record.messageIdHex != lastId) return@collect
-                val text = MessageProjector.copyableText(record, null) ?: return@collect
-                appState.appendSpeech(
-                    TtsSpeakableEntry(
-                        senderKey = record.sender,
-                        senderDisplayName = appState.displayName(record.sender),
-                        text = text,
-                    ),
-                    Locale.getDefault(),
-                )
+                val entry = ttsEntry(record) ?: return@collect
+                appState.appendSpeech(entry, Locale.getDefault())
             }
     }
     // Auto-read return-from-background: capture the actual timeline tail when
@@ -551,15 +554,8 @@ internal fun ConversationScreen(
                         // Bound before projecting so a delayed bulk sync cannot
                         // make the resume pass scale with the whole timeline.
                         .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                        .mapNotNull { message ->
-                            val record = message.record
-                            val text = MessageProjector.copyableText(record, null) ?: return@mapNotNull null
-                            TtsSpeakableEntry(
-                                senderKey = record.sender,
-                                senderDisplayName = appState.displayName(record.sender),
-                                text = text,
-                            )
-                        }
+                }.map { messages ->
+                    messages.mapNotNull { message -> ttsEntry(message.record) }
                 }.first { it.isNotEmpty() }
             } ?: return@LaunchedEffect
         // A newly started/manual session owns the transport; never replace it
