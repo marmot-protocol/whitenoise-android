@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -61,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
@@ -426,9 +427,15 @@ internal fun ChatsScreen(
         } ?: false
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
-    // scroll-to-top on tap. Wrapped in key(showArchived) so switching the
-    // active vs. archived view starts a fresh state at the top rather than
-    // carrying a stale scroll anchor across the source-list swap.
+    // scroll-to-top on tap. Archived/active sources own separate state. Folder
+    // and search datasets retain this state so LazyColumn can preserve a valid
+    // keyed anchor and animate shared rows without an unsolicited scroll.
+    val chatListDatasetKey =
+        ChatListDatasetKey(
+            showArchived = showArchived,
+            folderId = selectedFolderId,
+            query = trimmedQuery,
+        )
     val chatListState = key(showArchived) { rememberLazyListState() }
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
@@ -486,6 +493,7 @@ internal fun ChatsScreen(
     ChatListActiveHeadScrollEffect(
         listState = chatListState,
         activeHeadId = activeHeadId,
+        datasetKey = chatListDatasetKey,
         isActiveList = !showArchived,
     )
     val archivedUnreadCount =
@@ -767,8 +775,8 @@ internal fun ChatsScreen(
                             unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
                         )
                     else ->
-                        LazyColumn(Modifier.fillMaxSize(), state = chatListState) {
-                            items(visibleItems, key = { it.id }) { item ->
+                        LazyColumn(Modifier.fillMaxSize().clipToBounds(), state = chatListState) {
+                            itemsIndexed(visibleItems, key = { _, item -> item.id }) { targetIndex, item ->
                                 // Body-match snippet + tap-to-message focus are
                                 // for rows that matched ONLY on an older message
                                 // body. A row that also matches its title or
@@ -790,14 +798,15 @@ internal fun ChatsScreen(
                                     ) {
                                         rawBodyMatch?.takeUnless {
                                             ChatListMessageSearch.titleOrPreviewMatches(
-                                                displayTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                                                displayTitle =
+                                                    chatListItemDisplayTitle(item, appState, groupTitleCopy),
                                                 previewText = item.projectedPreviewText(),
                                                 ciNeedle = ciSearchNeedle,
                                                 description = item.group.description,
                                             )
                                         }
                                     }
-                                Box(modifier = chatListHeadReorderPlacement()) {
+                                Box(modifier = chatListRowMotion(targetIndex)) {
                                     ChatListRow(
                                         item = item,
                                         appState = appState,
