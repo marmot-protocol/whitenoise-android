@@ -2,9 +2,17 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
+import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
+import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
+import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
+import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -27,6 +35,54 @@ import org.junit.Test
  * composer immediately.
  */
 class ConversationComposerGateTest {
+    @Test
+    fun conversationFrameReadyCanBeRecordedBeforeComposerReady() {
+        var state = ChatCreateOpenConversationTimingState()
+
+        assertNull(
+            "composer readiness must not complete timing before the first conversation frame",
+            chatCreateOpenConversationTimingStage(state, ChatCreateOpenConversationTimingEvent.ComposerReady),
+        )
+        state =
+            reduceChatCreateOpenConversationTiming(
+                state,
+                ChatCreateOpenConversationTimingEvent.ComposerReady,
+            )
+        assertFalse(state.composerReadyMarked)
+        assertEquals(
+            ChatCreateOpenTiming.STAGE_CONVERSATION_FRAME_READY,
+            chatCreateOpenConversationTimingStage(
+                state,
+                ChatCreateOpenConversationTimingEvent.ConversationFrameCommitted,
+            ),
+        )
+        state =
+            reduceChatCreateOpenConversationTiming(
+                state,
+                ChatCreateOpenConversationTimingEvent.ConversationFrameCommitted,
+            )
+        assertTrue(state.frameReadyMarked)
+        assertFalse(state.composerReadyMarked)
+        assertNull(
+            chatCreateOpenConversationTimingStage(
+                state,
+                ChatCreateOpenConversationTimingEvent.ConversationFrameCommitted,
+            ),
+        )
+
+        assertEquals(
+            ChatCreateOpenTiming.STAGE_COMPOSER_READY,
+            chatCreateOpenConversationTimingStage(state, ChatCreateOpenConversationTimingEvent.ComposerReady),
+        )
+        state =
+            reduceChatCreateOpenConversationTiming(
+                state,
+                ChatCreateOpenConversationTimingEvent.ComposerReady,
+            )
+        assertTrue(state.frameReadyMarked)
+        assertTrue(state.composerReadyMarked)
+    }
+
     @Test
     fun unrecoverableGroupShowsFrozenNoticeBeforeOtherGates() {
         assertEquals(

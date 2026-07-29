@@ -2011,6 +2011,60 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
     )
 
 /**
+ * Build a conversation-open [ChatListItem] from a targeted authoritative
+ * [groupDetails] read. Used immediately after create returns a canonical group
+ * id, before the broad chat-list subscription materializes a row (#1729).
+ */
+internal fun chatListItemFromAuthoritativeGroupDetails(
+    details: GroupDetailsFfi,
+    activeAccountIdHex: String?,
+): ChatListItem {
+    val applied = applyAuthoritativeGroupDetails(details)
+    val members = applied.members
+    return ChatListItem(
+        group = applied.group,
+        latest = null,
+        otherMemberAccount = GroupProjector.otherMemberAccount(members, activeAccountIdHex),
+        memberCount = GroupProjector.uniqueMemberCount(members),
+        memberSnapshot = members.let(::GroupMemberSnapshot),
+        projection = null,
+    )
+}
+
+/**
+ * When a provisional open (no chat-list row yet) is already foregrounded,
+ * upgrade [open] to the authoritative projected row exactly once when it
+ * arrives — no second navigation event and no duplicate list row.
+ */
+internal fun reconcileOpenChatWithAuthoritativeRow(
+    open: ChatListItem,
+    authoritative: ChatListItem,
+): ChatListItem? =
+    when {
+        !open.group.groupIdHex.equals(authoritative.group.groupIdHex, ignoreCase = true) -> null
+        open.projection != null -> null
+        authoritative.projection == null -> null
+        else -> authoritative
+    }
+
+/**
+ * Upgrade a provisional foreground open using the live chat-list backing row,
+ * without waiting for the frozen [ChatsController.items] snapshot while the
+ * list is hidden behind an open conversation (#1729).
+ */
+internal fun reconcileProvisionalOpenChat(
+    open: ChatListItem,
+    chatsController: ChatsController,
+): ChatListItem? {
+    if (open.projection != null) return null
+    val authoritative =
+        chatsController
+            .chatItemForGroup(open.group.groupIdHex)
+            ?.takeIf { it.projection != null }
+    return authoritative?.let { reconcileOpenChatWithAuthoritativeRow(open, it) }
+}
+
+/**
  * Returns true when a pushed group record should pay the forced OpenMLS replay
  * before reading group details.
  *
@@ -2264,6 +2318,15 @@ class ChatsController(
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
     var boundAccountRef by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Monotonic signal for [chatRowsByGroup] membership changes. Incremented when
+     * a group id is added, removed, or replaced by snapshot — not on in-place
+     * row updates — so foreground provisional opens can reconcile against live
+     * backing rows while [items] stays frozen behind an open conversation (#1729).
+     */
+    var materializedGroupsRevision by mutableStateOf(0L)
         private set
 
     private var accountRef: String? = null
@@ -2783,9 +2846,7 @@ class ChatsController(
     }
 
     // Lightweight membership probe over the raw rows — no per-row ChatListItem
-    // projection. awaitChatListItem's poll loop uses this to test whether a
-    // freshly created group has surfaced yet without rebuilding the whole
-    // projected list on every 50ms tick.
+    // projection.
     fun containsGroup(groupIdHex: String): Boolean = chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
 
     /**
@@ -2825,7 +2886,9 @@ class ChatsController(
             )
         }
         if (folded == current) return
+        val membershipChanged = current == null
         chatRowsByGroup[key] = folded
+        if (membershipChanged) noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
     }
 
@@ -2849,13 +2912,23 @@ class ChatsController(
     }
 
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
+        val previousKeys = chatRowsByGroup.keys.toSet()
         chatRowsByGroup.clear()
         rows.forEach { row -> chatRowsByGroup[chatRowKey(row.groupIdHex)] = row }
+        if (previousKeys != chatRowsByGroup.keys.toSet()) {
+            noteMaterializedGroupMembershipChanged()
+        }
     }
 
     private fun removeChatRow(groupIdHex: String) {
-        chatRowsByGroup.remove(chatRowKey(groupIdHex))
-        scheduleRecompute()
+        if (chatRowsByGroup.remove(chatRowKey(groupIdHex)) != null) {
+            noteMaterializedGroupMembershipChanged()
+            scheduleRecompute()
+        }
+    }
+
+    private fun noteMaterializedGroupMembershipChanged() {
+        materializedGroupsRevision += 1L
     }
 
     /**

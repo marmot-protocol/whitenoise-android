@@ -605,6 +605,8 @@
     <string name="toast_couldnt_delete_audit_logs">无法删除审计日志</string>
     <string name="toast_no_audit_logs_to_delete">没有可删除的审计日志</string>
     <string name="toast_chat_created">聊天已创建</string>
+    <string name="group_create_stage_creating">正在创建群组…</string>
+    <string name="group_create_stage_applying_retention">正在应用阅后即焚…</string>
     <string name="toast_notification_permission_denied">通知权限被拒绝</string>
     <string name="toast_signed_out">退出登录</string>
     <string name="group_title_invite_from">来自 %1$s 的邀请</string>

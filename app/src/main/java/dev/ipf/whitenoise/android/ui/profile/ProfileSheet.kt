@@ -363,6 +363,7 @@ internal fun ProfileSheet(
         val progressHex = hex ?: return
         startChatError = null
         creatingChat = true
+        appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
                 when (
@@ -373,8 +374,10 @@ internal fun ProfileSheet(
                             recipientName = displayTitle,
                             retryGroupIdHex = retryGroupIdHex,
                             createGroup = appState::createProfileChatGroup,
-                            awaitChatListItem = appState::awaitChatListItem,
+                            loadCreatedChatListItem = appState::loadCreatedChatListItem,
                             displayName = appState::displayName,
+                            markCreateOpenStage = appState::markChatCreateOpenStage,
+                            abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
                     is StartChatAttemptResult.Open -> onOpenGroup(result.item, true)

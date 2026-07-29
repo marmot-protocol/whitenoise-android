@@ -614,6 +614,8 @@
     <string name="toast_couldnt_delete_audit_logs">Prüfprotokolle konnten nicht gelöscht werden</string>
     <string name="toast_no_audit_logs_to_delete">Keine Prüfprotokolle zum Löschen vorhanden</string>
     <string name="toast_chat_created">Chat erstellt</string>
+    <string name="group_create_stage_creating">Gruppe wird erstellt…</string>
+    <string name="group_create_stage_applying_retention">Verschwindende Nachrichten werden angewendet…</string>
     <string name="toast_notification_permission_denied">Benachrichtigungsberechtigung verweigert</string>
     <string name="toast_signed_out">Abmelden</string>
     <string name="group_title_invite_from">Einladung von %1$s</string>
