@@ -468,6 +468,39 @@ object MentionComposer {
         candidates: List<Candidate>,
     ): ChipVisualText = visualText(text, candidatesByNpub(candidates))
 
+    /**
+     * Build mention visuals for the editable composer.
+     *
+     * A length-changing [VisualTransformation] is unsafe when a chip reaches
+     * the end of the backing text: the caret at the original end maps to the
+     * transformed text length, and Compose can ask its paragraph for a
+     * character box at that exclusive offset while drawing the cursor. Keep
+     * terminal chips untransformed until another character (normally the
+     * picker's trailing space) follows them. This also makes persisted drafts
+     * containing a manually pasted terminal `@npub…` safe to restore.
+     */
+    fun editingVisualText(
+        text: String,
+        candidates: List<Candidate>,
+    ): ChipVisualText = editingVisualText(text, candidatesByNpub(candidates))
+
+    fun editingVisualText(
+        text: String,
+        candidatesByNpub: Map<String, Candidate>,
+    ): ChipVisualText {
+        val terminalChip = chipRanges(text).lastOrNull()?.takeIf { it.last + 1 == text.length }
+        if (terminalChip != null) {
+            val safePrefix = text.substring(0, terminalChip.first)
+            val prefixVisual = visualText(safePrefix, candidatesByNpub)
+            return ChipVisualText(
+                text = prefixVisual.text + text.substring(terminalChip.first),
+                ranges = prefixVisual.ranges,
+                originalLength = text.length,
+            )
+        }
+        return visualText(text, candidatesByNpub)
+    }
+
     fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> = candidates.associateBy { it.npub.lowercase(Locale.ROOT) }
 
     fun visualText(
