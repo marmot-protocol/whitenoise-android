@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,8 +19,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
+import dev.ipf.whitenoise.android.ui.chats.ChatRowLayout
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPreviewLine
-import dev.ipf.whitenoise.android.ui.chats.ChatRowTrailingContent
+import dev.ipf.whitenoise.android.ui.chats.ChatRowSupportingMetadata
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -68,7 +68,12 @@ private fun PreviewScenario(
     scenario: PreviewScenarioModel,
     timestampAt: ULong,
 ) {
-    ListItem(
+    ChatRowLayout(
+        title = scenario.title,
+        timestampAt = timestampAt,
+        rowHasUnread = scenario.unreadCount > 0uL,
+        selectionMode = scenario.selectionMode,
+        selected = scenario.selected,
         leadingContent = {
             Surface(
                 modifier = Modifier.size(44.dp),
@@ -80,7 +85,6 @@ private fun PreviewScenario(
                 }
             }
         },
-        headlineContent = { Text(scenario.title) },
         supportingContent = {
             if (scenario.bodySearch) {
                 Text(scenario.preview, maxLines = 1)
@@ -92,17 +96,21 @@ private fun PreviewScenario(
                 )
             }
         },
-        trailingContent = {
-            ChatRowTrailingContent(
-                selectionMode = scenario.selectionMode,
-                selected = scenario.selected,
-                timestampAt = timestampAt,
-                pendingConfirmation = false,
-                rowHasUnread = scenario.unreadCount > 0uL,
-                rowUnreadCount = scenario.unreadCount,
-                unreadMention = scenario.unreadMention,
-            )
-        },
+        supportingMetadata =
+            if (scenario.unreadCount > 0uL) {
+                {
+                    ChatRowSupportingMetadata(
+                        pendingConfirmation = false,
+                        rowHasUnread = true,
+                        rowUnreadCount = scenario.unreadCount,
+                        unreadMention = scenario.unreadMention,
+                        actionColors = null,
+                        pinned = false,
+                    )
+                }
+            } else {
+                null
+            },
     )
 }
 

@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.view.RoundedCorner
+import android.view.View
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +36,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.media.RecentMediaStrip
@@ -64,6 +72,61 @@ internal class ComposerAttachmentSheetState {
 @Composable
 internal fun rememberComposerAttachmentSheetState(): ComposerAttachmentSheetState = remember { ComposerAttachmentSheetState() }
 
+internal data class ComposerAttachmentPaneBottomCorners(
+    val start: Dp,
+    val end: Dp,
+)
+
+internal fun composerAttachmentPaneBottomCorners(
+    bottomLeftRadiusPx: Int,
+    bottomRightRadiusPx: Int,
+    density: Float,
+    layoutDirection: LayoutDirection,
+): ComposerAttachmentPaneBottomCorners {
+    val safeDensity = density.takeIf { it > 0f } ?: 1f
+    val left = (bottomLeftRadiusPx.coerceAtLeast(0) / safeDensity).dp
+    val right = (bottomRightRadiusPx.coerceAtLeast(0) / safeDensity).dp
+    return when (layoutDirection) {
+        LayoutDirection.Ltr -> ComposerAttachmentPaneBottomCorners(start = left, end = right)
+        LayoutDirection.Rtl -> ComposerAttachmentPaneBottomCorners(start = right, end = left)
+    }
+}
+
+@Composable
+private fun rememberComposerAttachmentPaneBottomCorners(): ComposerAttachmentPaneBottomCorners {
+    val view = LocalView.current
+    val density = LocalDensity.current.density
+    val layoutDirection = LocalLayoutDirection.current
+    var physicalRadii by remember(view) {
+        mutableStateOf(readBottomRoundedCornerRadii(view))
+    }
+
+    DisposableEffect(view) {
+        val listener =
+            View.OnLayoutChangeListener { changedView, _, _, _, _, _, _, _, _ ->
+                physicalRadii = readBottomRoundedCornerRadii(changedView)
+            }
+        view.addOnLayoutChangeListener(listener)
+        physicalRadii = readBottomRoundedCornerRadii(view)
+        view.requestApplyInsets()
+        onDispose { view.removeOnLayoutChangeListener(listener) }
+    }
+
+    return composerAttachmentPaneBottomCorners(
+        bottomLeftRadiusPx = physicalRadii.first,
+        bottomRightRadiusPx = physicalRadii.second,
+        density = density,
+        layoutDirection = layoutDirection,
+    )
+}
+
+private fun readBottomRoundedCornerRadii(view: View): Pair<Int, Int> {
+    val insets = view.rootWindowInsets
+    val bottomLeft = insets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)?.radius ?: 0
+    val bottomRight = insets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT)?.radius ?: 0
+    return bottomLeft to bottomRight
+}
+
 @Composable
 internal fun ComposerAttachmentSheetPane(
     alpha: Float,
@@ -76,8 +139,12 @@ internal fun ComposerAttachmentSheetPane(
     onShareUser: (() -> Unit)?,
     onShareContact: (() -> Unit)?,
     onComingSoon: () -> Unit,
+    bottomCornersOverride: ComposerAttachmentPaneBottomCorners? = null,
     modifier: Modifier = Modifier,
 ) {
+    val platformBottomCorners = rememberComposerAttachmentPaneBottomCorners()
+    val bottomCorners = bottomCornersOverride ?: platformBottomCorners
+
     Surface(
         modifier =
             modifier
@@ -85,18 +152,24 @@ internal fun ComposerAttachmentSheetPane(
                 .heightIn(min = minimumHeight)
                 .clipToBounds()
                 .alpha(alpha),
+        shape =
+            RoundedCornerShape(
+                topStart = 0.dp,
+                topEnd = 0.dp,
+                bottomStart = bottomCorners.start,
+                bottomEnd = bottomCorners.end,
+            ),
         color = MaterialTheme.colorScheme.surface,
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
-        // Flush inline pane matching the emoji picker — no rounded corners or
-        // drag handle — so it reads as the same composer surface, not a floating
-        // modal. Height wraps the two tile rows rather than matching the
-        // keyboard, so the sheet is only as tall as it needs to be (no dead
-        // space below). During an IME-to-pane handoff, [minimumHeight] follows
-        // the shrinking keyboard inset so the composer moves only once, in
-        // lockstep with the system animation, before settling at this natural
-        // content height.
+        // The top edge stays flush with the composer while the bottom edge
+        // follows the physical display corners. Height wraps the two tile rows
+        // rather than matching the keyboard, so the sheet is only as tall as it
+        // needs to be (no dead space below). During an IME-to-pane handoff,
+        // [minimumHeight] follows the shrinking keyboard inset so the composer
+        // moves only once, in lockstep with the system animation, before
+        // settling at this natural content height.
         Column(
             modifier =
                 Modifier

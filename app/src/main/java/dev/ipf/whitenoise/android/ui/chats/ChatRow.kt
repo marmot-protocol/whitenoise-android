@@ -6,9 +6,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +19,6 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -56,12 +52,9 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
-import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
-import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
-import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
@@ -195,9 +188,17 @@ internal fun ChatRow(
                 Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
             else -> Modifier.clickable(onClick = onClick)
         }
+    val pinned = item.pinned()
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || pinned
+    val actionColors = accountActionColors(appState)
     Box(modifier = rowModifier) {
-        ListItem(
+        ChatRowLayout(
             modifier = Modifier.fillMaxWidth(),
+            title = title,
+            timestampAt = timestampAt,
+            rowHasUnread = rowHasUnread,
+            selectionMode = selectionMode,
+            selected = selected,
             leadingContent = {
                 Box(
                     modifier =
@@ -235,10 +236,7 @@ internal fun ChatRow(
                     }
                 }
             },
-            headlineContent = {
-                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            supportingContent = {
+            supportingContent = supportingContent@{
                 val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
                 // Tokens only ever describe the last message's body, so they're
                 // ignored whenever the line shows something else (invite copy,
@@ -301,19 +299,21 @@ internal fun ChatRow(
                     )
                 }
             },
-            trailingContent = {
-                ChatRowTrailingContent(
-                    selectionMode = selectionMode,
-                    selected = selected,
-                    timestampAt = timestampAt,
-                    pendingConfirmation = item.group.pendingConfirmation,
-                    rowHasUnread = rowHasUnread,
-                    rowUnreadCount = rowUnreadCount,
-                    unreadMention = item.unreadMention,
-                    actionColors = accountActionColors(appState),
-                    pinned = item.pinned(),
-                )
-            },
+            supportingMetadata =
+                if (hasSupportingMetadata) {
+                    {
+                        ChatRowSupportingMetadata(
+                            pendingConfirmation = item.group.pendingConfirmation,
+                            rowHasUnread = rowHasUnread,
+                            rowUnreadCount = rowUnreadCount,
+                            unreadMention = item.unreadMention,
+                            actionColors = actionColors,
+                            pinned = pinned,
+                        )
+                    }
+                } else {
+                    null
+                },
         )
         if (selectionMode) {
             Box(
@@ -377,64 +377,6 @@ internal fun ChatRowPreviewLine(
                             indicator = indicator,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                }
-            }
-        }
-    }
-}
-
-internal fun chatRowSelectionIcon(selected: Boolean): ImageVector = selectionRowIcon(selected)
-
-@Composable
-internal fun ChatRowTrailingContent(
-    selectionMode: Boolean,
-    selected: Boolean,
-    timestampAt: ULong,
-    pendingConfirmation: Boolean,
-    rowHasUnread: Boolean,
-    rowUnreadCount: ULong,
-    unreadMention: Boolean,
-    actionColors: dev.ipf.whitenoise.android.ui.common.AccountActionColors? = null,
-    pinned: Boolean = false,
-) {
-    if (selectionMode) {
-        Icon(
-            imageVector = chatRowSelectionIcon(selected),
-            // The clickable row already exposes selected semantics. Keeping the
-            // visual indicator decorative avoids a second TalkBack announcement.
-            contentDescription = null,
-            tint =
-                if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.size(24.dp),
-        )
-    } else {
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                rememberedRelativeTime(timestampAt),
-                style = MaterialTheme.typography.labelSmall,
-                color =
-                    if (rowHasUnread) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-            if (pendingConfirmation) {
-                Badge { Text(stringResource(R.string.invited)) }
-            } else if (rowHasUnread || pinned) {
-                // Surface the highest-signal unread: an @ badge beside the
-                // count when one of the unread messages mentions you (#611).
-                // A pinned chat keeps its glyph visible beside the badges.
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (pinned) PinnedBadge()
-                    if (rowHasUnread) {
-                        if (unreadMention) MentionBadge()
-                        UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
                     }
                 }
             }
