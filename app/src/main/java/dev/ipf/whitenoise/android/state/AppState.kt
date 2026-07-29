@@ -1176,6 +1176,11 @@ private data class AccountActionColorSlot(
     val theme: BubbleTheme,
 )
 
+private data class PendingAccountSwitchTrace(
+    val accountRef: String,
+    val startedAtMs: Long,
+)
+
 class WhiteNoiseAppState private constructor(
     context: Context,
     val draftStore: DraftStore,
@@ -1812,6 +1817,8 @@ class WhiteNoiseAppState private constructor(
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var accountCatchUpJob: Job? = null
+    private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
     // in-flight profile refresh captures it at start and discards its result if
@@ -2535,6 +2542,16 @@ class WhiteNoiseAppState private constructor(
         catchUpAccountsBestEffort()
     }
 
+    /**
+     * Starts one process-lifetime catch-up after a chat list has rendered its
+     * local snapshot. A blocked relay call must not block that controller's live
+     * consumers, and rapid rebinds can share the same all-account catch-up.
+     */
+    internal fun launchCatchUpAccounts() {
+        if (accountCatchUpJob?.isActive == true) return
+        accountCatchUpJob = notificationScope.launch { catchUpAccounts() }
+    }
+
     private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatchingCancellable { marmotIo { catchUpAccounts() } }
             .onFailure {
@@ -3128,7 +3145,18 @@ class WhiteNoiseAppState private constructor(
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
 
-    suspend fun setActiveAccount(label: String) {
+    suspend fun setActiveAccount(
+        label: String,
+        onActivated: () -> Unit = {},
+    ) {
+        val switchingAccounts = label != activeAccountRef
+        if (switchingAccounts && BuildConfig.DEBUG) {
+            pendingAccountSwitchTrace =
+                PendingAccountSwitchTrace(
+                    accountRef = label,
+                    startedAtMs = SystemClock.elapsedRealtime(),
+                )
+        }
         // Account switch: drop in-process plaintext so account A's bytes
         // aren't reachable from account B's UI loops, but keep L2 (disk)
         // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
@@ -3138,7 +3166,7 @@ class WhiteNoiseAppState private constructor(
         // wipes disk; switching is just a UI context flip.
         // Skip the wipe when the label is unchanged (no-op tap on the
         // already-active account).
-        if (label != activeAccountRef) {
+        if (switchingAccounts) {
             clearInMemoryMediaCaches()
             clearCrossAccountCaches()
             clearConversationShortcutSurfaces()
@@ -3156,10 +3184,29 @@ class WhiteNoiseAppState private constructor(
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         reloadMediaAutoDownloadMatrix()
+        // This is the local-ready boundary for account switching. UI callers can
+        // dismiss/reset navigation now, while the process-lifetime mutation keeps
+        // the profile/privacy/notification/push work below alive in the background.
+        onActivated()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         configurePrivacyRuntime()
         refreshLocalNotificationSettings()
         syncNativePushRegistrationIfEnabled()
+    }
+
+    /**
+     * Records switch-to-first-local-frame latency without logging an account id.
+     * A stale controller cannot finish a newer switch's trace.
+     */
+    internal fun recordAccountSwitchLocalSnapshotRendered(
+        accountRef: String,
+        rowCount: Int,
+    ) {
+        val trace = pendingAccountSwitchTrace ?: return
+        if (trace.accountRef != accountRef || activeAccountRef != accountRef) return
+        pendingAccountSwitchTrace = null
+        val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
     }
 
     /**
