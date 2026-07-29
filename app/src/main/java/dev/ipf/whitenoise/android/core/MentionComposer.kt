@@ -490,9 +490,11 @@ object MentionComposer {
     ): ChipVisualText {
         val terminalChip = chipRanges(text).lastOrNull()?.takeIf { it.last + 1 == text.length }
         if (terminalChip != null) {
+            val safePrefix = text.substring(0, terminalChip.first)
+            val prefixVisual = visualText(safePrefix, candidatesByNpub)
             return ChipVisualText(
-                text = text,
-                ranges = emptyList(),
+                text = prefixVisual.text + text.substring(terminalChip.first),
+                ranges = prefixVisual.ranges,
                 originalLength = text.length,
             )
         }
