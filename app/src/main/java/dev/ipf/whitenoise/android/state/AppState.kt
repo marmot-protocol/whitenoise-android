@@ -5719,8 +5719,9 @@ class WhiteNoiseAppState private constructor(
 
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        // This is called from render/timeline projection paths, so do not synchronously
-        // probe the Rust profile cache here. The refresh job owns the binding work.
+        // Always materialize the local SQLite record independently of relay freshness.
+        // This only schedules off-main binding work; render/timeline callers stay non-blocking.
+        ensureProfileMaterialized(id)
         if (!profileRefreshGate.tryStart(id, System.currentTimeMillis())) return
         // Snapshot the cache epoch now, before the job is queued. A switch or
         // sign-out can clear the caches in the gap before this coroutine starts,
@@ -6750,8 +6751,9 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "applyProfilePresentation" }
         val (changed, shouldPreWarm) =
             synchronized(profilePresentationLock) {
-                profile?.let { userProfiles.put(accountIdHex, it) }
-                val changed = profilePresentations.put(accountIdHex, presentation) != presentation
+                val profileChanged = profile?.let { userProfiles.put(accountIdHex, it) != it } ?: false
+                val presentationChanged = profilePresentations.put(accountIdHex, presentation) != presentation
+                val changed = profileChanged || presentationChanged
                 if (presentation.displayName != null) notificationDisplayNameHints.remove(accountIdHex)
                 val shouldPreWarm =
                     presentation.avatarUrl != null && pendingAvatarPreWarmAccountIds.remove(accountIdHex)

@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.ScopedSet
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -124,6 +125,60 @@ class ShareChatPickerSheetProfileTest {
     }
 
     @Test
+    fun aliasOnlyProfileUpdateRefreshesActiveSearch() {
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            deliverProfile(
+                appState,
+                PEER_A,
+                profile(displayName = "Alice Example", name = "old_alias"),
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithText(app.getString(R.string.share_search_chats))
+            .performClick()
+            .performTextInput("new_alias")
+        composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            deliverProfile(
+                appState,
+                PEER_A,
+                profile(displayName = "Alice Example", name = "new_alias"),
+            )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsNotDisplayed()
+    }
+
+    @Test
+    fun profileRequestStartsLocalMaterializationBeforeRelayRefresh() {
+        val appState = emptyAppState()
+        var materializationStarted = false
+
+        composeRule.runOnIdle {
+            appState.requestProfile(PEER_A)
+            materializationStarted = profileMaterializationInFlight(appState, PEER_A)
+        }
+
+        assertTrue("Local profile materialization must start without waiting for relay refresh", materializationStarted)
+    }
+
+    @Test
     fun unresolvedTargetUsesStableConversationFallback() {
         val appState = appStateWithUnresolvedChat(GROUP_A)
         val fallback = "${app.getString(R.string.unknown)} · ${IdentityFormatter.short(GROUP_A)}"
@@ -213,14 +268,7 @@ class ShareChatPickerSheetProfileTest {
     ): WhiteNoiseAppState = appStateWithDirectChats(groupId to peerId)
 
     private fun appStateWithDirectChats(vararg chats: Pair<String, String>): WhiteNoiseAppState {
-        val appState =
-            WhiteNoiseAppState(
-                context = app,
-                draftStore = DraftStore(InMemoryDraftPersistence()),
-                accountIdHexResolver = { null },
-                accounts = listOf(activeAccount()),
-                activeAccountRef = ACCOUNT_REF,
-            )
+        val appState = emptyAppState()
         val controller = ChatsController(appState)
         bindAccount(controller)
         chats.forEach { (groupId, _) -> controller.applyChatListRow(chatRow(groupId)) }
@@ -235,20 +283,22 @@ class ShareChatPickerSheetProfileTest {
     }
 
     private fun appStateWithUnresolvedChat(groupId: String): WhiteNoiseAppState {
-        val appState =
-            WhiteNoiseAppState(
-                context = app,
-                draftStore = DraftStore(InMemoryDraftPersistence()),
-                accountIdHexResolver = { null },
-                accounts = listOf(activeAccount()),
-                activeAccountRef = ACCOUNT_REF,
-            )
+        val appState = emptyAppState()
         val controller = ChatsController(appState)
         bindAccount(controller)
         controller.applyChatListRow(chatRow(groupId))
         appState.attachChatsController(controller)
         return appState
     }
+
+    private fun emptyAppState() =
+        WhiteNoiseAppState(
+            context = app,
+            draftStore = DraftStore(InMemoryDraftPersistence()),
+            accountIdHexResolver = { null },
+            accounts = listOf(activeAccount()),
+            activeAccountRef = ACCOUNT_REF,
+        )
 
     private fun bindAccount(controller: ChatsController) {
         val field = ChatsController::class.java.getDeclaredField("accountRef").apply { isAccessible = true }
@@ -276,15 +326,30 @@ class ShareChatPickerSheetProfileTest {
             .invoke(appState, accountIdHex, profile, presentation)
     }
 
-    private fun profile(displayName: String) =
-        UserProfileMetadataFfi(
-            name = displayName.lowercase(),
-            displayName = displayName,
-            about = null,
-            picture = null,
-            nip05 = null,
-            lud16 = null,
-        )
+    private fun profileMaterializationInFlight(
+        appState: WhiteNoiseAppState,
+        accountIdHex: String,
+    ): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        val materializingProfiles =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("materializingProfiles")
+                .apply { isAccessible = true }
+                .get(appState) as ScopedSet<String>
+        return accountIdHex in materializingProfiles
+    }
+
+    private fun profile(
+        displayName: String,
+        name: String = displayName.lowercase(),
+    ) = UserProfileMetadataFfi(
+        name = name,
+        displayName = displayName,
+        about = null,
+        picture = null,
+        nip05 = null,
+        lud16 = null,
+    )
 
     private fun activeAccount() =
         AccountSummaryFfi(
