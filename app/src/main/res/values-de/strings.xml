@@ -455,6 +455,7 @@
     <string name="published">Veröffentlicht</string>
     <string name="no_key_packages_found">Keine Schlüsselpakete gefunden</string>
     <string name="no_key_packages_found_help">Lokal ist nichts zwischengespeichert und von der Relay-Liste dieses Kontos wurden keine Schlüsselpaket-Ereignisse zurückgegeben. Versuchen Sie &quot;Neu veröffentlichen&quot;.</string>
+    <string name="retained_key_packages_not_published_help">Zurückbehaltenes lokales Schlüsselpaketmaterial wird automatisch verwaltet und nicht auf Relays veröffentlicht.</string>
     <string name="delete_key_package_question">Schlüsselpaket löschen?</string>
     <string name="delete_key_package_help">Veröffentlicht ein Löschereignis für dieses Schlüsselpaket und löscht es aus dem lokalen Cache.</string>
     <string name="event_value">Ereignis: %1$s</string>

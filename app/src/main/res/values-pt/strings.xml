@@ -455,6 +455,7 @@
     <string name="published">Publicado</string>
     <string name="no_key_packages_found">Nenhum pacote de chaves encontrado</string>
     <string name="no_key_packages_found_help">Nada está em cache localmente e a lista de relays desta conta não retornou eventos de pacote de chaves. Tente &quot;Publicar novo&quot;.</string>
+    <string name="retained_key_packages_not_published_help">O material local retido do pacote de chaves é gerenciado automaticamente e não é publicado em relays.</string>
     <string name="delete_key_package_question">Excluir pacote de chaves?</string>
     <string name="delete_key_package_help">Publica um evento de exclusão para este pacote de chaves e o limpa do cache local.</string>
     <string name="event_value">Evento: %1$s</string>
