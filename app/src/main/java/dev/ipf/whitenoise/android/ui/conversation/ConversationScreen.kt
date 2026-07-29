@@ -121,7 +121,8 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
+import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
+import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -129,8 +130,10 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
+import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
+import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.shouldFocusComposerOnDraftRestore
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
@@ -2590,24 +2593,42 @@ internal fun ConversationScreen(
             disbanding = controller.group.disbanding,
             disbanded = controller.group.disbanded,
         )
+    var createOpenConversationTiming by remember(chat.id) {
+        mutableStateOf(ChatCreateOpenConversationTimingState())
+    }
     LaunchedEffect(chat.id) {
         if (!appState.hasActiveChatCreateOpenTiming()) return@LaunchedEffect
-        snapshotFlow {
-            conversationComposerGate(
-                pendingInvite = controller.group.pendingConfirmation,
-                membersVerified = controller.membersVerified,
-                isSelfMember = controller.isSelfMember,
-                seededSelfMember = controller.seededSelfMember,
-                seededMembershipKnown = controller.seededMembershipKnown,
-                assumeMemberUntilVerified = notificationOpenRequestId != 0L,
-                unrecoverable = controller.group.unrecoverable,
-                disbanding = controller.group.disbanding,
-                disbanded = controller.group.disbanded,
-            )
-        }.first { it == ComposerGate.COMPOSER }
         withFrameNanos { }
-        appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_CONVERSATION_FRAME_READY)
-        appState.completeChatCreateOpenTiming(ChatCreateOpenTiming.STAGE_COMPOSER_READY)
+        val stage =
+            chatCreateOpenConversationTimingStage(
+                createOpenConversationTiming,
+                ChatCreateOpenConversationTimingEvent.ConversationFrameCommitted,
+            )
+        if (stage != null) {
+            appState.markChatCreateOpenStage(stage)
+            createOpenConversationTiming =
+                reduceChatCreateOpenConversationTiming(
+                    createOpenConversationTiming,
+                    ChatCreateOpenConversationTimingEvent.ConversationFrameCommitted,
+                )
+        }
+    }
+    LaunchedEffect(chat.id, composerGate, createOpenConversationTiming.frameReadyMarked) {
+        if (!appState.hasActiveChatCreateOpenTiming()) return@LaunchedEffect
+        if (composerGate != ComposerGate.COMPOSER) return@LaunchedEffect
+        val stage =
+            chatCreateOpenConversationTimingStage(
+                createOpenConversationTiming,
+                ChatCreateOpenConversationTimingEvent.ComposerReady,
+            )
+        if (stage != null) {
+            appState.completeChatCreateOpenTiming(stage)
+            createOpenConversationTiming =
+                reduceChatCreateOpenConversationTiming(
+                    createOpenConversationTiming,
+                    ChatCreateOpenConversationTimingEvent.ComposerReady,
+                )
+        }
     }
     val mentionPicker =
         rememberConversationMentionPickerState(

@@ -83,18 +83,22 @@ private suspend fun applyNewGroupRetentionIfNeeded(
     retentionSecs: Long,
     isRetryLoad: Boolean,
     onStage: (NewGroupCreateStage?) -> Unit,
-) {
-    if (retentionSecs <= 0L || isRetryLoad) return
+): GroupRetentionApplyOutcome {
+    if (retentionSecs <= 0L || isRetryLoad) return GroupRetentionApplyOutcome.Skipped
     // Applied post-create because the create commit has no retention parameter;
     // a failure leaves the group usable with the default (off) window.
     onStage(NewGroupCreateStage.ApplyingRetention)
-    runCatchingCancellable {
+    return runCatchingCancellable {
         appState.withGroupCommitLock(account, groupIdHex) {
             appState.marmotIo { updateMessageRetention(account, groupIdHex, retentionSecs.toULong()) }
         }
-    }.onFailure {
-        appState.present(R.string.toast_disappearing_not_applied, copyable = true)
-    }
+    }.fold(
+        onSuccess = { GroupRetentionApplyOutcome.Applied },
+        onFailure = {
+            appState.present(R.string.toast_disappearing_not_applied, copyable = true)
+            GroupRetentionApplyOutcome.Failed
+        },
+    )
 }
 
 private suspend fun runNewGroupCreateMutation(
@@ -135,18 +139,20 @@ private suspend fun runNewGroupCreateMutation(
                     return
                 }
         onRetryGroupId(groupIdHex)
-        applyNewGroupRetentionIfNeeded(
-            appState = appState,
-            account = account,
-            groupIdHex = groupIdHex,
-            retentionSecs = retentionSecs,
-            isRetryLoad = isRetryLoad,
-            onStage = onStage,
-        )
+        val retentionOutcome =
+            applyNewGroupRetentionIfNeeded(
+                appState = appState,
+                account = account,
+                groupIdHex = groupIdHex,
+                retentionSecs = retentionSecs,
+                isRetryLoad = isRetryLoad,
+                onStage = onStage,
+            )
         openCreatedGroupAfterCanonicalCreate(
             appState = appState,
             groupIdHex = groupIdHex,
             showCreatedToast = !isRetryLoad,
+            retentionOutcome = retentionOutcome,
             onOpenConversation = onOpenConversation,
             onRetryGroupIdCleared = onRetryGroupIdCleared,
             onAuthoritativeReadFailed = onAuthoritativeReadFailed,
@@ -161,13 +167,12 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     appState: WhiteNoiseAppState,
     groupIdHex: String,
     showCreatedToast: Boolean,
+    retentionOutcome: GroupRetentionApplyOutcome,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
     onRetryGroupIdCleared: () -> Unit,
     onAuthoritativeReadFailed: (Throwable) -> Unit,
 ) {
-    if (showCreatedToast) {
-        appState.present(R.string.toast_chat_created)
-    }
+    groupCreateSuccessToastResId(showCreatedToast, retentionOutcome)?.let { appState.present(it) }
     runCatchingCancellable {
         val item = appState.loadCreatedChatListItem(groupIdHex)
         onRetryGroupIdCleared()
@@ -190,6 +195,7 @@ internal fun NewGroupSetupScreen(
     members: List<RecipientSearch.Candidate>,
     onBack: () -> Unit,
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
+    initialRetryGroupIdHex: String? = null,
 ) {
     var groupName by rememberSaveable { mutableStateOf("") }
     var retentionSecs by rememberSaveable { mutableLongStateOf(0L) }
@@ -199,7 +205,7 @@ internal fun NewGroupSetupScreen(
     var imagePreparing by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var createStage by remember { mutableStateOf<NewGroupCreateStage?>(null) }
-    var retryGroupIdHex by rememberSaveable { mutableStateOf<String?>(null) }
+    var retryGroupIdHex by rememberSaveable { mutableStateOf(initialRetryGroupIdHex) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val imagePreview = rememberImageUploadPreview(imageDraft)
@@ -213,11 +219,13 @@ internal fun NewGroupSetupScreen(
             pendingRecipient = "",
             groupName = groupName,
         )
+    val setupUi = newGroupSetupUiState(retryGroupIdHex, canCreate, busy)
+    val setupMessage = setupUi.statusResId?.let { stringResource(it) } ?: error
 
     fun create(retryLoadGroupIdHex: String? = null) {
         // canCreate is a composition-time snapshot; the direct `busy` state
         // read blocks a second tap that lands before recomposition.
-        if (busy || !canCreate) return
+        if (!canStartNewGroupCreateAttempt(busy, canCreate, retryLoadGroupIdHex)) return
         val account = appState.activeAccountRef ?: return
         val isRetryLoad = retryLoadGroupIdHex != null
         val recipients =
@@ -293,16 +301,16 @@ internal fun NewGroupSetupScreen(
         floatingActionButton = {
             Surface(
                 onClick = { create(retryLoadGroupIdHex = retryGroupIdHex) },
-                enabled = canCreate,
+                enabled = setupUi.submitEnabled,
                 shape = FloatingActionButtonDefaults.extendedFabShape,
                 color =
-                    if (canCreate) {
+                    if (setupUi.submitEnabled) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerHighest
                     },
                 contentColor =
-                    if (canCreate) {
+                    if (setupUi.submitEnabled) {
                         MaterialTheme.colorScheme.onPrimaryContainer
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
@@ -319,7 +327,7 @@ internal fun NewGroupSetupScreen(
                         Icon(Icons.Default.Check, contentDescription = null)
                     }
                     Spacer(Modifier.size(Dimens.spaceSm))
-                    Text(stringResource(R.string.create))
+                    Text(stringResource(setupUi.fabLabelResId))
                 }
             }
         },
@@ -353,7 +361,7 @@ internal fun NewGroupSetupScreen(
                             Modifier
                                 .size(72.dp)
                                 .clickable(
-                                    enabled = !busy && !imagePreparing,
+                                    enabled = setupUi.detailsEditable && !busy && !imagePreparing,
                                     onClickLabel = editImageLabel,
                                     role = Role.Button,
                                 ) { showImagePicker = true },
@@ -411,7 +419,7 @@ internal fun NewGroupSetupScreen(
                         onValueChange = { groupName = it },
                         label = { Text(stringResource(R.string.group_name)) },
                         singleLine = true,
-                        enabled = !busy,
+                        enabled = setupUi.detailsEditable && !busy,
                         colors =
                             TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -423,7 +431,7 @@ internal fun NewGroupSetupScreen(
                     )
                 }
             }
-            error?.let { message ->
+            setupMessage?.let { message ->
                 item {
                     SelectionContainer {
                         Text(
@@ -454,7 +462,7 @@ internal fun NewGroupSetupScreen(
                     icon = Icons.Default.Schedule,
                     title = stringResource(R.string.disappearing_messages),
                     value = disappearingMessagesLabel(retentionSecs),
-                    enabled = !busy,
+                    enabled = setupUi.detailsEditable && !busy,
                     onClick = { showRetentionPicker = true },
                 )
             }

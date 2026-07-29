@@ -20,9 +20,11 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.canStartNewGroupCreateAttempt
 import dev.ipf.whitenoise.android.ui.chats.newchat.canSubmitNewChatSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.groupContainsResolvedMember
 import dev.ipf.whitenoise.android.ui.chats.newchat.newChatMemberRefs
+import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupSetupUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewAllowsSubmit
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewState
@@ -37,6 +39,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NewChatFlowTest {
+    @Test
+    fun newGroupSetupAfterCanonicalCreateFailureShowsRetryOpenSurface() {
+        val retryState =
+            newGroupSetupUiState(
+                retryGroupIdHex = "created-group",
+                canCreate = false,
+                busy = false,
+            )
+
+        assertEquals(R.string.retry, retryState.fabLabelResId)
+        assertEquals(R.string.error_chat_created_not_loaded, retryState.statusResId)
+        assertFalse(retryState.detailsEditable)
+        assertTrue(retryState.submitEnabled)
+
+        val createState =
+            newGroupSetupUiState(
+                retryGroupIdHex = null,
+                canCreate = true,
+                busy = false,
+            )
+        assertEquals(R.string.create, createState.fabLabelResId)
+        assertEquals(null, createState.statusResId)
+        assertTrue(createState.detailsEditable)
+    }
+
+    @Test
+    fun canonicalGroupRetryCanStartWithoutCreateFormEligibility() {
+        assertTrue(
+            canStartNewGroupCreateAttempt(
+                busy = false,
+                canCreate = false,
+                retryGroupIdHex = "created-group",
+            ),
+        )
+        assertFalse(
+            canStartNewGroupCreateAttempt(
+                busy = true,
+                canCreate = false,
+                retryGroupIdHex = "created-group",
+            ),
+        )
+    }
+
     @Test
     fun groupCreateRequiresNameButNoRecipients() {
         assertTrue(
