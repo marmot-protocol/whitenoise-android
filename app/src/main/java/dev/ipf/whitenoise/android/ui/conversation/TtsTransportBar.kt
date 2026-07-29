@@ -37,8 +37,9 @@ import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 /**
  * Read-aloud transport strip rendered beneath the conversation's top bar in
  * every top-bar state (default, selection, search): speech continues through
- * all of them, so the controls must too. Sentence-granular progress only —
- * no scrub gesture, since the framework offers no utterance-internal seek.
+ * all of them, so the controls must too. Message-level navigation with
+ * sentence-granular pause/resume — no scrub gesture, since the framework
+ * offers no utterance-internal seek.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -85,7 +86,7 @@ internal fun TtsTransportBar(
                     if (current is TtsState.Error) {
                         stringResource(R.string.tts_bar_error)
                     } else {
-                        appState.ttsNowPlayingPreview.orEmpty()
+                        current.messagePreview
                     }
                 if (preview.isNotBlank()) {
                     Text(
@@ -102,11 +103,11 @@ internal fun TtsTransportBar(
                     )
                 }
                 if (current !is TtsState.Error) {
-                    val chunkCount = ttsChunkCount(current)
-                    val chunkIndex = ttsChunkIndex(current)
-                    if (chunkCount > 0) {
+                    val messageCount = ttsMessageCount(current)
+                    val messageIndex = ttsMessageIndex(current)
+                    if (messageCount > 0) {
                         LinearProgressIndicator(
-                            progress = { chunkIndex.toFloat() / chunkCount },
+                            progress = { (messageIndex + 1).toFloat() / messageCount },
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         )
                     }
@@ -124,20 +125,20 @@ internal fun TtsTransportBar(
     }
 }
 
-internal fun ttsChunkIndex(state: TtsState): Int =
+internal fun ttsMessageIndex(state: TtsState): Int =
     when (state) {
-        is TtsState.Speaking -> state.chunkIndex
-        is TtsState.Paused -> state.chunkIndex
-        is TtsState.Error -> state.chunkIndex
-        is TtsState.Idle -> state.chunkIndex
+        is TtsState.Speaking -> state.messageIndex
+        is TtsState.Paused -> state.messageIndex
+        is TtsState.Error -> state.messageIndex
+        is TtsState.Idle -> state.messageIndex
     }
 
-internal fun ttsChunkCount(state: TtsState): Int =
+internal fun ttsMessageCount(state: TtsState): Int =
     when (state) {
-        is TtsState.Speaking -> state.chunkCount
-        is TtsState.Paused -> state.chunkCount
-        is TtsState.Error -> state.chunkCount
-        is TtsState.Idle -> state.chunkCount
+        is TtsState.Speaking -> state.messageCount
+        is TtsState.Paused -> state.messageCount
+        is TtsState.Error -> state.messageCount
+        is TtsState.Idle -> state.messageCount
     }
 
 /** Cycles the preset list; from the System default it starts at 1×. */

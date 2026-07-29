@@ -87,7 +87,6 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.ttsAutoReadScript
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -659,7 +658,7 @@ internal fun MessageBubble(
         } else {
             appState.speakAloudAutoRead(
                 controller.group.groupIdHex,
-                ttsAutoReadScript(entries),
+                entries,
                 java.util.Locale.getDefault(),
             )
         }

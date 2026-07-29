@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
@@ -63,6 +64,42 @@ class TtsChunkerTest {
 
         assertTrue(chunks.all { it.text.length <= 8 })
         assertEquals(text, chunks.joinToString("", transform = TtsChunk::text))
+    }
+
+    @Test
+    fun leadingChunkReserveShrinksOnlyTheFirstOutputChunk() {
+        val text = "alpha beta gamma delta epsilon zeta eta theta"
+        val reserve = 10
+        val maxChunkLength = 20
+
+        val chunks =
+            TtsChunker.chunk(
+                text = text,
+                locale = Locale.US,
+                maxChunkLength = maxChunkLength,
+                leadingChunkReserve = reserve,
+            )
+
+        val firstChunkLimit = maxChunkLength - reserve
+        assertTrue(chunks.size > 1)
+        assertTrue(chunks.first().text.length <= firstChunkLimit)
+        assertTrue(chunks.drop(1).all { it.text.length <= maxChunkLength })
+        assertTrue(chunks.drop(1).any { it.text.length > firstChunkLimit })
+        assertEquals(text, chunks.joinToString(" ", transform = TtsChunk::text))
+    }
+
+    @Test
+    fun leadingChunkReserveMustLeaveRoomForSpeech() {
+        listOf(20, 21).forEach { reserve ->
+            assertThrows(IllegalArgumentException::class.java) {
+                TtsChunker.chunk(
+                    text = "speech",
+                    locale = Locale.US,
+                    maxChunkLength = 20,
+                    leadingChunkReserve = reserve,
+                )
+            }
+        }
     }
 
     @Test

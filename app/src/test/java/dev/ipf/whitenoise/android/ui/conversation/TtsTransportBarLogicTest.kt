@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.TtsError
+import dev.ipf.whitenoise.android.audio.tts.errorTts
+import dev.ipf.whitenoise.android.audio.tts.idleTts
+import dev.ipf.whitenoise.android.audio.tts.pausedTts
+import dev.ipf.whitenoise.android.audio.tts.speakingTts
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -33,8 +37,14 @@ class TtsTransportBarLogicTest {
     }
 
     @Test
-    fun chunkPositionReadsEveryStateVariant() {
-        assertEquals(3, ttsChunkIndex(TtsState.Speaking(chunkIndex = 3, chunkCount = 8)))
-        assertEquals(8, ttsChunkCount(TtsState.Paused(chunkIndex = 3, chunkCount = 8)))
+    fun messagePositionReadsEveryStateVariant() {
+        assertEquals(2, ttsMessageIndex(speakingTts(3, 8, 2, 5, "Preview")))
+        assertEquals(5, ttsMessageCount(speakingTts(3, 8, 2, 5, "Preview")))
+        assertEquals(2, ttsMessageIndex(pausedTts(3, 8, 2, 5, "Preview")))
+        assertEquals(5, ttsMessageCount(pausedTts(3, 8, 2, 5, "Preview")))
+        assertEquals(3, ttsMessageIndex(errorTts(TtsError.Synthesis, 4, 8, 3, 5, "Preview")))
+        assertEquals(5, ttsMessageCount(errorTts(TtsError.Synthesis, 4, 8, 3, 5, "Preview")))
+        assertEquals(4, ttsMessageIndex(idleTts(8, 8, 4, 5, "Preview")))
+        assertEquals(5, ttsMessageCount(idleTts(8, 8, 4, 5, "Preview")))
     }
 }

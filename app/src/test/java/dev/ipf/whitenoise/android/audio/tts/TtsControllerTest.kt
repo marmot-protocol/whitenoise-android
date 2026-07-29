@@ -20,12 +20,21 @@ class TtsControllerTest {
         assertEquals(1, focus.acquireCalls)
         assertEquals(Locale.US, engine.locale)
         assertEquals(listOf("First sentence.", "Second sentence."), engine.spoken.map { it.text })
-        assertEquals(TtsState.Speaking(chunkIndex = 0, chunkCount = 2), controller.state.value)
+        assertEquals(
+            speakingTts(0, 2, 0, 1, "First sentence. Second sentence."),
+            controller.state.value,
+        )
 
         engine.complete(0)
-        assertEquals(TtsState.Speaking(chunkIndex = 1, chunkCount = 2), controller.state.value)
+        assertEquals(
+            speakingTts(1, 2, 0, 1, "First sentence. Second sentence."),
+            controller.state.value,
+        )
         engine.complete(1)
-        assertEquals(TtsState.Idle(chunkIndex = 2, chunkCount = 2), controller.state.value)
+        assertEquals(
+            idleTts(2, 2, 1, 1, "First sentence. Second sentence."),
+            controller.state.value,
+        )
         assertEquals(1, focus.releaseCalls)
     }
 
@@ -40,14 +49,42 @@ class TtsControllerTest {
 
         focus.loseFocus()
 
-        assertEquals(TtsState.Paused(chunkIndex = 1, chunkCount = 2), controller.state.value)
+        assertEquals(
+            pausedTts(1, 2, 0, 1, "First. Second."),
+            controller.state.value,
+        )
         assertEquals(1, focus.releaseCalls)
 
         controller.resume()
 
         assertEquals(2, focus.acquireCalls)
-        assertEquals(TtsState.Speaking(chunkIndex = 1, chunkCount = 2), controller.state.value)
+        assertEquals(
+            speakingTts(1, 2, 0, 1, "First. Second."),
+            controller.state.value,
+        )
         assertEquals("Second.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun skipNextWhilePausedReacquiresFocusAndStartsNextMessage() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First."),
+                TtsSpeakableEntry("bob", "Bob", "Second."),
+            ),
+            Locale.US,
+        )
+        controller.pause()
+
+        controller.skipNext()
+
+        assertEquals(2, focus.acquireCalls)
+        assertEquals(speakingTts(1, 2, 1, 2, "Second."), controller.state.value)
+        assertEquals("Bob: Second.", engine.spoken.last().text)
     }
 
     @Test
@@ -60,7 +97,10 @@ class TtsControllerTest {
 
         engine.fail(0, TextToSpeech.ERROR_NETWORK)
 
-        assertEquals(TtsState.Error(TtsError.Network, chunkIndex = 0, chunkCount = 1), controller.state.value)
+        assertEquals(
+            errorTts(TtsError.Network, 0, 1, 0, 1, "One."),
+            controller.state.value,
+        )
         assertEquals(1, focus.releaseCalls)
     }
 
@@ -115,7 +155,10 @@ class TtsControllerTest {
         assertFalse(controller.speak("One.", Locale.US))
 
         assertTrue(engine.spoken.isEmpty())
-        assertEquals(TtsState.Error(TtsError.Synthesis, chunkIndex = 0, chunkCount = 1), controller.state.value)
+        assertEquals(
+            errorTts(TtsError.Synthesis, 0, 1, 0, 1, "One."),
+            controller.state.value,
+        )
         assertEquals(1, focus.acquireCalls)
         assertEquals(1, focus.releaseCalls)
     }
@@ -134,7 +177,10 @@ class TtsControllerTest {
         controller.speak("New one. New two.", Locale.US)
         staleCompletion?.invoke(staleId)
 
-        assertEquals(TtsState.Speaking(chunkIndex = 0, chunkCount = 2), controller.state.value)
+        assertEquals(
+            speakingTts(0, 2, 0, 1, "New one. New two."),
+            controller.state.value,
+        )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })
     }
 
@@ -146,7 +192,7 @@ class TtsControllerTest {
         val controller =
             TtsController(
                 audioFocus = focus,
-                chunkText = { text, locale -> TtsChunker.chunk(text, locale, maxChunkLength = 4_000) },
+                maxChunkLength = 4_000,
                 speechRate = { rate },
             )
         controller.attachEngine(engine)
@@ -163,7 +209,27 @@ class TtsControllerTest {
         // At the boundary the remaining chunks re-queue with the new rate.
         assertEquals(1.5f, engine.appliedRates.last())
         assertEquals("Second sentence.", engine.spoken.last().text)
-        assertEquals(TtsState.Speaking(chunkIndex = 1, chunkCount = 2), controller.state.value)
+        assertEquals(
+            speakingTts(1, 2, 0, 1, "First sentence. Second sentence."),
+            controller.state.value,
+        )
+    }
+
+    @Test
+    fun naturalPlaybackDoesNotRepeatAnUnchangedSenderAnnouncement() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First."),
+                TtsSpeakableEntry("ALICE", "Alice", "Second."),
+            ),
+            Locale.US,
+        )
+
+        assertEquals(listOf("Alice: First.", "Second."), engine.spoken.map { it.text })
     }
 
     @Test
@@ -173,14 +239,86 @@ class TtsControllerTest {
         controller.attachEngine(engine)
         controller.speak("First. Second.", Locale.US)
 
-        assertTrue(controller.appendSpeech("Third.", Locale.US))
+        assertTrue(controller.appendSpeech(TtsSpeakableEntry("", "", "Third."), Locale.US))
 
-        assertEquals(TtsState.Speaking(chunkIndex = 0, chunkCount = 3), controller.state.value)
+        assertEquals(
+            speakingTts(0, 3, 0, 2, "First. Second."),
+            controller.state.value,
+        )
         assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.map { it.text })
         engine.complete(0)
         engine.complete(1)
         engine.complete(2)
-        assertEquals(TtsState.Idle(chunkIndex = 3, chunkCount = 3), controller.state.value)
+        assertEquals(idleTts(3, 3, 2, 2, "Third."), controller.state.value)
+    }
+
+    @Test
+    fun appendRejectsBlankEntryWithoutChangingActiveQueue() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        controller.speak("One.", Locale.US)
+        val stateBeforeAppend = controller.state.value
+
+        assertFalse(controller.appendSpeech(TtsSpeakableEntry("bob", "Bob", "   "), Locale.US))
+
+        assertEquals(stateBeforeAppend, controller.state.value)
+        assertEquals(listOf("One."), engine.spoken.map { it.text })
+    }
+
+    @Test
+    fun everyFinalEnginePayloadStaysWithinMaxSpeechInputLength() {
+        val maxLen = 30
+        val displayName = "Alexandra"
+        val announcementPrefix = "$displayName: "
+        val longBody = "alpha beta gamma delta epsilon zeta eta theta iota"
+        val engine = FakeTtsSpeechEngine()
+        val controller =
+            TtsController(
+                audioFocus = FakeTtsAudioFocus(),
+                maxChunkLength = maxLen,
+            )
+        controller.attachEngine(engine)
+
+        controller.speak(
+            listOf(TtsSpeakableEntry("alice", "  $displayName  ", longBody)),
+            Locale.US,
+        )
+        val initialPayloads = engine.spoken.map { it.text }
+        assertTrue(
+            "initial playback must keep every engine payload within the limit",
+            initialPayloads.all { it.length <= maxLen },
+        )
+        assertEquals(longBody, bodyTextFromEnginePayloads(initialPayloads, displayName))
+        assertTrue(initialPayloads.size > 1)
+        assertTrue(initialPayloads.first().startsWith(announcementPrefix))
+
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", displayName, "First bit."),
+                TtsSpeakableEntry("alice", displayName, "Second bit."),
+            ),
+            Locale.US,
+        )
+        val naturalPayloads = engine.spoken.drop(initialPayloads.size).map { it.text }
+        assertEquals(listOf("$displayName: First bit.", "Second bit."), naturalPayloads)
+
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", displayName, "Skip me."),
+                TtsSpeakableEntry("alice", displayName, longBody),
+            ),
+            Locale.US,
+        )
+        val beforeJumpCount = engine.spoken.size
+        controller.skipNext()
+        val jumpPayloads = engine.spoken.drop(beforeJumpCount).map { it.text }
+        assertTrue(
+            "message jumps must keep every engine payload within the limit",
+            jumpPayloads.all { it.length <= maxLen },
+        )
+        assertEquals(longBody, bodyTextFromEnginePayloads(jumpPayloads, displayName))
+        assertTrue(jumpPayloads.first().startsWith(announcementPrefix))
     }
 
     @Test
@@ -189,15 +327,25 @@ class TtsControllerTest {
         val controller = controller(FakeTtsAudioFocus())
         controller.attachEngine(engine)
 
-        assertFalse(controller.appendSpeech("Orphan.", Locale.US))
+        assertFalse(controller.appendSpeech(TtsSpeakableEntry("", "", "Orphan."), Locale.US))
         assertTrue(engine.spoken.isEmpty())
     }
 
     private fun controller(focus: FakeTtsAudioFocus): TtsController =
         TtsController(
             audioFocus = focus,
-            chunkText = { text, locale -> TtsChunker.chunk(text, locale, maxChunkLength = 4_000) },
+            maxChunkLength = 4_000,
         )
+
+    private fun bodyTextFromEnginePayloads(
+        payloads: List<String>,
+        displayName: String,
+    ): String {
+        val prefix = "$displayName: "
+        return payloads.joinToString(" ") { payload ->
+            if (payload.startsWith(prefix)) payload.removePrefix(prefix) else payload
+        }
+    }
 
     private data class Spoken(
         val text: String,

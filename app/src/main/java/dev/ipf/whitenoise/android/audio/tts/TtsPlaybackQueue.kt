@@ -8,26 +8,41 @@ import kotlinx.coroutines.flow.asStateFlow
 sealed interface TtsState {
     val chunkIndex: Int
     val chunkCount: Int
+    val messageIndex: Int
+    val messageCount: Int
+    val messagePreview: String
 
     data class Idle(
         override val chunkIndex: Int = 0,
         override val chunkCount: Int = 0,
+        override val messageIndex: Int = 0,
+        override val messageCount: Int = 0,
+        override val messagePreview: String = "",
     ) : TtsState
 
     data class Speaking(
         override val chunkIndex: Int,
         override val chunkCount: Int,
+        override val messageIndex: Int,
+        override val messageCount: Int,
+        override val messagePreview: String,
     ) : TtsState
 
     data class Paused(
         override val chunkIndex: Int,
         override val chunkCount: Int,
+        override val messageIndex: Int,
+        override val messageCount: Int,
+        override val messagePreview: String,
     ) : TtsState
 
     data class Error(
         val error: TtsError,
         override val chunkIndex: Int,
         override val chunkCount: Int,
+        override val messageIndex: Int,
+        override val messageCount: Int,
+        override val messagePreview: String,
     ) : TtsState
 }
 
@@ -37,7 +52,7 @@ enum class TtsError {
 }
 
 /**
- * Pure sentence-queue state machine. The Android TTS owner supplies the two
+ * Pure message-aware sentence queue. The Android TTS owner supplies the two
  * engine operations so queue/progress behavior remains deterministic in tests.
  */
 internal class TtsPlaybackQueue(
@@ -48,10 +63,14 @@ internal class TtsPlaybackQueue(
     private val _state = MutableStateFlow<TtsState>(TtsState.Idle())
     val state: StateFlow<TtsState> = _state.asStateFlow()
 
+    private var messages: List<TtsQueuedMessage> = emptyList()
     private var chunks: List<TtsChunk> = emptyList()
+    private var messageFirstChunkIndex: IntArray = intArrayOf()
     private var currentIndex = 0
     private var generation = 0L
     private var refreshAtNextBoundary = false
+    private var announceSenderForCurrentMessage = false
+    private var senderAnnouncedAtMessageIndex: Int? = null
 
     /**
      * Applies changed enqueue-time parameters (speech rate) at the next chunk
@@ -63,12 +82,14 @@ internal class TtsPlaybackQueue(
         if (_state.value is TtsState.Speaking) refreshAtNextBoundary = true
     }
 
-    fun start(chunks: List<TtsChunk>) {
+    fun start(messages: List<TtsQueuedMessage>) {
         stopEngine()
         generation += 1
         refreshAtNextBoundary = false
-        this.chunks = chunks
+        replaceMessages(messages)
         currentIndex = 0
+        announceSenderForCurrentMessage = false
+        senderAnnouncedAtMessageIndex = null
         if (chunks.isEmpty()) {
             _state.value = TtsState.Idle()
             return
@@ -77,31 +98,29 @@ internal class TtsPlaybackQueue(
     }
 
     /**
-     * Extends an active queue with more sentences (auto-read live
+     * Extends an active queue with more messages (auto-read live
      * continuation). No-op when idle or errored — appending must never
      * resurrect a finished session. While speaking, the new chunks enqueue
      * immediately behind the engine's pending utterances; while paused,
      * resume() re-enqueues everything from the current index anyway.
      */
-    fun append(moreChunks: List<TtsChunk>): Boolean {
+    fun append(moreMessages: List<TtsQueuedMessage>): Boolean {
         val current = _state.value
         val active = current is TtsState.Speaking || current is TtsState.Paused
-        if (moreChunks.isEmpty() || !active) return false
-        val base = chunks.size
-        val reindexed = moreChunks.mapIndexed { offset, chunk -> chunk.copy(index = base + offset) }
-        chunks = chunks + reindexed
+        if (moreMessages.isEmpty() || !active) return false
+        val appended = appendMessages(moreMessages)
         if (current is TtsState.Speaking) {
-            _state.value = TtsState.Speaking(currentIndex, chunks.size)
-            for (chunk in reindexed) {
+            publishSpeaking(currentIndex)
+            for (chunk in appended) {
                 val utteranceId = utteranceId(generation, chunk.index)
-                val result = enqueue(chunk, utteranceId)
+                val result = enqueue(spokenChunk(chunk), utteranceId)
                 if (result != TextToSpeech.SUCCESS) {
                     onError(utteranceId, result)
                     break
                 }
             }
         } else {
-            _state.value = TtsState.Paused(currentIndex, chunks.size)
+            publishPaused(currentIndex)
         }
         return true
     }
@@ -109,8 +128,17 @@ internal class TtsPlaybackQueue(
     fun failBeforePlayback(
         error: TtsError,
         chunkCount: Int,
+        messageCount: Int = 0,
+        messagePreview: String = "",
     ) {
-        fail(error = error, chunkIndex = 0, chunkCount = chunkCount)
+        fail(
+            error = error,
+            chunkIndex = 0,
+            chunkCount = chunkCount,
+            messageIndex = 0,
+            messageCount = messageCount,
+            messagePreview = messagePreview,
+        )
     }
 
     fun pause() {
@@ -118,42 +146,66 @@ internal class TtsPlaybackQueue(
         stopEngine()
         generation += 1
         currentIndex = speaking.chunkIndex
-        _state.value = TtsState.Paused(currentIndex, chunks.size)
+        publishPaused(currentIndex)
     }
 
     fun resume() {
         val paused = _state.value as? TtsState.Paused ?: return
         currentIndex = paused.chunkIndex
+        announceSenderForCurrentMessage = false
+        // The previous engine queue was stopped by pause(). Recompute sender
+        // narration when the paused sentence is the first chunk of a message;
+        // otherwise a changed speaker can resume without their announcement.
+        senderAnnouncedAtMessageIndex = null
         enqueueFromCurrentIndex()
     }
 
     fun stop() {
         stopEngine()
         generation += 1
+        messages = emptyList()
         chunks = emptyList()
+        messageFirstChunkIndex = intArrayOf()
         currentIndex = 0
+        announceSenderForCurrentMessage = false
+        senderAnnouncedAtMessageIndex = null
         _state.value = TtsState.Idle()
     }
 
     fun skipNext() {
         if (_state.value !is TtsState.Speaking && _state.value !is TtsState.Paused) return
-        val next = currentIndex + 1
-        if (next >= chunks.size) {
+        val currentMessage = messageIndexForChunk(currentIndex)
+        val nextMessage = currentMessage + 1
+        if (nextMessage >= messages.size) {
             stopEngine()
             generation += 1
             val completedCount = chunks.size
+            val completedMessages = messages.size
+            val lastPreview = messages.lastOrNull()?.preview.orEmpty()
+            messages = emptyList()
             chunks = emptyList()
+            messageFirstChunkIndex = intArrayOf()
             currentIndex = completedCount
-            _state.value = TtsState.Idle(completedCount, completedCount)
+            announceSenderForCurrentMessage = false
+            _state.value =
+                TtsState.Idle(
+                    chunkIndex = completedCount,
+                    chunkCount = completedCount,
+                    messageIndex = completedMessages,
+                    messageCount = completedMessages,
+                    messagePreview = lastPreview,
+                )
             onTerminal()
             return
         }
-        requeueFrom(next)
+        requeueFrom(firstChunkIndexOfMessage(nextMessage), announceSender = true)
     }
 
     fun skipPrevious() {
         if (_state.value !is TtsState.Speaking && _state.value !is TtsState.Paused) return
-        requeueFrom((currentIndex - 1).coerceAtLeast(0))
+        val currentMessage = messageIndexForChunk(currentIndex)
+        val previousMessage = (currentMessage - 1).coerceAtLeast(0)
+        requeueFrom(firstChunkIndexOfMessage(previousMessage), announceSender = true)
     }
 
     fun onDone(utteranceId: String?) {
@@ -162,16 +214,29 @@ internal class TtsPlaybackQueue(
         val next = completedIndex + 1
         if (next >= chunks.size) {
             val completedCount = chunks.size
+            val completedMessages = messages.size
+            val lastPreview = messages.lastOrNull()?.preview.orEmpty()
+            messages = emptyList()
             chunks = emptyList()
+            messageFirstChunkIndex = intArrayOf()
             currentIndex = completedCount
-            _state.value = TtsState.Idle(completedCount, completedCount)
+            announceSenderForCurrentMessage = false
+            _state.value =
+                TtsState.Idle(
+                    chunkIndex = completedCount,
+                    chunkCount = completedCount,
+                    messageIndex = completedMessages,
+                    messageCount = completedMessages,
+                    messagePreview = lastPreview,
+                )
             onTerminal()
         } else {
             currentIndex = next
-            _state.value = TtsState.Speaking(currentIndex, chunks.size)
+            announceSenderForCurrentMessage = false
+            publishSpeaking(currentIndex)
             if (refreshAtNextBoundary) {
                 refreshAtNextBoundary = false
-                requeueFrom(next)
+                requeueFrom(next, announceSender = false)
             }
         }
     }
@@ -190,27 +255,46 @@ internal class TtsPlaybackQueue(
 
                 else -> TtsError.Synthesis
             }
-        fail(error = error, chunkIndex = failedIndex, chunkCount = chunks.size)
+        val messageIndex = messageIndexForChunk(failedIndex)
+        fail(
+            error = error,
+            chunkIndex = failedIndex,
+            chunkCount = chunks.size,
+            messageIndex = messageIndex,
+            messageCount = messages.size,
+            messagePreview = messages.getOrNull(messageIndex)?.preview.orEmpty(),
+        )
     }
 
     private fun fail(
         error: TtsError,
         chunkIndex: Int,
         chunkCount: Int,
+        messageIndex: Int,
+        messageCount: Int,
+        messagePreview: String,
     ) {
         stopEngine()
         generation += 1
+        messages = emptyList()
         chunks = emptyList()
+        messageFirstChunkIndex = intArrayOf()
         currentIndex = chunkIndex
-        _state.value = TtsState.Error(error, chunkIndex, chunkCount)
+        announceSenderForCurrentMessage = false
+        _state.value = TtsState.Error(error, chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
         onTerminal()
     }
 
-    private fun requeueFrom(index: Int) {
+    private fun requeueFrom(
+        index: Int,
+        announceSender: Boolean,
+    ) {
         stopEngine()
         generation += 1
         refreshAtNextBoundary = false
         currentIndex = index
+        announceSenderForCurrentMessage = announceSender
+        senderAnnouncedAtMessageIndex = null
         enqueueFromCurrentIndex()
     }
 
@@ -219,15 +303,101 @@ internal class TtsPlaybackQueue(
             _state.value = TtsState.Idle()
             return
         }
-        _state.value = TtsState.Speaking(currentIndex, chunks.size)
+        publishSpeaking(currentIndex)
         for (chunk in chunks.drop(currentIndex)) {
             val utteranceId = utteranceId(generation, chunk.index)
-            val result = enqueue(chunk, utteranceId)
+            val result = enqueue(spokenChunk(chunk), utteranceId)
             if (result != TextToSpeech.SUCCESS) {
                 onError(utteranceId, result)
                 break
             }
+            if (chunk.index == firstChunkIndexOfMessage(messageIndexForChunk(chunk.index))) {
+                announceSenderForCurrentMessage = false
+            }
         }
+    }
+
+    private fun spokenChunk(chunk: TtsChunk): TtsChunk {
+        val messageIndex = messageIndexForChunk(chunk.index)
+        val message = messages[messageIndex]
+        val isFirstChunkOfMessage = chunk.index == firstChunkIndexOfMessage(messageIndex)
+        val announced =
+            isFirstChunkOfMessage &&
+                shouldAnnounceSender(messageIndex) &&
+                message.senderDisplayName.isNotBlank()
+        if (!announced) return chunk
+        senderAnnouncedAtMessageIndex = messageIndex
+        return chunk.copy(text = "${message.senderDisplayName}: ${chunk.text}")
+    }
+
+    private fun shouldAnnounceSender(messageIndex: Int): Boolean =
+        when {
+            announceSenderForCurrentMessage -> true
+            senderAnnouncedAtMessageIndex == messageIndex -> false
+            messageIndex == 0 -> true
+            else ->
+                !messages[messageIndex].senderKey.equals(messages[messageIndex - 1].senderKey, ignoreCase = true)
+        }
+
+    private fun replaceMessages(newMessages: List<TtsQueuedMessage>) {
+        messages = newMessages
+        rebuildFlatChunks()
+    }
+
+    private fun appendMessages(moreMessages: List<TtsQueuedMessage>): List<TtsChunk> {
+        val firstAppendedChunkIndex = chunks.size
+        messages = messages + moreMessages
+        rebuildFlatChunks()
+        return chunks.drop(firstAppendedChunkIndex)
+    }
+
+    private fun rebuildFlatChunks() {
+        val firstIndices = mutableListOf<Int>()
+        val flat = mutableListOf<TtsChunk>()
+        var nextIndex = 0
+        for (message in messages) {
+            firstIndices += nextIndex
+            for (chunk in message.chunks) {
+                flat += chunk.copy(index = nextIndex)
+                nextIndex += 1
+            }
+        }
+        chunks = flat
+        messageFirstChunkIndex = firstIndices.toIntArray()
+    }
+
+    private fun messageIndexForChunk(chunkIndex: Int): Int {
+        var messageIndex = 0
+        for (index in messageFirstChunkIndex.indices) {
+            if (messageFirstChunkIndex[index] <= chunkIndex) messageIndex = index
+        }
+        return messageIndex
+    }
+
+    private fun firstChunkIndexOfMessage(messageIndex: Int): Int = messageFirstChunkIndex[messageIndex]
+
+    private fun publishSpeaking(chunkIndex: Int) {
+        val messageIndex = messageIndexForChunk(chunkIndex)
+        _state.value =
+            TtsState.Speaking(
+                chunkIndex = chunkIndex,
+                chunkCount = chunks.size,
+                messageIndex = messageIndex,
+                messageCount = messages.size,
+                messagePreview = messages[messageIndex].preview,
+            )
+    }
+
+    private fun publishPaused(chunkIndex: Int) {
+        val messageIndex = messageIndexForChunk(chunkIndex)
+        _state.value =
+            TtsState.Paused(
+                chunkIndex = chunkIndex,
+                chunkCount = chunks.size,
+                messageIndex = messageIndex,
+                messageCount = messages.size,
+                messagePreview = messages[messageIndex].preview,
+            )
     }
 
     private fun parseCurrentGenerationIndex(utteranceId: String?): Int? {
