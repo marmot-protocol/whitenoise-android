@@ -900,6 +900,15 @@
     <string name="profile_picture_remove">Удалить фото</string>
     <string name="profile_picture_use_link">Использовать ссылку</string>
     <string name="profile_banner">Баннер профиля</string>
+    <string name="profile_banner_edit">Изменить баннер профиля</string>
+    <string name="profile_banner_sheet_title">Баннер профиля</string>
+    <string name="profile_banner_placeholder">Баннер ещё не задан</string>
+    <string name="profile_banner_uploading">Загрузка баннера профиля…</string>
+    <string name="profile_banner_choose_photo">Выбрать баннер из фотографий</string>
+    <string name="profile_banner_url_label">Публичный HTTPS-адрес баннера</string>
+    <string name="profile_banner_remove">Удалить баннер</string>
+    <string name="profile_banner_apply">Использовать этот баннер</string>
+    <string name="toast_couldnt_upload_profile_banner">Не удалось загрузить баннер профиля.</string>
     <string name="profile_banner_hint">Необязательный публичный HTTPS-адрес баннера</string>
     <string name="profile_banner_invalid">Разрешены только публичные HTTPS-адреса изображений.</string>
     <string name="toast_couldnt_upload_profile_image">Не удалось загрузить изображение профиля.</string>

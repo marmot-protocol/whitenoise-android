@@ -868,6 +868,15 @@
     <string name="profile_picture_remove">Resmi kaldır</string>
     <string name="profile_picture_use_link">Bu bağlantıyı kullan</string>
     <string name="profile_banner">Profil bannerı</string>
+    <string name="profile_banner_edit">Profil bannerını düzenle</string>
+    <string name="profile_banner_sheet_title">Profil bannerı</string>
+    <string name="profile_banner_placeholder">Henüz banner ayarlanmadı</string>
+    <string name="profile_banner_uploading">Profil bannerı yükleniyor…</string>
+    <string name="profile_banner_choose_photo">Fotoğraflardan banner seç</string>
+    <string name="profile_banner_url_label">Herkese açık HTTPS banner URL\'si</string>
+    <string name="profile_banner_remove">Bannerı kaldır</string>
+    <string name="profile_banner_apply">Bu bannerı kullan</string>
+    <string name="toast_couldnt_upload_profile_banner">Profil bannerı yüklenemedi.</string>
     <string name="profile_banner_hint">İsteğe bağlı herkese açık HTTPS banner URL\'si</string>
     <string name="profile_banner_invalid">Yalnızca herkese açık HTTPS görsel URL\'lerine izin verilir.</string>
     <string name="toast_couldnt_upload_profile_image">Profil görseli yüklenemedi.</string>
