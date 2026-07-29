@@ -1,19 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
@@ -23,8 +19,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.chats.ChatRowLayout
-import dev.ipf.whitenoise.android.ui.chats.MentionBadge
-import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.chats.ChatRowSupportingMetadata
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -94,7 +89,13 @@ class ChatRowLayoutScreenshotTest {
                         ChatRowFixture(
                             title = "Selected conversation",
                             preview = "Normal metadata is replaced",
+                            selectionMode = true,
                             selected = true,
+                        )
+                        ChatRowFixture(
+                            title = "Unselected conversation",
+                            preview = "Normal metadata is replaced",
+                            selectionMode = true,
                         )
                     }
                 }
@@ -120,6 +121,7 @@ private fun ChatRowFixture(
     unread: Boolean = false,
     invited: Boolean = false,
     draft: Boolean = false,
+    selectionMode: Boolean = false,
     selected: Boolean = false,
 ) {
     val timestampAt = remember { (System.currentTimeMillis() / 1_000L).toULong() }
@@ -128,7 +130,7 @@ private fun ChatRowFixture(
             title = title,
             timestampAt = timestampAt,
             rowHasUnread = unread,
-            selectionMode = selected,
+            selectionMode = selectionMode,
             selected = selected,
             leadingContent = {
                 Box(
@@ -146,24 +148,19 @@ private fun ChatRowFixture(
                 )
             },
             supportingMetadata =
-                when {
-                    invited -> {
-                        {
-                            Badge { Text("Invited") }
-                        }
+                if (invited || unread) {
+                    {
+                        ChatRowSupportingMetadata(
+                            pendingConfirmation = invited,
+                            rowHasUnread = unread,
+                            rowUnreadCount = 3uL,
+                            unreadMention = unread,
+                            actionColors = null,
+                            pinned = false,
+                        )
                     }
-                    unread -> {
-                        {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                MentionBadge()
-                                UnreadCountBadge(3uL)
-                            }
-                        }
-                    }
-                    else -> null
+                } else {
+                    null
                 },
             modifier = Modifier.fillMaxWidth(),
         )
