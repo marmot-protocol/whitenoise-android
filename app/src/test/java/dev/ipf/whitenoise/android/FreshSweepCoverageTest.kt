@@ -24,6 +24,17 @@ class FreshSweepCoverageTest {
         assertTrue("edits must invalidate projections", "controller.editsByTarget" in projectionsBlock)
         assertTrue("copy text must be projected once per timeline change", "MessageProjector.copyableText" in projectionsBlock)
         assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
+        assertTrue(
+            "convergence-invalidated text must remain available to bulk copy",
+            "copyableText = MessageProjector.copyableText(record, editedText)" in projectionsBlock,
+        )
+        assertTrue(
+            "convergence-invalidated text must remain unavailable to bulk forward",
+            (
+                "forwardableText = if (invalidated) null else " +
+                    "MessageProjector.forwardableText(record, editedText)"
+            ) in projectionsBlock,
+        )
         assertFalse("profile changes must not rebuild text projections", "appState.profileRevisionForCompose" in projectionsBlock)
         // The whole-timeline selectable map must never key on the profile
         // revision: that re-ran an O(n) rebuild on every profile resolution

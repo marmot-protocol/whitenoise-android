@@ -666,7 +666,7 @@ internal fun ConversationScreen(
                                 messageId = messageId,
                                 senderId = record.sender,
                                 senderDisplayName = record.sender,
-                                copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
+                                copyableText = MessageProjector.copyableText(record, editedText),
                                 forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
                                 // Same authoritative accessor the single-message
                                 // surface and the mutation guard use, so bulk

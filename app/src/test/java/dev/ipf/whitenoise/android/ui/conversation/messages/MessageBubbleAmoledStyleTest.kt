@@ -6,14 +6,18 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,6 +29,28 @@ import org.robolectric.annotation.Config
 class MessageBubbleAmoledStyleTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun invalidationWarningRendersWithoutMessageBodyText() {
+        val warning = "May not be visible to everyone"
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageBubbleInvalidationWarning(
+                    warning = warning,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(warning).assertIsDisplayed()
+    }
+
+    @Test
+    fun captionlessInvalidatedMediaUsesSupplementalBubbleFrame() {
+        assertTrue(shouldFrameMessageBubbleSupplement(bodyText = null, invalidationWarning = "warning"))
+        assertFalse(shouldFrameMessageBubbleSupplement(bodyText = null, invalidationWarning = null))
+    }
 
     @Test
     fun amoledBubbleChromeColorCodesSentAndReceivedMessages() {

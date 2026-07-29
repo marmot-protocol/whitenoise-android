@@ -1345,21 +1345,19 @@ internal fun MessageBubble(
                         deleted -> displayedBody
                         // The contact card / location bubble / user card carry
                         // the body, so the raw caption/link/npub text is hidden.
-                        sharedContact != null || sharedLocation != null || sharedUser != null ->
-                            if (invalidationWarning != null) "" else null
-                        mediaPendingName != null && !anyConfirmedMedia ->
-                            if (invalidationWarning != null) "" else null
+                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
+                        mediaPendingName != null && !anyConfirmedMedia -> null
                         anyConfirmedMedia ->
-                            (editState?.latestText ?: record.plaintext).takeIf {
-                                it.isNotBlank() || invalidationWarning != null
-                            }
+                            (editState?.latestText ?: record.plaintext).takeIf(String::isNotBlank)
                         else -> displayedBody
                     }
+                val bodyOrWarningInsideBubble =
+                    shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
                 // Captions/plain bodies sit on the resolved bubble background and therefore use
                 // its paired WCAG-safe content color. Footer-only media rows are
                 // outside the bubble and retain the page's surface foreground.
                 val timestampColor =
-                    if (bodyTextToRender != null) bubbleContentColor else colorScheme.onSurfaceVariant
+                    if (bodyOrWarningInsideBubble) bubbleContentColor else colorScheme.onSurfaceVariant
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)
@@ -1624,9 +1622,8 @@ internal fun MessageBubble(
                         }
                     }
                     invalidationWarning?.let { warning ->
-                        Text(
-                            text = warning,
-                            style = MaterialTheme.typography.labelSmall,
+                        MessageBubbleInvalidationWarning(
+                            warning = warning,
                             color = timestampColor,
                             modifier = Modifier.align(Alignment.Start).padding(top = 2.dp),
                         )
@@ -1745,10 +1742,9 @@ internal fun MessageBubble(
                         senderNameLabel(false)
                         replyPreviewCard(false)
                         mediaBlocks()
-                        // Caption: only when a non-blank caption accompanies the
-                        // media. It gets the same colored bubble look as a plain
-                        // text message, placed directly below the media.
-                        if (bodyTextToRender != null) {
+                        // A caption or convergence warning gets the same colored
+                        // bubble look as a plain text message below the media.
+                        if (bodyOrWarningInsideBubble) {
                             MessageBubbleFrame(
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,

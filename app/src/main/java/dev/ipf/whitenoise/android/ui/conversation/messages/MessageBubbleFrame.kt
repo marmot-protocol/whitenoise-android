@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -64,6 +65,26 @@ internal fun MessageBubbleFrame(
         )
     }
 }
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun MessageBubbleInvalidationWarning(
+    warning: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = warning,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = modifier,
+    )
+}
+
+internal fun shouldFrameMessageBubbleSupplement(
+    bodyText: String?,
+    invalidationWarning: String?,
+): Boolean = bodyText != null || invalidationWarning != null
 
 private fun messageTargetHighlightModifier(
     highlighted: Boolean,
