@@ -100,7 +100,12 @@ class ChatRowPreviewMarkdownSourceTest {
                 sender = "sender",
                 senderDisplayName = "Sender",
                 plaintext = plaintext,
-                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                contentTokens =
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks = emptyList(),
+                        blankLinesBefore = ByteArray(0),
+                    ),
                 kind = kind,
                 timelineAt = 1uL,
                 deleted = deleted,

@@ -354,6 +354,7 @@ class ChatListProjectionReducerTest {
             MarkdownDocumentFfi(
                 truncated = false,
                 blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("hi")))),
+                blankLinesBefore = ByteArray(0),
             )
 
         val item =
@@ -449,7 +450,7 @@ class ChatListProjectionReducerTest {
         sender = sender,
         senderDisplayName = null,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = kind,
         timelineAt = timelineAt,
         deleted = deleted,

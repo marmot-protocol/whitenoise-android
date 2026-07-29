@@ -297,7 +297,12 @@ class MessageBatchActionsTest {
                     groupIdHex = "group",
                     sender = "alice",
                     plaintext = id,
-                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    contentTokens =
+                        MarkdownDocumentFfi(
+                            truncated = false,
+                            blocks = emptyList(),
+                            blankLinesBefore = ByteArray(0),
+                        ),
                     kind = 9uL,
                     tags = emptyList(),
                     sourceEpoch = null,

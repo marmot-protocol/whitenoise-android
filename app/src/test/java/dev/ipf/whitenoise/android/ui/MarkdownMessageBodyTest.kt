@@ -31,7 +31,13 @@ class MarkdownMessageBodyTest {
     private fun render(blocks: List<MarkdownBlockFfi>) {
         composeRule.setContent {
             WhiteNoiseTheme {
-                MarkdownMessageBody(MarkdownDocumentFfi(blocks = blocks, truncated = false))
+                MarkdownMessageBody(
+                    MarkdownDocumentFfi(
+                        blocks = blocks,
+                        truncated = false,
+                        blankLinesBefore = ByteArray(0),
+                    ),
+                )
             }
         }
         composeRule.waitForIdle()
@@ -72,6 +78,7 @@ class MarkdownMessageBodyTest {
             listOf(
                 MarkdownBlockFfi.BlockQuote(
                     List(MARKDOWN_MAX_CONTAINER_SIBLINGS + 2) { paragraph("quote-$it") },
+                    blankLinesBefore = ByteArray(0),
                 ),
             ),
         )
@@ -91,7 +98,11 @@ class MarkdownMessageBodyTest {
                     tight = true,
                     items =
                         List(MARKDOWN_MAX_CONTAINER_SIBLINGS + 2) { index ->
-                            MarkdownListItemFfi(blocks = listOf(paragraph("item-$index")), checked = null)
+                            MarkdownListItemFfi(
+                                blocks = listOf(paragraph("item-$index")),
+                                checked = null,
+                                blankLinesBefore = ByteArray(0),
+                            )
                         },
                 ),
             ),

@@ -40,7 +40,12 @@ class RecordedAtOverrideTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = "hello",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = 9uL,
             tags = emptyList(),
             sourceEpoch = null,

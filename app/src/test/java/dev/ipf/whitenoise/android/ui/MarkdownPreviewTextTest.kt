@@ -33,7 +33,11 @@ class MarkdownPreviewTextTest {
     private fun build(
         blocks: List<MarkdownBlockFfi>,
         maxLength: Int = 200,
-    ) = markdownDocumentToPreviewAnnotatedString(MarkdownDocumentFfi(blocks = blocks, truncated = false), codeStyle, maxLength)
+    ) = markdownDocumentToPreviewAnnotatedString(
+        MarkdownDocumentFfi(blocks = blocks, truncated = false, blankLinesBefore = ByteArray(0)),
+        codeStyle,
+        maxLength,
+    )
 
     private fun paragraph(text: String) = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))
 
@@ -46,7 +50,12 @@ class MarkdownPreviewTextTest {
             ),
         )
 
-    private fun listItem(blocks: List<MarkdownBlockFfi>) = MarkdownListItemFfi(blocks = blocks, checked = null)
+    private fun listItem(blocks: List<MarkdownBlockFfi>) =
+        MarkdownListItemFfi(
+            blocks = blocks,
+            checked = null,
+            blankLinesBefore = ByteArray(0),
+        )
 
     private fun tableCell(text: String) = MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text(text)))
 
@@ -84,7 +93,7 @@ class MarkdownPreviewTextTest {
         // is the only thing bounding the recursion. Far deeper than the cap;
         // must return, not StackOverflowError.
         var block: MarkdownBlockFfi = paragraph("deep")
-        repeat(10_000) { block = MarkdownBlockFfi.BlockQuote(listOf(block)) }
+        repeat(10_000) { block = MarkdownBlockFfi.BlockQuote(listOf(block), blankLinesBefore = ByteArray(0)) }
         val annotated = build(listOf(block))
         // Capped before reaching the innermost paragraph — the point is that it
         // returns at all rather than crashing.
@@ -268,14 +277,22 @@ class MarkdownPreviewTextTest {
         val annotated =
             build(
                 listOf(
-                    MarkdownBlockFfi.BlockQuote(listOf(paragraph("quoted"))),
+                    MarkdownBlockFfi.BlockQuote(listOf(paragraph("quoted")), blankLinesBefore = ByteArray(0)),
                     MarkdownBlockFfi.ListBlock(
                         kind = MarkdownListKindFfi.Bullet(marker = "-"),
                         tight = true,
                         items =
                             listOf(
-                                MarkdownListItemFfi(blocks = listOf(paragraph("alpha")), checked = null),
-                                MarkdownListItemFfi(blocks = listOf(paragraph("beta")), checked = true),
+                                MarkdownListItemFfi(
+                                    blocks = listOf(paragraph("alpha")),
+                                    checked = null,
+                                    blankLinesBefore = ByteArray(0),
+                                ),
+                                MarkdownListItemFfi(
+                                    blocks = listOf(paragraph("beta")),
+                                    checked = true,
+                                    blankLinesBefore = ByteArray(0),
+                                ),
                             ),
                     ),
                     MarkdownBlockFfi.Table(
@@ -326,6 +343,7 @@ class MarkdownPreviewTextTest {
                                     ),
                                 ),
                             ),
+                        blankLinesBefore = ByteArray(0),
                     ),
                 codeStyle = codeStyle,
                 mentionDisplayName = { bech32 -> "Alice".takeIf { bech32 == knownNpub } },
@@ -361,8 +379,10 @@ class MarkdownPreviewTextTest {
                                     ),
                                 ),
                             ),
+                            blankLinesBefore = ByteArray(0),
                         ),
                     ),
+                blankLinesBefore = ByteArray(0),
             )
 
         assertEquals(setOf(npub), markdownDocumentMentionBech32s(document))
@@ -400,6 +420,7 @@ class MarkdownPreviewTextTest {
                 blocks =
                     List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownBlockFfi.ThematicBreak } +
                         paragraphWithMention(npub),
+                blankLinesBefore = ByteArray(0),
             )
 
         assertEquals(emptySet<String>(), markdownDocumentMentionBech32s(document))
@@ -416,6 +437,7 @@ class MarkdownPreviewTextTest {
                         MarkdownBlockFfi.BlockQuote(
                             List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownBlockFfi.ThematicBreak } +
                                 paragraphWithMention(npub),
+                            blankLinesBefore = ByteArray(0),
                         ),
                         MarkdownBlockFfi.ListBlock(
                             kind = MarkdownListKindFfi.Bullet(marker = "-"),
@@ -432,6 +454,7 @@ class MarkdownPreviewTextTest {
                                     listOf(listOf(tableCellWithMention(npub))),
                         ),
                     ),
+                blankLinesBefore = ByteArray(0),
             )
 
         assertEquals(emptySet<String>(), markdownDocumentMentionBech32s(document))
@@ -473,6 +496,7 @@ class MarkdownPreviewTextTest {
                                 } + listOf(listOf(tableCellWithMention(npub))),
                         ),
                     ),
+                blankLinesBefore = ByteArray(0),
             )
 
         assertEquals(emptySet<String>(), markdownDocumentMentionBech32s(document))
@@ -515,6 +539,7 @@ class MarkdownPreviewTextTest {
                         MarkdownBlockFfi.BlockQuote(
                             List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownBlockFfi.ThematicBreak } +
                                 paragraph("never reached"),
+                            blankLinesBefore = ByteArray(0),
                         ),
                     ),
             )

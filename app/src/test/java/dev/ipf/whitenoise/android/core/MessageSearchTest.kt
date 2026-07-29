@@ -105,7 +105,7 @@ class MessageSearchTest {
         groupIdHex = "group",
         sender = sender,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = kind,
         tags = tags,
         sourceEpoch = null,

@@ -303,7 +303,12 @@ class AgentStreamPreviewTest {
             groupIdHex = "group",
             sender = "agent",
             plaintext = "answer",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = kind,
             tags = tags,
             timelineAt = recordedAt,
@@ -350,7 +355,12 @@ class AgentStreamPreviewTest {
             groupIdHex = "group",
             sender = "agent",
             plaintext = "answer",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+            contentTokens =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = ByteArray(0),
+                ),
             kind = if (final) 9uL else 1200uL,
             tags =
                 buildList {

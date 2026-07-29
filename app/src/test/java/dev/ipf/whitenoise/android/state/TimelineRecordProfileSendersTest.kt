@@ -16,7 +16,12 @@ import org.junit.Test
  * leaves that author's row flickering its name/avatar in on first paint.
  */
 class TimelineRecordProfileSendersTest {
-    private fun emptyDoc() = MarkdownDocumentFfi(truncated = false, blocks = emptyList())
+    private fun emptyDoc() =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks = emptyList(),
+            blankLinesBefore = ByteArray(0),
+        )
 
     private fun reaction(sender: String) =
         TimelineUserReactionFfi(

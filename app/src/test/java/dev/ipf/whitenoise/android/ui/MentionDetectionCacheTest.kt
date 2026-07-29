@@ -88,5 +88,6 @@ class MentionDetectionCacheTest {
         MarkdownDocumentFfi(
             truncated = false,
             blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))),
+            blankLinesBefore = ByteArray(0),
         )
 }
