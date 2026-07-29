@@ -1119,6 +1119,20 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1207,6 +1221,8 @@ internal interface UniffiLib : Library {
     ): Pointer
     fun uniffi_marmot_uniffi_fn_method_marmot_accept_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_account_follows(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_id_hex(`ptr`: Pointer,`reference`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1277,6 +1293,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_export_encrypted_secret_key(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_follow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1295,6 +1313,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_is_following(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     fun uniffi_marmot_uniffi_fn_method_marmot_is_stopping(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     fun uniffi_marmot_uniffi_fn_method_marmot_key_package_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
@@ -1385,6 +1405,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_schedule_group_self_update(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_search_users(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,`radiusStart`: Byte,`radiusEnd`: Byte,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_secure_delete_expired(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
@@ -1457,6 +1479,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_unfollow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_update_group_avatar_url(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`dim`: RustBuffer.ByValue,`thumbhash`: RustBuffer.ByValue,
@@ -1507,6 +1531,12 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_clone_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_marmot_uniffi_fn_free_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_marmot_uniffi_fn_method_usersearchsubscription_next_update(`ptr`: Pointer,
+    ): Long
     fun uniffi_marmot_uniffi_fn_func_parse_media_imeta_tag(`tag`: RustBuffer.ByValue,`sourceEpoch`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_marmot_uniffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1657,6 +1687,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_accept_group_invite(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_account_follows(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_id_hex(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_inbox_relays(
@@ -1727,6 +1759,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_follow_user(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_maintenance_status(
@@ -1744,6 +1778,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members_detailed(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_is_following(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_is_stopping(
     ): Short
@@ -1835,6 +1871,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_schedule_group_self_update(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_search_users(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin(
@@ -1907,6 +1945,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_unfollow_user(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_avatar_url(
@@ -1944,6 +1984,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_paginate_forwards(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_snapshot(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update(
     ): Short
     fun uniffi_marmot_uniffi_checksum_constructor_marmot_new(
     ): Short
@@ -2018,6 +2060,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_accept_group_invite() != 61156.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_follows() != 12625.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_id_hex() != 53507.toShort()) {
@@ -2125,6 +2170,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 16556.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_follow_user() != 26050.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2150,6 +2198,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_invite_members_detailed() != 32257.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_is_following() != 21250.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_is_stopping() != 60094.toShort()) {
@@ -2287,6 +2338,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_schedule_group_self_update() != 23804.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_search_users() != 58582.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired() != 16091.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2395,6 +2449,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages() != 49184.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unfollow_user() != 7605.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message() != 11846.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2450,6 +2507,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_snapshot() != 33790.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update() != 9602.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new() != 56105.toShort()) {
@@ -4819,6 +4879,16 @@ public interface MarmotInterface {
     suspend fun `acceptGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): AppGroupRecordFfi
     
     /**
+     * Return the complete locally cached kind-3 follow list for `account_ref`
+     * as canonical lowercase public-key hex strings.
+     *
+     * This is a synchronous, network-free read intended for profile screens
+     * and bulk membership checks. Follow/unfollow and directory refreshes
+     * update the cache before returning.
+     */
+    fun `accountFollows`(`accountRef`: kotlin.String): List<kotlin.String>
+    
+    /**
      * Normalize a public-key reference (npub or hex) to canonical hex.
      * `None` if it isn't a valid public key. Used to resolve a scanned or
      * deep-linked npub back to the account id the rest of the API expects.
@@ -5038,6 +5108,17 @@ public interface MarmotInterface {
     fun `exportEncryptedSecretKey`(`accountRef`: kotlin.String, `passphrase`: kotlin.String): kotlin.String
     
     /**
+     * Follow `user_ref` while preserving every other entry in the account's
+     * current kind-3 contact list. Returns the complete updated list.
+     *
+     * This fetches the current replaceable event from the account's known
+     * outbox/default relays before publishing. If no current event can be
+     * established, it returns `FollowListUnavailable` rather than risking a
+     * destructive replacement.
+     */
+    suspend fun `followUser`(`accountRef`: kotlin.String, `userRef`: kotlin.String): List<kotlin.String>
+    
+    /**
      * Group plus enriched member rows for detail screens.
      */
     suspend fun `groupDetails`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupDetailsFfi
@@ -5072,6 +5153,13 @@ public interface MarmotInterface {
     suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
     
     suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
+    
+    /**
+     * Return whether `account_ref` currently follows `user_ref`, using the
+     * same local cache as [`Self::account_follows`]. `user_ref` accepts npub,
+     * hex, `nostr:npub…`, and Marmot profile links.
+     */
+    fun `isFollowing`(`accountRef`: kotlin.String, `userRef`: kotlin.String): kotlin.Boolean
     
     /**
      * True once shutdown has started. Host apps can use this to avoid
@@ -5342,6 +5430,33 @@ public interface MarmotInterface {
     suspend fun `scheduleGroupSelfUpdate`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.String
     
     /**
+     * Search the searcher's web of trust, streaming matches as each radius
+     * resolves.
+     *
+     * `radius_start`/`radius_end` are inclusive social distances: 0 is the
+     * searcher, 1 their direct follows. Lower radii are still traversed to
+     * reach the window, they just do not emit — which is what makes
+     * `radius_start` usable for paging further out without re-delivering
+     * results the host already has.
+     *
+     * Returns as soon as the traversal is spawned; drive
+     * [`UserSearchSubscription::next_update`] in a loop until it yields
+     * `None`. Dropping the subscription cancels the traversal, so a host that
+     * abandons a search should release it rather than draining it.
+     *
+     * Radius 1 covers more than the follow list: people sharing a group with
+     * the searcher are seeded into it, because sharing a group is social
+     * proximity even when neither has followed the other. That membership is
+     * gathered here, where both the app and the runtime are in scope, rather
+     * than inside the search — hosts pass nothing extra for it.
+     *
+     * People found this way are deliberately *not* added to the local
+     * directory: a search result is not a relationship. `user_profile` keeps
+     * answering only for accounts the user has actually interacted with.
+     */
+    suspend fun `searchUsers`(`accountIdHex`: kotlin.String, `query`: kotlin.String, `radiusStart`: kotlin.UByte, `radiusEnd`: kotlin.UByte): UserSearchSubscription
+    
+    /**
      * Securely scrub and prune expired disappearing-message plaintext for a
      * group according to its active retention component. The media hash list
      * identifies pruned encrypted-media blobs so host apps can purge their own
@@ -5596,6 +5711,12 @@ public interface MarmotInterface {
     fun `timelineMessages`(`accountRef`: kotlin.String, `query`: TimelineMessageQueryFfi): TimelinePageFfi
     
     /**
+     * Unfollow `user_ref` while preserving every other entry in the account's
+     * current kind-3 contact list. Returns the complete updated list.
+     */
+    suspend fun `unfollowUser`(`accountRef`: kotlin.String, `userRef`: kotlin.String): List<kotlin.String>
+    
+    /**
      * Remove this account's reaction from `target_message_id`.
      */
     suspend fun `unreactFromMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String): SendSummaryFfi
@@ -5792,6 +5913,27 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Return the complete locally cached kind-3 follow list for `account_ref`
+     * as canonical lowercase public-key hex strings.
+     *
+     * This is a synchronous, network-free read intended for profile screens
+     * and bulk membership checks. Follow/unfollow and directory refreshes
+     * update the cache before returning.
+     */
+    @Throws(MarmotKitException::class)override fun `accountFollows`(`accountRef`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_account_follows(
+        it, FfiConverterString.lower(`accountRef`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -6573,6 +6715,36 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Follow `user_ref` while preserving every other entry in the account's
+     * current kind-3 contact list. Returns the complete updated list.
+     *
+     * This fetches the current replaceable event from the account's known
+     * outbox/default relays before publishing. If no current event can be
+     * established, it returns `FollowListUnavailable` rather than risking a
+     * destructive replacement.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `followUser`(`accountRef`: kotlin.String, `userRef`: kotlin.String) : List<kotlin.String> {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_follow_user(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`userRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceString.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Group plus enriched member rows for detail screens.
      */
     @Throws(MarmotKitException::class)
@@ -6769,6 +6941,24 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Return whether `account_ref` currently follows `user_ref`, using the
+     * same local cache as [`Self::account_follows`]. `user_ref` accepts npub,
+     * hex, `nostr:npub…`, and Marmot profile links.
+     */
+    @Throws(MarmotKitException::class)override fun `isFollowing`(`accountRef`: kotlin.String, `userRef`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_is_following(
+        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`userRef`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -7767,6 +7957,52 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Search the searcher's web of trust, streaming matches as each radius
+     * resolves.
+     *
+     * `radius_start`/`radius_end` are inclusive social distances: 0 is the
+     * searcher, 1 their direct follows. Lower radii are still traversed to
+     * reach the window, they just do not emit — which is what makes
+     * `radius_start` usable for paging further out without re-delivering
+     * results the host already has.
+     *
+     * Returns as soon as the traversal is spawned; drive
+     * [`UserSearchSubscription::next_update`] in a loop until it yields
+     * `None`. Dropping the subscription cancels the traversal, so a host that
+     * abandons a search should release it rather than draining it.
+     *
+     * Radius 1 covers more than the follow list: people sharing a group with
+     * the searcher are seeded into it, because sharing a group is social
+     * proximity even when neither has followed the other. That membership is
+     * gathered here, where both the app and the runtime are in scope, rather
+     * than inside the search — hosts pass nothing extra for it.
+     *
+     * People found this way are deliberately *not* added to the local
+     * directory: a search result is not a relationship. `user_profile` keeps
+     * answering only for accounts the user has actually interacted with.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `searchUsers`(`accountIdHex`: kotlin.String, `query`: kotlin.String, `radiusStart`: kotlin.UByte, `radiusEnd`: kotlin.UByte) : UserSearchSubscription {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_search_users(
+                thisPtr,
+                FfiConverterString.lower(`accountIdHex`),FfiConverterString.lower(`query`),FfiConverterUByte.lower(`radiusStart`),FfiConverterUByte.lower(`radiusEnd`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_pointer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_pointer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_pointer(future) },
+        // lift function
+        { FfiConverterTypeUserSearchSubscription.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Securely scrub and prune expired disappearing-message plaintext for a
      * group according to its active retention component. The media hash list
      * identifies pruned encrypted-media blobs so host apps can purge their own
@@ -8632,6 +8868,31 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
     
+
+    
+    /**
+     * Unfollow `user_ref` while preserving every other entry in the account's
+     * current kind-3 contact list. Returns the complete updated list.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `unfollowUser`(`accountRef`: kotlin.String, `userRef`: kotlin.String) : List<kotlin.String> {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_unfollow_user(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`userRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceString.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
 
     
     /**
@@ -9849,6 +10110,275 @@ public object FfiConverterTypeTimelineMessagesSubscription: FfiConverter<Timelin
     override fun allocationSize(value: TimelineMessagesSubscription) = 8UL
 
     override fun write(value: TimelineMessagesSubscription, buf: ByteBuffer) {
+        // The Rust code always expects pointers written as 8 bytes,
+        // and will fail to compile if they don't fit.
+        buf.putLong(Pointer.nativeValue(lower(value)))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+// to the live Rust struct on the other side of the FFI.
+//
+// Each instance implements core operations for working with the Rust `Arc<T>` and the
+// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque pointer to the underlying Rust struct.
+//     Method calls need to read this pointer from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its pointer should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
+//      before it can pass the pointer over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * A live user search. Dropping it cancels the traversal.
+ *
+ * Unlike the runtime subscriptions above there is no `snapshot()`: a search
+ * has no initial state, only results that arrive as each radius resolves.
+ */
+public interface UserSearchSubscriptionInterface {
+    
+    /**
+     * Await the next step of the search, or `None` once it is over.
+     *
+     * `None` follows the `SearchCompleted` trigger, so a host can loop until
+     * either signal. Dropping this object stops the traversal at its next
+     * checkpoint.
+     */
+    suspend fun `nextUpdate`(): UserSearchUpdateFfi?
+    
+    companion object
+}
+
+/**
+ * A live user search. Dropping it cancels the traversal.
+ *
+ * Unlike the runtime subscriptions above there is no `snapshot()`: a search
+ * has no initial state, only results that arrive as each radius resolves.
+ */
+open class UserSearchSubscription: Disposable, AutoCloseable, UserSearchSubscriptionInterface {
+
+    constructor(pointer: Pointer) {
+        this.pointer = pointer
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    /**
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noPointer: NoPointer) {
+        this.pointer = null
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    protected val pointer: Pointer?
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the pointer being freed concurrently.
+        try {
+            return block(this.uniffiClonePointer())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+        override fun run() {
+            pointer?.let { ptr ->
+                uniffiRustCall { status ->
+                    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_free_usersearchsubscription(ptr, status)
+                }
+            }
+        }
+    }
+
+    fun uniffiClonePointer(): Pointer {
+        return uniffiRustCall() { status ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_clone_usersearchsubscription(pointer!!, status)
+        }
+    }
+
+    
+    /**
+     * Await the next step of the search, or `None` once it is over.
+     *
+     * `None` follows the `SearchCompleted` trigger, so a host can loop until
+     * either signal. Dropping this object stops the traversal at its next
+     * checkpoint.
+     */
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `nextUpdate`() : UserSearchUpdateFfi? {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_usersearchsubscription_next_update(
+                thisPtr,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalTypeUserSearchUpdateFfi.lift(it) },
+        // Error FFI converter
+        UniffiNullRustCallStatusErrorHandler,
+    )
+    }
+
+    
+
+    
+    
+    companion object
+    
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUserSearchSubscription: FfiConverter<UserSearchSubscription, Pointer> {
+
+    override fun lower(value: UserSearchSubscription): Pointer {
+        return value.uniffiClonePointer()
+    }
+
+    override fun lift(value: Pointer): UserSearchSubscription {
+        return UserSearchSubscription(value)
+    }
+
+    override fun read(buf: ByteBuffer): UserSearchSubscription {
+        // The Rust code always writes pointers as 8 bytes, and will
+        // fail to compile if they don't fit.
+        return lift(Pointer(buf.getLong()))
+    }
+
+    override fun allocationSize(value: UserSearchSubscription) = 8UL
+
+    override fun write(value: UserSearchSubscription, buf: ByteBuffer) {
         // The Rust code always expects pointers written as 8 bytes,
         // and will fail to compile if they don't fit.
         buf.putLong(Pointer.nativeValue(lower(value)))
@@ -13480,7 +14010,13 @@ data class RelayHealthFfi (
     var `banned`: kotlin.UInt, 
     var `sleeping`: kotlin.UInt, 
     var `connectionAttempts`: kotlin.UInt, 
-    var `connectionSuccesses`: kotlin.UInt
+    var `connectionSuccesses`: kotlin.UInt, 
+    var `notificationForwarderRunning`: kotlin.Boolean, 
+    var `notificationForwarderRestarts`: kotlin.ULong, 
+    var `notificationForwarderLagIncidents`: kotlin.ULong, 
+    var `notificationForwarderLaggedNotifications`: kotlin.ULong, 
+    var `notificationForwarderPanics`: kotlin.ULong, 
+    var `notificationForwarderUnexpectedExits`: kotlin.ULong
 ) {
     
     companion object
@@ -13504,6 +14040,12 @@ public object FfiConverterTypeRelayHealthFfi: FfiConverterRustBuffer<RelayHealth
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
@@ -13519,7 +14061,13 @@ public object FfiConverterTypeRelayHealthFfi: FfiConverterRustBuffer<RelayHealth
             FfiConverterUInt.allocationSize(value.`banned`) +
             FfiConverterUInt.allocationSize(value.`sleeping`) +
             FfiConverterUInt.allocationSize(value.`connectionAttempts`) +
-            FfiConverterUInt.allocationSize(value.`connectionSuccesses`)
+            FfiConverterUInt.allocationSize(value.`connectionSuccesses`) +
+            FfiConverterBoolean.allocationSize(value.`notificationForwarderRunning`) +
+            FfiConverterULong.allocationSize(value.`notificationForwarderRestarts`) +
+            FfiConverterULong.allocationSize(value.`notificationForwarderLagIncidents`) +
+            FfiConverterULong.allocationSize(value.`notificationForwarderLaggedNotifications`) +
+            FfiConverterULong.allocationSize(value.`notificationForwarderPanics`) +
+            FfiConverterULong.allocationSize(value.`notificationForwarderUnexpectedExits`)
     )
 
     override fun write(value: RelayHealthFfi, buf: ByteBuffer) {
@@ -13535,6 +14083,12 @@ public object FfiConverterTypeRelayHealthFfi: FfiConverterRustBuffer<RelayHealth
             FfiConverterUInt.write(value.`sleeping`, buf)
             FfiConverterUInt.write(value.`connectionAttempts`, buf)
             FfiConverterUInt.write(value.`connectionSuccesses`, buf)
+            FfiConverterBoolean.write(value.`notificationForwarderRunning`, buf)
+            FfiConverterULong.write(value.`notificationForwarderRestarts`, buf)
+            FfiConverterULong.write(value.`notificationForwarderLagIncidents`, buf)
+            FfiConverterULong.write(value.`notificationForwarderLaggedNotifications`, buf)
+            FfiConverterULong.write(value.`notificationForwarderPanics`, buf)
+            FfiConverterULong.write(value.`notificationForwarderUnexpectedExits`, buf)
     }
 }
 
@@ -14523,6 +15077,65 @@ public object FfiConverterTypeTransportFanoutStatusFfi: FfiConverterRustBuffer<T
 
 
 
+/**
+ * One person the search found.
+ *
+ * `radius` is social distance from the searcher: 0 is the searcher, 1 a
+ * direct follow. Render it as provenance ("via someone you follow").
+ *
+ * `255` is the exception and means *off-graph*: the searcher has no social
+ * graph of their own, so this person was found through a configured fallback
+ * rather than through anyone they know. Present those as discovery, never as
+ * a connection -- they are not a distance from the user at all.
+ */
+data class UserDirectorySearchResultFfi (
+    var `accountIdHex`: kotlin.String, 
+    var `npub`: kotlin.String, 
+    var `radius`: kotlin.UByte, 
+    var `matchedField`: MatchedFieldFfi, 
+    var `matchQuality`: MatchQualityFfi, 
+    var `profile`: UserProfileMetadataFfi?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUserDirectorySearchResultFfi: FfiConverterRustBuffer<UserDirectorySearchResultFfi> {
+    override fun read(buf: ByteBuffer): UserDirectorySearchResultFfi {
+        return UserDirectorySearchResultFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterUByte.read(buf),
+            FfiConverterTypeMatchedFieldFfi.read(buf),
+            FfiConverterTypeMatchQualityFfi.read(buf),
+            FfiConverterOptionalTypeUserProfileMetadataFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: UserDirectorySearchResultFfi) = (
+            FfiConverterString.allocationSize(value.`accountIdHex`) +
+            FfiConverterString.allocationSize(value.`npub`) +
+            FfiConverterUByte.allocationSize(value.`radius`) +
+            FfiConverterTypeMatchedFieldFfi.allocationSize(value.`matchedField`) +
+            FfiConverterTypeMatchQualityFfi.allocationSize(value.`matchQuality`) +
+            FfiConverterOptionalTypeUserProfileMetadataFfi.allocationSize(value.`profile`)
+    )
+
+    override fun write(value: UserDirectorySearchResultFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`accountIdHex`, buf)
+            FfiConverterString.write(value.`npub`, buf)
+            FfiConverterUByte.write(value.`radius`, buf)
+            FfiConverterTypeMatchedFieldFfi.write(value.`matchedField`, buf)
+            FfiConverterTypeMatchQualityFfi.write(value.`matchQuality`, buf)
+            FfiConverterOptionalTypeUserProfileMetadataFfi.write(value.`profile`, buf)
+    }
+}
+
+
+
 data class UserProfileMetadataFfi (
     var `name`: kotlin.String?, 
     var `displayName`: kotlin.String?, 
@@ -14570,6 +15183,53 @@ public object FfiConverterTypeUserProfileMetadataFfi: FfiConverterRustBuffer<Use
             FfiConverterOptionalString.write(value.`banner`, buf)
             FfiConverterOptionalString.write(value.`nip05`, buf)
             FfiConverterOptionalString.write(value.`lud16`, buf)
+    }
+}
+
+
+
+/**
+ * One incremental step of a running search.
+ */
+data class UserSearchUpdateFfi (
+    var `trigger`: SearchUpdateTriggerFfi, 
+    /**
+     * Matches found by this step, pre-sorted within the batch. Ordering
+     * *across* updates is the radius order they arrive in, so a host that
+     * renders one flat list should re-sort the aggregate.
+     */
+    var `newResults`: List<UserDirectorySearchResultFfi>, 
+    /**
+     * Running total this search has emitted so far, including `new_results`.
+     */
+    var `totalResultCount`: kotlin.UInt
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUserSearchUpdateFfi: FfiConverterRustBuffer<UserSearchUpdateFfi> {
+    override fun read(buf: ByteBuffer): UserSearchUpdateFfi {
+        return UserSearchUpdateFfi(
+            FfiConverterTypeSearchUpdateTriggerFfi.read(buf),
+            FfiConverterSequenceTypeUserDirectorySearchResultFfi.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: UserSearchUpdateFfi) = (
+            FfiConverterTypeSearchUpdateTriggerFfi.allocationSize(value.`trigger`) +
+            FfiConverterSequenceTypeUserDirectorySearchResultFfi.allocationSize(value.`newResults`) +
+            FfiConverterUInt.allocationSize(value.`totalResultCount`)
+    )
+
+    override fun write(value: UserSearchUpdateFfi, buf: ByteBuffer) {
+            FfiConverterTypeSearchUpdateTriggerFfi.write(value.`trigger`, buf)
+            FfiConverterSequenceTypeUserDirectorySearchResultFfi.write(value.`newResults`, buf)
+            FfiConverterUInt.write(value.`totalResultCount`, buf)
     }
 }
 
@@ -17089,6 +17749,17 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = "details=${ `details` }"
     }
     
+    /**
+     * No current kind-3 event was found on the account's known outbox/default
+     * relays. Retrying after directory/relay recovery is safe; publishing from
+     * an assumed empty list is not.
+     */
+    class FollowListUnavailable(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
     class TransportClosed(
         ) : MarmotKitException() {
         override val message
@@ -17384,67 +18055,68 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             11 -> MarmotKitException.Publish(
                 FfiConverterString.read(buf),
                 )
-            12 -> MarmotKitException.TransportClosed()
-            13 -> MarmotKitException.RuntimeStopping()
-            14 -> MarmotKitException.AccountCatchUp(
+            12 -> MarmotKitException.FollowListUnavailable()
+            13 -> MarmotKitException.TransportClosed()
+            14 -> MarmotKitException.RuntimeStopping()
+            15 -> MarmotKitException.AccountCatchUp(
                 FfiConverterString.read(buf),
                 )
-            15 -> MarmotKitException.NotGroupAdmin(
+            16 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            16 -> MarmotKitException.AdminCannotSelfRemove(
+            17 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            17 -> MarmotKitException.LeaveAlreadyRequested(
+            18 -> MarmotKitException.LeaveAlreadyRequested(
                 FfiConverterString.read(buf),
                 )
-            18 -> MarmotKitException.WouldRemoveLastAdmin(
+            19 -> MarmotKitException.WouldRemoveLastAdmin(
                 FfiConverterString.read(buf),
                 )
-            19 -> MarmotKitException.DisbandingUnsupportedMembers(
+            20 -> MarmotKitException.DisbandingUnsupportedMembers(
                 FfiConverterString.read(buf),
                 FfiConverterSequenceString.read(buf),
                 )
-            20 -> MarmotKitException.DisbandingNotEnabled(
+            21 -> MarmotKitException.DisbandingNotEnabled(
                 FfiConverterString.read(buf),
                 )
-            21 -> MarmotKitException.GroupDisbanding(
+            22 -> MarmotKitException.GroupDisbanding(
                 FfiConverterString.read(buf),
                 )
-            22 -> MarmotKitException.MemberNotInGroup(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            23 -> MarmotKitException.AlreadyAdmin(
+            23 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            24 -> MarmotKitException.NotAdmin(
+            24 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            25 -> MarmotKitException.StorageBusy(
+            25 -> MarmotKitException.NotAdmin(
+                FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            26 -> MarmotKitException.SecretNotFound(
+            26 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            27 -> MarmotKitException.KeystoreUnavailable(
+            27 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            28 -> MarmotKitException.EmptyPassphrase()
-            29 -> MarmotKitException.EncryptionFailed(
+            28 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            30 -> MarmotKitException.Io(
+            29 -> MarmotKitException.EmptyPassphrase()
+            30 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            31 -> MarmotKitException.ExternalSignerUnavailable(
+            31 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            32 -> MarmotKitException.ExternalSignerMismatch()
-            33 -> MarmotKitException.ExternalSignerRejected()
-            34 -> MarmotKitException.Runtime(
+            32 -> MarmotKitException.ExternalSignerUnavailable(
+                FfiConverterString.read(buf),
+                )
+            33 -> MarmotKitException.ExternalSignerMismatch()
+            34 -> MarmotKitException.ExternalSignerRejected()
+            35 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -17507,6 +18179,10 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`details`)
+            )
+            is MarmotKitException.FollowListUnavailable -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
             )
             is MarmotKitException.TransportClosed -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -17682,117 +18358,121 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.TransportClosed -> {
+            is MarmotKitException.FollowListUnavailable -> {
                 buf.putInt(12)
                 Unit
             }
-            is MarmotKitException.RuntimeStopping -> {
+            is MarmotKitException.TransportClosed -> {
                 buf.putInt(13)
                 Unit
             }
-            is MarmotKitException.AccountCatchUp -> {
+            is MarmotKitException.RuntimeStopping -> {
                 buf.putInt(14)
+                Unit
+            }
+            is MarmotKitException.AccountCatchUp -> {
+                buf.putInt(15)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(15)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(16)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.LeaveAlreadyRequested -> {
+            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(17)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.WouldRemoveLastAdmin -> {
+            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(18)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.DisbandingUnsupportedMembers -> {
+            is MarmotKitException.WouldRemoveLastAdmin -> {
                 buf.putInt(19)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.DisbandingUnsupportedMembers -> {
+                buf.putInt(20)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
                 Unit
             }
             is MarmotKitException.DisbandingNotEnabled -> {
-                buf.putInt(20)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.GroupDisbanding -> {
                 buf.putInt(21)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.MemberNotInGroup -> {
+            is MarmotKitException.GroupDisbanding -> {
                 buf.putInt(22)
                 FfiConverterString.write(value.`groupIdHex`, buf)
-                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.AlreadyAdmin -> {
+            is MarmotKitException.MemberNotInGroup -> {
                 buf.putInt(23)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.NotAdmin -> {
+            is MarmotKitException.AlreadyAdmin -> {
                 buf.putInt(24)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.StorageBusy -> {
+            is MarmotKitException.NotAdmin -> {
                 buf.putInt(25)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.SecretNotFound -> {
+            is MarmotKitException.StorageBusy -> {
                 buf.putInt(26)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.KeystoreUnavailable -> {
+            is MarmotKitException.SecretNotFound -> {
                 buf.putInt(27)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.EmptyPassphrase -> {
+            is MarmotKitException.KeystoreUnavailable -> {
                 buf.putInt(28)
-                Unit
-            }
-            is MarmotKitException.EncryptionFailed -> {
-                buf.putInt(29)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Io -> {
+            is MarmotKitException.EmptyPassphrase -> {
+                buf.putInt(29)
+                Unit
+            }
+            is MarmotKitException.EncryptionFailed -> {
                 buf.putInt(30)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.ExternalSignerUnavailable -> {
+            is MarmotKitException.Io -> {
                 buf.putInt(31)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.ExternalSignerUnavailable -> {
+                buf.putInt(32)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(32)
-                Unit
-            }
-            is MarmotKitException.ExternalSignerRejected -> {
                 buf.putInt(33)
                 Unit
             }
-            is MarmotKitException.Runtime -> {
+            is MarmotKitException.ExternalSignerRejected -> {
                 buf.putInt(34)
+                Unit
+            }
+            is MarmotKitException.Runtime -> {
+                buf.putInt(35)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
@@ -17800,6 +18480,81 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
     }
 
 }
+
+
+
+/**
+ * How closely the record matched, best first.
+ */
+
+enum class MatchQualityFfi {
+    
+    EXACT,
+    PREFIX,
+    CONTAINS;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMatchQualityFfi: FfiConverterRustBuffer<MatchQualityFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MatchQualityFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MatchQualityFfi) = 4UL
+
+    override fun write(value: MatchQualityFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Which field matched, most identifying first.
+ */
+
+enum class MatchedFieldFfi {
+    
+    NAME,
+    NIP05,
+    DISPLAY_NAME,
+    ABOUT,
+    NPUB,
+    PUBKEY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMatchedFieldFfi: FfiConverterRustBuffer<MatchedFieldFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MatchedFieldFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MatchedFieldFfi) = 4UL
+
+    override fun write(value: MatchedFieldFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
 
 
 
@@ -18186,6 +18941,189 @@ public object FfiConverterTypeRetentionSweepStatusFfi: FfiConverterRustBuffer<Re
 
     override fun write(value: RetentionSweepStatusFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Why an update was emitted, so a host can show traversal progress without
+ * tracking the search itself.
+ */
+sealed class SearchUpdateTriggerFfi {
+    
+    data class RadiusStarted(
+        val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+    data class ResultsFound(
+        val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+    data class RadiusCompleted(
+        val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+    /**
+     * This radius ran out of time; traversal stops here. Results already
+     * delivered stay valid — present them as partial, not failed.
+     */
+    data class RadiusTimeout(
+        val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+    /**
+     * Expanding this radius hit the per-radius candidate cap, so deeper
+     * results are incomplete. Like a timeout, this is partial rather than
+     * failed: everything already delivered is still correct.
+     */
+    data class RadiusTruncated(
+        val `radius`: kotlin.UByte) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+    /**
+     * Terminal: no further updates follow.
+     */
+    object SearchCompleted : SearchUpdateTriggerFfi()
+    
+    
+    /**
+     * Traversal failed. Always followed by [`Self::SearchCompleted`].
+     */
+    data class Error(
+        val `message`: kotlin.String) : SearchUpdateTriggerFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSearchUpdateTriggerFfi : FfiConverterRustBuffer<SearchUpdateTriggerFfi>{
+    override fun read(buf: ByteBuffer): SearchUpdateTriggerFfi {
+        return when(buf.getInt()) {
+            1 -> SearchUpdateTriggerFfi.RadiusStarted(
+                FfiConverterUByte.read(buf),
+                )
+            2 -> SearchUpdateTriggerFfi.ResultsFound(
+                FfiConverterUByte.read(buf),
+                )
+            3 -> SearchUpdateTriggerFfi.RadiusCompleted(
+                FfiConverterUByte.read(buf),
+                )
+            4 -> SearchUpdateTriggerFfi.RadiusTimeout(
+                FfiConverterUByte.read(buf),
+                )
+            5 -> SearchUpdateTriggerFfi.RadiusTruncated(
+                FfiConverterUByte.read(buf),
+                )
+            6 -> SearchUpdateTriggerFfi.SearchCompleted
+            7 -> SearchUpdateTriggerFfi.Error(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: SearchUpdateTriggerFfi) = when(value) {
+        is SearchUpdateTriggerFfi.RadiusStarted -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.ResultsFound -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.RadiusCompleted -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.RadiusTimeout -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.RadiusTruncated -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`radius`)
+            )
+        }
+        is SearchUpdateTriggerFfi.SearchCompleted -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is SearchUpdateTriggerFfi.Error -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`message`)
+            )
+        }
+    }
+
+    override fun write(value: SearchUpdateTriggerFfi, buf: ByteBuffer) {
+        when(value) {
+            is SearchUpdateTriggerFfi.RadiusStarted -> {
+                buf.putInt(1)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.ResultsFound -> {
+                buf.putInt(2)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.RadiusCompleted -> {
+                buf.putInt(3)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.RadiusTimeout -> {
+                buf.putInt(4)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.RadiusTruncated -> {
+                buf.putInt(5)
+                FfiConverterUByte.write(value.`radius`, buf)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.SearchCompleted -> {
+                buf.putInt(6)
+                Unit
+            }
+            is SearchUpdateTriggerFfi.Error -> {
+                buf.putInt(7)
+                FfiConverterString.write(value.`message`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 
@@ -19188,6 +20126,38 @@ public object FfiConverterOptionalTypeUserProfileMetadataFfi: FfiConverterRustBu
         } else {
             buf.put(1)
             FfiConverterTypeUserProfileMetadataFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeUserSearchUpdateFfi: FfiConverterRustBuffer<UserSearchUpdateFfi?> {
+    override fun read(buf: ByteBuffer): UserSearchUpdateFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeUserSearchUpdateFfi.read(buf)
+    }
+
+    override fun allocationSize(value: UserSearchUpdateFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeUserSearchUpdateFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: UserSearchUpdateFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeUserSearchUpdateFfi.write(value, buf)
         }
     }
 }
@@ -20508,6 +21478,34 @@ public object FfiConverterSequenceTypeTransportFanoutStatusFfi: FfiConverterRust
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTransportFanoutStatusFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeUserDirectorySearchResultFfi: FfiConverterRustBuffer<List<UserDirectorySearchResultFfi>> {
+    override fun read(buf: ByteBuffer): List<UserDirectorySearchResultFfi> {
+        val len = buf.getInt()
+        return List<UserDirectorySearchResultFfi>(len) {
+            FfiConverterTypeUserDirectorySearchResultFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<UserDirectorySearchResultFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeUserDirectorySearchResultFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<UserDirectorySearchResultFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeUserDirectorySearchResultFfi.write(it, buf)
         }
     }
 }
