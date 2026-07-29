@@ -2,9 +2,12 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.moveBy
@@ -55,6 +58,7 @@ class ChatFoldersContentTest {
         val editAction = row.config[SemanticsActions.OnClick]
         val moveActions = row.config[SemanticsActions.CustomActions]
 
+        assertEquals(Role.Button, row.config[SemanticsProperties.Role])
         assertEquals(app.getString(R.string.edit), editAction.label)
         composeRule.runOnUiThread { editAction.action?.invoke() }
         assertEquals("unread", editedId)
@@ -108,6 +112,23 @@ class ChatFoldersContentTest {
             }
 
         assertEquals("unread" to 1, moved)
+        assertEquals(null, editedId)
+    }
+
+    @Test
+    fun tappingDragHandleDoesNotOpenEditor() {
+        var editedId: String? = null
+        render(
+            folders = listOf(folderRow(id = "unread", name = "Unread")),
+            onEdit = { editedId = it },
+        )
+
+        composeRule
+            .onNodeWithContentDescription(
+                app.getString(R.string.chat_folder_drag_to_reorder),
+                useUnmergedTree = true,
+            ).performTouchInput { click() }
+
         assertEquals(null, editedId)
     }
 

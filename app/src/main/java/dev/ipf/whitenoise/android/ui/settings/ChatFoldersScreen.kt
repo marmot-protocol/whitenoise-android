@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -484,6 +485,8 @@ private fun ChatFolderDragHandle(
         contentDescription = stringResource(R.string.chat_folder_drag_to_reorder),
         modifier =
             Modifier
+                // Keep taps on the drag affordance from bubbling to the editable row.
+                .pointerInput(folderId) { detectTapGestures() }
                 .pointerInput(folderId) {
                     detectDragGestures(
                         onDragStart = { currentOnDragStart() },
