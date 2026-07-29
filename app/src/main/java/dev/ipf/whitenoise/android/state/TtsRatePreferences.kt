@@ -65,7 +65,7 @@ class TtsRatePreferences(
         // Presets instead of a free slider: TextToSpeech.setSpeechRate only
         // validates rate > 0 and every real clamp lives engine-side, so
         // engines disagree about what an extreme rate means.
-        val PRESET_RATES = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+        val PRESET_RATES = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f)
         const val DEFAULT_RATE = 1.0f
 
         private const val PREFERENCES_NAME = "whitenoise.tts_rate"
