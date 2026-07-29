@@ -133,8 +133,20 @@ class ChatListInlineConnectivityLayoutTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.switch_account)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.chat_list_search_open)).assertIsDisplayed()
+        val overflowBounds =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.switch_account))
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val searchBounds =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.chat_list_search_open))
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertTrue("account overflow must not overlap search", overflowBounds.right <= searchBounds.left)
     }
 
     @Test
