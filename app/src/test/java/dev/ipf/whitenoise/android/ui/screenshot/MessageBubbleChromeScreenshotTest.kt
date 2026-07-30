@@ -140,7 +140,6 @@ class MessageBubbleChromeScreenshotTest {
 private fun CustomAmoledReplyBubble(highlighted: Boolean) {
     val presentation =
         messageBubblePresentation(
-            invalidated = false,
             deleted = false,
             mine = false,
             customArgb = CUSTOM_AMOLED_ARGB,
@@ -149,7 +148,6 @@ private fun CustomAmoledReplyBubble(highlighted: Boolean) {
         presentation = presentation,
         highlighted = highlighted,
         mine = false,
-        invalidated = false,
         mentionedSelf = false,
         mentionedYouLabel = "Mentioned you",
     ) {
@@ -189,7 +187,7 @@ private fun DirectionalBubble(
             Text(
                 text = time,
                 style = MaterialTheme.typography.labelSmall,
-                color = messageBubbleTimestampColor(invalidated = false, mine = mine, deleted = false),
+                color = messageBubbleTimestampColor(mine = mine, deleted = false),
             )
         }
     }

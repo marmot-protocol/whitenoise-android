@@ -9,6 +9,7 @@ data class TimelineReplyDisplay(
     val sender: String,
     val body: String,
     val mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+    val warning: String? = null,
 )
 
 enum class ReplyMediaKind { None, Photo, Video, Voice, Document }
@@ -56,12 +57,48 @@ fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
     }
 }
 
+private fun replyPreviewMediaKind(
+    deleted: Boolean,
+    mediaFallback: MediaPreviewFallback?,
+    mediaJson: String?,
+): ReplyMediaKind =
+    if (deleted) {
+        ReplyMediaKind.None
+    } else {
+        mediaFallback?.kind ?: replyMediaKindFromJson(mediaJson)
+    }
+
 /**
  * Whether a bubble shows the disappearing-message indicator. An explicit
  * `0` means retention was disabled for this message, so only a positive
  * duration counts.
  */
 fun retentionIndicatorVisible(retentionSeconds: ULong?): Boolean = (retentionSeconds ?: 0uL) > 0uL
+
+internal enum class TimelineInvalidationPresentation {
+    None,
+    PartialVisibility,
+    NonCanonicalHistory,
+    PersistedFailure,
+}
+
+internal fun timelineInvalidationPresentation(status: String?): TimelineInvalidationPresentation =
+    when (status) {
+        null -> TimelineInvalidationPresentation.None
+        "LosingBranch" -> TimelineInvalidationPresentation.PartialVisibility
+        "BeyondAnchor",
+        "BeyondAppRetention",
+        "UndecryptableInCanonicalState",
+        -> TimelineInvalidationPresentation.NonCanonicalHistory
+        "local_publish_failed" -> TimelineInvalidationPresentation.PersistedFailure
+        // Preserve the established failure UI for future engine reasons until
+        // Android has an explicit reason-specific presentation for them.
+        else -> TimelineInvalidationPresentation.PersistedFailure
+    }
+
+internal fun usesPersistedFailurePresentation(record: TimelineMessageRecordFfi): Boolean =
+    !record.deleted &&
+        timelineInvalidationPresentation(record.invalidationStatus) == TimelineInvalidationPresentation.PersistedFailure
 
 object TimelineProjector {
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
@@ -81,16 +118,29 @@ object TimelineProjector {
             receivedAt = record.receivedAt,
         )
 
+    fun invalidationWarning(
+        record: TimelineMessageRecordFfi,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): String? = if (record.deleted) null else invalidationWarning(record.invalidationStatus, copy)
+
+    private fun invalidationWarning(
+        status: String?,
+        copy: MessageTextCopy,
+    ): String? =
+        when (timelineInvalidationPresentation(status)) {
+            TimelineInvalidationPresentation.PartialVisibility -> copy.partialVisibility
+            TimelineInvalidationPresentation.NonCanonicalHistory -> copy.nonCanonicalHistory
+            TimelineInvalidationPresentation.None,
+            TimelineInvalidationPresentation.PersistedFailure,
+            -> null
+        }
+
     fun displayBody(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): String {
         if (record.deleted) return copy.deleted
-        // A non-null invalidationStatus means convergence dropped this message
-        // onto a losing branch: it never reached the group. The record is kept
-        // as a tombstone, so render the "didn't reach the group" copy instead
-        // of the original body.
-        if (record.invalidationStatus != null) return copy.invalidated
+        if (usesPersistedFailurePresentation(record)) return copy.invalidated
         return projectedBody(
             plaintext = record.plaintext,
             kind = record.kind,
@@ -106,11 +156,33 @@ object TimelineProjector {
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
         val preview = record.replyPreview ?: return null
-        val mediaFallback = typedReplyMediaFallback(preview.media)
+        val mediaFallback = if (preview.deleted) null else typedReplyMediaFallback(preview.media)
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy, mediaFallback),
-            mediaKind = mediaFallback?.kind ?: replyMediaKindFromJson(preview.mediaJson),
+            mediaKind = replyPreviewMediaKind(preview.deleted, mediaFallback, preview.mediaJson),
+            warning = if (preview.deleted) null else invalidationWarning(preview.invalidationStatus, copy),
+        )
+    }
+
+    fun replyTargetPreview(
+        record: TimelineMessageRecordFfi,
+        mediaFallback: MediaPreviewFallback? = typedReplyMediaFallback(record.media),
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): TimelineReplyDisplay {
+        val visibleMediaFallback = if (record.deleted) null else mediaFallback
+        val projectedBody = displayBody(record, copy)
+        return TimelineReplyDisplay(
+            sender = record.sender,
+            body =
+                replyBodyWithTypedMediaFallback(
+                    plaintext = record.plaintext,
+                    projectedBody = projectedBody,
+                    mediaFallback = visibleMediaFallback,
+                    copy = copy,
+                ),
+            mediaKind = replyPreviewMediaKind(record.deleted, visibleMediaFallback, record.mediaJson),
+            warning = invalidationWarning(record, copy),
         )
     }
 

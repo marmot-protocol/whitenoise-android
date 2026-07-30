@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
@@ -292,6 +293,7 @@ internal fun rememberComposerTextState(
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
     replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
+    replyingToDisplay: TimelineReplyDisplay? = null,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
@@ -780,9 +782,10 @@ internal fun ComposerBar(
             } else if (replyingTo != null) {
                 val mediaFallback = remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }
                 val mediaKind =
-                    remember(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch) {
-                        composerReplyMediaKind(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch)
-                    }
+                    replyingToDisplay?.mediaKind
+                        ?: remember(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch) {
+                            composerReplyMediaKind(mediaFallback, replyingTo.tags, replyingTo.sourceEpoch)
+                        }
                 val profileRevision = appState?.profileRevisionForCompose
                 val replyMentionDisplayName =
                     remember(appState, profileRevision) {
@@ -795,14 +798,15 @@ internal fun ComposerBar(
                         MessageProjector.displayBody(replyingTo, messageTextCopy)
                     }
                 val replyBody =
-                    remember(replyingTo, projectedReplyBody, mediaFallback, messageTextCopy) {
-                        replyBodyWithTypedMediaFallback(
-                            plaintext = replyingTo.plaintext,
-                            projectedBody = projectedReplyBody,
-                            mediaFallback = mediaFallback,
-                            copy = messageTextCopy,
-                        )
-                    }
+                    replyingToDisplay?.body
+                        ?: remember(replyingTo, projectedReplyBody, mediaFallback, messageTextCopy) {
+                            replyBodyWithTypedMediaFallback(
+                                plaintext = replyingTo.plaintext,
+                                projectedBody = projectedReplyBody,
+                                mediaFallback = mediaFallback,
+                                copy = messageTextCopy,
+                            )
+                        }
                 ReplyPreviewCard(
                     senderTitle =
                         if (replyingTo.direction == "sent") {
@@ -813,6 +817,7 @@ internal fun ComposerBar(
                     isOwn = replyingTo.direction == "sent",
                     body = replyBody,
                     mediaKind = mediaKind,
+                    warning = replyingToDisplay?.warning,
                     onClick = null,
                     onDismiss = onCancelReply,
                     mentionDisplayName = replyMentionDisplayName,

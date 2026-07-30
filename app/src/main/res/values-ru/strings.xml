@@ -815,6 +815,8 @@
     </plurals>
     <string name="message_invalidated">Это сообщение не дошло до группы</string>
     <string name="message_invalidated_preview">Не дошло до группы</string>
+    <string name="message_partial_visibility_warning">Может быть видно не всем</string>
+    <string name="message_noncanonical_history_warning">Не подтверждено в текущей истории группы</string>
     <string name="group_avatar_url">URL аватара</string>
     <string name="relative_time_future">будущее</string>
     <string name="relative_time_now">сейчас</string>

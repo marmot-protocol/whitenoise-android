@@ -24,7 +24,7 @@ internal fun FontSizePreviewBubble(
     text: String,
     mine: Boolean,
 ) {
-    val bubbleColor = messageBubbleFillColor(invalidated = false, deleted = false, mine = mine)
+    val bubbleColor = messageBubbleFillColor(deleted = false, mine = mine)
     Box(Modifier.fillMaxWidth()) {
         Surface(
             modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),

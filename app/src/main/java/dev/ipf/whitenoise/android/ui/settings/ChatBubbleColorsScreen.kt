@@ -226,12 +226,12 @@ private fun BubbleColorPreview(
         PreviewBubble(
             text = stringResource(R.string.bubble_preview_other),
             mine = false,
-            presentation = resolveBubblePresentationArgb(false, false, amoled, false, otherOverrideArgb, tokens),
+            presentation = resolveBubblePresentationArgb(false, amoled, false, otherOverrideArgb, tokens),
         )
         PreviewBubble(
             text = stringResource(R.string.bubble_preview_mine),
             mine = true,
-            presentation = resolveBubblePresentationArgb(false, false, amoled, true, mineOverrideArgb, tokens),
+            presentation = resolveBubblePresentationArgb(false, amoled, true, mineOverrideArgb, tokens),
         )
     }
 }

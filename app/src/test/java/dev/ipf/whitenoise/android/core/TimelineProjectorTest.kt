@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -103,15 +104,43 @@ class TimelineProjectorTest {
     }
 
     @Test
-    fun invalidatedProjectedRecordUsesInvalidatedCopy() {
+    fun outgoingLosingBranchKeepsBodyAndUsesPartialVisibilityWarning() {
         val record =
             timelineRecord(
                 id = "invalidated",
                 plaintext = "Secret",
                 invalidationStatus = "LosingBranch",
+                direction = "sent",
             )
 
+        assertEquals("Secret", TimelineProjector.displayBody(record))
+        assertEquals("May not be visible to everyone", TimelineProjector.invalidationWarning(record))
+    }
+
+    @Test
+    fun beyondAnchorUsesNonCanonicalHistoryWarning() {
+        val record = timelineRecord(invalidationStatus = "BeyondAnchor")
+
+        assertEquals(
+            "Not confirmed in the group's current history",
+            TimelineProjector.invalidationWarning(record),
+        )
+    }
+
+    @Test
+    fun localPublishFailureKeepsPersistedFailurePresentation() {
+        val record = timelineRecord(plaintext = "Secret", invalidationStatus = "local_publish_failed")
+
         assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+        assertNull(TimelineProjector.invalidationWarning(record))
+    }
+
+    @Test
+    fun unknownInvalidationKeepsPersistedFailurePresentation() {
+        val record = timelineRecord(plaintext = "Secret", invalidationStatus = "FutureReason")
+
+        assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+        assertNull(TimelineProjector.invalidationWarning(record))
     }
 
     @Test
@@ -126,6 +155,7 @@ class TimelineProjectorTest {
             )
 
         assertEquals("Deleted a message", TimelineProjector.displayBody(record))
+        assertNull(TimelineProjector.invalidationWarning(record))
     }
 
     @Test
@@ -192,12 +222,66 @@ class TimelineProjectorTest {
                         plaintext = "Parent message",
                         kind = 9uL,
                         deleted = true,
+                        invalidationStatus = "LosingBranch",
+                        mediaJson = """{"media_type":"image/jpeg"}""",
+                        media = listOf(mediaAttachment(fileName = "secret.jpg", mediaType = "image/jpeg")),
                     ),
             )
 
         assertEquals(
             TimelineReplyDisplay(sender = "alice", body = "Deleted a message"),
             TimelineProjector.replyPreview(record),
+        )
+    }
+
+    @Test
+    fun losingBranchReplyPreviewKeepsBodyAndAddsPartialVisibilityWarning() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "Parent message",
+                        invalidationStatus = "LosingBranch",
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "Parent message",
+                warning = "May not be visible to everyone",
+            ),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    @Test
+    fun fallbackReplyTargetKeepsBodyAndAddsPartialVisibilityWarning() {
+        val target = timelineRecord(plaintext = "Parent message", invalidationStatus = "LosingBranch")
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "Parent message",
+                warning = "May not be visible to everyone",
+            ),
+            TimelineProjector.replyTargetPreview(target),
+        )
+    }
+
+    @Test
+    fun deletedFallbackReplyTargetSuppressesWarningAndMedia() {
+        val target =
+            timelineRecord(
+                plaintext = "Parent message",
+                deleted = true,
+                invalidationStatus = "LosingBranch",
+                mediaJson = """{"media_type":"image/jpeg"}""",
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "Deleted a message"),
+            TimelineProjector.replyTargetPreview(target),
         )
     }
 
@@ -272,6 +356,7 @@ class TimelineProjectorTest {
         kind: ULong = 9uL,
         sender: String = "alice",
         deleted: Boolean = false,
+        invalidationStatus: String? = null,
         mediaJson: String? = null,
         media: List<MediaAttachmentReferenceFfi> = emptyList(),
     ) = TimelineReplyPreviewFfi(
@@ -284,7 +369,7 @@ class TimelineProjectorTest {
         media = media,
         agentTextStreamJson = null,
         deleted = deleted,
-        invalidationStatus = null,
+        invalidationStatus = invalidationStatus,
     )
 
     private fun mediaAttachment(
@@ -312,10 +397,12 @@ class TimelineProjectorTest {
         deleted: Boolean = false,
         deletedByMessageIdHex: String? = null,
         invalidationStatus: String? = null,
+        direction: String = "received",
+        mediaJson: String? = null,
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
-        direction = "received",
+        direction = direction,
         groupIdHex = "group",
         sender = "alice",
         plaintext = plaintext,
@@ -326,7 +413,7 @@ class TimelineProjectorTest {
         receivedAt = timelineAt,
         replyToMessageIdHex = replyPreview?.messageIdHex,
         replyPreview = replyPreview,
-        mediaJson = null,
+        mediaJson = mediaJson,
         media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
