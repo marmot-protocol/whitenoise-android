@@ -13,6 +13,28 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class TtsRatePreferencesTest {
     @Test
+    fun presetRatesIncludeHighRatesAfterTwoX() {
+        assertEquals(
+            listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f),
+            TtsRatePreferences.PRESET_RATES,
+        )
+    }
+
+    @Test
+    fun highRateOverridesPersistAcrossReload() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = TtsRatePreferences(context)
+
+        store.setRateOverride(2.5f)
+        assertEquals(2.5f, store.rateOverride.value)
+        assertEquals(2.5f, TtsRatePreferences(context).rateOverride.value)
+
+        store.setRateOverride(3.0f)
+        assertEquals(3.0f, store.rateOverride.value)
+        assertEquals(3.0f, TtsRatePreferences(context).rateOverride.value)
+    }
+
+    @Test
     fun overridesSnapToThePresetGridOnWriteAndRead() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = TtsRatePreferences(context)

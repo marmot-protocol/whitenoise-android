@@ -13,7 +13,9 @@ class TtsTransportBarLogicTest {
     fun ratePillCyclesPresetsStartingFromDefaultWhenFollowingTheSystem() {
         assertEquals(1.0f, nextTtsPresetRate(null))
         assertEquals(1.25f, nextTtsPresetRate(1.0f))
-        assertEquals(0.5f, nextTtsPresetRate(2.0f))
+        assertEquals(2.5f, nextTtsPresetRate(2.0f))
+        assertEquals(3.0f, nextTtsPresetRate(2.5f))
+        assertEquals(0.5f, nextTtsPresetRate(3.0f))
     }
 
     @Test
@@ -30,6 +32,16 @@ class TtsTransportBarLogicTest {
                 "1\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
                     .ttsRateLabel(1.0f),
+            )
+            assertEquals(
+                "2,5\u00d7",
+                dev.ipf.whitenoise.android.ui.settings
+                    .ttsRateLabel(2.5f),
+            )
+            assertEquals(
+                "3\u00d7",
+                dev.ipf.whitenoise.android.ui.settings
+                    .ttsRateLabel(3.0f),
             )
         } finally {
             java.util.Locale.setDefault(previous)
