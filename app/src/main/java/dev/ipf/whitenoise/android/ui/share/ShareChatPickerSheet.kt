@@ -28,6 +28,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,10 +46,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
-import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -139,23 +141,47 @@ private fun rememberShareChatPickerPresentations(
     pickerState: ShareChatPickerState,
 ): List<ShareChatPickerTargetPresentation> {
     val groupTitleCopy = rememberGroupTitleCopy()
+    val memberSnapshotsRevision = appState.forwardTargetMembersRevision
+    val currentTargets =
+        remember(pickerState.targets, memberSnapshotsRevision) {
+            val currentById = appState.forwardTargets().associateBy { it.group.groupIdHex }
+            pickerState.targets.map { target ->
+                currentById[target.group.groupIdHex] ?: target
+            }
+        }
+    val unresolvedDirectGroupIds =
+        remember(currentTargets, pickerState.activeAccountIdHex) {
+            currentTargets
+                .filter { target ->
+                    target.projection?.conversationKind == ChatConversationKindFfi.DIRECT &&
+                        shareTargetAccountIds(target, pickerState.activeAccountIdHex).isEmpty()
+                }.map { it.group.groupIdHex }
+        }
+    LaunchedEffect(appState, unresolvedDirectGroupIds) {
+        appState.requestForwardTargetMembers(unresolvedDirectGroupIds)
+    }
     val targetAccountIds =
-        remember(pickerState.targets, pickerState.activeAccountIdHex) {
-            pickerState.targets
+        remember(currentTargets, pickerState.activeAccountIdHex) {
+            currentTargets
                 .flatMap { shareTargetAccountIds(it, pickerState.activeAccountIdHex) }
                 .distinct()
         }
     LaunchedEffect(appState, targetAccountIds) {
         appState.requestProfiles(targetAccountIds)
     }
-    return remember(pickerState.targets, groupTitleCopy, appState.profileRevisionForCompose) {
-        pickerState.targets.map { item ->
-            shareTargetPresentation(
-                item = item,
-                appState = appState,
-                activeAccountIdHex = pickerState.activeAccountIdHex,
-                groupTitleCopy = groupTitleCopy,
-            )
+    val aliasesByAccount = rememberShareAccountAliases(appState, targetAccountIds)
+    return currentTargets.map { item ->
+        key(item.group.groupIdHex) {
+            val accountAliases =
+                shareTargetAccountIds(item, pickerState.activeAccountIdHex)
+                    .associateWith { aliasesByAccount.getValue(it) }
+            remember(item, accountAliases, groupTitleCopy) {
+                shareTargetPresentation(
+                    item = item,
+                    accountAliases = accountAliases,
+                    groupTitleCopy = groupTitleCopy,
+                )
+            }
         }
     }
 }
@@ -199,8 +225,7 @@ private fun ShareChatPickerContent(
         ShareChatPickerFooter(
             selectedCount = pickerState.selected.size,
             onStage = {
-                onStage(pickerState.selected.toList())
-                onDismiss()
+                if (pickerState.stage(onStage)) onDismiss()
             },
         )
     }
@@ -322,6 +347,7 @@ private class ShareChatPickerState(
     val appState: WhiteNoiseAppState,
     val payload: SharePayload,
     val targets: List<ChatListItem>,
+    private val activeAccountRef: String?,
     val activeAccountIdHex: String?,
     val previewText: String,
     val attachmentCount: Int,
@@ -335,8 +361,14 @@ private class ShareChatPickerState(
         return if (needle.isEmpty()) {
             presentedTargets
         } else {
+            val foldedNeedle = localeInvariantFold(needle)
+            val matchIdentityAliases = looksLikeShareIdentityNeedle(foldedNeedle)
             presentedTargets.filter { target ->
-                target.searchValues.any { it.contains(needle, ignoreCase = true) }
+                val humanMatch = target.humanSearchValues.any { localeInvariantFold(it).contains(foldedNeedle) }
+                val identityMatch =
+                    matchIdentityAliases &&
+                        target.identitySearchValues.any { localeInvariantFold(it).contains(foldedNeedle) }
+                humanMatch || identityMatch
             }
         }
     }
@@ -344,46 +376,58 @@ private class ShareChatPickerState(
     fun toggleSelection(groupId: String) {
         if (selected.contains(groupId)) selected.remove(groupId) else selected.add(groupId)
     }
+
+    fun stage(onStage: (List<String>) -> Unit): Boolean {
+        if (!sharePickerAccountStillActive(activeAccountRef, appState.activeAccountRef)) return false
+        onStage(selected.toList())
+        return true
+    }
 }
 
 private data class ShareChatPickerTargetPresentation(
     val item: ChatListItem,
     val title: String,
-    val searchValues: List<String>,
+    val humanSearchValues: List<String>,
+    val identitySearchValues: List<String>,
 )
 
 private fun shareTargetPresentation(
     item: ChatListItem,
-    appState: WhiteNoiseAppState,
-    activeAccountIdHex: String?,
+    accountAliases: Map<String, ShareAccountAliases>,
     groupTitleCopy: GroupTitleCopy,
 ): ShareChatPickerTargetPresentation {
-    val accountIds = shareTargetAccountIds(item, activeAccountIdHex)
-    val projectedTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy)
+    val projectedTitle =
+        item.sanitizedNamedTitle ?: GroupProjector.displayTitle(
+            group = item.group,
+            otherMemberAccount = item.otherMemberAccount,
+            memberCount = item.memberCount,
+            memberTitle = { accountIdHex ->
+                accountAliases[accountIdHex]?.displayName ?: IdentityFormatter.short(accountIdHex)
+            },
+            copy = groupTitleCopy,
+        )
     val title =
         when {
             item.sanitizedNamedTitle != null || projectedTitle != groupTitleCopy.unknownTitle -> projectedTitle
-            accountIds.isNotEmpty() -> appState.contactDisplayNameCached(accountIds.first())
+            accountAliases.isNotEmpty() -> accountAliases.values.first().displayName
             else -> "${groupTitleCopy.unknownTitle} · ${IdentityFormatter.short(item.group.groupIdHex)}"
         }
-    val profileAliases =
-        accountIds.flatMap { accountIdHex ->
-            val profile = appState.userProfileCached(accountIdHex)
-            listOfNotNull(
-                appState.contactNickname(accountIdHex),
-                profile?.displayName,
-                profile?.name,
-                profile?.nip05,
-                accountIdHex,
-                runCatching { appState.npub(accountIdHex) }.getOrNull(),
-            )
+    val searchableTitle =
+        title.takeIf {
+            item.sanitizedNamedTitle != null ||
+                title == groupTitleCopy.groupOfPeople(item.memberCount) ||
+                accountAliases.values.any { aliases -> title in aliases.human }
         }
+    val humanSearchValues =
+        (listOfNotNull(searchableTitle) + accountAliases.values.flatMap { it.human })
+            .mapNotNull(ProfileSanitizer::displayName)
+            .distinct()
     return ShareChatPickerTargetPresentation(
         item = item,
         title = title,
-        searchValues =
-            (listOf(title) + profileAliases)
-                .mapNotNull(ProfileSanitizer::displayName)
+        humanSearchValues = humanSearchValues,
+        identitySearchValues =
+            (listOf(item.group.groupIdHex) + accountAliases.values.flatMap { it.identity })
                 .distinct(),
     )
 }
@@ -418,6 +462,7 @@ private fun rememberShareChatPickerState(
             appState = appState,
             payload = payload,
             targets = targets,
+            activeAccountRef = appState.activeAccountRef,
             activeAccountIdHex = appState.activeAccount?.accountIdHex,
             previewText = payload.text?.trim().orEmpty(),
             attachmentCount = payload.streamUris.size,
@@ -436,8 +481,18 @@ private fun ShareTargetRow(
 ) {
     val groupId = item.group.groupIdHex
     val avatarAccount = forwardTargetAvatarAccount(item)
+    val memberIds =
+        remember(item, activeAccountIdHex) {
+            item.memberSnapshot
+                ?.members
+                .orEmpty()
+                .map { it.memberIdHex }
+                .filter { it.isNotBlank() && it != activeAccountIdHex }
+                .distinct()
+        }
+    val memberRevisions = memberIds.map(appState::profileRevisionForCompose)
     val membersPreview =
-        remember(item, appState.profileRevisionForCompose) {
+        remember(item, memberRevisions) {
             forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
                 appState.contactDisplayNameCached(memberIdHex)
             }

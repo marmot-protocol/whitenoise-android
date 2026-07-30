@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -27,10 +28,14 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.ScopedSet
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -84,7 +89,8 @@ class ShareChatPickerSheetProfileTest {
 
     @Test
     fun lateProfileUsernameBecomesSearchableWhileDisplayingPreferredName() {
-        val appState = appStateWithDirectChat(GROUP_A, PEER_A)
+        val profiles = mutableMapOf<String, UserProfileMetadataFfi>()
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -103,21 +109,16 @@ class ShareChatPickerSheetProfileTest {
             .performTextInput("alice_dev")
         composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsDisplayed()
 
-        composeRule.runOnIdle {
-            deliverProfile(
-                appState = appState,
-                accountIdHex = PEER_A,
-                profile =
-                    UserProfileMetadataFfi(
-                        name = "alice_dev",
-                        displayName = "Alice Example",
-                        about = null,
-                        picture = null,
-                        nip05 = "alice@example.com",
-                        lud16 = null,
-                    ),
+        profiles[PEER_A] =
+            UserProfileMetadataFfi(
+                name = "alice_dev",
+                displayName = "Alice Example",
+                about = null,
+                picture = null,
+                nip05 = "alice@example.com",
+                lud16 = null,
             )
-        }
+        refreshProfile(appState, PEER_A)
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
@@ -126,7 +127,8 @@ class ShareChatPickerSheetProfileTest {
 
     @Test
     fun aliasOnlyProfileUpdateRefreshesActiveSearch() {
-        val appState = appStateWithDirectChat(GROUP_A, PEER_A)
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice Example", name = "old_alias"))
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -138,13 +140,6 @@ class ShareChatPickerSheetProfileTest {
                 )
             }
         }
-        composeRule.runOnIdle {
-            deliverProfile(
-                appState,
-                PEER_A,
-                profile(displayName = "Alice Example", name = "old_alias"),
-            )
-        }
         composeRule.waitForIdle()
         composeRule
             .onNodeWithText(app.getString(R.string.share_search_chats))
@@ -152,13 +147,8 @@ class ShareChatPickerSheetProfileTest {
             .performTextInput("new_alias")
         composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsDisplayed()
 
-        composeRule.runOnIdle {
-            deliverProfile(
-                appState,
-                PEER_A,
-                profile(displayName = "Alice Example", name = "new_alias"),
-            )
-        }
+        profiles[PEER_A] = profile(displayName = "Alice Example", name = "new_alias")
+        refreshProfile(appState, PEER_A)
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
@@ -166,16 +156,165 @@ class ShareChatPickerSheetProfileTest {
     }
 
     @Test
-    fun profileRequestStartsLocalMaterializationBeforeRelayRefresh() {
-        val appState = emptyAppState()
-        var materializationStarted = false
+    fun localProfileMaterializesWhenRelayRefreshFails() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice\u202E Example"))
+        var refreshAttempts = 0
+        val appState =
+            appStateWithDirectChat(
+                GROUP_A,
+                PEER_A,
+                profiles = profiles,
+                profileRefresh = {
+                    refreshAttempts += 1
+                    error("relay unavailable")
+                },
+            )
 
-        composeRule.runOnIdle {
-            appState.requestProfile(PEER_A)
-            materializationStarted = profileMaterializationInFlight(appState, PEER_A)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
         }
 
-        assertTrue("Local profile materialization must start without waiting for relay refresh", materializationStarted)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Alice Example").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) { refreshAttempts > 0 }
+        composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
+    }
+
+    @Test
+    fun shortIdentityFragmentsDoNotMatchUnresolvedProfiles() {
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A)
+        val fallbackTitle = appState.shortNpub(PEER_A)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText(fallbackTitle).assertIsDisplayed()
+
+        val search = composeRule.onNodeWithText(app.getString(R.string.share_search_chats))
+        search.performClick().performTextInput("b1")
+
+        composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsDisplayed()
+
+        composeRule.onNode(hasSetTextAction()).performTextInput("b1b1b1")
+        composeRule.onNodeWithText(fallbackTitle).assertIsDisplayed()
+    }
+
+    @Test
+    fun npubSearchRequiresFullIdentityThreshold() {
+        assertFalse(looksLikeShareIdentityNeedle("npub1"))
+        assertTrue(looksLikeShareIdentityNeedle("npub1abc"))
+    }
+
+    @Test
+    fun stagingRequiresTheAccountThatOpenedThePicker() {
+        assertTrue(sharePickerAccountStillActive("account-a", "account-a"))
+        assertFalse(sharePickerAccountStillActive("account-a", "account-b"))
+        assertFalse(sharePickerAccountStillActive(null, "account-a"))
+    }
+
+    @Test
+    fun visibleMultiMemberTitleRemainsSearchableWhenMemberProfilesResolve() {
+        val profiles =
+            mutableMapOf(
+                PEER_A to profile(displayName = "Alice"),
+                PEER_B to profile(displayName = "Bob"),
+            )
+        val appState = emptyAppState(profiles = profiles)
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        controller.applyChatListRow(chatRow(GROUP_A))
+        controller.applyLocalGroupDetails(
+            record = group(GROUP_A),
+            members =
+                listOf(
+                    member(ACCOUNT_HEX, local = true),
+                    member(PEER_A, local = false),
+                    member(PEER_B, local = false),
+                ),
+        )
+        appState.attachChatsController(controller)
+        val visibleTitle = app.getString(R.string.group_title_people_count, 3)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(visibleTitle).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(app.getString(R.string.share_search_chats))
+            .performClick()
+            .performTextInput(visibleTitle)
+
+        composeRule.onAllNodesWithText(visibleTitle).assertCountEquals(2)
+        composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsNotDisplayed()
+    }
+
+    @Test
+    fun profileArrivalInvalidatesOnlyItsAccountAliases() {
+        val profiles = mutableMapOf<String, UserProfileMetadataFfi>()
+        val appState = emptyAppState(profiles = profiles)
+        val peerABefore = appState.profileRevisionForCompose(PEER_A)
+        val peerBBefore = appState.profileRevisionForCompose(PEER_B)
+
+        profiles[PEER_A] = profile(displayName = "Alice")
+        refreshProfile(appState, PEER_A)
+
+        assertNotEquals(peerABefore, appState.profileRevisionForCompose(PEER_A))
+        assertEquals(peerBBefore, appState.profileRevisionForCompose(PEER_B))
+    }
+
+    @Test
+    fun unresolvedDirectTargetRequestsRosterAndResolvesPeer() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice Example"))
+        var rosterRequests = 0
+        val appState = emptyAppState(profiles = profiles)
+        val controller =
+            ChatsController(appState, ACCOUNT_REF) { _, groupId ->
+                rosterRequests += 1
+                check(groupId == GROUP_A)
+                listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false))
+            }
+        controller.applyChatListRow(chatRow(GROUP_A))
+        controller.applyLocalGroupUpdate(group(GROUP_A))
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { rosterRequests == 1 }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Alice Example").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
     }
 
     @Test
@@ -199,7 +338,13 @@ class ShareChatPickerSheetProfileTest {
 
     @Test
     fun duplicateResolvedNamesPreserveSelectionByGroupId() {
-        val appState = appStateWithDirectChats(GROUP_A to PEER_A, GROUP_B to PEER_B)
+        val profiles = mutableMapOf<String, UserProfileMetadataFfi>()
+        val appState =
+            appStateWithDirectChats(
+                GROUP_A to PEER_A,
+                GROUP_B to PEER_B,
+                profiles = profiles,
+            )
         val firstFallback = appState.shortNpub(PEER_A)
         var staged = emptyList<String>()
 
@@ -216,10 +361,10 @@ class ShareChatPickerSheetProfileTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText(firstFallback).performClick()
 
-        composeRule.runOnIdle {
-            deliverProfile(appState, PEER_A, profile(displayName = "Alex"))
-            deliverProfile(appState, PEER_B, profile(displayName = "Alex"))
-        }
+        profiles[PEER_A] = profile(displayName = "Alex")
+        profiles[PEER_B] = profile(displayName = "Alex")
+        refreshProfile(appState, PEER_A)
+        refreshProfile(appState, PEER_B)
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithText("Alex").assertCountEquals(2)
@@ -231,7 +376,13 @@ class ShareChatPickerSheetProfileTest {
 
     @Test
     fun lateProfileResolutionDoesNotReorderTargetsByResolvedTitle() {
-        val appState = appStateWithDirectChats(GROUP_A to PEER_A, GROUP_B to PEER_B)
+        val profiles = mutableMapOf<String, UserProfileMetadataFfi>()
+        val appState =
+            appStateWithDirectChats(
+                GROUP_A to PEER_A,
+                GROUP_B to PEER_B,
+                profiles = profiles,
+            )
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -243,10 +394,10 @@ class ShareChatPickerSheetProfileTest {
                 )
             }
         }
-        composeRule.runOnIdle {
-            deliverProfile(appState, PEER_A, profile(displayName = "Zebra"))
-            deliverProfile(appState, PEER_B, profile(displayName = "Alpha"))
-        }
+        profiles[PEER_A] = profile(displayName = "Zebra")
+        profiles[PEER_B] = profile(displayName = "Alpha")
+        refreshProfile(appState, PEER_A)
+        refreshProfile(appState, PEER_B)
         composeRule.waitForIdle()
 
         val zebraTop =
@@ -265,12 +416,22 @@ class ShareChatPickerSheetProfileTest {
     private fun appStateWithDirectChat(
         groupId: String,
         peerId: String,
-    ): WhiteNoiseAppState = appStateWithDirectChats(groupId to peerId)
+        profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
+        profileRefresh: suspend (String) -> Unit = {},
+    ): WhiteNoiseAppState =
+        appStateWithDirectChats(
+            groupId to peerId,
+            profiles = profiles,
+            profileRefresh = profileRefresh,
+        )
 
-    private fun appStateWithDirectChats(vararg chats: Pair<String, String>): WhiteNoiseAppState {
-        val appState = emptyAppState()
-        val controller = ChatsController(appState)
-        bindAccount(controller)
+    private fun appStateWithDirectChats(
+        vararg chats: Pair<String, String>,
+        profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
+        profileRefresh: suspend (String) -> Unit = {},
+    ): WhiteNoiseAppState {
+        val appState = emptyAppState(profiles = profiles, profileRefresh = profileRefresh)
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
         chats.forEach { (groupId, _) -> controller.applyChatListRow(chatRow(groupId)) }
         chats.forEach { (groupId, peerId) ->
             controller.applyLocalGroupDetails(
@@ -284,59 +445,36 @@ class ShareChatPickerSheetProfileTest {
 
     private fun appStateWithUnresolvedChat(groupId: String): WhiteNoiseAppState {
         val appState = emptyAppState()
-        val controller = ChatsController(appState)
-        bindAccount(controller)
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
         controller.applyChatListRow(chatRow(groupId))
         appState.attachChatsController(controller)
         return appState
     }
 
-    private fun emptyAppState() =
+    private fun emptyAppState(
+        profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
+        profileRefresh: suspend (String) -> Unit = {},
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = app,
             draftStore = DraftStore(InMemoryDraftPersistence()),
             accountIdHexResolver = { null },
             accounts = listOf(activeAccount()),
             activeAccountRef = ACCOUNT_REF,
+            profileReader = { profiles[it] },
+            profileDisplayNameReader = { profiles[it]?.displayName },
+            profileRefreshRequest = profileRefresh,
         )
 
-    private fun bindAccount(controller: ChatsController) {
-        val field = ChatsController::class.java.getDeclaredField("accountRef").apply { isAccessible = true }
-        field.set(controller, ACCOUNT_REF)
-    }
-
-    private fun deliverProfile(
+    private fun refreshProfile(
         appState: WhiteNoiseAppState,
         accountIdHex: String,
-        profile: UserProfileMetadataFfi,
     ) {
-        val presentationClass = Class.forName("dev.ipf.whitenoise.android.state.ProfilePresentation")
-        val presentation =
-            presentationClass
-                .getDeclaredConstructor(String::class.java, String::class.java)
-                .apply { isAccessible = true }
-                .newInstance(profile.displayName, profile.picture)
-        WhiteNoiseAppState::class.java
-            .getDeclaredMethod(
-                "applyProfilePresentation",
-                String::class.java,
-                UserProfileMetadataFfi::class.java,
-                presentationClass,
-            ).apply { isAccessible = true }
-            .invoke(appState, accountIdHex, profile, presentation)
-    }
-
-    private fun profileMaterializationInFlight(
-        appState: WhiteNoiseAppState,
-        accountIdHex: String,
-    ): Boolean {
-        @Suppress("UNCHECKED_CAST")
-        val materializingProfiles =
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("materializingProfiles")
-                .apply { isAccessible = true }
-                .get(appState) as ScopedSet<String>
-        return accountIdHex in materializingProfiles
+        composeRule.runOnIdle {
+            CoroutineScope(Dispatchers.Main.immediate).launch {
+                appState.refreshProfile(accountIdHex)
+            }
+        }
     }
 
     private fun profile(

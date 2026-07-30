@@ -547,6 +547,7 @@ internal fun MainShell(
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
         if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
+            sharePickerRequest = null
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false

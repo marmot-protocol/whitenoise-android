@@ -2308,9 +2308,26 @@ internal class RetainedMediaUpload(
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
 )
 
-class ChatsController(
+class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
+    private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+    initialAccountRef: String?,
 ) {
+    constructor(appState: WhiteNoiseAppState) :
+        this(
+            appState = appState,
+            memberSnapshotLoader = { accountRef, groupIdHex ->
+                appState.marmotIo { groupMembers(accountRef, groupIdHex) }
+            },
+            initialAccountRef = null,
+        )
+
+    internal constructor(
+        appState: WhiteNoiseAppState,
+        initialAccountRef: String,
+        memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+    ) : this(appState, memberSnapshotLoader, initialAccountRef)
+
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
     var archivedItems by mutableStateOf<List<ChatListItem>>(emptyList())
@@ -2326,7 +2343,7 @@ class ChatsController(
 
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
-    var boundAccountRef by mutableStateOf<String?>(null)
+    var boundAccountRef by mutableStateOf<String?>(initialAccountRef)
         private set
 
     /**
@@ -2338,7 +2355,10 @@ class ChatsController(
     var materializedGroupsRevision by mutableStateOf(0L)
         private set
 
-    private var accountRef: String? = null
+    var memberSnapshotsRevision by mutableStateOf(0L)
+        private set
+
+    private var accountRef: String? = initialAccountRef
 
     private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
 
@@ -2744,6 +2764,7 @@ class ChatsController(
                 )
             memberCacheByGroup = updated.memberCacheByGroup
             removedGroupIds = updated.removedGroupIds
+            memberSnapshotsRevision += 1L
         }
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
@@ -3622,6 +3643,7 @@ class ChatsController(
         replaceChatRows(emptyList())
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
+        memberSnapshotsRevision += 1L
         removedGroupIds = emptySet()
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
@@ -3694,14 +3716,20 @@ class ChatsController(
      * profile-sheet shared-group intersections see the local member snapshot,
      * with a burst of completions coalesced into one rebuild.
      */
-    private fun schedulePendingMemberFetches() {
+    internal fun requestMemberSnapshots(groupIds: Iterable<String>) {
+        schedulePendingMemberFetches(groupIds)
+    }
+
+    private fun schedulePendingMemberFetches(groupIds: Iterable<String> = chatRows.map { it.groupIdHex }) {
         val account = accountRef ?: return
         val epoch = bindEpoch
         val cacheEpoch = memberCacheEpoch
+        val liveGroupIds = chatRows.mapTo(mutableSetOf()) { it.groupIdHex }
         val pending =
-            chatRows
+            groupIds
                 .asSequence()
-                .map { it.groupIdHex }
+                .distinct()
+                .filter { it in liveGroupIds }
                 .filterNot { memberCacheByGroup.containsKey(it) }
                 .filterNot { it in inFlightMemberFetches }
                 .toList()
@@ -3712,13 +3740,14 @@ class ChatsController(
                 try {
                     memberFetchGate.withPermit {
                         if (!isActiveBindEpoch(epoch)) return@withPermit
-                        val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                        val members = memberSnapshotLoader(account, groupIdHex)
                         if (isActiveBindEpoch(epoch) && cacheEpoch == memberCacheEpoch) {
                             members
                                 .map { it.memberIdHex }
                                 .filter { it.isNotBlank() }
                                 .forEach(appState::requestProfile)
                             memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                            memberSnapshotsRevision += 1L
                             // A loaded roster that omits self is known removal
                             // evidence (admin eviction / self-leave the engine
                             // has already applied). Marking it makes an empty

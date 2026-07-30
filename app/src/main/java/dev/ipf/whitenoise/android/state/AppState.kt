@@ -1142,6 +1142,11 @@ internal data class ProfilePresentationRevision(
     val contactNicknames: Int,
 )
 
+internal data class ProfileAccountRevision(
+    val epoch: Int,
+    val account: Int,
+)
+
 internal fun contactNicknameAccountRefForAccess(
     accountRef: String?,
     accounts: List<AccountSummaryFfi>,
@@ -1186,6 +1191,9 @@ class WhiteNoiseAppState private constructor(
     val draftStore: DraftStore,
     startPlatformServices: Boolean,
     private val accountIdHexResolver: (suspend (String) -> String?)?,
+    private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
+    private val profileDisplayNameReader: (suspend (String) -> String?)?,
+    private val profileRefreshRequest: (suspend (String) -> Unit)?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1195,6 +1203,9 @@ class WhiteNoiseAppState private constructor(
             draftStore = DraftStore.forContext(context.applicationContext),
             startPlatformServices = true,
             accountIdHexResolver = null,
+            profileReader = null,
+            profileDisplayNameReader = null,
+            profileRefreshRequest = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1206,11 +1217,17 @@ class WhiteNoiseAppState private constructor(
         accountIdHexResolver: suspend (String) -> String?,
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,
+        profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
+        profileDisplayNameReader: (suspend (String) -> String?)? = null,
+        profileRefreshRequest: (suspend (String) -> Unit)? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
         startPlatformServices = false,
         accountIdHexResolver = accountIdHexResolver,
+        profileReader = profileReader,
+        profileDisplayNameReader = profileDisplayNameReader,
+        profileRefreshRequest = profileRefreshRequest,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -1691,6 +1708,9 @@ class WhiteNoiseAppState private constructor(
         )
     private var profileRevision by mutableStateOf(0)
     private var contactNicknameRevision by mutableStateOf(0)
+    private var profileAccountRevisionEpoch by mutableStateOf(0)
+    private val profileAccountRevisions = mutableStateMapOf<String, Int>()
+    private val profileAccountRevisionOrder = linkedSetOf<String>()
 
     /**
      * Read-only Compose-tracked snapshot of profile-presentation invalidations
@@ -1701,6 +1721,34 @@ class WhiteNoiseAppState private constructor(
      */
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
+
+    internal fun profileRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
+        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
+        return ProfileAccountRevision(
+            epoch = profileAccountRevisionEpoch,
+            account = profileAccountRevisions[normalized] ?: 0,
+        )
+    }
+
+    private fun bumpProfileAccountRevision(accountIdHex: String) {
+        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
+        if (normalized.isEmpty()) return
+        profileAccountRevisions[normalized] = (profileAccountRevisions[normalized] ?: 0) + 1
+        profileAccountRevisionOrder.remove(normalized)
+        profileAccountRevisionOrder.add(normalized)
+        if (profileAccountRevisionOrder.size > MAX_PROFILE_PRESENTATION_CACHE_ENTRIES) {
+            val evicted = profileAccountRevisionOrder.first()
+            profileAccountRevisionOrder.remove(evicted)
+            profileAccountRevisions.remove(evicted)
+        }
+    }
+
+    private fun bumpAllProfileAccountRevisions() {
+        profileAccountRevisionEpoch += 1
+        profileAccountRevisions.clear()
+        profileAccountRevisionOrder.clear()
+    }
+
     private val profilePresentations =
         ScopedCache<String, ProfilePresentation>(
             registry = accountScopedCaches,
@@ -2278,6 +2326,13 @@ class WhiteNoiseAppState private constructor(
      * stream hasn't bound) — the forward picker then shows its empty state.
      */
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
+
+    internal val forwardTargetMembersRevision: Long
+        get() = chatsController?.memberSnapshotsRevision ?: 0L
+
+    internal fun requestForwardTargetMembers(groupIds: Iterable<String>) {
+        chatsController?.requestMemberSnapshots(groupIds)
+    }
 
     fun stageInboundShare(
         targetGroupIds: List<String>,
@@ -3348,6 +3403,7 @@ class WhiteNoiseAppState private constructor(
             }
         if (nicknamesCleared) {
             contactNicknameRevision += 1
+            bumpAllProfileAccountRevisions()
         }
     }
 
@@ -3367,6 +3423,7 @@ class WhiteNoiseAppState private constructor(
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
+        bumpAllProfileAccountRevisions()
     }
 
     /**
@@ -5568,6 +5625,7 @@ class WhiteNoiseAppState private constructor(
         if (isContactRefBeingCleared(account)) return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
+            bumpProfileAccountRevision(accountIdHex)
         }
     }
 
@@ -5846,18 +5904,23 @@ class WhiteNoiseAppState private constructor(
             try {
                 val result =
                     runCatching {
-                        marmotIo {
-                            val activeAccountRelays =
-                                activeAccountRef
-                                    ?.let { runCatchingCancellable { accountNip65Relays(it) }.getOrNull() }
-                                    .orEmpty()
-                            val relays =
-                                profileLookupRelays(
-                                    bootstrapRelays = MarmotClient.bootstrapRelays,
-                                    activeAccountRelays = activeAccountRelays,
-                                )
-                            refreshProfile(accountIdHex, relays)
-                            userProfile(accountIdHex)
+                        if (profileRefreshRequest != null || profileReader != null) {
+                            profileRefreshRequest?.invoke(accountIdHex)
+                            profileReader?.invoke(accountIdHex)
+                        } else {
+                            marmotIo {
+                                val activeAccountRelays =
+                                    activeAccountRef
+                                        ?.let { runCatchingCancellable { accountNip65Relays(it) }.getOrNull() }
+                                        .orEmpty()
+                                val relays =
+                                    profileLookupRelays(
+                                        bootstrapRelays = MarmotClient.bootstrapRelays,
+                                        activeAccountRelays = activeAccountRelays,
+                                    )
+                                refreshProfile(accountIdHex, relays)
+                                userProfile(accountIdHex)
+                            }
                         }
                     }
                 // Don't let runCatching swallow cancellation: rethrow so the
@@ -5873,10 +5936,13 @@ class WhiteNoiseAppState private constructor(
             // completion runs on profileScope = Main.immediate), then apply the
             // in-memory caches on the main thread. The read accessors serve from
             // these caches so composition never crosses the binding. See #4, #49.
-            val displayName =
-                runCatchingCancellable { marmotIo { displayName(accountIdHex) } }
-                    .getOrNull()
-                    ?.let { ProfileSanitizer.displayName(it) }
+            val rawDisplayName =
+                if (profileDisplayNameReader != null) {
+                    runCatchingCancellable { profileDisplayNameReader.invoke(accountIdHex) }.getOrNull()
+                } else {
+                    runCatchingCancellable { marmotIo { displayName(accountIdHex) } }.getOrNull()
+                }
+            val displayName = rawDisplayName?.let { ProfileSanitizer.displayName(it) }
             val presentation =
                 ProfilePresentation(
                     displayName = displayName,
@@ -6159,7 +6225,10 @@ class WhiteNoiseAppState private constructor(
                     notificationDisplayNameHints.put(senderIdHex, hint) != hint
                 }
             }
-        if (changed) profileRevision += 1
+        if (changed) {
+            profileRevision += 1
+            bumpProfileAccountRevision(senderIdHex)
+        }
     }
 
     // The recipient (own) identity's display name for the notification subtext,
@@ -6720,11 +6789,19 @@ class WhiteNoiseAppState private constructor(
      */
     private suspend fun materializeProfileLocally(id: String) {
         val epoch = profileCacheEpoch.get()
-        val profile = runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
-        val displayName =
-            runCatchingCancellable { marmotIo { displayName(id) } }
-                .getOrNull()
-                ?.let { ProfileSanitizer.displayName(it) }
+        val profile =
+            if (profileReader != null) {
+                runCatchingCancellable { profileReader.invoke(id) }.getOrNull()
+            } else {
+                runCatchingCancellable { marmotIo { userProfile(id) } }.getOrNull()
+            }
+        val rawDisplayName =
+            if (profileDisplayNameReader != null) {
+                runCatchingCancellable { profileDisplayNameReader.invoke(id) }.getOrNull()
+            } else {
+                runCatchingCancellable { marmotIo { displayName(id) } }.getOrNull()
+            }
+        val displayName = rawDisplayName?.let { ProfileSanitizer.displayName(it) }
         val presentation =
             ProfilePresentation(
                 displayName = displayName,
@@ -6764,6 +6841,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (changed) {
             profileRevision += 1
+            bumpProfileAccountRevision(accountIdHex)
         }
     }
 
@@ -6776,6 +6854,7 @@ class WhiteNoiseAppState private constructor(
             materializingProfiles.clear()
         }
         profileRevision += 1
+        bumpAllProfileAccountRevisions()
     }
 
     private fun groupMemberSnapshotKey(
