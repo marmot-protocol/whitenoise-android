@@ -86,7 +86,6 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -674,23 +673,19 @@ internal fun MessageBubble(
     // left the loaded timeline.
     fun speakFromHere() {
         appState.launchMutation {
-            val timeline = controller.timeline
-            val startIndex = timeline.indexOfFirst { it.record.messageIdHex == record.messageIdHex }
             val entries =
-                if (startIndex < 0) {
-                    listOfNotNull(ttsEntry(record))
-                } else {
-                    timeline
-                        .drop(startIndex)
-                        .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                        .mapNotNull { message -> ttsEntry(message.record) }
-                }
+                ttsSpeakFromHereCandidates(
+                    timeline = controller.timeline,
+                    selected = record,
+                ).mapNotNull { entryRecord -> ttsEntry(entryRecord) }
             if (entries.isNotEmpty()) {
                 appState.speakAloudAutoRead(
                     controller.group.groupIdHex,
                     entries,
                     java.util.Locale.getDefault(),
                 )
+            } else {
+                appState.present(R.string.tts_bar_error)
             }
         }
     }
@@ -1853,8 +1848,9 @@ internal fun MessageBubble(
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
-                    // Speak covers exactly what Copy exposes; hidden entirely
-                    // on devices with no usable engine (explained in Settings).
+                    // Keep the action discoverable for copyable text and hide it
+                    // when no engine exists. If URL omission leaves no speech,
+                    // the action reports that it could not read the message.
                     canSpeak = displayedBody.isNotBlank() && appState.ttsHasUsableEngine,
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,

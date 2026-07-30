@@ -27,7 +27,11 @@ internal suspend fun projectTtsSpeakableEntry(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                MarkdownDocumentFfi(truncated = false, blocks = emptyList())
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = byteArrayOf(),
+                )
             }
         }
     val speakableText =

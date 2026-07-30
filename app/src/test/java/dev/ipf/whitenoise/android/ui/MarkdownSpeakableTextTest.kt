@@ -22,6 +22,7 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Heading(
@@ -51,6 +52,7 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Paragraph(
@@ -108,10 +110,35 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun emailAutolinksSpeakTheAddressVisibleInTheBubble() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Text("Email me at "),
+                                MarkdownInlineFfi.Autolink(
+                                    url = "bob@example.com",
+                                    kind = MarkdownAutolinkKindFfi.EMAIL,
+                                    classification = MarkdownLinkDestinationKindFfi.CONTACT,
+                                ),
+                            ),
+                        ),
+                    ),
+            )
+
+        assertEquals("Email me at bob@example.com.", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
     fun urlShapedLinkLabelsContributeNoSpeech() {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Paragraph(
@@ -122,12 +149,25 @@ class MarkdownSpeakableTextTest {
                                     children = listOf(MarkdownInlineFfi.Text("example.com/docs")),
                                     classification = MarkdownLinkDestinationKindFfi.WEB,
                                 ),
+                                MarkdownInlineFfi.Link(
+                                    dest = "https://nodejs.org",
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text("Node.js")),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                                MarkdownInlineFfi.Text(" "),
+                                MarkdownInlineFfi.Link(
+                                    dest = "https://vuejs.org",
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text("Vue.js")),
+                                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                                ),
                             ),
                         ),
                     ),
             )
 
-        assertEquals("", markdownDocumentToSpeakableText(document))
+        assertEquals("Node.js Vue.js.", markdownDocumentToSpeakableText(document))
     }
 
     @Test
@@ -135,6 +175,7 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.CodeBlock(
@@ -155,16 +196,28 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
-                        MarkdownBlockFfi.BlockQuote(listOf(paragraph("quoted"))),
+                        MarkdownBlockFfi.BlockQuote(
+                            blocks = listOf(paragraph("quoted")),
+                            blankLinesBefore = byteArrayOf(),
+                        ),
                         MarkdownBlockFfi.ListBlock(
                             kind = MarkdownListKindFfi.Bullet("-"),
                             tight = true,
                             items =
                                 listOf(
-                                    MarkdownListItemFfi(listOf(paragraph("first item")), checked = null),
-                                    MarkdownListItemFfi(listOf(paragraph("second item")), checked = true),
+                                    MarkdownListItemFfi(
+                                        blocks = listOf(paragraph("first item")),
+                                        checked = null,
+                                        blankLinesBefore = byteArrayOf(),
+                                    ),
+                                    MarkdownListItemFfi(
+                                        blocks = listOf(paragraph("second item")),
+                                        checked = true,
+                                        blankLinesBefore = byteArrayOf(),
+                                    ),
                                 ),
                         ),
                         MarkdownBlockFfi.CodeBlock(
@@ -212,6 +265,7 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Paragraph(
@@ -251,6 +305,7 @@ class MarkdownSpeakableTextTest {
         val document =
             MarkdownDocumentFfi(
                 truncated = false,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Paragraph(
@@ -293,10 +348,12 @@ class MarkdownSpeakableTextTest {
             MarkdownListItemFfi(
                 blocks = List(breadth) { mentionParagraph },
                 checked = null,
+                blankLinesBefore = byteArrayOf(),
             )
         val document =
             MarkdownDocumentFfi(
                 truncated = true,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.ListBlock(
@@ -328,11 +385,13 @@ class MarkdownSpeakableTextTest {
         val deeplyNested =
             MarkdownDocumentFfi(
                 truncated = true,
+                blankLinesBefore = byteArrayOf(),
                 blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(inline))),
             )
         val oversized =
             MarkdownDocumentFfi(
                 truncated = true,
+                blankLinesBefore = byteArrayOf(),
                 blocks =
                     listOf(
                         MarkdownBlockFfi.Paragraph(

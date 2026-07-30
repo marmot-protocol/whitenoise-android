@@ -1,13 +1,10 @@
 package dev.ipf.whitenoise.android.ui
 
+import java.net.URI
+import java.util.Locale
+
 private val speakableUrl = Regex("(?i)\\b(?:https?://|www\\.)[^\\s<>)\\]}\"']+")
-private val speakableHostLabel =
-    Regex(
-        "(?i)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,63}" +
-            "(?::\\d{1,5})?(?:[/#?][^\\s<>()\\[\\]{}\"']*)?",
-    )
-private val speakableIpv4Label =
-    Regex("(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d{1,5})?(?:[/#?][^\\s<>()\\[\\]{}\"']*)?")
+private val speakableScheme = Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE)
 private val speakableWhitespace = Regex("\\s+")
 private val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*]|\\{\\s*}")
 private val spaceBeforeSpeakablePunctuation = Regex("\\s+([,.;:!?])")
@@ -46,12 +43,32 @@ private fun String.withoutSpeakableUrls(): String {
     }
 }
 
-/** True when a markdown link's entire visible label is itself a URL. */
-internal fun isSpeakableUrlLabel(label: String): Boolean {
+/** True when a web link's entire visible label names the destination host. */
+internal fun isSpeakableUrlLabel(
+    label: String,
+    destination: String,
+    destinationIsWeb: Boolean,
+): Boolean {
     val candidate = label.trim().trimEnd('.', ',', ';', ':', '!', '?')
-    return candidate.isNotEmpty() &&
-        (speakableHostLabel.matches(candidate) || speakableIpv4Label.matches(candidate))
+    val labelHost = candidate.takeIf { destinationIsWeb && it.isNotEmpty() }?.speakableWebHost()
+    val destinationHost = destination.takeIf { destinationIsWeb }?.speakableWebHost()
+    return labelHost != null && labelHost == destinationHost
 }
+
+private fun String.speakableWebHost(): String? =
+    runCatching {
+        val url =
+            when {
+                startsWith("//") -> "https:$this"
+                speakableScheme.containsMatchIn(this) -> this
+                else -> "https://$this"
+            }
+        URI(url)
+            .host
+            ?.lowercase(Locale.ROOT)
+            ?.removePrefix("www.")
+            ?.takeIf(String::isNotEmpty)
+    }.getOrNull()
 
 internal fun StringBuilder.appendSpeakableSegment(segment: String) {
     val sentence = segment.asSpeakableSentence()

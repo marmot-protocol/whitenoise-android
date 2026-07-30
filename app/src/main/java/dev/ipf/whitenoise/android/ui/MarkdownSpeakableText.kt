@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 
 internal const val MARKDOWN_SPEAKABLE_MAX_LENGTH = 32_000
@@ -111,6 +113,7 @@ private fun collectSpeakableInlineSegment(
                 mentionDisplayName = mentionDisplayName,
                 isGroupMember = isGroupMember,
                 depth = 0,
+                maxChars = collector.remainingChars,
             )
         }
     for (line in text.lineSequence()) {
@@ -121,23 +124,24 @@ private fun collectSpeakableInlineSegment(
 
 // Exhaustive sealed-node dispatch is clearer than scattering one AST walk
 // across type casts; the traversal itself remains depth/node/size bounded.
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 private fun StringBuilder.appendSpeakableInlines(
     inlines: List<MarkdownInlineFfi>,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
     isGroupMember: ((String) -> Boolean)?,
     depth: Int,
+    maxChars: Int,
 ) {
     if (markdownInlineDepthExceeded(depth)) return
     for (inline in markdownVisibleSiblings(inlines)) {
-        if (length >= MARKDOWN_SPEAKABLE_MAX_LENGTH || !collector.visitNode()) break
+        if (length >= maxChars || !collector.visitNode()) break
         when (inline) {
             is MarkdownInlineFfi.Text ->
                 append(
                     markdownSpeakableLeafText(
                         inline.content,
-                        MARKDOWN_SPEAKABLE_MAX_LENGTH - length,
+                        maxChars - length,
                     ),
                 )
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
@@ -145,25 +149,72 @@ private fun StringBuilder.appendSpeakableInlines(
                 append(
                     markdownSpeakableLeafText(
                         inline.content,
-                        MARKDOWN_SPEAKABLE_MAX_LENGTH - length,
+                        maxChars - length,
                     ),
                 )
             is MarkdownInlineFfi.Emph ->
-                appendSpeakableInlines(inline.children, collector, mentionDisplayName, isGroupMember, depth + 1)
+                appendSpeakableInlines(
+                    inline.children,
+                    collector,
+                    mentionDisplayName,
+                    isGroupMember,
+                    depth + 1,
+                    maxChars,
+                )
             is MarkdownInlineFfi.Strong ->
-                appendSpeakableInlines(inline.children, collector, mentionDisplayName, isGroupMember, depth + 1)
+                appendSpeakableInlines(
+                    inline.children,
+                    collector,
+                    mentionDisplayName,
+                    isGroupMember,
+                    depth + 1,
+                    maxChars,
+                )
             is MarkdownInlineFfi.Strikethrough ->
-                appendSpeakableInlines(inline.children, collector, mentionDisplayName, isGroupMember, depth + 1)
+                appendSpeakableInlines(
+                    inline.children,
+                    collector,
+                    mentionDisplayName,
+                    isGroupMember,
+                    depth + 1,
+                    maxChars,
+                )
             is MarkdownInlineFfi.Link ->
-                appendSpeakableLinkLabel(inline.children, collector, mentionDisplayName, isGroupMember, depth + 1)
+                appendSpeakableLinkLabel(
+                    children = inline.children,
+                    destination = inline.dest,
+                    destinationIsWeb = inline.classification == MarkdownLinkDestinationKindFfi.WEB,
+                    collector = collector,
+                    mentionDisplayName = mentionDisplayName,
+                    isGroupMember = isGroupMember,
+                    depth = depth + 1,
+                    maxChars = maxChars - length,
+                )
             is MarkdownInlineFfi.Image ->
-                appendSpeakableLinkLabel(inline.alt, collector, mentionDisplayName, isGroupMember, depth + 1)
-            is MarkdownInlineFfi.Autolink -> Unit
+                appendSpeakableLinkLabel(
+                    children = inline.alt,
+                    destination = inline.dest,
+                    destinationIsWeb = inline.classification == MarkdownLinkDestinationKindFfi.WEB,
+                    collector = collector,
+                    mentionDisplayName = mentionDisplayName,
+                    isGroupMember = isGroupMember,
+                    depth = depth + 1,
+                    maxChars = maxChars - length,
+                )
+            is MarkdownInlineFfi.Autolink ->
+                if (inline.kind == MarkdownAutolinkKindFfi.EMAIL) {
+                    append(
+                        markdownSpeakableLeafText(
+                            inline.url,
+                            maxChars - length,
+                        ),
+                    )
+                }
             is MarkdownInlineFfi.Math ->
                 append(
                     markdownSpeakableLeafText(
                         inline.content,
-                        MARKDOWN_SPEAKABLE_MAX_LENGTH - length,
+                        maxChars - length,
                     ),
                 )
             is MarkdownInlineFfi.NostrMention ->
@@ -172,6 +223,7 @@ private fun StringBuilder.appendSpeakableInlines(
                     isMention = true,
                     mentionDisplayName = mentionDisplayName,
                     isGroupMember = isGroupMember,
+                    maxChars = maxChars,
                 )
             is MarkdownInlineFfi.NostrUri ->
                 appendSpeakableNostrEntity(
@@ -179,6 +231,7 @@ private fun StringBuilder.appendSpeakableInlines(
                     isMention = false,
                     mentionDisplayName = mentionDisplayName,
                     isGroupMember = isGroupMember,
+                    maxChars = maxChars,
                 )
         }
     }
@@ -186,16 +239,26 @@ private fun StringBuilder.appendSpeakableInlines(
 
 private fun StringBuilder.appendSpeakableLinkLabel(
     children: List<MarkdownInlineFfi>,
+    destination: String,
+    destinationIsWeb: Boolean,
     collector: SpeakableCollector,
     mentionDisplayName: ((String) -> String?)?,
     isGroupMember: ((String) -> Boolean)?,
     depth: Int,
+    maxChars: Int,
 ) {
     val label =
         buildString {
-            appendSpeakableInlines(children, collector, mentionDisplayName, isGroupMember, depth)
+            appendSpeakableInlines(
+                inlines = children,
+                collector = collector,
+                mentionDisplayName = mentionDisplayName,
+                isGroupMember = isGroupMember,
+                depth = depth,
+                maxChars = maxChars,
+            )
         }
-    if (!isSpeakableUrlLabel(label)) append(label)
+    if (!isSpeakableUrlLabel(label, destination, destinationIsWeb)) append(label)
 }
 
 private fun StringBuilder.appendSpeakableNostrEntity(
@@ -203,6 +266,7 @@ private fun StringBuilder.appendSpeakableNostrEntity(
     isMention: Boolean,
     mentionDisplayName: ((String) -> String?)?,
     isGroupMember: ((String) -> Boolean)?,
+    maxChars: Int,
 ) {
     val display =
         markdownNostrEntityDisplay(
@@ -211,7 +275,7 @@ private fun StringBuilder.appendSpeakableNostrEntity(
             mentionDisplayName = mentionDisplayName,
             isGroupMember = isGroupMember,
         )
-    append(display.visibleText.safeUtf16Prefix(MARKDOWN_SPEAKABLE_MAX_LENGTH - length))
+    append(display.visibleText.safeUtf16Prefix(maxChars - length))
 }
 
 private class SpeakableCollector {
@@ -221,6 +285,9 @@ private class SpeakableCollector {
     val exhausted: Boolean
         get() = output.length >= MARKDOWN_SPEAKABLE_MAX_LENGTH || visitedNodes >= MARKDOWN_SPEAKABLE_MAX_NODES
 
+    val remainingChars: Int
+        get() = (MARKDOWN_SPEAKABLE_MAX_LENGTH - output.length).coerceAtLeast(0)
+
     fun visitNode(): Boolean {
         if (exhausted) return false
         visitedNodes++
@@ -228,7 +295,7 @@ private class SpeakableCollector {
     }
 
     fun addLeafSegment(content: String) {
-        addSegment(markdownSpeakableLeafText(content, MARKDOWN_SPEAKABLE_MAX_LENGTH))
+        addSegment(markdownSpeakableLeafText(content, remainingChars))
     }
 
     fun addSegment(segment: String) {

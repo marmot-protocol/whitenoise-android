@@ -61,7 +61,12 @@ class TtsMessageProjectionTest {
     @Test
     fun legacyFallbackOmitsUrlsAndNonMessageKindsRemainFiltered() =
         runBlocking {
-            val emptyDocument = MarkdownDocumentFfi(truncated = false, blocks = emptyList())
+            val emptyDocument =
+                MarkdownDocumentFfi(
+                    truncated = false,
+                    blocks = emptyList(),
+                    blankLinesBefore = byteArrayOf(),
+                )
             val legacy = message(plaintext = "Details: https://example.com/private", contentTokens = emptyDocument)
 
             assertEquals(
@@ -72,6 +77,14 @@ class TtsMessageProjectionTest {
                     senderDisplayName = "Alice",
                     parseMarkdown = { emptyDocument },
                 )?.text,
+            )
+            assertNull(
+                projectTtsSpeakableEntry(
+                    message = message(plaintext = "https://example.com/private", contentTokens = emptyDocument),
+                    editedText = null,
+                    senderDisplayName = "Alice",
+                    parseMarkdown = { emptyDocument },
+                ),
             )
             assertNull(
                 projectTtsSpeakableEntry(
@@ -90,7 +103,12 @@ class TtsMessageProjectionTest {
                 message =
                     message(
                         plaintext = "Edited value",
-                        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                        contentTokens =
+                            MarkdownDocumentFfi(
+                                truncated = false,
+                                blocks = emptyList(),
+                                blankLinesBefore = byteArrayOf(),
+                            ),
                     ),
                 editedText = "Edited value",
                 senderDisplayName = "Alice",
@@ -113,6 +131,7 @@ class TtsMessageProjectionTest {
                     ),
                 ),
             ),
+        blankLinesBefore = byteArrayOf(),
     )
 
     private fun message(
