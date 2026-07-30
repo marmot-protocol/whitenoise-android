@@ -3961,14 +3961,23 @@ class ChatsController private constructor(
             state.orderedGroupIds
                 .withIndex()
                 .associate { (index, id) -> id.lowercase() to index.toUInt() }
-        chatRowsByGroup.replaceAll { key, row ->
+        chatRowsByGroup.keys.toList().forEach { key ->
             val position = positionByGroup[key]
-            if (position != null) {
-                row.copy(pinned = true, pinnedPosition = position)
-            } else if (row.pinned) {
-                row.copy(pinned = false, pinnedPosition = null)
+            val optimisticState = optimisticChatListPreviewByGroup[key]
+            val row = optimisticState?.baselineRow ?: chatRowsByGroup[key] ?: return@forEach
+            val updated =
+                if (position != null) {
+                    row.copy(pinned = true, pinnedPosition = position)
+                } else if (row.pinned) {
+                    row.copy(pinned = false, pinnedPosition = null)
+                } else {
+                    row
+                }
+            if (optimisticState == null) {
+                chatRowsByGroup[key] = updated
             } else {
-                row
+                optimisticState.baselineRow = updated
+                materializeOptimisticChatListPreview(key, optimisticState)
             }
         }
         scheduleRecompute()

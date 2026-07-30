@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -826,6 +827,30 @@ class OptimisticSentPreviewAuthoritativeFoldTest {
     }
 }
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class OptimisticSentPreviewMetadataTest {
+    @Test
+    fun pinUpdateDuringPendingSendSurvivesRollback() {
+        val controller =
+            controllerWithRows(
+                row("chat-a", "Alpha", 20uL),
+                row("chat-b", "Zulu", 10uL),
+            )
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
+        applyPinState(controller, listOf("chat-b"))
+        controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
+        controller.setChatListVisible(true)
+
+        assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
+        val projection = controller.items.first().projection
+        assertTrue(projection?.pinned == true)
+        assertEquals(0u, projection?.pinnedPosition)
+    }
+}
+
 private fun controllerWithRows(vararg rows: ChatListRowFfi): ChatsController {
     val controller = ChatsController(appState())
     ChatsController::class.java
@@ -857,6 +882,16 @@ private fun applySubscriptionChatListRow(
         .getDeclaredMethod("foldChatRow", ChatListRowFfi::class.java, ChatListUpdateTriggerFfi::class.java)
         .apply { isAccessible = true }
         .invoke(controller, row, trigger)
+}
+
+private fun applyPinState(
+    controller: ChatsController,
+    orderedGroupIds: List<String>,
+) {
+    ChatsController::class.java
+        .getDeclaredMethod("applyPinState", ChatPinStateFfi::class.java)
+        .apply { isAccessible = true }
+        .invoke(controller, ChatPinStateFfi(orderedGroupIds))
 }
 
 private fun removeAndRestoreChatRow(
