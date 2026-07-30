@@ -1,14 +1,22 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.Surface
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.down
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.moveBy
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.up
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
@@ -29,26 +37,36 @@ class ChatFoldersContentTest {
     private val app = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun rowExposesAccessibilityMoveActionsRespectingListBounds() {
+    fun rowExposesAccessibilityEditAndMoveActionsRespectingListBounds() {
         var moved: Pair<String, Int>? = null
+        var editedId: String? = null
         render(
             folders =
                 listOf(
                     folderRow(id = "unread", name = "Unread", canMoveUp = false, canMoveDown = true),
                 ),
             onMove = { id, delta -> moved = id to delta },
+            onEdit = { editedId = it },
         )
 
-        // The drag gesture's TalkBack fallback: only the in-bounds direction
-        // is offered, and invoking it moves the row.
-        val actions =
+        val row =
             composeRule
-                .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions), useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .config[SemanticsActions.CustomActions]
-        assertEquals(listOf(app.getString(R.string.chat_folder_move_down)), actions.map { it.label })
+                .onNode(
+                    SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick) and
+                        SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions),
+                ).fetchSemanticsNode()
+        val editAction = row.config[SemanticsActions.OnClick]
+        val moveActions = row.config[SemanticsActions.CustomActions]
 
-        composeRule.runOnUiThread { actions.single().action() }
+        assertEquals(Role.Button, row.config[SemanticsProperties.Role])
+        assertEquals(app.getString(R.string.edit), editAction.label)
+        composeRule.runOnUiThread { editAction.action?.invoke() }
+        assertEquals("unread", editedId)
+
+        // The drag gesture's TalkBack fallback still offers only the
+        // in-bounds direction on the same editable row.
+        assertEquals(listOf(app.getString(R.string.chat_folder_move_down)), moveActions.map { it.label })
+        composeRule.runOnUiThread { moveActions.single().action() }
         assertEquals("unread" to 1, moved)
     }
 
@@ -65,6 +83,71 @@ class ChatFoldersContentTest {
         composeRule
             .onAllNodesWithContentDescription(app.getString(R.string.chat_folder_drag_to_reorder))
             .assertCountEquals(2)
+    }
+
+    @Test
+    fun draggingHandleReordersWithoutOpeningEditor() {
+        var moved: Pair<String, Int>? = null
+        var editedId: String? = null
+        render(
+            folders =
+                listOf(
+                    folderRow(id = "unread", name = "Unread", canMoveUp = false, canMoveDown = true),
+                    folderRow(id = "work", name = "Work", systemKind = null, canMoveDown = false),
+                ),
+            onMove = { id, delta -> moved = id to delta },
+            onEdit = { editedId = it },
+        )
+
+        composeRule
+            .onAllNodesWithContentDescription(
+                app.getString(R.string.chat_folder_drag_to_reorder),
+                useUnmergedTree = true,
+            )[0]
+            .performTouchInput {
+                down(center)
+                moveBy(Offset(0f, 20f))
+                moveBy(Offset(0f, 200f))
+                up()
+            }
+
+        assertEquals("unread" to 1, moved)
+        assertEquals(null, editedId)
+    }
+
+    @Test
+    fun tappingDragHandleDoesNotOpenEditor() {
+        var editedId: String? = null
+        render(
+            folders = listOf(folderRow(id = "unread", name = "Unread")),
+            onEdit = { editedId = it },
+        )
+
+        composeRule
+            .onNodeWithContentDescription(
+                app.getString(R.string.chat_folder_drag_to_reorder),
+                useUnmergedTree = true,
+            ).performTouchInput { click() }
+
+        assertEquals(null, editedId)
+    }
+
+    @Test
+    fun customAndDefaultFolderNamesOpenTheirExactEditors() {
+        val editedIds = mutableListOf<String>()
+        render(
+            folders =
+                listOf(
+                    folderRow(id = "unread", name = "Unread"),
+                    folderRow(id = "work", name = "Work", systemKind = null),
+                ),
+            onEdit = editedIds::add,
+        )
+
+        composeRule.onNodeWithText(app.getString(R.string.chat_list_filter_unread)).performClick()
+        composeRule.onNodeWithText("Work").performClick()
+
+        assertEquals(listOf("unread", "work"), editedIds)
     }
 
     @Test
