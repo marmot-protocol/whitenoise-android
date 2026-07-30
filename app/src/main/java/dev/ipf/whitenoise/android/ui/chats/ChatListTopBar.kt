@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -65,6 +66,7 @@ internal fun ChatListTopBar(
     onMic: () -> Unit,
     onOpenSettings: () -> Unit,
     onSwitchAccount: (String) -> Unit,
+    connectivityState: ConnectivityBannerState = ConnectivityBannerState.Hidden,
 ) {
     TopAppBar(
         title = {
@@ -92,14 +94,23 @@ internal fun ChatListTopBar(
                                 imeAction = ImeAction.Search,
                             ),
                     )
-                // Other signed-in accounts sit immediately right of the active
-                // avatar (the navigationIcon), i.e. on the left of the bar.
+                // Connecting / JustConnected sit immediately right of the active
+                // avatar; other signed-in accounts follow. Search mode hides the
+                // inline chrome so it cannot overlap the field.
                 else ->
-                    OtherAccountAvatarsRow(
-                        appState = appState,
-                        onSwitchAccount = onSwitchAccount,
-                        onOpenSwitcher = onOpenSettings,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ChatListInlineConnectivityIndicator(state = connectivityState)
+                        Box(modifier = Modifier.weight(1f, fill = false)) {
+                            OtherAccountAvatarsRow(
+                                appState = appState,
+                                onSwitchAccount = onSwitchAccount,
+                                onOpenSwitcher = onOpenSettings,
+                            )
+                        }
+                    }
             }
         },
         navigationIcon = {
