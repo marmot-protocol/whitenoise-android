@@ -51,6 +51,7 @@
     <string name="chat_row_action_move_down">Переместить вниз</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
     <string name="chat_row_action_mark_unread">Отметить непрочитанным</string>
+    <string name="chat_row_marked_unread">Отмечено как непрочитанное</string>
     <string name="chat_row_action_delete_group">Удалить группу</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
     <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>

@@ -51,6 +51,7 @@
     <string name="chat_row_action_move_down">Mover para baixo</string>
     <string name="chat_row_action_mark_read">Marcar como lido</string>
     <string name="chat_row_action_mark_unread">Marcar como não lido</string>
+    <string name="chat_row_marked_unread">Marcado como não lido</string>
     <string name="chat_row_action_delete_group">Excluir grupo</string>
     <string name="delete_group_dialog_title">Excluir grupo?</string>
     <string name="delete_group_dialog_message">Remover este grupo deste dispositivo? Se você ainda for membro, sairá do grupo primeiro.</string>

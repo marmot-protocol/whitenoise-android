@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -8,8 +9,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 
 @Composable
@@ -28,4 +31,21 @@ internal fun UnreadCountBadge(
     ) {
         Text(if (unreadCount > 99uL) "99+" else unreadCount.toString())
     }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun ManualUnreadDot(
+    modifier: Modifier = Modifier,
+    actionColors: AccountActionColors? = null,
+) {
+    val description = stringResource(R.string.chat_row_marked_unread)
+    Badge(
+        modifier =
+            modifier
+                .defaultMinSize(minWidth = 10.dp, minHeight = 10.dp)
+                .semantics { contentDescription = description },
+        containerColor = actionColors?.container ?: MaterialTheme.colorScheme.primary,
+        contentColor = actionColors?.content ?: MaterialTheme.colorScheme.onPrimary,
+    )
 }

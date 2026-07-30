@@ -51,6 +51,7 @@
     <string name="chat_row_action_move_down">Aşağı taşı</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
     <string name="chat_row_action_mark_unread">Okunmadı olarak işaretle</string>
+    <string name="chat_row_marked_unread">Okunmadı olarak işaretlendi</string>
     <string name="chat_row_action_delete_group">Grubu sil</string>
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
     <string name="delete_group_dialog_message">Bu grup bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce gruptan çıkarsınız.</string>

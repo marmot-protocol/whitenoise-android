@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
@@ -144,7 +145,11 @@ internal fun ChatRowSupportingMetadata(
             if (pinned) PinnedBadge()
             if (rowHasUnread) {
                 if (unreadMention) MentionBadge()
-                UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
+                if (rowUnreadCount > 0uL) {
+                    UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
+                } else {
+                    ManualUnreadDot(actionColors = actionColors)
+                }
             }
         }
     }
