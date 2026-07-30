@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.chats.MentionBadge
+import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -43,15 +44,25 @@ class ChatListBadgesScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_badges_dark.png")
     }
 
-    private fun render(darkTheme: Boolean) {
+    @Test
+    fun chatListBadgesAmoled() {
+        render(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_badges_amoled.png")
+    }
+
+    private fun render(
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 Surface {
                     Row(
                         modifier = Modifier.padding(8.dp).testTag(TAG),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         MentionBadge()
+                        ManualUnreadDot()
                         UnreadCountBadge(unreadCount = 3u)
                         UnreadCountBadge(unreadCount = 128u)
                     }

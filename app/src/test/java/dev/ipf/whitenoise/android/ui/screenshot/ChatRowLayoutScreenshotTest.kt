@@ -71,6 +71,12 @@ class ChatRowLayoutScreenshotTest {
                             title = "Unread conversation",
                             preview = "Unread preview reserves only the badge width",
                             unread = true,
+                            unreadCount = 3uL,
+                        )
+                        ChatRowFixture(
+                            title = "Marked unread",
+                            preview = "Manual unread shows a dot instead of a zero badge",
+                            manualUnread = true,
                         )
                         ChatRowFixture(
                             title = "Invited group",
@@ -119,17 +125,26 @@ private fun ChatRowFixture(
     title: String,
     preview: String,
     unread: Boolean = false,
+    unreadCount: ULong = 3uL,
+    manualUnread: Boolean = false,
     invited: Boolean = false,
     draft: Boolean = false,
     selectionMode: Boolean = false,
     selected: Boolean = false,
 ) {
     val timestampAt = remember { (System.currentTimeMillis() / 1_000L).toULong() }
+    val rowHasUnread = unread || manualUnread
+    val rowUnreadCount =
+        when {
+            manualUnread -> 0uL
+            unread -> unreadCount
+            else -> 0uL
+        }
     Box {
         ChatRowLayout(
             title = title,
             timestampAt = timestampAt,
-            rowHasUnread = unread,
+            rowHasUnread = rowHasUnread,
             selectionMode = selectionMode,
             selected = selected,
             leadingContent = {
@@ -148,12 +163,12 @@ private fun ChatRowFixture(
                 )
             },
             supportingMetadata =
-                if (invited || unread) {
+                if (invited || rowHasUnread) {
                     {
                         ChatRowSupportingMetadata(
                             pendingConfirmation = invited,
-                            rowHasUnread = unread,
-                            rowUnreadCount = 3uL,
+                            rowHasUnread = rowHasUnread,
+                            rowUnreadCount = rowUnreadCount,
                             unreadMention = unread,
                             actionColors = null,
                             pinned = false,

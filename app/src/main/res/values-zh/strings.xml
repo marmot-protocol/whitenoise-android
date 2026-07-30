@@ -51,6 +51,7 @@
     <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
     <string name="chat_row_action_mark_unread">标记为未读</string>
+    <string name="chat_row_marked_unread">已标为未读</string>
     <string name="chat_row_action_delete_group">删除群组</string>
     <string name="delete_group_dialog_title">删除群组？</string>
     <string name="delete_group_dialog_message">从此设备移除此群组？如果你仍是成员，将先退出群组。</string>
