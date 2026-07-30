@@ -20,7 +20,6 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -710,18 +709,106 @@ class OptimisticSentPreviewOrderingTest {
                 ?.messageIdHex,
         )
     }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class OptimisticSentPreviewAuthoritativeFoldTest {
+    @Test
+    fun backwardSameSecondSubscriptionRowUpdatesContentWithoutLoweringOrder() {
+        val controller = controllerWithRows(row("chat-a", "Alpha", 20uL), row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "sent B", 20uL))
+        controller.commitOptimisticSentPreview("chat-b", "temp-b", "ff-sent-b")
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "ff-sent-b",
+                        "sent B",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Renamed", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "0a-reply-b",
+                        "same-second reply",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+                muted = true,
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        controller.setChatListVisible(true)
+
+        assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
+        val projection = controller.items.first().projection
+        assertEquals("0a-reply-b", projection?.lastMessage?.messageIdHex)
+        assertEquals("same-second reply", projection?.lastMessage?.plaintext)
+        assertEquals("Renamed", projection?.groupName)
+        assertTrue(projection?.muted == true)
+    }
 
     @Test
-    fun olderOptimisticUpdateCannotOverwriteANewerAuthoritativeRow() {
+    fun lateConfirmedEchoCannotReplaceBackwardAcceptedAuthoritativeContent() {
+        val controller = controllerWithRows(row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "sent B", 20uL))
+        controller.commitOptimisticSentPreview("chat-b", "temp-b", "ff-sent-b")
+        val sentRow =
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "ff-sent-b",
+                        "sent B",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            )
+        applySubscriptionChatListRow(controller, sentRow, ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE)
+        applySubscriptionChatListRow(
+            controller,
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "0a-reply-b",
+                        "same-second reply",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+            ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        )
+        applySubscriptionChatListRow(controller, sentRow, ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE)
+        controller.setChatListVisible(true)
+
+        val projection = controller.items.single().projection
+        assertEquals("0a-reply-b", projection?.lastMessage?.messageIdHex)
+        assertEquals("same-second reply", projection?.lastMessage?.plaintext)
+    }
+
+    @Test
+    fun clockSkewedOptimisticSendUpdatesPreviewWithoutLoweringRecency() {
         val controller = controllerWithRows(row("chat-b", "Beta", 30uL))
 
         controller.setChatListVisible(false)
-        val applied = controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "stale pending", 20uL))
+        val applied = controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "local pending", 20uL))
         controller.setChatListVisible(true)
 
-        assertFalse(applied)
+        assertTrue(applied)
         val current = controller.items.single().projection
-        assertEquals("message-chat-b", current?.lastMessage?.messageIdHex)
+        assertEquals("temp-b", current?.lastMessage?.messageIdHex)
+        assertEquals("local pending", current?.lastMessage?.plaintext)
         assertEquals(30uL, current?.activitySortAt)
     }
 }

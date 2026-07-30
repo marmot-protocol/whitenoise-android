@@ -2546,11 +2546,19 @@ class ChatsController private constructor(
         }
     }
 
-    private fun optimisticMatchPrecedesBaseline(
+    private fun optimisticMatchIsStale(
         match: OptimisticChatListPreviewMatch,
+        baselineRow: ChatListRowFfi,
+        row: ChatListRowFfi,
         baselineActivitySequence: ULong,
         activityCompare: Int,
-    ): Boolean = match.activitySequence < baselineActivitySequence || activityCompare < 0
+    ): Boolean =
+        match.activitySequence < baselineActivitySequence ||
+            activityCompare < 0 ||
+            (
+                match.activitySequence == baselineActivitySequence &&
+                    row.lastMessage?.messageIdHex != baselineRow.lastMessage?.messageIdHex
+            )
 
     private fun foldOptimisticChatListBaseline(
         state: OptimisticChatListPreviewState,
@@ -2579,7 +2587,14 @@ class ChatsController private constructor(
             // The echo keeps the order assigned when the local send was
             // accepted. If a later authoritative activity already owns the
             // row, consuming this stale echo must not move the row backward.
-            val staleMatch = optimisticMatchPrecedesBaseline(match, state.baselineActivitySequence, activityCompare)
+            val staleMatch =
+                optimisticMatchIsStale(
+                    match,
+                    state.baselineRow,
+                    row,
+                    state.baselineActivitySequence,
+                    activityCompare,
+                )
             if (staleMatch && !acceptBackwardActivity) {
                 acceptRow = false
             } else {
@@ -2608,7 +2623,11 @@ class ChatsController private constructor(
                     state.baselineActivitySequence = 0uL
                     rememberBaselineActivitySequence(state, row, 0uL)
                 } else {
-                    acceptRow = false
+                    // Subscription rows remain authoritative for content even
+                    // when their last-message tuple compares backward. Keep
+                    // the accepted ordering sequence without leaving other
+                    // fields stale after same-second id order or preview loss.
+                    rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
                 }
             } else {
                 rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
@@ -2984,29 +3003,24 @@ class ChatsController private constructor(
     ): Boolean {
         val rowKey = chatRowKey(groupIdHex)
         val row = chatRowsByGroup[rowKey].takeIf { accountRef != null } ?: return false
-        val currentActivityAt = maxOf(row.activitySortAt, row.lastMessage?.timelineAt ?: 0uL)
-        return if (preview.timelineAt < currentActivityAt) {
-            false
-        } else {
-            val state =
-                optimisticChatListPreviewByGroup.getOrPut(rowKey) {
-                    val baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL
-                    OptimisticChatListPreviewState(
-                        baselineRow = row,
-                        baselineActivitySequence = baselineActivitySequence,
-                    ).also { state ->
-                        rememberBaselineActivitySequence(state, row, baselineActivitySequence)
-                    }
+        val state =
+            optimisticChatListPreviewByGroup.getOrPut(rowKey) {
+                val baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL
+                OptimisticChatListPreviewState(
+                    baselineRow = row,
+                    baselineActivitySequence = baselineActivitySequence,
+                ).also { state ->
+                    rememberBaselineActivitySequence(state, row, baselineActivitySequence)
                 }
-            state.entries[preview.messageIdHex] =
-                OptimisticChatListPreviewEntry(
-                    preview = preview,
-                    activitySequence = nextChatActivitySequence(),
-                )
-            materializeOptimisticChatListPreview(rowKey, state)
-            scheduleRecompute()
-            true
-        }
+            }
+        state.entries[preview.messageIdHex] =
+            OptimisticChatListPreviewEntry(
+                preview = preview,
+                activitySequence = nextChatActivitySequence(),
+            )
+        materializeOptimisticChatListPreview(rowKey, state)
+        scheduleRecompute()
+        return true
     }
 
     internal fun commitOptimisticSentPreview(
