@@ -1,14 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import android.content.SharedPreferences
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
-import java.io.IOException
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
@@ -238,66 +235,109 @@ class DraftStore internal constructor(
 }
 
 /**
- * Draft text is message-shaped plaintext, so it is held in an
- * [EncryptedSharedPreferences] store keyed by the Android Keystore rather than
- * a plaintext file.
+ * Draft text is message-shaped plaintext, so it is sealed with an AES-GCM key
+ * held in the Android Keystore rather than written to a plaintext file. The
+ * previous implementation used the now-EOL `androidx.security-crypto` stack;
+ * existing drafts are imported once from that file and it is then deleted.
  */
 internal class EncryptedDraftPersistence(
     context: Context,
 ) : DraftPersistence {
-    private val prefs: SharedPreferences = openSecure(context.applicationContext)
+    private val app = context.applicationContext
+    private val store =
+        KeystoreSecureStore(
+            context = app,
+            fileName = SECURE_FILE,
+            keyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS),
+        )
 
-    override fun read(): Map<String, String> {
-        @Suppress("UNCHECKED_CAST")
-        return prefs.all.filterValues { it is String } as Map<String, String>
+    init {
+        importLegacyDrafts()
     }
+
+    override fun read(): Map<String, String> =
+        try {
+            store.readAll()
+        } catch (error: GeneralSecurityException) {
+            // A rotated/cleared Keystore key or a tampered payload leaves the
+            // store undecryptable; drafts are disposable, so drop it and start
+            // fresh rather than failing every read.
+            Log.w(LOG_TAG, "draft store unreadable, recreating", error)
+            recreateAfterCorruption()
+            emptyMap()
+        }
 
     override fun write(
         key: String,
         value: String?,
     ) {
-        prefs
-            .edit()
-            .apply {
-                if (value == null) remove(key) else putString(key, value)
-            }.apply()
+        try {
+            store.write(key, value)
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft write failed, recreating store", error)
+            recreateAfterCorruption()
+            runCatching { store.write(key, value) }
+        }
     }
 
-    private companion object {
-        const val SECURE_FILE = "whitenoise.drafts.secure"
+    private fun recreateAfterCorruption() {
+        runCatching { store.clear() }
+    }
 
-        fun openSecure(context: Context): SharedPreferences =
-            try {
-                create(context)
-            } catch (error: GeneralSecurityException) {
-                // A rotated/cleared Keystore key or tampered keyset leaves the
-                // file undecryptable; drafts are disposable, so drop the corrupt
-                // store and start fresh. Unrelated failures propagate rather
-                // than silently wiping valid drafts.
-                recreateAfterCorruption(context)
-            } catch (error: IOException) {
-                recreateAfterCorruption(context)
-            }
-
-        fun recreateAfterCorruption(context: Context): SharedPreferences {
-            context.deleteSharedPreferences(SECURE_FILE)
-            return create(context)
-        }
-
-        fun create(context: Context): SharedPreferences {
-            val masterKey =
-                MasterKey
-                    .Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-            return EncryptedSharedPreferences.create(
-                context,
-                SECURE_FILE,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+    /**
+     * One-way import from the retired library, routed through [migrateDrafts]
+     * so it keeps that helper's two guarantees: encrypted values win over the
+     * legacy copy, and the legacy file is deleted only once the new store has
+     * DURABLY committed. Deleting on a transient failure — or before the write
+     * reaches disk — would lose a draft the user is mid-way through typing.
+     */
+    private fun importLegacyDrafts() {
+        val legacy = readLegacyDrafts()
+        val existingKeys = if (legacy == null) null else secureKeys()
+        if (legacy != null && existingKeys != null) {
+            migrateDrafts(
+                legacy = legacy,
+                existingSecureKeys = existingKeys,
+                persistSecure = ::persistImportedDrafts,
+                clearLegacy = { app.deleteSharedPreferences(LEGACY_SECURE_FILE) },
             )
         }
+    }
+
+    // Null when there is nothing to import, or when the legacy keyset is
+    // unreadable — in which case the file is only dead weight and is dropped.
+    private fun readLegacyDrafts(): Map<String, String>? =
+        try {
+            LegacySecurePreferences.read(app, LEGACY_SECURE_FILE)
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
+            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
+            null
+        }
+
+    // Null aborts the import: without knowing what the new store already holds,
+    // migrateDrafts cannot honour "encrypted values win".
+    private fun secureKeys(): Set<String>? =
+        try {
+            store.readAll().keys
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft store unreadable during import", error)
+            null
+        }
+
+    private fun persistImportedDrafts(fresh: Map<String, String>): Boolean =
+        try {
+            store.putAllDurably(fresh)
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft import write failed, keeping legacy file", error)
+            false
+        }
+
+    private companion object {
+        const val LOG_TAG = "DMDrafts"
+        const val SECURE_FILE = "whitenoise.drafts.keystore"
+        const val LEGACY_SECURE_FILE = "whitenoise.drafts.secure"
+        const val KEY_ALIAS = "whitenoise.drafts.aes_gcm.v1"
     }
 }
 
