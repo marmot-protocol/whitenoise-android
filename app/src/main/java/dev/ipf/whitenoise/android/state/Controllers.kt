@@ -3779,7 +3779,13 @@ class ChatsController private constructor(
                     if (isActiveBindEpoch(epoch)) {
                         inFlightMemberFetches.remove(groupIdHex)
                         if (cacheEpoch != memberCacheEpoch && !memberCacheByGroup.containsKey(groupIdHex)) {
-                            scheduleRecompute()
+                            // The chat list can be hidden behind an open
+                            // conversation while the system-share picker is
+                            // visible. Retry the invalidated targeted fetch
+                            // directly: recompute() deliberately skips member
+                            // fan-out while hidden, and the picker's effect key
+                            // is unchanged until a roster lands.
+                            schedulePendingMemberFetches(listOf(groupIdHex))
                         }
                     }
                 }

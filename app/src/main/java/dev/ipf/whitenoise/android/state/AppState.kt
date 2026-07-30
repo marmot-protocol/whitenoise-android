@@ -1709,6 +1709,7 @@ class WhiteNoiseAppState private constructor(
     private var profileRevision by mutableStateOf(0)
     private var contactNicknameRevision by mutableStateOf(0)
     private var profileAccountRevisionEpoch by mutableStateOf(0)
+    private var profileAccountRevisionSequence = 0
     private val profileAccountRevisions = mutableStateMapOf<String, Int>()
     private val profileAccountRevisionOrder = linkedSetOf<String>()
 
@@ -1733,7 +1734,8 @@ class WhiteNoiseAppState private constructor(
     private fun bumpProfileAccountRevision(accountIdHex: String) {
         val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
         if (normalized.isEmpty()) return
-        profileAccountRevisions[normalized] = (profileAccountRevisions[normalized] ?: 0) + 1
+        profileAccountRevisionSequence += 1
+        profileAccountRevisions[normalized] = profileAccountRevisionSequence
         profileAccountRevisionOrder.remove(normalized)
         profileAccountRevisionOrder.add(normalized)
         if (profileAccountRevisionOrder.size > MAX_PROFILE_PRESENTATION_CACHE_ENTRIES) {
@@ -1745,6 +1747,7 @@ class WhiteNoiseAppState private constructor(
 
     private fun bumpAllProfileAccountRevisions() {
         profileAccountRevisionEpoch += 1
+        profileAccountRevisionSequence = 0
         profileAccountRevisions.clear()
         profileAccountRevisionOrder.clear()
     }
@@ -5670,21 +5673,29 @@ class WhiteNoiseAppState private constructor(
     // whose lazy ensureProfileMaterialized is a side effect); touches
     // profileRevision only for Compose invalidation. Callers drive the prefetch
     // from a LaunchedEffect (e.g. requestProfiles over the roster).
-    fun chatMemberTitleCached(accountIdHex: String): String {
+    private fun chatMemberNameCached(accountIdHex: String): String? {
         profileRevision
-        val cachedName =
-            synchronized(profilePresentationLock) {
-                resolvedProfileDisplayName(
-                    profileDisplayName = profilePresentations[accountIdHex]?.displayName,
-                    notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
-                )
-            }
+        return synchronized(profilePresentationLock) {
+            resolvedProfileDisplayName(
+                profileDisplayName = profilePresentations[accountIdHex]?.displayName,
+                notificationDisplayNameHint = notificationDisplayNameHints[accountIdHex],
+            )
+        }
+    }
+
+    fun chatMemberTitleCached(accountIdHex: String): String {
+        val cachedName = chatMemberNameCached(accountIdHex)
         return cachedName ?: shortNpub(accountIdHex)
     }
 
-    fun contactDisplayNameCached(accountIdHex: String): String {
+    internal fun contactDisplayNameCachedOrNull(accountIdHex: String): String? {
         contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
-        return chatMemberTitleCached(accountIdHex)
+        return chatMemberNameCached(accountIdHex)
+    }
+
+    fun contactDisplayNameCached(accountIdHex: String): String {
+        val cachedName = contactDisplayNameCachedOrNull(accountIdHex)
+        return cachedName ?: shortNpub(accountIdHex)
     }
 
     private fun profileDisplayName(accountIdHex: String): String? =

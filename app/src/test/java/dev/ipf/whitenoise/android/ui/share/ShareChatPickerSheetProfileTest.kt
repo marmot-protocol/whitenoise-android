@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -190,6 +191,43 @@ class ShareChatPickerSheetProfileTest {
     }
 
     @Test
+    fun cachedPresentationNameResolvesWithoutProfileMetadata() {
+        val appState =
+            emptyAppState(
+                profileDisplayName = { accountIdHex ->
+                    "Alice Example".takeIf { accountIdHex == PEER_A }
+                },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        controller.applyChatListRow(chatRow(GROUP_A))
+        controller.applyLocalGroupDetails(
+            record = group(GROUP_A),
+            members = listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false)),
+        )
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Alice Example").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule
+            .onNodeWithText(app.getString(R.string.share_search_chats))
+            .performClick()
+            .performTextInput("Alice")
+        composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsNotDisplayed()
+    }
+
+    @Test
     fun shortIdentityFragmentsDoNotMatchUnresolvedProfiles() {
         val appState = appStateWithDirectChat(GROUP_A, PEER_A)
         val fallbackTitle = appState.shortNpub(PEER_A)
@@ -317,6 +355,50 @@ class ShareChatPickerSheetProfileTest {
             composeRule.onAllNodesWithText("Alice Example").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("Alice Example").assertIsDisplayed()
+    }
+
+    @Test
+    fun invalidatedRosterFetchRetriesWhileChatListIsHidden() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice Example"))
+        val firstRosterStarted = CompletableDeferred<Unit>()
+        val releaseFirstRoster = CompletableDeferred<Unit>()
+        var rosterRequests = 0
+        val appState = emptyAppState(profiles = profiles)
+        val controller =
+            ChatsController(appState, ACCOUNT_REF) { _, groupId ->
+                check(groupId == GROUP_A)
+                rosterRequests += 1
+                if (rosterRequests == 1) {
+                    firstRosterStarted.complete(Unit)
+                    releaseFirstRoster.await()
+                }
+                listOf(member(ACCOUNT_HEX, local = true), member(PEER_A, local = false))
+            }
+        controller.applyChatListRow(chatRow(GROUP_A))
+        controller.applyLocalGroupUpdate(group(GROUP_A))
+        controller.setChatListVisible(false)
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerSheet(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = {},
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { firstRosterStarted.isCompleted }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(group(GROUP_A))
+            releaseFirstRoster.complete(Unit)
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) { rosterRequests >= 2 }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Alice Example").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test
@@ -456,6 +538,7 @@ class ShareChatPickerSheetProfileTest {
     private fun emptyAppState(
         profiles: MutableMap<String, UserProfileMetadataFfi> = mutableMapOf(),
         profileRefresh: suspend (String) -> Unit = {},
+        profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
     ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = app,
@@ -464,7 +547,7 @@ class ShareChatPickerSheetProfileTest {
             accounts = listOf(activeAccount()),
             activeAccountRef = ACCOUNT_REF,
             profileReader = { profiles[it] },
-            profileDisplayNameReader = { profiles[it]?.displayName },
+            profileDisplayNameReader = profileDisplayName,
             profileRefreshRequest = profileRefresh,
         )
 

@@ -29,7 +29,7 @@ internal fun rememberShareAccountAliases(
                         val profile = appState.userProfileCached(accountIdHex)
                         val human =
                             listOfNotNull(
-                                appState.contactNickname(accountIdHex),
+                                appState.contactDisplayNameCachedOrNull(accountIdHex),
                                 profile?.displayName,
                                 profile?.name,
                                 profile?.nip05,
