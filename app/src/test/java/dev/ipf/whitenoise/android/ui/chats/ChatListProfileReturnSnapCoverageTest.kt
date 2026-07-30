@@ -185,6 +185,20 @@ class ChatListProfileReturnSnapCoverageTest {
         )
     }
 
+    @Test
+    fun accountSwitchDismissesSharePickerBeforeTargetsCanCrossAccounts() {
+        val accountResetBlock =
+            mainShellSource().readText().requiredSection(
+                start = "if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {",
+                end = "\n        }",
+            )
+
+        assertTrue(
+            "account reset must dismiss the picker holding the previous account's group ids",
+            "sharePickerRequest = null" in accountResetBlock,
+        )
+    }
+
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),
