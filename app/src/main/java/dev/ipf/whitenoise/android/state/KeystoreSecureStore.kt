@@ -138,6 +138,17 @@ internal class KeystoreSecureStore(
             }
         }
 
+    /**
+     * Replaces the complete logical map and commits synchronously. Callers run
+     * this off-main when coalescing high-frequency updates such as drafts.
+     */
+    fun replaceAllDurably(values: Map<String, String>): Boolean =
+        asSecurityFailure {
+            synchronized(lock) {
+                prefs.edit().putString(PAYLOAD_KEY, encrypt(values)).commit()
+            }
+        }
+
     fun clear() {
         synchronized(lock) { prefs.edit().clear().apply() }
     }

@@ -4632,6 +4632,7 @@ class WhiteNoiseAppState private constructor(
             chatMutePreferences.resolveExpiredNow()
         } else {
             recordAppLockBackgrounded()
+            mutationsScope.launch(Dispatchers.IO) { draftStore.flush() }
             // Read-aloud is foreground-only in v1 (no mediaPlayback FGS):
             // spoken private messages must not continue after an app switch.
             stopSpeaking()
@@ -4669,6 +4670,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
+        draftStore.flush()
     }
 
     private fun applyActiveConversationTransition(groupIdHex: String?) {

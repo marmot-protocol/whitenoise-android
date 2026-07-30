@@ -10,6 +10,9 @@ import java.io.IOException
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Persistence layer for unsent conversation drafts. The storage map is keyed
@@ -25,6 +28,8 @@ internal interface DraftPersistence {
         key: String,
         value: String?,
     )
+
+    fun flush() = Unit
 }
 
 private class EvictedDraftStateReference(
@@ -43,6 +48,7 @@ private class EvictedDraftStateReference(
  * SnapshotStateMap, which tracks reads at whole-map granularity — would
  * recompose every chat-list row on every keystroke in any conversation.)
  */
+@Suppress("TooManyFunctions")
 class DraftStore internal constructor(
     private val persistence: DraftPersistence,
     private val nowSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
@@ -208,6 +214,9 @@ class DraftStore internal constructor(
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
+    /** Durably drains any coalesced background persistence work. */
+    fun flush() = persistence.flush()
+
     private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
         drainCollectedEvictedDraftStatesLocked()
         if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
@@ -243,6 +252,7 @@ class DraftStore internal constructor(
  */
 internal class EncryptedDraftPersistence(
     context: Context,
+    writeExecutor: ExecutorService = newDraftWriteExecutor(),
 ) : DraftPersistence {
     private val app = context.applicationContext
     private val store =
@@ -251,12 +261,28 @@ internal class EncryptedDraftPersistence(
             fileName = SECURE_FILE,
             keyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS),
         )
+    private val writer: CoalescingDraftWriter
 
     init {
         importLegacyDrafts()
+        writer =
+            CoalescingDraftWriter(
+                initial = readSecureStore(),
+                executor = writeExecutor,
+                persist = ::persistSnapshot,
+            )
     }
 
-    override fun read(): Map<String, String> =
+    override fun read(): Map<String, String> = writer.read()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = writer.write(key, value)
+
+    override fun flush() = writer.flush()
+
+    private fun readSecureStore(): Map<String, String> =
         try {
             store.readAll()
         } catch (error: GeneralSecurityException) {
@@ -268,16 +294,15 @@ internal class EncryptedDraftPersistence(
             emptyMap()
         }
 
-    override fun write(
-        key: String,
-        value: String?,
-    ) {
+    private fun persistSnapshot(values: Map<String, String>) {
         try {
-            store.write(key, value)
+            if (!store.replaceAllDurably(values)) {
+                Log.w(LOG_TAG, "draft snapshot commit failed")
+            }
         } catch (error: GeneralSecurityException) {
             Log.w(LOG_TAG, "draft write failed, recreating store", error)
             recreateAfterCorruption()
-            runCatching { store.write(key, value) }
+            runCatching { store.replaceAllDurably(values) }
         }
     }
 
@@ -343,6 +368,90 @@ internal class EncryptedDraftPersistence(
         const val SECURE_FILE = "whitenoise.drafts.keystore"
         const val LEGACY_SECURE_FILE = "whitenoise.drafts.secure"
         const val KEY_ALIAS = "whitenoise.drafts.aes_gcm.v1"
+
+        fun newDraftWriteExecutor(): ExecutorService =
+            Executors.newSingleThreadExecutor { task ->
+                Thread(task, "WhiteNoiseDraftWriter").apply { isDaemon = true }
+            }
+    }
+}
+
+/**
+ * Keeps the latest draft map in memory and serializes durable writes through a
+ * single background worker. A burst of keystrokes produces at most one active
+ * encryption plus one latest snapshot, rather than one whole-map encryption
+ * per key event on the main thread.
+ */
+internal class CoalescingDraftWriter(
+    initial: Map<String, String>,
+    private val executor: ExecutorService,
+    private val persist: (Map<String, String>) -> Unit,
+) {
+    private val lock = Any()
+    private var values = initial.toMap()
+    private var generation = 0L
+    private var workerScheduled = false
+    private var workerDone = CountDownLatch(0)
+
+    fun read(): Map<String, String> = synchronized(lock) { values.toMap() }
+
+    fun write(
+        key: String,
+        value: String?,
+    ) {
+        synchronized(lock) {
+            val updated = if (value == null) values - key else values + (key to value)
+            if (updated == values) return
+            values = updated
+            generation += 1
+            scheduleWorkerLocked()
+        }
+    }
+
+    fun flush() {
+        while (true) {
+            val completion =
+                synchronized(lock) {
+                    if (!workerScheduled) return
+                    workerDone
+                }
+            completion.await()
+        }
+    }
+
+    private fun drain(completion: CountDownLatch) {
+        try {
+            while (true) {
+                val (snapshot, snapshotGeneration) =
+                    synchronized(lock) { values.toMap() to generation }
+                persist(snapshot)
+                val caughtUp =
+                    synchronized(lock) {
+                        if (generation == snapshotGeneration) {
+                            workerScheduled = false
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                if (caughtUp) return
+            }
+        } finally {
+            synchronized(lock) {
+                if (workerDone === completion) {
+                    workerScheduled = false
+                }
+                completion.countDown()
+            }
+        }
+    }
+
+    private fun scheduleWorkerLocked() {
+        if (workerScheduled) return
+        workerScheduled = true
+        val completion = CountDownLatch(1)
+        workerDone = completion
+        executor.execute { drain(completion) }
     }
 }
 
