@@ -696,6 +696,19 @@ class OptimisticSentPreviewOrderingTest {
         controller.setChatListVisible(false)
         controller.applyOptimisticSentPreview("chat-b", preview("temp-b", "pending B", 20uL))
         removeAndRestoreChatRow(controller, "chat-b")
+        controller.setChatListVisible(true)
+
+        assertEquals(listOf("chat-b", "chat-a"), controller.items.map { it.id })
+        assertEquals(
+            "temp-b",
+            controller.items
+                .first()
+                .projection
+                ?.lastMessage
+                ?.messageIdHex,
+        )
+
+        controller.setChatListVisible(false)
         controller.rollbackOptimisticSentPreview("chat-b", "temp-b")
         controller.setChatListVisible(true)
 

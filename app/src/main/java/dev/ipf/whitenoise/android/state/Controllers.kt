@@ -2383,6 +2383,13 @@ private data class OptimisticChatListPreviewState(
     val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
 )
 
+private fun OptimisticChatListPreviewState.snapshot(): OptimisticChatListPreviewState =
+    copy(
+        entries = LinkedHashMap(entries),
+        confirmedActivitySequenceById = LinkedHashMap(confirmedActivitySequenceById),
+        baselineActivitySequenceByLastMessage = LinkedHashMap(baselineActivitySequenceByLastMessage),
+    )
+
 private data class ChatListLastMessageActivity(
     val activitySortAt: ULong,
     val timelineAt: ULong?,
@@ -2397,6 +2404,7 @@ private data class OptimisticChatListPreviewMatch(
 private data class RemovedChatRowSnapshot(
     val row: ChatListRowFfi,
     val activitySequence: ULong,
+    val optimisticState: OptimisticChatListPreviewState?,
 )
 
 class ChatsController private constructor(
@@ -3378,6 +3386,7 @@ class ChatsController private constructor(
         return RemovedChatRowSnapshot(
             row = row,
             activitySequence = optimisticState?.baselineActivitySequence ?: activitySequenceByGroup[rowKey] ?: 0uL,
+            optimisticState = optimisticState?.snapshot(),
         )
     }
 
@@ -3396,6 +3405,10 @@ class ChatsController private constructor(
         if (chatRowsByGroup.containsKey(rowKey)) return
         chatRowsByGroup[rowKey] = snapshot.row
         activitySequenceByGroup[rowKey] = snapshot.activitySequence
+        snapshot.optimisticState?.let { state ->
+            optimisticChatListPreviewByGroup[rowKey] = state
+            materializeOptimisticChatListPreview(rowKey, state)
+        }
         noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
     }
