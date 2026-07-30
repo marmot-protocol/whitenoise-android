@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -45,6 +47,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -393,7 +396,14 @@ private fun ChatFolderManageRow(
         )
 
     ListItem(
-        modifier = Modifier.semantics { customActions = moveActions },
+        modifier =
+            Modifier
+                .semantics { customActions = moveActions }
+                .clickable(
+                    onClickLabel = stringResource(R.string.edit),
+                    role = Role.Button,
+                    onClick = onEdit,
+                ),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(folder.displayName(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
@@ -475,6 +485,8 @@ private fun ChatFolderDragHandle(
         contentDescription = stringResource(R.string.chat_folder_drag_to_reorder),
         modifier =
             Modifier
+                // Keep taps on the drag affordance from bubbling to the editable row.
+                .pointerInput(folderId) { detectTapGestures() }
                 .pointerInput(folderId) {
                     detectDragGestures(
                         onDragStart = { currentOnDragStart() },
