@@ -214,6 +214,8 @@ private fun BubbleColorPreview(
     val scheme = MaterialTheme.colorScheme
     val tokens =
         BubblePresentationTokens(
+            errorBackgroundArgb = scheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
+            errorContentArgb = scheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
             surfaceBackgroundArgb = scheme.surfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
             surfaceContentArgb = scheme.onSurfaceVariant.toArgb().toLong() and 0xFFFFFFFFL,
             mineBackgroundArgb = scheme.primaryContainer.toArgb().toLong() and 0xFFFFFFFFL,

@@ -52,7 +52,13 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted, mine, presentation.borderOverrideArgb),
+        border =
+            messageBubbleBorder(
+                highlighted = highlighted,
+                mine = mine,
+                customArgb = presentation.borderOverrideArgb,
+                persistedFailure = presentation.suppressBorder,
+            ),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(

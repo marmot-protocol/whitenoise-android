@@ -75,6 +75,31 @@ private fun replyPreviewMediaKind(
  */
 fun retentionIndicatorVisible(retentionSeconds: ULong?): Boolean = (retentionSeconds ?: 0uL) > 0uL
 
+internal enum class TimelineInvalidationPresentation {
+    None,
+    PartialVisibility,
+    NonCanonicalHistory,
+    PersistedFailure,
+}
+
+internal fun timelineInvalidationPresentation(status: String?): TimelineInvalidationPresentation =
+    when (status) {
+        null -> TimelineInvalidationPresentation.None
+        "LosingBranch" -> TimelineInvalidationPresentation.PartialVisibility
+        "BeyondAnchor",
+        "BeyondAppRetention",
+        "UndecryptableInCanonicalState",
+        -> TimelineInvalidationPresentation.NonCanonicalHistory
+        "local_publish_failed" -> TimelineInvalidationPresentation.PersistedFailure
+        // Preserve the established failure UI for future engine reasons until
+        // Android has an explicit reason-specific presentation for them.
+        else -> TimelineInvalidationPresentation.PersistedFailure
+    }
+
+internal fun usesPersistedFailurePresentation(record: TimelineMessageRecordFfi): Boolean =
+    !record.deleted &&
+        timelineInvalidationPresentation(record.invalidationStatus) == TimelineInvalidationPresentation.PersistedFailure
+
 object TimelineProjector {
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
         AppMessageRecordFfi(
@@ -102,14 +127,12 @@ object TimelineProjector {
         status: String?,
         copy: MessageTextCopy,
     ): String? =
-        when (status) {
-            "LosingBranch" -> copy.partialVisibility
-            "BeyondAnchor",
-            "BeyondAppRetention",
-            "UndecryptableInCanonicalState",
-            -> copy.nonCanonicalHistory
-            null -> null
-            else -> copy.nonCanonicalHistory
+        when (timelineInvalidationPresentation(status)) {
+            TimelineInvalidationPresentation.PartialVisibility -> copy.partialVisibility
+            TimelineInvalidationPresentation.NonCanonicalHistory -> copy.nonCanonicalHistory
+            TimelineInvalidationPresentation.None,
+            TimelineInvalidationPresentation.PersistedFailure,
+            -> null
         }
 
     fun displayBody(
@@ -117,6 +140,7 @@ object TimelineProjector {
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): String {
         if (record.deleted) return copy.deleted
+        if (usesPersistedFailurePresentation(record)) return copy.invalidated
         return projectedBody(
             plaintext = record.plaintext,
             kind = record.kind,

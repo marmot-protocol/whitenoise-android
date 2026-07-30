@@ -26,7 +26,9 @@ class FreshSweepCoverageTest {
         assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
         assertTrue(
             "convergence-invalidated text must remain available to bulk copy",
-            "copyableText = MessageProjector.copyableText(record, editedText)" in projectionsBlock,
+            "copyableText =" in projectionsBlock &&
+                "if (persistedFailure)" in projectionsBlock &&
+                "MessageProjector.copyableText(record, editedText)" in projectionsBlock,
         )
         assertTrue(
             "convergence-invalidated text must remain unavailable to bulk forward",

@@ -128,6 +128,22 @@ class TimelineProjectorTest {
     }
 
     @Test
+    fun localPublishFailureKeepsPersistedFailurePresentation() {
+        val record = timelineRecord(plaintext = "Secret", invalidationStatus = "local_publish_failed")
+
+        assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+        assertNull(TimelineProjector.invalidationWarning(record))
+    }
+
+    @Test
+    fun unknownInvalidationKeepsPersistedFailurePresentation() {
+        val record = timelineRecord(plaintext = "Secret", invalidationStatus = "FutureReason")
+
+        assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+        assertNull(TimelineProjector.invalidationWarning(record))
+    }
+
+    @Test
     fun deletedTakesPrecedenceOverInvalidation() {
         val record =
             timelineRecord(

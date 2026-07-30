@@ -297,6 +297,7 @@
     <string name="confirm_leave_sole_member_message">You\'re the only member. Leaving deletes this group entirely.</string>
     <string name="toast_left_named">Left %1$s</string>
     <string name="message_deleted">Message deleted</string>
+    <string name="message_invalidated">This message didn\'t reach the group</string>
     <string name="toast_original_message_unavailable">Original message is unavailable</string>
     <string name="toast_notification_account_unavailable">That account is no longer available</string>
     <string name="toast_notification_conversation_unavailable">That conversation is no longer available</string>
@@ -306,6 +307,7 @@
     <string name="message_read_more">Read More</string>
     <string name="message_react">React</string>
     <string name="message_deleted_preview">Deleted a message</string>
+    <string name="message_invalidated_preview">Didn\'t reach the group</string>
     <string name="message_partial_visibility_warning">May not be visible to everyone</string>
     <string name="message_noncanonical_history_warning">Not confirmed in the group\'s current history</string>
     <string name="agent_stream_started">Agent stream started</string>

@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.ui.graphics.toArgb
+import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
+import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
@@ -12,6 +14,8 @@ import org.junit.Test
 class BubblePresentationTest {
     private val tokens =
         BubblePresentationTokens(
+            errorBackgroundArgb = 0xFFFFDAD6,
+            errorContentArgb = 0xFF410002,
             surfaceBackgroundArgb = 0xFFE1E3E4,
             surfaceContentArgb = 0xFF444748,
             mineBackgroundArgb = 0xFFB5EFFF,
@@ -31,6 +35,58 @@ class BubblePresentationTest {
                 tokens = tokens,
             ),
         )
+    }
+
+    @Test
+    fun localPublishFailureKeepsPersistedFailureBubbleChrome() {
+        val persistedFailure =
+            timelineInvalidationPresentation("local_publish_failed") ==
+                TimelineInvalidationPresentation.PersistedFailure
+
+        assertEquals(
+            BubblePresentation(
+                backgroundArgb = tokens.errorBackgroundArgb,
+                contentArgb = tokens.errorContentArgb,
+                mentionAccentArgb = tokens.mentionAccentArgb,
+                suppressBorder = true,
+            ),
+            resolveBubblePresentationArgb(
+                deleted = false,
+                amoled = true,
+                mine = true,
+                customArgb = 0xFFFF0000,
+                tokens = tokens,
+                persistedFailure = persistedFailure,
+            ),
+        )
+        assertTrue(persistedFailure)
+        assertTrue(!shouldShowMessageStatus(mine = true, deleted = false, persistedFailure = persistedFailure))
+    }
+
+    @Test
+    fun unknownInvalidationKeepsPersistedFailureBubbleChrome() {
+        val persistedFailure =
+            timelineInvalidationPresentation("FutureReason") ==
+                TimelineInvalidationPresentation.PersistedFailure
+
+        assertEquals(
+            BubblePresentation(
+                backgroundArgb = tokens.errorBackgroundArgb,
+                contentArgb = tokens.errorContentArgb,
+                mentionAccentArgb = tokens.mentionAccentArgb,
+                suppressBorder = true,
+            ),
+            resolveBubblePresentationArgb(
+                deleted = false,
+                amoled = false,
+                mine = true,
+                customArgb = 0xFFFF0000,
+                tokens = tokens,
+                persistedFailure = persistedFailure,
+            ),
+        )
+        assertTrue(persistedFailure)
+        assertTrue(!shouldShowMessageStatus(mine = true, deleted = false, persistedFailure = persistedFailure))
     }
 
     @Test

@@ -185,6 +185,8 @@ class MessageBubbleFrameTest {
             customArgb = CUSTOM_BACKGROUND,
             tokens =
                 BubblePresentationTokens(
+                    errorBackgroundArgb = 0xFFFFDAD6,
+                    errorContentArgb = 0xFF410002,
                     surfaceBackgroundArgb = 0xFFE1E3E4,
                     surfaceContentArgb = OPAQUE_WHITE,
                     mineBackgroundArgb = 0xFFB5EFFF,

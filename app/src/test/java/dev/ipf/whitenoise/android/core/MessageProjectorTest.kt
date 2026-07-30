@@ -272,6 +272,7 @@ class MessageProjectorTest {
                 reactedFormat = "R:%1\$s",
                 reactionFallback = "target",
                 deleted = "deleted",
+                invalidated = "invalidated",
                 partialVisibility = "partial",
                 nonCanonicalHistory = "noncanonical",
                 agentStreamStarted = "started",
