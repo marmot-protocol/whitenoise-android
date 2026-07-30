@@ -2530,7 +2530,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update() != 9602.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new() != 53434.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new() != 56105.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new_with_cursor_persistence() != 18903.toShort()) {
@@ -5851,11 +5851,8 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * platform keyring (Keychain on Apple platforms, Android's native
      * keyring on Android) via the default keychain-backed account home —
      * not in a plaintext file. Fallible because initializing the platform
-     * secret store can fail or another process may own the same root
-     * ([`MarmotKitError::RuntimeBusy`]). Root ownership is nonblocking and
-     * remains held until the final `Marmot`/runtime handle is dropped, even
-     * after [`Marmot::shutdown`]. Call [`Marmot::start`] before subscribing
-     * to events.
+     * secret store can fail. Call [`Marmot::start`] before subscribing to
+     * events.
      */
     constructor(`rootPath`: kotlin.String, `relayUrls`: List<kotlin.String>) :
         this(
@@ -17904,17 +17901,6 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = ""
     }
     
-    /**
-     * Another process or runtime owns the shared Marmot root. This is a typed,
-     * retryable/fallback signal for the iOS foreground app and NSE; neither
-     * host should open an unleased runtime after receiving it.
-     */
-    class RuntimeBusy(
-        ) : MarmotKitException() {
-        override val message
-            get() = ""
-    }
-    
     class RuntimeStopping(
         ) : MarmotKitException() {
         override val message
@@ -18206,67 +18192,66 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 )
             12 -> MarmotKitException.FollowListUnavailable()
             13 -> MarmotKitException.TransportClosed()
-            14 -> MarmotKitException.RuntimeBusy()
-            15 -> MarmotKitException.RuntimeStopping()
-            16 -> MarmotKitException.AccountCatchUp(
+            14 -> MarmotKitException.RuntimeStopping()
+            15 -> MarmotKitException.AccountCatchUp(
                 FfiConverterString.read(buf),
                 )
-            17 -> MarmotKitException.NotGroupAdmin(
+            16 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            18 -> MarmotKitException.AdminCannotSelfRemove(
+            17 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            19 -> MarmotKitException.LeaveAlreadyRequested(
+            18 -> MarmotKitException.LeaveAlreadyRequested(
                 FfiConverterString.read(buf),
                 )
-            20 -> MarmotKitException.WouldRemoveLastAdmin(
+            19 -> MarmotKitException.WouldRemoveLastAdmin(
                 FfiConverterString.read(buf),
                 )
-            21 -> MarmotKitException.DisbandingUnsupportedMembers(
+            20 -> MarmotKitException.DisbandingUnsupportedMembers(
                 FfiConverterString.read(buf),
                 FfiConverterSequenceString.read(buf),
                 )
-            22 -> MarmotKitException.DisbandingNotEnabled(
+            21 -> MarmotKitException.DisbandingNotEnabled(
                 FfiConverterString.read(buf),
                 )
-            23 -> MarmotKitException.GroupDisbanding(
+            22 -> MarmotKitException.GroupDisbanding(
                 FfiConverterString.read(buf),
                 )
-            24 -> MarmotKitException.MemberNotInGroup(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            25 -> MarmotKitException.AlreadyAdmin(
+            23 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            26 -> MarmotKitException.NotAdmin(
+            24 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            27 -> MarmotKitException.StorageBusy(
+            25 -> MarmotKitException.NotAdmin(
+                FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            28 -> MarmotKitException.SecretNotFound(
+            26 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            29 -> MarmotKitException.KeystoreUnavailable(
+            27 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            30 -> MarmotKitException.EmptyPassphrase()
-            31 -> MarmotKitException.EncryptionFailed(
+            28 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            32 -> MarmotKitException.Io(
+            29 -> MarmotKitException.EmptyPassphrase()
+            30 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            33 -> MarmotKitException.ExternalSignerUnavailable(
+            31 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            34 -> MarmotKitException.ExternalSignerMismatch()
-            35 -> MarmotKitException.ExternalSignerRejected()
-            36 -> MarmotKitException.Runtime(
+            32 -> MarmotKitException.ExternalSignerUnavailable(
+                FfiConverterString.read(buf),
+                )
+            33 -> MarmotKitException.ExternalSignerMismatch()
+            34 -> MarmotKitException.ExternalSignerRejected()
+            35 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -18335,10 +18320,6 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 4UL
             )
             is MarmotKitException.TransportClosed -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4UL
-            )
-            is MarmotKitException.RuntimeBusy -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -18520,117 +18501,113 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 buf.putInt(13)
                 Unit
             }
-            is MarmotKitException.RuntimeBusy -> {
+            is MarmotKitException.RuntimeStopping -> {
                 buf.putInt(14)
                 Unit
             }
-            is MarmotKitException.RuntimeStopping -> {
-                buf.putInt(15)
-                Unit
-            }
             is MarmotKitException.AccountCatchUp -> {
-                buf.putInt(16)
+                buf.putInt(15)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(17)
+                buf.putInt(16)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.AdminCannotSelfRemove -> {
-                buf.putInt(18)
+                buf.putInt(17)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.LeaveAlreadyRequested -> {
-                buf.putInt(19)
+                buf.putInt(18)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.WouldRemoveLastAdmin -> {
-                buf.putInt(20)
+                buf.putInt(19)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.DisbandingUnsupportedMembers -> {
-                buf.putInt(21)
+                buf.putInt(20)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
                 Unit
             }
             is MarmotKitException.DisbandingNotEnabled -> {
-                buf.putInt(22)
+                buf.putInt(21)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.GroupDisbanding -> {
-                buf.putInt(23)
+                buf.putInt(22)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.MemberNotInGroup -> {
-                buf.putInt(24)
+                buf.putInt(23)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.AlreadyAdmin -> {
-                buf.putInt(25)
+                buf.putInt(24)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.NotAdmin -> {
-                buf.putInt(26)
+                buf.putInt(25)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.StorageBusy -> {
-                buf.putInt(27)
+                buf.putInt(26)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.SecretNotFound -> {
-                buf.putInt(28)
+                buf.putInt(27)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.KeystoreUnavailable -> {
-                buf.putInt(29)
+                buf.putInt(28)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.EmptyPassphrase -> {
-                buf.putInt(30)
+                buf.putInt(29)
                 Unit
             }
             is MarmotKitException.EncryptionFailed -> {
-                buf.putInt(31)
+                buf.putInt(30)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.Io -> {
-                buf.putInt(32)
+                buf.putInt(31)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerUnavailable -> {
-                buf.putInt(33)
+                buf.putInt(32)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(34)
+                buf.putInt(33)
                 Unit
             }
             is MarmotKitException.ExternalSignerRejected -> {
-                buf.putInt(35)
+                buf.putInt(34)
                 Unit
             }
             is MarmotKitException.Runtime -> {
-                buf.putInt(36)
+                buf.putInt(35)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
