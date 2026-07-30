@@ -415,6 +415,7 @@
     <string name="confirm_delete_member_message_message">This removes the message for everyone in the group. It can\'t be undone.</string>
     <string name="sent">Sent</string>
     <string name="send_failed">Send failed</string>
+    <string name="delivery_not_confirmed">Delivery not confirmed</string>
     <string name="sending">Sending</string>
     <string name="cancel_reply">Cancel reply</string>
     <string name="message">Message</string>

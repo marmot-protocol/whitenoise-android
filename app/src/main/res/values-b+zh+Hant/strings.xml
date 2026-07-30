@@ -297,6 +297,7 @@
     <string name="confirm_delete_member_message_message">此操作會為群組中的所有人刪除該訊息，且無法復原。</string>
     <string name="sent">已傳送</string>
     <string name="send_failed">訊息傳送失敗。請再試一次。</string>
+    <string name="delivery_not_confirmed">送達未確認</string>
     <string name="sending">正在傳送</string>
     <string name="cancel_reply">取消回覆</string>
     <string name="message">輸入訊息</string>

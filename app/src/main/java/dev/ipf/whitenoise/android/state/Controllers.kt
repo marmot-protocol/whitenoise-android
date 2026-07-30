@@ -1869,6 +1869,24 @@ internal fun unreadCountDivergenceReport(
     )
 }
 
+/**
+ * Reports a send failure to the user without leaking engine internals. The
+ * engine's message can name internal state machines and transitions (for
+ * example an `illegal queue_app_message transition from PendingPublish`),
+ * which is meaningless to a user and is not ours to put on screen; the raw
+ * text stays in the log until the privacy-safe report path exists.
+ */
+internal fun presentSendFailure(
+    appState: WhiteNoiseAppState,
+    throwable: Throwable,
+) {
+    Log.w(
+        "DMSend",
+        "send failed type=${throwable.javaClass.simpleName} detail=${throwable.message}",
+    )
+    appState.present(R.string.toast_send_failed)
+}
+
 internal fun logUnreadCountDivergence(
     tag: String,
     report: UnreadCountDivergenceReport,
@@ -5245,7 +5263,7 @@ class ConversationController(
                 context = arrayOf("error" to throwable.javaClass.simpleName),
             )
             forgetSendTrace(tempId)
-            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+            presentSendFailure(appState, throwable)
         }
     }
 
@@ -5746,7 +5764,7 @@ class ConversationController(
                 // path runs) or explicitly discards.
                 publishTimelineFromIndexes()
                 Log.w("DMConversation", "media upload failed for ${group.groupIdHex.take(8)}", throwable)
-                appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+                presentSendFailure(appState, throwable)
             }
         } finally {
             appState.untrackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key, uploadJob)
@@ -6471,7 +6489,7 @@ class ConversationController(
                 ),
             )
             publishTimelineFromIndexes()
-            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+            presentSendFailure(appState, throwable)
         }
     }
 

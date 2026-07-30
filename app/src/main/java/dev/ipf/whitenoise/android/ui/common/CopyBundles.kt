@@ -40,6 +40,7 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         invalidated = stringResource(R.string.message_invalidated_preview),
         partialVisibility = stringResource(R.string.message_partial_visibility_warning),
         nonCanonicalHistory = stringResource(R.string.message_noncanonical_history_warning),
+        deliveryNotConfirmed = stringResource(R.string.delivery_not_confirmed),
         agentStreamStarted = stringResource(R.string.agent_stream_started),
         streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),

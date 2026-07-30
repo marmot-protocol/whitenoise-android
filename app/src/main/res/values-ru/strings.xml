@@ -326,6 +326,7 @@
     <string name="confirm_delete_member_message_message">Сообщение будет удалено для всех участников группы. Это действие нельзя отменить.</string>
     <string name="sent">Отправлено</string>
     <string name="send_failed">Не удалось отправить сообщение. Попробуйте снова.</string>
+    <string name="delivery_not_confirmed">Доставка не подтверждена</string>
     <string name="sending">Отправка</string>
     <string name="cancel_reply">Отменить ответ</string>
     <string name="message">Сообщение</string>
