@@ -308,6 +308,8 @@
     <string name="message_react">React</string>
     <string name="message_deleted_preview">Deleted a message</string>
     <string name="message_invalidated_preview">Didn\'t reach the group</string>
+    <string name="message_partial_visibility_warning">May not be visible to everyone</string>
+    <string name="message_noncanonical_history_warning">Not confirmed in the group\'s current history</string>
     <string name="agent_stream_started">Agent stream started</string>
     <string name="stream_finished">Stream finished</string>
     <string name="media_attachment">Media attachment</string>

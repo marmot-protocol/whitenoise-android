@@ -63,6 +63,7 @@ internal fun ReplyPreviewCard(
     senderTitle: String,
     isOwn: Boolean,
     body: String,
+    warning: String? = null,
     mediaKind: dev.ipf.whitenoise.android.core.ReplyMediaKind,
     onClick: (() -> Unit)?,
     onDismiss: (() -> Unit)?,
@@ -164,6 +165,15 @@ internal fun ReplyPreviewCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = resolvedContentColor,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    warning?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = resolvedContentColor.copy(alpha = 0.75f),
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }

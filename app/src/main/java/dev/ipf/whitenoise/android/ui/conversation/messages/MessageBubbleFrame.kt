@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -27,7 +28,6 @@ internal fun MessageBubbleFrame(
     presentation: BubblePresentation,
     highlighted: Boolean,
     mine: Boolean,
-    invalidated: Boolean,
     mentionedSelf: Boolean,
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
@@ -38,7 +38,6 @@ internal fun MessageBubbleFrame(
         messageTargetHighlightModifier(
             highlighted = highlighted,
             customBorderArgb = presentation.borderOverrideArgb,
-            invalidated = invalidated,
             color = MaterialTheme.colorScheme.tertiary,
         )
     val mentionModifier =
@@ -53,7 +52,13 @@ internal fun MessageBubbleFrame(
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = RoundedCornerShape(18.dp),
-        border = messageBubbleBorder(highlighted, mine, invalidated, presentation.borderOverrideArgb),
+        border =
+            messageBubbleBorder(
+                highlighted = highlighted,
+                mine = mine,
+                customArgb = presentation.borderOverrideArgb,
+                persistedFailure = presentation.suppressBorder,
+            ),
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
@@ -67,13 +72,32 @@ internal fun MessageBubbleFrame(
     }
 }
 
+@Composable
+@Suppress("FunctionNaming")
+internal fun MessageBubbleInvalidationWarning(
+    warning: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = warning,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = modifier,
+    )
+}
+
+internal fun shouldFrameMessageBubbleSupplement(
+    bodyText: String?,
+    invalidationWarning: String?,
+): Boolean = bodyText != null || invalidationWarning != null
+
 private fun messageTargetHighlightModifier(
     highlighted: Boolean,
     customBorderArgb: Long?,
-    invalidated: Boolean,
     color: Color,
 ): Modifier =
-    if (highlighted && customBorderArgb != null && !invalidated) {
+    if (highlighted && customBorderArgb != null) {
         Modifier.drawWithContent {
             drawContent()
             val inset = 4.dp.toPx()

@@ -273,6 +273,8 @@ class MessageProjectorTest {
                 reactionFallback = "target",
                 deleted = "deleted",
                 invalidated = "invalidated",
+                partialVisibility = "partial",
+                nonCanonicalHistory = "noncanonical",
                 agentStreamStarted = "started",
                 streamFinished = "finished",
                 mediaAttachment = "media",

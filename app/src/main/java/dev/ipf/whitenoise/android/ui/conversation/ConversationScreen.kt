@@ -117,6 +117,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
+import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.AppText
@@ -656,6 +657,8 @@ internal fun ConversationScreen(
                         return@mapNotNull null
                     }
                     val invalidated = item.projected?.invalidationStatus != null
+                    val persistedFailure =
+                        item.projected?.let(::usesPersistedFailurePresentation) == true
                     val editedText =
                         controller.editsByTarget[messageId]
                             ?.latestText
@@ -666,7 +669,12 @@ internal fun ConversationScreen(
                                 messageId = messageId,
                                 senderId = record.sender,
                                 senderDisplayName = record.sender,
-                                copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
+                                copyableText =
+                                    if (persistedFailure) {
+                                        null
+                                    } else {
+                                        MessageProjector.copyableText(record, editedText)
+                                    },
                                 forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
                                 // Same authoritative accessor the single-message
                                 // surface and the mutation guard use, so bulk
@@ -3051,6 +3059,9 @@ internal fun ConversationScreen(
                                         controller.replyingTo
                                             ?.let(controller::mediaReferencesFor)
                                             .orEmpty(),
+                                    replyingToDisplay =
+                                        controller.replyingTo
+                                            ?.let { controller.replyTargetPreview(it, messageTextCopy) },
                                     messageTextCopy = messageTextCopy,
                                     onCancelReply = { controller.replyingTo = null },
                                     onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },

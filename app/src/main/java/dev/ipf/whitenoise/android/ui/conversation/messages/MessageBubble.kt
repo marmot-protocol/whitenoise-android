@@ -93,6 +93,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipe
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
+import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
@@ -156,12 +157,12 @@ import kotlin.math.roundToInt
 internal fun messageBubbleBorder(
     highlighted: Boolean,
     mine: Boolean,
-    invalidated: Boolean = false,
     customArgb: Long? = null,
+    persistedFailure: Boolean = false,
 ): BorderStroke? {
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
-        invalidated -> null
+        persistedFailure -> null
         amoledAccent != null && customArgb != null -> BorderStroke(2.dp, colorFromArgb(customArgb))
         highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
         amoledAccent != null -> BorderStroke(2.dp, customArgb?.let(::colorFromArgb) ?: amoledAccent)
@@ -182,14 +183,13 @@ internal fun replyPreviewAccentArgb(
 
 @Composable
 internal fun messageBubblePresentation(
-    invalidated: Boolean,
     deleted: Boolean,
     mine: Boolean,
     customArgb: Long? = null,
+    persistedFailure: Boolean = false,
 ): BubblePresentation {
     val colorScheme = MaterialTheme.colorScheme
     return resolveBubblePresentationArgb(
-        invalidated = invalidated,
         deleted = deleted,
         amoled = isAmoledSurfaceTheme(),
         mine = mine,
@@ -204,26 +204,27 @@ internal fun messageBubblePresentation(
                 mineContentArgb = colorScheme.onPrimaryContainer.toArgb().toLong() and 0xFFFFFFFFL,
                 mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
             ),
+        persistedFailure = persistedFailure,
     )
 }
 
 @Composable
 internal fun messageBubbleFillColor(
-    invalidated: Boolean,
     deleted: Boolean,
     mine: Boolean,
-): Color = colorFromArgb(messageBubblePresentation(invalidated, deleted, mine).backgroundArgb)
+    persistedFailure: Boolean = false,
+): Color = colorFromArgb(messageBubblePresentation(deleted, mine, persistedFailure = persistedFailure).backgroundArgb)
 
 @Composable
 internal fun messageBubbleTimestampColor(
-    invalidated: Boolean,
     mine: Boolean,
     deleted: Boolean,
+    persistedFailure: Boolean = false,
 ): Color {
     val colorScheme = MaterialTheme.colorScheme
     val amoledAccent = amoledDirectionalAccentColor(mine)
     return when {
-        invalidated -> colorScheme.onErrorContainer
+        persistedFailure -> colorScheme.onErrorContainer
         amoledAccent != null -> amoledAccent
         mine && !deleted -> colorScheme.onPrimaryContainer
         else -> colorScheme.onSurfaceVariant
@@ -337,10 +338,12 @@ internal fun MessageBubble(
         } else {
             controller.deleteCapabilityFor(record, alreadyDeleted = deleted)
         }
-    // Convergence dropped this message onto a losing branch: it never reached
-    // the group. The record survives as a tombstone, so flag it (an explicit
-    // delete takes precedence over an invalidation tombstone).
+    // Convergence reasons keep content and add a warning. Persisted local or
+    // unknown failures retain the pre-#1740 failure presentation so #1747 can
+    // change that state independently. Explicit deletion always wins.
     val invalidated = !deleted && item.projected?.invalidationStatus != null
+    val persistedFailure =
+        !deleted && item.projected?.let(::usesPersistedFailurePresentation) == true
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
     val bubbleSide = if (mine) BubbleSide.Mine else BubbleSide.Other
     val customBubbleArgb =
@@ -350,17 +353,17 @@ internal fun MessageBubble(
             groupIdHex = controller.group.groupIdHex,
         )
     val colorScheme = MaterialTheme.colorScheme
-    val customBubbleColorActive = customBubbleArgb != null && !deleted && !invalidated
+    val customBubbleColorActive = customBubbleArgb != null && !deleted && !persistedFailure
     val bubblePresentation =
         messageBubblePresentation(
-            invalidated = invalidated,
             deleted = deleted,
             mine = mine,
             customArgb = customBubbleArgb,
+            persistedFailure = persistedFailure,
         )
     val bubbleContentColor = colorFromArgb(bubblePresentation.contentArgb)
-    // #414: "you were mentioned" treatment. A received (not mine), live (not
-    // deleted/invalidated) message whose markdown body @-mentions the current
+    // #414: "you were mentioned" treatment. A received (not mine), live
+    // message whose markdown body @-mentions the current
     // account gets a left-edge accent line so a self-mention is spottable while
     // scrolling. Keyed on the body tokens + account so a late account switch /
     // profile load re-evaluates. The resolver is the FFI bech32→hex encoding;
@@ -369,7 +372,7 @@ internal fun MessageBubble(
     val mentionedSelf =
         !mine &&
             !deleted &&
-            !invalidated &&
+            !persistedFailure &&
             remember(record.contentTokens, selfAccountIdHex) {
                 documentMentionsAccount(
                     document = record.contentTokens,
@@ -472,8 +475,16 @@ internal fun MessageBubble(
             Modifier
         }
     val deletedBodyText = stringResource(R.string.message_deleted)
-    val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
+    val messageActionsLabel = stringResource(R.string.message_actions)
+    val invalidationWarning =
+        remember(item.projected, messageTextCopy, deleted) {
+            if (deleted) {
+                null
+            } else {
+                item.projected?.let { TimelineProjector.invalidationWarning(it, messageTextCopy) }
+            }
+        }
     // Cached like the media references below: displayBody sanitizes/allocates
     // per call, and recomputing it for every visible bubble on every timeline
     // recomposition adds up. See #131.
@@ -483,12 +494,12 @@ internal fun MessageBubble(
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
     val displayedBody =
-        remember(item, deleted, invalidated, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
+        remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
             when {
                 // Check `deleted` first so the optimistic tombstone (from
                 // controller.deletedMessageIds) renders immediately on tap.
                 deleted -> deletedBodyText
-                invalidated -> invalidatedBodyText
+                persistedFailure -> invalidatedBodyText
                 // Edit overlay wins over both projected and raw plaintext.
                 // We don't go through MessageProjector here — the edit
                 // payload is plain text by spec; markdown re-parse will
@@ -498,7 +509,10 @@ internal fun MessageBubble(
                 item.projected != null ->
                     TimelineProjector.displayBody(
                         item.projected,
-                        messageTextCopy.copy(deleted = deletedBodyText),
+                        messageTextCopy.copy(
+                            deleted = deletedBodyText,
+                            invalidated = invalidatedBodyText,
+                        ),
                     )
                 else -> MessageProjector.displayBody(record, messageTextCopy)
             }
@@ -529,7 +543,7 @@ internal fun MessageBubble(
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
     // directional accent as the border; other themes keep their paired M3
     // on-color tokens.
-    val timestampColor = messageBubbleTimestampColor(invalidated, mine, deleted)
+    val timestampColor = messageBubbleTimestampColor(mine, deleted, persistedFailure)
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // A long body clips to a few lines with an inline Read More; opening it
     // routes through a full-screen view rather than expanding in place, so the
@@ -988,7 +1002,7 @@ internal fun MessageBubble(
                 // it instead via the text path below.
                 val footerOnVisualMedia =
                     !deleted &&
-                        !invalidated &&
+                        invalidationWarning == null &&
                         visualAttachments.size == 1 &&
                         (editState?.latestText ?: record.plaintext).isBlank()
                 val anyConfirmedMedia =
@@ -1009,25 +1023,30 @@ internal fun MessageBubble(
                         }
                     }
                 val shareBodyText = editState?.latestText ?: record.plaintext
+                val canRenderSharedContent = !deleted && !persistedFailure
+                val canRenderStructuredShare =
+                    canRenderSharedContent &&
+                        !anyConfirmedMedia &&
+                        record.kind == 9uL
                 val sharedContact =
-                    remember(vcardAttachment, shareBodyText, deleted, invalidated) {
-                        if (vcardAttachment != null && !deleted && !invalidated) {
+                    remember(vcardAttachment, shareBodyText, canRenderSharedContent) {
+                        if (vcardAttachment != null && canRenderSharedContent) {
                             parseSharedContactFromText(shareBodyText)
                         } else {
                             null
                         }
                     }
                 val sharedLocation =
-                    remember(shareBodyText, deleted, invalidated, anyConfirmedMedia, record.kind) {
-                        if (!deleted && !invalidated && !anyConfirmedMedia && record.kind == 9uL) {
+                    remember(shareBodyText, canRenderStructuredShare) {
+                        if (canRenderStructuredShare) {
                             parseSharedLocationFromText(shareBodyText)
                         } else {
                             null
                         }
                     }
                 val sharedUser =
-                    remember(shareBodyText, deleted, invalidated, anyConfirmedMedia, record.kind) {
-                        if (!deleted && !invalidated && !anyConfirmedMedia && record.kind == 9uL) {
+                    remember(shareBodyText, canRenderStructuredShare) {
+                        if (canRenderStructuredShare) {
                             parseSharedUserFromText(shareBodyText)
                         } else {
                             null
@@ -1088,10 +1107,12 @@ internal fun MessageBubble(
                         }
                     }
                 val footerOnPendingVisual =
-                    !deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.size == 1
+                    !deleted &&
+                        invalidationWarning == null &&
+                        !anyConfirmedMedia &&
+                        pendingVisualRefs.size == 1
                 val showPendingPlaceholder =
                     !deleted &&
-                        !invalidated &&
                         !anyConfirmedMedia &&
                         pendingAudio.isEmpty() &&
                         pendingVisualRefs.isEmpty() &&
@@ -1099,12 +1120,12 @@ internal fun MessageBubble(
                 // #527: media (images/video, audio, files) renders on its OWN,
                 // outside the colored message bubble. `hasMedia` decides whether
                 // this row splits into standalone media + an optional caption
-                // bubble, or stays a single text bubble. Deleted/invalidated
-                // tombstones never pull media out — they always render as the
-                // single tombstone bubble.
+                // bubble, or stays a single text bubble. Deleted and persisted
+                // failure tombstones stay single bubbles; convergence-invalidated
+                // messages retain local media.
                 val hasMedia =
                     !deleted &&
-                        !invalidated &&
+                        !persistedFailure &&
                         (
                             anyConfirmedMedia ||
                                 pendingAudio.isNotEmpty() ||
@@ -1163,7 +1184,7 @@ internal fun MessageBubble(
                             onOpen = { appState.presentProfile(sharedUser.npub) },
                         )
                     }
-                    if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
+                    if (!deleted && visualAttachments.isNotEmpty()) {
                         if (visualAttachments.size == 1) {
                             val entry = visualAttachments.first()
                             Box {
@@ -1208,7 +1229,7 @@ internal fun MessageBubble(
                             )
                         }
                     }
-                    if (!deleted && !invalidated && audioAttachments.isNotEmpty()) {
+                    if (!deleted && audioAttachments.isNotEmpty()) {
                         audioAttachments.forEach { entry ->
                             MediaVoiceBubble(
                                 messageIdHex = record.messageIdHex,
@@ -1221,7 +1242,7 @@ internal fun MessageBubble(
                             )
                         }
                     }
-                    if (!deleted && !invalidated && fileAttachments.isNotEmpty()) {
+                    if (!deleted && fileAttachments.isNotEmpty()) {
                         fileAttachments.forEach { entry ->
                             // A vCard renders the contact card above; keep its file
                             // pill too so the .vcf stays downloadable/openable until
@@ -1238,7 +1259,7 @@ internal fun MessageBubble(
                             )
                         }
                     }
-                    if (!deleted && !invalidated && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
+                    if (!deleted && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
                         pendingAudio.forEach { (index, pending) ->
                             MediaVoiceBubble(
                                 messageIdHex = record.messageIdHex,
@@ -1265,7 +1286,7 @@ internal fun MessageBubble(
                             )
                         }
                     }
-                    if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
+                    if (!deleted && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
                         val uploadFailed = item.status == MessageStatus.Failed
                         val retryUpload: () -> Unit = {
                             appState.launchMutation { controller.retryFailedSend(item) }
@@ -1345,29 +1366,33 @@ internal fun MessageBubble(
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
                     when {
-                        // Deleted/invalidated tombstones show only the
-                        // tombstone copy, never an inline image/caption.
-                        deleted || invalidated -> displayedBody
+                        // Deleted and persisted failure tombstones show only
+                        // their copy, never an inline image/caption.
+                        deleted || persistedFailure -> displayedBody
                         // The contact card / location bubble / user card carry
                         // the body, so the raw caption/link/npub text is hidden.
                         sharedContact != null || sharedLocation != null || sharedUser != null -> null
                         mediaPendingName != null && !anyConfirmedMedia -> null
                         anyConfirmedMedia ->
-                            (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }
+                            (editState?.latestText ?: record.plaintext).takeIf(String::isNotBlank)
                         else -> displayedBody
                     }
+                val bodyOrWarningInsideBubble =
+                    shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
                 // Captions/plain bodies sit on the resolved bubble background and therefore use
                 // its paired WCAG-safe content color. Footer-only media rows are
                 // outside the bubble and retain the page's surface foreground.
                 val timestampColor =
-                    if (bodyTextToRender != null) bubbleContentColor else colorScheme.onSurfaceVariant
+                    if (bodyOrWarningInsideBubble) bubbleContentColor else colorScheme.onSurfaceVariant
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)
                     }
                 }
                 val editedLabel =
-                    if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
+                    if (deleted || persistedFailure) {
+                        null
+                    } else if (editState != null && record.kind == 9uL) {
                         if (editState.count > 1) {
                             stringResource(R.string.edited_count, editState.count)
                         } else {
@@ -1380,7 +1405,7 @@ internal fun MessageBubble(
                     MessageInlineFooter(
                         timeText = rememberedMessageBubbleTime(record.recordedAt),
                         color = timestampColor,
-                        showStatus = mine && !deleted && !invalidated,
+                        showStatus = shouldShowMessageStatus(mine, deleted, persistedFailure),
                         status = item.status,
                         showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                         editedLabel = editedLabel,
@@ -1415,7 +1440,7 @@ internal fun MessageBubble(
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
                 val collapsible =
-                    collapseLongMessages && !deleted && !invalidated && !textSelectionMode
+                    collapseLongMessages && !deleted && !persistedFailure && !textSelectionMode
                 val readMoreLabel = stringResource(R.string.message_read_more)
                 val readMoreStyle =
                     SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
@@ -1436,7 +1461,7 @@ internal fun MessageBubble(
                         val markdownDocument = record.contentTokens
                         val renderMarkdownBody =
                             !deleted &&
-                                !invalidated &&
+                                !persistedFailure &&
                                 markdownDocument.blocks.isNotEmpty() &&
                                 bodyTextToRender == record.plaintext
                         // Markdown can't be cleanly truncated to a line
@@ -1625,6 +1650,13 @@ internal fun MessageBubble(
                             inlineFooter()
                         }
                     }
+                    invalidationWarning?.let { warning ->
+                        MessageBubbleInvalidationWarning(
+                            warning = warning,
+                            color = timestampColor,
+                            modifier = Modifier.align(Alignment.Start).padding(top = 2.dp),
+                        )
+                    }
                     if (mine && item.status == MessageStatus.Failed) {
                         Row(
                             modifier = Modifier.align(Alignment.End),
@@ -1704,6 +1736,7 @@ internal fun MessageBubble(
                             isOwn = isOwnReplySender(preview.sender, appState),
                             body = preview.body,
                             mediaKind = preview.mediaKind,
+                            warning = preview.warning,
                             onClick = {
                                 if (!textSelectionMode) onReplyPreviewClick(item)
                             },
@@ -1738,15 +1771,13 @@ internal fun MessageBubble(
                         senderNameLabel(false)
                         replyPreviewCard(false)
                         mediaBlocks()
-                        // Caption: only when a non-blank caption accompanies the
-                        // media. It gets the same colored bubble look as a plain
-                        // text message, placed directly below the media.
-                        if (bodyTextToRender != null) {
+                        // A caption or convergence warning gets the same colored
+                        // bubble look as a plain text message below the media.
+                        if (bodyOrWarningInsideBubble) {
                             MessageBubbleFrame(
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,
                                 mine = mine,
-                                invalidated = invalidated,
                                 mentionedSelf = mentionedSelf,
                                 mentionedYouLabel = mentionedYouLabel,
                                 modifier = textSelectionBoundsModifier,
@@ -1773,7 +1804,6 @@ internal fun MessageBubble(
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
-                        invalidated = invalidated,
                         mentionedSelf = mentionedSelf,
                         mentionedYouLabel = mentionedYouLabel,
                         // With a reply quote present, size the column to its
@@ -1859,7 +1889,7 @@ internal fun MessageBubble(
                         senderAvatarUrl = appState.avatarUrl(record.sender),
                         body = displayedBody,
                         timeText = rememberedClockTime(record.recordedAt),
-                        showStatus = mine && !deleted && !invalidated,
+                        showStatus = shouldShowMessageStatus(mine, deleted, persistedFailure),
                         status = item.status,
                         canReply = canUseExpandedComposer,
                         canReact = canUseExpandedComposer,
@@ -1912,6 +1942,9 @@ internal fun MessageBubble(
                                                 controller.replyingTo
                                                     ?.let(controller::mediaReferencesFor)
                                                     .orEmpty(),
+                                            replyingToDisplay =
+                                                controller.replyingTo
+                                                    ?.let { controller.replyTargetPreview(it, messageTextCopy) },
                                             messageTextCopy = messageTextCopy,
                                             onCancelReply = { controller.replyingTo = null },
                                             onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
