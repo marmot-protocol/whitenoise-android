@@ -20,9 +20,9 @@ internal fun rememberShareAccountAliases(
     accountIds: List<String>,
 ): Map<String, ShareAccountAliases> =
     buildMap {
-        accountIds.forEach { accountIdHex ->
+        accountIds.distinct().forEach { accountIdHex ->
             key(accountIdHex) {
-                val revision = appState.profileRevisionForCompose(accountIdHex)
+                val revision = appState.profileAccountRevisionForCompose(accountIdHex)
                 put(
                     accountIdHex,
                     remember(appState, accountIdHex, revision) {

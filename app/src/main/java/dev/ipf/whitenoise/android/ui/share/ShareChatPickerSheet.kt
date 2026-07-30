@@ -174,7 +174,9 @@ private fun rememberShareChatPickerPresentations(
         key(item.group.groupIdHex) {
             val accountAliases =
                 shareTargetAccountIds(item, pickerState.activeAccountIdHex)
-                    .associateWith { aliasesByAccount.getValue(it) }
+                    .mapNotNull { accountIdHex ->
+                        aliasesByAccount[accountIdHex]?.let { accountIdHex to it }
+                    }.toMap()
             remember(item, accountAliases, groupTitleCopy) {
                 shareTargetPresentation(
                     item = item,
@@ -364,10 +366,10 @@ private class ShareChatPickerState(
             val foldedNeedle = localeInvariantFold(needle)
             val matchIdentityAliases = looksLikeShareIdentityNeedle(foldedNeedle)
             presentedTargets.filter { target ->
-                val humanMatch = target.humanSearchValues.any { localeInvariantFold(it).contains(foldedNeedle) }
+                val humanMatch = target.foldedHumanSearchValues.any { it.contains(foldedNeedle) }
                 val identityMatch =
                     matchIdentityAliases &&
-                        target.identitySearchValues.any { localeInvariantFold(it).contains(foldedNeedle) }
+                        target.foldedIdentitySearchValues.any { it.contains(foldedNeedle) }
                 humanMatch || identityMatch
             }
         }
@@ -387,8 +389,8 @@ private class ShareChatPickerState(
 private data class ShareChatPickerTargetPresentation(
     val item: ChatListItem,
     val title: String,
-    val humanSearchValues: List<String>,
-    val identitySearchValues: List<String>,
+    val foldedHumanSearchValues: List<String>,
+    val foldedIdentitySearchValues: List<String>,
 )
 
 private fun shareTargetPresentation(
@@ -425,9 +427,10 @@ private fun shareTargetPresentation(
     return ShareChatPickerTargetPresentation(
         item = item,
         title = title,
-        humanSearchValues = humanSearchValues,
-        identitySearchValues =
+        foldedHumanSearchValues = humanSearchValues.map(::localeInvariantFold),
+        foldedIdentitySearchValues =
             (listOf(item.group.groupIdHex) + accountAliases.values.flatMap { it.identity })
+                .map(::localeInvariantFold)
                 .distinct(),
     )
 }
@@ -490,7 +493,7 @@ private fun ShareTargetRow(
                 .filter { it.isNotBlank() && it != activeAccountIdHex }
                 .distinct()
         }
-    val memberRevisions = memberIds.map(appState::profileRevisionForCompose)
+    val memberRevisions = memberIds.map(appState::profileAccountRevisionForCompose)
     val membersPreview =
         remember(item, memberRevisions) {
             forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->

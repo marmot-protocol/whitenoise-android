@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -210,7 +211,8 @@ class ShareChatPickerSheetProfileTest {
 
         composeRule.onNodeWithText(app.getString(R.string.share_no_matches)).assertIsDisplayed()
 
-        composeRule.onNode(hasSetTextAction()).performTextInput("b1b1b1")
+        composeRule.onNode(hasSetTextAction()).performTextClearance()
+        composeRule.onNode(hasSetTextAction()).performTextInput("b1b1b1b1")
         composeRule.onNodeWithText(fallbackTitle).assertIsDisplayed()
     }
 
@@ -274,14 +276,14 @@ class ShareChatPickerSheetProfileTest {
     fun profileArrivalInvalidatesOnlyItsAccountAliases() {
         val profiles = mutableMapOf<String, UserProfileMetadataFfi>()
         val appState = emptyAppState(profiles = profiles)
-        val peerABefore = appState.profileRevisionForCompose(PEER_A)
-        val peerBBefore = appState.profileRevisionForCompose(PEER_B)
+        val peerABefore = appState.profileAccountRevisionForCompose(PEER_A)
+        val peerBBefore = appState.profileAccountRevisionForCompose(PEER_B)
 
         profiles[PEER_A] = profile(displayName = "Alice")
         refreshProfile(appState, PEER_A)
 
-        assertNotEquals(peerABefore, appState.profileRevisionForCompose(PEER_A))
-        assertEquals(peerBBefore, appState.profileRevisionForCompose(PEER_B))
+        assertNotEquals(peerABefore, appState.profileAccountRevisionForCompose(PEER_A))
+        assertEquals(peerBBefore, appState.profileAccountRevisionForCompose(PEER_B))
     }
 
     @Test

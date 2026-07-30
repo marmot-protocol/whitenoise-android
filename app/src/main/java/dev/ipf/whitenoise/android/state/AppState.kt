@@ -1722,7 +1722,7 @@ class WhiteNoiseAppState private constructor(
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
 
-    internal fun profileRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
+    internal fun profileAccountRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
         val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
         return ProfileAccountRevision(
             epoch = profileAccountRevisionEpoch,
@@ -5904,9 +5904,9 @@ class WhiteNoiseAppState private constructor(
             try {
                 val result =
                     runCatching {
-                        if (profileRefreshRequest != null || profileReader != null) {
+                        if (profileReader != null) {
                             profileRefreshRequest?.invoke(accountIdHex)
-                            profileReader?.invoke(accountIdHex)
+                            profileReader.invoke(accountIdHex)
                         } else {
                             marmotIo {
                                 val activeAccountRelays =
