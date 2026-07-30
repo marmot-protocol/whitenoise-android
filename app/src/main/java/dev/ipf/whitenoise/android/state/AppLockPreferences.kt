@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import java.io.IOException
 import java.security.GeneralSecurityException
 
 /**
@@ -107,6 +108,9 @@ internal object AppLockPreferences {
         try {
             LegacySecurePreferences.read(context, LEGACY_SECURE_FILE)
         } catch (error: GeneralSecurityException) {
+            context.deleteSharedPreferences(LEGACY_SECURE_FILE)
+            null
+        } catch (error: IOException) {
             context.deleteSharedPreferences(LEGACY_SECURE_FILE)
             null
         }

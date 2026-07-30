@@ -6,6 +6,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import java.io.IOException
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
@@ -310,6 +311,10 @@ internal class EncryptedDraftPersistence(
         try {
             LegacySecurePreferences.read(app, LEGACY_SECURE_FILE)
         } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
+            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
+            null
+        } catch (error: IOException) {
             Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
             app.deleteSharedPreferences(LEGACY_SECURE_FILE)
             null
