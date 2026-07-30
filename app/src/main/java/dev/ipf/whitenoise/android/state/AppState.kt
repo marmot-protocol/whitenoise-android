@@ -2578,6 +2578,13 @@ class WhiteNoiseAppState private constructor(
         chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
+    internal suspend fun resolveExistingDirectChat(
+        targetReference: String,
+        excludingGroupIdHex: String? = null,
+    ): NewMessageDirectChatResolution =
+        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
+            ?: NewMessageDirectChatResolution(item = null, createRequired = false)
+
     private fun isActiveConversation(
         accountRef: String,
         groupIdHex: String,

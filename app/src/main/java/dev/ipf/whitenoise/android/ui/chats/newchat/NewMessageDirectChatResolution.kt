@@ -20,17 +20,32 @@ internal suspend fun resolveNewMessageDirectChat(
     npub: String,
     existingDmGroupIdHex: String?,
     provenanceDirectChat: suspend (String?, String) -> NewMessageDirectChatResolution,
-    existingDirectChat: (String) -> ChatListItem?,
+    existingDirectChat: suspend (String) -> NewMessageDirectChatResolution,
 ): NewMessageDirectChatResolution {
     val provenance = existingDmGroupIdHex?.trim()?.takeIf { it.isNotEmpty() }
     if (provenance != null) {
-        // A provenance result is authoritative. Do not reopen the same stale
-        // group through the cache-dependent fallback that this path exists to
-        // avoid, and do not create if the local source-of-truth read failed.
-        return provenanceDirectChat(provenance, npub)
+        val resolution = provenanceDirectChat(provenance, npub)
+        if (resolution.item != null || !resolution.createRequired) return resolution
     }
-    val item = existingDirectChat(npub)
-    return NewMessageDirectChatResolution(item = item, createRequired = item == null)
+    return existingDirectChat(npub)
+}
+
+/**
+ * Scans current direct-chat candidates for the target. A stale/non-match
+ * only rejects that group; any unavailable authoritative read fails closed if
+ * no other candidate can be opened.
+ */
+internal suspend fun resolveExistingDirectChatCandidates(
+    candidateGroupIds: List<String>,
+    resolveCandidate: suspend (String) -> NewMessageDirectChatResolution,
+): NewMessageDirectChatResolution {
+    var unavailable = false
+    candidateGroupIds.forEach { groupIdHex ->
+        val resolution = resolveCandidate(groupIdHex)
+        if (resolution.item != null) return resolution
+        if (!resolution.createRequired) unavailable = true
+    }
+    return NewMessageDirectChatResolution(item = null, createRequired = !unavailable)
 }
 
 /**

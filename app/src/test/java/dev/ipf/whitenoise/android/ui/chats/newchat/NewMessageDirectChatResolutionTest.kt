@@ -20,7 +20,7 @@ class NewMessageDirectChatResolutionTest {
                     provenanceDirectChat = { _, _ -> error("provenance lookup must not run") },
                     existingDirectChat = {
                         fallbackLookups += 1
-                        null
+                        NewMessageDirectChatResolution(item = null, createRequired = true)
                     },
                 )
 
@@ -30,7 +30,7 @@ class NewMessageDirectChatResolutionTest {
         }
 
     @Test
-    fun invalidProvenanceDoesNotReopenCacheDependentFallback() =
+    fun invalidProvenanceChecksOtherDirectChatsBeforeCreating() =
         runTest {
             var fallbackLookups = 0
 
@@ -43,13 +43,13 @@ class NewMessageDirectChatResolutionTest {
                     },
                     existingDirectChat = {
                         fallbackLookups += 1
-                        error("stale provenance must not reopen through the member cache")
+                        NewMessageDirectChatResolution(item = null, createRequired = false)
                     },
                 )
 
-            assertEquals(0, fallbackLookups)
+            assertEquals(1, fallbackLookups)
             assertNull(resolution.item)
-            assertTrue(resolution.createRequired)
+            assertFalse(resolution.createRequired)
         }
 
     @Test
@@ -66,7 +66,7 @@ class NewMessageDirectChatResolutionTest {
                     },
                     existingDirectChat = {
                         fallbackLookups += 1
-                        null
+                        NewMessageDirectChatResolution(item = null, createRequired = true)
                     },
                 )
 

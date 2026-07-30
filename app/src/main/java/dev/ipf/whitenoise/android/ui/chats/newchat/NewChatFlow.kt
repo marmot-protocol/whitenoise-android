@@ -86,6 +86,7 @@ internal data class StartChatErrorUiState(
 internal sealed interface StartChatAttemptResult {
     data class Open(
         val item: ChatListItem,
+        val newlyCreated: Boolean = true,
     ) : StartChatAttemptResult
 
     data class Failed(
@@ -184,6 +185,62 @@ internal suspend fun attemptStartProfileChat(
         abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
         throw cancelled
     }
+}
+
+internal suspend fun attemptOpenOrStartProfileChat(
+    npub: String,
+    progressHex: String,
+    recipientName: String?,
+    retryGroupIdHex: String? = null,
+    resolveDirectChat: suspend () -> NewMessageDirectChatResolution,
+    createGroup: suspend (String) -> String,
+    loadCreatedChatListItem: suspend (String) -> ChatListItem,
+    displayName: (String) -> String,
+    markCreateOpenStage: (String) -> Unit = {},
+    abandonCreateOpenTiming: (String) -> Unit = {},
+): StartChatAttemptResult {
+    val existingChatResult =
+        if (retryGroupIdHex == null) {
+            markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
+            val resolution =
+                try {
+                    resolveDirectChat()
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+                    throw cancelled
+                }
+            markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
+            when {
+                resolution.item != null ->
+                    StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false)
+                !resolution.createRequired -> {
+                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
+                    StartChatAttemptResult.Failed(
+                        StartChatErrorUiState(
+                            npub = npub,
+                            progressHex = progressHex,
+                            detail = AppText.Resource(R.string.couldnt_load_chats),
+                            copyable = false,
+                            recipientName = recipientName,
+                        ),
+                    )
+                }
+                else -> null
+            }
+        } else {
+            null
+        }
+    return existingChatResult ?: attemptStartProfileChat(
+        npub = npub,
+        progressHex = progressHex,
+        recipientName = recipientName,
+        retryGroupIdHex = retryGroupIdHex,
+        createGroup = createGroup,
+        loadCreatedChatListItem = loadCreatedChatListItem,
+        displayName = displayName,
+        markCreateOpenStage = markCreateOpenStage,
+        abandonCreateOpenTiming = abandonCreateOpenTiming,
+    )
 }
 
 internal fun inviteShareIntent(message: String): Intent =
@@ -312,24 +369,23 @@ private fun NewMessageScreen(
         appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
-                if (retryGroupIdHex == null) {
-                    val resolution =
-                        resolveNewMessageDirectChat(
-                            npub = npub,
-                            existingDmGroupIdHex = existingDmGroupIdHex,
-                            provenanceDirectChat = appState::resolveProvenanceDirectChat,
-                            existingDirectChat = appState::existingDirectChat,
-                        )
-                    resolution.item?.let { onOpenConversation(it, false) }
-                    if (resolution.item != null || !resolution.createRequired) return@launchMutation
-                }
                 when (
                     val result =
-                        attemptStartProfileChat(
+                        attemptOpenOrStartProfileChat(
                             npub = npub,
                             progressHex = hexForProgress,
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
+                            resolveDirectChat = {
+                                resolveNewMessageDirectChat(
+                                    npub = npub,
+                                    existingDmGroupIdHex = existingDmGroupIdHex,
+                                    provenanceDirectChat = appState::resolveProvenanceDirectChat,
+                                    existingDirectChat = { target ->
+                                        appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
+                                    },
+                                )
+                            },
                             createGroup = appState::createProfileChatGroup,
                             loadCreatedChatListItem = appState::loadCreatedChatListItem,
                             displayName = appState::displayName,
@@ -337,7 +393,8 @@ private fun NewMessageScreen(
                             abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
-                    is StartChatAttemptResult.Open -> onOpenConversation(result.item, true)
+                    is StartChatAttemptResult.Open ->
+                        onOpenConversation(result.item, result.newlyCreated)
                     is StartChatAttemptResult.Failed -> startChatError = result.error
                 }
             } finally {

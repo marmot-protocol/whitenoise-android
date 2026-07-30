@@ -500,7 +500,9 @@ class RecipientResolutionTest {
                     npub = "npub1$bob",
                     existingDmGroupIdHex = null,
                     provenanceDirectChat = { _, _ -> error("provenance lookup must not run") },
-                    existingDirectChat = { fallbackItem },
+                    existingDirectChat = {
+                        NewMessageDirectChatResolution(item = fallbackItem, createRequired = false)
+                    },
                 )
 
             assertFalse(resolution.createRequired)
@@ -550,13 +552,56 @@ class RecipientResolutionTest {
                     },
                     existingDirectChat = {
                         fallbackLookups += 1
-                        null
+                        NewMessageDirectChatResolution(item = null, createRequired = true)
                     },
                 )
 
             assertEquals(0, fallbackLookups)
             assertFalse(opened.createRequired)
             assertEquals(groupId, opened.item?.id)
+        }
+
+    @Test
+    fun candidateSearchSkipsStaleGroupAndOpensValidOlderDm() =
+        runTest {
+            val alice = "a".repeat(64)
+            val bob = "b".repeat(64)
+            val validOlderDm =
+                dmChatItem(
+                    groupId = "valid-older-dm",
+                    activeHex = alice,
+                    members = listOf(member(alice, local = true), member(bob)),
+                )
+            val scanned = mutableListOf<String>()
+
+            val resolution =
+                resolveExistingDirectChatCandidates(listOf("stale-dm", validOlderDm.id)) { groupId ->
+                    scanned += groupId
+                    if (groupId == validOlderDm.id) {
+                        NewMessageDirectChatResolution(item = validOlderDm, createRequired = false)
+                    } else {
+                        NewMessageDirectChatResolution(item = null, createRequired = true)
+                    }
+                }
+
+            assertEquals(listOf("stale-dm", validOlderDm.id), scanned)
+            assertEquals(validOlderDm.id, resolution.item?.id)
+            assertFalse(resolution.createRequired)
+        }
+
+    @Test
+    fun candidateSearchFailsClosedWhenAnyDirectChatCannotBeRead() =
+        runTest {
+            val resolution =
+                resolveExistingDirectChatCandidates(listOf("unavailable-dm", "not-a-match")) { groupId ->
+                    NewMessageDirectChatResolution(
+                        item = null,
+                        createRequired = groupId != "unavailable-dm",
+                    )
+                }
+
+            assertNull(resolution.item)
+            assertFalse(resolution.createRequired)
         }
 }
 
@@ -589,7 +634,7 @@ private fun appliedDetails(
     members: List<AppGroupMemberRecordFfi>,
 ): AppliedGroupDetails = AppliedGroupDetails(group = item.group, members = members)
 
-private fun dmChatItem(
+internal fun dmChatItem(
     groupId: String,
     activeHex: String,
     members: List<AppGroupMemberRecordFfi>?,
@@ -649,7 +694,7 @@ private fun dmLatestMessage(sender: String) =
         sender = sender,
         senderDisplayName = null,
         plaintext = "hi",
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = byteArrayOf()),
         kind = 1uL,
         timelineAt = 1uL,
         deleted = false,
