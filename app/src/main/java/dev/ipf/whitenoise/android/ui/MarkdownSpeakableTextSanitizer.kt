@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui
 import java.net.URI
 import java.util.Locale
 
-private val speakableUrl = Regex("(?i)\\b(?:https?://|www\\.)[^\\s<>)\\]}\"']+")
+private val speakableUrl = Regex("(?i)\\b(?:https?://|www\\.)[^\\s<>\\]}\"']+")
 private val speakableScheme = Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE)
 private val speakableWhitespace = Regex("\\s+")
 private val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*]|\\{\\s*}")
@@ -32,15 +32,31 @@ internal fun markdownSpeakableLeafText(
 private fun String.withoutSpeakableUrls(): String {
     var removedUrl = false
     val withoutUrls =
-        speakableUrl.replace(this) {
+        speakableUrl.replace(this) { match ->
             removedUrl = true
-            " "
+            " ${match.value.unmatchedClosingParenthesisSuffix()}"
         }
     return if (removedUrl) {
         withoutUrls.trimEnd().trimEnd(':', ';', ',')
     } else {
         withoutUrls
     }
+}
+
+private fun String.unmatchedClosingParenthesisSuffix(): String {
+    var openParentheses = 0
+    forEachIndexed { index, character ->
+        when (character) {
+            '(' -> openParentheses++
+            ')' ->
+                if (openParentheses == 0) {
+                    return substring(index)
+                } else {
+                    openParentheses--
+                }
+        }
+    }
+    return ""
 }
 
 /** True when a web link's entire visible label names the destination host. */

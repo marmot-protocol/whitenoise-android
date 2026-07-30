@@ -333,6 +333,39 @@ class MarkdownSpeakableTextTest {
     }
 
     @Test
+    fun softBreaksRemainAnAudiblePause() {
+        val document =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Text("hello"),
+                                MarkdownInlineFfi.SoftBreak,
+                                MarkdownInlineFfi.Text("world"),
+                            ),
+                        ),
+                    ),
+            )
+
+        assertEquals("hello. world.", markdownDocumentToSpeakableText(document))
+    }
+
+    @Test
+    fun balancedUrlParenthesesAreOmittedWithoutLeakingPathText() {
+        assertEquals(
+            "See now.",
+            legacyTextToSpeakableText("See https://example.com/path_(detail) now"),
+        )
+        assertEquals(
+            "See now.",
+            legacyTextToSpeakableText("See (https://example.com/path) now"),
+        )
+    }
+
+    @Test
     fun malformedBreadthStopsAtTheGlobalNodeBudget() {
         val npub = "npub1" + "q".repeat(58)
         val mentionParagraph =
