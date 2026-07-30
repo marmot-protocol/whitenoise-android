@@ -124,15 +124,56 @@ class ChatsScreenSelectionActionsCoverageTest {
 
         assertTrue(
             "add-to-folder must capture the selected chats as picker targets",
-            "folderPickerChatIds" in addToFolderHandler,
+            "folderHandoff.pickerChatIds" in addToFolderHandler,
         )
         assertTrue(
             "the picker's New-folder entry must hand the targets to the create form",
-            "folderEditorChatIds = targets.toSet()" in source,
+            "folderHandoff.editorChatIds = targets.toSet()" in source,
         )
         assertTrue(
             "the create form must preload the targets as manual members",
             "initialManualChatIds = folderEditorTargets" in source,
+        )
+    }
+
+    @Test
+    fun folderEditorHandoffPreservesChatListState() {
+        val source = chatsScreenSource().readText()
+        val handoffStart = source.indexOf("// Folder editor handoff:")
+        val handoff =
+            source.requiredSection(
+                start = "// Folder editor handoff:",
+                end = "\n    Scaffold(",
+            )
+
+        assertTrue("folder editor handoff must exist", handoffStart >= 0)
+        listOf(
+            "var searchOpen by remember",
+            "var searchQuery by remember",
+            "var selectedFolderId by remember",
+            "val chatListState = key(showArchived) { rememberLazyListState() }",
+        ).forEach { declaration ->
+            assertTrue(
+                "$declaration must remain outside the editor swap so closing it preserves list state",
+                source.indexOf(declaration) in 0 until handoffStart,
+            )
+        }
+        assertTrue(
+            "the rendered chat list must use the state preserved across the editor swap",
+            "LazyColumn(Modifier.fillMaxSize().clipToBounds(), state = chatListState)" in source,
+        )
+        assertTrue(
+            "a folder-chip edit must activate the in-place editor handoff",
+            "onEditFolder = { folderHandoff.editingFolderId = it }" in source,
+        )
+        assertTrue(
+            "closing the folder editor must clear both create and edit handoff state",
+            "folderHandoff.editorChatIds = null" in handoff &&
+                "folderHandoff.editingFolderId = null" in handoff,
+        )
+        assertTrue(
+            "the editor call must be followed by an unconditional return before the scaffold",
+            "ChatFolderEditScreen(" in handoff && "        )\n        return\n    }" in handoff,
         )
     }
 
