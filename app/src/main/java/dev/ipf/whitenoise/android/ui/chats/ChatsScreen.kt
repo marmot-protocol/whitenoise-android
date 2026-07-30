@@ -555,6 +555,7 @@ internal fun ChatsScreen(
 
     Scaffold(
         topBar = {
+            val connectivityState = rememberChatListConnectivityState(appState)
             Column {
                 if (selectionMode) {
                     ChatListSelectionBar(
@@ -683,11 +684,12 @@ internal fun ChatsScreen(
                             }
                         },
                         onOpenSettings = onOpenSettings,
+                        connectivityState = connectivityState,
                     )
                 }
-                // Transient connectivity strip: offline prompt, connecting
-                // spinner, brief connected flash — hidden at steady state.
-                ChatListConnectivityBanner(appState)
+                // Offline is a full-width actionable strip; connecting and the
+                // brief connected flash render inline in the top bar.
+                ChatListConnectivityBanner(displayed = connectivityState)
             }
         },
         floatingActionButton = {
