@@ -133,9 +133,7 @@ internal fun ChatsScreen(
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
     // Folder-assignment sheet targets for the current selection, and the
     // create form pre-populated with them when New folder is picked there.
-    var folderPickerChatIds by remember { mutableStateOf<List<String>?>(null) }
-    var folderEditorChatIds by remember { mutableStateOf<Set<String>?>(null) }
-    var editingFolderId by remember { mutableStateOf<String?>(null) }
+    val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     val selectionMode = selectedChatIds.isNotEmpty()
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
@@ -549,17 +547,17 @@ internal fun ChatsScreen(
     // Folder editor handoff: create-from-selection (folderId = null) or
     // long-press edit on a chip (folderId set). Same in-place swap as the
     // new-chat flow so filter/search/list state survives close/save.
-    val folderEditorTargets = folderEditorChatIds
+    val folderEditorTargets = folderHandoff.editorChatIds
     val folderEditorAccountRef = appState.activeAccountRef
-    val folderEditId = editingFolderId
+    val folderEditId = folderHandoff.editingFolderId
     if (folderEditorAccountRef != null && (folderEditorTargets != null || folderEditId != null)) {
         ChatFolderEditScreen(
             appState = appState,
             accountRef = folderEditorAccountRef,
             folderId = folderEditId,
             onClose = {
-                folderEditorChatIds = null
-                editingFolderId = null
+                folderHandoff.editorChatIds = null
+                folderHandoff.editingFolderId = null
             },
             initialManualChatIds = folderEditorTargets.orEmpty(),
         )
@@ -622,7 +620,7 @@ internal fun ChatsScreen(
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
                         },
                         onAddToFolder = {
-                            folderPickerChatIds =
+                            folderHandoff.pickerChatIds =
                                 selectedVisibleItems
                                     .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
                                     .takeIf { it.isNotEmpty() }
@@ -735,7 +733,7 @@ internal fun ChatsScreen(
                     chips = folderChipModels,
                     selectedFolderId = selectedFolderId,
                     onSelect = { selectedFolderId = it },
-                    onEditFolder = { editingFolderId = it },
+                    onEditFolder = { folderHandoff.editingFolderId = it },
                 )
             }
             // Pasted-identifier resolution result (#344). Sits above the list so
@@ -907,16 +905,16 @@ internal fun ChatsScreen(
         }
     }
 
-    folderPickerChatIds?.let { targets ->
+    folderHandoff.pickerChatIds?.let { targets ->
         ChatFolderPickerSheet(
             appState = appState,
             targetChatIds = targets,
             onCreateFolder = {
-                folderPickerChatIds = null
-                folderEditorChatIds = targets.toSet()
+                folderHandoff.pickerChatIds = null
+                folderHandoff.editorChatIds = targets.toSet()
                 clearSelection()
             },
-            onDismiss = { folderPickerChatIds = null },
+            onDismiss = { folderHandoff.pickerChatIds = null },
         )
     }
 

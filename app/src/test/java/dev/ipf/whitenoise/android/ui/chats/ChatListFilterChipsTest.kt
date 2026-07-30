@@ -79,19 +79,11 @@ class ChatListFilterChipsTest {
 
     @Test
     fun allChipHasNoLongPressEditAction() {
-        var selected: String? = WORK_ID
-        var edits = 0
         render(
             chips = listOf(chip(folderId = WORK_ID, label = "Work")),
             selectedFolderId = WORK_ID,
-            onSelect = { selected = it },
-            onEditFolder = { edits++ },
         )
 
-        composeRule.onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG).performTouchInput { longClick() }
-
-        assertEquals(WORK_ID, selected)
-        assertEquals(0, edits)
         assertFalse(
             composeRule
                 .onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG)
@@ -99,6 +91,32 @@ class ChatListFilterChipsTest {
                 .config
                 .contains(SemanticsActions.OnLongClick),
         )
+    }
+
+    @Test
+    fun slowAllChipTapStillClearsSelectionAfterLongPressTimeout() {
+        var selected: String? = WORK_ID
+        var edits = 0
+        var selections = 0
+        render(
+            chips = listOf(chip(folderId = WORK_ID, label = "Work")),
+            selectedFolderId = WORK_ID,
+            onSelect = {
+                selections++
+                selected = it
+            },
+            onEditFolder = { edits++ },
+        )
+
+        composeRule.onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+
+        assertEquals(null, selected)
+        assertEquals(1, selections)
+        assertEquals(0, edits)
     }
 
     @Test

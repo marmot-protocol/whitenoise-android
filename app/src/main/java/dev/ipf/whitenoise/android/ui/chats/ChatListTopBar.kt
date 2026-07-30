@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -43,15 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -383,33 +379,16 @@ private fun ChatFolderChip(
         }
     val accessibleDescription = chatFolderChipAccessibleDescription(label, trailingCount)
     val interactionSource = remember { MutableInteractionSource() }
+    val longClickLabel = if (onLongClick != null) stringResource(R.string.edit) else null
     val gestureModifier =
-        if (onLongClick == null) {
-            // All: short-tap filters; long-press is swallowed with no edit
-            // semantics so TalkBack never advertises a folder editor.
-            Modifier
-                .pointerInput(onClick) {
-                    detectTapGestures(
-                        onTap = { onClick() },
-                        onLongPress = {},
-                    )
-                }.semantics {
-                    role = Role.Checkbox
-                    onClick(action = {
-                        onClick()
-                        true
-                    })
-                }
-        } else {
-            Modifier.combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onLongClick,
-                onLongClickLabel = stringResource(R.string.edit),
-                role = Role.Checkbox,
-            )
-        }
+        Modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            onLongClickLabel = longClickLabel,
+            role = Role.Checkbox,
+        )
     Box {
         FilterChip(
             selected = selected,
