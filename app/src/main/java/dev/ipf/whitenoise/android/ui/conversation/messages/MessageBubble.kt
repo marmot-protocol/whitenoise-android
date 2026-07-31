@@ -81,12 +81,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -104,6 +104,7 @@ import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -650,39 +651,42 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    suspend fun ttsEntry(entryRecord: AppMessageRecordFfi) =
+        projectTtsSpeakableEntry(
+            message = entryRecord,
+            editedText = controller.editsByTarget[entryRecord.messageIdHex]?.latestText,
+            senderDisplayName = appState.displayName(entryRecord.sender),
+            parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+            mentionDisplayName = appState::mentionDisplayName,
+            isGroupMember =
+                if (controller.membersLoaded) {
+                    { bech32 -> appState.isRosterMember(bech32, controller.members) }
+                } else {
+                    null
+                },
+        )
+
     // Speak aloud reads from this message onward: catch-up listening is the
     // point of the action, and Stop on the transport bar is one tap. The
     // session takes auto-read ownership so messages arriving while it speaks
-    // continue the read. Falls back to just this bubble's text when the
-    // record has left the loaded timeline.
+    // continue the read. Falls back to just this bubble when its record has
+    // left the loaded timeline.
     fun speakFromHere() {
-        val timeline = controller.timeline
-        val startIndex = timeline.indexOfFirst { it.record.messageIdHex == record.messageIdHex }
-        val entries =
-            if (startIndex < 0) {
-                emptyList()
+        appState.launchMutation {
+            val entries =
+                ttsSpeakFromHereCandidates(
+                    timeline = controller.timeline,
+                    selected = record,
+                ).mapNotNull { entryRecord -> ttsEntry(entryRecord) }
+            if (entries.isNotEmpty()) {
+                appState.speakAloudAutoRead(
+                    controller.group.groupIdHex,
+                    entries,
+                    java.util.Locale.getDefault(),
+                )
             } else {
-                timeline
-                    .drop(startIndex)
-                    .take(TTS_AUTO_READ_MAX_MESSAGES * 2)
-                    .mapNotNull { message ->
-                        val entryRecord = message.record
-                        val text = MessageProjector.copyableText(entryRecord, null) ?: return@mapNotNull null
-                        TtsSpeakableEntry(
-                            senderKey = entryRecord.sender,
-                            senderDisplayName = appState.displayName(entryRecord.sender),
-                            text = text,
-                        )
-                    }
+                appState.present(R.string.tts_bar_error)
             }
-        if (entries.isEmpty()) {
-            appState.speakAloud(displayedBody, java.util.Locale.getDefault())
-        } else {
-            appState.speakAloudAutoRead(
-                controller.group.groupIdHex,
-                entries,
-                java.util.Locale.getDefault(),
-            )
         }
     }
 
@@ -1844,8 +1848,9 @@ internal fun MessageBubble(
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
-                    // Speak covers exactly what Copy exposes; hidden entirely
-                    // on devices with no usable engine (explained in Settings).
+                    // Keep the action discoverable for copyable text and hide it
+                    // when no engine exists. If URL omission leaves no speech,
+                    // the action reports that it could not read the message.
                     canSpeak = displayedBody.isNotBlank() && appState.ttsHasUsableEngine,
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,

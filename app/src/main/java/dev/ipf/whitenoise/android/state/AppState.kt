@@ -1396,12 +1396,6 @@ class WhiteNoiseAppState private constructor(
         return started
     }
 
-    /** Convenience for a single plain-text utterance without sender metadata. */
-    fun speakAloud(
-        text: String,
-        locale: java.util.Locale,
-    ): Boolean = speakAloud(listOf(TtsSpeakableEntry(senderKey = "", senderDisplayName = "", text = text)), locale)
-
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
     fun speakAloudAutoRead(
         groupIdHex: String,
