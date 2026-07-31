@@ -141,6 +141,12 @@ data class ChatListItem(
      * removal while a null/failed-fetch empty roster stays non-removed.
      */
     val removed: Boolean = false,
+    /**
+     * In-memory arrival order for activities that share the engine's
+     * unix-seconds sort timestamp. Zero for ordinary standalone projections;
+     * [ChatsController] supplies a monotonic value for live/local activity.
+     */
+    val activitySequence: ULong = 0uL,
 ) {
     val id: String = group.groupIdHex
 
@@ -301,28 +307,66 @@ data class ChatListItem(
 internal fun sortChatListItems(
     items: List<ChatListItem>,
     draftedAtSeconds: (ChatListItem) -> ULong? = { null },
-): List<ChatListItem> =
-    items.sortedWith(
+): List<ChatListItem> {
+    val draftedAtById = items.associate { item -> item.id to draftedAtSeconds(item) }
+    val recencyTiesWithDraft =
+        items
+            .filter { item -> chatListItemRecencyComesFromDraft(item, draftedAtById[item.id]) }
+            .mapTo(mutableSetOf()) { item -> chatListItemRecencyTie(item, draftedAtById[item.id]) }
+    return items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
             // Pinned block above recency, in the engine's normalized manual
             // order; unpinned rows tie on both keys and fall through to the
             // draft-aware recency chain unchanged.
             .thenByDescending { it.pinned() }
             .thenBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
-            .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtSeconds(it)) }
-            .thenBy { chatListItemSortKey(it) },
+            // MDK activity timestamps use whole seconds. Preserve arrival order
+            // inside a same-second tie so a locally accepted send is already in
+            // its final slot on the first frame after returning to the list. If
+            // a draft supplies a tied recency, the entire tie falls back to the
+            // stable title key instead of mixing unrelated message sequences.
+            .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtById[it.id]) }
+            .thenByDescending { item ->
+                val recencyTie = chatListItemRecencyTie(item, draftedAtById[item.id])
+                if (recencyTie.recency == 0uL || recencyTie in recencyTiesWithDraft) {
+                    0uL
+                } else {
+                    item.activitySequence
+                }
+            }.thenBy { chatListItemSortKey(it) },
     )
+}
 
 // A chat with an unsent draft rises to reflect when drafting began, but only
 // when that is newer than the chat's last activity — a stale draft never
 // outranks a fresher incoming message. Same unix-seconds unit as [latestAt].
 internal fun chatListItemDraftSortAt(
     latestAt: ULong?,
-    draftedAtSeconds: ULong?,
-): ULong {
-    val base = latestAt ?: 0uL
-    return if (draftedAtSeconds != null && draftedAtSeconds > base) draftedAtSeconds else base
-}
+    draftedAt: ULong?,
+): ULong = maxOf(latestAt ?: 0uL, draftedAt ?: 0uL)
+
+private fun chatListItemRecencyComesFromDraft(
+    item: ChatListItem,
+    draftedAt: ULong?,
+): Boolean = draftedAt != null && draftedAt > (item.latestAt ?: 0uL)
+
+private data class ChatListItemRecencyTie(
+    val pendingConfirmation: Boolean,
+    val pinned: Boolean,
+    val pinnedPosition: UInt?,
+    val recency: ULong,
+)
+
+private fun chatListItemRecencyTie(
+    item: ChatListItem,
+    draftedAt: ULong?,
+): ChatListItemRecencyTie =
+    ChatListItemRecencyTie(
+        pendingConfirmation = item.group.pendingConfirmation,
+        pinned = item.pinned(),
+        pinnedPosition = item.pinnedPosition(),
+        recency = chatListItemDraftSortAt(item.latestAt, draftedAt),
+    )
 
 /**
  * Sort tie-breaker key. Mirrors the gating that the UI uses to derive a
@@ -361,6 +405,7 @@ internal fun chatListItemFromProjection(
     previewTokens: MarkdownDocumentFfi? = null,
     resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     removed: Boolean = false,
+    activitySequence: ULong = 0uL,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -418,6 +463,7 @@ internal fun chatListItemFromProjection(
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         removed = removed,
+        activitySequence = activitySequence,
     )
 }
 
@@ -2326,6 +2372,45 @@ internal class RetainedMediaUpload(
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
 )
 
+private data class OptimisticChatListPreviewEntry(
+    val preview: ChatListMessagePreviewFfi,
+    val activitySequence: ULong,
+    val confirmedMessageIdHex: String? = null,
+    val pendingAuthoritativeRow: ChatListRowFfi? = null,
+)
+
+private data class OptimisticChatListPreviewState(
+    var baselineRow: ChatListRowFfi,
+    var baselineActivitySequence: ULong,
+    val entries: LinkedHashMap<String, OptimisticChatListPreviewEntry> = linkedMapOf(),
+    val confirmedActivitySequenceById: LinkedHashMap<String, ULong> = linkedMapOf(),
+    val baselineActivitySequenceByLastMessage: LinkedHashMap<ChatListLastMessageActivity, ULong> = linkedMapOf(),
+)
+
+private fun OptimisticChatListPreviewState.snapshot(): OptimisticChatListPreviewState =
+    copy(
+        entries = LinkedHashMap(entries),
+        confirmedActivitySequenceById = LinkedHashMap(confirmedActivitySequenceById),
+        baselineActivitySequenceByLastMessage = LinkedHashMap(baselineActivitySequenceByLastMessage),
+    )
+
+private data class ChatListLastMessageActivity(
+    val activitySortAt: ULong,
+    val timelineAt: ULong?,
+    val messageIdHex: String?,
+)
+
+private data class OptimisticChatListPreviewMatch(
+    val entryKey: String?,
+    val activitySequence: ULong,
+)
+
+private data class RemovedChatRowSnapshot(
+    val row: ChatListRowFfi,
+    val activitySequence: ULong,
+    val optimisticState: OptimisticChatListPreviewState?,
+)
+
 class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
@@ -2380,10 +2465,230 @@ class ChatsController private constructor(
 
     private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
 
+    private fun nextChatActivitySequence(): ULong {
+        if (nextActivitySequence != ULong.MAX_VALUE) nextActivitySequence += 1uL
+        return nextActivitySequence
+    }
+
+    private fun chatListActivityAdvanced(
+        previous: ChatListRowFfi,
+        current: ChatListRowFfi,
+    ): Boolean = compareChatListActivity(previous, current) > 0
+
+    private fun compareChatListActivity(
+        previous: ChatListRowFfi,
+        current: ChatListRowFfi,
+    ): Int {
+        val lastMessageCompare = compareChatListLastMessageActivity(previous, current)
+        return if (lastMessageCompare != 0) {
+            lastMessageCompare
+        } else {
+            current.activitySortAt.compareTo(previous.activitySortAt)
+        }
+    }
+
+    private fun compareChatListLastMessageActivity(
+        previous: ChatListRowFfi,
+        current: ChatListRowFfi,
+    ): Int {
+        val currentLast = current.lastMessage
+        val previousLast = previous.lastMessage
+        return when {
+            currentLast == null && previousLast == null -> 0
+            currentLast == null -> -1
+            previousLast == null -> 1
+            else ->
+                compareTimelineAtMessageIdHex(
+                    currentLast.timelineAt,
+                    currentLast.messageIdHex,
+                    previousLast.timelineAt,
+                    previousLast.messageIdHex,
+                )
+        }
+    }
+
+    private fun rememberBaselineActivitySequence(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+        activitySequence: ULong,
+    ) {
+        val activity = chatListLastMessageActivity(row)
+        state.baselineActivitySequenceByLastMessage.remove(activity)
+        state.baselineActivitySequenceByLastMessage[activity] = activitySequence
+        while (state.baselineActivitySequenceByLastMessage.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+            state.baselineActivitySequenceByLastMessage.remove(state.baselineActivitySequenceByLastMessage.keys.first())
+        }
+    }
+
+    private fun chatListLastMessageActivity(row: ChatListRowFfi): ChatListLastMessageActivity =
+        ChatListLastMessageActivity(
+            activitySortAt = row.activitySortAt,
+            timelineAt = row.lastMessage?.timelineAt,
+            messageIdHex = row.lastMessage?.messageIdHex,
+        )
+
+    private fun representsSameChatListActivity(
+        optimistic: ChatListMessagePreviewFfi,
+        authoritative: ChatListMessagePreviewFfi,
+    ): Boolean =
+        optimistic.timelineAt == authoritative.timelineAt &&
+            optimistic.sender == authoritative.sender &&
+            optimistic.plaintext == authoritative.plaintext &&
+            optimistic.kind == authoritative.kind &&
+            optimistic.deleted == authoritative.deleted &&
+            optimistic.attachmentKind == authoritative.attachmentKind &&
+            optimistic.attachmentCount == authoritative.attachmentCount
+
+    private fun matchingOptimisticPreview(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+    ): OptimisticChatListPreviewMatch? {
+        val authoritative = row.lastMessage ?: return null
+        val matchingEntry =
+            state.entries.entries.firstOrNull { (_, entry) ->
+                entry.confirmedMessageIdHex == authoritative.messageIdHex
+            } ?: state.entries.entries.firstOrNull { (_, entry) ->
+                entry.confirmedMessageIdHex == null &&
+                    representsSameChatListActivity(entry.preview, authoritative)
+            }
+        return matchingEntry?.let { (entryKey, entry) ->
+            OptimisticChatListPreviewMatch(entryKey, entry.activitySequence)
+        } ?: state.confirmedActivitySequenceById[authoritative.messageIdHex]?.let { activitySequence ->
+            OptimisticChatListPreviewMatch(entryKey = null, activitySequence = activitySequence)
+        }
+    }
+
+    private fun optimisticMatchIsStale(
+        match: OptimisticChatListPreviewMatch,
+        baselineRow: ChatListRowFfi,
+        row: ChatListRowFfi,
+        baselineActivitySequence: ULong,
+        activityCompare: Int,
+    ): Boolean =
+        match.activitySequence < baselineActivitySequence ||
+            activityCompare < 0 ||
+            (
+                match.activitySequence == baselineActivitySequence &&
+                    row.lastMessage?.messageIdHex != baselineRow.lastMessage?.messageIdHex
+            )
+
+    private fun retireCommittedOptimisticEntriesThrough(
+        state: OptimisticChatListPreviewState,
+        activitySequence: ULong,
+    ) {
+        state.entries.entries.removeAll { (_, entry) ->
+            entry.confirmedMessageIdHex != null &&
+                entry.activitySequence <= activitySequence
+        }
+    }
+
+    private fun foldOptimisticChatListBaseline(
+        state: OptimisticChatListPreviewState,
+        row: ChatListRowFfi,
+        acceptBackwardActivity: Boolean = false,
+    ) {
+        val activityCompare = compareChatListActivity(state.baselineRow, row)
+        val match =
+            matchingOptimisticPreview(state, row)
+                ?.takeUnless { acceptBackwardActivity && activityCompare < 0 }
+        val pendingEntryKey = match?.entryKey?.takeIf { state.entries[it]?.confirmedMessageIdHex == null }
+        if (pendingEntryKey != null) {
+            // The stream can expose the locally committed row before send()
+            // reports whether publishing succeeded. Keep it provisional so a
+            // later failure still restores the pre-send baseline.
+            state.entries[pendingEntryKey] = state.entries.getValue(pendingEntryKey).copy(pendingAuthoritativeRow = row)
+            return
+        }
+        var acceptRow = true
+        if (match != null) {
+            // A coalesced snapshot can skip every earlier successful send.
+            // Retire older committed previews, whose compact id/sequence
+            // tombstones still recognize queued echoes. Pending previews stay
+            // until their callback can record a confirmed id or roll them back.
+            retireCommittedOptimisticEntriesThrough(state, match.activitySequence)
+            // The echo keeps the order assigned when the local send was
+            // accepted. If a later authoritative activity already owns the
+            // row, consuming this stale echo must not move the row backward.
+            val staleMatch =
+                optimisticMatchIsStale(
+                    match,
+                    state.baselineRow,
+                    row,
+                    state.baselineActivitySequence,
+                    activityCompare,
+                )
+            if (staleMatch && !acceptBackwardActivity) {
+                acceptRow = false
+            } else {
+                state.baselineActivitySequence = match.activitySequence
+                rememberBaselineActivitySequence(state, row, match.activitySequence)
+            }
+        } else {
+            val knownActivitySequence =
+                state.baselineActivitySequenceByLastMessage[chatListLastMessageActivity(row)]
+            if (knownActivitySequence != null) {
+                if (knownActivitySequence < state.baselineActivitySequence && !acceptBackwardActivity) {
+                    acceptRow = false
+                } else {
+                    state.baselineActivitySequence = knownActivitySequence
+                    rememberBaselineActivitySequence(state, row, knownActivitySequence)
+                }
+            } else if (activityCompare > 0) {
+                state.baselineActivitySequence = nextChatActivitySequence()
+                rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
+                state.entries.entries.removeAll { (_, entry) ->
+                    entry.confirmedMessageIdHex != null &&
+                        entry.activitySequence < state.baselineActivitySequence
+                }
+            } else if (activityCompare < 0) {
+                if (acceptBackwardActivity) {
+                    state.baselineActivitySequence = 0uL
+                    rememberBaselineActivitySequence(state, row, 0uL)
+                } else {
+                    // Subscription rows remain authoritative for content even
+                    // when their last-message tuple compares backward. Keep
+                    // the accepted ordering sequence without leaving other
+                    // fields stale after same-second id order or preview loss.
+                    rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
+                }
+            } else {
+                rememberBaselineActivitySequence(state, row, state.baselineActivitySequence)
+            }
+        }
+        if (acceptRow) state.baselineRow = row
+    }
+
+    private fun materializeOptimisticChatListPreview(
+        rowKey: String,
+        state: OptimisticChatListPreviewState,
+    ) {
+        val latestEntry = state.entries.values.maxByOrNull { it.activitySequence }
+        val visibleEntry = latestEntry?.takeIf { it.activitySequence > state.baselineActivitySequence }
+        chatRowsByGroup[rowKey] =
+            visibleEntry?.let { entry ->
+                state.baselineRow.copy(
+                    lastMessage = entry.preview,
+                    activitySortAt = maxOf(state.baselineRow.activitySortAt, entry.preview.timelineAt),
+                    updatedAt = maxOf(state.baselineRow.updatedAt, entry.preview.timelineAt),
+                )
+            } ?: state.baselineRow
+        activitySequenceByGroup[rowKey] = visibleEntry?.activitySequence ?: state.baselineActivitySequence
+        if (state.entries.isEmpty() && state.confirmedActivitySequenceById.isEmpty()) {
+            optimisticChatListPreviewByGroup.remove(rowKey)
+        }
+    }
+
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
     private val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
+
+    // Whole-second activity timestamps need an in-memory tie-break that follows
+    // the order local/live activity is accepted. This is bounded to one scalar
+    // per materialized row and cleared with the backing projection on bind.
+    private val activitySequenceByGroup = mutableMapOf<String, ULong>()
+    private var nextActivitySequence = 0uL
+    private val optimisticChatListPreviewByGroup = mutableMapOf<String, OptimisticChatListPreviewState>()
 
     // Whether the chat list is on screen. While a conversation is foregrounded
     // the subscription stays warm (updates keep folding into the maps above),
@@ -2714,37 +3019,86 @@ class ChatsController private constructor(
     // returning to the list paints the new preview immediately, instead of one
     // frame of the prior last-message before the chat-list stream catches up.
     // The real stream update reconciles this shortly after. See #900.
-    fun applyOptimisticSentPreview(
+    internal fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
-    ): ChatListRowFfi? {
-        if (accountRef == null) return null
-        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: return null
-        chatRowsByGroup[chatRowKey(groupIdHex)] =
-            row.copy(
-                lastMessage = preview,
-                updatedAt = maxOf(row.updatedAt, preview.timelineAt),
+    ): Boolean {
+        val rowKey = chatRowKey(groupIdHex)
+        val row = chatRowsByGroup[rowKey].takeIf { accountRef != null } ?: return false
+        val state =
+            optimisticChatListPreviewByGroup.getOrPut(rowKey) {
+                val baselineActivitySequence = activitySequenceByGroup[rowKey] ?: 0uL
+                OptimisticChatListPreviewState(
+                    baselineRow = row,
+                    baselineActivitySequence = baselineActivitySequence,
+                ).also { state ->
+                    rememberBaselineActivitySequence(state, row, baselineActivitySequence)
+                }
+            }
+        state.entries[preview.messageIdHex] =
+            OptimisticChatListPreviewEntry(
+                preview = preview,
+                activitySequence = nextChatActivitySequence(),
             )
+        materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
-        return row
+        return true
     }
 
-    fun rollbackOptimisticSentPreview(
+    internal fun commitOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
-        previousRow: ChatListRowFfi?,
+        confirmedMessageIdHex: String,
     ) {
-        if (accountRef == null || previousRow == null) return
         val rowKey = chatRowKey(groupIdHex)
-        val current = chatRowsByGroup[rowKey] ?: return
-        val rolledBack =
-            rollbackOptimisticChatListPreview(
-                current = current,
-                previous = previousRow,
-                optimisticMessageIdHex = optimisticMessageIdHex,
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        val entry = state.entries[optimisticMessageIdHex] ?: return
+        state.confirmedActivitySequenceById[confirmedMessageIdHex] = entry.activitySequence
+        while (state.confirmedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
+            state.confirmedActivitySequenceById.remove(state.confirmedActivitySequenceById.keys.first())
+        }
+        state.entries[optimisticMessageIdHex] =
+            entry.copy(
+                preview =
+                    entry.preview.copy(
+                        messageIdHex = confirmedMessageIdHex,
+                        deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+                    ),
+                confirmedMessageIdHex = confirmedMessageIdHex,
+                pendingAuthoritativeRow = null,
             )
-        if (rolledBack === current) return
-        chatRowsByGroup[rowKey] = rolledBack
+        // Re-evaluate an echo that arrived while this send was still pending.
+        // An exact confirmed id retires this entry; an id mismatch is offered to
+        // the next still-pending identical send instead.
+        entry.pendingAuthoritativeRow?.let { row -> foldOptimisticChatListBaseline(state, row) }
+        state.entries[optimisticMessageIdHex]?.let { committedEntry ->
+            state.entries.entries.removeAll { (messageIdHex, candidate) ->
+                messageIdHex != optimisticMessageIdHex &&
+                    candidate.confirmedMessageIdHex != null &&
+                    candidate.activitySequence < committedEntry.activitySequence
+            }
+            val supersededByNewerCommit =
+                state.entries.any { (messageIdHex, candidate) ->
+                    messageIdHex != optimisticMessageIdHex &&
+                        candidate.confirmedMessageIdHex != null &&
+                        candidate.activitySequence > committedEntry.activitySequence
+                }
+            if (committedEntry.activitySequence <= state.baselineActivitySequence || supersededByNewerCommit) {
+                state.entries.remove(optimisticMessageIdHex)
+            }
+        }
+        materializeOptimisticChatListPreview(rowKey, state)
+        scheduleRecompute()
+    }
+
+    internal fun rollbackOptimisticSentPreview(
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+    ) {
+        val rowKey = chatRowKey(groupIdHex)
+        val state = optimisticChatListPreviewByGroup[rowKey].takeIf { accountRef != null } ?: return
+        if (state.entries.remove(optimisticMessageIdHex) == null) return
+        materializeOptimisticChatListPreview(rowKey, state)
         scheduleRecompute()
     }
 
@@ -2787,13 +3141,19 @@ class ChatsController private constructor(
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
-        chatRowsByGroup[rowKey]?.let { row ->
-            chatRowsByGroup[rowKey] =
+        (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
+            val updated =
                 row.copy(
                     archived = record.archived,
                     pendingConfirmation = record.pendingConfirmation,
                     groupName = record.name.ifBlank { row.groupName },
                 )
+            optimisticChatListPreviewByGroup[rowKey]?.let { state ->
+                state.baselineRow = updated
+                materializeOptimisticChatListPreview(rowKey, state)
+            } ?: run {
+                chatRowsByGroup[rowKey] = updated
+            }
         }
         foldGroup(record, invalidateMembers = members == null)
     }
@@ -2825,6 +3185,7 @@ class ChatsController private constructor(
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                 resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
+                activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
             )
         }
 
@@ -2845,6 +3206,7 @@ class ChatsController private constructor(
             previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
             resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
+            activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
         )
 
     fun sharedGroupsWith(
@@ -2940,7 +3302,8 @@ class ChatsController private constructor(
         trigger: ChatListUpdateTriggerFfi? = null,
     ) {
         val key = chatRowKey(row.groupIdHex)
-        val current = chatRowsByGroup[key]
+        val state = optimisticChatListPreviewByGroup[key]
+        val current = state?.baselineRow ?: chatRowsByGroup[key]
         val folded =
             when {
                 current == null -> row
@@ -2955,7 +3318,19 @@ class ChatsController private constructor(
         }
         if (folded == current) return
         val membershipChanged = current == null
-        chatRowsByGroup[key] = folded
+        if (state == null) {
+            chatRowsByGroup[key] = folded
+            if (current == null || chatListActivityAdvanced(current, folded)) {
+                activitySequenceByGroup[key] = nextChatActivitySequence()
+            }
+        } else {
+            foldOptimisticChatListBaseline(
+                state,
+                folded,
+                acceptBackwardActivity = trigger == ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+            )
+            materializeOptimisticChatListPreview(key, state)
+        }
         if (membershipChanged) noteMaterializedGroupMembershipChanged()
         scheduleRecompute()
     }
@@ -2970,7 +3345,7 @@ class ChatsController private constructor(
     fun applyChatListRow(row: ChatListRowFfi) {
         if (accountRef == null) return
         val key = chatRowKey(row.groupIdHex)
-        val current = chatRowsByGroup[key]
+        val current = optimisticChatListPreviewByGroup[key]?.baselineRow ?: chatRowsByGroup[key]
         if (current == null) {
             foldChatRow(row)
             return
@@ -2980,19 +3355,76 @@ class ChatsController private constructor(
     }
 
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
-        val previousKeys = chatRowsByGroup.keys.toSet()
+        val previousRowsByGroup =
+            chatRowsByGroup.keys.associateWith { key ->
+                optimisticChatListPreviewByGroup[key]?.baselineRow ?: chatRowsByGroup.getValue(key)
+            }
+        val previousKeys = previousRowsByGroup.keys
+        val previousSequences =
+            previousRowsByGroup.keys.associateWith { key ->
+                optimisticChatListPreviewByGroup[key]?.baselineActivitySequence
+                    ?: activitySequenceByGroup[key]
+                    ?: 0uL
+            }
+        val wasMaterialized = previousRowsByGroup.isNotEmpty()
         chatRowsByGroup.clear()
-        rows.forEach { row -> chatRowsByGroup[chatRowKey(row.groupIdHex)] = row }
+        activitySequenceByGroup.clear()
+        rows.forEach { row ->
+            val key = chatRowKey(row.groupIdHex)
+            val previous = previousRowsByGroup[key]
+            val state = optimisticChatListPreviewByGroup[key]
+            if (state == null) {
+                chatRowsByGroup[key] = row
+                val sequence =
+                    when {
+                        previous == null && wasMaterialized -> nextChatActivitySequence()
+                        previous != null && chatListActivityAdvanced(previous, row) -> nextChatActivitySequence()
+                        else -> previousSequences[key] ?: 0uL
+                    }
+                activitySequenceByGroup[key] = sequence
+            } else {
+                foldOptimisticChatListBaseline(state, row, acceptBackwardActivity = true)
+                materializeOptimisticChatListPreview(key, state)
+            }
+        }
+        optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
             noteMaterializedGroupMembershipChanged()
         }
     }
 
+    private fun snapshotChatRowForRemoval(groupIdHex: String): RemovedChatRowSnapshot? {
+        val rowKey = chatRowKey(groupIdHex)
+        val optimisticState = optimisticChatListPreviewByGroup[rowKey]
+        val row = optimisticState?.baselineRow ?: chatRowsByGroup[rowKey] ?: return null
+        return RemovedChatRowSnapshot(
+            row = row,
+            activitySequence = optimisticState?.baselineActivitySequence ?: activitySequenceByGroup[rowKey] ?: 0uL,
+            optimisticState = optimisticState?.snapshot(),
+        )
+    }
+
     private fun removeChatRow(groupIdHex: String) {
-        if (chatRowsByGroup.remove(chatRowKey(groupIdHex)) != null) {
+        val rowKey = chatRowKey(groupIdHex)
+        if (chatRowsByGroup.remove(rowKey) != null) {
+            activitySequenceByGroup.remove(rowKey)
+            optimisticChatListPreviewByGroup.remove(rowKey)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
+    }
+
+    private fun restoreRemovedChatRow(snapshot: RemovedChatRowSnapshot) {
+        val rowKey = chatRowKey(snapshot.row.groupIdHex)
+        if (chatRowsByGroup.containsKey(rowKey)) return
+        chatRowsByGroup[rowKey] = snapshot.row
+        activitySequenceByGroup[rowKey] = snapshot.activitySequence
+        snapshot.optimisticState?.let { state ->
+            optimisticChatListPreviewByGroup[rowKey] = state
+            materializeOptimisticChatListPreview(rowKey, state)
+        }
+        noteMaterializedGroupMembershipChanged()
+        scheduleRecompute()
     }
 
     private fun noteMaterializedGroupMembershipChanged() {
@@ -3273,12 +3705,12 @@ class ChatsController private constructor(
         notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
-        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
         removeChatRow(groupIdHex)
         val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
-            removedRow?.let { row -> foldChatRow(row) }
+            removedSnapshot?.let(::restoreRemovedChatRow)
             appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
             return false
         }
@@ -3302,7 +3734,7 @@ class ChatsController private constructor(
         // Hide the row immediately on confirm so it can't be tapped (reopening the
         // group being deleted) during the 1-2s of leave/wipe work; restore it if
         // the delete fails. See #894.
-        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
         removeChatRow(groupIdHex)
         // Decide leave-first from the live roster, not the chat-list row's
         // removed heuristic (which can lag a leave done elsewhere) — a genuinely
@@ -3324,13 +3756,13 @@ class ChatsController private constructor(
                 activeIdHex,
             )
         if (stillMember && !soleMember && !leaveGroup(groupIdHex)) {
-            removedRow?.let { foldChatRow(it) }
+            removedSnapshot?.let(::restoreRemovedChatRow)
             return false
         }
         val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
-            removedRow?.let { row -> foldChatRow(row) }
+            removedSnapshot?.let(::restoreRemovedChatRow)
             appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
             return false
         }
@@ -3382,7 +3814,7 @@ class ChatsController private constructor(
         }
         // Hide the row immediately so it can't be reopened mid-operation; restore
         // it if the transfer/leave fails (mirrors deleteGroupFromChatList, #894).
-        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
         removeChatRow(groupIdHex)
         var grantedBeforeLeave = false
         val left =
@@ -3408,7 +3840,7 @@ class ChatsController private constructor(
                     AppText.Plain(it.message ?: it.javaClass.simpleName),
                     copyable = true,
                 )
-                removedRow?.let { foldChatRow(it) }
+                removedSnapshot?.let(::restoreRemovedChatRow)
                 false
             }
         if (!left) return false
@@ -3543,14 +3975,23 @@ class ChatsController private constructor(
             state.orderedGroupIds
                 .withIndex()
                 .associate { (index, id) -> id.lowercase() to index.toUInt() }
-        chatRowsByGroup.replaceAll { key, row ->
+        chatRowsByGroup.keys.toList().forEach { key ->
             val position = positionByGroup[key]
-            if (position != null) {
-                row.copy(pinned = true, pinnedPosition = position)
-            } else if (row.pinned) {
-                row.copy(pinned = false, pinnedPosition = null)
+            val optimisticState = optimisticChatListPreviewByGroup[key]
+            val row = optimisticState?.baselineRow ?: chatRowsByGroup[key] ?: return@forEach
+            val updated =
+                if (position != null) {
+                    row.copy(pinned = true, pinnedPosition = position)
+                } else if (row.pinned) {
+                    row.copy(pinned = false, pinnedPosition = null)
+                } else {
+                    row
+                }
+            if (optimisticState == null) {
+                chatRowsByGroup[key] = updated
             } else {
-                row
+                optimisticState.baselineRow = updated
+                materializeOptimisticChatListPreview(key, optimisticState)
             }
         }
         scheduleRecompute()
@@ -3660,6 +4101,9 @@ class ChatsController private constructor(
     private fun resetBackingState() {
         replaceChatRows(emptyList())
         groupRecordsById = emptyMap()
+        activitySequenceByGroup.clear()
+        nextActivitySequence = 0uL
+        optimisticChatListPreviewByGroup.clear()
         memberCacheByGroup = emptyMap()
         memberSnapshotsRevision += 1L
         removedGroupIds = emptySet()
@@ -4056,6 +4500,7 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
+private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val NOTIFICATION_AVATAR_PREWARM_CONVERSATIONS = 24
 
 // Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
@@ -4290,7 +4735,6 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
-    private val optimisticChatListPreviewRows = mutableMapOf<String, ChatListRowFfi>()
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineTimestampOverrides =
@@ -5182,9 +5626,7 @@ class ConversationController(
                     attachmentCount = 0u,
                     deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
                 ),
-            )?.let { previousRow ->
-                optimisticChatListPreviewRows[optimisticKey] = previousRow
-            }
+            )
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
@@ -5233,7 +5675,11 @@ class ConversationController(
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = optimisticOrder,
                 )
-            optimisticChatListPreviewRows.remove(optimisticKey)
+            appState.commitOptimisticSentPreview(
+                groupIdHex = group.groupIdHex,
+                optimisticMessageIdHex = tempId,
+                confirmedMessageIdHex = reconciliation.confirmedId,
+            )
             invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
                 .forEach(::removeProjectedRecord)
             val insertedSent = reconciliation.insertedSent
@@ -5267,7 +5713,7 @@ class ConversationController(
                 // flip to the read-only removed state — the same realization the
                 // conversation-open and refresh paths perform — instead of
                 // surfacing the raw backend error.
-                rollbackOptimisticChatListPreview(optimisticKey, tempId)
+                rollbackOptimisticChatListPreview(tempId)
                 optimisticMessages.remove(optimisticKey)
                 messageById.remove(tempId)
                 forgetSendTrace(tempId)
@@ -5275,7 +5721,7 @@ class ConversationController(
                 markActiveAccountRemovedFromMembers(account)
                 return
             }
-            rollbackOptimisticChatListPreview(optimisticKey, tempId)
+            rollbackOptimisticChatListPreview(tempId)
             retainFailedOptimisticTextSend(
                 optimisticMessages = optimisticMessages,
                 messageById = messageById,
@@ -6009,12 +6455,8 @@ class ConversationController(
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
 
-    private fun rollbackOptimisticChatListPreview(
-        key: String,
-        optimisticMessageIdHex: String,
-    ) {
-        val previousRow = optimisticChatListPreviewRows.remove(key) ?: return
-        appState.rollbackOptimisticSentPreview(group.groupIdHex, optimisticMessageIdHex, previousRow)
+    private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
+        appState.rollbackOptimisticSentPreview(group.groupIdHex, optimisticMessageIdHex)
     }
 
     /**
@@ -6474,7 +6916,6 @@ class ConversationController(
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
                 optimisticMessages.remove(key)
-                optimisticChatListPreviewRows.remove(key)
                 messageById.remove(tempId)
                 publishTimelineFromIndexes()
                 return
@@ -6490,7 +6931,6 @@ class ConversationController(
                     projectedMessageIds = projectedMessageIds,
                     timelineOrder = order,
                 )
-            optimisticChatListPreviewRows.remove(key)
             invalidatedProjectionIdsMatchingMessage(timelineRecords, reconciliation.confirmed)
                 .forEach(::removeProjectedRecord)
             publishTimelineFromIndexes()
@@ -6504,7 +6944,6 @@ class ConversationController(
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
-                optimisticChatListPreviewRows.remove(key)
                 messageById.remove(tempId)
                 publishTimelineFromIndexes()
                 return
@@ -6559,7 +6998,7 @@ class ConversationController(
             MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)
             else -> return
         }
-        rollbackOptimisticChatListPreview(key, tempId)
+        rollbackOptimisticChatListPreview(tempId)
         optimisticMessages.remove(key)
         messageById.remove(tempId)
         // Free any retained attachment bytes for a discarded media send.
