@@ -257,6 +257,7 @@
     <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownCodeBlockView</ID>
     <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownElisionMarker</ID>
     <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownListView</ID>
+    <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownTableRowDivider</ID>
     <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownTableRowView</ID>
     <ID>FunctionNaming:MarkdownRenderer.kt:@Composable private fun MarkdownTableView</ID>
     <ID>FunctionNaming:MediaControls.kt:@Composable internal fun MediaCircleAction</ID>
