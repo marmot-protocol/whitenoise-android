@@ -1513,7 +1513,7 @@
     <ID>ReturnCount:ContactShare.kt:internal fun parseSharedContactFromText: SharedContact?</ID>
     <ID>ReturnCount:Controllers.kt:ChatListItem$fun removedFromGroup: Boolean</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun applyChatListRow</ID>
-    <ID>ReturnCount:Controllers.kt:ChatsController$fun applyOptimisticSentPreview: ChatListRowFfi?</ID>
+    <ID>ReturnCount:Controllers.kt:ChatsController$fun applyOptimisticSentPreview: Boolean</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun rollbackOptimisticSentPreview</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$fun sharedGroupsWith: List&lt;ChatListItem&gt;</ID>
     <ID>ReturnCount:Controllers.kt:ChatsController$private suspend fun searchOneChat: MessageBodyMatch?</ID>

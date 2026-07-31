@@ -49,7 +49,7 @@ class ChatListBulkDeleteCoverageTest {
         )
         assertTrue(
             "local chat-list wipe must optimistically hide and restore the row",
-            "removeChatRow" in body && "foldChatRow" in body,
+            "removeChatRow" in body && "restoreRemovedChatRow" in body,
         )
     }
 
