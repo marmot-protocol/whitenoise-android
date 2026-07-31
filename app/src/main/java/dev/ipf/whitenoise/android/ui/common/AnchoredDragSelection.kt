@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName") // Shared drag-selection primitives intentionally live together.
+
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -67,15 +69,16 @@ internal fun dragSelectionAutoScrollDelta(
     maxStep: Float,
 ): Float {
     if (viewportEnd <= viewportStart || edgeThreshold <= 0f || maxStep <= 0f) return 0f
-    val upperEdge = viewportStart + edgeThreshold
-    val lowerEdge = viewportEnd - edgeThreshold
+    val band = edgeThreshold.coerceAtMost((viewportEnd - viewportStart) / 2f)
+    val upperEdge = viewportStart + band
+    val lowerEdge = viewportEnd - band
     return when {
         pointerY < upperEdge -> {
-            val strength = ((upperEdge - pointerY) / edgeThreshold).coerceIn(0f, 1f)
+            val strength = ((upperEdge - pointerY) / band).coerceIn(0f, 1f)
             -maxStep * strength
         }
         pointerY > lowerEdge -> {
-            val strength = ((pointerY - lowerEdge) / edgeThreshold).coerceIn(0f, 1f)
+            val strength = ((pointerY - lowerEdge) / band).coerceIn(0f, 1f)
             maxStep * strength
         }
         else -> 0f
@@ -90,6 +93,11 @@ internal fun dragSelectionAutoScrollDelta(
  * pointer through release.
  */
 @Composable
+@Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LoopWithTooManyJumpStatements",
+) // Keeping the pointer lifecycle in one state machine makes terminal delivery auditable.
 internal fun Modifier.longPressOrVerticalDrag(
     enabled: Boolean = true,
     onLongPressStart: (Offset) -> Unit = {},

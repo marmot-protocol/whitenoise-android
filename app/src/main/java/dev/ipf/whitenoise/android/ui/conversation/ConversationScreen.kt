@@ -718,6 +718,18 @@ internal fun ConversationScreen(
     var dragPointerWindowY by
         remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
 
+    fun currentScrollAnchor(): ConversationScrollAnchor {
+        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+        return conversationScrollAnchor(
+            listState = listState,
+            renderedItemIds = liveRenderedTimeline.map { it.id },
+            renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
+            hasOlderHeader = liveHasOlderHeader,
+        )
+    }
+
+    @Suppress("ReturnCount") // Guard clauses keep invalid live-timeline gesture state explicit.
     fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorTimelineId ?: return false
         val endpointId =
@@ -754,9 +766,11 @@ internal fun ConversationScreen(
     }
 
     fun finishMessageDrag(clearSelection: Boolean) {
+        val hadActiveDrag = dragAnchorTimelineId != null
         dragAnchorTimelineId = null
         dragPointerWindowY = null
         if (clearSelection) selectedMessages.clear()
+        if (hadActiveDrag) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     }
 
     LaunchedEffect(orderedTimelineIds, selectableTimelineIds) {
@@ -845,17 +859,6 @@ internal fun ConversationScreen(
             renderedTimelineSize = renderedSize,
             hasOlderHeader = hasOlderHeader,
         )
-
-    fun currentScrollAnchor(): ConversationScrollAnchor {
-        val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-        return conversationScrollAnchor(
-            listState = listState,
-            renderedItemIds = liveRenderedTimeline.map { it.id },
-            renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
-            hasOlderHeader = liveHasOlderHeader,
-        )
-    }
 
     fun resolveScrollAnchorIndex(anchor: ConversationScrollAnchor): Int? {
         val liveRenderedTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
@@ -3538,6 +3541,7 @@ internal fun ConversationScreen(
                                             onDragSelectionStart = { pointerWindowY ->
                                                 openActionMenuId = null
                                                 clearTextSelection()
+                                                scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
                                                 dragAnchorTimelineId = item.id
                                                 dragPointerWindowY = pointerWindowY
                                             },

@@ -20,7 +20,9 @@ class ChatActionSheetTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private fun string(res: Int): String = context.getString(res)
 
     @Test
     fun rendersInverseActionsAndRoutesSelectionAfterDismissing() {

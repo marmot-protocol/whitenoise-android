@@ -6,7 +6,7 @@ import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
     @Test
-    fun singleSelectionOverflowWiresMarkReadAndMute() {
+    fun singleSelectionOverflowWiresMarkRead() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
@@ -23,29 +23,15 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onMarkUnread = {",
                 end = "\n                        onMuteToggle = {",
             )
-        val muteHandler =
-            selectionBar.requiredSection(
-                start = "onMuteToggle = {",
-                end = "\n                        onSelectAll = {",
-            )
         val markReadHelper =
             source.requiredSection(
                 start = "fun markChatRead(",
                 end = "\n    fun toggleChatMute(",
             )
-        val muteHelper =
-            source.requiredSection(
-                start = "fun toggleChatMute(",
-                end = "\n    // Hoisted list state",
-            )
 
         assertTrue(
             "selection bar must expose mark-read only for an effective unread selection",
             "singleSelectedItem?.effectiveHasUnread" in selectionBar,
-        )
-        assertTrue(
-            "selection bar must expose mute toggle for a single selection",
-            "showMuteToggle = singleSelectedItem != null" in selectionBar,
         )
         assertTrue(
             "mark-read overflow must route to controller.markAllRead",
@@ -65,15 +51,37 @@ class ChatsScreenSelectionActionsCoverageTest {
             "mark-unread overflow must exit selection mode",
             "clearSelection()" in markReadHelper,
         )
+    }
+
+    @Test
+    fun singleSelectionOverflowWiresMute() {
+        val source = chatsScreenSource().readText()
+        val selectionBar =
+            source.requiredSection(
+                start = "ChatListSelectionBar(",
+                end = "\n                    )\n                } else {",
+            )
+        val muteHandler =
+            selectionBar.requiredSection(
+                start = "onMuteToggle = {",
+                end = "\n                        onSelectAll = {",
+            )
+        val muteHelper =
+            source.requiredSection(
+                start = "fun toggleChatMute(",
+                end = "\n    // Hoisted list state",
+            )
+
+        assertTrue(
+            "selection bar must expose mute toggle for a single selection",
+            "showMuteToggle = singleSelectedItem != null" in selectionBar,
+        )
         assertTrue(
             "mute overflow must route to appState.setConversationMuted",
             "toggleChatMute(item, singleSelectionMuted)" in muteHandler &&
                 "appState.setConversationMuted" in muteHelper,
         )
-        assertTrue(
-            "mute overflow must exit selection mode",
-            "clearSelection()" in muteHelper,
-        )
+        assertTrue("mute overflow must exit selection mode", "clearSelection()" in muteHelper)
     }
 
     @Test

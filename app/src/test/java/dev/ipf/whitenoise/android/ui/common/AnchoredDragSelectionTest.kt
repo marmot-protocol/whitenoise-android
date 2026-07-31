@@ -66,6 +66,13 @@ class AnchoredDragSelectionTest {
     }
 
     @Test
+    fun autoScrollBandsDoNotOverlapInShortViewports() {
+        assertEquals(-4f, dragSelectionAutoScrollDelta(10f, 0f, 30f, 20f, 12f))
+        assertEquals(0f, dragSelectionAutoScrollDelta(15f, 0f, 30f, 20f, 12f))
+        assertEquals(4f, dragSelectionAutoScrollDelta(20f, 0f, 30f, 20f, 12f))
+    }
+
+    @Test
     fun completedHoldOpensActionButVerticalDragSuppressesIt() {
         var longPresses = 0
         var dragStarts = 0

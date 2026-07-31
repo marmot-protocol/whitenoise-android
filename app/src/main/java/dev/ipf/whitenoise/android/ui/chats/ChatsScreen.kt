@@ -511,6 +511,7 @@ internal fun ChatsScreen(
     var dragPointerWindowY by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
 
+    @Suppress("ReturnCount") // Guard clauses keep invalid live-list gesture state explicit.
     fun updateChatDragSelection(pointerWindowY: Float): Boolean {
         val anchorId = dragAnchorChatId ?: return false
         val pointerY = pointerWindowY - chatListWindowTop
@@ -555,6 +556,10 @@ internal fun ChatsScreen(
     }
     LaunchedEffect(chatListDatasetKey) {
         if (dragAnchorChatId != null) finishChatDrag(clearSelection = true)
+    }
+    LaunchedEffect(visibleChatIds) {
+        val anchorId = dragAnchorChatId ?: return@LaunchedEffect
+        if (anchorId !in visibleChatIds) finishChatDrag(clearSelection = true)
     }
 
     LaunchedEffect(dragAnchorChatId, chatListState) {

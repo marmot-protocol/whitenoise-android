@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Column

@@ -719,6 +719,7 @@ internal fun MessageBubble(
         val messageGroupMaxWidth = (maxWidth * 0.95f - selectionGutterWidth).coerceAtLeast(0.dp)
         val senderAvatarWidth = if (showSenderAvatar) 40.dp else 0.dp
         val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
+        val longPressBlockedBySelection = selectionMode && !rangeDragActive
 
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
@@ -775,7 +776,7 @@ internal fun MessageBubble(
                         // Once held, release opens actions while a vertical drag
                         // switches to anchored batch selection. Horizontal motion
                         // remains available to swipe-to-reply above.
-                        if (deleted || (selectionMode && !rangeDragActive) || textSelectionMode) {
+                        if (deleted || longPressBlockedBySelection || textSelectionMode) {
                             // A deleted message has no actions menu; batch selection
                             // and text selection route the row through their own UI.
                             Modifier
