@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Bu işlem mesajı gruptaki herkes için siler ve geri alınamaz.</string>
     <string name="sent">Gönderildi</string>
     <string name="send_failed">Mesaj gönderilemedi. Lütfen tekrar deneyin.</string>
+    <string name="delivery_not_confirmed">Teslim doğrulanmadı</string>
     <string name="sending">Gönderiliyor</string>
     <string name="cancel_reply">Cevabı iptal et</string>
     <string name="message">Mesaj</string>

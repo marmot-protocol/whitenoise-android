@@ -275,6 +275,7 @@ class MessageProjectorTest {
                 invalidated = "invalidated",
                 partialVisibility = "partial",
                 nonCanonicalHistory = "noncanonical",
+                deliveryNotConfirmed = "unconfirmed",
                 agentStreamStarted = "started",
                 streamFinished = "finished",
                 mediaAttachment = "media",

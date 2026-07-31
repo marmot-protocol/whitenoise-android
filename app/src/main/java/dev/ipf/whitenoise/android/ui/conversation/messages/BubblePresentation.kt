@@ -1,16 +1,35 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.ui.graphics.Color
+import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.state.OPAQUE_BLACK_ARGB
 import dev.ipf.whitenoise.android.state.readableTextArgb
 
 internal fun colorFromArgb(argb: Long): Color = Color(argb)
 
+/**
+ * Whether the outgoing delivery glyph renders. Any row whose invalidation
+ * reason already states its delivery on the row suppresses it: the glyph is
+ * derived from send status, which for an unpublished row reads "Sending"
+ * forever and would contradict a "Delivery not confirmed" warning sitting
+ * beside it.
+ */
 internal fun shouldShowMessageStatus(
     mine: Boolean,
     deleted: Boolean,
-    persistedFailure: Boolean,
-): Boolean = mine && !deleted && !persistedFailure
+    presentation: TimelineInvalidationPresentation,
+): Boolean =
+    mine &&
+        !deleted &&
+        when (presentation) {
+            TimelineInvalidationPresentation.PersistedFailure,
+            TimelineInvalidationPresentation.UnconfirmedDelivery,
+            -> false
+            TimelineInvalidationPresentation.None,
+            TimelineInvalidationPresentation.PartialVisibility,
+            TimelineInvalidationPresentation.NonCanonicalHistory,
+            -> true
+        }
 
 internal data class BubblePresentation(
     val backgroundArgb: Long,

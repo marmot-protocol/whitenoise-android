@@ -91,8 +91,10 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplySwipe
+import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
+import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.BubbleSide
@@ -338,10 +340,16 @@ internal fun MessageBubble(
         } else {
             controller.deleteCapabilityFor(record, alreadyDeleted = deleted)
         }
-    // Convergence reasons keep content and add a warning. Persisted local or
-    // unknown failures retain the pre-#1740 failure presentation so #1747 can
-    // change that state independently. Explicit deletion always wins.
+    // Convergence reasons and local publish failures keep their content and
+    // add a warning; only unknown reasons still take the error-styled
+    // tombstone. Explicit deletion always wins.
     val invalidated = !deleted && item.projected?.invalidationStatus != null
+    val invalidationPresentation =
+        if (deleted) {
+            TimelineInvalidationPresentation.None
+        } else {
+            timelineInvalidationPresentation(item.projected?.invalidationStatus)
+        }
     val persistedFailure =
         !deleted && item.projected?.let(::usesPersistedFailurePresentation) == true
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
@@ -1405,7 +1413,7 @@ internal fun MessageBubble(
                     MessageInlineFooter(
                         timeText = rememberedMessageBubbleTime(record.recordedAt),
                         color = timestampColor,
-                        showStatus = shouldShowMessageStatus(mine, deleted, persistedFailure),
+                        showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                         status = item.status,
                         showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                         editedLabel = editedLabel,
@@ -1889,7 +1897,7 @@ internal fun MessageBubble(
                         senderAvatarUrl = appState.avatarUrl(record.sender),
                         body = displayedBody,
                         timeText = rememberedClockTime(record.recordedAt),
-                        showStatus = shouldShowMessageStatus(mine, deleted, persistedFailure),
+                        showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                         status = item.status,
                         canReply = canUseExpandedComposer,
                         canReact = canUseExpandedComposer,
