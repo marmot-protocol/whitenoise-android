@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,6 +112,7 @@ internal fun FlowSearchField(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ContactRow(
     title: String,
     subtitle: String?,
@@ -170,11 +172,14 @@ internal fun ContactRow(
                         if (onSubtitleClick == null) {
                             Modifier
                         } else {
-                            Modifier.clickable(
-                                onClickLabel = copyLabel,
-                                role = Role.Button,
-                                onClick = onSubtitleClick,
-                            )
+                            Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(
+                                    enabled = enabled,
+                                    onClickLabel = copyLabel,
+                                    role = Role.Button,
+                                    onClick = onSubtitleClick,
+                                )
                         },
                 )
             }

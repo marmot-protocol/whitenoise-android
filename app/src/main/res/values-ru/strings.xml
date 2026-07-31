@@ -170,6 +170,7 @@
     <string name="profile_add_to_groups_confirm_title">Добавить в выбранные группы?</string>
     <string name="profile_add_to_groups_confirm_message">%1$s будет добавлен в %2$s. Это будет видно всем участникам.</string>
     <string name="profile_add_to_groups_confirm_label">Добавить в группы</string>
+    <string name="profile_no_addable_groups">Нет групп, в которые можно добавить этого человека.</string>
     <string name="profile_view_picture">Посмотреть фото профиля</string>
     <string name="profile_name_from_profile">Имя (из профиля): %1$s</string>
     <string name="profile_nickname_and_notes">Псевдоним и заметки</string>
@@ -922,6 +923,7 @@
     <string name="profile_banner_remove">Удалить баннер</string>
     <string name="profile_banner_apply">Использовать этот баннер</string>
     <string name="toast_couldnt_upload_profile_banner">Не удалось загрузить баннер профиля.</string>
+    <string name="toast_couldnt_load_profile">Не удалось загрузить профиль.</string>
     <string name="profile_banner_hint">Необязательный публичный HTTPS-адрес баннера</string>
     <string name="profile_banner_invalid">Разрешены только публичные HTTPS-адреса изображений.</string>
     <string name="toast_couldnt_upload_profile_image">Не удалось загрузить изображение профиля.</string>

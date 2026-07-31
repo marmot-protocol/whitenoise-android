@@ -224,6 +224,7 @@ internal fun ImageSearchSheet(
     applyImageLabel: String? = null,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
     resultImageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    resultImageCacheLookup: (String) -> ImageBitmap? = { AvatarImageLoader.peek(it) },
 ) {
     // Tracks which button initiated the current in-flight mutation, so the
     // spinner lands on that button while every competing action is disabled.
@@ -451,6 +452,7 @@ internal fun ImageSearchSheet(
                                 hit = hit,
                                 isSelected = hit.imageUrl == trimmedUrl,
                                 imageLoader = resultImageLoader,
+                                imageCacheLookup = resultImageCacheLookup,
                                 onTap = { urlDraft = hit.imageUrl },
                             )
                         }
@@ -540,11 +542,12 @@ private fun GroupImageSearchTile(
     hit: ImageSearchResult,
     isSelected: Boolean,
     imageLoader: suspend (String) -> ImageBitmap?,
+    imageCacheLookup: (String) -> ImageBitmap?,
     onTap: () -> Unit,
 ) {
     val thumbnailKey = hit.thumbnailUrl ?: hit.imageUrl
     val thumbnail by produceState<ImageBitmap?>(
-        initialValue = AvatarImageLoader.peek(thumbnailKey),
+        initialValue = imageCacheLookup(thumbnailKey),
         key1 = thumbnailKey,
     ) {
         if (value == null) value = imageLoader(thumbnailKey)

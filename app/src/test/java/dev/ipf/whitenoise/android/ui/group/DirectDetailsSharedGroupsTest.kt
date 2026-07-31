@@ -15,6 +15,7 @@ class DirectDetailsSharedGroupsTest {
     fun keepsGroupsIncludingNamedPairsAndExcludesDirectChats() {
         val openDm = item("current", name = "", memberCount = 2)
         val otherDm = item("other-dm", name = "", memberCount = 2)
+        val soloGroup = item("solo", name = "Solo", memberCount = 1)
         val unnamedGroup = item("unnamed", name = "", memberCount = 4)
         val namedPair = item("named-pair", name = "Project", memberCount = 2)
         val commonGroup = item("friends", name = "Friends", memberCount = 4)
@@ -22,7 +23,7 @@ class DirectDetailsSharedGroupsTest {
         assertEquals(
             listOf("unnamed", "named-pair", "friends"),
             directDetailsSharedGroups(
-                groups = listOf(openDm, otherDm, unnamedGroup, namedPair, commonGroup),
+                groups = listOf(openDm, otherDm, soloGroup, unnamedGroup, namedPair, commonGroup),
                 currentGroupIdHex = "CURRENT",
             ).map { it.group.groupIdHex },
         )
@@ -32,7 +33,10 @@ class DirectDetailsSharedGroupsTest {
     fun previewShowsThreeGroupsUntilExpanded() {
         val groups = (1..5).map { item("group-$it", name = "Group $it", memberCount = 3) }
 
-        assertEquals(listOf("group-1", "group-2", "group-3"), visibleDirectDetailsSharedGroups(groups, expanded = false).map { it.group.groupIdHex })
+        assertEquals(
+            listOf("group-1", "group-2", "group-3"),
+            visibleDirectDetailsSharedGroups(groups, expanded = false).map { it.group.groupIdHex },
+        )
         assertEquals(groups, visibleDirectDetailsSharedGroups(groups, expanded = true))
     }
 

@@ -240,6 +240,7 @@ internal fun ProfileBannerControl(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileHeroHeader(
     title: String,
     seed: String,
@@ -636,6 +637,10 @@ internal fun ProfileEditScreen(
                 nip05 = profile.nip05 ?: ""
                 lud16 = profile.lud16 ?: ""
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            appState.present(R.string.toast_couldnt_load_profile, copyable = true)
         } finally {
             profileLoaded = true
         }
@@ -702,7 +707,9 @@ internal fun ProfileEditScreen(
                         bannerUploading = bannerUploading,
                         contentReady = profileLoaded,
                         avatarImageAvailable = avatarImageAvailable,
-                        pictureInvalid = picture.isNotBlank() && !ProfileFieldValidation.isAcceptablePictureUrl(picture),
+                        pictureInvalid =
+                            picture.isNotBlank() &&
+                                !ProfileFieldValidation.isAcceptablePictureUrl(picture),
                         onEditBanner = { showBannerSheet = true },
                         onOpenPicture = {
                             if (avatarImageAvailable) {

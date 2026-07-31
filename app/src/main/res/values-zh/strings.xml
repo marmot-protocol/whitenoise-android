@@ -150,6 +150,7 @@
     <string name="profile_add_to_groups_confirm_title">添加到所选群组？</string>
     <string name="profile_add_to_groups_confirm_message">%1$s 将被添加到 %2$s。所有成员都能看到此操作。</string>
     <string name="profile_add_to_groups_confirm_label">添加到群组</string>
+    <string name="profile_no_addable_groups">没有可将此人添加到其中的群组。</string>
     <string name="profile_view_picture">查看头像</string>
     <string name="profile_name_from_profile">名称（来自个人资料）：%1$s</string>
     <string name="profile_nickname_and_notes">昵称和备注</string>
@@ -873,6 +874,7 @@
     <string name="profile_banner_remove">移除横幅</string>
     <string name="profile_banner_apply">使用此横幅</string>
     <string name="toast_couldnt_upload_profile_banner">无法上传个人资料横幅。</string>
+    <string name="toast_couldnt_load_profile">无法加载个人资料。</string>
     <string name="profile_banner_hint">可选的公开 HTTPS 横幅网址</string>
     <string name="profile_banner_invalid">仅允许公开的 HTTPS 图片网址。</string>
     <string name="toast_couldnt_upload_profile_image">无法上传个人资料图片。</string>

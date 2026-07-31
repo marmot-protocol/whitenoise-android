@@ -156,6 +156,7 @@
     <string name="profile_add_to_groups_confirm_title">Aggiungere ai gruppi selezionati?</string>
     <string name="profile_add_to_groups_confirm_message">%1$s verrà aggiunto a %2$s. Questo sarà visibile a tutti i membri.</string>
     <string name="profile_add_to_groups_confirm_label">Aggiungi ai gruppi</string>
+    <string name="profile_no_addable_groups">Non ci sono gruppi a cui puoi aggiungere questa persona.</string>
     <string name="profile_view_picture">Visualizza immagine del profilo</string>
     <string name="profile_name_from_profile">Nome (dal profilo): %1$s</string>
     <string name="profile_nickname_and_notes">Soprannome e note</string>
@@ -890,6 +891,7 @@
     <string name="profile_banner_remove">Rimuovi banner</string>
     <string name="profile_banner_apply">Usa questo banner</string>
     <string name="toast_couldnt_upload_profile_banner">Impossibile caricare il banner del profilo.</string>
+    <string name="toast_couldnt_load_profile">Impossibile caricare il profilo.</string>
     <string name="profile_banner_hint">URL HTTPS pubblico facoltativo del banner</string>
     <string name="profile_banner_invalid">Sono consentiti solo URL HTTPS pubblici di immagini.</string>
     <string name="toast_couldnt_upload_profile_image">Impossibile caricare l’immagine del profilo.</string>

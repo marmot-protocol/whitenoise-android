@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
@@ -42,6 +43,7 @@ import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -438,19 +441,36 @@ internal fun ProfileSheet(
                     }
                 }
                 if (compactMemberSheet) {
-                    Text(
-                        IdentityFormatter.short(npub, prefix = 12, suffix = 8),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        softWrap = false,
+                    val copyLabel = stringResource(R.string.copy)
+                    Row(
                         modifier =
                             Modifier
-                                .clickable(role = Role.Button) {
+                                .minimumInteractiveComponentSize()
+                                .semantics { contentDescription = npub }
+                                .clickable(
+                                    onClickLabel = copyLabel,
+                                    role = Role.Button,
+                                ) {
                                     clipboard.setText(AnnotatedString(npub))
                                 }.padding(horizontal = 24.dp),
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            IdentityFormatter.short(npub, prefix = 12, suffix = 8),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
@@ -515,7 +535,12 @@ internal fun ProfileSheet(
                     SectionCard(title = stringResource(R.string.about)) {
                         Text(
                             about ?: stringResource(R.string.profile_no_bio),
-                            color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                            color =
+                                if (about == null) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    Color.Unspecified
+                                },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -679,6 +704,7 @@ private fun ContactPrivateDetailsDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileAddToGroupsSheet(
     appState: WhiteNoiseAppState,
     targetName: String,
@@ -734,57 +760,72 @@ internal fun ProfileAddToGroupsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
-            FlowSearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = stringResource(R.string.forward_search_chats),
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-            ) {
-                if (filteredGroups.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+            if (groups.isEmpty()) {
+                Text(
+                    stringResource(R.string.profile_no_addable_groups),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+                )
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    Text(stringResource(R.string.close))
+                }
+            } else {
+                FlowSearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = stringResource(R.string.forward_search_chats),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                ) {
+                    if (filteredGroups.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
+                    }
+                    items(
+                        filteredGroups,
+                        key = { (item, _) -> item.group.groupIdHex },
+                    ) { (item, title) ->
+                        val groupId = item.group.groupIdHex
+                        val isSelected = selected.contains(groupId)
+                        ContactRow(
+                            title = title,
+                            subtitle = stringResource(R.string.members_count, item.memberCount),
+                            avatarSeed = item.group.groupIdHex,
+                            avatarUrl = item.group.avatarUrl,
+                            avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
+                            enabled = !busy,
+                            onClick = {
+                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                            },
+                            trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }
                 }
-                items(
-                    filteredGroups,
-                    key = { (item, _) -> item.group.groupIdHex },
-                ) { (item, title) ->
-                    val groupId = item.group.groupIdHex
-                    val isSelected = selected.contains(groupId)
-                    ContactRow(
-                        title = title,
-                        subtitle = stringResource(R.string.members_count, item.memberCount),
-                        avatarSeed = item.group.groupIdHex,
-                        avatarUrl = item.group.avatarUrl,
-                        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
-                        enabled = !busy,
-                        onClick = {
-                            if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                        },
-                        trailing = { SelectionIndicator(selected = isSelected) },
-                    )
+                Button(
+                    onClick = { confirmSelection = selectedGroups },
+                    enabled = selectedGroups.isNotEmpty() && !busy,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.profile_add_to_groups_confirm_label))
                 }
-            }
-            Button(
-                onClick = { confirmSelection = selectedGroups },
-                enabled = selectedGroups.isNotEmpty() && !busy,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.profile_add_to_groups_confirm_label))
             }
         }
     }

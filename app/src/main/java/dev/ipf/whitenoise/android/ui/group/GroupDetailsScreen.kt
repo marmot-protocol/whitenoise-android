@@ -65,6 +65,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -88,6 +89,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -331,6 +333,8 @@ internal fun GroupDetailsScreen(
             null
         }
     val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
+    val canShowEditAction =
+        !isDm && !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
     val dmSharedGroups =
         remember(dmPeerAccountIdHex, appState.chatListItems, controller.group.groupIdHex) {
             dmPeerAccountIdHex
@@ -689,7 +693,7 @@ internal fun GroupDetailsScreen(
                         offset = DpOffset(x = (-8).dp, y = 0.dp),
                         modifier = Modifier.widthIn(min = 232.dp),
                     ) {
-                        if (!isDm && !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin) {
+                        if (canShowEditAction) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -901,7 +905,6 @@ internal fun GroupDetailsScreen(
                 // live rule match — so the value tracks membership changes made
                 // anywhere (chat list, Settings, or a rule flipping).
                 val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-                val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
                 val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
                 val folderNames =
                     remember(
@@ -957,7 +960,9 @@ internal fun GroupDetailsScreen(
                         // only, so it must say why a checked-looking folder shows
                         // an unchecked box.
                         ruleMatchedFolderIds =
-                            folderNames.filterNot { (_, manual) -> manual }.mapTo(HashSet()) { (folder, _) -> folder.id },
+                            folderNames
+                                .filterNot { (_, manual) -> manual }
+                                .mapTo(HashSet()) { (folder, _) -> folder.id },
                         onCreateFolder = {
                             showFolderPicker = false
                             showFolderCreate = true
@@ -1043,13 +1048,6 @@ internal fun GroupDetailsScreen(
                 // makes the contact actions and shared groups look disconnected.
                 Column {
                     AppDivider()
-                    SectionHeader(
-                        pluralStringResource(
-                            R.plurals.contact_groups_in_common,
-                            dmSharedGroups.size,
-                            dmSharedGroups.size,
-                        ),
-                    )
                     FlowQuickActionRow(
                         icon = Icons.Default.Group,
                         title = stringResource(R.string.contact_create_group_with, conversationTitle),
@@ -1061,6 +1059,15 @@ internal fun GroupDetailsScreen(
                         enabled = !addingContactToGroups,
                         onClick = { showAddContactToGroups = true },
                     )
+                    if (dmSharedGroups.isNotEmpty()) {
+                        SectionHeader(
+                            pluralStringResource(
+                                R.plurals.contact_groups_in_common,
+                                dmSharedGroups.size,
+                                dmSharedGroups.size,
+                            ),
+                        )
+                    }
                     visibleDirectDetailsSharedGroups(dmSharedGroups, sharedGroupsExpanded).forEach { sharedGroup ->
                         ContactRow(
                             title = chatListItemDisplayTitle(sharedGroup, appState, groupTitleCopy),
@@ -1165,7 +1172,9 @@ internal fun GroupDetailsScreen(
                         when {
                             memberNeedle.isNotEmpty() ->
                                 displayedMembers.filter {
-                                    memberTitlesByHex[it.memberIdHex].orEmpty().contains(memberNeedle, ignoreCase = true)
+                                    memberTitlesByHex[it.memberIdHex]
+                                        .orEmpty()
+                                        .contains(memberNeedle, ignoreCase = true)
                                 }
                             membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
                             else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
@@ -1218,7 +1227,11 @@ internal fun GroupDetailsScreen(
                             },
                         )
                     }
-                    if (memberNeedle.isEmpty() && !membersExpanded && displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT) {
+                    val canExpandMembers =
+                        memberNeedle.isEmpty() &&
+                            !membersExpanded &&
+                            displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
+                    if (canExpandMembers) {
                         FlowQuickActionRow(
                             icon = Icons.Default.ExpandMore,
                             title = stringResource(R.string.see_all_members, displayedMembers.size),
@@ -1238,7 +1251,14 @@ internal fun GroupDetailsScreen(
                                     onClick = {
                                         clipboard.setText(AnnotatedString(invite))
                                     },
-                                    label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                R.string.invite_pending,
+                                                IdentityFormatter.short(invite),
+                                            ),
+                                        )
+                                    },
                                     leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
                                 )
                             }
@@ -1356,14 +1376,6 @@ internal fun GroupDetailsScreen(
                     )
                 }
                 if (controller.isSelfMember) {
-                    controller.lastMutationError?.let { error ->
-                        Text(
-                            error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                        )
-                    }
                     DangerActionRow(
                         icon = Icons.AutoMirrored.Filled.Logout,
                         title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
@@ -1687,26 +1699,50 @@ internal fun GroupDetailsHeader(
                 )
             }
             if (description.isNotBlank()) {
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (descriptionCopyValue == null) 3 else 1,
-                    overflow = TextOverflow.Ellipsis,
-                    softWrap = descriptionCopyValue == null,
-                    fontFamily = if (descriptionCopyValue == null) null else FontFamily.Monospace,
-                    modifier =
-                        if (descriptionCopyValue == null) {
+                val copyValue = descriptionCopyValue
+                if (copyValue == null) {
+                    Text(
+                        description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    val copyLabel = stringResource(R.string.copy)
+                    Row(
+                        modifier =
                             Modifier
-                        } else {
-                            Modifier.clickable(
-                                onClickLabel = stringResource(R.string.copy),
-                                role = Role.Button,
-                            ) {
-                                clipboard.setText(AnnotatedString(descriptionCopyValue))
-                            }
-                        },
-                )
+                                .widthIn(max = 320.dp)
+                                .minimumInteractiveComponentSize()
+                                .semantics { contentDescription = copyValue }
+                                .clickable(
+                                    onClickLabel = copyLabel,
+                                    role = Role.Button,
+                                ) {
+                                    clipboard.setText(AnnotatedString(copyValue))
+                                },
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             } else if (onAddDescription != null) {
                 TextButton(onClick = onAddDescription) {
                     Text(stringResource(R.string.add_group_description))

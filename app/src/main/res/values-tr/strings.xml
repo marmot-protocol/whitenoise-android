@@ -156,6 +156,7 @@
     <string name="profile_add_to_groups_confirm_title">Seçili gruplara eklensin mi?</string>
     <string name="profile_add_to_groups_confirm_message">%1$s, %2$s gruplarına eklenecek. Bu tüm üyeler tarafından görülebilir.</string>
     <string name="profile_add_to_groups_confirm_label">Gruplara ekle</string>
+    <string name="profile_no_addable_groups">Bu kişiyi ekleyebileceğiniz bir grup yok.</string>
     <string name="profile_view_picture">Profil resmini görüntüle</string>
     <string name="profile_name_from_profile">Ad (profilden): %1$s</string>
     <string name="profile_nickname_and_notes">Takma ad ve notlar</string>
@@ -888,6 +889,7 @@
     <string name="profile_banner_remove">Bannerı kaldır</string>
     <string name="profile_banner_apply">Bu bannerı kullan</string>
     <string name="toast_couldnt_upload_profile_banner">Profil bannerı yüklenemedi.</string>
+    <string name="toast_couldnt_load_profile">Profil yüklenemedi.</string>
     <string name="profile_banner_hint">İsteğe bağlı herkese açık HTTPS banner URL\'si</string>
     <string name="profile_banner_invalid">Yalnızca herkese açık HTTPS görsel URL\'lerine izin verilir.</string>
     <string name="toast_couldnt_upload_profile_image">Profil görseli yüklenemedi.</string>

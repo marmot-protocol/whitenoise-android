@@ -60,6 +60,7 @@ class ImageSearchSheetBannerResultsTest {
                             override suspend fun search(query: String): List<ImageSearchResult> = hits
                         },
                     resultImageLoader = { null },
+                    resultImageCacheLookup = { null },
                 )
             }
         }
