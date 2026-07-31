@@ -128,10 +128,26 @@ class TimelineProjectorTest {
     }
 
     @Test
-    fun localPublishFailureKeepsPersistedFailurePresentation() {
+    fun localPublishFailureKeepsItsBodyAndWarnsDeliveryIsUnconfirmed() {
+        // Nothing is known about what the group received, so the tombstone
+        // would both overclaim and destroy the only copy of the text (#1747).
         val record = timelineRecord(plaintext = "Secret", invalidationStatus = "local_publish_failed")
 
-        assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+        assertEquals("Secret", TimelineProjector.displayBody(record))
+        assertEquals("Delivery not confirmed", TimelineProjector.invalidationWarning(record))
+    }
+
+    @Test
+    fun deletedTakesPrecedenceOverLocalPublishFailure() {
+        val record =
+            timelineRecord(
+                plaintext = "Secret",
+                deleted = true,
+                deletedByMessageIdHex = "delete-event",
+                invalidationStatus = "local_publish_failed",
+            )
+
+        assertEquals("Deleted a message", TimelineProjector.displayBody(record))
         assertNull(TimelineProjector.invalidationWarning(record))
     }
 

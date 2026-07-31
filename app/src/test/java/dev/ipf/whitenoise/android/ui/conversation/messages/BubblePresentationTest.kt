@@ -38,29 +38,29 @@ class BubblePresentationTest {
     }
 
     @Test
-    fun localPublishFailureKeepsPersistedFailureBubbleChrome() {
-        val persistedFailure =
-            timelineInvalidationPresentation("local_publish_failed") ==
-                TimelineInvalidationPresentation.PersistedFailure
-
+    fun localPublishFailureKeepsOrdinaryChromeButNoDeliveryGlyph() {
+        // #1747: the body and normal chrome are retained, and the delivery
+        // glyph is suppressed so a "Sending" clock cannot contradict the
+        // "Delivery not confirmed" warning rendered beside it.
         assertEquals(
-            BubblePresentation(
-                backgroundArgb = tokens.errorBackgroundArgb,
-                contentArgb = tokens.errorContentArgb,
-                mentionAccentArgb = tokens.mentionAccentArgb,
-                suppressBorder = true,
-            ),
-            resolveBubblePresentationArgb(
-                deleted = false,
-                amoled = true,
+            TimelineInvalidationPresentation.UnconfirmedDelivery,
+            timelineInvalidationPresentation("local_publish_failed"),
+        )
+        assertTrue(
+            !shouldShowMessageStatus(
                 mine = true,
-                customArgb = 0xFFFF0000,
-                tokens = tokens,
-                persistedFailure = persistedFailure,
+                deleted = false,
+                presentation = TimelineInvalidationPresentation.UnconfirmedDelivery,
             ),
         )
-        assertTrue(persistedFailure)
-        assertTrue(!shouldShowMessageStatus(mine = true, deleted = false, persistedFailure = persistedFailure))
+        // A delivered row still shows its glyph.
+        assertTrue(
+            shouldShowMessageStatus(
+                mine = true,
+                deleted = false,
+                presentation = TimelineInvalidationPresentation.None,
+            ),
+        )
     }
 
     @Test
@@ -86,7 +86,13 @@ class BubblePresentationTest {
             ),
         )
         assertTrue(persistedFailure)
-        assertTrue(!shouldShowMessageStatus(mine = true, deleted = false, persistedFailure = persistedFailure))
+        assertTrue(
+            !shouldShowMessageStatus(
+                mine = true,
+                deleted = false,
+                presentation = TimelineInvalidationPresentation.PersistedFailure,
+            ),
+        )
     }
 
     @Test

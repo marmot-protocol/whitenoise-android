@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Il messaggio verrà eliminato per tutti nel gruppo. Questa azione non può essere annullata.</string>
     <string name="sent">Inviato</string>
     <string name="send_failed">Invio del messaggio fallito. Riprova.</string>
+    <string name="delivery_not_confirmed">Consegna non confermata</string>
     <string name="sending">Invio</string>
     <string name="cancel_reply">Annulla risposta</string>
     <string name="message">Messaggio</string>

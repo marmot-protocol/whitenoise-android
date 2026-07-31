@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Isso excluirá a mensagem para todos no grupo. Esta ação não pode ser desfeita.</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Falha ao enviar mensagem. Por favor, tente novamente.</string>
+    <string name="delivery_not_confirmed">Entrega não confirmada</string>
     <string name="sending">Enviando</string>
     <string name="cancel_reply">Cancelar resposta</string>
     <string name="message">Mensagem</string>

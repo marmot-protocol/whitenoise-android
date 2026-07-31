@@ -79,6 +79,13 @@ internal enum class TimelineInvalidationPresentation {
     None,
     PartialVisibility,
     NonCanonicalHistory,
+
+    /**
+     * The local publish attempt failed, so delivery is unknown. Content is
+     * preserved: claiming the group never got it is a guess, and the tombstone
+     * would destroy the user's only copy of the text (#1747).
+     */
+    UnconfirmedDelivery,
     PersistedFailure,
 }
 
@@ -90,7 +97,7 @@ internal fun timelineInvalidationPresentation(status: String?): TimelineInvalida
         "BeyondAppRetention",
         "UndecryptableInCanonicalState",
         -> TimelineInvalidationPresentation.NonCanonicalHistory
-        "local_publish_failed" -> TimelineInvalidationPresentation.PersistedFailure
+        "local_publish_failed" -> TimelineInvalidationPresentation.UnconfirmedDelivery
         // Preserve the established failure UI for future engine reasons until
         // Android has an explicit reason-specific presentation for them.
         else -> TimelineInvalidationPresentation.PersistedFailure
@@ -130,6 +137,7 @@ object TimelineProjector {
         when (timelineInvalidationPresentation(status)) {
             TimelineInvalidationPresentation.PartialVisibility -> copy.partialVisibility
             TimelineInvalidationPresentation.NonCanonicalHistory -> copy.nonCanonicalHistory
+            TimelineInvalidationPresentation.UnconfirmedDelivery -> copy.deliveryNotConfirmed
             TimelineInvalidationPresentation.None,
             TimelineInvalidationPresentation.PersistedFailure,
             -> null

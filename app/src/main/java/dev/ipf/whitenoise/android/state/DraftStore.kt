@@ -1,17 +1,18 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import android.content.SharedPreferences
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import java.io.IOException
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Persistence layer for unsent conversation drafts. The storage map is keyed
@@ -27,6 +28,8 @@ internal interface DraftPersistence {
         key: String,
         value: String?,
     )
+
+    fun flush() = Unit
 }
 
 private class EvictedDraftStateReference(
@@ -45,6 +48,7 @@ private class EvictedDraftStateReference(
  * SnapshotStateMap, which tracks reads at whole-map granularity — would
  * recompose every chat-list row on every keystroke in any conversation.)
  */
+@Suppress("TooManyFunctions")
 class DraftStore internal constructor(
     private val persistence: DraftPersistence,
     private val nowSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
@@ -210,6 +214,9 @@ class DraftStore internal constructor(
         if (sortOrderChanged) onDraftSortOrderChanged?.invoke()
     }
 
+    /** Durably drains any coalesced background persistence work. */
+    fun flush() = persistence.flush()
+
     private fun pruneEmptyDraftStatesLocked(retainedState: MutableState<String?>? = null) {
         drainCollectedEvictedDraftStatesLocked()
         if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
@@ -238,66 +245,213 @@ class DraftStore internal constructor(
 }
 
 /**
- * Draft text is message-shaped plaintext, so it is held in an
- * [EncryptedSharedPreferences] store keyed by the Android Keystore rather than
- * a plaintext file.
+ * Draft text is message-shaped plaintext, so it is sealed with an AES-GCM key
+ * held in the Android Keystore rather than written to a plaintext file. The
+ * previous implementation used the now-EOL `androidx.security-crypto` stack;
+ * existing drafts are imported once from that file and it is then deleted.
  */
 internal class EncryptedDraftPersistence(
     context: Context,
+    writeExecutor: ExecutorService = newDraftWriteExecutor(),
 ) : DraftPersistence {
-    private val prefs: SharedPreferences = openSecure(context.applicationContext)
+    private val app = context.applicationContext
+    private val store =
+        KeystoreSecureStore(
+            context = app,
+            fileName = SECURE_FILE,
+            keyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS),
+        )
+    private val writer: CoalescingDraftWriter
 
-    override fun read(): Map<String, String> {
-        @Suppress("UNCHECKED_CAST")
-        return prefs.all.filterValues { it is String } as Map<String, String>
+    init {
+        importLegacyDrafts()
+        writer =
+            CoalescingDraftWriter(
+                initial = readSecureStore(),
+                executor = writeExecutor,
+                persist = ::persistSnapshot,
+            )
     }
+
+    override fun read(): Map<String, String> = writer.read()
 
     override fun write(
         key: String,
         value: String?,
-    ) {
-        prefs
-            .edit()
-            .apply {
-                if (value == null) remove(key) else putString(key, value)
-            }.apply()
+    ) = writer.write(key, value)
+
+    override fun flush() = writer.flush()
+
+    private fun readSecureStore(): Map<String, String> =
+        try {
+            store.readAll()
+        } catch (error: GeneralSecurityException) {
+            // A rotated/cleared Keystore key or a tampered payload leaves the
+            // store undecryptable; drafts are disposable, so drop it and start
+            // fresh rather than failing every read.
+            Log.w(LOG_TAG, "draft store unreadable, recreating", error)
+            recreateAfterCorruption()
+            emptyMap()
+        }
+
+    private fun persistSnapshot(values: Map<String, String>) {
+        try {
+            if (!store.replaceAllDurably(values)) {
+                Log.w(LOG_TAG, "draft snapshot commit failed")
+            }
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft write failed, recreating store", error)
+            recreateAfterCorruption()
+            runCatching { store.replaceAllDurably(values) }
+        }
     }
 
-    private companion object {
-        const val SECURE_FILE = "whitenoise.drafts.secure"
+    private fun recreateAfterCorruption() {
+        runCatching { store.clear() }
+    }
 
-        fun openSecure(context: Context): SharedPreferences =
-            try {
-                create(context)
-            } catch (error: GeneralSecurityException) {
-                // A rotated/cleared Keystore key or tampered keyset leaves the
-                // file undecryptable; drafts are disposable, so drop the corrupt
-                // store and start fresh. Unrelated failures propagate rather
-                // than silently wiping valid drafts.
-                recreateAfterCorruption(context)
-            } catch (error: IOException) {
-                recreateAfterCorruption(context)
-            }
-
-        fun recreateAfterCorruption(context: Context): SharedPreferences {
-            context.deleteSharedPreferences(SECURE_FILE)
-            return create(context)
-        }
-
-        fun create(context: Context): SharedPreferences {
-            val masterKey =
-                MasterKey
-                    .Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-            return EncryptedSharedPreferences.create(
-                context,
-                SECURE_FILE,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+    /**
+     * One-way import from the retired library, routed through [migrateDrafts]
+     * so it keeps that helper's two guarantees: encrypted values win over the
+     * legacy copy, and the legacy file is deleted only once the new store has
+     * DURABLY committed. Deleting on a transient failure — or before the write
+     * reaches disk — would lose a draft the user is mid-way through typing.
+     */
+    private fun importLegacyDrafts() {
+        val legacy = readLegacyDrafts()
+        val existingKeys = if (legacy == null) null else secureKeys()
+        if (legacy != null && existingKeys != null) {
+            migrateDrafts(
+                legacy = legacy,
+                existingSecureKeys = existingKeys,
+                persistSecure = ::persistImportedDrafts,
+                clearLegacy = { app.deleteSharedPreferences(LEGACY_SECURE_FILE) },
             )
         }
+    }
+
+    // Null when there is nothing to import, or when the legacy keyset is
+    // unreadable — in which case the file is only dead weight and is dropped.
+    private fun readLegacyDrafts(): Map<String, String>? =
+        try {
+            LegacySecurePreferences.read(app, LEGACY_SECURE_FILE)
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
+            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
+            null
+        } catch (error: IOException) {
+            Log.w(LOG_TAG, "legacy draft store unreadable, discarding", error)
+            app.deleteSharedPreferences(LEGACY_SECURE_FILE)
+            null
+        }
+
+    // Null aborts the import: without knowing what the new store already holds,
+    // migrateDrafts cannot honour "encrypted values win".
+    private fun secureKeys(): Set<String>? =
+        try {
+            store.readAll().keys
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft store unreadable during import", error)
+            null
+        }
+
+    private fun persistImportedDrafts(fresh: Map<String, String>): Boolean =
+        try {
+            store.putAllDurably(fresh)
+        } catch (error: GeneralSecurityException) {
+            Log.w(LOG_TAG, "draft import write failed, keeping legacy file", error)
+            false
+        }
+
+    private companion object {
+        const val LOG_TAG = "DMDrafts"
+        const val SECURE_FILE = "whitenoise.drafts.keystore"
+        const val LEGACY_SECURE_FILE = "whitenoise.drafts.secure"
+        const val KEY_ALIAS = "whitenoise.drafts.aes_gcm.v1"
+
+        fun newDraftWriteExecutor(): ExecutorService =
+            Executors.newSingleThreadExecutor { task ->
+                Thread(task, "WhiteNoiseDraftWriter").apply { isDaemon = true }
+            }
+    }
+}
+
+/**
+ * Keeps the latest draft map in memory and serializes durable writes through a
+ * single background worker. A burst of keystrokes produces at most one active
+ * encryption plus one latest snapshot, rather than one whole-map encryption
+ * per key event on the main thread.
+ */
+internal class CoalescingDraftWriter(
+    initial: Map<String, String>,
+    private val executor: ExecutorService,
+    private val persist: (Map<String, String>) -> Unit,
+) {
+    private val lock = Any()
+    private var values = initial.toMap()
+    private var generation = 0L
+    private var workerScheduled = false
+    private var workerDone = CountDownLatch(0)
+
+    fun read(): Map<String, String> = synchronized(lock) { values.toMap() }
+
+    fun write(
+        key: String,
+        value: String?,
+    ) {
+        synchronized(lock) {
+            val updated = if (value == null) values - key else values + (key to value)
+            if (updated == values) return
+            values = updated
+            generation += 1
+            scheduleWorkerLocked()
+        }
+    }
+
+    fun flush() {
+        while (true) {
+            val completion =
+                synchronized(lock) {
+                    if (!workerScheduled) return
+                    workerDone
+                }
+            completion.await()
+        }
+    }
+
+    private fun drain(completion: CountDownLatch) {
+        try {
+            while (true) {
+                val (snapshot, snapshotGeneration) =
+                    synchronized(lock) { values.toMap() to generation }
+                persist(snapshot)
+                val caughtUp =
+                    synchronized(lock) {
+                        if (generation == snapshotGeneration) {
+                            workerScheduled = false
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                if (caughtUp) return
+            }
+        } finally {
+            synchronized(lock) {
+                if (workerDone === completion) {
+                    workerScheduled = false
+                }
+                completion.countDown()
+            }
+        }
+    }
+
+    private fun scheduleWorkerLocked() {
+        if (workerScheduled) return
+        workerScheduled = true
+        val completion = CountDownLatch(1)
+        workerDone = completion
+        executor.execute { drain(completion) }
     }
 }
 

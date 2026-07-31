@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Ce message sera supprimé pour tous les membres du groupe. Cette action est irréversible.</string>
     <string name="sent">Envoyé</string>
     <string name="send_failed">Échec de l’envoi du message. Veuillez réessayer.</string>
+    <string name="delivery_not_confirmed">Livraison non confirmée</string>
     <string name="sending">Envoi</string>
     <string name="cancel_reply">Annuler la réponse</string>
     <string name="message">Message</string>

@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Dadurch wird die Nachricht für alle in der Gruppe gelöscht. Dies kann nicht rückgängig gemacht werden.</string>
     <string name="sent">Gesendet</string>
     <string name="send_failed">Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.</string>
+    <string name="delivery_not_confirmed">Zustellung nicht bestätigt</string>
     <string name="sending">Wird gesendet</string>
     <string name="cancel_reply">Antwort abbrechen</string>
     <string name="message">Nachricht</string>

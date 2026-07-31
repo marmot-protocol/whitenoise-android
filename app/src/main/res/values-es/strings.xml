@@ -307,6 +307,7 @@
     <string name="confirm_delete_member_message_message">Esto eliminará el mensaje para todos en el grupo. Esta acción no se puede deshacer.</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Error al enviar el mensaje. Por favor, inténtalo de nuevo.</string>
+    <string name="delivery_not_confirmed">Entrega no confirmada</string>
     <string name="sending">Enviando</string>
     <string name="cancel_reply">Cancelar respuesta</string>
     <string name="message">Mensaje</string>
