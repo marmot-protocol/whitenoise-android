@@ -328,7 +328,11 @@ internal fun sortChatListItems(
             .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtById[it.id]) }
             .thenByDescending { item ->
                 val recencyTie = chatListItemRecencyTie(item, draftedAtById[item.id])
-                if (recencyTie in recencyTiesWithDraft) 0uL else item.activitySequence
+                if (recencyTie.recency == 0uL || recencyTie in recencyTiesWithDraft) {
+                    0uL
+                } else {
+                    item.activitySequence
+                }
             }.thenBy { chatListItemSortKey(it) },
     )
 }

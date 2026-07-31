@@ -100,6 +100,20 @@ class ChatListSortingTest {
     }
 
     @Test
+    fun noActivityTieFallsBackToStableTitleInsteadOfMaterializationSequence() {
+        val alpha =
+            item("alpha", latestAt = null, activitySequence = 1uL)
+                .copy(group = group("alpha").copy(name = "Alpha"))
+        val zulu =
+            item("zulu", latestAt = null, activitySequence = 2uL)
+                .copy(group = group("zulu").copy(name = "Zulu"))
+
+        val sorted = sortChatListItems(listOf(zulu, alpha))
+
+        assertEquals(listOf("alpha", "zulu"), sorted.map { it.id })
+    }
+
+    @Test
     fun sameSecondDraftTieFallsBackToTitleInsteadOfMessageActivitySequence() {
         val alpha =
             item("alpha", latestAt = 10uL, activitySequence = 1uL)
