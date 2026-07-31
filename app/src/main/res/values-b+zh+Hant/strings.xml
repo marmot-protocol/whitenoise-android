@@ -136,6 +136,13 @@
     <string name="profile_shared_groups">共同群組</string>
     <string name="profile_no_shared_groups">尚無共同群組。</string>
     <string name="profile_start_new_group_with">與 %1$s 開始新群組</string>
+    <string name="contact_create_group_with">與 %1$s 建立群組</string>
+    <string name="contact_add_to_group">新增至群組</string>
+    <string name="contact_groups_see_all">查看全部</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d 個共同群組</item>
+        <item quantity="other">%1$d 個共同群組</item>
+    </plurals>
     <string name="profile_add_to_another_group">新增到另一個群組</string>
     <string name="new_group_invited_members">已邀請成員</string>
     <string name="profile_add_to_groups_title">將 %1$s 新增到群組</string>

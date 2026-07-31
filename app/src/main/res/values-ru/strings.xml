@@ -154,6 +154,15 @@
     <string name="profile_shared_groups">Общие группы</string>
     <string name="profile_no_shared_groups">Пока нет общих групп.</string>
     <string name="profile_start_new_group_with">Начать новую группу с %1$s</string>
+    <string name="contact_create_group_with">Создать группу с %1$s</string>
+    <string name="contact_add_to_group">Добавить в группу</string>
+    <string name="contact_groups_see_all">Показать все</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d общая группа</item>
+        <item quantity="few">%1$d общие группы</item>
+        <item quantity="many">%1$d общих групп</item>
+        <item quantity="other">%1$d общей группы</item>
+    </plurals>
     <string name="profile_add_to_another_group">Добавить в другую группу</string>
     <string name="new_group_invited_members">Приглашённые участники</string>
     <string name="profile_add_to_groups_title">Добавить %1$s в группы</string>

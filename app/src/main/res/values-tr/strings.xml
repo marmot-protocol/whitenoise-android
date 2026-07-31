@@ -142,6 +142,13 @@
     <string name="profile_shared_groups">Ortak gruplar</string>
     <string name="profile_no_shared_groups">Henüz ortak grup yok.</string>
     <string name="profile_start_new_group_with">%1$s ile yeni grup başlat</string>
+    <string name="contact_create_group_with">%1$s ile grup oluştur</string>
+    <string name="contact_add_to_group">Gruba ekle</string>
+    <string name="contact_groups_see_all">Tümünü göster</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d ortak grup</item>
+        <item quantity="other">%1$d ortak grup</item>
+    </plurals>
     <string name="profile_add_to_another_group">Başka bir gruba ekle</string>
     <string name="new_group_invited_members">Davet edilen üyeler</string>
     <string name="profile_add_to_groups_title">%1$s kullanıcısını gruplara ekle</string>

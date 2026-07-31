@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,6 +36,19 @@ class ChatRowAdaptiveLayoutTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val nowText by lazy { context.getString(R.string.relative_time_now) }
     private val timestampAt = (System.currentTimeMillis() / 1_000L).toULong()
+
+    @Test
+    fun normalDensityUsesCompactRowHeight() {
+        render()
+
+        val rowBounds =
+            composeRule
+                .onNodeWithTag(ROW_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertEquals(72f, rowBounds.height, 0.5f)
+    }
 
     @Test
     fun longTitleEllipsizesBeforeTimestampWhilePreviewUsesSpaceBelowIt() {
@@ -208,7 +222,7 @@ class ChatRowAdaptiveLayoutTest {
                             } else {
                                 null
                             },
-                        modifier = Modifier.width(240.dp),
+                        modifier = Modifier.width(240.dp).testTag(ROW_TAG),
                     )
                 }
             }
@@ -220,5 +234,6 @@ class ChatRowAdaptiveLayoutTest {
         const val PREVIEW = "A very long supporting preview that should reach beneath the timestamp"
         const val PREVIEW_TAG = "chat-row-preview"
         const val METADATA_TAG = "chat-row-supporting-metadata"
+        const val ROW_TAG = "chat-row"
     }
 }

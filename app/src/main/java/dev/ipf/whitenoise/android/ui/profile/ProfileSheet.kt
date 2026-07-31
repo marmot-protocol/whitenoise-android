@@ -64,6 +64,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -181,38 +182,40 @@ internal fun ProfileSheetAdminActionRows(
     onRevokeAdmin: () -> Unit,
     onRemoveMember: () -> Unit,
 ) {
-    actions.forEach { action ->
-        when (action) {
-            GroupMemberMenuAction.GrantAdmin ->
-                SettingsActionRow(
-                    icon = Icons.Default.Shield,
-                    title = stringResource(R.string.make_admin),
-                    modifier = Modifier.testTag(adminActionRowTag(action)),
-                    enabled = !busy,
-                    inProgress = pendingAction == action,
-                    onClick = onGrantAdmin,
-                )
-            GroupMemberMenuAction.RevokeAdmin ->
-                SettingsActionRow(
-                    icon = Icons.Default.Shield,
-                    title = stringResource(R.string.remove_admin),
-                    modifier = Modifier.testTag(adminActionRowTag(action)),
-                    enabled = !busy,
-                    inProgress = pendingAction == action,
-                    onClick = onRevokeAdmin,
-                )
-            GroupMemberMenuAction.RemoveMember ->
-                DangerActionRow(
-                    icon = Icons.Default.Delete,
-                    title = stringResource(R.string.remove_member),
-                    modifier = Modifier.testTag(adminActionRowTag(action)),
-                    enabled = !busy,
-                    inProgress = pendingAction == action,
-                    onClick = onRemoveMember,
-                )
-            // Self is excluded on this surface, so StepDownAsAdmin never
-            // appears (it is filtered out by profileSheetAdminActions).
-            GroupMemberMenuAction.StepDownAsAdmin -> Unit
+    Column(Modifier.fillMaxWidth()) {
+        actions.forEach { action ->
+            when (action) {
+                GroupMemberMenuAction.GrantAdmin ->
+                    SettingsActionRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.make_admin),
+                        modifier = Modifier.testTag(adminActionRowTag(action)),
+                        enabled = !busy,
+                        inProgress = pendingAction == action,
+                        onClick = onGrantAdmin,
+                    )
+                GroupMemberMenuAction.RevokeAdmin ->
+                    SettingsActionRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.remove_admin),
+                        modifier = Modifier.testTag(adminActionRowTag(action)),
+                        enabled = !busy,
+                        inProgress = pendingAction == action,
+                        onClick = onRevokeAdmin,
+                    )
+                GroupMemberMenuAction.RemoveMember ->
+                    DangerActionRow(
+                        icon = Icons.Default.Delete,
+                        title = stringResource(R.string.remove_member),
+                        modifier = Modifier.testTag(adminActionRowTag(action)),
+                        enabled = !busy,
+                        inProgress = pendingAction == action,
+                        onClick = onRemoveMember,
+                    )
+                // Self is excluded on this surface, so StepDownAsAdmin never
+                // appears (it is filtered out by profileSheetAdminActions).
+                GroupMemberMenuAction.StepDownAsAdmin -> Unit
+            }
         }
     }
 }
@@ -246,6 +249,7 @@ internal fun ProfileSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contentScrollState = rememberScrollState()
     val groupTitleCopy = rememberGroupTitleCopy()
+    val compactMemberSheet = adminController != null
 
     LaunchedEffect(npub) {
         val resolved = appState.accountIdHex(npub)
@@ -398,10 +402,8 @@ internal fun ProfileSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScroll(
-                    state = contentScrollState,
-                    enabled = contentScrollState.maxValue > 0,
-                ).padding(vertical = 24.dp),
+                .verticalScroll(contentScrollState)
+                .padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -434,6 +436,21 @@ internal fun ProfileSheet(
                         )
                         Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+                if (compactMemberSheet) {
+                    Text(
+                        IdentityFormatter.short(npub, prefix = 12, suffix = 8),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        modifier =
+                            Modifier
+                                .clickable(role = Role.Button) {
+                                    clipboard.setText(AnnotatedString(npub))
+                                }.padding(horizontal = 24.dp),
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
@@ -485,35 +502,37 @@ internal fun ProfileSheet(
                     onCopy = { detail -> clipboard.setText(AnnotatedString(detail)) },
                 )
             }
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                CopyableValueRow(
-                    label = "npub",
-                    value = npub,
-                    clipboard = clipboard,
-                )
-                SectionCard(title = stringResource(R.string.about)) {
-                    Text(
-                        about ?: stringResource(R.string.profile_no_bio),
-                        color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
-                        modifier = Modifier.fillMaxWidth(),
+            if (!compactMemberSheet) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CopyableValueRow(
+                        label = "npub",
+                        value = npub,
+                        clipboard = clipboard,
                     )
-                }
-                SectionCard(title = stringResource(R.string.profile_shared_groups)) {
-                    if (sharedGroups.isEmpty()) {
-                        Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        sharedGroups.forEachIndexed { index, group ->
-                            ProfileSharedGroupRow(
-                                item = group,
-                                appState = appState,
-                                titleCopy = groupTitleCopy,
-                                onOpen = { onOpenGroup(group, false) },
-                            )
-                            if (index != sharedGroups.lastIndex) {
-                                AppDivider()
+                    SectionCard(title = stringResource(R.string.about)) {
+                        Text(
+                            about ?: stringResource(R.string.profile_no_bio),
+                            color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    SectionCard(title = stringResource(R.string.profile_shared_groups)) {
+                        if (sharedGroups.isEmpty()) {
+                            Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            sharedGroups.forEachIndexed { index, group ->
+                                ProfileSharedGroupRow(
+                                    item = group,
+                                    appState = appState,
+                                    titleCopy = groupTitleCopy,
+                                    onOpen = { onOpenGroup(group, false) },
+                                )
+                                if (index != sharedGroups.lastIndex) {
+                                    AppDivider()
+                                }
                             }
                         }
                     }
@@ -526,7 +545,14 @@ internal fun ProfileSheet(
                 Column(Modifier.fillMaxWidth()) {
                     SettingsActionRow(
                         icon = Icons.Default.Edit,
-                        title = stringResource(R.string.profile_nickname_and_notes),
+                        title =
+                            stringResource(
+                                if (contactNickname == null) {
+                                    R.string.profile_add_nickname_and_notes
+                                } else {
+                                    R.string.profile_nickname_and_notes
+                                },
+                            ),
                         value =
                             profileSheetContactPrivateDetailsRowValue(
                                 contactNickname = contactNickname,
@@ -553,14 +579,12 @@ internal fun ProfileSheet(
                             }
                         },
                     )
-                    if (addableGroups.isNotEmpty()) {
-                        SettingsActionRow(
-                            icon = Icons.Default.Add,
-                            title = stringResource(R.string.profile_add_to_another_group),
-                            enabled = !creatingChat,
-                            onClick = { showAddToGroups = true },
-                        )
-                    }
+                    SettingsActionRow(
+                        icon = Icons.Default.Add,
+                        title = stringResource(R.string.profile_add_to_another_group),
+                        enabled = !creatingChat,
+                        onClick = { showAddToGroups = true },
+                    )
                 }
             }
             // Group-admin moderation actions (issue #635). Only rendered when the
@@ -655,7 +679,7 @@ private fun ContactPrivateDetailsDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileAddToGroupsSheet(
+internal fun ProfileAddToGroupsSheet(
     appState: WhiteNoiseAppState,
     targetName: String,
     groups: List<ChatListItem>,
@@ -850,11 +874,8 @@ private fun ProfileSheetAdminActions(
         )
     }
 
-    AppDivider()
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AppDivider()
         // Reuses the same "Admin" badge the members list shows so the action
         // labels (Grant/Revoke admin) read naturally. Uses an existing string
         // (R.string.admin) only — no new copy to translate.
@@ -863,7 +884,7 @@ private fun ProfileSheetAdminActions(
                 stringResource(R.string.admin),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
         }
         ProfileSheetAdminActionRows(

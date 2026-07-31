@@ -190,6 +190,13 @@
     <string name="profile_shared_groups">Shared groups</string>
     <string name="profile_no_shared_groups">No shared groups yet.</string>
     <string name="profile_start_new_group_with">Start new group with %1$s</string>
+    <string name="contact_create_group_with">Create group with %1$s</string>
+    <string name="contact_add_to_group">Add to group</string>
+    <string name="contact_groups_see_all">See all</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d group in common</item>
+        <item quantity="other">%1$d groups in common</item>
+    </plurals>
     <string name="profile_add_to_another_group">Add to another group</string>
     <string name="new_group_invited_members">Invited members</string>
     <string name="profile_add_to_groups_title">Add %1$s to groups</string>

@@ -285,6 +285,7 @@ internal fun ConversationScreen(
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
+    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Push the global snackbar host above the conversation composer so
@@ -2590,6 +2591,10 @@ internal fun ConversationScreen(
             onOpenSearch = {
                 showDetails = false
                 searchOpen = true
+            },
+            onOpenConversation = { item, created ->
+                showDetails = false
+                onOpenConversation(item, created)
             },
         )
         return

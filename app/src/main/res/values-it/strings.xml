@@ -142,6 +142,13 @@
     <string name="profile_shared_groups">Gruppi condivisi</string>
     <string name="profile_no_shared_groups">Ancora nessun gruppo condiviso.</string>
     <string name="profile_start_new_group_with">Avvia nuovo gruppo con %1$s</string>
+    <string name="contact_create_group_with">Crea gruppo con %1$s</string>
+    <string name="contact_add_to_group">Aggiungi a un gruppo</string>
+    <string name="contact_groups_see_all">Mostra tutti</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d gruppo in comune</item>
+        <item quantity="other">%1$d gruppi in comune</item>
+    </plurals>
     <string name="profile_add_to_another_group">Aggiungi a un altro gruppo</string>
     <string name="new_group_invited_members">Membri invitati</string>
     <string name="profile_add_to_groups_title">Aggiungi %1$s ai gruppi</string>

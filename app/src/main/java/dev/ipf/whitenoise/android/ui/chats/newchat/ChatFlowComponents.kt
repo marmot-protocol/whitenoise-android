@@ -121,8 +121,10 @@ internal fun ContactRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onSubtitleClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val copyLabel = stringResource(R.string.copy)
     Row(
         modifier =
             modifier
@@ -164,6 +166,16 @@ internal fun ContactRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        if (onSubtitleClick == null) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(
+                                onClickLabel = copyLabel,
+                                role = Role.Button,
+                                onClick = onSubtitleClick,
+                            )
+                        },
                 )
             }
         }

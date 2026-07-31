@@ -217,7 +217,7 @@ internal fun ChatRow(
                         group = item.group,
                         title = title,
                         seed = avatarAccount ?: item.group.groupIdHex,
-                        size = 44.dp,
+                        size = 48.dp,
                         fallbackPictureUrl = avatarAccount?.let { appState.avatarUrl(it) },
                     )
                     if (isMuted) {
