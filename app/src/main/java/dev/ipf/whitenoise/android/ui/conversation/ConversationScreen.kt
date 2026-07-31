@@ -8,6 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,7 +83,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -147,11 +150,15 @@ import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
+import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
+import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
@@ -689,6 +696,95 @@ internal fun ConversationScreen(
     // pass (plus the downstream invalid-ids pass and reconcile effect) on
     // every bump. Names are only shown for the selected few — resolved below.
     val selectableMessages = selectableMessageProjections
+    val orderedTimelineIds = remember(renderedTimeline) { renderedTimeline.map { it.id } }
+    val timelineSelectionById =
+        remember(renderedTimeline, selectableMessages) {
+            renderedTimeline
+                .mapNotNull { item ->
+                    selectableMessages[item.record.messageIdHex]?.let { item.id to it }
+                }.toMap()
+        }
+    val timelineIdSet = remember(orderedTimelineIds) { orderedTimelineIds.toSet() }
+    val selectableTimelineIds = remember(timelineSelectionById) { timelineSelectionById.keys }
+    val dragSelectionDensity = LocalDensity.current
+    val dragEdgeThresholdPx = with(dragSelectionDensity) { 56.dp.toPx() }
+    val dragMaxScrollStepPx = with(dragSelectionDensity) { 18.dp.toPx() }
+    var transcriptWindowTop by
+        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+    var transcriptHeightPx by
+        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+    var dragAnchorTimelineId by
+        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    var dragPointerWindowY by
+        remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
+
+    fun updateMessageDragSelection(pointerWindowY: Float): Boolean {
+        val anchorId = dragAnchorTimelineId ?: return false
+        val endpointId =
+            dragSelectionEndpoint(
+                listState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
+                    val id = visible.key as? String
+                    id
+                        ?.takeIf(timelineIdSet::contains)
+                        ?.let {
+                            DragSelectionVisibleItem(
+                                key = it,
+                                start = visible.offset.toFloat(),
+                                end = (visible.offset + visible.size).toFloat(),
+                            )
+                        }
+                },
+                pointerY = pointerWindowY - transcriptWindowTop,
+            ) ?: return false
+        if (endpointId == anchorId && selectedMessages.isEmpty()) return false
+        val nextTimelineIds =
+            anchoredDragSelection(
+                orderedIds = orderedTimelineIds,
+                eligibleIds = selectableTimelineIds,
+                anchorId = anchorId,
+                endpointId = endpointId,
+            )
+        selectedMessages.clear()
+        nextTimelineIds.forEach { timelineId ->
+            timelineSelectionById[timelineId]?.let { selection ->
+                selectedMessages[selection.action.messageId] = selection
+            }
+        }
+        return true
+    }
+
+    fun finishMessageDrag(clearSelection: Boolean) {
+        dragAnchorTimelineId = null
+        dragPointerWindowY = null
+        if (clearSelection) selectedMessages.clear()
+    }
+
+    LaunchedEffect(orderedTimelineIds, selectableTimelineIds) {
+        val anchorId = dragAnchorTimelineId ?: return@LaunchedEffect
+        if (anchorId !in orderedTimelineIds || anchorId !in selectableTimelineIds) {
+            finishMessageDrag(clearSelection = true)
+        }
+    }
+
+    LaunchedEffect(dragAnchorTimelineId, listState) {
+        while (dragAnchorTimelineId != null) {
+            withFrameNanos { }
+            val pointerWindowY = dragPointerWindowY ?: continue
+            val pointerY = pointerWindowY - transcriptWindowTop
+            val scrollDelta =
+                dragSelectionAutoScrollDelta(
+                    pointerY = pointerY,
+                    viewportStart = 0f,
+                    viewportEnd = transcriptHeightPx,
+                    edgeThreshold = dragEdgeThresholdPx,
+                    maxStep = dragMaxScrollStepPx,
+                )
+            if (scrollDelta != 0f) {
+                listState.scrollBy(scrollDelta)
+                updateMessageDragSelection(pointerWindowY)
+            }
+        }
+    }
     val invalidVisibleMessageIds =
         remember(renderedTimeline, selectableMessages) {
             renderedTimeline
@@ -3239,7 +3335,11 @@ internal fun ConversationScreen(
                                 Modifier
                                     .fillMaxSize()
                                     .padding(horizontal = 12.dp)
-                                    .alpha(if (initialTimelineAnchored) 1f else 0f),
+                                    .alpha(if (initialTimelineAnchored) 1f else 0f)
+                                    .onGloballyPositioned { coordinates ->
+                                        transcriptWindowTop = coordinates.positionInWindow().y
+                                        transcriptHeightPx = coordinates.size.height.toFloat()
+                                    },
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 8.dp),
                         ) {
@@ -3434,6 +3534,19 @@ internal fun ConversationScreen(
                                                     }
                                                 }
                                             },
+                                            rangeDragActive = dragAnchorTimelineId == item.id,
+                                            onDragSelectionStart = { pointerWindowY ->
+                                                openActionMenuId = null
+                                                clearTextSelection()
+                                                dragAnchorTimelineId = item.id
+                                                dragPointerWindowY = pointerWindowY
+                                            },
+                                            onDragSelection = { pointerWindowY ->
+                                                dragPointerWindowY = pointerWindowY
+                                                updateMessageDragSelection(pointerWindowY)
+                                            },
+                                            onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
+                                            onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
                                             quickReactionEmojis = quickReactionEmojis,
                                             recentEmojis = recentEmojiRecentsOwner.recents,
                                             onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },

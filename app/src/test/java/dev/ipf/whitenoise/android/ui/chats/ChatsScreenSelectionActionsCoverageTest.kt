@@ -28,6 +28,16 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onMuteToggle = {",
                 end = "\n                        onSelectAll = {",
             )
+        val markReadHelper =
+            source.requiredSection(
+                start = "fun markChatRead(",
+                end = "\n    fun toggleChatMute(",
+            )
+        val muteHelper =
+            source.requiredSection(
+                start = "fun toggleChatMute(",
+                end = "\n    // Hoisted list state",
+            )
 
         assertTrue(
             "selection bar must expose mark-read only for an effective unread selection",
@@ -39,27 +49,30 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "mark-read overflow must route to controller.markAllRead",
-            "controller.markAllRead(item)" in markReadHandler,
+            "markChatRead(item, unread = false)" in markReadHandler &&
+                "controller.markAllRead(item)" in markReadHelper,
         )
         assertTrue(
             "mark-read overflow must exit selection mode",
-            "clearSelection()" in markReadHandler,
+            "clearSelection()" in markReadHelper,
         )
         assertTrue(
             "mark-unread overflow must route to controller.markUnread",
-            "controller.markUnread(item)" in markUnreadHandler,
+            "markChatRead(item, unread = true)" in markUnreadHandler &&
+                "controller.markUnread(item)" in markReadHelper,
         )
         assertTrue(
             "mark-unread overflow must exit selection mode",
-            "clearSelection()" in markUnreadHandler,
+            "clearSelection()" in markReadHelper,
         )
         assertTrue(
             "mute overflow must route to appState.setConversationMuted",
-            "appState.setConversationMuted" in muteHandler,
+            "toggleChatMute(item, singleSelectionMuted)" in muteHandler &&
+                "appState.setConversationMuted" in muteHelper,
         )
         assertTrue(
             "mute overflow must exit selection mode",
-            "clearSelection()" in muteHandler,
+            "clearSelection()" in muteHelper,
         )
     }
 
@@ -121,10 +134,16 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onAddToFolder = {",
                 end = "\n                        onMarkRead = {",
             )
+        val folderPickerHelper =
+            source.requiredSection(
+                start = "fun openFolderPicker(",
+                end = "\n    fun markChatRead(",
+            )
 
         assertTrue(
             "add-to-folder must capture the selected chats as picker targets",
-            "folderHandoff.pickerChatIds" in addToFolderHandler,
+            "openFolderPicker(selectedVisibleItems)" in addToFolderHandler &&
+                "folderHandoff.pickerChatIds" in folderPickerHelper,
         )
         assertTrue(
             "the picker's New-folder entry must hand the targets to the create form",
@@ -160,7 +179,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         }
         assertTrue(
             "the rendered chat list must use the state preserved across the editor swap",
-            "LazyColumn(Modifier.fillMaxSize().clipToBounds(), state = chatListState)" in source,
+            "state = chatListState" in source,
         )
         assertTrue(
             "a folder-chip edit must activate the in-place editor handoff",

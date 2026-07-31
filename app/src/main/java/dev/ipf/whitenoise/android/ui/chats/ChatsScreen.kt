@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,12 +60,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -88,11 +93,14 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
+import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
+import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -131,6 +139,8 @@ internal fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     var pendingBulkDelete by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    var actionSheetChatId by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     // Folder-assignment sheet targets for the current selection, and the
     // create form pre-populated with them when New folder is picked there.
     val folderHandoff = rememberFolderHandoff(appState.activeAccountRef)
@@ -371,6 +381,7 @@ internal fun ChatsScreen(
             )
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
+    val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
 
     fun openGroupFromVisibleList(
         item: ChatListItem,
@@ -389,6 +400,9 @@ internal fun ChatsScreen(
         if (selectionMode) {
             selectedChatIds.retainAll(reconcileChatListSelection(selectedChatIds, visibleChatIds))
         }
+    }
+    LaunchedEffect(visibleChatIds, actionSheetChatId) {
+        if (actionSheetChatId != null && actionSheetChatId !in visibleChatIds) actionSheetChatId = null
     }
     val selectedVisibleItems =
         remember(visibleItems, selectedChatIds.size) {
@@ -424,6 +438,55 @@ internal fun ChatsScreen(
                     ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedConversations
                 } == true
         } ?: false
+
+    fun archiveChats(
+        items: List<ChatListItem>,
+        archive: Boolean,
+    ) {
+        if (items.isEmpty()) return
+        clearSelection()
+        appState.launchMutation {
+            var succeeded = 0
+            items.forEach { item ->
+                if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) succeeded++
+            }
+            if (succeeded > 0) {
+                val pluralRes =
+                    if (archive) {
+                        R.plurals.toast_chat_list_chats_archived
+                    } else {
+                        R.plurals.toast_chat_list_chats_restored
+                    }
+                appState.present(context.resources.getQuantityString(pluralRes, succeeded, succeeded))
+            }
+        }
+    }
+
+    fun openFolderPicker(items: List<ChatListItem>) {
+        folderHandoff.pickerChatIds =
+            items
+                .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
+                .takeIf { it.isNotEmpty() }
+    }
+
+    fun markChatRead(
+        item: ChatListItem,
+        unread: Boolean,
+    ) {
+        clearSelection()
+        appState.launchMutation {
+            if (unread) controller.markUnread(item) else controller.markAllRead(item)
+        }
+    }
+
+    fun toggleChatMute(
+        item: ChatListItem,
+        muted: Boolean,
+    ) {
+        clearSelection()
+        appState.setConversationMuted(item.group.groupIdHex, !muted)
+    }
+
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
     // scroll position for its visibility predicate and drive the animated
     // scroll-to-top on tap. Archived/active sources own separate state. Folder
@@ -436,6 +499,83 @@ internal fun ChatsScreen(
             query = trimmedQuery,
         )
     val chatListState = key(showArchived) { rememberLazyListState() }
+    val density = LocalDensity.current
+    val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
+    val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
+    var chatListWindowTop by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+    var chatListHeightPx by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(0f) }
+    var dragAnchorChatId by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    var dragPointerWindowY by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<Float?>(null) }
+
+    fun updateChatDragSelection(pointerWindowY: Float): Boolean {
+        val anchorId = dragAnchorChatId ?: return false
+        val pointerY = pointerWindowY - chatListWindowTop
+        val endpointId =
+            dragSelectionEndpoint(
+                chatListState.layoutInfo.visibleItemsInfo.mapNotNull { visible ->
+                    val id = visible.key as? String
+                    id
+                        ?.takeIf(visibleChatIds::contains)
+                        ?.let {
+                            DragSelectionVisibleItem(
+                                key = it,
+                                start = visible.offset.toFloat(),
+                                end = (visible.offset + visible.size).toFloat(),
+                            )
+                        }
+                },
+                pointerY,
+            ) ?: return false
+        if (endpointId == anchorId && selectedChatIds.isEmpty()) return false
+        val next =
+            anchoredDragSelection(
+                orderedIds = orderedVisibleChatIds,
+                eligibleIds = visibleChatIds,
+                anchorId = anchorId,
+                endpointId = endpointId,
+            )
+        selectedChatIds.clear()
+        selectedChatIds.addAll(next)
+        return true
+    }
+
+    fun finishChatDrag(clearSelection: Boolean) {
+        dragAnchorChatId = null
+        dragPointerWindowY = null
+        if (clearSelection) selectedChatIds.clear()
+    }
+
+    LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
+        finishChatDrag(clearSelection = true)
+        actionSheetChatId = null
+    }
+    LaunchedEffect(chatListDatasetKey) {
+        if (dragAnchorChatId != null) finishChatDrag(clearSelection = true)
+    }
+
+    LaunchedEffect(dragAnchorChatId, chatListState) {
+        while (dragAnchorChatId != null) {
+            withFrameNanos { }
+            val pointerWindowY = dragPointerWindowY ?: continue
+            val pointerY = pointerWindowY - chatListWindowTop
+            val scrollDelta =
+                dragSelectionAutoScrollDelta(
+                    pointerY = pointerY,
+                    viewportStart = 0f,
+                    viewportEnd = chatListHeightPx,
+                    edgeThreshold = dragEdgeThresholdPx,
+                    maxStep = dragMaxScrollStepPx,
+                )
+            if (scrollDelta != 0f) {
+                chatListState.scrollBy(scrollDelta)
+                updateChatDragSelection(pointerWindowY)
+            }
+        }
+    }
     // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
     // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
     // quick scroll wiggle near the threshold from toggling the button (issue
@@ -595,54 +735,25 @@ internal fun ChatsScreen(
                             val selected = selectedVisibleItems
                             if (selected.isEmpty()) return@ChatListSelectionBar
                             val archive = bulkArchiveAction == ChatListBulkArchiveAction.Archive
-                            clearSelection()
-                            appState.launchMutation {
-                                var succeeded = 0
-                                selected.forEach { item ->
-                                    if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) {
-                                        succeeded++
-                                    }
-                                }
-                                if (succeeded > 0) {
-                                    val pluralRes =
-                                        if (archive) {
-                                            R.plurals.toast_chat_list_chats_archived
-                                        } else {
-                                            R.plurals.toast_chat_list_chats_restored
-                                        }
-                                    appState.present(
-                                        context.resources.getQuantityString(pluralRes, succeeded, succeeded),
-                                    )
-                                }
-                            }
+                            archiveChats(selected, archive)
                         },
                         onDelete = {
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
                         },
                         onAddToFolder = {
-                            folderHandoff.pickerChatIds =
-                                selectedVisibleItems
-                                    .map { it.group.groupIdHex.lowercase(Locale.ROOT) }
-                                    .takeIf { it.isNotEmpty() }
+                            openFolderPicker(selectedVisibleItems)
                         },
                         onMarkRead = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            clearSelection()
-                            appState.launchMutation { controller.markAllRead(item) }
+                            markChatRead(item, unread = false)
                         },
                         onMarkUnread = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            clearSelection()
-                            appState.launchMutation { controller.markUnread(item) }
+                            markChatRead(item, unread = true)
                         },
                         onMuteToggle = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            val nextMuted = !singleSelectionMuted
-                            clearSelection()
-                            appState.setConversationMuted(
-                                item.group.groupIdHex,
-                                nextMuted,
-                            )
+                            toggleChatMute(item, singleSelectionMuted)
                         },
                         onPinToggle = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
@@ -781,7 +892,17 @@ internal fun ChatsScreen(
                             unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
                         )
                     else ->
-                        LazyColumn(Modifier.fillMaxSize().clipToBounds(), state = chatListState) {
+                        LazyColumn(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .clipToBounds()
+                                    .onGloballyPositioned { coordinates ->
+                                        chatListWindowTop = coordinates.positionInWindow().y
+                                        chatListHeightPx = coordinates.size.height.toFloat()
+                                    },
+                            state = chatListState,
+                        ) {
                             itemsIndexed(visibleItems, key = { _, item -> item.id }) { targetIndex, item ->
                                 // Body-match snippet + tap-to-message focus are
                                 // for rows that matched ONLY on an older message
@@ -823,10 +944,21 @@ internal fun ChatsScreen(
                                         bodyMatch = bodyMatch,
                                         onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
                                         onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
-                                        onEnterSelection = {
-                                            selectedChatIds.clear()
-                                            selectedChatIds.addAll(enterChatListSelection(item.id))
+                                        onOpenActions = {
+                                            actionSheetChatId = item.id
                                         },
+                                        onDragSelectionStart = { pointerWindowY ->
+                                            actionSheetChatId = null
+                                            dragAnchorChatId = item.id
+                                            dragPointerWindowY = pointerWindowY
+                                        },
+                                        onDragSelection = { pointerWindowY ->
+                                            dragPointerWindowY = pointerWindowY
+                                            updateChatDragSelection(pointerWindowY)
+                                        },
+                                        onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
+                                        onDragSelectionCancel = { finishChatDrag(clearSelection = true) },
+                                        rangeDragActive = dragAnchorChatId == item.id,
                                         onToggleSelection = {
                                             val updated = toggleChatListSelection(selectedChatIds, item.id)
                                             selectedChatIds.clear()
@@ -905,6 +1037,30 @@ internal fun ChatsScreen(
         }
     }
 
+    actionSheetChatId
+        ?.let { id -> visibleItems.firstOrNull { it.id == id } }
+        ?.let { item ->
+            val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
+            val muted = item.engineMuted() || isLocallyMuted(item.group.groupIdHex)
+            ChatActionSheet(
+                hasUnread = hasUnread,
+                canMarkUnread = !item.removedFromGroup(appState.activeAccount?.accountIdHex),
+                archived = item.group.archived,
+                muted = muted,
+                onMarkRead = { markChatRead(item, unread = false) },
+                onMarkUnread = { markChatRead(item, unread = true) },
+                onAddToFolder = { openFolderPicker(listOf(item)) },
+                onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
+                onMuteToggle = { toggleChatMute(item, muted) },
+                onSelect = {
+                    selectedChatIds.clear()
+                    selectedChatIds.addAll(enterChatListSelection(item.id))
+                },
+                onDelete = { pendingBulkDelete = listOf(item) },
+                onDismiss = { actionSheetChatId = null },
+            )
+        }
+
     folderHandoff.pickerChatIds?.let { targets ->
         ChatFolderPickerSheet(
             appState = appState,
@@ -919,12 +1075,8 @@ internal fun ChatsScreen(
     }
 
     pendingBulkDelete?.let { items ->
-        val count = items.size
-        ConfirmDialog(
-            title = stringResource(R.string.delete_group_confirm),
-            message = pluralStringResource(R.plurals.chat_list_bulk_delete_confirm, count, count),
-            confirmLabel = stringResource(R.string.delete_group_confirm),
-            destructive = true,
+        ChatDeleteConfirmationDialog(
+            count = items.size,
             onConfirm = {
                 pendingBulkDelete = null
                 clearSelection()

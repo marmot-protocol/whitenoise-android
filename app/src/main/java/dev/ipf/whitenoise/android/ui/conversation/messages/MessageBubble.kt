@@ -7,9 +7,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -108,6 +105,7 @@ import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
@@ -312,6 +310,11 @@ internal fun MessageBubble(
     batchSelectable: Boolean,
     selected: Boolean,
     onToggleSelection: () -> Unit,
+    rangeDragActive: Boolean,
+    onDragSelectionStart: (Float) -> Unit,
+    onDragSelection: (Float) -> Boolean,
+    onDragSelectionEnd: () -> Unit,
+    onDragSelectionCancel: () -> Unit,
     quickReactionEmojis: List<String>,
     recentEmojis: List<String>,
     onEmojiUsed: (String) -> Unit,
@@ -768,47 +771,53 @@ internal fun MessageBubble(
                         // before a row-level combinedClickable saw the
                         // long-press — which is why long-press did nothing on a
                         // media bubble while it worked on a text bubble (#262).
-                        // awaitLongPressOrCancellation observes the down WITHOUT
-                        // consuming it (so a quick tap still reaches the child's
-                        // viewer/player) and only fires once the press is held
-                        // past the long-press timeout, at which point it wins
-                        // the gesture and opens the actions menu. It self-cancels
-                        // on movement beyond touch slop, so swipe-to-reply above
-                        // is unaffected.
-                        if (deleted || selectionMode || textSelectionMode) {
+                        // A quick tap still reaches the child's viewer/player.
+                        // Once held, release opens actions while a vertical drag
+                        // switches to anchored batch selection. Horizontal motion
+                        // remains available to swipe-to-reply above.
+                        if (deleted || (selectionMode && !rangeDragActive) || textSelectionMode) {
                             // A deleted message has no actions menu; batch selection
                             // and text selection route the row through their own UI.
                             Modifier
                         } else {
-                            Modifier.pointerInput(record.messageIdHex) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = false)
-                                    val longPress = awaitLongPressOrCancellation(down.id)
-                                    if (longPress != null) {
-                                        longPress.consume()
-                                        val windowPosition =
-                                            rowCoordinates[0]?.let {
-                                                messageBubbleLongPressPositionInWindow(it, longPress.position)
-                                            } ?: return@awaitEachGesture
-                                        val linkDestination =
-                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
-                                        haptics.performHapticFeedback(
-                                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                        )
-                                        if (linkDestination != null) {
-                                            copyMarkdownLink(linkDestination)
-                                            consumePointerInputUntilReleased(down.id)
-                                        } else {
-                                            // Capture the press in window space before
-                                            // opening so both the popover and text
-                                            // selection seed at the finger (#326, #1370).
-                                            longPressWindowPosition = windowPosition
-                                            longPressWindowY = windowPosition.y
-                                            onActionMenuOpenChange(true)
-                                        }
+                            Modifier.longPressOrVerticalDrag(
+                                onLongPressStart = {
+                                    haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                    )
+                                },
+                                onLongPressRelease = { position ->
+                                    val windowPosition =
+                                        rowCoordinates[0]?.let {
+                                            messageBubbleLongPressPositionInWindow(it, position)
+                                        } ?: return@longPressOrVerticalDrag
+                                    val linkDestination =
+                                        markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                    if (linkDestination != null) {
+                                        copyMarkdownLink(linkDestination)
+                                    } else {
+                                        // Capture the press in window space before
+                                        // opening so both the popover and text
+                                        // selection seed at the finger (#326, #1370).
+                                        longPressWindowPosition = windowPosition
+                                        longPressWindowY = windowPosition.y
+                                        onActionMenuOpenChange(true)
                                     }
-                                }
-                            }
+                                },
+                                onDragStart = { position ->
+                                    rowCoordinates[0]
+                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                        ?.let(onDragSelectionStart)
+                                },
+                                onDrag = { position ->
+                                    rowCoordinates[0]
+                                        ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
+                                        ?.let(onDragSelection)
+                                        ?: false
+                                },
+                                onDragEnd = onDragSelectionEnd,
+                                onGestureCancel = onDragSelectionCancel,
+                            )
                         },
                     ).then(
                         // The raw pointerInput above only fires on a physical
