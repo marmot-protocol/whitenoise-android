@@ -4670,7 +4670,7 @@ class WhiteNoiseAppState private constructor(
      */
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
-        draftStore.flush()
+        mutationsScope.launch(Dispatchers.IO) { draftStore.flush() }
     }
 
     private fun applyActiveConversationTransition(groupIdHex: String?) {
