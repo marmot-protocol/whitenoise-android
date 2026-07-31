@@ -2572,6 +2572,16 @@ class ChatsController private constructor(
                     row.lastMessage?.messageIdHex != baselineRow.lastMessage?.messageIdHex
             )
 
+    private fun retireCommittedOptimisticEntriesThrough(
+        state: OptimisticChatListPreviewState,
+        activitySequence: ULong,
+    ) {
+        state.entries.entries.removeAll { (_, entry) ->
+            entry.confirmedMessageIdHex != null &&
+                entry.activitySequence <= activitySequence
+        }
+    }
+
     private fun foldOptimisticChatListBaseline(
         state: OptimisticChatListPreviewState,
         row: ChatListRowFfi,
@@ -2592,10 +2602,10 @@ class ChatsController private constructor(
         var acceptRow = true
         if (match != null) {
             // A coalesced snapshot can skip every earlier successful send.
-            // Once it confirms this entry, all older full previews are
-            // superseded; compact id/sequence tombstones still recognize any
-            // older echo that was already queued by the stream.
-            state.entries.entries.removeAll { (_, entry) -> entry.activitySequence <= match.activitySequence }
+            // Retire older committed previews, whose compact id/sequence
+            // tombstones still recognize queued echoes. Pending previews stay
+            // until their callback can record a confirmed id or roll them back.
+            retireCommittedOptimisticEntriesThrough(state, match.activitySequence)
             // The echo keeps the order assigned when the local send was
             // accepted. If a later authoritative activity already owns the
             // row, consuming this stale echo must not move the row backward.

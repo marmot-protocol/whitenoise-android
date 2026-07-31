@@ -829,6 +829,56 @@ class OptimisticSentPreviewAuthoritativeFoldTest {
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+class OptimisticSentPreviewPendingRetirementTest {
+    @Test
+    fun pendingSendRetiredByNewerEchoStillOwnsItsLateEchoAfterCommit() {
+        val controller = controllerWithRows(row("chat-b", "Zulu", 10uL))
+
+        controller.setChatListVisible(false)
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-1", "pending 1", 20uL))
+        controller.applyOptimisticSentPreview("chat-b", preview("temp-2", "pending 2", 20uL))
+        controller.commitOptimisticSentPreview("chat-b", "temp-2", "confirmed-a")
+        replaceRows(
+            controller,
+            listOf(
+                row("chat-b", "Zulu", 20uL).copy(
+                    lastMessage =
+                        preview(
+                            "confirmed-a",
+                            "pending 2",
+                            20uL,
+                            ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                        ),
+                ),
+            ),
+        )
+        controller.commitOptimisticSentPreview("chat-b", "temp-1", "confirmed-z")
+        controller.applyChatListRow(
+            row("chat-b", "Zulu", 20uL).copy(
+                lastMessage =
+                    preview(
+                        "confirmed-z",
+                        "pending 1",
+                        20uL,
+                        ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    ),
+            ),
+        )
+        controller.setChatListVisible(true)
+
+        assertEquals(
+            "confirmed-a",
+            controller.items
+                .single()
+                .projection
+                ?.lastMessage
+                ?.messageIdHex,
+        )
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
 class OptimisticSentPreviewMetadataTest {
     @Test
     fun pinUpdateDuringPendingSendSurvivesRollback() {
