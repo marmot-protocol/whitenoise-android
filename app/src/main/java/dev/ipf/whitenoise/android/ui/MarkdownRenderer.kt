@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
@@ -183,6 +185,9 @@ internal fun MarkdownMessageBody(
             depth = 0,
             modifier = modifier,
             onLastTextLayout = onLastTextLayout,
+            // Only the document's top-level blocks carry source blank-line
+            // counts; nested lists, quotes and details keep uniform spacing.
+            blankLinesBefore = document.blankLinesBefore,
         )
     }
     pendingLinkUrl?.let { url ->
@@ -250,6 +255,22 @@ internal const val MARKDOWN_MAX_TABLE_COLUMNS = 12
 
 /** One table shares a single cell budget across its header and all body rows. */
 internal const val MARKDOWN_MAX_TABLE_CELLS = MARKDOWN_MAX_CONTAINER_SIBLINGS
+
+/** Vertical gap between adjacent top-level Markdown blocks. */
+internal val MARKDOWN_BLOCK_SPACING = 6.dp
+
+/**
+ * Total gap added per authored blank line beyond the first. See
+ * [markdownBlankRunSpacerHeight] for why the spacer itself is shorter than this.
+ */
+internal val MARKDOWN_BLANK_LINE_HEIGHT = 10.dp
+
+/**
+ * Render-side ceiling on extra blank lines. The parser already clamps its own
+ * count; this bounds it again so hostile input can't push a bubble arbitrarily
+ * tall (#1719).
+ */
+internal const val MARKDOWN_MAX_EXTRA_BLANK_LINES = 6
 
 internal fun <T> markdownVisibleSiblings(items: List<T>): List<T> =
     if (items.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS) items else items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)
@@ -481,16 +502,33 @@ private fun MarkdownBlockList(
     depth: Int,
     modifier: Modifier = Modifier,
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
+    blankLinesBefore: ByteArray = ByteArray(0),
 ) {
     val visibleBlocks = markdownVisibleSiblings(blocks)
     val blocksElided = markdownSiblingsElided(blocks)
-    val groups = remember(visibleBlocks) { groupMarkdownDetailsBlocks(visibleBlocks) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // markdownVisibleSiblings takes a prefix, so visible block indices still
+    // line up with the document's per-block blankLinesBefore entries.
+    val grouped = remember(visibleBlocks) { groupMarkdownDetailsBlocksWithSource(visibleBlocks) }
+    val groups = grouped.groups
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MARKDOWN_BLOCK_SPACING)) {
         groups.forEachIndexed { index, group ->
             // A collapsible has no stable trailing text line, so the inline
             // footer callback only rides the last group when it is a plain block.
             val lastPlainCallback =
                 if (!blocksElided && index == groups.lastIndex) onLastTextLayout else null
+            // One authored blank line is the ordinary paragraph break the Column
+            // spacing already provides; each additional one adds a further gap so
+            // two blank lines read differently from one (#1719). Leading blank
+            // lines stay normalized by the send path, so index 0 is skipped.
+            val extraBlankLines =
+                if (index == 0) {
+                    0
+                } else {
+                    markdownExtraBlankLines(blankLinesBefore, grouped.sourceIndices.getOrNull(index))
+                }
+            if (extraBlankLines > 0) {
+                Spacer(Modifier.height(markdownBlankRunSpacerHeight(extraBlankLines)))
+            }
             when (group) {
                 is MarkdownRenderGroup.Plain ->
                     MarkdownBlockView(group.block, ctx, depth = depth, onTextLayout = lastPlainCallback)
@@ -503,6 +541,28 @@ private fun MarkdownBlockList(
         }
     }
 }
+
+/** Authored blank lines beyond the single one the paragraph gap already represents. */
+internal fun markdownExtraBlankLines(
+    blankLinesBefore: ByteArray,
+    sourceIndex: Int?,
+): Int {
+    val raw = sourceIndex?.let { blankLinesBefore.getOrNull(it) }?.toInt() ?: return 0
+    return (raw - 1).coerceIn(0, MARKDOWN_MAX_EXTRA_BLANK_LINES)
+}
+
+/**
+ * Spacer height for [extraBlankLines] additional authored blank lines.
+ *
+ * The spacer is a [Column] child, so inserting it adds a *second* arrangement
+ * gap between the two blocks (block → spacing → spacer → spacing → block). The
+ * spacer therefore subtracts one [MARKDOWN_BLOCK_SPACING] so the total gap grows
+ * by exactly [MARKDOWN_BLANK_LINE_HEIGHT] per extra line and stays linear —
+ * without it the first extra line would cost one whole spacing more than each
+ * one after it.
+ */
+internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp =
+    (MARKDOWN_BLANK_LINE_HEIGHT * extraBlankLines - MARKDOWN_BLOCK_SPACING).coerceAtLeast(0.dp)
 
 @Composable
 private fun MarkdownElisionMarker(
@@ -695,17 +755,23 @@ private data class MarkdownDetailsOpen(
 )
 
 /**
- * Reassemble multi-block `<details>` groups. A self-contained single-paragraph
- * disclosure is left as a Plain block — [MarkdownBlockView] renders that case
- * inline via [markdownDetailsSection]. An opener with no matching close renders
- * literally (stays Plain), so unterminated markup never swallows the rest.
+ * Render groups plus, for each one, the index of the source block it starts at.
+ * A `<details>` group swallows a variable number of blocks, so group position
+ * alone can't index per-block source metadata like `blankLinesBefore` (#1719).
  */
-internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> {
+internal data class MarkdownGroupedBlocks(
+    val groups: List<MarkdownRenderGroup>,
+    val sourceIndices: List<Int>,
+)
+
+internal fun groupMarkdownDetailsBlocksWithSource(blocks: List<MarkdownBlockFfi>): MarkdownGroupedBlocks {
     val out = ArrayList<MarkdownRenderGroup>()
+    val sources = ArrayList<Int>()
     var index = 0
     while (index < blocks.size) {
         val opener = markdownDetailsOpener(blocks[index])
         val closeIndex = if (opener == null) -1 else markdownDetailsCloseIndex(blocks, index + 1)
+        sources += index
         if (opener == null || closeIndex < 0) {
             out += MarkdownRenderGroup.Plain(blocks[index])
             index += 1
@@ -716,8 +782,16 @@ internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<Ma
             index = closeIndex + 1
         }
     }
-    return out
+    return MarkdownGroupedBlocks(out, sources)
 }
+
+/**
+ * Reassemble multi-block `<details>` groups. A self-contained single-paragraph
+ * disclosure is left as a Plain block — [MarkdownBlockView] renders that case
+ * inline via [markdownDetailsSection]. An opener with no matching close renders
+ * literally (stays Plain), so unterminated markup never swallows the rest.
+ */
+internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> = groupMarkdownDetailsBlocksWithSource(blocks).groups
 
 // A Paragraph whose only lines are the <details> tag (optional same-line
 // summary) and optionally an own-line <summary>. Residual content on the
@@ -955,10 +1029,14 @@ private fun MarkdownListView(
     }
 }
 
+internal const val MARKDOWN_TABLE_DIVIDER_ALPHA = 0.25f
+
+internal const val MARKDOWN_TABLE_DIVIDER_TAG = "markdown_table_row_divider"
+
 /**
- * Simple v1 table: equal-weight columns, a divider under the bolded header
- * row, column alignment honored via [TextAlign]. No per-column intrinsic
- * sizing — acceptable inside a chat bubble's width budget.
+ * Simple v1 table: equal-weight columns, a rule under the bolded header row and
+ * between adjacent body rows, column alignment honored via [TextAlign]. No
+ * per-column intrinsic sizing — acceptable inside a chat bubble's width budget.
  */
 @Composable
 private fun MarkdownTableView(
@@ -968,14 +1046,34 @@ private fun MarkdownTableView(
     val visibleTable = markdownVisibleTable(block.header, block.rows)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx)
-        HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
-        visibleTable.rows.forEach { row ->
+        // An empty body — or a header that exhausted the cell budget — would
+        // otherwise leave a rule under the header separating nothing.
+        if (visibleTable.rows.isNotEmpty()) {
+            MarkdownTableRowDivider()
+        }
+        visibleTable.rows.forEachIndexed { index, row ->
             MarkdownTableRowView(row, block.alignments, header = false, ctx)
+            // Separates adjacent body rows only: a Column child sits below the
+            // whole row, so wrapped cells get one rule after the full row height
+            // rather than one per text line. No trailing rule after the last row,
+            // and none before the elision marker, which is not itself a row.
+            if (index < visibleTable.rows.lastIndex) {
+                MarkdownTableRowDivider()
+            }
         }
         if (visibleTable.rowsElided) {
             MarkdownElisionMarker()
         }
     }
+}
+
+/** Row rule for markdown tables; derives from [LocalContentColor] so it stays visible on every bubble surface. */
+@Composable
+private fun MarkdownTableRowDivider() {
+    HorizontalDivider(
+        modifier = Modifier.testTag(MARKDOWN_TABLE_DIVIDER_TAG),
+        color = LocalContentColor.current.copy(alpha = MARKDOWN_TABLE_DIVIDER_ALPHA),
+    )
 }
 
 @Composable
