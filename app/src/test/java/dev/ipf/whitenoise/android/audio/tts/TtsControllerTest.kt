@@ -39,6 +39,28 @@ class TtsControllerTest {
     }
 
     @Test
+    fun speakableEntryTextIsAlsoTheTransportPreview() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+        val projectedText = "Status. This is important."
+
+        assertTrue(
+            controller.speak(
+                listOf(TtsSpeakableEntry("alice", "Alice", projectedText)),
+                Locale.US,
+            ),
+        )
+
+        assertEquals(projectedText, (controller.state.value as TtsState.Speaking).messagePreview)
+        assertEquals(
+            listOf("Alice: Status.", "This is important."),
+            engine.spoken.map { it.text },
+        )
+    }
+
+    @Test
     fun focusLossPausesAndResumeRestartsTheCurrentChunk() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()

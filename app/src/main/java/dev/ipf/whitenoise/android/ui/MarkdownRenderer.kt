@@ -1279,25 +1279,56 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
  * to the in-app profile sheet in every resolved/unresolved case; the other HRPs
  * (note/nevent/naddr/nrelay) have no in-app destination yet, so they stay inert.
  */
+internal data class MarkdownNostrEntityDisplay(
+    val name: String?,
+    val opensProfile: Boolean,
+    val mentionIsMember: Boolean,
+    val shortened: String,
+) {
+    val memberMention: Boolean = name != null && mentionIsMember
+    val visibleText: String =
+        when {
+            memberMention -> "@$name"
+            name != null -> name
+            else -> (if (mentionIsMember) "@" else "") + shortened
+        }
+}
+
+/**
+ * Shared visible projection for bubbles, speech, and other non-interactive
+ * Markdown surfaces. `@` is a group-membership signal for profile mentions;
+ * without a roster snapshot, preserve the historical member treatment.
+ */
+internal fun markdownNostrEntityDisplay(
+    entity: MarkdownNostrEntityFfi,
+    mention: Boolean,
+    mentionDisplayName: ((String) -> String?)?,
+    isGroupMember: ((String) -> Boolean)?,
+): MarkdownNostrEntityDisplay {
+    val name = if (mention) mentionDisplayName?.invoke(entity.bech32) else null
+    val opensProfile =
+        entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
+    val mentionIsMember =
+        mention &&
+            (!opensProfile || (isGroupMember?.invoke(entity.bech32) ?: true))
+    return MarkdownNostrEntityDisplay(
+        name = name,
+        opensProfile = opensProfile,
+        mentionIsMember = mentionIsMember,
+        shortened = shortenedBech32(entity.bech32),
+    )
+}
+
 private fun AnnotatedString.Builder.appendNostrEntity(
     entity: MarkdownNostrEntityFfi,
     mention: Boolean,
     ctx: MarkdownInlineRenderContext,
 ) {
-    val name = if (mention) ctx.mentionDisplayName?.invoke(entity.bech32) else null
-    val opensProfile =
-        entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
-    // The "@" is a group-membership signal for profile mentions: apply it (and
-    // the bold mention treatment) only when the resolved account is a member of
-    // the roster snapshot. A null resolver means no roster is available, so keep
-    // the pre-#1017 behavior and treat profile mentions as members. Known
-    // non-members drop the prefix even when the profile name is not cached yet.
-    // Non-profile NostrMention nodes keep their historical "@" fallback because
-    // they do not resolve to accounts/roster seats.
-    val mentionIsMember =
-        mention &&
-            (!opensProfile || (ctx.isGroupMember?.invoke(entity.bech32) ?: true))
-    val memberMention = name != null && mentionIsMember
+    val display = markdownNostrEntityDisplay(entity, mention, ctx.mentionDisplayName, ctx.isGroupMember)
+    val name = display.name
+    val opensProfile = display.opensProfile
+    val mentionIsMember = display.mentionIsMember
+    val memberMention = display.memberMention
     // The annotated run borrows the link color (LocalContentColor in the
     // bubble): a Clickable region is painted with ITS OWN TextLinkStyles —
     // when those are null, Material's Text falls back to the theme's default
@@ -1327,12 +1358,7 @@ private fun AnnotatedString.Builder.appendNostrEntity(
             name != null -> ctx.linkStyle
             else -> ctx.codeStyle.copy(color = ctx.linkStyle.color)
         }
-    val visible =
-        when {
-            memberMention -> "@$name"
-            name != null -> name
-            else -> (if (mentionIsMember) "@" else "") + shortenedBech32(entity.bech32)
-        }
+    val visible = display.visibleText
     if (opensProfile) {
         withLink(
             LinkAnnotation.Clickable(
