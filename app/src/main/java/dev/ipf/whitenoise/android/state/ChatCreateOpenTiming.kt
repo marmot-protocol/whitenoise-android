@@ -23,6 +23,9 @@ internal class ChatCreateOpenTiming private constructor() {
         private const val NANOS_PER_MS = 1_000_000L
 
         const val STAGE_CONFIRM_TAP = "confirm_tap"
+        const val STAGE_EXISTING_DM_LOOKUP_START = "existing_dm_lookup_start"
+        const val STAGE_EXISTING_DM_LOOKUP_RETURN = "existing_dm_lookup_return"
+        const val STAGE_EXISTING_DM_LOOKUP_FAILED = "existing_dm_lookup_failed"
         const val STAGE_MDK_CREATE_START = "mdk_create_start"
         const val STAGE_MDK_CREATE_RETURN = "mdk_create_return"
         const val STAGE_AUTHORITATIVE_READ_START = "authoritative_read_start"

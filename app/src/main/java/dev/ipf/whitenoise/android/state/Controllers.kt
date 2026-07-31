@@ -78,6 +78,9 @@ import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
+import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
+import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -3273,6 +3276,91 @@ class ChatsController private constructor(
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
         val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
         return row?.let { projectChatRow(it) }
+    }
+
+    /**
+     * Revalidate picker provenance against the current backing row and an
+     * authoritative local [groupDetails] read (#1701). Uses [chatRowsByGroup],
+     * not the debounced [items] snapshot.
+     */
+    internal suspend fun resolveProvenanceDirectChat(
+        provenanceGroupIdHex: String?,
+        targetReference: String,
+    ): NewMessageDirectChatResolution {
+        val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
+        val account = accountRef ?: return unavailable
+        return resolveDirectChatGroup(
+            account = account,
+            bindAccount = account,
+            epoch = bindEpoch,
+            activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+            groupIdHex = provenanceGroupIdHex,
+            targetReference = targetReference,
+        )
+    }
+
+    /**
+     * Authoritatively search every current direct-chat row except stale picker
+     * provenance. This covers identifier/QR taps and cold member-cache misses,
+     * while refusing creation if any candidate could not be read locally.
+     */
+    internal suspend fun resolveExistingDirectChat(
+        targetReference: String,
+        excludingGroupIdHex: String? = null,
+    ): NewMessageDirectChatResolution {
+        val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
+        val account = accountRef ?: return unavailable
+        val bindAccount = account
+        val epoch = bindEpoch
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+        // The cache is only a priority hint: every candidate is still
+        // revalidated through authoritative group details before opening.
+        val cachedMatchId = existingDirectChat(targetReference)?.id
+        val candidateGroupIds =
+            chatRows
+                .asSequence()
+                .filterNot { it.pendingConfirmation }
+                .map(::projectChatRow)
+                .filter(ChatListItem::isDm)
+                .map { it.id }
+                .filterNot { it.equals(excludingGroupIdHex, ignoreCase = true) }
+                .distinctBy { it.lowercase() }
+                .sortedBy { if (it.equals(cachedMatchId, ignoreCase = true)) 0 else 1 }
+                .toList()
+        return resolveExistingDirectChatCandidates(candidateGroupIds) { groupIdHex ->
+            resolveDirectChatGroup(
+                account = account,
+                bindAccount = bindAccount,
+                epoch = epoch,
+                activeAccountIdHex = activeAccountIdHex,
+                groupIdHex = groupIdHex,
+                targetReference = targetReference,
+            )
+        }
+    }
+
+    private suspend fun resolveDirectChatGroup(
+        account: String,
+        bindAccount: String,
+        epoch: Long,
+        activeAccountIdHex: String?,
+        groupIdHex: String?,
+        targetReference: String,
+    ): NewMessageDirectChatResolution {
+        val normalizedTarget = targetReference.trim()
+        return existingDirectChatFromProvenance(
+            provenanceGroupIdHex = groupIdHex,
+            targetReference = targetReference,
+            activeAccountIdHex = activeAccountIdHex,
+            equivalentTarget = { other -> appState.npub(other).equals(normalizedTarget, ignoreCase = true) },
+            chatItemForGroup = ::chatItemForGroup,
+            authoritativeGroupDetails = { currentGroupIdHex ->
+                runCatchingCancellable {
+                    appState.marmotIo { groupDetails(account, currentGroupIdHex) }
+                }.getOrNull()?.let(::applyAuthoritativeGroupDetails)
+            },
+            accountStillBound = { accountRef == bindAccount && isActiveBindEpoch(epoch) },
+        )
     }
 
     // Lightweight membership probe over the raw rows — no per-row ChatListItem
