@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -111,6 +112,114 @@ class MarkdownMessageBodyTest {
         composeRule.onAllNodesWithText("item-0").assertCountEquals(1)
         composeRule.onAllNodesWithText("item-${MARKDOWN_MAX_CONTAINER_SIBLINGS - 1}").assertCountEquals(1)
         composeRule.onAllNodesWithText("item-$MARKDOWN_MAX_CONTAINER_SIBLINGS").assertCountEquals(0)
+        composeRule.onAllNodesWithText("…").assertCountEquals(1)
+    }
+
+    private fun table(rows: List<List<MarkdownTableCellFfi>>) =
+        MarkdownBlockFfi.Table(
+            alignments = listOf(MarkdownAlignmentFfi.NONE),
+            header = listOf(tableCell("header")),
+            rows = rows,
+        )
+
+    @Test
+    fun headerWithNoBodyRowsRendersNoRuleAtAll() {
+        render(listOf(table(rows = emptyList())))
+
+        // A rule under the header would separate nothing.
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun aWideHeaderStillLeavesBudgetForBodyRowsSoTheRuleRemains() {
+        render(
+            listOf(
+                MarkdownBlockFfi.Table(
+                    alignments = List(MARKDOWN_MAX_TABLE_COLUMNS) { MarkdownAlignmentFfi.NONE },
+                    header = List(MARKDOWN_MAX_TABLE_CELLS + 1) { tableCell("header-$it") },
+                    rows = listOf(listOf(tableCell("alpha"))),
+                ),
+            ),
+        )
+
+        // markdownVisibleTable caps each row at MARKDOWN_MAX_TABLE_COLUMNS, so a
+        // header can never consume the whole cell budget and starve the body.
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(1)
+    }
+
+    @Test
+    fun singleBodyRowKeepsOnlyTheHeaderRuleWithNoTrailingRule() {
+        render(listOf(table(listOf(listOf(tableCell("alpha"))))))
+
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(1)
+    }
+
+    @Test
+    fun threeBodyRowsSeparateTheHeaderAndEachAdjacentPair() {
+        render(
+            listOf(
+                table(
+                    listOf(
+                        listOf(tableCell("alpha")),
+                        listOf(tableCell("beta")),
+                        listOf(tableCell("gamma")),
+                    ),
+                ),
+            ),
+        )
+
+        // One rule under the header plus one between each body-row pair.
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(3)
+    }
+
+    @Test
+    fun wrappedRowContentTakesOneRuleForTheWholeRowNotOnePerLine() {
+        render(
+            listOf(
+                table(
+                    listOf(
+                        listOf(tableCell("wrapped\nsecond line\nthird line")),
+                        listOf(tableCell("beta")),
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(2)
+    }
+
+    @Test
+    fun emptyCellsStillSeparateAdjacentRows() {
+        render(
+            listOf(
+                table(
+                    listOf(
+                        listOf(tableCell("")),
+                        listOf(tableCell("beta")),
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(2)
+    }
+
+    @Test
+    fun truncatedTableKeepsTheElisionMarkerWithoutAnOrphanRule() {
+        render(
+            listOf(
+                MarkdownBlockFfi.Table(
+                    alignments = listOf(MarkdownAlignmentFfi.NONE),
+                    header = listOf(tableCell("header")),
+                    rows = List(MARKDOWN_MAX_CONTAINER_SIBLINGS + 2) { listOf(tableCell("row-$it")) },
+                ),
+            ),
+        )
+
+        // Header rule plus one between each visible body-row pair, and none
+        // before the elision marker, which is not itself a row.
+        val visibleRows = MARKDOWN_MAX_TABLE_CELLS - 1
+        composeRule.onAllNodesWithTag(MARKDOWN_TABLE_DIVIDER_TAG).assertCountEquals(visibleRows)
         composeRule.onAllNodesWithText("…").assertCountEquals(1)
     }
 
