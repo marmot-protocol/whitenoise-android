@@ -112,6 +112,7 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedOnNetworkChange
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
@@ -2563,6 +2564,20 @@ class WhiteNoiseAppState private constructor(
         get() = chatsController?.archivedItems.orEmpty()
 
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
+
+    internal suspend fun resolveProvenanceDirectChat(
+        provenanceGroupIdHex: String?,
+        targetReference: String,
+    ): NewMessageDirectChatResolution =
+        chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference)
+            ?: NewMessageDirectChatResolution(item = null, createRequired = false)
+
+    internal suspend fun resolveExistingDirectChat(
+        targetReference: String,
+        excludingGroupIdHex: String? = null,
+    ): NewMessageDirectChatResolution =
+        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
+            ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
     private fun isActiveConversation(
         accountRef: String,
