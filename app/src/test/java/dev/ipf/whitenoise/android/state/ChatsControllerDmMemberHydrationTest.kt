@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -27,12 +28,20 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ChatsControllerDmMemberHydrationTest {
     @get:Rule val composeRule = createComposeRule()
+    private val boundControllers = mutableListOf<ChatsController>()
+
+    @After
+    fun tearDown() {
+        boundControllers.forEach(ChatsController::onCleared)
+        boundControllers.clear()
+    }
 
     private fun bindDmController(
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
@@ -40,6 +49,7 @@ class ChatsControllerDmMemberHydrationTest {
     ): ChatsController {
         val appState = testAppState()
         val controller = ChatsController(appState, ACCOUNT_REF, loader)
+        boundControllers += controller
         composeRule.setContent {}
         composeRule.runOnIdle {
             controller.setChatListVisible(false)
@@ -77,7 +87,7 @@ class ChatsControllerDmMemberHydrationTest {
     }
 
     @Test
-    fun failedMemberFetchRetriesAndResolvesPeerWithoutExtraRecompute() {
+    fun failedMemberFetchRetriesAndResolvesPeer() {
         var attempts = 0
         var allowSuccess = false
         val controller =
@@ -102,32 +112,6 @@ class ChatsControllerDmMemberHydrationTest {
         }
         assertTrue(attempts >= 2)
         assertEquals(PEER, controller.items.single().otherMemberAccount)
-    }
-
-    @Test
-    fun saturatedRetryBackoffStillSelfHeals() {
-        var attempts = 0
-        var firstAttemptStarted = false
-        var releaseFirstFailure = false
-        val controller =
-            bindDmController { _, _ ->
-                attempts += 1
-                if (attempts == 1) {
-                    firstAttemptStarted = true
-                    while (coroutineContext.isActive && !releaseFirstFailure) {
-                        delay(10)
-                    }
-                    error("transient roster read failure")
-                }
-                listOf(member(ME, local = true), member(PEER, local = false))
-            }
-
-        awaitCondition { firstAttemptStarted }
-        retryBackoffTiers(controller)[DM_GROUP] = Int.MAX_VALUE
-        releaseFirstFailure = true
-
-        awaitCondition(timeoutMs = 15_000) { attempts >= 2 }
-        awaitCondition(timeoutMs = 15_000) { controller.items.single().otherMemberAccount == PEER }
     }
 
     @Test
@@ -339,32 +323,23 @@ class ChatsControllerDmMemberHydrationTest {
                 ),
         )
 
-    @Suppress("UNCHECKED_CAST")
-    private fun retryBackoffTiers(controller: ChatsController): MutableMap<String, Int> {
-        val field = ChatsController::class.java.getDeclaredField("memberFetchRetryBackoffTierByGroup")
-        field.isAccessible = true
-        return field.get(controller) as MutableMap<String, Int>
-    }
-
     private fun drainMainLooperFor(durationMs: Long) {
-        val deadline = System.currentTimeMillis() + durationMs
-        while (System.currentTimeMillis() < deadline) {
-            composeRule.waitForIdle()
-            ShadowLooper.idleMainLooper()
-            Thread.sleep(20)
-        }
+        composeRule.waitForIdle()
+        ShadowLooper.idleMainLooper(durationMs, TimeUnit.MILLISECONDS)
+        composeRule.waitForIdle()
     }
 
     private fun awaitCondition(
         timeoutMs: Long = 5_000,
         condition: () -> Boolean,
     ) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
+        var elapsedMs = 0L
+        while (elapsedMs <= timeoutMs) {
             composeRule.waitForIdle()
             ShadowLooper.idleMainLooper()
             if (condition()) return
-            Thread.sleep(20)
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            elapsedMs += 20
         }
         throw AssertionError("Condition not met within ${timeoutMs}ms")
     }

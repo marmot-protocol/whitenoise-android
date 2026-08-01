@@ -4463,7 +4463,11 @@ class ChatsController private constructor(
                     }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Throwable) {
+                } catch (throwable: Throwable) {
+                    chatsDebug(throwable) {
+                        "member fetch failed group=${groupIdHex.take(8)}: " +
+                            (throwable.message ?: throwable.javaClass.simpleName)
+                    }
                     if (isActiveBindEpoch(epoch)) {
                         scheduleMemberSnapshotRetry(groupIdHex, epoch, cacheEpoch)
                     }
@@ -4499,7 +4503,7 @@ class ChatsController private constructor(
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         val knownSelfRemoval =
             groupIdHex in removedGroupIds ||
-                chatRows.firstOrNull { it.groupIdHex == groupIdHex }?.selfMembership?.isNonMember() == true ||
+                chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
                 groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
         if (!memberSnapshotReadyToCache(members, knownSelfRemoval)) {
             scheduleMemberSnapshotRetry(groupIdHex, epoch, cacheEpoch)
@@ -4535,7 +4539,7 @@ class ChatsController private constructor(
         val shouldRetry =
             isActiveBindEpoch(epoch) &&
                 !memberCacheByGroup.containsKey(groupIdHex) &&
-                chatRows.any { it.groupIdHex == groupIdHex }
+                chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
         if (!shouldRetry) return
         memberFetchRetryBackoffTierByGroup[groupIdHex] =
             if (backoffTier >= MEMBER_FETCH_MAX_BACKOFF_TIER) {

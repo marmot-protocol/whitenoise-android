@@ -289,6 +289,16 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun memberSnapshotReadyToCache_acceptsEmptyRosterWhenSelfRemovalIsKnown() {
+        assertTrue(memberSnapshotReadyToCache(emptyList(), knownSelfRemoval = true))
+    }
+
+    @Test
+    fun memberSnapshotRetryDelay_capsAtMaximumBackoff() {
+        assertEquals(8_000L, memberSnapshotRetryDelayMillis(Int.MAX_VALUE))
+    }
+
+    @Test
     fun memberSnapshotReadyToCache_acceptsDmRosterWithSelf() {
         val members =
             listOf(
