@@ -56,6 +56,24 @@ class ProfileBannerControlTest {
     }
 
     @Test
+    fun profileLoadingNeverFlashesTheEmptyBannerState() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileBannerControl(
+                    bannerUrl = null,
+                    isValid = true,
+                    isUploading = false,
+                    isProfileLoaded = false,
+                    onClick = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(app.getString(R.string.profile_banner_placeholder)).assertDoesNotExist()
+        composeRule.onNodeWithTag(PROFILE_BANNER_CONTROL_TAG).assertIsNotEnabled()
+    }
+
+    @Test
     fun invalidBannerShowsInlineErrorAndRemainsRepairable() {
         var opened = false
         composeRule.setContent {

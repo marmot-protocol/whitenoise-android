@@ -27,9 +27,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
@@ -99,6 +101,8 @@ private enum class GroupImageAction { Apply, Remove, PickPhoto }
 internal enum class ImagePreviewPresentation { Avatar, Banner }
 
 internal const val IMAGE_SEARCH_BANNER_PREVIEW_TAG = "image_search_banner_preview"
+internal const val IMAGE_SEARCH_RESULTS_TAG = "image_search_results"
+internal const val IMAGE_SEARCH_ACTIONS_TAG = "image_search_actions"
 private const val IMAGE_SEARCH_BANNER_ASPECT_RATIO = 3f
 
 @Suppress("FunctionNaming", "LongMethod")
@@ -219,6 +223,8 @@ internal fun ImageSearchSheet(
     removeImageLabel: String? = null,
     applyImageLabel: String? = null,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
+    resultImageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    resultImageCacheLookup: (String) -> ImageBitmap? = { AvatarImageLoader.peek(it) },
 ) {
     // Tracks which button initiated the current in-flight mutation, so the
     // spinner lands on that button while every competing action is disabled.
@@ -318,164 +324,178 @@ internal fun ImageSearchSheet(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .imePadding()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .imePadding(),
         ) {
-            Text(
-                header,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            val subtitleRes =
-                when {
-                    trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
-                    previewUrl == null -> R.string.group_image_search_preview_subtitle_invalid
-                    else -> R.string.group_image_search_preview_subtitle_ready
-                }
-            ImageSearchPreview(
-                title = title,
-                header = header,
-                seed = seed,
-                previewUrl = previewUrl,
-                subtitle = stringResource(subtitleRes),
-                presentation = previewPresentation,
-            )
-            if (onPickPhoto != null) {
-                Button(
-                    onClick = {
-                        photoPicker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    enabled = !applyInFlight,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (applyInFlight && pendingAction == GroupImageAction.PickPhoto) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(resolvedChoosePhotoLabel)
-                }
-            }
-            OutlinedTextField(
-                value = urlDraft,
-                onValueChange = { urlDraft = it },
-                label = { Text(urlLabel) },
-                placeholder = { Text("https://example.com/image.jpg") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                OutlinedTextField(
-                    value = queryDraft,
-                    onValueChange = { queryDraft = it },
-                    label = { Text(stringResource(R.string.group_image_search_query_label)) },
-                    placeholder = { Text(stringResource(R.string.group_image_search_query_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions =
-                        KeyboardOptions(
-                            imeAction = ImeAction.Search,
-                            keyboardType = KeyboardType.Text,
-                        ),
-                    keyboardActions = KeyboardActions(onSearch = { launchSearch() }),
-                )
-                IconButton(
-                    onClick = { launchSearch() },
-                    enabled = !isSearching && queryDraft.trim().isNotEmpty(),
-                ) {
-                    if (isSearching) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = stringResource(R.string.group_image_search_action),
-                        )
-                    }
-                }
-            }
-            Text(
-                stringResource(R.string.group_image_search_privacy),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            searchErrorRes?.let { errRes ->
                 Text(
-                    stringResource(errRes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        if (errRes == noResultsRes || errRes == emptyQueryRes) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
+                    header,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                 )
-            }
-            if (results.isNotEmpty()) {
-                // Bounded height so the grid scrolls inside the sheet rather
-                // than fighting the sheet's own gesture for vertical scrolling.
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 100.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 360.dp),
-                ) {
-                    items(results.distinctBy { it.imageUrl }, key = { it.imageUrl }) { hit ->
-                        GroupImageSearchTile(
-                            hit = hit,
-                            isSelected = hit.imageUrl == trimmedUrl,
-                            onTap = { urlDraft = hit.imageUrl },
-                        )
+                val subtitleRes =
+                    when {
+                        trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
+                        previewUrl == null -> R.string.group_image_search_preview_subtitle_invalid
+                        else -> R.string.group_image_search_preview_subtitle_ready
+                    }
+                ImageSearchPreview(
+                    title = title,
+                    header = header,
+                    seed = seed,
+                    previewUrl = previewUrl,
+                    subtitle = stringResource(subtitleRes),
+                    presentation = previewPresentation,
+                )
+                if (onPickPhoto != null) {
+                    Button(
+                        onClick = {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        enabled = !applyInFlight,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (applyInFlight && pendingAction == GroupImageAction.PickPhoto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        } else {
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(resolvedChoosePhotoLabel)
                     }
                 }
-            }
-            // Destructive "Remove image" only when the group ALREADY has an
-            // avatar — for a group without one there's nothing to remove.
-            // Greyed out while the mutation is running (no double-tap into
-            // a silently no-op'd second call inside withMutationLockResult).
-            if (hasCurrentImage) {
-                TextButton(
-                    onClick = {
-                        pendingAction = GroupImageAction.Remove
-                        onApply(null)
-                    },
-                    enabled = !applyInFlight,
+                OutlinedTextField(
+                    value = urlDraft,
+                    onValueChange = { urlDraft = it },
+                    label = { Text(urlLabel) },
+                    placeholder = { Text("https://example.com/image.jpg") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (applyInFlight && pendingAction == GroupImageAction.Remove) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    } else {
-                        Icon(Icons.Default.Delete, contentDescription = null)
+                    OutlinedTextField(
+                        value = queryDraft,
+                        onValueChange = { queryDraft = it },
+                        label = { Text(stringResource(R.string.group_image_search_query_label)) },
+                        placeholder = { Text(stringResource(R.string.group_image_search_query_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                imeAction = ImeAction.Search,
+                                keyboardType = KeyboardType.Text,
+                            ),
+                        keyboardActions = KeyboardActions(onSearch = { launchSearch() }),
+                    )
+                    IconButton(
+                        onClick = { launchSearch() },
+                        enabled = !isSearching && queryDraft.trim().isNotEmpty(),
+                    ) {
+                        if (isSearching) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = stringResource(R.string.group_image_search_action),
+                            )
+                        }
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Text(resolvedRemoveImageLabel)
+                }
+                Text(
+                    stringResource(R.string.group_image_search_privacy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                searchErrorRes?.let { errRes ->
+                    Text(
+                        stringResource(errRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (errRes == noResultsRes || errRes == emptyQueryRes) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                }
+                if (results.isNotEmpty()) {
+                    // Bounded height so the grid scrolls inside the sheet rather
+                    // than fighting the sheet's own gesture for vertical scrolling.
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 100.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp)
+                                .testTag(IMAGE_SEARCH_RESULTS_TAG),
+                    ) {
+                        items(results.distinctBy { it.imageUrl }, key = { it.imageUrl }) { hit ->
+                            GroupImageSearchTile(
+                                hit = hit,
+                                isSelected = hit.imageUrl == trimmedUrl,
+                                imageLoader = resultImageLoader,
+                                imageCacheLookup = resultImageCacheLookup,
+                                onTap = { urlDraft = hit.imageUrl },
+                            )
+                        }
+                    }
+                }
+                // Destructive "Remove image" only when the group ALREADY has an
+                // avatar — for a group without one there's nothing to remove.
+                // Greyed out while the mutation is running (no double-tap into
+                // a silently no-op'd second call inside withMutationLockResult).
+                if (hasCurrentImage) {
+                    TextButton(
+                        onClick = {
+                            pendingAction = GroupImageAction.Remove
+                            onApply(null)
+                        },
+                        enabled = !applyInFlight,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                    ) {
+                        if (applyInFlight && pendingAction == GroupImageAction.Remove) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(resolvedRemoveImageLabel)
+                    }
                 }
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .testTag(IMAGE_SEARCH_ACTIONS_TAG),
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
@@ -521,17 +541,20 @@ internal fun ImageSearchSheet(
 private fun GroupImageSearchTile(
     hit: ImageSearchResult,
     isSelected: Boolean,
+    imageLoader: suspend (String) -> ImageBitmap?,
+    imageCacheLookup: (String) -> ImageBitmap?,
     onTap: () -> Unit,
 ) {
     val thumbnailKey = hit.thumbnailUrl ?: hit.imageUrl
     val thumbnail by produceState<ImageBitmap?>(
-        initialValue = AvatarImageLoader.peek(thumbnailKey),
+        initialValue = imageCacheLookup(thumbnailKey),
         key1 = thumbnailKey,
     ) {
-        if (value == null) value = AvatarImageLoader.load(thumbnailKey)
+        if (value == null) value = imageLoader(thumbnailKey)
     }
     val borderColor =
         if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val resultDescription = hit.title.ifBlank { hit.sourceHost.orEmpty() }
     Surface(
         modifier =
             Modifier
@@ -539,8 +562,10 @@ private fun GroupImageSearchTile(
                 // TalkBack: announce the current selection so users hear
                 // which thumbnail is staged. Without this, the only cue is
                 // the border color change, which is inaccessible.
-                .semantics { selected = isSelected }
-                .clickable(onClick = onTap),
+                .semantics {
+                    selected = isSelected
+                    contentDescription = resultDescription
+                }.clickable(onClick = onTap),
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
@@ -550,7 +575,7 @@ private fun GroupImageSearchTile(
             if (bmp != null) {
                 Image(
                     bitmap = bmp,
-                    contentDescription = hit.title.ifBlank { hit.sourceHost ?: "" },
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )

@@ -2,17 +2,22 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.common.selectionRowIcon
 
 internal const val CHAT_ROW_SELECTION_INDICATOR_TAG = "chat-row-selection-indicator"
+private val CHAT_ROW_MIN_HEIGHT = 72.dp
 
 @Suppress("FunctionNaming")
 @Composable
@@ -42,32 +48,40 @@ internal fun ChatRowLayout(
     supportingMetadata: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    ListItem(
-        modifier = modifier,
-        leadingContent = leadingContent,
-        headlineContent = {
-            ChatRowTitleLine(
-                title = title,
-                timestampAt = timestampAt,
-                rowHasUnread = rowHasUnread,
-                showTimestamp = !selectionMode,
-            )
-        },
-        supportingContent = {
-            ChatRowSupportingLine(
-                supportingContent = supportingContent,
-                supportingMetadata = supportingMetadata.takeUnless { selectionMode },
-            )
-        },
-        trailingContent =
-            if (selectionMode) {
-                {
-                    ChatRowSelectionIndicator(selected = selected)
+    Row(
+        modifier =
+            modifier
+                .heightIn(min = CHAT_ROW_MIN_HEIGHT)
+                .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leadingContent()
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                ProvideTextStyle(MaterialTheme.typography.bodyLarge) {
+                    ChatRowTitleLine(
+                        title = title,
+                        timestampAt = timestampAt,
+                        rowHasUnread = rowHasUnread,
+                        showTimestamp = !selectionMode,
+                    )
                 }
-            } else {
-                null
-            },
-    )
+            }
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+                    ChatRowSupportingLine(
+                        supportingContent = supportingContent,
+                        supportingMetadata = supportingMetadata.takeUnless { selectionMode },
+                    )
+                }
+            }
+        }
+        if (selectionMode) {
+            Spacer(Modifier.width(12.dp))
+            ChatRowSelectionIndicator(selected = selected)
+        }
+    }
 }
 
 @Suppress("FunctionNaming")
