@@ -218,6 +218,13 @@
     <string name="saving_group">Saving group...</string>
     <string name="no_description">No description</string>
     <string name="info">Info</string>
+    <string name="group_info">Group info</string>
+    <string name="group_identifiers">Group identifiers</string>
+    <string name="mls_group_id">MLS group ID</string>
+    <string name="nostr_group_id">Nostr group ID</string>
+    <string name="group_relays">Group relays</string>
+    <string name="group_relays_description">Relays used to exchange messages for this group.</string>
+    <string name="relay_number">Relay %1$d</string>
     <string name="group_id">Group ID</string>
     <string name="nostr_group">Nostr group</string>
     <string name="relays">Relays</string>

@@ -253,6 +253,7 @@ internal fun GroupDetailsScreen(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
+    var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showMuteDurationDialog by remember { mutableStateOf(false) }
     var showNotifyForDialog by remember { mutableStateOf(false) }
@@ -669,6 +670,16 @@ internal fun GroupDetailsScreen(
         return
     }
 
+    if (showGroupInfo) {
+        GroupInfoScreen(
+            groupIdHex = controller.group.groupIdHex,
+            nostrGroupIdHex = controller.group.nostrGroupIdHex,
+            relays = controller.group.relays,
+            onBack = { showGroupInfo = false },
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -766,6 +777,19 @@ internal fun GroupDetailsScreen(
                                 },
                             )
                         }
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.group_info),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            },
+                            contentPadding = conversationMenuItemPadding,
+                            onClick = {
+                                menuOpen = false
+                                showGroupInfo = true
+                            },
+                        )
                     }
                 },
             )
@@ -1264,34 +1288,6 @@ internal fun GroupDetailsScreen(
                             }
                         }
                     }
-
-                    AppDivider()
-                    SectionHeader(stringResource(R.string.info))
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.spaceLg),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-                    ) {
-                        CopyableValueRow(
-                            label = stringResource(R.string.group_id),
-                            value = controller.group.groupIdHex,
-                            clipboard = clipboard,
-                        )
-                        DiagnosticRow(
-                            stringResource(R.string.nostr_group),
-                            IdentityFormatter.short(controller.group.nostrGroupIdHex),
-                            copyValue = controller.group.nostrGroupIdHex,
-                        )
-                        DiagnosticRow(
-                            stringResource(R.string.relays),
-                            controller.group.relays.size
-                                .toString(),
-                        )
-                        controller.group.relays.forEach { relay ->
-                            Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
                 }
             }
 
@@ -1639,6 +1635,81 @@ internal fun GroupDetailsScreen(
                     onDismiss = { pendingConfirm = null },
                     destructive = true,
                 )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupInfoScreen(
+    groupIdHex: String,
+    nostrGroupIdHex: String,
+    relays: List<String>,
+    onBack: () -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.group_info)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding)
+                    .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+        ) {
+            SectionCard(title = stringResource(R.string.group_identifiers)) {
+                CopyableValueRow(
+                    label = stringResource(R.string.mls_group_id),
+                    value = groupIdHex,
+                    displayValue = IdentityFormatter.short(groupIdHex, prefix = 16, suffix = 12),
+                    clipboard = clipboard,
+                )
+                CopyableValueRow(
+                    label = stringResource(R.string.nostr_group_id),
+                    value = nostrGroupIdHex,
+                    displayValue = IdentityFormatter.short(nostrGroupIdHex, prefix = 16, suffix = 12),
+                    clipboard = clipboard,
+                )
+            }
+
+            SectionCard(title = stringResource(R.string.group_relays)) {
+                Text(
+                    stringResource(R.string.group_relays_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (relays.isEmpty()) {
+                    Text(
+                        stringResource(R.string.no_relays),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    relays.forEachIndexed { index, relay ->
+                        CopyableValueRow(
+                            label = stringResource(R.string.relay_number, index + 1),
+                            value = relay,
+                            clipboard = clipboard,
+                        )
+                    }
+                }
+            }
         }
     }
 }
