@@ -1,14 +1,18 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -113,42 +117,49 @@ class ChatLongPressActionFlowTest {
         val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatListRow(
-                    item = item,
-                    appState = state,
-                    isMuted = false,
-                    selectionMode = rangeActive,
-                    selected = rangeActive,
-                    onOpen = {},
-                    onOpenProfile = {},
-                    onOpenActions = { actionOpens++ },
-                    onDragSelectionStart = {
-                        rangeActive = true
-                        dragStarts++
-                    },
-                    onDragSelection = {
-                        dragMoves++
-                        true
-                    },
-                    onDragSelectionEnd = { dragEnds++ },
-                    onDragSelectionCancel = {},
-                    rangeDragActive = rangeActive,
-                    onToggleSelection = {},
-                )
+                Box(Modifier.testTag(CHAT_DRAG_HOST_TAG)) {
+                    ChatListRow(
+                        item = item,
+                        appState = state,
+                        isMuted = false,
+                        selectionMode = rangeActive,
+                        selected = rangeActive,
+                        onOpen = {},
+                        onOpenProfile = {},
+                        onOpenActions = { actionOpens++ },
+                        onDragSelectionStart = {
+                            rangeActive = true
+                            dragStarts++
+                        },
+                        onDragSelection = {
+                            dragMoves++
+                            true
+                        },
+                        onDragSelectionEnd = { dragEnds++ },
+                        onDragSelectionCancel = {},
+                        rangeDragActive = rangeActive,
+                        onToggleSelection = {},
+                    )
+                }
             }
         }
 
-        composeRule.onNodeWithText(GROUP_NAME).performTouchInput {
+        val chatRow = composeRule.onNodeWithTag(CHAT_DRAG_HOST_TAG)
+        chatRow.performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 24f))
+        }
+        composeRule.waitForIdle()
+        chatRow.performTouchInput {
+            moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 48f))
             up()
         }
         composeRule.waitForIdle()
 
         assertEquals(0, actionOpens)
         assertEquals(1, dragStarts)
-        assertTrue(dragMoves >= 1)
+        assertTrue(dragMoves >= 2)
         assertEquals(1, dragEnds)
     }
 
@@ -297,5 +308,6 @@ class ChatLongPressActionFlowTest {
 
     private companion object {
         const val GROUP_NAME = "Gesture test group"
+        const val CHAT_DRAG_HOST_TAG = "chat-drag-host"
     }
 }

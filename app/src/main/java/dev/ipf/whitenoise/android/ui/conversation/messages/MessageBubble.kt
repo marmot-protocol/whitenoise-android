@@ -720,6 +720,7 @@ internal fun MessageBubble(
         val senderAvatarWidth = if (showSenderAvatar) 40.dp else 0.dp
         val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
+        val replySwipeUnavailable = deleted || readOnly || textSelectionMode
 
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
@@ -742,8 +743,11 @@ internal fun MessageBubble(
                         selected = selected,
                     ).then(
                         // A deleted or selection-mode message has no actionable
-                        // reply gesture; taps are owned by the selection row.
-                        if (deleted || readOnly || selectionMode || textSelectionMode) {
+                        // reply gesture; taps are owned by the selection row. Keep
+                        // the originating row's detector mounted while its range
+                        // drag is active so recomposition cannot break ownership
+                        // of the pointer that is already down.
+                        if (replySwipeUnavailable || longPressBlockedBySelection) {
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {

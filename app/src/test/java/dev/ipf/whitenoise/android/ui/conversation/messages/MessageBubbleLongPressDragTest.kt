@@ -1,14 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
@@ -37,6 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -62,7 +70,7 @@ class MessageBubbleLongPressDragTest {
 
         composeRule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_DRAG_HOST_TAG)) {
                     MessageBubble(
                         item = item,
                         controller = controller,
@@ -110,18 +118,143 @@ class MessageBubbleLongPressDragTest {
             }
         }
 
-        composeRule.onNodeWithText(MESSAGE_BODY).performTouchInput {
+        val messageBubble = composeRule.onNodeWithTag(MESSAGE_DRAG_HOST_TAG)
+        messageBubble.performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 24f))
+        }
+        composeRule.waitForIdle()
+
+        // The first range update enters selection mode and rewrites the row's
+        // visual/input chrome. The same physical pointer must remain owned by
+        // the range detector across that recomposition.
+        messageBubble.performTouchInput {
+            moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 48f))
             up()
         }
         composeRule.waitForIdle()
 
         assertEquals(0, actionOpens)
         assertEquals(1, dragStarts)
-        assertTrue(dragMoves >= 1)
+        assertTrue(dragMoves >= 2)
         assertEquals(1, dragEnds)
+    }
+
+    @Test
+    @Suppress("LongMethod") // Exercises four real MessageBubble rows through their public gesture contract.
+    fun longPressDragSelectsFourMessageRowsWithoutLifting() {
+        val appState = appState()
+        val controller = ConversationController(appState = appState, initialGroup = group())
+        val items = List(4, ::timelineMessage)
+        val composerTextState = ComposerTextState(TextFieldValue(""))
+        val rowBounds = arrayOfNulls<Rect>(items.size)
+        var selectedIds by mutableStateOf(emptySet<String>())
+        var anchorIndex by mutableIntStateOf(-1)
+        var dragEnds = 0
+        var dragCancels = 0
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column(Modifier.testTag(MESSAGE_RANGE_HOST_TAG)) {
+                    items.forEachIndexed { index, item ->
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("message-range-row-$index")
+                                .onGloballyPositioned { rowBounds[index] = it.boundsInWindow() },
+                        ) {
+                            MessageBubble(
+                                item = item,
+                                controller = controller,
+                                appState = appState,
+                                composerTextState = composerTextState,
+                                highlighted = false,
+                                selectionMode = selectedIds.isNotEmpty(),
+                                textSelectionMode = false,
+                                onTextSelectionModeChange = {},
+                                onTextSelectionBoundsChange = {},
+                                batchSelectable = true,
+                                selected = item.record.messageIdHex in selectedIds,
+                                onToggleSelection = {},
+                                rangeDragActive = anchorIndex == index,
+                                onDragSelectionStart = { anchorIndex = index },
+                                onDragSelection = { pointerWindowY ->
+                                    val endpoint =
+                                        rowBounds.indices.minByOrNull { candidate ->
+                                            abs(pointerWindowY - (rowBounds[candidate]?.center?.y ?: Float.MAX_VALUE))
+                                        }
+                                    if (endpoint == null || anchorIndex < 0) {
+                                        false
+                                    } else {
+                                        selectedIds =
+                                            (minOf(anchorIndex, endpoint)..maxOf(anchorIndex, endpoint))
+                                                .mapTo(linkedSetOf()) { items[it].record.messageIdHex }
+                                        true
+                                    }
+                                },
+                                onDragSelectionEnd = {
+                                    dragEnds++
+                                    anchorIndex = -1
+                                },
+                                onDragSelectionCancel = {
+                                    dragCancels++
+                                    anchorIndex = -1
+                                    selectedIds = emptySet()
+                                },
+                                quickReactionEmojis = emptyList(),
+                                recentEmojis = emptyList(),
+                                onEmojiUsed = {},
+                                isActionMenuOpen = false,
+                                onActionMenuOpenChange = {},
+                                onQuickReactionsSave = {},
+                                onQuickReactionsReset = {},
+                                onReplyPreviewClick = {},
+                                composerGate = ComposerGate.COMPOSER,
+                                inviteMutationInFlight = false,
+                                onJoinInvite = {},
+                                onDeclineInvite = {},
+                                mentionCandidates = emptyList(),
+                                mentionPickerEnabled = false,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        val start =
+            composeRule
+                .onNodeWithTag("message-range-row-0")
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val second =
+            composeRule
+                .onNodeWithTag("message-range-row-1")
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val fourth =
+            composeRule
+                .onNodeWithTag("message-range-row-3")
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val root = composeRule.onRoot()
+        root.performTouchInput {
+            down(start)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(second)
+        }
+        composeRule.runOnIdle { assertEquals(2, selectedIds.size) }
+        root.performTouchInput {
+            updatePointerTo(0, fourth)
+            move(100)
+            up()
+        }
+        composeRule.runOnIdle {
+            assertEquals(4, selectedIds.size)
+            assertEquals(1, dragEnds)
+            assertEquals(0, dragCancels)
+        }
     }
 
     private fun appState() =
@@ -143,16 +276,17 @@ class MessageBubbleLongPressDragTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
-    private fun timelineMessage() =
-        TimelineMessage(
-            id = "msg:$MESSAGE_ID",
+    private fun timelineMessage(index: Int = 0): TimelineMessage {
+        val messageId = (5 + index).toString(16).padStart(2, '0') + "00".repeat(31)
+        return TimelineMessage(
+            id = "msg:$messageId",
             record =
                 AppMessageRecordFfi(
-                    messageIdHex = MESSAGE_ID,
+                    messageIdHex = messageId,
                     direction = "received",
                     groupIdHex = GROUP_ID,
                     sender = SENDER_ID,
-                    plaintext = MESSAGE_BODY,
+                    plaintext = "$MESSAGE_BODY $index",
                     contentTokens =
                         MarkdownDocumentFfi(
                             truncated = false,
@@ -169,6 +303,7 @@ class MessageBubbleLongPressDragTest {
                 ),
             status = MessageStatus.Received,
         )
+    }
 
     private fun group() =
         AppGroupRecordFfi(
@@ -229,7 +364,8 @@ class MessageBubbleLongPressDragTest {
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val SENDER_ID = "02" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
-        val MESSAGE_ID = "05" + "00".repeat(31)
         const val MESSAGE_BODY = "Message drag host"
+        const val MESSAGE_DRAG_HOST_TAG = "message-drag-host"
+        const val MESSAGE_RANGE_HOST_TAG = "message-range-host"
     }
 }
