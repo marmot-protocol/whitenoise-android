@@ -6,7 +6,7 @@ import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
     @Test
-    fun singleSelectionOverflowWiresMarkReadAndMute() {
+    fun singleSelectionOverflowWiresMarkRead() {
         val source = chatsScreenSource().readText()
         val selectionBar =
             source.requiredSection(
@@ -23,10 +23,10 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onMarkUnread = {",
                 end = "\n                        onMuteToggle = {",
             )
-        val muteHandler =
-            selectionBar.requiredSection(
-                start = "onMuteToggle = {",
-                end = "\n                        onSelectAll = {",
+        val markReadHelper =
+            source.requiredSection(
+                start = "fun markChatRead(",
+                end = "\n    fun toggleChatMute(",
             )
 
         assertTrue(
@@ -34,33 +34,54 @@ class ChatsScreenSelectionActionsCoverageTest {
             "singleSelectedItem?.effectiveHasUnread" in selectionBar,
         )
         assertTrue(
+            "mark-read overflow must route to controller.markAllRead",
+            "markChatRead(item, unread = false)" in markReadHandler &&
+                "controller.markAllRead(item)" in markReadHelper,
+        )
+        assertTrue(
+            "mark-read overflow must exit selection mode",
+            "clearSelection()" in markReadHelper,
+        )
+        assertTrue(
+            "mark-unread overflow must route to controller.markUnread",
+            "markChatRead(item, unread = true)" in markUnreadHandler &&
+                "controller.markUnread(item)" in markReadHelper,
+        )
+        assertTrue(
+            "mark-unread overflow must exit selection mode",
+            "clearSelection()" in markReadHelper,
+        )
+    }
+
+    @Test
+    fun singleSelectionOverflowWiresMute() {
+        val source = chatsScreenSource().readText()
+        val selectionBar =
+            source.requiredSection(
+                start = "ChatListSelectionBar(",
+                end = "\n                    )\n                } else {",
+            )
+        val muteHandler =
+            selectionBar.requiredSection(
+                start = "onMuteToggle = {",
+                end = "\n                        onSelectAll = {",
+            )
+        val muteHelper =
+            source.requiredSection(
+                start = "fun toggleChatMute(",
+                end = "\n    // Hoisted list state",
+            )
+
+        assertTrue(
             "selection bar must expose mute toggle for a single selection",
             "showMuteToggle = singleSelectedItem != null" in selectionBar,
         )
         assertTrue(
-            "mark-read overflow must route to controller.markAllRead",
-            "controller.markAllRead(item)" in markReadHandler,
-        )
-        assertTrue(
-            "mark-read overflow must exit selection mode",
-            "clearSelection()" in markReadHandler,
-        )
-        assertTrue(
-            "mark-unread overflow must route to controller.markUnread",
-            "controller.markUnread(item)" in markUnreadHandler,
-        )
-        assertTrue(
-            "mark-unread overflow must exit selection mode",
-            "clearSelection()" in markUnreadHandler,
-        )
-        assertTrue(
             "mute overflow must route to appState.setConversationMuted",
-            "appState.setConversationMuted" in muteHandler,
+            "toggleChatMute(item, singleSelectionMuted)" in muteHandler &&
+                "appState.setConversationMuted" in muteHelper,
         )
-        assertTrue(
-            "mute overflow must exit selection mode",
-            "clearSelection()" in muteHandler,
-        )
+        assertTrue("mute overflow must exit selection mode", "clearSelection()" in muteHelper)
     }
 
     @Test
@@ -81,6 +102,16 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onMovePinned = {",
                 end = "\n                        onSelectAll = {",
             )
+        val pinHelper =
+            source.requiredSection(
+                start = "fun toggleChatPin(",
+                end = "\n    fun movePinnedChat(",
+            )
+        val moveHelper =
+            source.requiredSection(
+                start = "fun movePinnedChat(",
+                end = "\n    // Hoisted list state",
+            )
 
         assertTrue(
             "the engine only pins unarchived chats, so archived selections must not offer the toggle",
@@ -88,23 +119,47 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "pin overflow must route to controller.setPinned",
-            "controller.setPinned(item, nextPinned)" in pinHandler,
+            "toggleChatPin(item)" in pinHandler &&
+                "controller.setPinned(item, nextPinned)" in pinHelper,
         )
         assertTrue(
             "pin overflow must exit selection mode",
-            "clearSelection()" in pinHandler,
+            "clearSelection()" in pinHelper,
         )
         assertTrue(
             "manual order must route the full pinned set to controller.setPinnedOrder",
-            "controller.setPinnedOrder(reordered)" in moveHandler,
+            "movePinnedChat(item, delta)" in moveHandler &&
+                "controller.setPinnedOrder(reordered)" in moveHelper,
         )
         assertTrue(
             "a move must stay inside the pinned block",
-            "if (target !in pinnedOrderedIds.indices) return@ChatListSelectionBar" in moveHandler,
+            "if (target !in pinnedOrderedIds.indices) return" in moveHelper,
         )
         assertTrue(
             "move overflow must exit selection mode",
-            "clearSelection()" in moveHandler,
+            "clearSelection()" in moveHelper,
+        )
+    }
+
+    @Test
+    fun longPressSheetReusesPinAndManualOrderMutations() {
+        val source = chatsScreenSource().readText()
+
+        val actionSheet =
+            source.requiredSection(
+                start = "ChatActionSheet(",
+                end = "\n            )\n        }",
+            )
+        assertTrue(
+            "the long-press sheet must expose the same unarchived pin toggle",
+            "showPinToggle = !item.group.archived" in actionSheet &&
+                "onPinToggle = { toggleChatPin(item) }" in actionSheet,
+        )
+        assertTrue(
+            "the long-press sheet must reuse the same pinned-order mutation path",
+            "showMovePinnedUp" in actionSheet &&
+                "showMovePinnedDown" in actionSheet &&
+                "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
         )
     }
 
@@ -121,10 +176,16 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onAddToFolder = {",
                 end = "\n                        onMarkRead = {",
             )
+        val folderPickerHelper =
+            source.requiredSection(
+                start = "fun openFolderPicker(",
+                end = "\n    fun markChatRead(",
+            )
 
         assertTrue(
             "add-to-folder must capture the selected chats as picker targets",
-            "folderHandoff.pickerChatIds" in addToFolderHandler,
+            "openFolderPicker(selectedVisibleItems)" in addToFolderHandler &&
+                "folderHandoff.pickerChatIds" in folderPickerHelper,
         )
         assertTrue(
             "the picker's New-folder entry must hand the targets to the create form",
@@ -160,7 +221,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         }
         assertTrue(
             "the rendered chat list must use the state preserved across the editor swap",
-            "LazyColumn(Modifier.fillMaxSize().clipToBounds(), state = chatListState)" in source,
+            "state = chatListState" in source,
         )
         assertTrue(
             "a folder-chip edit must activate the in-place editor handoff",

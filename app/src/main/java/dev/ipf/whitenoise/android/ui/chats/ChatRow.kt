@@ -29,11 +29,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -53,6 +59,7 @@ import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
@@ -70,10 +77,9 @@ internal fun Modifier.chatListSelectionRow(
         .chatListSelectionRowClickable(onClick)
 
 /**
- * Chat list row with long-press selection entry (#1169). Long-press enters
- * multi-select mode; while active, tap toggles selection and long-press is a
- * no-op. Archive and delete run from the selection bar; mark-read and mute for
- * a single selected chat are in the selection bar overflow.
+ * A stationary long press opens the single-chat actions surface. Continuing
+ * the hold into a vertical drag enters anchored range selection; while
+ * selection is active, tap toggles a row and long press is a no-op.
  */
 @Composable
 internal fun ChatListRow(
@@ -84,7 +90,12 @@ internal fun ChatListRow(
     selected: Boolean,
     onOpen: () -> Unit,
     onOpenProfile: (String) -> Unit,
-    onEnterSelection: () -> Unit,
+    onOpenActions: () -> Unit,
+    onDragSelectionStart: (Float) -> Unit,
+    onDragSelection: (Float) -> Boolean,
+    onDragSelectionEnd: () -> Unit,
+    onDragSelectionCancel: () -> Unit,
+    rangeDragActive: Boolean,
     onToggleSelection: () -> Unit,
     // Non-null when this row matched the chat-list search on a message body
     // (issue #290); drives the highlighted snippet line under the row.
@@ -102,11 +113,16 @@ internal fun ChatListRow(
                 onOpen
             },
         onLongClick =
-            if (selectionMode) {
+            if (selectionMode && !rangeDragActive) {
                 null
             } else {
-                onEnterSelection
+                onOpenActions
             },
+        onDragSelectionStart = onDragSelectionStart,
+        onDragSelection = onDragSelection,
+        onDragSelectionEnd = onDragSelectionEnd,
+        onDragSelectionCancel = onDragSelectionCancel,
+        rangeDragActive = rangeDragActive,
         onOpenProfile = onOpenProfile,
         bodyMatch = bodyMatch,
         isMuted = isMuted,
@@ -139,6 +155,11 @@ internal fun ChatRow(
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
+    onDragSelectionStart: ((Float) -> Unit)? = null,
+    onDragSelection: ((Float) -> Boolean)? = null,
+    onDragSelectionEnd: (() -> Unit)? = null,
+    onDragSelectionCancel: (() -> Unit)? = null,
+    rangeDragActive: Boolean = false,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     isMuted: Boolean = false,
@@ -147,6 +168,12 @@ internal fun ChatRow(
     // highlighted, so the user can see why the chat appeared in the results.
     bodyMatch: MessageBodyMatch? = null,
 ) {
+    val haptics = LocalHapticFeedback.current
+    val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val actionsLabel = stringResource(R.string.actions)
+
+    fun pointerWindowY(position: Offset): Float? = rowCoordinates[0]?.localToWindow(position)?.y
+
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
     // derivedStateOf so the title is only recomputed when its snapshot reads
@@ -179,13 +206,33 @@ internal fun ChatRow(
             ?.takeIf { item.isDm() }
     val rowModifier =
         when {
-            selectionMode ->
+            selectionMode && !rangeDragActive ->
                 Modifier.chatListSelectionRow(
                     selected = selected,
                     onClick = onClick,
                 )
             onLongClick != null ->
-                Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                Modifier
+                    .clickable(onClick = onClick)
+                    .longPressOrVerticalDrag(
+                        onLongPressStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onLongPressRelease = { onLongClick() },
+                        onDragStart = { position ->
+                            pointerWindowY(position)?.let { onDragSelectionStart?.invoke(it) }
+                        },
+                        onDrag = { position ->
+                            pointerWindowY(position)?.let { onDragSelection?.invoke(it) } == true
+                        },
+                        onDragEnd = { onDragSelectionEnd?.invoke() },
+                        onGestureCancel = { onDragSelectionCancel?.invoke() },
+                    ).semantics {
+                        onLongClick(label = actionsLabel) {
+                            onLongClick()
+                            true
+                        }
+                    }.onGloballyPositioned { rowCoordinates[0] = it }
             else -> Modifier.clickable(onClick = onClick)
         }
     val pinned = item.pinned()

@@ -6,7 +6,7 @@ import java.util.Locale
 private val speakableUrl = Regex("(?i)\\b(?:https?://|www\\.)[^\\s<>\\]}\"']+")
 private val speakableScheme = Regex("^[a-z][a-z0-9+.-]*://", RegexOption.IGNORE_CASE)
 private val speakableWhitespace = Regex("\\s+")
-private val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*]|\\{\\s*}")
+private val emptySpeakableDelimiters = Regex("\\(\\s*\\)|\\[\\s*\\]|\\{\\s*\\}")
 private val spaceBeforeSpeakablePunctuation = Regex("\\s+([,.;:!?])")
 
 /** URL-safe last-resort projection when legacy content has no usable Markdown AST. */
