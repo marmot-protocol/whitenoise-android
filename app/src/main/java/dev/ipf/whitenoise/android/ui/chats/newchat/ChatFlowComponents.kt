@@ -33,7 +33,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -173,7 +172,7 @@ internal fun ContactRow(
                             Modifier
                         } else {
                             Modifier
-                                .minimumInteractiveComponentSize()
+                                .fillMaxWidth()
                                 .clickable(
                                     enabled = enabled,
                                     onClickLabel = copyLabel,

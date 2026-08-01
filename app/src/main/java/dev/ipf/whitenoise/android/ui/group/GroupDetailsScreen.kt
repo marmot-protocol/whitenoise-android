@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -1066,12 +1067,12 @@ internal fun GroupDetailsScreen(
             }
 
             if (isDm && dmPeerCandidate != null) {
-                // Use a single divider followed by contiguous preference rows.
-                // Each row already owns its touch
-                // height and vertical padding, so adding inter-item spacing here
-                // makes the contact actions and shared groups look disconnected.
+                // Give the contact actions a small section inset after the
+                // settings divider, then keep the actions and shared groups
+                // contiguous through their own row padding.
                 Column {
                     AppDivider()
+                    Spacer(Modifier.height(Dimens.spaceSm))
                     FlowQuickActionRow(
                         icon = Icons.Default.Group,
                         title = stringResource(R.string.contact_create_group_with, conversationTitle),
@@ -1119,12 +1120,14 @@ internal fun GroupDetailsScreen(
                 Column {
                     AppDivider()
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SectionHeader(
+                        Text(
                             stringResource(R.string.members_count, controller.memberCount),
-                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),
                         )
                         IconButton(
                             onClick = {

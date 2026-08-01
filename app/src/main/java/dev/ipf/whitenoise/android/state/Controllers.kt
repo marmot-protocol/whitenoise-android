@@ -2257,6 +2257,7 @@ internal fun conversationMembershipSeed(
 ): ConversationMembershipSeed {
     val initialMembers = initialMemberSnapshot?.members.orEmpty()
     val projectedNonMember = initialGroup.selfMembership.isNonMember()
+    val projectedMember = initialGroup.selfMembership == SelfMembershipFfi.MEMBER
     val seededMembers =
         if (projectedNonMember) {
             GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
@@ -2264,13 +2265,16 @@ internal fun conversationMembershipSeed(
             initialMembers
         }
     val seededSelfMember =
-        !projectedNonMember &&
-            initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+        projectedMember ||
+            (
+                !projectedNonMember &&
+                    initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+            )
     return ConversationMembershipSeed(
         members = seededMembers,
         membersLoaded = initialMemberSnapshot?.members?.isNotEmpty() == true,
         seededSelfMember = seededSelfMember,
-        seededMembershipKnown = projectedNonMember || initialMemberSnapshot != null,
+        seededMembershipKnown = projectedMember || projectedNonMember || initialMemberSnapshot != null,
         membersVerified = projectedNonMember,
     )
 }
@@ -4669,18 +4673,18 @@ class ConversationController(
     var membersLoaded by mutableStateOf(membershipSeed.membersLoaded)
         private set
 
-    // True when the seeding signals positively place the active account in the
-    // roster. Lets the bottom bar show the active composer immediately for a
-    // known member while refreshMembers() verifies, without flashing the active
-    // composer for a group the user has already left. A projected non-member row
-    // (`selfMembership = REMOVED/LEFT`) is authoritative and overrides any stale
-    // member snapshot that still contains self.
+    // True when the projected self-membership or cached roster positively places
+    // the active account in the group. Lets the bottom bar show the composer
+    // immediately while refreshMembers() verifies, without flashing it for a
+    // group the user has already left. A projected non-member row
+    // (`selfMembership = REMOVED/LEFT`) remains authoritative and overrides any
+    // stale member snapshot that still contains self.
     val seededSelfMember: Boolean = membershipSeed.seededSelfMember
 
     // True when construction received a synchronous membership signal: either a
     // member snapshot (warm from the chat-list cache or shared AppState snapshot)
-    // or the chat-list projection's own self-membership says this account is no
-    // longer in the group. When true, `seededSelfMember` is authoritative.
+    // or the chat-list projection's own self-membership. When true,
+    // `seededSelfMember` is authoritative for the initial composer state.
     //
     // When false there is NO local membership signal yet (genuinely cold open:
     // first-ever open, fresh process, or a row tapped before its background
