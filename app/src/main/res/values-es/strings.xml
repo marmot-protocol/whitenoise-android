@@ -170,6 +170,13 @@
     <string name="saving_group">Guardando grupo...</string>
     <string name="no_description">Sin descripción</string>
     <string name="info">Información</string>
+    <string name="group_info">Información del grupo</string>
+    <string name="group_identifiers">Identificadores del grupo</string>
+    <string name="mls_group_id">ID de grupo MLS</string>
+    <string name="nostr_group_id">ID de grupo Nostr</string>
+    <string name="group_relays">Relés del grupo</string>
+    <string name="group_relays_description">Relés utilizados para intercambiar mensajes en este grupo.</string>
+    <string name="relay_number">Relé %1$d</string>
     <string name="group_id">ID del Grupo</string>
     <string name="nostr_group">grupo Nostr</string>
     <string name="relays">Relés de red</string>

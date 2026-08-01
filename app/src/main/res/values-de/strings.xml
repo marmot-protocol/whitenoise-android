@@ -170,6 +170,13 @@
     <string name="saving_group">Gruppe wird gespeichert...</string>
     <string name="no_description">Keine Beschreibung</string>
     <string name="info">Infos</string>
+    <string name="group_info">Gruppeninfo</string>
+    <string name="group_identifiers">Gruppenkennungen</string>
+    <string name="mls_group_id">MLS-Gruppen-ID</string>
+    <string name="nostr_group_id">Nostr-Gruppen-ID</string>
+    <string name="group_relays">Gruppen-Relays</string>
+    <string name="group_relays_description">Relays, die zum Austausch von Nachrichten für diese Gruppe verwendet werden.</string>
+    <string name="relay_number">Relay-Server %1$d</string>
     <string name="group_id">Gruppen-ID</string>
     <string name="nostr_group">Nostr-Gruppe</string>
     <string name="relays">Netzwerk-Relays</string>

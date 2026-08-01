@@ -184,6 +184,13 @@
     <string name="saving_group">Сохранение группы...</string>
     <string name="no_description">Нет описания</string>
     <string name="info">Информация</string>
+    <string name="group_info">Информация о группе</string>
+    <string name="group_identifiers">Идентификаторы группы</string>
+    <string name="mls_group_id">ID группы MLS</string>
+    <string name="nostr_group_id">ID группы Nostr</string>
+    <string name="group_relays">Ретрансляторы группы</string>
+    <string name="group_relays_description">Ретрансляторы, используемые для обмена сообщениями в этой группе.</string>
+    <string name="relay_number">Ретранслятор %1$d</string>
     <string name="group_id">ID группы</string>
     <string name="nostr_group">Группа Nostr</string>
     <string name="relays">Сетевые реле</string>

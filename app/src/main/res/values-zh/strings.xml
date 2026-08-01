@@ -164,6 +164,13 @@
     <string name="saving_group">正在保存群组...</string>
     <string name="no_description">无描述</string>
     <string name="info">信息</string>
+    <string name="group_info">群组信息</string>
+    <string name="group_identifiers">群组标识符</string>
+    <string name="mls_group_id">MLS 群组 ID</string>
+    <string name="nostr_group_id">Nostr 群组 ID</string>
+    <string name="group_relays">群组中继</string>
+    <string name="group_relays_description">用于交换此群组消息的中继。</string>
+    <string name="relay_number">中继 %1$d</string>
     <string name="group_id">群组 ID</string>
     <string name="nostr_group">Nostr 组</string>
     <string name="relays">网络中继器</string>

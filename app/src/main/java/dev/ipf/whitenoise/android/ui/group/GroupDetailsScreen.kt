@@ -128,7 +128,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -671,6 +670,7 @@ internal fun GroupDetailsScreen(
     }
 
     if (showGroupInfo) {
+        BackHandler { showGroupInfo = false }
         GroupInfoScreen(
             groupIdHex = controller.group.groupIdHex,
             nostrGroupIdHex = controller.group.nostrGroupIdHex,
@@ -1635,81 +1635,6 @@ internal fun GroupDetailsScreen(
                     onDismiss = { pendingConfirm = null },
                     destructive = true,
                 )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GroupInfoScreen(
-    groupIdHex: String,
-    nostrGroupIdHex: String,
-    relays: List<String>,
-    onBack: () -> Unit,
-) {
-    val clipboard = LocalClipboardManager.current
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.group_info)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding)
-                    .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-        ) {
-            SectionCard(title = stringResource(R.string.group_identifiers)) {
-                CopyableValueRow(
-                    label = stringResource(R.string.mls_group_id),
-                    value = groupIdHex,
-                    displayValue = IdentityFormatter.short(groupIdHex, prefix = 16, suffix = 12),
-                    clipboard = clipboard,
-                )
-                CopyableValueRow(
-                    label = stringResource(R.string.nostr_group_id),
-                    value = nostrGroupIdHex,
-                    displayValue = IdentityFormatter.short(nostrGroupIdHex, prefix = 16, suffix = 12),
-                    clipboard = clipboard,
-                )
-            }
-
-            SectionCard(title = stringResource(R.string.group_relays)) {
-                Text(
-                    stringResource(R.string.group_relays_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (relays.isEmpty()) {
-                    Text(
-                        stringResource(R.string.no_relays),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    relays.forEachIndexed { index, relay ->
-                        CopyableValueRow(
-                            label = stringResource(R.string.relay_number, index + 1),
-                            value = relay,
-                            clipboard = clipboard,
-                        )
-                    }
-                }
-            }
         }
     }
 }

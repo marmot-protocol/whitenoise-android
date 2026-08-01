@@ -170,6 +170,13 @@
     <string name="saving_group">Grup kaydediliyor...</string>
     <string name="no_description">Açıklama yok</string>
     <string name="info">Bilgi</string>
+    <string name="group_info">Grup bilgileri</string>
+    <string name="group_identifiers">Grup tanımlayıcıları</string>
+    <string name="mls_group_id">MLS grup kimliği</string>
+    <string name="nostr_group_id">Nostr grup kimliği</string>
+    <string name="group_relays">Grup aktarıcıları</string>
+    <string name="group_relays_description">Bu grup için mesaj alışverişinde kullanılan aktarıcılar.</string>
+    <string name="relay_number">Aktarıcı %1$d</string>
     <string name="group_id">Grup Kimliği</string>
     <string name="nostr_group">Nostr grubu</string>
     <string name="relays">Ağ röleleri</string>
