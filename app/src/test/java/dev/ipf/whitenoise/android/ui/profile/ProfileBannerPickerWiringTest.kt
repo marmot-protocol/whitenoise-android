@@ -9,9 +9,12 @@ import java.io.File
 class ProfileBannerPickerWiringTest {
     @Test
     fun profileBannerUsesDedicatedPickerUploadAndStaleResultState() {
-        val body = profileEditSource().readText().functionBody("ProfileEditScreen")
+        val source = profileEditSource().readText()
+        val body = source.functionBody("ProfileEditScreen")
+        val heroBody = source.functionBody("ProfileHeroHeader")
 
-        assertTrue("header must render the tappable wide banner control", "ProfileBannerControl(" in body)
+        assertTrue("screen must delegate to the profile hero", "ProfileHeroHeader(" in body)
+        assertTrue("hero must render the tappable wide banner control", "ProfileBannerControl(" in heroBody)
         assertTrue(
             "banner picker must use the wide preview",
             "previewPresentation = ImagePreviewPresentation.Banner" in body,

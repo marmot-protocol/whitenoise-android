@@ -643,6 +643,7 @@ internal fun MainShell(
                     justCreated = selectedChatJustCreated,
                     openedAsDmHint = selectedChatOpenedAsDmHint,
                     restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
+                    onOpenConversation = openGroupFromProfile,
                     onSaveScrollSnapshot = { snapshot ->
                         if (snapshot == null) {
                             conversationScrollSnapshots.remove(scrollKey)

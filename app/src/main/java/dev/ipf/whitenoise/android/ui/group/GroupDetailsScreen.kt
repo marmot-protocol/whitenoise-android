@@ -40,8 +40,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -65,6 +65,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -83,10 +84,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -107,6 +110,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -117,13 +121,13 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowQuickActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.chats.newchat.QuickActionButton
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -134,6 +138,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
+import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsSheet
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
@@ -204,6 +209,22 @@ internal fun GroupDetailsLocalDeleteControl(
 
 // Members shown in Group Details before the "See all" expander.
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 6
+private const val SHARED_GROUPS_PREVIEW_COUNT = 3
+
+internal fun directDetailsSharedGroups(
+    groups: List<ChatListItem>,
+    currentGroupIdHex: String,
+): List<ChatListItem> =
+    groups.filter { item ->
+        !item.group.groupIdHex.equals(currentGroupIdHex, ignoreCase = true) &&
+            item.memberCount >= 2 &&
+            (item.memberCount != 2 || item.group.name.isNotBlank())
+    }
+
+internal fun visibleDirectDetailsSharedGroups(
+    groups: List<ChatListItem>,
+    expanded: Boolean,
+): List<ChatListItem> = if (expanded) groups else groups.take(SHARED_GROUPS_PREVIEW_COUNT)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,9 +246,13 @@ internal fun GroupDetailsScreen(
     onAutoOpenAddMemberConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
+    // Shared-group rows and a newly-created group replace the currently open
+    // conversation in the shell without bouncing through the chat list.
+    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
+    var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showMuteDurationDialog by remember { mutableStateOf(false) }
     var showNotifyForDialog by remember { mutableStateOf(false) }
@@ -239,6 +264,10 @@ internal fun GroupDetailsScreen(
     var membersExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var memberSearchOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var memberQuery by remember(controller.group.groupIdHex) { mutableStateOf("") }
+    var sharedGroupsExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var showStartGroupWithContact by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var showAddContactToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var addingContactToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
@@ -293,6 +322,42 @@ internal fun GroupDetailsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     val isDm = controller.isDm
     val conversationTitle = controller.title(groupTitleCopy)
+    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    val dmPeerAccountIdHex =
+        if (isDm) {
+            controller.avatarAccount
+                ?: controller.members
+                    .firstOrNull { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                    ?.memberIdHex
+        } else {
+            null
+        }
+    val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
+    val canShowEditAction =
+        !isDm && !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
+    val dmSharedGroups =
+        remember(dmPeerAccountIdHex, appState.chatListItems, controller.group.groupIdHex) {
+            dmPeerAccountIdHex
+                ?.let(appState::sharedGroupsWith)
+                ?.let { directDetailsSharedGroups(it, controller.group.groupIdHex) }
+                .orEmpty()
+        }
+    val dmAddableGroups =
+        remember(dmPeerAccountIdHex, appState.chatListItems) {
+            dmPeerAccountIdHex?.let(appState::profileAddableGroups).orEmpty()
+        }
+    val dmPeerCandidate =
+        remember(dmPeerAccountIdHex, dmPeerNpub, conversationTitle) {
+            if (dmPeerAccountIdHex != null && dmPeerNpub != null) {
+                RecipientSearch.Candidate(
+                    accountIdHex = dmPeerAccountIdHex,
+                    displayName = conversationTitle,
+                    npub = dmPeerNpub,
+                )
+            } else {
+                null
+            }
+        }
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
     val notificationModes = chatNotificationState.notificationModes
     val conversationNotifyMode =
@@ -594,6 +659,27 @@ internal fun GroupDetailsScreen(
         return
     }
 
+    if (showStartGroupWithContact && dmPeerCandidate != null) {
+        NewGroupFlow(
+            appState = appState,
+            initialMembers = listOf(dmPeerCandidate),
+            onOpenConversation = onOpenConversation,
+            onClose = { showStartGroupWithContact = false },
+        )
+        return
+    }
+
+    if (showGroupInfo) {
+        BackHandler { showGroupInfo = false }
+        GroupInfoScreen(
+            groupIdHex = controller.group.groupIdHex,
+            nostrGroupIdHex = controller.group.nostrGroupIdHex,
+            relays = controller.group.relays,
+            onBack = { showGroupInfo = false },
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -618,7 +704,7 @@ internal fun GroupDetailsScreen(
                         offset = DpOffset(x = (-8).dp, y = 0.dp),
                         modifier = Modifier.widthIn(min = 232.dp),
                     ) {
-                        if (!readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin) {
+                        if (canShowEditAction) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -691,6 +777,19 @@ internal fun GroupDetailsScreen(
                                 },
                             )
                         }
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.group_info),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            },
+                            contentPadding = conversationMenuItemPadding,
+                            onClick = {
+                                menuOpen = false
+                                showGroupInfo = true
+                            },
+                        )
                     }
                 },
             )
@@ -717,15 +816,18 @@ internal fun GroupDetailsScreen(
                 title = controller.title(groupTitleCopy),
                 subtitle =
                     if (isDm) {
-                        controller.subtitle(
-                            justYou = stringResource(R.string.just_you),
-                            oneMember = stringResource(R.string.one_member),
-                            membersFormat = stringResource(R.string.members_count),
-                        )
+                        ""
                     } else {
                         stringResource(R.string.group_details_subtitle, controller.memberCount)
                     },
-                description = controller.group.description,
+                description =
+                    if (isDm) {
+                        dmPeerNpub
+                            ?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
+                            .orEmpty()
+                    } else {
+                        controller.group.description
+                    },
                 // Show the DM peer's avatar + initials seed here — the same
                 // peer metadata the top bar and chat-list row resolve (#837).
                 // A group keeps its own avatar (controller.avatarUrl falls back
@@ -735,11 +837,12 @@ internal fun GroupDetailsScreen(
                 picture = encryptedGroupAvatar,
                 archived = controller.group.archived,
                 onAddDescription =
-                    if (canEdit && controller.group.description.isBlank()) {
+                    if (!isDm && canEdit && controller.group.description.isBlank()) {
                         { showEditGroup = true }
                     } else {
                         null
                     },
+                descriptionCopyValue = dmPeerNpub.takeIf { isDm },
             )
 
             Row(
@@ -763,7 +866,7 @@ internal fun GroupDetailsScreen(
                     enabled = false,
                     modifier = Modifier.weight(1f),
                 )
-                if (canEdit) {
+                if (!isDm && canEdit) {
                     QuickActionButton(
                         icon = Icons.Default.PersonAdd,
                         label = stringResource(R.string.quick_action_add),
@@ -803,124 +906,121 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            AppDivider()
-            SettingsActionRow(
-                icon = Icons.Default.Schedule,
-                title = stringResource(R.string.disappearing_messages),
-                value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages,
-                onClick =
-                    if (canEdit && !mutationsBlocked) {
-                        { showDisappearingPicker = true }
-                    } else {
-                        null
-                    },
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Palette,
-                title = stringResource(R.string.chat_bubble_colors),
-                onClick = { showBubbleColors = true },
-            )
-            // Custom folders containing this chat — manual membership or a
-            // live rule match — so the value tracks membership changes made
-            // anywhere (chat list, Settings, or a rule flipping).
-            val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-            val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
-            val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
-            val folderNames =
-                remember(
-                    folderStoreState,
-                    chatNotificationState,
-                    appState.chatListItems,
-                    appState.profileRevisionForCompose,
-                    folderAccountRef,
-                    chatIdLower,
-                    groupTitleCopy,
-                ) {
-                    val accountRef = folderAccountRef ?: return@remember emptyList()
-                    val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
-                    appState.chatFolderPreferences
-                        .foldersFor(accountRef)
-                        .mapNotNull { folder ->
-                            val manual =
-                                chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
-                            val effective =
-                                chatIdLower in
-                                    chatFolderChatIds(
-                                        items = thisChatRow,
-                                        manualChatIds =
-                                            appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                        rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                        activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                        isMuted = {
-                                            ChatMutePreferences.compositeKey(accountRef, it) in
-                                                chatNotificationState.mutedConversations
-                                        },
-                                        displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                    )
-                            if (effective) folder to manual else null
-                        }
+            Column {
+                AppDivider()
+                SettingsActionRow(
+                    icon = Icons.Default.Schedule,
+                    title = stringResource(R.string.disappearing_messages),
+                    value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                    inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages,
+                    onClick =
+                        if (canEdit && !mutationsBlocked) {
+                            { showDisappearingPicker = true }
+                        } else {
+                            null
+                        },
+                )
+                SettingsActionRow(
+                    icon = Icons.Default.Palette,
+                    title = stringResource(R.string.chat_bubble_colors),
+                    onClick = { showBubbleColors = true },
+                )
+                // Custom folders containing this chat — manual membership or a
+                // live rule match — so the value tracks membership changes made
+                // anywhere (chat list, Settings, or a rule flipping).
+                val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
+                val chatIdLower = controller.group.groupIdHex.lowercase(Locale.ROOT)
+                val folderNames =
+                    remember(
+                        folderStoreState,
+                        chatNotificationState,
+                        appState.chatListItems,
+                        appState.profileRevisionForCompose,
+                        folderAccountRef,
+                        chatIdLower,
+                        groupTitleCopy,
+                    ) {
+                        val accountRef = folderAccountRef ?: return@remember emptyList()
+                        val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                        appState.chatFolderPreferences
+                            .foldersFor(accountRef)
+                            .mapNotNull { folder ->
+                                val manual =
+                                    chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                                val effective =
+                                    chatIdLower in
+                                        chatFolderChatIds(
+                                            items = thisChatRow,
+                                            manualChatIds =
+                                                appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                            rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                                            isMuted = {
+                                                ChatMutePreferences.compositeKey(accountRef, it) in
+                                                    chatNotificationState.mutedConversations
+                                            },
+                                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                                        )
+                                if (effective) folder to manual else null
+                            }
+                    }
+                SettingsActionRow(
+                    icon = Icons.Default.Folder,
+                    title = stringResource(R.string.chat_folders_title),
+                    value =
+                        folderNames
+                            .takeIf { it.isNotEmpty() }
+                            ?.map { (folder, _) -> chatFolderDisplayName(folder) }
+                            ?.joinToString(", ")
+                            ?: stringResource(R.string.chat_folders_none),
+                    onClick = { showFolderPicker = true },
+                )
+                if (showFolderPicker) {
+                    ChatFolderPickerSheet(
+                        appState = appState,
+                        targetChatIds = listOf(chatIdLower),
+                        // Rule-matched membership is visible in the row above but
+                        // not toggleable here — the sheet edits manual membership
+                        // only, so it must say why a checked-looking folder shows
+                        // an unchecked box.
+                        ruleMatchedFolderIds =
+                            folderNames
+                                .filterNot { (_, manual) -> manual }
+                                .mapTo(HashSet()) { (folder, _) -> folder.id },
+                        onCreateFolder = {
+                            showFolderPicker = false
+                            showFolderCreate = true
+                        },
+                        onDismiss = { showFolderPicker = false },
+                    )
                 }
-            SettingsActionRow(
-                icon = Icons.Default.Folder,
-                title = stringResource(R.string.chat_folders_title),
-                value =
-                    folderNames
-                        .takeIf { it.isNotEmpty() }
-                        ?.map { (folder, _) -> chatFolderDisplayName(folder) }
-                        ?.joinToString(", ")
-                        ?: stringResource(R.string.chat_folders_none),
-                onClick = { showFolderPicker = true },
-            )
-            if (showFolderPicker) {
-                ChatFolderPickerSheet(
-                    appState = appState,
-                    targetChatIds = listOf(chatIdLower),
-                    // Rule-matched membership is visible in the row above but
-                    // not toggleable here — the sheet edits manual membership
-                    // only, so it must say why a checked-looking folder shows
-                    // an unchecked box.
-                    ruleMatchedFolderIds =
-                        folderNames.filterNot { (_, manual) -> manual }.mapTo(HashSet()) { (folder, _) -> folder.id },
-                    onCreateFolder = {
-                        showFolderPicker = false
-                        showFolderCreate = true
-                    },
-                    onDismiss = { showFolderPicker = false },
-                )
-            }
-            GroupSwitchActionRow(
-                icon = Icons.AutoMirrored.Filled.WrapText,
-                title = stringResource(R.string.collapse_long_messages),
-                subtitle = stringResource(R.string.collapse_long_messages_subtitle),
-                checked = collapseLongMessages,
-                onCheckedChange = {
-                    appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
-                },
-            )
-            if (appState.ttsHasUsableEngine) {
                 GroupSwitchActionRow(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    title = stringResource(R.string.tts_auto_read_title),
-                    subtitle = stringResource(R.string.tts_auto_read_subtitle),
-                    checked = autoReadEnabled,
+                    icon = Icons.AutoMirrored.Filled.WrapText,
+                    title = stringResource(R.string.collapse_long_messages),
+                    subtitle = stringResource(R.string.collapse_long_messages_subtitle),
+                    checked = collapseLongMessages,
                     onCheckedChange = {
-                        appState.setConversationAutoRead(controller.group.groupIdHex, it)
+                        appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                     },
                 )
+                if (appState.ttsHasUsableEngine) {
+                    GroupSwitchActionRow(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        title = stringResource(R.string.tts_auto_read_title),
+                        subtitle = stringResource(R.string.tts_auto_read_subtitle),
+                        checked = autoReadEnabled,
+                        onCheckedChange = {
+                            appState.setConversationAutoRead(controller.group.groupIdHex, it)
+                        },
+                    )
+                }
+                SettingsActionRow(
+                    icon = Icons.Default.Notifications,
+                    title = stringResource(R.string.sounds_and_notifications),
+                    value = notificationModeLabel(conversationNotifyMode),
+                    onClick = { showNotificationSettings = true },
+                )
             }
-            SettingsActionRow(
-                icon = Icons.Default.Notifications,
-                title = stringResource(R.string.sounds_and_notifications),
-                value = notificationModeLabel(conversationNotifyMode),
-                onClick = { showNotificationSettings = true },
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Fingerprint,
-                title = stringResource(R.string.chat_lock),
-                enabled = false,
-                comingSoon = true,
-            )
 
             if (showDisappearingPicker) {
                 DisappearingMessagesPickerDialog(
@@ -965,184 +1065,229 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            AppDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SectionHeader(
-                    stringResource(R.string.members_count, controller.memberCount),
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = {
-                        memberSearchOpen = !memberSearchOpen
-                        if (!memberSearchOpen) memberQuery = ""
-                    },
-                    modifier = Modifier.padding(end = Dimens.spaceSm),
-                ) {
-                    Icon(
-                        if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
-                        contentDescription = stringResource(R.string.search_members),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (isDm && dmPeerCandidate != null) {
+                // Use a single divider followed by contiguous preference rows.
+                // Each row already owns its touch
+                // height and vertical padding, so adding inter-item spacing here
+                // makes the contact actions and shared groups look disconnected.
+                Column {
+                    AppDivider()
+                    FlowQuickActionRow(
+                        icon = Icons.Default.Group,
+                        title = stringResource(R.string.contact_create_group_with, conversationTitle),
+                        onClick = { showStartGroupWithContact = true },
                     )
-                }
-            }
-            if (memberSearchOpen) {
-                FlowSearchField(
-                    value = memberQuery,
-                    onValueChange = { memberQuery = it },
-                    placeholder = stringResource(R.string.search_members),
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
-                )
-            }
-            if (canEdit) {
-                FlowQuickActionRow(
-                    icon = Icons.Default.PersonAdd,
-                    title = stringResource(R.string.add_member),
-                    enabled = !mutationsBlocked,
-                    onClick = {
-                        showAddMember = true
-                    },
-                )
-            }
-            // #612: render members in a deterministic order — you first,
-            // then other admins alpha by display name, then non-admins
-            // alpha by display name, with memberIdHex as a stable
-            // tiebreaker. Display names are resolved once into a map so
-            // the comparator does pure reads. lowercase(Locale.ROOT) keeps
-            // ordering consistent across device locales (e.g. Turkish I).
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            // Prefetch member profiles here so the title map below can stay a
-            // pure read (contactDisplayNameCached); the profile/nickname
-            // revision key recomposes the sort once names or local aliases land.
-            LaunchedEffect(controller.members) {
-                appState.requestProfiles(controller.members.map { it.memberIdHex })
-            }
-            val memberTitlesByHex =
-                remember(controller.members, appState.profileRevisionForCompose) {
-                    controller.members.associate {
-                        it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
+                    FlowQuickActionRow(
+                        icon = Icons.Default.PersonAdd,
+                        title = stringResource(R.string.contact_add_to_group),
+                        enabled = !addingContactToGroups,
+                        onClick = { showAddContactToGroups = true },
+                    )
+                    if (dmSharedGroups.isNotEmpty()) {
+                        SectionHeader(
+                            pluralStringResource(
+                                R.plurals.contact_groups_in_common,
+                                dmSharedGroups.size,
+                                dmSharedGroups.size,
+                            ),
+                        )
                     }
-                }
-            val displayedMembers =
-                remember(
-                    controller.members,
-                    activeAccountIdHex,
-                    memberTitlesByHex,
-                ) {
-                    controller.members.sortedWith(
-                        compareBy(
-                            { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
-                            { !controller.isAdmin(it) },
-                            { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
-                            { it.memberIdHex.lowercase(Locale.ROOT) },
-                        ),
-                    )
-                }
-            val memberNeedle = memberQuery.trim()
-            val visibleMembers =
-                when {
-                    memberNeedle.isNotEmpty() ->
-                        displayedMembers.filter {
-                            memberTitlesByHex[it.memberIdHex].orEmpty().contains(memberNeedle, ignoreCase = true)
-                        }
-                    membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
-                    else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
-                }
-            if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
-                Text(
-                    stringResource(R.string.no_matches),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                )
-            }
-            // Row taps route into the profile sheet, which carries the same
-            // admin actions (grant/revoke admin, remove) the old per-row menu
-            // exposed (#444/#635 scope rules).
-            GroupMemberIdentityRows(visibleMembers) { _, member ->
-                val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
-                val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
-                ContactRow(
-                    title = controller.memberDisplayName(member),
-                    subtitle =
-                        if (isSelfRow) {
-                            stringResource(R.string.you)
-                        } else {
-                            IdentityFormatter.short(appState.npub(member.memberIdHex))
-                        },
-                    avatarSeed = member.memberIdHex,
-                    avatarUrl = controller.memberAvatarUrl(member),
-                    onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
-                    trailing = {
-                        if (rowMutation != null) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else if (controller.isAdmin(member)) {
-                            Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                                Text(
-                                    stringResource(R.string.admin),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-            if (memberNeedle.isEmpty() && !membersExpanded && displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT) {
-                FlowQuickActionRow(
-                    icon = Icons.Default.ExpandMore,
-                    title = stringResource(R.string.see_all_members, displayedMembers.size),
-                    onClick = { membersExpanded = true },
-                )
-            }
-            if (pendingInvites.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                ) {
-                    pendingInvites.forEach { invite ->
-                        // Pending invites stay non-actionable, but a tap
-                        // copies the full invite key to the clipboard.
-                        AssistChip(
-                            onClick = {
-                                clipboard.setText(AnnotatedString(invite))
-                            },
-                            label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
-                            leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                    visibleDirectDetailsSharedGroups(dmSharedGroups, sharedGroupsExpanded).forEach { sharedGroup ->
+                        ContactRow(
+                            title = chatListItemDisplayTitle(sharedGroup, appState, groupTitleCopy),
+                            subtitle = stringResource(R.string.members_count, sharedGroup.memberCount),
+                            avatarSeed = sharedGroup.group.groupIdHex,
+                            avatarUrl = sharedGroup.group.avatarUrl,
+                            avatarImage = rememberEncryptedGroupAvatar(appState, sharedGroup.group),
+                            onClick = { onOpenConversation(sharedGroup, false) },
+                        )
+                    }
+                    if (!sharedGroupsExpanded && dmSharedGroups.size > SHARED_GROUPS_PREVIEW_COUNT) {
+                        FlowQuickActionRow(
+                            icon = Icons.Default.ExpandMore,
+                            title = stringResource(R.string.contact_groups_see_all),
+                            onClick = { sharedGroupsExpanded = true },
                         )
                     }
                 }
             }
 
-            AppDivider()
-            SectionHeader(stringResource(R.string.info))
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLg),
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-            ) {
-                CopyableValueRow(
-                    label = stringResource(R.string.group_id),
-                    value = controller.group.groupIdHex,
-                    clipboard = clipboard,
-                )
-                DiagnosticRow(
-                    stringResource(R.string.nostr_group),
-                    IdentityFormatter.short(controller.group.nostrGroupIdHex),
-                    copyValue = controller.group.nostrGroupIdHex,
-                )
-                DiagnosticRow(
-                    stringResource(R.string.relays),
-                    controller.group.relays.size
-                        .toString(),
-                )
-                controller.group.relays.forEach { relay ->
-                    Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            if (!isDm) {
+                // Keep the member header, add action, identities and technical
+                // info in one contiguous list section. ContactRow/FlowQuickActionRow
+                // already provide Material touch heights and internal padding.
+                Column {
+                    AppDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SectionHeader(
+                            stringResource(R.string.members_count, controller.memberCount),
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = {
+                                memberSearchOpen = !memberSearchOpen
+                                if (!memberSearchOpen) memberQuery = ""
+                            },
+                            modifier = Modifier.padding(end = Dimens.spaceSm),
+                        ) {
+                            Icon(
+                                if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = stringResource(R.string.search_members),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (memberSearchOpen) {
+                        FlowSearchField(
+                            value = memberQuery,
+                            onValueChange = { memberQuery = it },
+                            placeholder = stringResource(R.string.search_members),
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
+                        )
+                    }
+                    if (canEdit) {
+                        FlowQuickActionRow(
+                            icon = Icons.Default.PersonAdd,
+                            title = stringResource(R.string.add_member),
+                            enabled = !mutationsBlocked,
+                            onClick = {
+                                showAddMember = true
+                            },
+                        )
+                    }
+                    // #612: render members in a deterministic order — you first,
+                    // then other admins alpha by display name, then non-admins
+                    // alpha by display name, with memberIdHex as a stable
+                    // tiebreaker. Display names are resolved once into a map so
+                    // the comparator does pure reads. lowercase(Locale.ROOT) keeps
+                    // ordering consistent across device locales (e.g. Turkish I).
+                    // Prefetch member profiles here so the title map below can stay a
+                    // pure read (contactDisplayNameCached); the profile/nickname
+                    // revision key recomposes the sort once names or local aliases land.
+                    LaunchedEffect(controller.members) {
+                        appState.requestProfiles(controller.members.map { it.memberIdHex })
+                    }
+                    val memberTitlesByHex =
+                        remember(controller.members, appState.profileRevisionForCompose) {
+                            controller.members.associate {
+                                it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
+                            }
+                        }
+                    val displayedMembers =
+                        remember(
+                            controller.members,
+                            activeAccountIdHex,
+                            memberTitlesByHex,
+                        ) {
+                            controller.members.sortedWith(
+                                compareBy(
+                                    { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
+                                    { !controller.isAdmin(it) },
+                                    { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
+                                    { it.memberIdHex.lowercase(Locale.ROOT) },
+                                ),
+                            )
+                        }
+                    val memberNeedle = memberQuery.trim()
+                    val visibleMembers =
+                        when {
+                            memberNeedle.isNotEmpty() ->
+                                displayedMembers.filter {
+                                    memberTitlesByHex[it.memberIdHex]
+                                        .orEmpty()
+                                        .contains(memberNeedle, ignoreCase = true)
+                                }
+                            membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
+                            else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                        }
+                    if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                        Text(
+                            stringResource(R.string.no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                        )
+                    }
+                    // Row taps route into the profile sheet, which carries the same
+                    // admin actions (grant/revoke admin, remove) the old per-row menu
+                    // exposed (#444/#635 scope rules).
+                    GroupMemberIdentityRows(visibleMembers) { _, member ->
+                        val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+                        val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
+                        val memberNpub = appState.npub(member.memberIdHex)
+                        ContactRow(
+                            title = controller.memberDisplayName(member),
+                            subtitle =
+                                if (isSelfRow) {
+                                    stringResource(R.string.you)
+                                } else {
+                                    IdentityFormatter.short(memberNpub)
+                                },
+                            avatarSeed = member.memberIdHex,
+                            avatarUrl = controller.memberAvatarUrl(member),
+                            onSubtitleClick =
+                                if (isSelfRow) {
+                                    null
+                                } else {
+                                    { clipboard.setText(AnnotatedString(memberNpub)) }
+                                },
+                            onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
+                            trailing = {
+                                if (rowMutation != null) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else if (controller.isAdmin(member)) {
+                                    Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                        Text(
+                                            stringResource(R.string.admin),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    val canExpandMembers =
+                        memberNeedle.isEmpty() &&
+                            !membersExpanded &&
+                            displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
+                    if (canExpandMembers) {
+                        FlowQuickActionRow(
+                            icon = Icons.Default.ExpandMore,
+                            title = stringResource(R.string.see_all_members, displayedMembers.size),
+                            onClick = { membersExpanded = true },
+                        )
+                    }
+                    if (pendingInvites.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                        ) {
+                            pendingInvites.forEach { invite ->
+                                // Pending invites stay non-actionable, but a tap
+                                // copies the full invite key to the clipboard.
+                                AssistChip(
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(invite))
+                                    },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                R.string.invite_pending,
+                                                IdentityFormatter.short(invite),
+                                            ),
+                                        )
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1189,100 +1334,123 @@ internal fun GroupDetailsScreen(
             // sole-admin and sole-member cases get their own confirm copy. On
             // failure the controller's lastMutationError surfaces inline here
             // (in addition to the snackbar) so the user can retry in place.
-            AppDivider()
-            val selfMember =
-                controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-            if (canEdit && selfMember != null) {
-                DangerActionRow(
-                    icon = Icons.Default.Shield,
-                    title = stringResource(R.string.step_down_as_admin),
-                    enabled = !mutationsBlocked,
-                    inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
-                    onClick = {
-                        pendingConfirm =
-                            if (controller.isSoleAdminWithOtherMembers) {
-                                DetailsConfirm.StepDownSoleAdmin
-                            } else {
-                                DetailsConfirm.StepDownAdmin(selfMember)
-                            }
-                    },
-                )
-            }
-            if (!readOnlyInvite) {
-                DangerActionRow(
-                    icon = Icons.Default.Archive,
-                    title =
-                        stringResource(
-                            if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat,
-                        ),
-                    enabled = !mutationsBlocked,
-                    inProgress = activeMutation?.action == GroupMutationAction.Archive,
-                    onClick = {
-                        runGroupMutation(
-                            action = GroupMutationAction.Archive,
-                            mutation = { controller.setArchived(!controller.group.archived) },
-                        )
-                    },
-                )
-            }
-            if (controller.isSelfMember) {
-                controller.lastMutationError?.let { error ->
-                    Text(
-                        error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+            Column {
+                AppDivider()
+                val selfMember =
+                    controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                if (!isDm && canEdit && selfMember != null) {
+                    DangerActionRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.step_down_as_admin),
+                        enabled = !mutationsBlocked,
+                        inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                        onClick = {
+                            pendingConfirm =
+                                if (controller.isSoleAdminWithOtherMembers) {
+                                    DetailsConfirm.StepDownSoleAdmin
+                                } else {
+                                    DetailsConfirm.StepDownAdmin(selfMember)
+                                }
+                        },
                     )
                 }
-                DangerActionRow(
-                    icon = Icons.AutoMirrored.Filled.Logout,
-                    title = stringResource(R.string.leave_group),
-                    // The engine refuses Leave for disbanding/terminal groups;
-                    // local delete below is the exit for a dead group.
-                    enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
-                    inProgress = activeMutation?.action == GroupMutationAction.Leave,
-                    onClick = { requestLeave(controller.title(groupTitleCopy)) },
-                )
-                GroupDetailsDisbandControls(
-                    management = controller.managementState,
+                if (!readOnlyInvite) {
+                    DangerActionRow(
+                        icon = Icons.Default.Archive,
+                        title =
+                            stringResource(
+                                if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat,
+                            ),
+                        enabled = !mutationsBlocked,
+                        inProgress = activeMutation?.action == GroupMutationAction.Archive,
+                        onClick = {
+                            runGroupMutation(
+                                action = GroupMutationAction.Archive,
+                                mutation = { controller.setArchived(!controller.group.archived) },
+                            )
+                        },
+                    )
+                }
+                if (controller.isSelfMember) {
+                    DangerActionRow(
+                        icon = Icons.AutoMirrored.Filled.Logout,
+                        title = stringResource(if (isDm) R.string.leave_chat else R.string.leave_group),
+                        // The engine refuses Leave for disbanding/terminal groups;
+                        // local delete below is the exit for a dead group.
+                        enabled = !mutationsBlocked && controller.membersLoaded && !groupTerminal,
+                        inProgress = activeMutation?.action == GroupMutationAction.Leave,
+                        onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                    )
+                    if (!isDm) {
+                        GroupDetailsDisbandControls(
+                            management = controller.managementState,
+                            enabled = !mutationsBlocked,
+                            enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
+                            disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
+                            onEnable = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.EnableDisbanding,
+                                    mutation = { controller.enableGroupDisbanding() },
+                                )
+                            },
+                            onDisbandConfirmed = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.Disband,
+                                    mutation = { controller.disbandGroup() },
+                                )
+                            },
+                            onAcknowledgeFailure = {
+                                runGroupMutation(
+                                    action = GroupMutationAction.Disband,
+                                    mutation = { controller.acknowledgeDisbandFailure() },
+                                )
+                            },
+                        )
+                    }
+                }
+                GroupDetailsLocalDeleteControl(
+                    readOnlyInvite = readOnlyInvite,
+                    isSelfMember = controller.isSelfMember,
+                    membersVerified = controller.membersVerified,
                     enabled = !mutationsBlocked,
-                    enableInProgress = activeMutation?.action == GroupMutationAction.EnableDisbanding,
-                    disbandInProgress = activeMutation?.action == GroupMutationAction.Disband,
-                    onEnable = {
+                    inProgress = activeMutation?.action == GroupMutationAction.Delete,
+                    onDeleteConfirmed = {
                         runGroupMutation(
-                            action = GroupMutationAction.EnableDisbanding,
-                            mutation = { controller.enableGroupDisbanding() },
-                        )
-                    },
-                    onDisbandConfirmed = {
-                        runGroupMutation(
-                            action = GroupMutationAction.Disband,
-                            mutation = { controller.disbandGroup() },
-                        )
-                    },
-                    onAcknowledgeFailure = {
-                        runGroupMutation(
-                            action = GroupMutationAction.Disband,
-                            mutation = { controller.acknowledgeDisbandFailure() },
+                            action = GroupMutationAction.Delete,
+                            mutation = { controller.deleteGroupLocal() },
+                            onSuccess = onLeft,
                         )
                     },
                 )
             }
-            GroupDetailsLocalDeleteControl(
-                readOnlyInvite = readOnlyInvite,
-                isSelfMember = controller.isSelfMember,
-                membersVerified = controller.membersVerified,
-                enabled = !mutationsBlocked,
-                inProgress = activeMutation?.action == GroupMutationAction.Delete,
-                onDeleteConfirmed = {
-                    runGroupMutation(
-                        action = GroupMutationAction.Delete,
-                        mutation = { controller.deleteGroupLocal() },
-                        onSuccess = onLeft,
-                    )
-                },
-            )
         }
+    }
+    if (showAddContactToGroups && dmPeerAccountIdHex != null) {
+        ProfileAddToGroupsSheet(
+            appState = appState,
+            targetName = conversationTitle,
+            groups = dmAddableGroups,
+            busy = addingContactToGroups,
+            onDismiss = {
+                if (!addingContactToGroups) showAddContactToGroups = false
+            },
+            onAdd = { selected ->
+                if (addingContactToGroups) return@ProfileAddToGroupsSheet
+                addingContactToGroups = true
+                appState.launchMutation {
+                    try {
+                        val allAdded =
+                            appState.inviteProfileToGroups(
+                                targetRef = dmPeerAccountIdHex,
+                                targetGroupIds = selected.map { it.group.groupIdHex },
+                            )
+                        if (allAdded) showAddContactToGroups = false
+                    } finally {
+                        addingContactToGroups = false
+                    }
+                }
+            },
+        )
     }
     if (showTransferAdmin) {
         TransferAdminSheet(
@@ -1481,7 +1649,9 @@ internal fun GroupDetailsHeader(
     picture: ImageBitmap? = null,
     archived: Boolean,
     onAddDescription: (() -> Unit)? = null,
+    descriptionCopyValue: String? = null,
 ) {
+    val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val avatarImageAvailable = picture != null || remoteImageAvailable
@@ -1517,19 +1687,58 @@ internal fun GroupDetailsHeader(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (description.isNotBlank()) {
+            if (subtitle.isNotBlank()) {
                 Text(
-                    description,
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (description.isNotBlank()) {
+                val copyValue = descriptionCopyValue
+                if (copyValue == null) {
+                    Text(
+                        description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    val copyLabel = stringResource(R.string.copy)
+                    Row(
+                        modifier =
+                            Modifier
+                                .widthIn(max = 320.dp)
+                                .minimumInteractiveComponentSize()
+                                .semantics { contentDescription = copyValue }
+                                .clickable(
+                                    onClickLabel = copyLabel,
+                                    role = Role.Button,
+                                ) {
+                                    clipboard.setText(AnnotatedString(copyValue))
+                                },
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             } else if (onAddDescription != null) {
                 TextButton(onClick = onAddDescription) {
                     Text(stringResource(R.string.add_group_description))

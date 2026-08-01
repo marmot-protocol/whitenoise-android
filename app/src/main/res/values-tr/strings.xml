@@ -142,6 +142,13 @@
     <string name="profile_shared_groups">Ortak gruplar</string>
     <string name="profile_no_shared_groups">Henüz ortak grup yok.</string>
     <string name="profile_start_new_group_with">%1$s ile yeni grup başlat</string>
+    <string name="contact_create_group_with">%1$s ile grup oluştur</string>
+    <string name="contact_add_to_group">Gruba ekle</string>
+    <string name="contact_groups_see_all">Tümünü göster</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d ortak grup</item>
+        <item quantity="other">%1$d ortak grup</item>
+    </plurals>
     <string name="profile_add_to_another_group">Başka bir gruba ekle</string>
     <string name="new_group_invited_members">Davet edilen üyeler</string>
     <string name="profile_add_to_groups_title">%1$s kullanıcısını gruplara ekle</string>
@@ -149,6 +156,7 @@
     <string name="profile_add_to_groups_confirm_title">Seçili gruplara eklensin mi?</string>
     <string name="profile_add_to_groups_confirm_message">%1$s, %2$s gruplarına eklenecek. Bu tüm üyeler tarafından görülebilir.</string>
     <string name="profile_add_to_groups_confirm_label">Gruplara ekle</string>
+    <string name="profile_no_addable_groups">Bu kişiyi ekleyebileceğiniz bir grup yok.</string>
     <string name="profile_view_picture">Profil resmini görüntüle</string>
     <string name="profile_name_from_profile">Ad (profilden): %1$s</string>
     <string name="profile_nickname_and_notes">Takma ad ve notlar</string>
@@ -162,6 +170,13 @@
     <string name="saving_group">Grup kaydediliyor...</string>
     <string name="no_description">Açıklama yok</string>
     <string name="info">Bilgi</string>
+    <string name="group_info">Grup bilgileri</string>
+    <string name="group_identifiers">Grup tanımlayıcıları</string>
+    <string name="mls_group_id">MLS grup kimliği</string>
+    <string name="nostr_group_id">Nostr grup kimliği</string>
+    <string name="group_relays">Grup aktarıcıları</string>
+    <string name="group_relays_description">Bu grup için mesaj alışverişinde kullanılan aktarıcılar.</string>
+    <string name="relay_number">Aktarıcı %1$d</string>
     <string name="group_id">Grup Kimliği</string>
     <string name="nostr_group">Nostr grubu</string>
     <string name="relays">Ağ röleleri</string>
@@ -881,6 +896,7 @@
     <string name="profile_banner_remove">Bannerı kaldır</string>
     <string name="profile_banner_apply">Bu bannerı kullan</string>
     <string name="toast_couldnt_upload_profile_banner">Profil bannerı yüklenemedi.</string>
+    <string name="toast_couldnt_load_profile">Profil yüklenemedi.</string>
     <string name="profile_banner_hint">İsteğe bağlı herkese açık HTTPS banner URL\'si</string>
     <string name="profile_banner_invalid">Yalnızca herkese açık HTTPS görsel URL\'lerine izin verilir.</string>
     <string name="toast_couldnt_upload_profile_image">Profil görseli yüklenemedi.</string>

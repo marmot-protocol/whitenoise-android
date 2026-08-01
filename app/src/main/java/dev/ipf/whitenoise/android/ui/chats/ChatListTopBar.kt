@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chat-list-filter-chip-all"
+internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
 internal fun chatListFilterChipTag(folderId: String): String = "chat-list-filter-chip-$folderId"
 
@@ -107,22 +108,24 @@ internal fun ChatListTopBar(
                                 imeAction = ImeAction.Search,
                             ),
                     )
-                // Connecting / JustConnected sit immediately right of the active
-                // avatar; other signed-in accounts follow. Search mode hides the
-                // inline chrome so it cannot overlap the field.
+                // Keep every account avatar together: the active avatar is the
+                // navigation icon, then the other signed-in accounts render here,
+                // and Connecting / JustConnected follows the complete avatar
+                // cluster. Search mode hides this inline chrome so it cannot
+                // overlap the field.
                 else ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ChatListInlineConnectivityIndicator(state = connectivityState)
-                        Box(modifier = Modifier.weight(1f, fill = false)) {
+                        Box(modifier = Modifier.testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)) {
                             OtherAccountAvatarsRow(
                                 appState = appState,
                                 onSwitchAccount = onSwitchAccount,
                                 onOpenSwitcher = onOpenSettings,
                             )
                         }
+                        ChatListInlineConnectivityIndicator(state = connectivityState)
                     }
             }
         },

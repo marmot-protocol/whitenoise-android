@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,6 +112,7 @@ internal fun FlowSearchField(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ContactRow(
     title: String,
     subtitle: String?,
@@ -121,8 +123,10 @@ internal fun ContactRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onSubtitleClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val copyLabel = stringResource(R.string.copy)
     Row(
         modifier =
             modifier
@@ -164,6 +168,19 @@ internal fun ContactRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        if (onSubtitleClick == null) {
+                            Modifier
+                        } else {
+                            Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(
+                                    enabled = enabled,
+                                    onClickLabel = copyLabel,
+                                    role = Role.Button,
+                                    onClick = onSubtitleClick,
+                                )
+                        },
                 )
             }
         }

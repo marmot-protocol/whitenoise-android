@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -53,6 +55,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +65,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -113,7 +117,10 @@ internal data class ProfileImageDrafts(
 }
 
 internal const val PROFILE_BANNER_CONTROL_TAG = "profile_banner_control"
-private const val PROFILE_BANNER_ASPECT_RATIO = 3f
+internal const val PROFILE_HERO_LOADING_TAG = "profile_hero_loading"
+internal const val PROFILE_HEADER_AVATAR_TAG = "profile_header_avatar"
+internal const val PROFILE_HEADER_NAME_TAG = "profile_header_name"
+private const val PROFILE_BANNER_ASPECT_RATIO = 2f
 
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -121,6 +128,8 @@ internal fun ProfileBannerControl(
     bannerUrl: String?,
     isValid: Boolean,
     isUploading: Boolean,
+    isProfileLoaded: Boolean = true,
+    showValidationError: Boolean = true,
     imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
     onClick: () -> Unit,
 ) {
@@ -137,10 +146,10 @@ internal fun ProfileBannerControl(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(PROFILE_BANNER_ASPECT_RATIO)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RectangleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(
-                        enabled = !isUploading,
+                        enabled = !isUploading && isProfileLoaded,
                         onClickLabel = stringResource(R.string.profile_banner_edit),
                         role = Role.Button,
                         onClick = onClick,
@@ -148,20 +157,21 @@ internal fun ProfileBannerControl(
             contentAlignment = Alignment.Center,
         ) {
             val image = bannerImage
+            val imageAlpha by
+                animateFloatAsState(
+                    targetValue = if (image != null) 1f else 0f,
+                    animationSpec = tween(durationMillis = 220),
+                    label = "profile banner image",
+                )
             if (image != null) {
                 Image(
                     bitmap = image,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().alpha(imageAlpha),
                 )
-            } else if (bannerUrl != null) {
-                Icon(
-                    Icons.Default.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp),
-                )
+            } else if (!isProfileLoaded || bannerUrl != null) {
+                Spacer(Modifier.fillMaxSize())
             } else if (!isUploading) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -203,28 +213,217 @@ internal fun ProfileBannerControl(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(Dimens.spaceSm)
-                            .size(36.dp)
+                            .padding(Dimens.spaceMd)
+                            .size(44.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY)),
+                            .background(Color.Transparent),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.Default.PhotoCamera,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
         }
-        if (!isValid) {
+        if (!isValid && showValidationError) {
             Text(
                 stringResource(R.string.profile_banner_invalid),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming", "LongMethod")
+internal fun ProfileHeroHeader(
+    title: String,
+    seed: String,
+    npub: String,
+    pictureUrl: String?,
+    bannerUrl: String?,
+    bannerValid: Boolean,
+    bannerUploading: Boolean,
+    contentReady: Boolean = true,
+    avatarImageAvailable: Boolean,
+    pictureInvalid: Boolean,
+    onEditBanner: () -> Unit,
+    onOpenPicture: () -> Unit,
+    onEditPicture: () -> Unit,
+    onCopyNpub: () -> Unit,
+) {
+    var avatarImage by remember(pictureUrl) { mutableStateOf(AvatarImageLoader.peek(pictureUrl)) }
+    var avatarLoadFinished by
+        remember(pictureUrl) {
+            mutableStateOf(pictureUrl == null || avatarImage != null)
+        }
+    LaunchedEffect(pictureUrl, contentReady) {
+        if (contentReady && avatarImage == null && pictureUrl != null) {
+            avatarImage = AvatarImageLoader.load(pictureUrl)
+            avatarLoadFinished = true
+        }
+    }
+    val avatarImageAlpha by
+        animateFloatAsState(
+            targetValue = if (avatarImage != null) 1f else 0f,
+            animationSpec = tween(durationMillis = 220),
+            label = "profile avatar image",
+        )
+    val contentAlpha by
+        animateFloatAsState(
+            targetValue = if (contentReady) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "profile hero reveal",
+        )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().alpha(contentAlpha),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                ProfileBannerControl(
+                    bannerUrl = bannerUrl,
+                    isValid = bannerValid,
+                    isUploading = bannerUploading,
+                    isProfileLoaded = contentReady,
+                    showValidationError = false,
+                    onClick = onEditBanner,
+                )
+                val editPictureLabel = stringResource(R.string.profile_picture_edit)
+                Box(
+                    modifier =
+                        Modifier
+                            .offset(y = 58.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp,
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .testTag(PROFILE_HEADER_AVATAR_TAG)
+                                .clickable(
+                                    enabled = contentReady,
+                                    onClickLabel =
+                                        stringResource(
+                                            if (avatarImageAvailable) {
+                                                R.string.profile_view_picture
+                                            } else {
+                                                R.string.profile_picture_edit
+                                            },
+                                        ),
+                                    role = Role.Button,
+                                    onClick = onOpenPicture,
+                                ),
+                    ) {
+                        Box(Modifier.padding(4.dp)) {
+                            Box {
+                                Avatar(
+                                    title = if (avatarLoadFinished && avatarImage == null) title else "",
+                                    seed = seed,
+                                    size = 108.dp,
+                                )
+                                val image = avatarImage
+                                if (image != null) {
+                                    Image(
+                                        bitmap = image,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier =
+                                            Modifier
+                                                .size(108.dp)
+                                                .clip(CircleShape)
+                                                .alpha(avatarImageAlpha),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp)
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Color.Transparent)
+                                .clickable(
+                                    enabled = contentReady,
+                                    onClickLabel = editPictureLabel,
+                                    role = Role.Button,
+                                    onClick = onEditPicture,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.PhotoCamera,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.size(66.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.testTag(PROFILE_HEADER_NAME_TAG),
+            )
+            Text(
+                npub,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier =
+                    Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(
+                            enabled = contentReady,
+                            onClickLabel = stringResource(R.string.copy),
+                            role = Role.Button,
+                            onClick = onCopyNpub,
+                        ).padding(horizontal = Dimens.spaceLg),
+                maxLines = 1,
+            )
+            if (pictureInvalid) {
+                Text(
+                    stringResource(R.string.profile_picture_invalid),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+            }
+            if (!bannerValid) {
+                Text(
+                    stringResource(R.string.profile_banner_invalid),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+            }
+        }
+        if (!contentReady) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(PROFILE_BANNER_ASPECT_RATIO)
+                        .testTag(PROFILE_HERO_LOADING_TAG),
+            ) {}
         }
     }
 }
@@ -239,6 +438,7 @@ internal fun ProfileEditScreen(
     var displayName by remember(active?.accountIdHex) { mutableStateOf("") }
     var about by remember(active?.accountIdHex) { mutableStateOf("") }
     var imageDrafts by remember(active?.accountIdHex) { mutableStateOf(ProfileImageDrafts()) }
+    var profileLoaded by remember(active?.accountIdHex) { mutableStateOf(false) }
     val picture = imageDrafts.picture
     val banner = imageDrafts.banner
     var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
@@ -423,17 +623,26 @@ internal fun ProfileEditScreen(
     }
 
     LaunchedEffect(active?.accountIdHex) {
-        val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
-        if (profile != null) {
-            displayName = profile.displayName ?: profile.name ?: ""
-            about = profile.about ?: ""
-            imageDrafts =
-                ProfileImageDrafts(
-                    picture = profile.picture ?: "",
-                    banner = profile.banner ?: "",
-                )
-            nip05 = profile.nip05 ?: ""
-            lud16 = profile.lud16 ?: ""
+        profileLoaded = false
+        try {
+            val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
+            if (profile != null) {
+                displayName = profile.displayName ?: profile.name ?: ""
+                about = profile.about ?: ""
+                imageDrafts =
+                    ProfileImageDrafts(
+                        picture = profile.picture ?: "",
+                        banner = profile.banner ?: "",
+                    )
+                nip05 = profile.nip05 ?: ""
+                lud16 = profile.lud16 ?: ""
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            appState.present(R.string.toast_couldnt_load_profile, copyable = true)
+        } finally {
+            profileLoaded = true
         }
     }
 
@@ -474,116 +683,46 @@ internal fun ProfileEditScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding),
-            contentPadding = PaddingValues(Dimens.spaceLg),
+            contentPadding = PaddingValues(bottom = Dimens.spaceXl),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
         ) {
             item {
                 // Live profile header — the avatar, name, and npub update as the
                 // fields below are edited, so the user previews their card inline.
-                Column(
-                    Modifier.fillMaxWidth().padding(top = Dimens.spaceSm),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-                ) {
-                    if (active == null) {
-                        Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        ProfileBannerControl(
-                            bannerUrl = safeBannerUrl,
-                            isValid = bannerValid,
-                            isUploading = bannerUploading,
-                            onClick = { showBannerSheet = true },
-                        )
-                        // The avatar itself views the current picture. The small
-                        // camera badge remains the direct edit affordance (#317),
-                        // so viewing and editing no longer compete for the same tap.
-                        val editPictureLabel = stringResource(R.string.profile_picture_edit)
-                        Box(contentAlignment = Alignment.Center) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier =
-                                    Modifier
-                                        .clip(CircleShape)
-                                        .clickable(
-                                            onClickLabel =
-                                                stringResource(
-                                                    if (avatarImageAvailable) R.string.profile_view_picture else R.string.profile_picture_edit,
-                                                ),
-                                            role = Role.Button,
-                                        ) {
-                                            if (avatarImageAvailable) {
-                                                fullPictureOpen = true
-                                            } else {
-                                                showPictureSheet = true
-                                            }
-                                        },
-                            ) {
-                                Avatar(
-                                    title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
-                                    seed = active.accountIdHex,
-                                    size = 96.dp,
-                                    pictureUrl = safePictureUrl,
-                                )
+                if (active == null) {
+                    Text(
+                        stringResource(R.string.no_active_account_period),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLg),
+                        textAlign = TextAlign.Center,
+                    )
+                } else {
+                    ProfileHeroHeader(
+                        title = displayName.ifBlank { stringResource(R.string.anonymous) },
+                        seed = active.accountIdHex,
+                        npub = appState.shortNpub(active.accountIdHex),
+                        pictureUrl = safePictureUrl,
+                        bannerUrl = safeBannerUrl,
+                        bannerValid = bannerValid,
+                        bannerUploading = bannerUploading,
+                        contentReady = profileLoaded,
+                        avatarImageAvailable = avatarImageAvailable,
+                        pictureInvalid =
+                            picture.isNotBlank() &&
+                                !ProfileFieldValidation.isAcceptablePictureUrl(picture),
+                        onEditBanner = { showBannerSheet = true },
+                        onOpenPicture = {
+                            if (avatarImageAvailable) {
+                                fullPictureOpen = true
+                            } else {
+                                showPictureSheet = true
                             }
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 6.dp, y = 6.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = ScrimAlpha.HEAVY))
-                                        .clickable(
-                                            onClickLabel = editPictureLabel,
-                                            role = Role.Button,
-                                        ) { showPictureSheet = true },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.PhotoCamera,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                        Text(
-                            displayName.ifBlank { stringResource(R.string.anonymous) },
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        // Tap to copy the full npub (#287). Same affordance as
-                        // the Identity screen npub row and member rows.
-                        val copyNpubLabel = stringResource(R.string.copy)
-                        Text(
-                            appState.shortNpub(active.accountIdHex),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier =
-                                Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .clickable(
-                                        onClickLabel = copyNpubLabel,
-                                        role = Role.Button,
-                                    ) {
-                                        clipboard.setText(AnnotatedString(appState.npub(active.accountIdHex)))
-                                    },
-                        )
-                        // Surface an invalid stored picture URL right on the
-                        // avatar control. The inline Picture URL row is gone, so
-                        // without this an unsafe/malformed `picture` would
-                        // silently disable Publish with no on-screen reason; the
-                        // caption tells the user to tap the avatar to fix it.
-                        // See #286.
-                        if (picture.isNotBlank() && !ProfileFieldValidation.isAcceptablePictureUrl(picture)) {
-                            Text(
-                                stringResource(R.string.profile_picture_invalid),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
+                        },
+                        onEditPicture = { showPictureSheet = true },
+                        onCopyNpub = {
+                            clipboard.setText(AnnotatedString(appState.npub(active.accountIdHex)))
+                        },
+                    )
                 }
             }
             if (active != null) {
@@ -593,99 +732,103 @@ internal fun ProfileEditScreen(
                     // that everything here is visible to the whole network. Copy
                     // mirrors Whitenoise Flutter (profileIsPublic /
                     // profilePublicDescription) for cross-client parity.
-                    ProfilePublicWarning()
+                    Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg)) {
+                        ProfilePublicWarning()
+                    }
                 }
             }
             item {
-                SectionCard(title = stringResource(R.string.profile)) {
-                    // Borderless fields: drop the filled container so each input
-                    // reads as a label + underline row on the white panel, leaving
-                    // the indicator line to carry focus/error state.
-                    val profileFieldColors =
-                        TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            errorContainerColor = Color.Transparent,
-                        )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = displayName,
-                        onValueChange = { displayName = it },
-                        label = { Text(stringResource(R.string.display_name)) },
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = {
-                                    displayName = ProfilePseudonymGenerator.random(excluding = displayName)
-                                },
-                                enabled = !busy && active != null,
-                            ) {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.regenerate_display_name),
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = about,
-                        onValueChange = { about = it },
-                        label = { Text(stringResource(R.string.about)) },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    // Client-side validation: flag a malformed picture URL or
-                    // nip-05 and block publish so we don't push junk — or an
-                    // SSRF-prone avatar URL — to relays. The picture URL is now
-                    // edited via the avatar control above (no inline row), but
-                    // the same guard still gates publish in case a bad value was
-                    // pasted there. See #69, #286.
-                    TextField(
-                        colors = profileFieldColors,
-                        value = nip05,
-                        onValueChange = { nip05 = it },
-                        label = { Text(stringResource(R.string.nip_05)) },
-                        singleLine = true,
-                        isError = !nip05Valid,
-                        supportingText = {
-                            Text(
-                                stringResource(
-                                    if (nip05Valid) R.string.profile_nip05_hint else R.string.profile_nip05_invalid,
-                                ),
+                Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg)) {
+                    SectionCard(title = stringResource(R.string.profile)) {
+                        // Borderless fields: drop the filled container so each input
+                        // reads as a label + underline row on the white panel, leaving
+                        // the indicator line to carry focus/error state.
+                        val profileFieldColors =
+                            TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent,
                             )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                    )
-                    TextField(
-                        colors = profileFieldColors,
-                        value = lud16,
-                        onValueChange = {
-                            lud16 = it
-                            lud16ResolveError = null
-                        },
-                        label = { Text(stringResource(R.string.lightning)) },
-                        singleLine = true,
-                        isError = !lud16Valid || lud16ResolveError != null,
-                        supportingText = {
-                            val resolveError = lud16ResolveError
-                            Text(
-                                stringResource(
-                                    when {
-                                        !lud16Valid -> R.string.profile_lightning_invalid
-                                        lud16Checking -> R.string.profile_lightning_checking
-                                        resolveError != null -> resolveError
-                                        else -> R.string.profile_lightning_hint
+                        TextField(
+                            colors = profileFieldColors,
+                            value = displayName,
+                            onValueChange = { displayName = it },
+                            label = { Text(stringResource(R.string.display_name)) },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        displayName = ProfilePseudonymGenerator.random(excluding = displayName)
                                     },
-                                ),
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth().focusRequester(lud16FocusRequester),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                    )
+                                    enabled = !busy && active != null,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.regenerate_display_name),
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        TextField(
+                            colors = profileFieldColors,
+                            value = about,
+                            onValueChange = { about = it },
+                            label = { Text(stringResource(R.string.about)) },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        // Client-side validation: flag a malformed picture URL or
+                        // nip-05 and block publish so we don't push junk — or an
+                        // SSRF-prone avatar URL — to relays. The picture URL is now
+                        // edited via the avatar control above (no inline row), but
+                        // the same guard still gates publish in case a bad value was
+                        // pasted there. See #69, #286.
+                        TextField(
+                            colors = profileFieldColors,
+                            value = nip05,
+                            onValueChange = { nip05 = it },
+                            label = { Text(stringResource(R.string.nip_05)) },
+                            singleLine = true,
+                            isError = !nip05Valid,
+                            supportingText = {
+                                Text(
+                                    stringResource(
+                                        if (nip05Valid) R.string.profile_nip05_hint else R.string.profile_nip05_invalid,
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
+                        )
+                        TextField(
+                            colors = profileFieldColors,
+                            value = lud16,
+                            onValueChange = {
+                                lud16 = it
+                                lud16ResolveError = null
+                            },
+                            label = { Text(stringResource(R.string.lightning)) },
+                            singleLine = true,
+                            isError = !lud16Valid || lud16ResolveError != null,
+                            supportingText = {
+                                val resolveError = lud16ResolveError
+                                Text(
+                                    stringResource(
+                                        when {
+                                            !lud16Valid -> R.string.profile_lightning_invalid
+                                            lud16Checking -> R.string.profile_lightning_checking
+                                            resolveError != null -> resolveError
+                                            else -> R.string.profile_lightning_hint
+                                        },
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth().focusRequester(lud16FocusRequester),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
+                        )
+                    }
                 }
             }
         }

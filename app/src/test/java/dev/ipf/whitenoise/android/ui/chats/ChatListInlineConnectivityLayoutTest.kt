@@ -102,6 +102,35 @@ class ChatListInlineConnectivityLayoutTest {
     }
 
     @Test
+    fun connectingIndicatorFollowsEveryAccountAvatar() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListTopBarConnectivityHarness(
+                    connectivityState = ConnectivityBannerState.Connecting,
+                    appState = remember { testAppState(accountCount = 3) },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val otherAccountAvatars =
+            composeRule
+                .onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val connecting =
+            composeRule
+                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertTrue(
+            "connecting must render after the complete avatar cluster",
+            otherAccountAvatars.right <= connecting.left + POSITION_TOLERANCE,
+        )
+    }
+
+    @Test
     fun searchModeHidesInlineConnectivityChrome() {
         composeRule.setContent {
             WhiteNoiseTheme {

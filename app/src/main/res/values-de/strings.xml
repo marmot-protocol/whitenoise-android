@@ -142,6 +142,13 @@
     <string name="profile_shared_groups">Gemeinsame Gruppen</string>
     <string name="profile_no_shared_groups">Noch keine gemeinsamen Gruppen.</string>
     <string name="profile_start_new_group_with">Neue Gruppe mit %1$s starten</string>
+    <string name="contact_create_group_with">Gruppe mit %1$s erstellen</string>
+    <string name="contact_add_to_group">Zu Gruppe hinzufügen</string>
+    <string name="contact_groups_see_all">Alle anzeigen</string>
+    <plurals name="contact_groups_in_common">
+        <item quantity="one">%1$d gemeinsame Gruppe</item>
+        <item quantity="other">%1$d gemeinsame Gruppen</item>
+    </plurals>
     <string name="profile_add_to_another_group">Zu einer anderen Gruppe hinzufügen</string>
     <string name="new_group_invited_members">Eingeladene Mitglieder</string>
     <string name="profile_add_to_groups_title">%1$s zu Gruppen hinzufügen</string>
@@ -149,6 +156,7 @@
     <string name="profile_add_to_groups_confirm_title">Zu ausgewählten Gruppen hinzufügen?</string>
     <string name="profile_add_to_groups_confirm_message">%1$s wird zu %2$s hinzugefügt. Das ist für alle Mitglieder sichtbar.</string>
     <string name="profile_add_to_groups_confirm_label">Zu Gruppen hinzufügen</string>
+    <string name="profile_no_addable_groups">Es gibt keine Gruppen, zu denen du diese Person hinzufügen kannst.</string>
     <string name="profile_view_picture">Profilbild ansehen</string>
     <string name="profile_name_from_profile">Name (aus Profil): %1$s</string>
     <string name="profile_nickname_and_notes">Spitzname &amp; Notizen</string>
@@ -162,6 +170,13 @@
     <string name="saving_group">Gruppe wird gespeichert...</string>
     <string name="no_description">Keine Beschreibung</string>
     <string name="info">Infos</string>
+    <string name="group_info">Gruppeninfo</string>
+    <string name="group_identifiers">Gruppenkennungen</string>
+    <string name="mls_group_id">MLS-Gruppen-ID</string>
+    <string name="nostr_group_id">Nostr-Gruppen-ID</string>
+    <string name="group_relays">Gruppen-Relays</string>
+    <string name="group_relays_description">Relays, die zum Austausch von Nachrichten für diese Gruppe verwendet werden.</string>
+    <string name="relay_number">Relay-Server %1$d</string>
     <string name="group_id">Gruppen-ID</string>
     <string name="nostr_group">Nostr-Gruppe</string>
     <string name="relays">Netzwerk-Relays</string>
@@ -881,6 +896,7 @@
     <string name="profile_banner_remove">Banner entfernen</string>
     <string name="profile_banner_apply">Dieses Banner verwenden</string>
     <string name="toast_couldnt_upload_profile_banner">Das Profilbanner konnte nicht hochgeladen werden.</string>
+    <string name="toast_couldnt_load_profile">Das Profil konnte nicht geladen werden.</string>
     <string name="profile_banner_hint">Optionale öffentliche HTTPS-URL des Banners</string>
     <string name="profile_banner_invalid">Nur öffentliche HTTPS-Bild-URLs sind erlaubt.</string>
     <string name="toast_couldnt_upload_profile_image">Das Profilbild konnte nicht hochgeladen werden.</string>
