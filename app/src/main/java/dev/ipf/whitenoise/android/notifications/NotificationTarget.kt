@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
 import android.net.Uri
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.share.ShareRequest
 
 /** What a tapped notification should open. */
@@ -31,6 +33,13 @@ sealed interface NotificationNavStep {
     /** Right account is active but its chat list hasn't loaded yet — wait. */
     data object AwaitChatList : NotificationNavStep
 
+    /**
+     * Invite target: initial chat-list snapshot is ready but the pending invite
+     * row has not materialized yet — wait for the live row or an authoritative
+     * read before treating the invite as gone (#1767).
+     */
+    data object AwaitInviteRow : NotificationNavStep
+
     /** Ready: open this conversation and optionally persist its read-through cursor. */
     data class OpenConversation(
         val groupIdHex: String,
@@ -55,11 +64,18 @@ sealed interface NotificationNavStep {
  *  - ready + group present → [NotificationNavStep.OpenConversation], carrying the
  *    notified message id (already non-blank and MESSAGE-only by construction) so
  *    the persisted read cursor can advance before composition
- *  - ready + group absent → [NotificationNavStep.MissingConversation]
+ *  - ready + MESSAGE group absent → [NotificationNavStep.MissingConversation]
+ *  - ready + INVITE absent from the snapshot → [NotificationNavStep.AwaitInviteRow]
+ *    until the row materializes or [inviteAuthoritativelyUnavailable] is true
  *
  * @param chatListReady true only when the chat list is bound to [target]'s
  *   account AND finished its initial load, so a not-yet-loaded list never
  *   produces a spurious "conversation missing".
+ * @param inviteRowMaterialized true when the invite's group id is present on the
+ *   live chat-list backing rows, even if the debounced [availableGroupIds]
+ *   snapshot has not caught up yet.
+ * @param inviteAuthoritativelyUnavailable true only after a targeted authoritative
+ *   read proves the invite is gone (withdrawn/declined/deleted).
  */
 fun resolveNotificationNav(
     target: NotificationTarget,
@@ -67,14 +83,69 @@ fun resolveNotificationNav(
     activeAccountRef: String?,
     chatListReady: Boolean,
     availableGroupIds: Set<String>,
+    inviteRowMaterialized: Boolean = false,
+    inviteAuthoritativelyUnavailable: Boolean = false,
 ): NotificationNavStep {
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
     if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
     if (!chatListReady) return NotificationNavStep.AwaitChatList
-    if (target.groupIdHex in availableGroupIds) {
+    val groupPresent =
+        target.groupIdHex in availableGroupIds ||
+            (target.kind == NotificationTargetKind.INVITE && inviteRowMaterialized)
+    if (groupPresent) {
         return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
     }
+    if (target.kind == NotificationTargetKind.INVITE && !inviteAuthoritativelyUnavailable) {
+        return NotificationNavStep.AwaitInviteRow
+    }
     return NotificationNavStep.MissingConversation
+}
+
+/** Outcome of a targeted authoritative read while routing an invite notification (#1767). */
+internal sealed interface NotificationInviteAuthoritativeOutcome {
+    data object OpenConversation : NotificationInviteAuthoritativeOutcome
+
+    /** Withdrawn, declined, or deleted — terminal fallback. */
+    data object Unavailable : NotificationInviteAuthoritativeOutcome
+
+    /** Transient failure or not yet materialized — keep waiting on the live row. */
+    data object Inconclusive : NotificationInviteAuthoritativeOutcome
+}
+
+/**
+ * Classifies whether an authoritative invite target is still openable.
+ * Build [result] with [dev.ipf.whitenoise.android.state.runCatchingCancellable] so cancellation propagates.
+ */
+internal fun classifyInviteAuthoritativeLoad(result: Result<Boolean>): NotificationInviteAuthoritativeOutcome {
+    if (result.isSuccess) {
+        return if (result.getOrThrow()) {
+            NotificationInviteAuthoritativeOutcome.OpenConversation
+        } else {
+            NotificationInviteAuthoritativeOutcome.Unavailable
+        }
+    }
+    return when (result.exceptionOrNull()) {
+        is MarmotKitException.UnknownGroup -> NotificationInviteAuthoritativeOutcome.Unavailable
+        else -> NotificationInviteAuthoritativeOutcome.Inconclusive
+    }
+}
+
+/** Whether an authoritative group read still represents an openable invite target. */
+internal fun inviteAuthoritativeGroupAvailable(
+    pendingConfirmation: Boolean,
+    selfMembership: SelfMembershipFfi,
+): Boolean = pendingConfirmation || selfMembership == SelfMembershipFfi.MEMBER
+
+/** Authoritative invite probe state for notification routing (#1767). */
+internal enum class NotificationInviteAuthoritativeProbeState {
+    /** No authoritative read attempted for the current invite target yet. */
+    NotProbed,
+
+    /** Read failed inconclusively; keep waiting for the live chat-list row. */
+    Inconclusive,
+
+    /** Authoritative read proves the invite is gone. */
+    Unavailable,
 }
 
 /** The activity's pending inbound-intent routing: a tapped-notification target,

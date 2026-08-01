@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.notifications
 import androidx.work.BackoffPolicy
 import androidx.work.ListenableWorker
 import androidx.work.workDataOf
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -725,6 +727,123 @@ class NotificationTargetTest {
                 activeAccountRef = "acct-a",
                 chatListReady = true,
                 availableGroupIds = setOf("group-other"),
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun nav_readyButInviteAbsent_awaitsInviteRow() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-other"),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = false,
+            )
+        assertEquals(NotificationNavStep.AwaitInviteRow, step)
+    }
+
+    @Test
+    fun nav_inviteAbsentAfterReady_materializesLater() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        assertEquals(
+            NotificationNavStep.AwaitInviteRow,
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = emptySet(),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = false,
+            ),
+        )
+        assertEquals(
+            NotificationNavStep.OpenConversation("group-1", null),
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteAuthoritativelyUnavailable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeLoadClassification_distinguishesMissingFromTransientFailure() {
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Unavailable,
+            classifyInviteAuthoritativeLoad(
+                Result.failure(MarmotKitException.UnknownGroup("group-1")),
+            ),
+        )
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Inconclusive,
+            classifyInviteAuthoritativeLoad(
+                Result.failure(MarmotKitException.Runtime("sqlite busy")),
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeGroupAvailability_distinguishesAcceptedFromDeclinedInvite() {
+        assertTrue(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.MEMBER,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.LEFT,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.REMOVED,
+            ),
+        )
+        assertTrue(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.MEMBER,
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeLoadClassification_distinguishesAvailableFromUnavailableGroup() {
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.OpenConversation,
+            classifyInviteAuthoritativeLoad(Result.success(true)),
+        )
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Unavailable,
+            classifyInviteAuthoritativeLoad(Result.success(false)),
+        )
+    }
+
+    @Test
+    fun nav_inviteAuthoritativelyUnavailable_isMissingConversation() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = emptySet(),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = true,
             )
         assertEquals(NotificationNavStep.MissingConversation, step)
     }
