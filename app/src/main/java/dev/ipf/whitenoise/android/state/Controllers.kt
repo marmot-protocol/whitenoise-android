@@ -2069,6 +2069,98 @@ internal data class AppliedGroupDetails(
     val members: List<AppGroupMemberRecordFfi>,
 )
 
+internal enum class GroupRosterLoadState {
+    LOADING,
+    READY,
+    FAILED,
+    INCONSISTENT,
+}
+
+internal enum class GroupRosterRefreshEvent {
+    STARTED,
+    SUCCEEDED,
+    FAILED,
+    INCONSISTENT,
+}
+
+internal fun reduceGroupRosterLoadState(
+    current: GroupRosterLoadState,
+    event: GroupRosterRefreshEvent,
+): GroupRosterLoadState =
+    when (event) {
+        GroupRosterRefreshEvent.STARTED ->
+            if (current == GroupRosterLoadState.READY) {
+                current
+            } else {
+                GroupRosterLoadState.LOADING
+            }
+        GroupRosterRefreshEvent.SUCCEEDED -> GroupRosterLoadState.READY
+        GroupRosterRefreshEvent.FAILED -> GroupRosterLoadState.FAILED
+        GroupRosterRefreshEvent.INCONSISTENT -> GroupRosterLoadState.INCONSISTENT
+    }
+
+internal fun restoreGroupRosterLoadStateAfterCancellation(
+    previous: GroupRosterLoadState,
+    current: GroupRosterLoadState,
+): GroupRosterLoadState =
+    if (current != GroupRosterLoadState.LOADING) {
+        current
+    } else {
+        previous.takeUnless { it == GroupRosterLoadState.LOADING } ?: GroupRosterLoadState.FAILED
+    }
+
+internal class GroupRosterLoadTracker(
+    initial: GroupRosterLoadState,
+) {
+    var state by mutableStateOf(initial)
+        private set
+
+    private var lastSettledState =
+        initial.takeUnless { it == GroupRosterLoadState.LOADING }
+            ?: GroupRosterLoadState.FAILED
+
+    fun transition(event: GroupRosterRefreshEvent) {
+        state = reduceGroupRosterLoadState(state, event)
+        if (state != GroupRosterLoadState.LOADING) {
+            lastSettledState = state
+        }
+    }
+
+    fun restoreAfterCancellation() {
+        state =
+            restoreGroupRosterLoadStateAfterCancellation(
+                previous = lastSettledState,
+                current = state,
+            )
+    }
+}
+
+internal class GroupRosterRefreshGeneration {
+    private var generation: Long = 0
+
+    fun begin(): Long = ++generation
+
+    fun invalidate() {
+        generation++
+    }
+
+    fun isCurrent(candidate: Long): Boolean = candidate == generation
+}
+
+internal enum class GroupRosterInvariant {
+    EMPTY_JOINED_ROSTER,
+    LOCAL_MEMBER_MISSING,
+    MEMBER_COUNT_MISMATCH,
+}
+
+internal data class GroupRosterResolution(
+    val applied: AppliedGroupDetails,
+    val invariant: GroupRosterInvariant?,
+    val uniqueMemberCount: Int,
+    val mlsMemberCount: UInt,
+    val containsLocalMember: Boolean,
+)
+
 internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGroupDetails =
     AppliedGroupDetails(
         group = details.group,
@@ -2081,6 +2173,40 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
                 )
             },
     )
+
+internal fun resolveAuthoritativeGroupRoster(
+    details: GroupDetailsFfi,
+    activeAccountIdHex: String?,
+): GroupRosterResolution {
+    val applied = applyAuthoritativeGroupDetails(details)
+    val uniqueMemberCount = GroupProjector.uniqueMemberCount(applied.members)
+    val containsLocalMember =
+        details.members.any { member ->
+            member.isSelf ||
+                activeAccountIdHex?.let { accountId ->
+                    member.memberIdHex.equals(accountId, ignoreCase = true)
+                } == true
+        }
+    val activeJoinedGroup =
+        details.group.selfMembership == SelfMembershipFfi.MEMBER &&
+            !details.group.pendingConfirmation
+    val invariant =
+        when {
+            !activeJoinedGroup -> null
+            uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
+            !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
+            uniqueMemberCount.toLong() !=
+                details.mlsState.memberCount.toLong() -> GroupRosterInvariant.MEMBER_COUNT_MISMATCH
+            else -> null
+        }
+    return GroupRosterResolution(
+        applied = applied,
+        invariant = invariant,
+        uniqueMemberCount = uniqueMemberCount,
+        mlsMemberCount = details.mlsState.memberCount,
+        containsLocalMember = containsLocalMember,
+    )
+}
 
 /**
  * Build a conversation-open [ChatListItem] from a targeted authoritative
@@ -4712,6 +4838,20 @@ class ConversationController(
 
     var membersVerified by mutableStateOf(membershipSeed.membersVerified)
         private set
+
+    private val memberRosterLoadTracker =
+        GroupRosterLoadTracker(
+            if (membershipSeed.membersVerified) {
+                GroupRosterLoadState.READY
+            } else {
+                GroupRosterLoadState.LOADING
+            },
+        )
+
+    internal val memberRosterState: GroupRosterLoadState
+        get() = memberRosterLoadTracker.state
+
+    private val memberRosterRefreshGeneration = GroupRosterRefreshGeneration()
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
     // state (lives only as long as this controller, never persisted —
@@ -9182,27 +9322,50 @@ class ConversationController(
         return result
     }
 
+    suspend fun retryMembers() {
+        refreshMembers()
+    }
+
     private suspend fun refreshMembers(probeEviction: Boolean = true) {
         val account = conversationAccountRef ?: return
-        runCatchingCancellable {
-            if (probeEviction) {
-                // Force OpenMLS replay before trusting cached group details.
-                // For an evicted account this is where Rust currently reports
-                // GroupStateError::UseAfterEviction, which we map to read-only
-                // UI. Display-only group-record updates skip this replay but
-                // still read details below so non-admin roster changes are not
-                // hidden behind AppGroupRecordFfi's coarse shape.
-                appState.marmotIo { groupMlsState(account, group.groupIdHex) }
+        val refreshGeneration = memberRosterRefreshGeneration.begin()
+        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
+        try {
+            runCatchingCancellable {
+                if (probeEviction) {
+                    // Force OpenMLS replay before trusting cached group details.
+                    // For an evicted account this is where Rust currently reports
+                    // GroupStateError::UseAfterEviction, which we map to read-only
+                    // UI. Display-only group-record updates skip this replay but
+                    // still read details below so non-admin roster changes are not
+                    // hidden behind AppGroupRecordFfi's coarse shape.
+                    appState.marmotIo { groupMlsState(account, group.groupIdHex) }
+                }
+                if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                    return@runCatchingCancellable
+                }
+                val details = appState.marmotIo { groupDetails(account, group.groupIdHex) }
+                if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                    return@runCatchingCancellable
+                }
+                val applied = applyGroupDetails(account, details) ?: return@runCatchingCancellable
+                appState.applyLocalGroupDetails(account, applied.group, applied.members)
+            }.onFailure { throwable ->
+                if (!memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                    return@onFailure
+                }
+                if (throwable.isUseAfterEviction()) {
+                    markActiveAccountRemovedFromMembers(account)
+                    return
+                }
+                memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+                Log.w("DMConversation", "refresh members failed for ${group.groupIdHex.take(8)}", throwable)
             }
-            val details = appState.marmotIo { groupDetails(account, group.groupIdHex) }
-            val applied = applyGroupDetails(account, details)
-            appState.applyLocalGroupDetails(account, applied.group, applied.members)
-        }.onFailure {
-            if (it.isUseAfterEviction()) {
-                markActiveAccountRemovedFromMembers(account)
-                return
+        } catch (cancel: CancellationException) {
+            if (memberRosterRefreshGeneration.isCurrent(refreshGeneration)) {
+                memberRosterLoadTracker.restoreAfterCancellation()
             }
-            Log.w("DMConversation", "refresh members failed for ${group.groupIdHex.take(8)}", it)
+            throw cancel
         }
     }
 
@@ -9220,6 +9383,7 @@ class ConversationController(
         members = updatedMembers
         membersLoaded = true
         membersVerified = true
+        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
     }
 
@@ -9249,10 +9413,16 @@ class ConversationController(
     private fun applyGroupDetails(
         account: String,
         details: GroupDetailsFfi,
-    ): AppliedGroupDetails {
+    ): AppliedGroupDetails? {
         val previousRetention = group.disappearingMessageSecs
         val previousSelfMembership = group.selfMembership
-        val applied = applyAuthoritativeGroupDetails(details)
+        val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
+        resolution.invariant?.let { invariant ->
+            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
+            logGroupRosterInvariant(details, resolution, invariant)
+            return null
+        }
+        val applied = resolution.applied
         group =
             reconcileTerminalSelfMembership(
                 update = applied.group,
@@ -9276,15 +9446,60 @@ class ConversationController(
         members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
         membersLoaded = true
         membersVerified = true
+        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
+    }
+
+    private fun logGroupRosterInvariant(
+        details: GroupDetailsFfi,
+        resolution: GroupRosterResolution,
+        invariant: GroupRosterInvariant,
+    ) {
+        fun normalizedIds(rows: List<AppGroupMemberRecordFfi>): Set<String> =
+            rows
+                .mapNotNull { row ->
+                    row.memberIdHex
+                        .trim()
+                        .takeIf(String::isNotEmpty)
+                        ?.lowercase()
+                }.toSet()
+
+        val returnedIds = normalizedIds(resolution.applied.members)
+        // Before the first successful details read, `members` is the chat-list /
+        // shared snapshot seed. Compare sets here, but log counts only: member IDs
+        // and the group ID are intentionally excluded from this diagnostic.
+        val cachedIds = normalizedIds(members)
+        val cachedContainsLocal =
+            members.any { member ->
+                conversationAccountIdHex?.let { accountId ->
+                    member.memberIdHex.equals(accountId, ignoreCase = true)
+                } ?: member.local
+            }
+        Log.e(
+            "DMConversation",
+            "joined roster invariant" +
+                " reason=${invariant.name.lowercase()}" +
+                " rows=${resolution.applied.members.size}" +
+                " unique=${resolution.uniqueMemberCount}" +
+                " mls=${resolution.mlsMemberCount}" +
+                " cached_unique=${cachedIds.size}" +
+                " overlap=${returnedIds.intersect(cachedIds).size}" +
+                " cached_only=${cachedIds.subtract(returnedIds).size}" +
+                " returned_only=${returnedIds.subtract(cachedIds).size}" +
+                " returned_self=${resolution.containsLocalMember}" +
+                " cached_self=$cachedContainsLocal" +
+                " current_membership=${group.selfMembership.name.lowercase()}" +
+                " returned_membership=${details.group.selfMembership.name.lowercase()}",
+        )
     }
 
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
     ) {
-        val applied = applyGroupDetails(account, details)
+        memberRosterRefreshGeneration.invalidate()
+        val applied = applyGroupDetails(account, details) ?: return
         appState.applyLocalGroupDetails(account, applied.group, applied.members)
     }
 

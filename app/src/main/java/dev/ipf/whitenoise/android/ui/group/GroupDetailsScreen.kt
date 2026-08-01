@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -215,6 +216,46 @@ internal fun GroupDetailsLocalDeleteControl(
 // Members shown in Group Details before the "See all" expander.
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 6
 private const val SHARED_GROUPS_PREVIEW_COUNT = 3
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupRosterLoadStatus(
+    state: GroupRosterLoadState,
+    onRetry: () -> Unit,
+) {
+    when (state) {
+        GroupRosterLoadState.LOADING ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(R.string.members),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        GroupRosterLoadState.FAILED,
+        GroupRosterLoadState.INCONSISTENT,
+        ->
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    stringResource(R.string.couldnt_load_conversation),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.retry))
+                }
+            }
+        GroupRosterLoadState.READY -> Unit
+    }
+}
 
 internal fun directDetailsSharedGroups(
     groups: List<ChatListItem>,
@@ -326,6 +367,7 @@ internal fun GroupDetailsScreen(
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
     val isDm = controller.isDm
+    val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
     val conversationTitle = controller.title(groupTitleCopy)
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     val dmPeerAccountIdHex =
@@ -820,6 +862,8 @@ internal fun GroupDetailsScreen(
                 subtitle =
                     if (isDm) {
                         ""
+                    } else if (!rosterReady) {
+                        stringResource(R.string.members)
                     } else {
                         stringResource(R.string.group_details_subtitle, controller.memberCount)
                     },
@@ -1121,175 +1165,184 @@ internal fun GroupDetailsScreen(
                 // already provide Material touch heights and internal padding.
                 Column {
                     AppDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.members_count, controller.memberCount),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),
-                        )
-                        IconButton(
-                            onClick = {
-                                memberSearchOpen = !memberSearchOpen
-                                if (!memberSearchOpen) memberQuery = ""
+                    if (!rosterReady) {
+                        GroupRosterLoadStatus(
+                            state = controller.memberRosterState,
+                            onRetry = {
+                                scope.launch { controller.retryMembers() }
                             },
-                            modifier = Modifier.padding(end = Dimens.spaceSm),
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = stringResource(R.string.search_members),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Text(
+                                stringResource(R.string.members_count, controller.memberCount),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),
                             )
-                        }
-                    }
-                    if (memberSearchOpen) {
-                        FlowSearchField(
-                            value = memberQuery,
-                            onValueChange = { memberQuery = it },
-                            placeholder = stringResource(R.string.search_members),
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
-                        )
-                    }
-                    if (canEdit) {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.PersonAdd,
-                            title = stringResource(R.string.add_member),
-                            enabled = !mutationsBlocked,
-                            onClick = {
-                                showAddMember = true
-                            },
-                        )
-                    }
-                    // #612: render members in a deterministic order — you first,
-                    // then other admins alpha by display name, then non-admins
-                    // alpha by display name, with memberIdHex as a stable
-                    // tiebreaker. Display names are resolved once into a map so
-                    // the comparator does pure reads. lowercase(Locale.ROOT) keeps
-                    // ordering consistent across device locales (e.g. Turkish I).
-                    // Prefetch member profiles here so the title map below can stay a
-                    // pure read (contactDisplayNameCached); the profile/nickname
-                    // revision key recomposes the sort once names or local aliases land.
-                    LaunchedEffect(controller.members) {
-                        appState.requestProfiles(controller.members.map { it.memberIdHex })
-                    }
-                    val memberTitlesByHex =
-                        remember(controller.members, appState.profileRevisionForCompose) {
-                            controller.members.associate {
-                                it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
+                            IconButton(
+                                onClick = {
+                                    memberSearchOpen = !memberSearchOpen
+                                    if (!memberSearchOpen) memberQuery = ""
+                                },
+                                modifier = Modifier.padding(end = Dimens.spaceSm),
+                            ) {
+                                Icon(
+                                    if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
+                                    contentDescription = stringResource(R.string.search_members),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
-                    val displayedMembers =
-                        remember(
-                            controller.members,
-                            activeAccountIdHex,
-                            memberTitlesByHex,
-                        ) {
-                            controller.members.sortedWith(
-                                compareBy(
-                                    { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
-                                    { !controller.isAdmin(it) },
-                                    { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
-                                    { it.memberIdHex.lowercase(Locale.ROOT) },
-                                ),
+                        if (memberSearchOpen) {
+                            FlowSearchField(
+                                value = memberQuery,
+                                onValueChange = { memberQuery = it },
+                                placeholder = stringResource(R.string.search_members),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
                             )
                         }
-                    val memberNeedle = memberQuery.trim()
-                    val visibleMembers =
-                        when {
-                            memberNeedle.isNotEmpty() ->
-                                displayedMembers.filter {
-                                    memberTitlesByHex[it.memberIdHex]
-                                        .orEmpty()
-                                        .contains(memberNeedle, ignoreCase = true)
-                                }
-                            membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
-                            else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                        if (canEdit) {
+                            FlowQuickActionRow(
+                                icon = Icons.Default.PersonAdd,
+                                title = stringResource(R.string.add_member),
+                                enabled = !mutationsBlocked,
+                                onClick = {
+                                    showAddMember = true
+                                },
+                            )
                         }
-                    if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
-                        Text(
-                            stringResource(R.string.no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                        )
-                    }
-                    // Row taps route into the profile sheet, which carries the same
-                    // admin actions (grant/revoke admin, remove) the old per-row menu
-                    // exposed (#444/#635 scope rules).
-                    GroupMemberIdentityRows(visibleMembers) { _, member ->
-                        val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
-                        val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
-                        val memberNpub = appState.npub(member.memberIdHex)
-                        ContactRow(
-                            title = controller.memberDisplayName(member),
-                            subtitle =
-                                if (isSelfRow) {
-                                    stringResource(R.string.you)
-                                } else {
-                                    IdentityFormatter.short(memberNpub)
-                                },
-                            avatarSeed = member.memberIdHex,
-                            avatarUrl = controller.memberAvatarUrl(member),
-                            onSubtitleClick =
-                                if (isSelfRow) {
-                                    null
-                                } else {
-                                    { clipboard.setText(AnnotatedString(memberNpub)) }
-                                },
-                            onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
-                            trailing = {
-                                if (rowMutation != null) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                } else if (controller.isAdmin(member)) {
-                                    Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                                        Text(
-                                            stringResource(R.string.admin),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
-                                        )
-                                    }
+                        // #612: render members in a deterministic order — you first,
+                        // then other admins alpha by display name, then non-admins
+                        // alpha by display name, with memberIdHex as a stable
+                        // tiebreaker. Display names are resolved once into a map so
+                        // the comparator does pure reads. lowercase(Locale.ROOT) keeps
+                        // ordering consistent across device locales (e.g. Turkish I).
+                        // Prefetch member profiles here so the title map below can stay a
+                        // pure read (contactDisplayNameCached); the profile/nickname
+                        // revision key recomposes the sort once names or local aliases land.
+                        LaunchedEffect(controller.members) {
+                            appState.requestProfiles(controller.members.map { it.memberIdHex })
+                        }
+                        val memberTitlesByHex =
+                            remember(controller.members, appState.profileRevisionForCompose) {
+                                controller.members.associate {
+                                    it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
                                 }
-                            },
-                        )
-                    }
-                    val canExpandMembers =
-                        memberNeedle.isEmpty() &&
-                            !membersExpanded &&
-                            displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
-                    if (canExpandMembers) {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.ExpandMore,
-                            title = stringResource(R.string.see_all_members, displayedMembers.size),
-                            onClick = { membersExpanded = true },
-                        )
-                    }
-                    if (pendingInvites.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                        ) {
-                            pendingInvites.forEach { invite ->
-                                // Pending invites stay non-actionable, but a tap
-                                // copies the full invite key to the clipboard.
-                                AssistChip(
-                                    onClick = {
-                                        clipboard.setText(AnnotatedString(invite))
-                                    },
-                                    label = {
-                                        Text(
-                                            stringResource(
-                                                R.string.invite_pending,
-                                                IdentityFormatter.short(invite),
-                                            ),
-                                        )
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                            }
+                        val displayedMembers =
+                            remember(
+                                controller.members,
+                                activeAccountIdHex,
+                                memberTitlesByHex,
+                            ) {
+                                controller.members.sortedWith(
+                                    compareBy(
+                                        { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
+                                        { !controller.isAdmin(it) },
+                                        { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
+                                        { it.memberIdHex.lowercase(Locale.ROOT) },
+                                    ),
                                 )
+                            }
+                        val memberNeedle = memberQuery.trim()
+                        val visibleMembers =
+                            when {
+                                memberNeedle.isNotEmpty() ->
+                                    displayedMembers.filter {
+                                        memberTitlesByHex[it.memberIdHex]
+                                            .orEmpty()
+                                            .contains(memberNeedle, ignoreCase = true)
+                                    }
+                                membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
+                                else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                            }
+                        if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                            Text(
+                                stringResource(R.string.no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                            )
+                        }
+                        // Row taps route into the profile sheet, which carries the same
+                        // admin actions (grant/revoke admin, remove) the old per-row menu
+                        // exposed (#444/#635 scope rules).
+                        GroupMemberIdentityRows(visibleMembers) { _, member ->
+                            val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+                            val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
+                            val memberNpub = appState.npub(member.memberIdHex)
+                            ContactRow(
+                                title = controller.memberDisplayName(member),
+                                subtitle =
+                                    if (isSelfRow) {
+                                        stringResource(R.string.you)
+                                    } else {
+                                        IdentityFormatter.short(memberNpub)
+                                    },
+                                avatarSeed = member.memberIdHex,
+                                avatarUrl = controller.memberAvatarUrl(member),
+                                onSubtitleClick =
+                                    if (isSelfRow) {
+                                        null
+                                    } else {
+                                        { clipboard.setText(AnnotatedString(memberNpub)) }
+                                    },
+                                onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
+                                trailing = {
+                                    if (rowMutation != null) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else if (controller.isAdmin(member)) {
+                                        Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                            Text(
+                                                stringResource(R.string.admin),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        val canExpandMembers =
+                            memberNeedle.isEmpty() &&
+                                !membersExpanded &&
+                                displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT
+                        if (canExpandMembers) {
+                            FlowQuickActionRow(
+                                icon = Icons.Default.ExpandMore,
+                                title = stringResource(R.string.see_all_members, displayedMembers.size),
+                                onClick = { membersExpanded = true },
+                            )
+                        }
+                        if (pendingInvites.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                            ) {
+                                pendingInvites.forEach { invite ->
+                                    // Pending invites stay non-actionable, but a tap
+                                    // copies the full invite key to the clipboard.
+                                    AssistChip(
+                                        onClick = {
+                                            clipboard.setText(AnnotatedString(invite))
+                                        },
+                                        label = {
+                                            Text(
+                                                stringResource(
+                                                    R.string.invite_pending,
+                                                    IdentityFormatter.short(invite),
+                                                ),
+                                            )
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                                    )
+                                }
                             }
                         }
                     }
