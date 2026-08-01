@@ -48,12 +48,13 @@ internal enum class ComposerGate {
  * - Confirmed member (`isSelfMember`) → [ComposerGate.COMPOSER].
  * - Confirmed not-member (`membersLoaded && !isSelfMember`) → [ComposerGate.NOTICE].
  * - Still loading (`!membersLoaded`):
- *   - The seeding snapshot was present (`seededMembershipKnown`) → it is an
- *     authoritative local signal: self is in it (`seededSelfMember`) →
+ *   - A projected or cached membership signal was present
+ *     (`seededMembershipKnown`) → it is authoritative locally: self is a
+ *     member (`seededSelfMember`) →
  *     [ComposerGate.COMPOSER] (warm member, no blank-bar flash, preserving the
  *     #264 intent); self was removed from it (the left group) →
  *     [ComposerGate.NOTICE] immediately (the #545 fix).
- *   - No seeding snapshot at all (genuinely cold open) → membership is unknown,
+ *   - No seeding signal at all (genuinely cold open) → membership is unknown,
  *     so [ComposerGate.PENDING]: render neither the composer nor the notice
  *     until `refreshMembers()` confirms. This removes the #623 notice-flash for
  *     a member opening cold without reintroducing the #545 composer-flash for a
