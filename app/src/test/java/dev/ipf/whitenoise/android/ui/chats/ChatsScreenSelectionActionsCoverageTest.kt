@@ -102,6 +102,16 @@ class ChatsScreenSelectionActionsCoverageTest {
                 start = "onMovePinned = {",
                 end = "\n                        onSelectAll = {",
             )
+        val pinHelper =
+            source.requiredSection(
+                start = "fun toggleChatPin(",
+                end = "\n    fun movePinnedChat(",
+            )
+        val moveHelper =
+            source.requiredSection(
+                start = "fun movePinnedChat(",
+                end = "\n    // Hoisted list state",
+            )
 
         assertTrue(
             "the engine only pins unarchived chats, so archived selections must not offer the toggle",
@@ -109,23 +119,47 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "pin overflow must route to controller.setPinned",
-            "controller.setPinned(item, nextPinned)" in pinHandler,
+            "toggleChatPin(item)" in pinHandler &&
+                "controller.setPinned(item, nextPinned)" in pinHelper,
         )
         assertTrue(
             "pin overflow must exit selection mode",
-            "clearSelection()" in pinHandler,
+            "clearSelection()" in pinHelper,
         )
         assertTrue(
             "manual order must route the full pinned set to controller.setPinnedOrder",
-            "controller.setPinnedOrder(reordered)" in moveHandler,
+            "movePinnedChat(item, delta)" in moveHandler &&
+                "controller.setPinnedOrder(reordered)" in moveHelper,
         )
         assertTrue(
             "a move must stay inside the pinned block",
-            "if (target !in pinnedOrderedIds.indices) return@ChatListSelectionBar" in moveHandler,
+            "if (target !in pinnedOrderedIds.indices) return" in moveHelper,
         )
         assertTrue(
             "move overflow must exit selection mode",
-            "clearSelection()" in moveHandler,
+            "clearSelection()" in moveHelper,
+        )
+    }
+
+    @Test
+    fun longPressSheetReusesPinAndManualOrderMutations() {
+        val source = chatsScreenSource().readText()
+
+        val actionSheet =
+            source.requiredSection(
+                start = "ChatActionSheet(",
+                end = "\n            )\n        }",
+            )
+        assertTrue(
+            "the long-press sheet must expose the same unarchived pin toggle",
+            "showPinToggle = !item.group.archived" in actionSheet &&
+                "onPinToggle = { toggleChatPin(item) }" in actionSheet,
+        )
+        assertTrue(
+            "the long-press sheet must reuse the same pinned-order mutation path",
+            "showMovePinnedUp" in actionSheet &&
+                "showMovePinnedDown" in actionSheet &&
+                "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
         )
     }
 

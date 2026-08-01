@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
@@ -19,7 +23,9 @@ import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.MarkChatUnread
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,16 +48,23 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 /** Single-chat actions shown by a stationary long press outside selection mode. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod") // Keep the complete, user-visible action order auditable in one block.
 internal fun ChatActionSheet(
     hasUnread: Boolean,
     canMarkUnread: Boolean,
     archived: Boolean,
     muted: Boolean,
+    pinned: Boolean,
+    showPinToggle: Boolean,
+    showMovePinnedUp: Boolean,
+    showMovePinnedDown: Boolean,
     onMarkRead: () -> Unit,
     onMarkUnread: () -> Unit,
     onAddToFolder: () -> Unit,
     onArchiveToggle: () -> Unit,
     onMuteToggle: () -> Unit,
+    onPinToggle: () -> Unit,
+    onMovePinned: (Int) -> Unit,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
@@ -67,7 +80,12 @@ internal fun ChatActionSheet(
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
+        ) {
             if (hasUnread) {
                 ChatActionButton(
                     label = stringResource(R.string.chat_row_action_mark_read),
@@ -86,6 +104,30 @@ internal fun ChatActionSheet(
                 icon = Icons.Default.Folder,
                 onClick = { runAction(onAddToFolder) },
             )
+            if (showPinToggle) {
+                ChatActionButton(
+                    label =
+                        stringResource(
+                            if (pinned) R.string.chat_row_action_unpin else R.string.chat_row_action_pin,
+                        ),
+                    icon = if (pinned) Icons.Outlined.PushPin else Icons.Filled.PushPin,
+                    onClick = { runAction(onPinToggle) },
+                )
+            }
+            if (showMovePinnedUp) {
+                ChatActionButton(
+                    label = stringResource(R.string.chat_row_action_move_up),
+                    icon = Icons.Default.ArrowUpward,
+                    onClick = { runAction { onMovePinned(-1) } },
+                )
+            }
+            if (showMovePinnedDown) {
+                ChatActionButton(
+                    label = stringResource(R.string.chat_row_action_move_down),
+                    icon = Icons.Default.ArrowDownward,
+                    onClick = { runAction { onMovePinned(1) } },
+                )
+            }
             ChatActionButton(
                 label =
                     stringResource(

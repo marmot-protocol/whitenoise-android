@@ -425,12 +425,17 @@ internal fun ChatsScreen(
                 .sortedBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
                 .map { it.projection?.groupIdHex ?: it.group.groupIdHex }
         }
-    val singleSelectedPinnedIndex =
-        singleSelectedItem
-            ?.takeIf { it.pinned() }
-            ?.let { item ->
-                pinnedOrderedIds.indexOfFirst { it.equals(item.group.groupIdHex, ignoreCase = true) }
+
+    fun pinnedIndex(item: ChatListItem): Int? =
+        item
+            .takeIf { it.pinned() }
+            ?.let { pinnedItem ->
+                pinnedOrderedIds.indexOfFirst {
+                    it.equals(pinnedItem.group.groupIdHex, ignoreCase = true)
+                }
             }?.takeIf { it >= 0 }
+
+    val singleSelectedPinnedIndex = singleSelectedItem?.let(::pinnedIndex)
     val singleSelectionMuted =
         singleSelectedItem?.let { item ->
             item.engineMuted() ||
@@ -485,6 +490,29 @@ internal fun ChatsScreen(
     ) {
         clearSelection()
         appState.setConversationMuted(item.group.groupIdHex, !muted)
+    }
+
+    fun toggleChatPin(item: ChatListItem) {
+        if (item.group.archived) return
+        val nextPinned = !item.pinned()
+        clearSelection()
+        appState.launchMutation { controller.setPinned(item, nextPinned) }
+    }
+
+    fun movePinnedChat(
+        item: ChatListItem,
+        delta: Int,
+    ) {
+        val index = pinnedIndex(item) ?: return
+        val target = index + delta
+        if (target !in pinnedOrderedIds.indices) return
+        val reordered =
+            pinnedOrderedIds.toMutableList().also { ids ->
+                val id = ids.removeAt(index)
+                ids.add(target, id)
+            }
+        clearSelection()
+        appState.launchMutation { controller.setPinnedOrder(reordered) }
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -723,7 +751,7 @@ internal fun ChatsScreen(
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
                         showMarkUnread =
                             singleSelectedItem?.removedFromGroup(appState.activeAccount?.accountIdHex) == false &&
-                                singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
+                                singleSelectedItem.effectiveHasUnread(appState.activeAccount?.accountIdHex) != true,
                         showMuteToggle = singleSelectedItem != null,
                         muted = singleSelectionMuted,
                         // The engine only pins unarchived chats, so an archived
@@ -762,21 +790,11 @@ internal fun ChatsScreen(
                         },
                         onPinToggle = {
                             val item = singleSelectedItem ?: return@ChatListSelectionBar
-                            val nextPinned = !item.pinned()
-                            clearSelection()
-                            appState.launchMutation { controller.setPinned(item, nextPinned) }
+                            toggleChatPin(item)
                         },
                         onMovePinned = { delta ->
-                            val index = singleSelectedPinnedIndex ?: return@ChatListSelectionBar
-                            val target = index + delta
-                            if (target !in pinnedOrderedIds.indices) return@ChatListSelectionBar
-                            val reordered =
-                                pinnedOrderedIds.toMutableList().also { ids ->
-                                    val id = ids.removeAt(index)
-                                    ids.add(target, id)
-                                }
-                            clearSelection()
-                            appState.launchMutation { controller.setPinnedOrder(reordered) }
+                            val item = singleSelectedItem ?: return@ChatListSelectionBar
+                            movePinnedChat(item, delta)
                         },
                         onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
                         onDeselectAll = { selectedChatIds.clear() },
@@ -1047,16 +1065,23 @@ internal fun ChatsScreen(
         ?.let { item ->
             val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
             val muted = item.engineMuted() || isLocallyMuted(item.group.groupIdHex)
+            val pinnedIndex = pinnedIndex(item)
             ChatActionSheet(
                 hasUnread = hasUnread,
                 canMarkUnread = !item.removedFromGroup(appState.activeAccount?.accountIdHex),
                 archived = item.group.archived,
                 muted = muted,
+                pinned = item.pinned(),
+                showPinToggle = !item.group.archived,
+                showMovePinnedUp = (pinnedIndex ?: 0) > 0,
+                showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
                 onMarkRead = { markChatRead(item, unread = false) },
                 onMarkUnread = { markChatRead(item, unread = true) },
                 onAddToFolder = { openFolderPicker(listOf(item)) },
                 onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
                 onMuteToggle = { toggleChatMute(item, muted) },
+                onPinToggle = { toggleChatPin(item) },
+                onMovePinned = { delta -> movePinnedChat(item, delta) },
                 onSelect = {
                     selectedChatIds.clear()
                     selectedChatIds.addAll(enterChatListSelection(item.id))
