@@ -36,6 +36,34 @@ class ProfileSheetFirstFrameIdentityTest {
             .lineSequence()
             .first { it.contains("var hex by remember(npub)") }
 
+    /**
+     * The whole block introduced by [header], brace-balanced.
+     *
+     * Naive truncation at the first `}` would stop inside a nested lambda such
+     * as `?.also { hex = it }`, so anything added after it — a second resolver
+     * call, a retry — would escape these assertions.
+     */
+    private fun balancedBlock(
+        text: String,
+        header: String,
+    ): String {
+        val start = text.indexOf(header)
+        check(start >= 0) { "block not found: $header" }
+        var depth = 0
+        for (index in (start + header.length - 1) until text.length) {
+            when (text[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return text.substring(start, index + 1)
+                }
+            }
+        }
+        error("unbalanced block: $header")
+    }
+
+    private val identityEffect get() = balancedBlock(source, "LaunchedEffect(npub) {")
+
     @Test
     fun identityIsSeededSynchronouslySoTheFirstFrameMeasuresTheSettledHeight() {
         assertTrue(
@@ -56,7 +84,7 @@ class ProfileSheetFirstFrameIdentityTest {
 
     @Test
     fun theSuspendResolverRunsOnlyWhenTheLocalDecodeFailed() {
-        val effect = source.substringAfter("LaunchedEffect(npub) {").substringBefore("}")
+        val effect = identityEffect
 
         // `hex ?:` is what stops the IO hop re-resolving an identity the local
         // decode already produced, and stops it reassigning identical state.
@@ -68,18 +96,34 @@ class ProfileSheetFirstFrameIdentityTest {
 
     @Test
     fun exactlyOneFallbackResolutionIsAttempted() {
-        val effect = source.substringAfter("LaunchedEffect(npub) {").substringBefore("}")
+        val effect = identityEffect
 
-        // Keyed on npub with a single call site, so an unresolvable reference
-        // settles at null instead of retrying in a loop.
+        // Keyed on npub with a single call site inside the effect, so an
+        // unresolvable reference settles at null instead of retrying in a loop.
         assertEquals(
             "the fallback must be invoked at most once per npub; found: $effect",
             1,
             Regex("appState\\.accountIdHex\\(").findAll(effect).count(),
         )
+        // Asserted on the extracted block, not the whole file, so the call is
+        // proven to sit inside the npub-keyed effect.
         assertTrue(
-            "the effect must be keyed on npub so it does not re-run on recomposition",
-            source.contains("LaunchedEffect(npub) {"),
+            "the fallback must live in the npub-keyed effect; found: $effect",
+            effect.startsWith("LaunchedEffect(npub) {"),
+        )
+    }
+
+    @Test
+    fun theExtractorSurvivesTheNestedLambdaInTheEffect() {
+        // Guards the assertions above: truncating at the first `}` would stop
+        // inside `?.also { hex = it }` and hide anything added after it.
+        val effect = identityEffect
+
+        assertTrue("must span past the nested lambda", effect.contains("?.also { hex = it }"))
+        assertTrue("must close the effect block", effect.trimEnd().endsWith("}"))
+        assertTrue(
+            "must reach the refreshProfile call at the end of the effect",
+            effect.contains("refreshProfile("),
         )
     }
 
