@@ -247,7 +247,15 @@ internal fun ProfileSheet(
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    var hex by remember(npub) { mutableStateOf<String?>(null) }
+    // Seed the identity synchronously so the first composed frame already has
+    // the content it will settle on. ModalBottomSheet animates toward its
+    // measured height, so rows that resolve a frame later — about, NIP-05,
+    // avatar, shared groups — would move that target mid-animation and read as
+    // a stutter on open (#1432). This is the same pure FFI decode (no storage
+    // read) the message bubble already runs on its per-message render path, so
+    // it is cheap enough for composition; the suspend resolver below still
+    // covers references it can't normalize locally.
+    var hex by remember(npub) { mutableStateOf(appState.profileReferenceAccountIdHex(npub)) }
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contentScrollState = rememberScrollState()
@@ -255,8 +263,9 @@ internal fun ProfileSheet(
     val compactMemberSheet = adminController != null
 
     LaunchedEffect(npub) {
-        val resolved = appState.accountIdHex(npub)
-        hex = resolved
+        // Only pay the IO hop when the local decode couldn't normalize the
+        // reference; otherwise reassigning would rebuild identical state.
+        val resolved = hex ?: appState.accountIdHex(npub)?.also { hex = it }
         if (resolved != null) appState.refreshProfile(resolved)
     }
 
