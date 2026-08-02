@@ -134,11 +134,22 @@ internal fun GroupEditScreen(
 
     fun setPublicAvatarUrl(url: String) {
         if (imageSaving || controller.mutationInFlight) return
+        // Same HTTPS/credential/loopback policy the upload path enforces, but a
+        // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
+        val safeUrl = ProfileSanitizer.imageUrl(url)
+        if (safeUrl == null) {
+            appState.present(R.string.profile_picture_invalid, copyable = true)
+            return
+        }
         imageSaving = true
         controller.clearLastMutationError()
         appState.launchMutation {
             try {
-                if (controller.updateGroupAvatarUrl(url)) showImageSearch = false
+                if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                appState.present(R.string.toast_couldnt_upload_group_image, copyable = true)
             } finally {
                 imageSaving = false
             }

@@ -1128,12 +1128,6 @@
     <string name="notify_nothing">Nada</string>
     <string name="notify_muted_until">Silenciado hasta las %1$s</string>
     <string name="customize_sound_vibration">Personalizar sonido y vibración</string>
-    <string name="notification_importance_off">Desactivado</string>
-    <string name="notification_importance_silent">Silencioso</string>
-    <string name="notification_importance_sound">Sonido</string>
-    <string name="notification_importance_pop_up">Sonido y ventana emergente</string>
-    <string name="notification_importance_priority">Prioridad</string>
-    <string name="notification_importance_customized">Personalizado</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostrar un acceso «Leer más» para los mensajes largos en este chat</string>
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>

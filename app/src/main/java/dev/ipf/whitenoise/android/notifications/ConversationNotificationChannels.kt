@@ -136,37 +136,6 @@ object ConversationNotificationChannels {
         parent: NotificationChannel,
     ): Boolean = !existing.hasUserSetImportance() && parent.importance < existing.importance
 
-    /** Live per-conversation alerting state, read back for display. */
-    data class ConversationChannelStatus(
-        val importance: Int,
-        val userSetImportance: Boolean,
-        val importantConversation: Boolean,
-    )
-
-    /**
-     * Reads the conversation child's live state, falling back to the parent
-     * when the child has not been created yet — an untouched conversation
-     * alerts exactly like its parent, so that is the honest reading.
-     */
-    fun conversationChannelStatus(
-        context: Context,
-        parentChannelId: String,
-        conversationShortcutId: String,
-    ): ConversationChannelStatus? {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        val channelId = conversationChannelId(parentChannelId, conversationShortcutId)
-        val channel =
-            manager?.getNotificationChannel(channelId)
-                ?: manager?.getNotificationChannel(parentChannelId)
-        return channel?.let {
-            ConversationChannelStatus(
-                importance = it.importance,
-                userSetImportance = it.hasUserSetImportance(),
-                importantConversation = it.isImportantConversation,
-            )
-        }
-    }
-
     internal fun conversationChannelDisplayName(
         parentName: CharSequence,
         conversationTitle: String?,

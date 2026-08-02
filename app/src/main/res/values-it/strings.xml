@@ -1128,12 +1128,6 @@
     <string name="notify_nothing">Niente</string>
     <string name="notify_muted_until">Silenziato fino alle %1$s</string>
     <string name="customize_sound_vibration">Personalizza suono e vibrazione</string>
-    <string name="notification_importance_off">Disattivato</string>
-    <string name="notification_importance_silent">Silenzioso</string>
-    <string name="notification_importance_sound">Suono</string>
-    <string name="notification_importance_pop_up">Suono e avviso a comparsa</string>
-    <string name="notification_importance_priority">Prioritaria</string>
-    <string name="notification_importance_customized">Personalizzato</string>
     <string name="chat_muted_badge">Silenziato</string>
     <string name="collapse_long_messages_subtitle">Mostra una scorciatoia «Leggi tutto» per i messaggi lunghi in questa chat</string>
     <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>

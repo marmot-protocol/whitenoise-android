@@ -1170,12 +1170,6 @@
     <string name="notify_nothing">Ничего</string>
     <string name="notify_muted_until">Отключено до %1$s</string>
     <string name="customize_sound_vibration">Настроить звук и вибрацию</string>
-    <string name="notification_importance_off">Выключено</string>
-    <string name="notification_importance_silent">Без звука</string>
-    <string name="notification_importance_sound">Со звуком</string>
-    <string name="notification_importance_pop_up">Звук и всплывающее окно</string>
-    <string name="notification_importance_priority">Приоритет</string>
-    <string name="notification_importance_customized">Настроено</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>

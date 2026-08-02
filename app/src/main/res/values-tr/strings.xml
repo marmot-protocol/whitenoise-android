@@ -1126,12 +1126,6 @@
     <string name="notify_nothing">Hiçbiri</string>
     <string name="notify_muted_until">%1$s tarihine kadar sessiz</string>
     <string name="customize_sound_vibration">Ses ve titreşimi özelleştir</string>
-    <string name="notification_importance_off">Kapalı</string>
-    <string name="notification_importance_silent">Sessiz</string>
-    <string name="notification_importance_sound">Ses</string>
-    <string name="notification_importance_pop_up">Ses ve açılır bildirim</string>
-    <string name="notification_importance_priority">Öncelikli</string>
-    <string name="notification_importance_customized">Özelleştirildi</string>
     <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>

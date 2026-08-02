@@ -1128,12 +1128,6 @@
     <string name="notify_nothing">Rien</string>
     <string name="notify_muted_until">En sourdine jusqu\'à %1$s</string>
     <string name="customize_sound_vibration">Personnaliser le son et les vibrations</string>
-    <string name="notification_importance_off">Désactivé</string>
-    <string name="notification_importance_silent">Silencieux</string>
-    <string name="notification_importance_sound">Son</string>
-    <string name="notification_importance_pop_up">Son et fenêtre contextuelle</string>
-    <string name="notification_importance_priority">Prioritaire</string>
-    <string name="notification_importance_customized">Personnalisé</string>
     <string name="chat_muted_badge">En sourdine</string>
     <string name="collapse_long_messages_subtitle">Afficher un raccourci « Lire la suite » pour les longs messages de cette discussion</string>
     <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>

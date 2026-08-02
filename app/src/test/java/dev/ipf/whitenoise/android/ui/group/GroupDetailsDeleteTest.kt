@@ -104,6 +104,8 @@ class GroupDetailsDeleteTest {
                 R.string.delete_chat_dialog_title,
                 R.string.delete_chat_dialog_message,
                 R.string.leave_chat,
+                // The DM dialog reuses this confirm verb, so it has to stay generic.
+                R.string.delete_group_confirm,
             ).map { context.getString(it) }
 
         chatCopy.forEach { copy ->

@@ -1181,12 +1181,6 @@
     <string name="notify_nothing">Nothing</string>
     <string name="notify_muted_until">Muted until %1$s</string>
     <string name="customize_sound_vibration">Customize sound &amp; vibration</string>
-    <string name="notification_importance_off">Off</string>
-    <string name="notification_importance_silent">Silent</string>
-    <string name="notification_importance_sound">Sound</string>
-    <string name="notification_importance_pop_up">Sound and pop-up</string>
-    <string name="notification_importance_priority">Priority</string>
-    <string name="notification_importance_customized">Customized</string>
     <string name="chat_muted_badge">Muted</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>

@@ -456,7 +456,9 @@ internal fun PinnedBadge(modifier: Modifier = Modifier) {
 internal fun EvictedLabel(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.chat_row_removed_description)
     Surface(
-        modifier = modifier.semantics { contentDescription = description },
+        // Merge the chip's text in so the status is one focus stop reading the
+        // full description, not "Removed" announced again right after it.
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = description },
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -476,7 +478,7 @@ internal fun MentionBadge(modifier: Modifier = Modifier) {
     // Tertiary accent so a mention reads as distinct from the primary-colored
     // unread count sitting beside it.
     Badge(
-        modifier = modifier.semantics { contentDescription = description },
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = description },
         containerColor = MaterialTheme.colorScheme.tertiary,
         contentColor = MaterialTheme.colorScheme.onTertiary,
     ) {

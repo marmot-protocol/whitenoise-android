@@ -1106,12 +1106,6 @@
     <string name="notify_nothing">无</string>
     <string name="notify_muted_until">静音至 %1$s</string>
     <string name="customize_sound_vibration">自定义声音和振动</string>
-    <string name="notification_importance_off">关闭</string>
-    <string name="notification_importance_silent">静音</string>
-    <string name="notification_importance_sound">有声音</string>
-    <string name="notification_importance_pop_up">声音和弹出提醒</string>
-    <string name="notification_importance_priority">优先</string>
-    <string name="notification_importance_customized">已自定义</string>
     <string name="chat_muted_badge">已静音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中为长消息显示“阅读更多”快捷入口</string>
     <string name="toast_disappearing_not_applied">群组已创建，但无法开启阅后即焚消息</string>

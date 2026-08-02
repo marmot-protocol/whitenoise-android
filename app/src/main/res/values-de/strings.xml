@@ -1126,12 +1126,6 @@
     <string name="notify_nothing">Nichts</string>
     <string name="notify_muted_until">Stummgeschaltet bis %1$s</string>
     <string name="customize_sound_vibration">Ton und Vibration anpassen</string>
-    <string name="notification_importance_off">Aus</string>
-    <string name="notification_importance_silent">Lautlos</string>
-    <string name="notification_importance_sound">Ton</string>
-    <string name="notification_importance_pop_up">Ton und Einblendung</string>
-    <string name="notification_importance_priority">Priorität</string>
-    <string name="notification_importance_customized">Angepasst</string>
     <string name="chat_muted_badge">Stummgeschaltet</string>
     <string name="collapse_long_messages_subtitle">Für lange Nachrichten in diesem Chat eine „Mehr lesen“-Verknüpfung anzeigen</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>

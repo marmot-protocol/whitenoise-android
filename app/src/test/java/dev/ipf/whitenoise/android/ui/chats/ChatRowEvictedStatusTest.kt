@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
@@ -40,6 +43,14 @@ class ChatRowEvictedStatusTest {
 
         composeRule.onNodeWithText(removedLabel).assertExists()
         composeRule.onNodeWithContentDescription(removedDescription).assertExists()
+    }
+
+    @Test
+    fun theEvictedStatusExposesOneAccessibilityNode() {
+        render(evicted = true)
+
+        composeRule.onAllNodesWithContentDescription(removedDescription).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(removedDescription).assertTextEquals(removedLabel)
     }
 
     @Test
