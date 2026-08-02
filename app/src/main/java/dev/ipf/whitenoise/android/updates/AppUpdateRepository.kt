@@ -8,7 +8,9 @@ import kotlinx.coroutines.withContext
 
 class AppUpdateRepository(
     context: Context,
-    private val client: ZapstoreReleaseClient = ZapstoreReleaseClient(),
+    private val fetchLatestRelease: suspend (String, String?) -> ZapstoreLatestRelease? =
+        ZapstoreReleaseClient()::fetchLatest,
+    private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     private val appContext = context.applicationContext
     private val preferences: SharedPreferences =
@@ -30,10 +32,10 @@ class AppUpdateRepository(
 
     suspend fun refresh(installedVersion: String = installedVersionName()): AppUpdateInfo =
         withContext(Dispatchers.IO) {
-            val release = client.fetchLatest(AppUpdateConstants.WHITENOISE_ZAPSTORE_APP_ID, installedVersion)
+            val release = fetchLatestRelease(AppUpdateConstants.WHITENOISE_ZAPSTORE_APP_ID, installedVersion)
             preferences
                 .edit()
-                .putLong(KEY_LAST_SUCCESSFUL_CHECK_MS, System.currentTimeMillis())
+                .putLong(KEY_LAST_SUCCESSFUL_CHECK_MS, currentTimeMillis())
                 .apply {
                     if (release == null) {
                         remove(KEY_LATEST_VERSION)
