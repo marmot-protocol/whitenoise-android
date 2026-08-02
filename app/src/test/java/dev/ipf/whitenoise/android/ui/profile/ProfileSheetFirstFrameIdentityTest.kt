@@ -1,90 +1,102 @@
 package dev.ipf.whitenoise.android.ui.profile
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.v2.createComposeRule
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Rule
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import java.io.File
 
 /**
- * The profile sheet must know its identity on the first composed frame (#1432).
+ * The profile sheet must know its identity on its first composed frame (#1432).
  *
- * `ModalBottomSheet` animates toward the height it measures, so any row that
- * appears only after a suspend resolver returns — about text, NIP-05, avatar,
- * shared groups — moves that target while the open animation is running and
- * reads as a stutter. These pin the ordering that prevents it: a locally
- * decodable reference must be non-null in the very first composition, with the
- * suspend path reserved for references the local decode rejects.
+ * `ModalBottomSheet` animates toward the height it measures, so content that
+ * only appears after a suspend resolver returns moves that target mid-animation
+ * and reads as a stutter on open.
+ *
+ * These assert against the production source rather than a re-implementation of
+ * the resolution order. `ProfileSheet` takes a concrete `WhiteNoiseAppState`
+ * with no interface to fake and no injectable resolver seam, so a behavioural
+ * test would have to reconstruct the ordering it is meant to be checking — and
+ * would then pass even if the composable still initialised `hex` to null. The
+ * repository already uses this pattern where no seam exists
+ * (`ChatsScreenSelectionActionsCoverageTest`, `TtsMarkdownCallSiteCoverageTest`).
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
 class ProfileSheetFirstFrameIdentityTest {
-    @get:Rule
-    val composeRule = createComposeRule()
+    private val source =
+        File("src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt")
+            .readText()
 
-    /**
-     * Mirrors the sheet's resolution order: seed synchronously, fall back to the
-     * suspend resolver only when the seed is null.
-     */
-    private fun observeFirstFrame(
-        localDecode: (String) -> String?,
-        suspendDecode: suspend (String) -> String?,
-    ): Pair<String?, String?> {
-        var firstFrame: String? = null
-        var settled: String? = null
-        composeRule.setContent {
-            var hex by remember { mutableStateOf(localDecode("npub1example")) }
-            remember { firstFrame = hex }
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                hex = hex ?: suspendDecode("npub1example")
-            }
-            settled = hex
-        }
-        composeRule.waitForIdle()
-        return firstFrame to settled
+    private val appState =
+        File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
+            .readText()
+
+    /** The `hex` declaration, which is what decides the first frame. */
+    private val hexDeclaration =
+        source
+            .lineSequence()
+            .first { it.contains("var hex by remember(npub)") }
+
+    @Test
+    fun identityIsSeededSynchronouslySoTheFirstFrameMeasuresTheSettledHeight() {
+        assertTrue(
+            "hex must be seeded from the synchronous decode; found: $hexDeclaration",
+            hexDeclaration.contains("profileReferenceAccountIdHex(npub)"),
+        )
     }
 
     @Test
-    fun locallyDecodableReferenceIsResolvedBeforeAnyEffectRuns() {
-        val (firstFrame, settled) =
-            observeFirstFrame(
-                localDecode = { "abc123" },
-                suspendDecode = { error("the suspend resolver must not be needed") },
-            )
-
-        // Non-null on frame 1 is what keeps the measured height stable.
-        assertEquals("abc123", firstFrame)
-        assertEquals("abc123", settled)
+    fun identityIsNotInitialisedToNull() {
+        // The pre-fix form. Restoring it reintroduces the mid-animation height
+        // change that #1432 is about, so pin it explicitly.
+        assertFalse(
+            "hex must not start null; found: $hexDeclaration",
+            hexDeclaration.contains("mutableStateOf<String?>(null)"),
+        )
     }
 
     @Test
-    fun referenceTheLocalDecodeRejectsStillResolvesThroughTheSuspendPath() {
-        val (firstFrame, settled) =
-            observeFirstFrame(
-                localDecode = { null },
-                suspendDecode = { "resolved-later" },
-            )
+    fun theSuspendResolverRunsOnlyWhenTheLocalDecodeFailed() {
+        val effect = source.substringAfter("LaunchedEffect(npub) {").substringBefore("}")
 
-        assertNull("nothing to seed, so frame 1 legitimately has no identity", firstFrame)
-        assertEquals("resolved-later", settled)
+        // `hex ?:` is what stops the IO hop re-resolving an identity the local
+        // decode already produced, and stops it reassigning identical state.
+        assertTrue(
+            "the suspend resolver must be guarded by the seeded value; found: $effect",
+            effect.contains("hex ?: appState.accountIdHex(npub)"),
+        )
     }
 
     @Test
-    fun anUnresolvableReferenceLeavesTheIdentityNullWithoutLooping() {
-        val (firstFrame, settled) =
-            observeFirstFrame(
-                localDecode = { null },
-                suspendDecode = { null },
-            )
+    fun exactlyOneFallbackResolutionIsAttempted() {
+        val effect = source.substringAfter("LaunchedEffect(npub) {").substringBefore("}")
 
-        assertNull(firstFrame)
-        assertNull(settled)
+        // Keyed on npub with a single call site, so an unresolvable reference
+        // settles at null instead of retrying in a loop.
+        assertEquals(
+            "the fallback must be invoked at most once per npub; found: $effect",
+            1,
+            Regex("appState\\.accountIdHex\\(").findAll(effect).count(),
+        )
+        assertTrue(
+            "the effect must be keyed on npub so it does not re-run on recomposition",
+            source.contains("LaunchedEffect(npub) {"),
+        )
+    }
+
+    @Test
+    fun theSeedResolverIsThePureLocalDecodeAndNotASuspendCall() {
+        val declaration =
+            appState
+                .lineSequence()
+                .first { it.contains("fun profileReferenceAccountIdHex") }
+
+        assertFalse(
+            "the seed must not suspend — it runs during composition; found: $declaration",
+            declaration.contains("suspend"),
+        )
+        assertTrue(
+            "the seed must delegate to the pure local decode; found: $declaration",
+            declaration.contains("nostrEntityAccountIdHex"),
+        )
     }
 }
