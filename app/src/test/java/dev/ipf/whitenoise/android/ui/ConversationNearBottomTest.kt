@@ -208,6 +208,10 @@ class ConversationNearBottomTest {
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
         composeRule.runOnIdle {
+            assertFalse(
+                "Jump to newest must reach the physical end of the list",
+                listState.canScrollForward,
+            )
             assertTrue(coordinatorHolder[0]!!.isFollowingTail)
         }
     }
