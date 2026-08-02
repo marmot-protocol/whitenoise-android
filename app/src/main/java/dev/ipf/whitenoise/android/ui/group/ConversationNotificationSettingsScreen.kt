@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import android.app.NotificationManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,16 +26,26 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels.ConversationChannelStatus
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -43,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 private const val MILLIS_PER_SECOND = 1_000L
+private const val STATUS_SEPARATOR = " · "
 private val MUTE_ROW_MIN_HEIGHT = 56.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,17 +131,38 @@ private fun NotificationCategoriesSection(
     isDm: Boolean,
 ) {
     val context = LocalContext.current
+    val accountRef = appState.activeAccountRef
+    val shortcutId = accountRef?.let { conversationShortcutId(it, groupIdHex) }
+    // The rows report OS-owned state that the user edits in system settings,
+    // so re-read it every time this screen comes back to the foreground.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshToken by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) refreshToken++
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val fallbackValue = stringResource(R.string.customize_sound_vibration)
     ConversationNotificationChannels.relevantParents(isDm).forEach { parent ->
+        val status =
+            remember(refreshToken, shortcutId, parent) {
+                shortcutId?.let {
+                    ConversationNotificationChannels.conversationChannelStatus(context, parent.id, it)
+                }
+            }
         SettingsActionRow(
             icon = Icons.Default.Settings,
             title = notificationChannelTitle(parent),
-            value = stringResource(R.string.customize_sound_vibration),
+            value = status?.let { conversationChannelStatusValue(it) } ?: fallbackValue,
             onClick =
-                appState.activeAccountRef?.let { accountRef ->
+                accountRef?.let {
                     {
                         openConversationNotificationSettings(
                             context = context,
-                            accountRef = accountRef,
+                            accountRef = it,
                             groupIdHex = groupIdHex,
                             isDm = isDm,
                             parent = parent,
@@ -141,6 +174,30 @@ private fun NotificationCategoriesSection(
         )
     }
 }
+
+/**
+ * String resources describing a conversation channel's live alerting state,
+ * ordered most to least significant.
+ */
+internal fun conversationChannelStatusLabels(status: ConversationChannelStatus): List<Int> =
+    buildList {
+        add(
+            when {
+                status.importance <= NotificationManager.IMPORTANCE_NONE -> R.string.notification_importance_off
+                status.importance <= NotificationManager.IMPORTANCE_LOW -> R.string.notification_importance_silent
+                status.importance == NotificationManager.IMPORTANCE_DEFAULT -> R.string.notification_importance_sound
+                else -> R.string.notification_importance_pop_up
+            },
+        )
+        if (status.importantConversation) add(R.string.notification_importance_priority)
+        if (status.userSetImportance) add(R.string.notification_importance_customized)
+    }
+
+@Composable
+private fun conversationChannelStatusValue(status: ConversationChannelStatus): String =
+    conversationChannelStatusLabels(status)
+        .map { stringResource(it) }
+        .joinToString(STATUS_SEPARATOR)
 
 @Composable
 private fun mutedUntilLabel(expiryMillis: Long): String =

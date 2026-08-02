@@ -148,6 +148,7 @@ internal fun ChatRowSupportingMetadata(
     unreadMention: Boolean,
     actionColors: AccountActionColors?,
     pinned: Boolean,
+    evicted: Boolean = false,
 ) {
     if (pendingConfirmation) {
         Badge { Text(stringResource(R.string.invited)) }
@@ -157,6 +158,7 @@ internal fun ChatRowSupportingMetadata(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (pinned) PinnedBadge()
+            if (evicted) EvictedLabel()
             if (rowHasUnread) {
                 if (unreadMention) MentionBadge()
                 if (rowUnreadCount > 0uL) {

@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -193,6 +195,94 @@ class ConversationNotificationChannelsTest {
 
         assertNull(convId)
         assertNull(manager.getNotificationChannel(ConversationNotificationChannels.conversationChannelId("missing_parent", "conversation-orphan")))
+    }
+
+    @Test
+    fun conversationChannelDoesNotClaimDndBypass() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-dnd"
+
+        val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)
+
+        assertFalse(manager.getNotificationChannel(convId!!).canBypassDnd())
+    }
+
+    @Test
+    fun creationStillClonesTheParentImportanceEvenWhenItIsHigherThanTheDefault() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-create-high"
+
+        val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)
+
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, manager.getNotificationChannel(convId!!).importance)
+    }
+
+    @Test
+    fun pristineConversationChannelFollowsTheParentDownToALowerImportance() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-downgrade"
+        val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)!!
+        lowerParentImportance("messages_group", NotificationManager.IMPORTANCE_LOW)
+
+        ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)
+
+        assertEquals(NotificationManager.IMPORTANCE_LOW, manager.getNotificationChannel(convId).importance)
+    }
+
+    @Test
+    fun conversationChannelWithAUserSetImportanceIsLeftAloneWhenTheParentDrops() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-user-set"
+        val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)!!
+        val customised = manager.getNotificationChannel(convId)
+        customised.enableVibration(false)
+        customised.markImportanceUserSet()
+        manager.createNotificationChannel(customised)
+        lowerParentImportance("messages_group", NotificationManager.IMPORTANCE_LOW)
+
+        ConversationNotificationChannels.ensureConversationChannel(
+            context = context,
+            parentChannelId = "messages_group",
+            conversationShortcutId = shortcut,
+            conversationTitle = "Green Orca",
+        )
+
+        val updated = manager.getNotificationChannel(convId)
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, updated.importance)
+        assertEquals(false, updated.shouldVibrate())
+        // A permitted rename still lands; only the importance is off limits.
+        assertEquals("Green Orca · Group messages", updated.name.toString())
+    }
+
+    @Test
+    fun conversationChannelIsNeverRaisedBackUpToTheParentImportance() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-no-raise"
+        lowerParentImportance("messages_group", NotificationManager.IMPORTANCE_LOW)
+        val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)!!
+        lowerParentImportance("messages_group", NotificationManager.IMPORTANCE_HIGH)
+
+        ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)
+
+        assertEquals(NotificationManager.IMPORTANCE_LOW, manager.getNotificationChannel(convId).importance)
+    }
+
+    private fun lowerParentImportance(
+        parentChannelId: String,
+        importance: Int,
+    ) {
+        val parent = manager.getNotificationChannel(parentChannelId)
+        parent.importance = importance
+        manager.createNotificationChannel(parent)
+    }
+
+    /** `lockFields` is the only way to reproduce a user-edited importance off-device. */
+    private fun NotificationChannel.markImportanceUserSet() {
+        val userLockedImportance = NotificationChannel::class.java.getField("USER_LOCKED_IMPORTANCE").getInt(null)
+        NotificationChannel::class
+            .java
+            .getMethod("lockFields", Int::class.javaPrimitiveType)
+            .invoke(this, userLockedImportance)
     }
 
     private fun conversationChannel(
