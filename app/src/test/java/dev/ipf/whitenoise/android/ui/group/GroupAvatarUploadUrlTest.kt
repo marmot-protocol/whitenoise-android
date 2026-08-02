@@ -1,31 +1,10 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class GroupEditPhotoVisibilityTest {
-    @Test
-    fun aGroupPublishingASafeUrlAvatarStartsOnThePublicTrack() {
-        assertTrue(groupPhotoIsPublic("https://blossom.example/abc.jpg"))
-    }
-
-    @Test
-    fun aGroupWithoutAUrlAvatarStartsOnTheEncryptedTrack() {
-        assertFalse(groupPhotoIsPublic(null))
-        assertFalse(groupPhotoIsPublic(""))
-        assertFalse(groupPhotoIsPublic("   "))
-    }
-
-    @Test
-    fun anUnusableStoredUrlDoesNotReadAsPublic() {
-        assertFalse(groupPhotoIsPublic("http://blossom.example/abc.jpg"))
-        assertFalse(groupPhotoIsPublic("https://127.0.0.1/abc.jpg"))
-        assertFalse(groupPhotoIsPublic("not a url"))
-    }
-
+class GroupAvatarUploadUrlTest {
     @Test
     fun aSafeUploadUrlIsPublishedAsGiven() {
         assertEquals(
@@ -36,10 +15,14 @@ class GroupEditPhotoVisibilityTest {
 
     @Test
     fun anUnsafeUploadUrlIsRejectedRatherThanPublished() {
+        // The upload answer becomes a permanently public URL, so anything the
+        // sanitizer rejects must fail the publish instead of falling back.
         listOf(
             "http://blossom.example/abc.jpg",
             "https://user:pass@blossom.example/abc.jpg",
             "https://localhost/abc.jpg",
+            "https://127.0.0.1/abc.jpg",
+            "not a url",
             "",
         ).forEach { uploaded ->
             assertThrows(IllegalStateException::class.java) { safeAvatarUploadUrl(uploaded) }

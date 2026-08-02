@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,8 +26,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -68,13 +64,6 @@ import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 
 /**
- * Whether the group already publishes a usable public avatar. A URL avatar
- * outranks the encrypted image, so its presence is what puts a group on the
- * public track; a blank or unsafe URL does not count.
- */
-internal fun groupPhotoIsPublic(avatarUrl: String?): Boolean = ProfileSanitizer.imageUrl(avatarUrl) != null
-
-/**
  * The URL a Blossom upload may be published under. Throws rather than fall
  * back, so a host that answers with anything but a safe HTTPS URL can never
  * become the group's public avatar.
@@ -100,12 +89,6 @@ internal fun GroupEditScreen(
     var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
-    // Seeded from what the group already publishes, so the selector reads as
-    // the current state rather than an unrelated default.
-    var publicPhoto by
-        remember(controller.group.groupIdHex) {
-            mutableStateOf(groupPhotoIsPublic(controller.group.avatarUrl))
-        }
     val context = LocalContext.current
     val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
     val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
@@ -314,24 +297,6 @@ internal fun GroupEditScreen(
                     }
                 }
             }
-            if (canEdit) {
-                item {
-                    SectionCard(title = stringResource(R.string.group_photo_visibility)) {
-                        GroupPhotoVisibilityOption(
-                            label = stringResource(R.string.group_photo_visibility_members),
-                            supporting = stringResource(R.string.group_photo_visibility_members_detail),
-                            selected = !publicPhoto,
-                            onClick = { publicPhoto = false },
-                        )
-                        GroupPhotoVisibilityOption(
-                            label = stringResource(R.string.group_photo_visibility_public),
-                            supporting = stringResource(R.string.group_photo_visibility_public_detail),
-                            selected = publicPhoto,
-                            onClick = { publicPhoto = true },
-                        )
-                    }
-                }
-            }
             item {
                 SectionCard(title = stringResource(R.string.edit)) {
                     val profileFieldColors =
@@ -394,52 +359,11 @@ internal fun GroupEditScreen(
             urlLabel = stringResource(R.string.group_avatar_url),
             applyInFlight = imageSaving || controller.mutationInFlight,
             onApply = { picked ->
-                // Removal clears both components and is visibility-independent.
-                when {
-                    picked == null -> updateImage { null }
-                    publicPhoto -> setPublicAvatarUrl(picked)
-                    else -> updateImage { GroupImageDraftProcessor.fromRemoteUrl(picked) }
-                }
+                // Removal clears both the public URL and any encrypted image.
+                if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
-            onPickPhoto = { uri ->
-                if (publicPhoto) {
-                    uploadPublicAvatar(uri)
-                } else {
-                    updateImage {
-                        GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
-                    }
-                }
-            },
+            onPickPhoto = { uri -> uploadPublicAvatar(uri) },
             onDismiss = { showImageSearch = false },
         )
-    }
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun GroupPhotoVisibilityOption(
-    label: String,
-    supporting: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-                .padding(vertical = Dimens.spaceXs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                supporting,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }

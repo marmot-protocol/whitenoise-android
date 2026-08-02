@@ -801,11 +801,6 @@
     <string name="group_image_search_privacy">Веб-поиск передаёт ваш запрос и IP-адрес DuckDuckGo и серверам изображений.</string>
     <string name="group_image_search_apply">Использовать это изображение</string>
     <string name="group_image_choose_photo">Выбрать из фотографий</string>
-    <string name="group_photo_visibility">Видимость фото группы</string>
-    <string name="group_photo_visibility_members">Только участники</string>
-    <string name="group_photo_visibility_members_detail">Зашифровано для этого чата, поэтому нигде больше не отображается.</string>
-    <string name="group_photo_visibility_public">Все, у кого есть приглашение</string>
-    <string name="group_photo_visibility_public_detail">Хранится без шифрования, чтобы её показывали превью приглашений и QR-коды.</string>
     <string name="toast_couldnt_upload_group_image">Не удалось загрузить фото группы.</string>
     <string name="group_image_search_enter_query">Введите поисковый запрос.</string>
     <string name="group_image_search_unavailable">Поиск изображений временно недоступен.</string>

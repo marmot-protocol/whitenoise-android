@@ -773,11 +773,6 @@
     <string name="group_image_search_privacy">Web araması, sorgunuzu ve IP adresinizi DuckDuckGo\'ya ve görsel sunucularına gönderir.</string>
     <string name="group_image_search_apply">Bu görseli kullan</string>
     <string name="group_image_choose_photo">Fotoğraflardan seç</string>
-    <string name="group_photo_visibility">Grup fotoğrafı görünürlüğü</string>
-    <string name="group_photo_visibility_members">Yalnızca üyeler</string>
-    <string name="group_photo_visibility_members_detail">Bu sohbet için şifrelenir, dışarıda hiçbir yerde görünmez.</string>
-    <string name="group_photo_visibility_public">Daveti olan herkes</string>
-    <string name="group_photo_visibility_public_detail">Şifresiz saklanır, böylece davet önizlemeleri ve QR kodları gösterebilir.</string>
     <string name="toast_couldnt_upload_group_image">Grup fotoğrafı yüklenemedi.</string>
     <string name="group_image_search_enter_query">Bir arama terimi girin.</string>
     <string name="group_image_search_unavailable">Görsel araması geçici olarak kullanılamıyor.</string>

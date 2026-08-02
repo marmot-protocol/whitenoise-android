@@ -761,11 +761,6 @@
     <string name="group_image_search_privacy">網頁搜尋會將你的查詢和 IP 位址傳送給 DuckDuckGo 和圖片伺服器。</string>
     <string name="group_image_search_apply">使用此圖片</string>
     <string name="group_image_choose_photo">從照片中選擇</string>
-    <string name="group_photo_visibility">群組圖片可見性</string>
-    <string name="group_photo_visibility_members">僅成員</string>
-    <string name="group_photo_visibility_members_detail">為此聊天加密，聊天之外的任何地方都無法顯示。</string>
-    <string name="group_photo_visibility_public">任何持有邀請的人</string>
-    <string name="group_photo_visibility_public_detail">以未加密方式儲存，便於邀請預覽和 QR Code 顯示。</string>
     <string name="toast_couldnt_upload_group_image">無法上傳群組圖片。</string>
     <string name="group_image_search_enter_query">請輸入搜尋關鍵字。</string>
     <string name="group_image_search_unavailable">圖片搜尋暫時無法使用。</string>

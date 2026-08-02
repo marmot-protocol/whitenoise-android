@@ -1001,11 +1001,6 @@
     <string name="group_image_search_privacy">Web search sends your query and IP address to DuckDuckGo and image hosts.</string>
     <string name="group_image_search_apply">Use this image</string>
     <string name="group_image_choose_photo">Choose from photos</string>
-    <string name="group_photo_visibility">Group photo visibility</string>
-    <string name="group_photo_visibility_members">Members only</string>
-    <string name="group_photo_visibility_members_detail">Encrypted for this chat, so nothing outside it can show the photo.</string>
-    <string name="group_photo_visibility_public">Anyone with an invite</string>
-    <string name="group_photo_visibility_public_detail">Stored unencrypted, so invite previews and QR codes can show it.</string>
     <string name="toast_couldnt_upload_group_image">Couldn\'t upload the group photo.</string>
     <string name="group_image_search_enter_query">Enter a search term.</string>
     <string name="group_image_search_unavailable">Image search is temporarily unavailable.</string>

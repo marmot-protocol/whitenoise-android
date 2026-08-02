@@ -773,11 +773,6 @@
     <string name="group_image_search_privacy">Die Websuche sendet deine Suchanfrage und IP-Adresse an DuckDuckGo und Bildserver.</string>
     <string name="group_image_search_apply">Dieses Bild verwenden</string>
     <string name="group_image_choose_photo">Aus Fotos auswählen</string>
-    <string name="group_photo_visibility">Sichtbarkeit des Gruppenfotos</string>
-    <string name="group_photo_visibility_members">Nur Mitglieder</string>
-    <string name="group_photo_visibility_members_detail">Für diesen Chat verschlüsselt, außerhalb kann das Foto nirgends erscheinen.</string>
-    <string name="group_photo_visibility_public">Alle mit einer Einladung</string>
-    <string name="group_photo_visibility_public_detail">Unverschlüsselt gespeichert, damit Einladungsvorschauen und QR-Codes es zeigen können.</string>
     <string name="toast_couldnt_upload_group_image">Das Gruppenfoto konnte nicht hochgeladen werden.</string>
     <string name="group_image_search_enter_query">Suchbegriff eingeben.</string>
     <string name="group_image_search_unavailable">Bildersuche ist vorübergehend nicht verfügbar.</string>
