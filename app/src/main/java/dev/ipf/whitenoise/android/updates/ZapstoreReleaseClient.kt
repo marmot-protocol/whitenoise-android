@@ -21,7 +21,7 @@ import kotlin.coroutines.resumeWithException
 private const val KIND_ZAPSTORE_RELEASE = 30063
 
 class ZapstoreReleaseClient(
-    private val httpClient: OkHttpClient = defaultHttpClient(),
+    private val httpClient: WebSocket.Factory = defaultHttpClient(),
     private val relayUrl: String = ZAPSTORE_RELAY,
     private val publisherPubkey: String = ZAPSTORE_PUBLISHER_PUBKEY,
 ) {
@@ -137,7 +137,10 @@ class ZapstoreReleaseClient(
                         }
 
                     socket = httpClient.newWebSocket(Request.Builder().url(relayUrl).build(), listener)
-                    continuation.invokeOnCancellation { runCatching { socket.cancel() } }
+                    continuation.invokeOnCancellation {
+                        if (!completed.compareAndSet(false, true)) return@invokeOnCancellation
+                        runCatching { socket.cancel() }
+                    }
                 }
             }
         } catch (error: TimeoutCancellationException) {
