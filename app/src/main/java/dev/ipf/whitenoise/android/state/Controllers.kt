@@ -65,6 +65,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
+import dev.ipf.whitenoise.android.core.TimelineMediaCaption
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.aggregateEdits
@@ -984,6 +985,23 @@ private fun timelineRecordContentEqual(
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
         a.reactions == b.reactions
+
+/**
+ * When a media projection's plaintext is blank, keep the user-authored caption
+ * from the optimistic send/bridge row for this handoff. Engine plaintext wins
+ * when present; placeholder-only pending bodies never substitute for a caption.
+ */
+internal fun reconciledTimelineActionRecord(
+    projected: TimelineMessageRecordFfi,
+    priorActionRecord: AppMessageRecordFfi?,
+): AppMessageRecordFfi {
+    val actionRecord = TimelineProjector.toAppMessageRecord(projected)
+    val preserved =
+        priorActionRecord
+            ?.let { prior -> TimelineMediaCaption.handoffPlaintext(projected, prior) }
+            .orEmpty()
+    return if (preserved.isBlank()) actionRecord else actionRecord.copy(plaintext = preserved)
+}
 
 /**
  * Local optimistic state for an in-flight edit of one's own message: the new
@@ -5813,7 +5831,12 @@ class ConversationController(
             pendingProjectionsAwaitingBridge.remove(confirmedId)
             timelineRecords[confirmedId] = projected
             projectedMessageIds.add(confirmedId)
-            val projectedAction = TimelineProjector.toAppMessageRecord(projected)
+            val bridgeRecord = optimisticMessages["msg:$confirmedId"]?.record
+            val projectedAction =
+                reconciledTimelineActionRecord(
+                    projected,
+                    bridgeRecord ?: messageById[confirmedId],
+                )
             messageById[confirmedId] = projectedAction
             val projectedItem = timelineMessageFromProjection(projected, projectedAction)
             if (projectedItem.id !in timelineItemsById) {
@@ -8775,7 +8798,7 @@ class ConversationController(
         val previousItemId = existing?.let(::projectedItemId)
         val stillProjected = previousItemId != null && timelineItemsById.containsKey(previousItemId)
         if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
-            return TimelineProjector.toAppMessageRecord(record)
+            return messageById[record.messageIdHex] ?: TimelineProjector.toAppMessageRecord(record)
         }
         if (previousItemId != null) {
             timelineItemsById.remove(previousItemId)
@@ -8806,6 +8829,8 @@ class ConversationController(
             }
         }
         pendingProjectionsAwaitingBridge.remove(record.messageIdHex)
+        var mediaCaptionHandoffPrior =
+            messageById[record.messageIdHex] ?: optimisticMessages["msg:${record.messageIdHex}"]?.record
         val actionRecord = draftAction
         if (
             record.invalidationStatus != null &&
@@ -8827,8 +8852,9 @@ class ConversationController(
         ) {
             timelineRecords[record.messageIdHex] = record
             projectedMessageIds.add(record.messageIdHex)
-            messageById[record.messageIdHex] = actionRecord
-            return actionRecord
+            val renderedAction = reconciledTimelineActionRecord(record, mediaCaptionHandoffPrior)
+            messageById[record.messageIdHex] = renderedAction
+            return renderedAction
         }
         if (record.invalidationStatus == null) {
             invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
@@ -8851,6 +8877,7 @@ class ConversationController(
             ?.let { optimisticId ->
                 preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
                 val optimisticKey = "msg:$optimisticId"
+                mediaCaptionHandoffPrior = optimisticMessages[optimisticKey]?.record ?: mediaCaptionHandoffPrior
                 // Hand off own-sent media bytes from the pending optimistic to
                 // the projection's cache key BEFORE the bubble's LaunchedEffect
                 // can fire and ask Blossom for them. Without this, the projected
@@ -8866,11 +8893,12 @@ class ConversationController(
                 // "self-echo drives the sent flip" path (issue #913).
                 traceEchoReconcile(optimisticId)
             }
-        messageById[record.messageIdHex] = actionRecord
-        val item = timelineMessageFromProjection(record, actionRecord)
+        val renderedAction = reconciledTimelineActionRecord(record, mediaCaptionHandoffPrior)
+        messageById[record.messageIdHex] = renderedAction
+        val item = timelineMessageFromProjection(record, renderedAction)
         timelineItemsById[item.id] = item
         insertTimelineItemId(item.id)
-        return actionRecord
+        return renderedAction
     }
 
     private fun preserveOptimisticDisplayPosition(
@@ -8929,7 +8957,11 @@ class ConversationController(
         val projected = timelineRecords[messageId] ?: return
         val itemId = projectedItemId(projected)
         if (itemId !in timelineItemsById) return
-        val actionRecord = TimelineProjector.toAppMessageRecord(projected)
+        val actionRecord =
+            reconciledTimelineActionRecord(
+                projected,
+                messageById[messageId],
+            )
         timelineItemsById[itemId] = timelineMessageFromProjection(projected, actionRecord)
         timelineOrder.remove(itemId)
         insertTimelineItemId(itemId)

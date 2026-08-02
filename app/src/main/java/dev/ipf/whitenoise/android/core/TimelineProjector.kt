@@ -146,15 +146,24 @@ object TimelineProjector {
     fun displayBody(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
+        mediaCaptionHandoff: String? = null,
     ): String {
         if (record.deleted) return copy.deleted
         if (usesPersistedFailurePresentation(record)) return copy.invalidated
+        val effectivePlaintext =
+            record.plaintext.takeIf { it.isNotBlank() } ?: mediaCaptionHandoff.orEmpty()
+        val actionRecord =
+            if (effectivePlaintext != record.plaintext) {
+                toAppMessageRecord(record).copy(plaintext = effectivePlaintext)
+            } else {
+                toAppMessageRecord(record)
+            }
         return projectedBody(
-            plaintext = record.plaintext,
+            plaintext = effectivePlaintext,
             kind = record.kind,
             mediaJson = record.mediaJson,
             agentTextStreamJson = record.agentTextStreamJson,
-            fallback = { MessageProjector.displayBody(toAppMessageRecord(record), copy) },
+            fallback = { MessageProjector.displayBody(actionRecord, copy) },
             copy = copy,
         )
     }

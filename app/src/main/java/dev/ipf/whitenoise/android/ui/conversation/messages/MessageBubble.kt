@@ -507,27 +507,16 @@ internal fun MessageBubble(
     val editState = controller.editsByTarget[record.messageIdHex]
     val displayedBody =
         remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
-            when {
-                // Check `deleted` first so the optimistic tombstone (from
-                // controller.deletedMessageIds) renders immediately on tap.
-                deleted -> deletedBodyText
-                persistedFailure -> invalidatedBodyText
-                // Edit overlay wins over both projected and raw plaintext.
-                // We don't go through MessageProjector here — the edit
-                // payload is plain text by spec; markdown re-parse will
-                // happen below if record.contentTokens is populated, but
-                // for kind-9 edits the body is the latest version verbatim.
-                editState != null && record.kind == 9uL -> editState.latestText
-                item.projected != null ->
-                    TimelineProjector.displayBody(
-                        item.projected,
-                        messageTextCopy.copy(
-                            deleted = deletedBodyText,
-                            invalidated = invalidatedBodyText,
-                        ),
-                    )
-                else -> MessageProjector.displayBody(record, messageTextCopy)
-            }
+            timelineMessageDisplayedBody(
+                item = item,
+                record = record,
+                deleted = deleted,
+                persistedFailure = persistedFailure,
+                editState = editState,
+                deletedBodyText = deletedBodyText,
+                invalidatedBodyText = invalidatedBodyText,
+                messageTextCopy = messageTextCopy,
+            )
         }
     // Issue #390 v1 forwards text only. Forward must be hidden for any record
     // whose displayed body is a synthetic surrogate (media filename/placeholder,
@@ -1391,18 +1380,18 @@ internal fun MessageBubble(
                 // - Non-media: render displayedBody (covers reactions,
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
-                    when {
-                        // Deleted and persisted failure tombstones show only
-                        // their copy, never an inline image/caption.
-                        deleted || persistedFailure -> displayedBody
-                        // The contact card / location bubble / user card carry
-                        // the body, so the raw caption/link/npub text is hidden.
-                        sharedContact != null || sharedLocation != null || sharedUser != null -> null
-                        mediaPendingName != null && !anyConfirmedMedia -> null
-                        anyConfirmedMedia ->
-                            (editState?.latestText ?: record.plaintext).takeIf(String::isNotBlank)
-                        else -> displayedBody
-                    }
+                    timelineMessageBubbleSupplementBody(
+                        deleted = deleted,
+                        persistedFailure = persistedFailure,
+                        displayedBody = displayedBody,
+                        hideForStructuredShare =
+                            sharedContact != null || sharedLocation != null || sharedUser != null,
+                        mediaPendingName = mediaPendingName,
+                        anyConfirmedMedia = anyConfirmedMedia,
+                        editState = editState,
+                        projected = item.projected,
+                        actionRecord = record,
+                    )
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
                 // Captions/plain bodies sit on the resolved bubble background and therefore use
