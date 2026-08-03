@@ -53,6 +53,167 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun noSeedRefreshFailureTransitionsToFailedInsteadOfReady() {
+        assertEquals(
+            GroupRosterLoadState.FAILED,
+            reduceGroupRosterLoadState(
+                current = GroupRosterLoadState.LOADING,
+                event = GroupRosterRefreshEvent.FAILED,
+            ),
+        )
+    }
+
+    @Test
+    fun verifiedRosterSurvivesATransientRefreshFailure() {
+        val tracker = GroupRosterLoadTracker(GroupRosterLoadState.READY)
+
+        tracker.transition(GroupRosterRefreshEvent.STARTED)
+        tracker.transition(GroupRosterRefreshEvent.FAILED)
+
+        assertEquals(GroupRosterLoadState.READY, tracker.state)
+    }
+
+    @Test
+    fun cancelledRetryRestoresItsPreviousRetryableState() {
+        val tracker = GroupRosterLoadTracker(GroupRosterLoadState.FAILED)
+        tracker.transition(GroupRosterRefreshEvent.STARTED)
+        tracker.restoreAfterCancellation()
+
+        assertEquals(GroupRosterLoadState.FAILED, tracker.state)
+    }
+
+    @Test
+    fun cancelledNewestOverlappingRefreshRestoresLastSettledState() {
+        val tracker = GroupRosterLoadTracker(GroupRosterLoadState.FAILED)
+        tracker.transition(GroupRosterRefreshEvent.STARTED)
+        tracker.transition(GroupRosterRefreshEvent.STARTED)
+        tracker.restoreAfterCancellation()
+
+        assertEquals(GroupRosterLoadState.FAILED, tracker.state)
+    }
+
+    @Test
+    fun newerRosterRefreshSupersedesOlderRefreshAndMutationInvalidatesBoth() {
+        val generations = GroupRosterRefreshGeneration()
+        val first = generations.begin()
+        val second = generations.begin()
+
+        assertFalse(generations.isCurrent(first))
+        assertTrue(generations.isCurrent(second))
+
+        generations.invalidate()
+        assertFalse(generations.isCurrent(second))
+    }
+
+    @Test
+    fun delayedAuthoritativeRosterTransitionsFromLoadingToReady() {
+        var state = GroupRosterLoadState.LOADING
+        state = reduceGroupRosterLoadState(state, GroupRosterRefreshEvent.STARTED)
+
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 2u),
+                        group = group(admins = listOf("alice")),
+                        members =
+                            listOf(
+                                member("alice", account = "alice", local = true, isAdmin = true, isSelf = true),
+                                member("bob", isAdmin = false),
+                            ),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertNull(resolution.invariant)
+        assertEquals(listOf("alice", "bob"), resolution.applied.members.map { it.memberIdHex })
+        state = reduceGroupRosterLoadState(state, GroupRosterRefreshEvent.SUCCEEDED)
+        assertEquals(GroupRosterLoadState.READY, state)
+    }
+
+    @Test
+    fun successfulEmptyJoinedRosterIsInconsistentInsteadOfAuthoritativeZero() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 2u),
+                        group = group(admins = listOf("alice")),
+                        members = emptyList(),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertEquals(GroupRosterInvariant.EMPTY_JOINED_ROSTER, resolution.invariant)
+        assertEquals(
+            GroupRosterLoadState.INCONSISTENT,
+            reduceGroupRosterLoadState(
+                current = GroupRosterLoadState.LOADING,
+                event = GroupRosterRefreshEvent.INCONSISTENT,
+            ),
+        )
+    }
+
+    @Test
+    fun joinedRosterMustContainTheConversationAccountNotJustAnotherLocalAccount() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 1u),
+                        group = group(admins = listOf("alice")),
+                        members =
+                            listOf(
+                                member("bob", account = "bob", local = true, isAdmin = false, isSelf = false),
+                            ),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertEquals(GroupRosterInvariant.LOCAL_MEMBER_MISSING, resolution.invariant)
+    }
+
+    @Test
+    fun joinedRosterMemberCountMustMatchMlsState() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 3u),
+                        group = group(admins = listOf("alice")),
+                        members =
+                            listOf(
+                                member("alice", account = "alice", local = true, isAdmin = true, isSelf = true),
+                                member("bob", isAdmin = false),
+                            ),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertEquals(GroupRosterInvariant.MEMBER_COUNT_MISMATCH, resolution.invariant)
+    }
+
+    @Test
+    fun emptyRosterRemainsValidAfterLeavingTheGroup() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 0u),
+                        group =
+                            group(
+                                admins = listOf("alice"),
+                                selfMembership = SelfMembershipFfi.LEFT,
+                            ),
+                        members = emptyList(),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertNull(resolution.invariant)
+    }
+
+    @Test
     fun detailedProjectionIncludesRemoteAdminMemberWhenSameEpochChangeLands() {
         val authoritative = group(admins = listOf("alice", "bob", "carol"))
 
@@ -314,13 +475,16 @@ class GroupMutationDetailsApplicationTest {
         )
 }
 
-private fun testMlsState(groupIdHex: String = ""): dev.ipf.marmotkit.AppGroupMlsStateFfi =
+private fun testMlsState(
+    groupIdHex: String = "",
+    memberCount: UInt = 0u,
+): dev.ipf.marmotkit.AppGroupMlsStateFfi =
     dev.ipf.marmotkit.AppGroupMlsStateFfi(
         groupIdHex = groupIdHex,
         protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.CURRENT,
         lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
         epoch = 0uL,
-        memberCount = 0u,
+        memberCount = memberCount,
         unrecoverable = false,
         requiredAppComponents = emptyList(),
         disbandingEnabled = false,
