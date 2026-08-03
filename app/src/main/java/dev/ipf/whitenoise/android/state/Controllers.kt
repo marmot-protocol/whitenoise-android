@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -4540,17 +4541,24 @@ class ChatsController private constructor(
                 chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
                 groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
         val row = chatRowsByGroup[chatRowKey(groupIdHex)]
-        val directConversation =
-            GroupProjector.isDm(
-                conversationKind = row?.conversationKind,
-                memberCount = GroupProjector.uniqueMemberCount(members),
-                name = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty(),
-            )
+        val memberCount = GroupProjector.uniqueMemberCount(members)
+        val groupName = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty()
+        val unresolvedDirectConversation =
+            row?.conversationKind == ChatConversationKindFfi.UNKNOWN &&
+                memberCount <= 1 &&
+                GroupProjector.isUnnamed(groupName)
+        val directConversationCandidate =
+            unresolvedDirectConversation ||
+                GroupProjector.isDm(
+                    conversationKind = row?.conversationKind,
+                    memberCount = memberCount,
+                    name = groupName,
+                )
         if (
             !memberSnapshotReadyToCache(
                 members = members,
                 knownSelfRemoval = knownSelfRemoval,
-                directConversation = directConversation,
+                directConversation = directConversationCandidate,
                 activeAccountIdHex = activeAccountIdHex,
             )
         ) {

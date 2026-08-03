@@ -198,6 +198,24 @@ class ChatsControllerDmMemberHydrationTest {
     }
 
     @Test
+    fun transientSelfOnlyUnknownRosterDoesNotPinUnknownTitle() {
+        var attempts = 0
+        val controller =
+            bindDmController { _, _ ->
+                attempts += 1
+                when (attempts) {
+                    1 -> listOf(member(ME, local = true))
+                    else -> listOf(member(ME, local = true), member(PEER, local = false))
+                }
+            }
+
+        awaitCondition(timeoutMs = 10_000) { attempts >= 2 }
+        awaitCondition(timeoutMs = 10_000) {
+            controller.items.single().otherMemberAccount == PEER
+        }
+    }
+
+    @Test
     fun terminalRemovedEmptyRosterDoesNotRetryForever() {
         var attempts = 0
         bindDmController(selfMembership = SelfMembershipFfi.REMOVED) { _, _ ->
