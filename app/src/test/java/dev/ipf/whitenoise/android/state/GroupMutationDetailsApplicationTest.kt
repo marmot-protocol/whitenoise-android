@@ -37,6 +37,22 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun publicAvatarPartialSuccessRetainsResidualEncryptedImageForLaterCleanup() {
+        val encryptedHash = "ab".repeat(32)
+        val original = group(admins = emptyList()).copy(imageHashHex = encryptedHash)
+
+        val updated =
+            groupWithPublicAvatar(
+                group = original,
+                avatarUrl = "https://blossom.example/avatar.jpg",
+                encryptedImageCleared = false,
+            )
+
+        assertEquals("https://blossom.example/avatar.jpg", updated.avatarUrl)
+        assertEquals(encryptedHash, updated.imageHashHex)
+    }
+
+    @Test
     fun detailedProjectionIncludesRemoteAdminMemberWhenSameEpochChangeLands() {
         val authoritative = group(admins = listOf("alice", "bob", "carol"))
 
