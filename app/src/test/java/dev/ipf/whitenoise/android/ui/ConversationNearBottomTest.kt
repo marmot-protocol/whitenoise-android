@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -58,6 +59,7 @@ class ConversationNearBottomTest {
         listState: LazyListState,
         timelineSize: Int,
         modifier: Modifier = Modifier.height(400.dp),
+        tailRowHeight: Dp = 50.dp,
     ) {
         LazyColumn(modifier = modifier, state = listState) {
             item { Spacer(Modifier.height(1.dp)) }
@@ -66,7 +68,7 @@ class ConversationNearBottomTest {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(if (index == timelineSize - 1) tailRowHeight else 50.dp)
                         .then(
                             if (index == timelineSize - 1) {
                                 Modifier.testTag(TAIL_ROW_TAG)
@@ -77,6 +79,50 @@ class ConversationNearBottomTest {
                 )
             }
             item { Spacer(Modifier.height(1.dp)) }
+        }
+    }
+
+    @Composable
+    private fun TallTailHarness(
+        listState: LazyListState,
+        timelineSize: Int,
+        coordinatorHolder: Array<ConversationScrollCoordinator?>,
+    ) {
+        val bottomTimelineIndex = timelineSize + 2
+        val coordinator =
+            remember(listState) {
+                ConversationScrollCoordinator(
+                    writer = LazyListConversationScrollWriter(listState),
+                    initialMode = ConversationScrollMode.ReadingHistory("tail", 0),
+                )
+            }
+        val scope = rememberCoroutineScope()
+        coordinatorHolder[0] = coordinator
+        val nearBottom =
+            rememberConversationNearBottom(
+                listState = listState,
+                renderedTimelineSize = timelineSize,
+                hasOlderHeader = true,
+            )
+
+        Box {
+            TimelineHarness(
+                listState = listState,
+                timelineSize = timelineSize,
+                modifier = Modifier.height(100.dp),
+                tailRowHeight = 400.dp,
+            )
+            if (!nearBottom) {
+                ConversationJumpToNewestButton(
+                    unreadIncomingCount = 0,
+                    onClick = {
+                        scope.launch {
+                            coordinator.jumpToNewest(bottomTimelineIndex)
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
+            }
         }
     }
 
@@ -110,6 +156,65 @@ class ConversationNearBottomTest {
                 "Jump FAB should show when scrolled up after timeline hydration",
                 nearBottomHolder[0]!!,
             )
+        }
+    }
+
+    @Test
+    fun tallTailShowsJumpButtonBeforeItsBodyLeavesTheViewport() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val jumpToNewestLabel = context.getString(R.string.jump_to_newest)
+        val listState = LazyListState()
+        val timelineSize = 1
+        val tailListIndex = timelineSize + 1
+        val bottomTimelineIndex = timelineSize + 2
+        val coordinatorHolder = arrayOf<ConversationScrollCoordinator?>(null)
+
+        composeRule.setContent {
+            TallTailHarness(listState, timelineSize, coordinatorHolder)
+        }
+
+        composeRule.waitForIdle()
+        scrollTo(listState, bottomTimelineIndex)
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+
+        val viewportHeight =
+            listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+        val tailSize =
+            listState.layoutInfo.visibleItemsInfo
+                .single { it.index == tailListIndex }
+                .size
+        val nearTailOffset = tailSize - viewportHeight - viewportHeight / 8
+        scrollTo(listState, tailListIndex, nearTailOffset)
+        val nearTail = listState.layoutInfo.visibleItemsInfo.last()
+        val nearTailDistanceFromViewport =
+            nearTail.offset + nearTail.size - listState.layoutInfo.viewportEndOffset
+
+        assertEquals(tailListIndex, nearTail.index)
+        assertTrue(nearTailDistanceFromViewport in 1 until viewportHeight / 4)
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+
+        val farTailOffset = tailSize - viewportHeight - viewportHeight / 2
+        scrollTo(listState, tailListIndex, farTailOffset)
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.last()
+        val tailDistanceFromViewport =
+            lastVisible.offset + lastVisible.size - listState.layoutInfo.viewportEndOffset
+        assertEquals(tailListIndex, lastVisible.index)
+        assertTrue(tailDistanceFromViewport > viewportHeight / 4)
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertFalse(
+                "Jump to newest must reach the physical end of the list",
+                listState.canScrollForward,
+            )
+            assertTrue(coordinatorHolder[0]!!.isFollowingTail)
         }
     }
 
