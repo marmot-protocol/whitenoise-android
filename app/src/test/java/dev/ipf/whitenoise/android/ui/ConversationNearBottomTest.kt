@@ -27,6 +27,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollAnchor
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollBookmark
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollReason
@@ -280,6 +281,80 @@ class ConversationNearBottomTest {
     }
 
     @Test
+    fun pausingInsideATallTailPreservesTheOffsetOnResumeWithTheKeyboardClosed() {
+        assertTallTailResumePreservesOffset(resumeViewportHeight = TALL_TAIL_VIEWPORT)
+    }
+
+    @Test
+    fun pausingInsideATallTailPreservesTheOffsetOnResumeWithTheKeyboardOpen() {
+        assertTallTailResumePreservesOffset(resumeViewportHeight = 60.dp)
+    }
+
+    /**
+     * Drives the production pause/resume path: real [isNearBottom] feeds
+     * [ConversationScrollCoordinator.onUserGestureSettled], the settled mode is
+     * bookmarked, and [restoreViewport] must land back on the same pixel.
+     */
+    private fun assertTallTailResumePreservesOffset(resumeViewportHeight: Dp) {
+        val listState = LazyListState()
+        val timelineSize = 5
+        val tailListIndex = timelineSize + 1
+        val itemIds = (0 until timelineSize).map { "item-$it" }
+        val messageIds = (0 until timelineSize).map { "message-$it" }
+        val viewportHeight = mutableStateOf(TALL_TAIL_VIEWPORT)
+
+        composeRule.setContent {
+            TimelineHarness(
+                listState = listState,
+                timelineSize = timelineSize,
+                modifier = Modifier.height(viewportHeight.value),
+                tailRowHeight = 600.dp,
+            )
+        }
+        composeRule.waitForIdle()
+        scrollTo(listState, tailListIndex, PAUSED_OFFSET_IN_TALL_TAIL)
+
+        val nearBottom = isNearBottom(listState, timelineSize, hasOlderHeader = true)
+        assertTrue(
+            "Unread pixels must remain below the viewport for this to be a history read",
+            listState.canScrollForward,
+        )
+        assertFalse(
+            "A reader partway through a tall newest message is not at the tail",
+            nearBottom,
+        )
+
+        val anchor =
+            conversationScrollAnchor(
+                listState = listState,
+                renderedItemIds = itemIds,
+                renderedMessageIds = messageIds,
+                hasOlderHeader = true,
+            )
+        val coordinator =
+            ConversationScrollCoordinator(writer = LazyListConversationScrollWriter(listState))
+        coordinator.onUserGestureSettled(anchor, nearBottom)
+        assertFalse("Gesture settlement must not claim tail-follow intent", coordinator.isFollowingTail)
+
+        val snapshot = coordinator.bookmark(anchor)
+        // Models a new message landing while backgrounded plus the resume relayout.
+        scrollTo(listState, 2)
+        composeRule.runOnUiThread { viewportHeight.value = resumeViewportHeight }
+        composeRule.waitForIdle()
+        restoreOnResume(coordinator, snapshot, listState, messageIds)
+
+        assertEquals("message-${timelineSize - 1}", snapshot.anchor.messageId)
+        assertEquals(tailListIndex, listState.firstVisibleItemIndex)
+        assertEquals(
+            "Resume must preserve the pixel offset inside the long message",
+            PAUSED_OFFSET_IN_TALL_TAIL,
+            listState.firstVisibleItemScrollOffset,
+        )
+        assertTrue("The reader must still see unread pixels below", listState.canScrollForward)
+        assertFalse(coordinator.isFollowingTail)
+    }
+
+    @Test
     fun readingHistoryViewportRestoreKeepsTheSameListAnchorAndPixelOffset() {
         val listState = LazyListState()
         composeRule.setContent {
@@ -431,6 +506,29 @@ class ConversationNearBottomTest {
         assertEquals("message-0", anchor.messageId)
     }
 
+    /** Mirrors the resume observer: resolve the bookmarked message back to a live list index. */
+    private fun restoreOnResume(
+        coordinator: ConversationScrollCoordinator,
+        snapshot: ConversationScrollBookmark,
+        listState: LazyListState,
+        messageIds: List<String>,
+    ) {
+        composeRule.runOnUiThread {
+            runBlocking {
+                coordinator.restoreViewport(
+                    snapshot = snapshot,
+                    resolveAnchorIndex = { anchor ->
+                        messageIds.indexOf(anchor.messageId).takeIf { it >= 0 }?.plus(2)
+                    },
+                    resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
+                    frameCount = 1,
+                    awaitFrame = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
     private fun scrollTo(
         listState: LazyListState,
         index: Int,
@@ -444,3 +542,5 @@ class ConversationNearBottomTest {
 }
 
 private const val TAIL_ROW_TAG = "conversation-tail-row"
+private val TALL_TAIL_VIEWPORT = 100.dp
+private const val PAUSED_OFFSET_IN_TALL_TAIL = 200
