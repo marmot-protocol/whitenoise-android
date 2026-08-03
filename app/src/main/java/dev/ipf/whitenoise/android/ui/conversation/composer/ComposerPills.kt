@@ -52,6 +52,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
@@ -72,6 +73,8 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -107,6 +110,8 @@ internal fun ComposerPill(
     // #589: report the BasicTextField's focus edge up so the conversation
     // screen can record whether the keyboard was up when the app was paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
+    preImeBackEnabled: Boolean = false,
+    onPreImeBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
@@ -237,7 +242,22 @@ internal fun ComposerPill(
                         Modifier
                             .fillMaxWidth()
                             .contentReceiver(pasteImageReceiver)
-                            .focusRequester(composerFocus)
+                            .onPreInterceptKeyBeforeSoftKeyboard { event ->
+                                when (
+                                    composerPreImeBackAction(
+                                        enabled = preImeBackEnabled,
+                                        isBackKey = event.key == Key.Back,
+                                        isKeyDown = event.type == KeyEventType.KeyDown,
+                                    )
+                                ) {
+                                    ComposerPreImeBackAction.IGNORE -> false
+                                    ComposerPreImeBackAction.CONSUME -> true
+                                    ComposerPreImeBackAction.DISMISS -> {
+                                        onPreImeBack()
+                                        true
+                                    }
+                                }
+                            }.focusRequester(composerFocus)
                             // #589: track focus so the conversation screen's
                             // resume observer knows whether the keyboard was up
                             // when the app was backgrounded (Case B gate).
