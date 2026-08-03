@@ -347,6 +347,39 @@ class TimelineProjectorTest {
     }
 
     @Test
+    fun replyTargetPreviewPrefersReconciledMediaCaptionHandoffOverFilenameFallback() {
+        val attachment = mediaAttachment(fileName = "photo.jpg", mediaType = "image/jpeg")
+        val target =
+            timelineRecord(
+                plaintext = "",
+                tags =
+                    listOf(
+                        MessageTagFfi(
+                            listOf(
+                                "imeta",
+                                "url https://example/photo.jpg",
+                                "m image/jpeg",
+                                "filename photo.jpg",
+                            ),
+                        ),
+                    ),
+                media = listOf(attachment),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "launch diagram",
+                mediaKind = ReplyMediaKind.Photo,
+            ),
+            TimelineProjector.replyTargetPreview(
+                record = target,
+                mediaCaptionHandoff = "launch diagram",
+            ),
+        )
+    }
+
+    @Test
     fun replyPreviewRetainsLegacyMediaKindWhenTypedAttachmentIsUnavailable() {
         val record =
             timelineRecord(
@@ -415,6 +448,8 @@ class TimelineProjectorTest {
         invalidationStatus: String? = null,
         direction: String = "received",
         mediaJson: String? = null,
+        tags: List<MessageTagFfi> = emptyList(),
+        media: List<MediaAttachmentReferenceFfi> = emptyList(),
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -424,13 +459,13 @@ class TimelineProjectorTest {
         plaintext = plaintext,
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = 9uL,
-        tags = emptyList<MessageTagFfi>(),
+        tags = tags,
         timelineAt = timelineAt,
         receivedAt = timelineAt,
         replyToMessageIdHex = replyPreview?.messageIdHex,
         replyPreview = replyPreview,
         mediaJson = mediaJson,
-        media = emptyList(),
+        media = media,
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = reactions,

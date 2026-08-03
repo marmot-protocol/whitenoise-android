@@ -8421,7 +8421,8 @@ class ConversationController(
         val refs = mediaReferencesFor(target)
         val mediaFallback = typedReplyMediaFallback(refs)
         timelineRecords[target.messageIdHex]?.let { projectedTarget ->
-            return TimelineProjector.replyTargetPreview(projectedTarget, mediaFallback, copy)
+            val mediaCaptionHandoff = TimelineMediaCaption.handoffPlaintext(projectedTarget, target)
+            return TimelineProjector.replyTargetPreview(projectedTarget, mediaFallback, copy, mediaCaptionHandoff)
         }
         val mediaKind =
             mediaFallback?.kind

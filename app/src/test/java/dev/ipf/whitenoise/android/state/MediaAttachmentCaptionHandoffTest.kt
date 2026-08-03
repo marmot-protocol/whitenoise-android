@@ -12,16 +12,24 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineMediaCaption
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.timelineMessageBubbleSupplementBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.timelineMessageDisplayedBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Regression for #1783: outbound media captions through optimistic bridge,
  * projected upsert/handoff, bubble display seams, and reload-shaped reads.
+ *
+ * Bounded [TimelineMediaCaption.handoffPlaintext] covers blank projection seams
+ * while a reconciled action record still carries the user caption. A fresh
+ * MarmotKit timeline page must project persisted captions into plaintext; that
+ * path needs no optimistic state and no Android caption storage.
  */
 class MediaAttachmentCaptionHandoffTest {
     @Test
@@ -209,6 +217,20 @@ class MediaAttachmentCaptionHandoffTest {
         val pending = pendingMedia(plaintext = "📎 scan.pdf", fileName = "scan.pdf")
 
         assertEquals("", reconciledTimelineActionRecord(projected, pending).plaintext)
+        assertEquals("", TimelineMediaCaption.effectivePlaintext(projected, pending))
+        assertNull(
+            timelineMessageBubbleSupplementBody(
+                deleted = false,
+                persistedFailure = false,
+                displayedBody = "Photo",
+                hideForStructuredShare = false,
+                mediaPendingName = null,
+                anyConfirmedMedia = true,
+                editState = null,
+                projected = projected,
+                actionRecord = pending,
+            ),
+        )
     }
 
     @Test
@@ -231,6 +253,20 @@ class MediaAttachmentCaptionHandoffTest {
         val item = projectedItem(reloadAction, projected)
 
         assertEquals("persisted caption", reloadAction.plaintext)
+        assertNull(TimelineMediaCaption.handoffPlaintext(projected, reloadAction))
+        assertEquals(
+            "persisted caption",
+            timelineMessageDisplayedBody(
+                item = item,
+                record = item.record,
+                deleted = false,
+                persistedFailure = false,
+                editState = null,
+                deletedBodyText = "deleted",
+                invalidatedBodyText = "invalidated",
+                messageTextCopy = MessageTextCopy.Default,
+            ),
+        )
         assertEquals(
             "persisted caption",
             timelineMessageBubbleSupplementBody(
@@ -245,20 +281,47 @@ class MediaAttachmentCaptionHandoffTest {
                 actionRecord = item.record,
             ),
         )
+        assertEquals(
+            "persisted caption",
+            TimelineProjector.replyTargetPreview(projected).body,
+        )
     }
 
     @Test
-    fun freshReloadWithBlankProjectionCannotRecoverCaptionWithoutPriorState() {
+    fun replyTargetPreviewUsesReconciledActionRecordCaptionWhenProjectionBlank() {
         val projected = mediaProjection(plaintext = "")
-        val reloadAction = reconciledTimelineActionRecord(projected, priorActionRecord = null)
+        val bridge = mediaBridge(plaintext = "launch diagram")
+        val reconciled = reconciledTimelineActionRecord(projected, bridge)
+        val handoff = TimelineMediaCaption.handoffPlaintext(projected, reconciled)
 
-        assertEquals("", reloadAction.plaintext)
-        assertNull(
-            TimelineMediaCaption.handoffPlaintext(projected, reloadAction),
+        assertEquals("launch diagram", reconciled.plaintext)
+        assertEquals(
+            "launch diagram",
+            TimelineProjector.replyTargetPreview(projected, mediaCaptionHandoff = handoff).body,
+        )
+    }
+
+    @Test
+    fun conversationControllerReplyTargetPreviewDerivesMediaCaptionHandoffFromTarget() {
+        val body = controllersSource().readText().functionBody("replyTargetPreview")
+
+        assertTrue(
+            "projected reply targets must derive bounded caption handoff from the reconciled action record",
+            "TimelineMediaCaption.handoffPlaintext(projectedTarget, target)" in body,
+        )
+        assertTrue(
+            "handoff must be threaded into TimelineProjector.replyTargetPreview",
+            "TimelineProjector.replyTargetPreview(projectedTarget, mediaFallback, copy, mediaCaptionHandoff)" in body,
         )
     }
 
     // ---- helpers ------------------------------------------------------------
+
+    private fun controllersSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing Controllers.kt")
 
     private fun projectedItem(
         actionRecord: AppMessageRecordFfi,

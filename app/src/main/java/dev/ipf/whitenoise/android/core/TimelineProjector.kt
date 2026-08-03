@@ -186,14 +186,17 @@ object TimelineProjector {
         record: TimelineMessageRecordFfi,
         mediaFallback: MediaPreviewFallback? = typedReplyMediaFallback(record.media),
         copy: MessageTextCopy = MessageTextCopy.Default,
+        mediaCaptionHandoff: String? = null,
     ): TimelineReplyDisplay {
         val visibleMediaFallback = if (record.deleted) null else mediaFallback
-        val projectedBody = displayBody(record, copy)
+        val projectedBody = displayBody(record, copy, mediaCaptionHandoff)
+        val effectivePlaintext =
+            record.plaintext.takeIf { it.isNotBlank() } ?: mediaCaptionHandoff.orEmpty()
         return TimelineReplyDisplay(
             sender = record.sender,
             body =
                 replyBodyWithTypedMediaFallback(
-                    plaintext = record.plaintext,
+                    plaintext = effectivePlaintext,
                     projectedBody = projectedBody,
                     mediaFallback = visibleMediaFallback,
                     copy = copy,
