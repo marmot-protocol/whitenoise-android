@@ -45,15 +45,17 @@ class ChatsControllerDmMemberHydrationTest {
 
     private fun bindDmController(
         selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+        conversationKind: ChatConversationKindFfi = ChatConversationKindFfi.UNKNOWN,
+        retryDelayMillis: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
         loader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
     ): ChatsController {
         val appState = testAppState()
-        val controller = ChatsController(appState, ACCOUNT_REF, loader)
+        val controller = ChatsController(appState, ACCOUNT_REF, retryDelayMillis, loader)
         boundControllers += controller
         composeRule.setContent {}
         composeRule.runOnIdle {
             controller.setChatListVisible(false)
-            controller.applyChatListRow(dmRow(selfMembership))
+            controller.applyChatListRow(dmRow(selfMembership, conversationKind))
             controller.applyLocalGroupUpdate(unnamedDmGroup(selfMembership))
             controller.setChatListVisible(true)
         }
@@ -115,6 +117,47 @@ class ChatsControllerDmMemberHydrationTest {
     }
 
     @Test
+    fun ordinaryRecomputeDoesNotBypassScheduledMemberRetry() {
+        var attempts = 0
+        val controller =
+            bindDmController(retryDelayMillis = { 60_000L }) { _, _ ->
+                attempts += 1
+                error("persistent roster read failure")
+            }
+
+        awaitCondition { attempts >= 1 }
+        composeRule.runOnIdle {
+            controller.applyChatListRow(
+                dmRow(SelfMembershipFfi.MEMBER, ChatConversationKindFfi.UNKNOWN).copy(updatedAt = 2uL),
+            )
+        }
+        drainMainLooperFor(100)
+
+        assertEquals(1, attempts)
+    }
+
+    @Test
+    fun authoritativeGroupUpdateWakesScheduledMemberRetry() {
+        var attempts = 0
+        val controller =
+            bindDmController(retryDelayMillis = { 60_000L }) { _, _ ->
+                attempts += 1
+                if (attempts == 1) error("roster not ready")
+                listOf(member(ME, local = true), member(PEER, local = false))
+            }
+
+        awaitCondition { attempts >= 1 }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "updated"),
+            )
+        }
+
+        awaitCondition { attempts >= 2 }
+        awaitCondition { controller.items.single().otherMemberAccount == PEER }
+    }
+
+    @Test
     fun transientEmptyRosterDoesNotPinUnknownTitle() {
         var attempts = 0
         val controller =
@@ -133,6 +176,24 @@ class ChatsControllerDmMemberHydrationTest {
                 .single()
                 .otherMemberAccount
                 ?.equals(PEER, ignoreCase = true) == true
+        }
+    }
+
+    @Test
+    fun transientSelfOnlyDirectRosterDoesNotPinUnknownTitle() {
+        var attempts = 0
+        val controller =
+            bindDmController(conversationKind = ChatConversationKindFfi.DIRECT) { _, _ ->
+                attempts += 1
+                when (attempts) {
+                    1 -> listOf(member(ME, local = true))
+                    else -> listOf(member(ME, local = true), member(PEER, local = false))
+                }
+            }
+
+        awaitCondition(timeoutMs = 10_000) { attempts >= 2 }
+        awaitCondition(timeoutMs = 10_000) {
+            controller.items.single().otherMemberAccount == PEER
         }
     }
 
@@ -245,57 +306,59 @@ class ChatsControllerDmMemberHydrationTest {
             disbandRequest = null,
         )
 
-    private fun dmRow(selfMembership: SelfMembershipFfi) =
-        ChatListRowFfi(
-            selfMembership = selfMembership,
-            unreadMentionCount = 0uL,
-            unreadMention = false,
-            groupIdHex = DM_GROUP,
-            archived = false,
-            pendingConfirmation = false,
-            title = DM_GROUP,
-            groupName = "",
-            avatarUrl = null,
-            avatar = null,
-            lastMessage =
-                ChatListMessagePreviewFfi(
-                    messageIdHex = "msg-1",
-                    sender = PEER,
-                    senderDisplayName = null,
-                    plaintext = "hi",
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blocks = emptyList(),
-                            blankLinesBefore = ByteArray(0),
-                        ),
-                    kind = 9uL,
-                    timelineAt = 1uL,
-                    deleted = false,
-                    attachmentKind = null,
-                    attachmentCount = 0u,
-                    deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
-                ),
-            unreadCount = 0uL,
-            hasUnread = false,
-            firstUnreadMessageIdHex = null,
-            lastReadMessageIdHex = null,
-            lastReadTimelineAt = null,
-            conversationCreatedAt = 0uL,
-            activitySortAt = 1uL,
-            updatedAt = 1uL,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            manuallyMarkedUnread = false,
-            conversationKind = ChatConversationKindFfi.UNKNOWN,
-            muted = false,
-            mutedUntilMs = null,
-            pinned = false,
-            pinnedPosition = null,
-            lifecycleState = GroupLifecycleStateFfi.STABLE,
-            disbanding = false,
-            disbandRequest = null,
-        )
+    private fun dmRow(
+        selfMembership: SelfMembershipFfi,
+        conversationKind: ChatConversationKindFfi,
+    ) = ChatListRowFfi(
+        selfMembership = selfMembership,
+        unreadMentionCount = 0uL,
+        unreadMention = false,
+        groupIdHex = DM_GROUP,
+        archived = false,
+        pendingConfirmation = false,
+        title = DM_GROUP,
+        groupName = "",
+        avatarUrl = null,
+        avatar = null,
+        lastMessage =
+            ChatListMessagePreviewFfi(
+                messageIdHex = "msg-1",
+                sender = PEER,
+                senderDisplayName = null,
+                plaintext = "hi",
+                contentTokens =
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks = emptyList(),
+                        blankLinesBefore = ByteArray(0),
+                    ),
+                kind = 9uL,
+                timelineAt = 1uL,
+                deleted = false,
+                attachmentKind = null,
+                attachmentCount = 0u,
+                deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+            ),
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = null,
+        lastReadTimelineAt = null,
+        conversationCreatedAt = 0uL,
+        activitySortAt = 1uL,
+        updatedAt = 1uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = conversationKind,
+        muted = false,
+        mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
+    )
 
     private fun member(
         accountIdHex: String,

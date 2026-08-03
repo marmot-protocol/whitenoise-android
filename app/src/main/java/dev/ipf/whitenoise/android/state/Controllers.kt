@@ -84,6 +84,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCand
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -2315,13 +2316,25 @@ internal data class AuthoritativeChatListMembers(
  * Whether a roster returned from `groupMembers` is complete enough to cache.
  * An empty roster can be a transient catch-up result and must stay uncached so
  * the chat list retries instead of pinning an Unknown DM title. Once self-
- * removal is independently known, an empty roster is terminal and cacheable;
- * any non-empty roster also remains authoritative.
+ * removal is independently known, an empty roster is terminal and cacheable.
+ * A joined direct conversation containing only self is likewise unresolved:
+ * caching it would permanently pin the title to Unknown before its peer lands.
  */
 internal fun memberSnapshotReadyToCache(
     members: List<AppGroupMemberRecordFfi>,
     knownSelfRemoval: Boolean = false,
-): Boolean = members.isNotEmpty() || knownSelfRemoval
+    directConversation: Boolean = false,
+    activeAccountIdHex: String? = null,
+): Boolean {
+    if (knownSelfRemoval) return true
+    val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() }
+    val directRosterReady =
+        !directConversation ||
+            active == null ||
+            members.none { GroupProjector.isActiveAccountMember(it, active) } ||
+            members.any { !GroupProjector.isActiveAccountMember(it, active) }
+    return members.isNotEmpty() && directRosterReady
+}
 
 internal fun memberSnapshotRetryDelayMillis(backoffTier: Int): Long {
     var delayMs = MEMBER_FETCH_INITIAL_RETRY_DELAY_MS
@@ -2572,6 +2585,7 @@ private data class RemovedChatRowSnapshot(
 class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+    private val memberSnapshotRetryDelay: (Int) -> Long,
     initialAccountRef: String?,
 ) {
     constructor(appState: WhiteNoiseAppState) :
@@ -2580,14 +2594,16 @@ class ChatsController private constructor(
             memberSnapshotLoader = { accountRef, groupIdHex ->
                 appState.marmotIo { groupMembers(accountRef, groupIdHex) }
             },
+            memberSnapshotRetryDelay = ::memberSnapshotRetryDelayMillis,
             initialAccountRef = null,
         )
 
     internal constructor(
         appState: WhiteNoiseAppState,
         initialAccountRef: String,
+        memberSnapshotRetryDelay: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
         memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
-    ) : this(appState, memberSnapshotLoader, initialAccountRef)
+    ) : this(appState, memberSnapshotLoader, memberSnapshotRetryDelay, initialAccountRef)
 
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
@@ -2882,6 +2898,7 @@ class ChatsController private constructor(
     // a roster lands or the group/account lifecycle ends, so Unknown cannot
     // become permanent after a finite retry budget.
     private val memberFetchRetryBackoffTierByGroup = mutableMapOf<String, Int>()
+    private val memberFetchRetryJobsByGroup = mutableMapOf<String, Job>()
 
     // Widening member snapshots to every group makes the chat-list projection
     // much more useful, but the app should not start one roster FFI call per
@@ -3168,7 +3185,14 @@ class ChatsController private constructor(
     }
 
     private fun invalidateMemberCacheForGroup(groupIdHex: String) {
-        if (!memberCacheByGroup.containsKey(groupIdHex) && groupIdHex !in inFlightMemberFetches) return
+        val hasRetryScheduled = memberFetchRetryJobsByGroup[groupIdHex]?.isActive == true
+        if (!memberCacheByGroup.containsKey(groupIdHex) &&
+            groupIdHex !in inFlightMemberFetches &&
+            !hasRetryScheduled
+        ) {
+            return
+        }
+        cancelMemberSnapshotRetry(groupIdHex)
         memberCacheByGroup = memberCacheByGroup - groupIdHex
         memberCacheEpoch += 1L
     }
@@ -3636,7 +3660,12 @@ class ChatsController private constructor(
             }
         }
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
-        memberFetchRetryBackoffTierByGroup.keys.retainAll(rows.mapTo(mutableSetOf()) { it.groupIdHex })
+        val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
+        memberFetchRetryJobsByGroup.keys
+            .filterNot { it in liveGroupIds }
+            .toList()
+            .forEach(::cancelMemberSnapshotRetry)
+        memberFetchRetryBackoffTierByGroup.keys.retainAll(liveGroupIds)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
             noteMaterializedGroupMembershipChanged()
         }
@@ -3655,10 +3684,12 @@ class ChatsController private constructor(
 
     private fun removeChatRow(groupIdHex: String) {
         val rowKey = chatRowKey(groupIdHex)
-        if (chatRowsByGroup.remove(rowKey) != null) {
+        val removedRow = chatRowsByGroup.remove(rowKey)
+        if (removedRow != null) {
             activitySequenceByGroup.remove(rowKey)
             optimisticChatListPreviewByGroup.remove(rowKey)
-            memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+            cancelMemberSnapshotRetry(removedRow.groupIdHex)
+            memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
@@ -4358,6 +4389,8 @@ class ChatsController private constructor(
         memberSnapshotsRevision += 1L
         removedGroupIds = emptySet()
         inFlightMemberFetches.clear()
+        memberFetchRetryJobsByGroup.values.forEach(Job::cancel)
+        memberFetchRetryJobsByGroup.clear()
         memberFetchRetryBackoffTierByGroup.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -4445,6 +4478,7 @@ class ChatsController private constructor(
                 .filter { it in liveGroupIds }
                 .filterNot { memberCacheByGroup.containsKey(it) }
                 .filterNot { it in inFlightMemberFetches }
+                .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
                 .toList()
         if (pending.isEmpty()) return
         inFlightMemberFetches.addAll(pending)
@@ -4469,7 +4503,7 @@ class ChatsController private constructor(
                             (throwable.message ?: throwable.javaClass.simpleName)
                     }
                     if (isActiveBindEpoch(epoch)) {
-                        scheduleMemberSnapshotRetry(groupIdHex, epoch, cacheEpoch)
+                        scheduleMemberSnapshotRetry(groupIdHex, epoch)
                     }
                 } finally {
                     // Only mutate the in-flight set if this job still
@@ -4505,8 +4539,22 @@ class ChatsController private constructor(
             groupIdHex in removedGroupIds ||
                 chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
                 groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
-        if (!memberSnapshotReadyToCache(members, knownSelfRemoval)) {
-            scheduleMemberSnapshotRetry(groupIdHex, epoch, cacheEpoch)
+        val row = chatRowsByGroup[chatRowKey(groupIdHex)]
+        val directConversation =
+            GroupProjector.isDm(
+                conversationKind = row?.conversationKind,
+                memberCount = GroupProjector.uniqueMemberCount(members),
+                name = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty(),
+            )
+        if (
+            !memberSnapshotReadyToCache(
+                members = members,
+                knownSelfRemoval = knownSelfRemoval,
+                directConversation = directConversation,
+                activeAccountIdHex = activeAccountIdHex,
+            )
+        ) {
+            scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
         members
@@ -4514,6 +4562,7 @@ class ChatsController private constructor(
             .filter { it.isNotBlank() }
             .forEach(appState::requestProfile)
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+        cancelMemberSnapshotRetry(groupIdHex)
         memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
         memberSnapshotsRevision += 1L
         // A loaded roster that omits self is known removal evidence (admin
@@ -4533,8 +4582,11 @@ class ChatsController private constructor(
     private fun scheduleMemberSnapshotRetry(
         groupIdHex: String,
         epoch: Long,
-        cacheEpoch: Long,
     ) {
+        memberFetchRetryJobsByGroup[groupIdHex]?.let { existing ->
+            if (existing.isActive) return
+            memberFetchRetryJobsByGroup.remove(groupIdHex)
+        }
         val backoffTier = memberFetchRetryBackoffTierByGroup.getOrDefault(groupIdHex, 0)
         val shouldRetry =
             isActiveBindEpoch(epoch) &&
@@ -4547,15 +4599,28 @@ class ChatsController private constructor(
             } else {
                 backoffTier + 1
             }
-        recomputeScope.launch {
-            delay(memberSnapshotRetryDelayMillis(backoffTier))
-            if (isActiveBindEpoch(epoch) &&
-                cacheEpoch == memberCacheEpoch &&
-                !memberCacheByGroup.containsKey(groupIdHex)
-            ) {
-                schedulePendingMemberFetches(listOf(groupIdHex))
+        val retryJob =
+            recomputeScope.launch(start = CoroutineStart.LAZY) {
+                val currentJob = coroutineContext[Job]
+                val shouldFetch =
+                    try {
+                        delay(memberSnapshotRetryDelay(backoffTier))
+                        isActiveBindEpoch(epoch) &&
+                            !memberCacheByGroup.containsKey(groupIdHex) &&
+                            chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
+                    } finally {
+                        if (memberFetchRetryJobsByGroup[groupIdHex] === currentJob) {
+                            memberFetchRetryJobsByGroup.remove(groupIdHex)
+                        }
+                    }
+                if (shouldFetch) schedulePendingMemberFetches(listOf(groupIdHex))
             }
-        }
+        memberFetchRetryJobsByGroup[groupIdHex] = retryJob
+        retryJob.start()
+    }
+
+    private fun cancelMemberSnapshotRetry(groupIdHex: String) {
+        memberFetchRetryJobsByGroup.remove(groupIdHex)?.cancel()
     }
 
     /**
@@ -4823,8 +4888,8 @@ private const val SEARCH_MAX_PAGES = 20
 // still letting shared-group snapshots materialize in the background.
 private const val MEMBER_FETCH_FANOUT = 4
 private const val MEMBER_FETCH_INITIAL_RETRY_DELAY_MS = 250L
-private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 8_000L
-private const val MEMBER_FETCH_MAX_BACKOFF_TIER = 5
+private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 300_000L
+private const val MEMBER_FETCH_MAX_BACKOFF_TIER = 11
 private const val PREVIEW_PARSE_FANOUT = 4
 private const val MEDIA_KIND_RESOLVE_FANOUT = 4
 

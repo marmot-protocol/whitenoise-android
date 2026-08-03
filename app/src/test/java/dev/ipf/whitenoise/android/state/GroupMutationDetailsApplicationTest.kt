@@ -294,8 +294,8 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
-    fun memberSnapshotRetryDelay_capsAtMaximumBackoff() {
-        assertEquals(8_000L, memberSnapshotRetryDelayMillis(Int.MAX_VALUE))
+    fun memberSnapshotRetryDelay_capsAtSustainableBackgroundInterval() {
+        assertEquals(300_000L, memberSnapshotRetryDelayMillis(Int.MAX_VALUE))
     }
 
     @Test
