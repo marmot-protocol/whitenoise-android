@@ -184,12 +184,14 @@ internal fun isNearBottom(
     if (lastVisible.index < bottomTimelineIndex - 1) return false
 
     // A normal tail row counts as near-bottom as soon as any part is visible,
-    // preserving the existing one-row threshold. Cap that threshold at one
-    // viewport so an oversized row cannot hide a far-off conversation tail.
+    // preserving the existing one-row threshold. For an oversized row, keep
+    // only a small no-flicker zone near the real tail; a full viewport delays
+    // the FAB until too much of an expanded message has already scrolled away.
     val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
     val tailDistanceFromViewport =
         lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
-    return tailDistanceFromViewport <= minOf(lastVisible.size, viewportHeight)
+    val oversizedTailThreshold = viewportHeight / 4
+    return tailDistanceFromViewport <= minOf(lastVisible.size, oversizedTailThreshold)
 }
 
 /**

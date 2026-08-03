@@ -160,7 +160,7 @@ class ConversationNearBottomTest {
     }
 
     @Test
-    fun tallTailShowsJumpButtonWhenItsBottomIsMoreThanAViewportAway() {
+    fun tallTailShowsJumpButtonBeforeItsBodyLeavesTheViewport() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val jumpToNewestLabel = context.getString(R.string.jump_to_newest)
         val listState = LazyListState()
@@ -183,23 +183,25 @@ class ConversationNearBottomTest {
             listState.layoutInfo.visibleItemsInfo
                 .single { it.index == tailListIndex }
                 .size
-        val nearTailOffset = tailSize - viewportHeight - viewportHeight / 2
+        val nearTailOffset = tailSize - viewportHeight - viewportHeight / 8
         scrollTo(listState, tailListIndex, nearTailOffset)
         val nearTail = listState.layoutInfo.visibleItemsInfo.last()
         val nearTailDistanceFromViewport =
             nearTail.offset + nearTail.size - listState.layoutInfo.viewportEndOffset
 
         assertEquals(tailListIndex, nearTail.index)
-        assertTrue(nearTailDistanceFromViewport in 1..viewportHeight)
+        assertTrue(nearTailDistanceFromViewport in 1 until viewportHeight / 4)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
 
-        scrollTo(listState, tailListIndex, viewportHeight)
+        val farTailOffset = tailSize - viewportHeight - viewportHeight / 2
+        scrollTo(listState, tailListIndex, farTailOffset)
         val lastVisible = listState.layoutInfo.visibleItemsInfo.last()
         val tailDistanceFromViewport =
             lastVisible.offset + lastVisible.size - listState.layoutInfo.viewportEndOffset
         assertEquals(tailListIndex, lastVisible.index)
-        assertTrue(tailDistanceFromViewport > viewportHeight)
+        assertTrue(tailDistanceFromViewport > viewportHeight / 4)
+        composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription(jumpToNewestLabel).performClick()
