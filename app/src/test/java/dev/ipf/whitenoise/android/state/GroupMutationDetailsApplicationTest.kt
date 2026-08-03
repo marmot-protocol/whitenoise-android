@@ -284,6 +284,40 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun memberSnapshotReadyToCache_rejectsEmptyRoster() {
+        assertFalse(memberSnapshotReadyToCache(emptyList()))
+    }
+
+    @Test
+    fun memberSnapshotReadyToCache_acceptsEmptyRosterWhenSelfRemovalIsKnown() {
+        assertTrue(memberSnapshotReadyToCache(emptyList(), knownSelfRemoval = true))
+    }
+
+    @Test
+    fun memberSnapshotRetryDelay_capsAtSustainableBackgroundInterval() {
+        assertEquals(300_000L, memberSnapshotRetryDelayMillis(Int.MAX_VALUE))
+    }
+
+    @Test
+    fun memberSnapshotReadyToCache_acceptsDmRosterWithSelf() {
+        val members =
+            listOf(
+                chatMember("alice", account = "alice", local = true),
+                chatMember("bob"),
+            )
+        assertTrue(memberSnapshotReadyToCache(members))
+    }
+
+    @Test
+    fun memberSnapshotReadyToCache_acceptsNonEmptyRosterWithoutSelfForRemovalDetection() {
+        assertTrue(
+            memberSnapshotReadyToCache(
+                members = listOf(chatMember("bob")),
+            ),
+        )
+    }
+
+    @Test
     fun authoritativeChatListMembersReplaceStaleDmRosterBeforeLookup() {
         val alice = chatMember("alice", account = "alice", local = true)
         val bob = chatMember("bob", account = "bob")
