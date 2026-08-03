@@ -6037,6 +6037,14 @@ class WhiteNoiseAppState private constructor(
     fun accountIdHexForMention(bech32: String): String? = nostrEntityAccountIdHex(bech32)
 
     /**
+     * Same pure decode for surfaces that must know the identity on their first
+     * composed frame. The profile sheet uses it so its height is settled before
+     * the open animation starts (#1432); callers still need [accountIdHex] for
+     * references this can't normalize locally.
+     */
+    fun profileReferenceAccountIdHex(reference: String): String? = nostrEntityAccountIdHex(reference)
+
+    /**
      * Whether a mention/profile [bech32] (npub/nprofile) resolves to an account
      * that is in [members] — the active group's roster snapshot for this
      * message render. The message renderer uses this to reserve the "@" mention
