@@ -912,6 +912,11 @@ internal fun ComposerBar(
                             }
                         },
                         attachmentSheetOpen = attachmentSheetState.isOpen,
+                        preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
+                        onPreImeBack = {
+                            focusManager.clearFocus(force = true)
+                            keyboardController?.hide()
+                        },
                         hasCameraCapture = onCaptureFromCamera != null,
                         hasLocationShare = onShareLocation != null,
                         hasUserShare = onShareUser != null,
