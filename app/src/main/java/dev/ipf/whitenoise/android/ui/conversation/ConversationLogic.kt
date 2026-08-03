@@ -178,11 +178,20 @@ internal fun isNearBottom(
     // truthful when the viewport shrinks (e.g. keyboard open) and fewer
     // items fit, which pushes firstVisibleItemIndex earlier even though
     // the bottom is still on-screen.
-    val lastVisible =
-        listState.layoutInfo.visibleItemsInfo
-            .lastOrNull()
-            ?.index ?: return false
-    return lastVisible >= bottomTimelineIndex - 1
+    val layoutInfo = listState.layoutInfo
+    val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return false
+    if (lastVisible.index >= bottomTimelineIndex) return true
+    if (lastVisible.index < bottomTimelineIndex - 1) return false
+
+    // A normal tail row counts as near-bottom as soon as any part is visible,
+    // preserving the existing one-row threshold. For an oversized row, keep
+    // only a small no-flicker zone near the real tail; a full viewport delays
+    // the FAB until too much of an expanded message has already scrolled away.
+    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    val tailDistanceFromViewport =
+        lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
+    val oversizedTailThreshold = viewportHeight / 4
+    return tailDistanceFromViewport <= minOf(lastVisible.size, oversizedTailThreshold)
 }
 
 /**
