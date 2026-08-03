@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">置頂</string>
     <string name="chat_row_action_unpin">取消置頂</string>
     <string name="chat_pinned_badge">已置頂</string>
+    <string name="chat_row_removed_badge">已移除</string>
+    <string name="chat_row_removed_description">你已被移出此對話</string>
     <string name="chat_row_action_move_up">上移</string>
     <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
     <string name="chat_row_action_mark_unread">標示為未讀</string>
     <string name="chat_row_marked_unread">已標示為未讀</string>
     <string name="chat_row_action_delete_group">刪除群組</string>
+    <string name="chat_row_action_delete_chat">刪除對話</string>
+    <string name="delete_chat_dialog_title">刪除對話？</string>
+    <string name="delete_chat_dialog_message">從此裝置移除此對話？如果你仍是成員，將先退出對話。</string>
     <string name="delete_group_dialog_title">刪除群組？</string>
     <string name="delete_group_dialog_message">從此裝置移除此群組？如果你仍是成員，將先退出群組。</string>
     <string name="delete_group_confirm">刪除</string>
@@ -188,7 +193,7 @@
     <string name="unarchive_chat">取消封存</string>
     <string name="archiving_chat">正在封存聊天...</string>
     <string name="restoring_chat">正在還原聊天...</string>
-    <string name="leave_chat">離開群組</string>
+    <string name="leave_chat">離開對話</string>
     <string name="leaving_chat">正在離開聊天...</string>
     <string name="promote_admin_before_leaving">離開前晉升另一位管理員</string>
     <string name="export_conversation_transcript">匯出會話記錄</string>
@@ -756,6 +761,7 @@
     <string name="group_image_search_privacy">網頁搜尋會將你的查詢和 IP 位址傳送給 DuckDuckGo 和圖片伺服器。</string>
     <string name="group_image_search_apply">使用此圖片</string>
     <string name="group_image_choose_photo">從照片中選擇</string>
+    <string name="toast_couldnt_upload_group_image">無法上傳群組圖片。</string>
     <string name="group_image_search_enter_query">請輸入搜尋關鍵字。</string>
     <string name="group_image_search_unavailable">圖片搜尋暫時無法使用。</string>
     <string name="group_image_search_bad_response">圖片搜尋傳回意外的回應。</string>

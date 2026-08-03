@@ -87,9 +87,14 @@
     <string name="chat_row_action_pin">Pin</string>
     <string name="chat_row_action_unpin">Unpin</string>
     <string name="chat_pinned_badge">Pinned</string>
+    <string name="chat_row_removed_badge">Removed</string>
+    <string name="chat_row_removed_description">You were removed from this chat</string>
     <string name="chat_row_action_move_up">Move up</string>
     <string name="chat_row_action_move_down">Move down</string>
     <string name="chat_row_action_delete_group">Delete group</string>
+    <string name="chat_row_action_delete_chat">Delete chat</string>
+    <string name="delete_chat_dialog_title">Delete chat?</string>
+    <string name="delete_chat_dialog_message">Remove this chat from this device? If you\'re still a member, you\'ll leave the chat first.</string>
     <string name="delete_group_dialog_title">Delete group?</string>
     <string name="delete_group_dialog_message">Remove this group from this device? If you\'re still a member, you\'ll leave the group first.</string>
     <string name="delete_group_confirm">Delete</string>
@@ -247,7 +252,7 @@
     <string name="unarchive_chat">Unarchive Chat</string>
     <string name="archiving_chat">Archiving chat...</string>
     <string name="restoring_chat">Restoring chat...</string>
-    <string name="leave_chat">Leave Chat</string>
+    <string name="leave_chat">Leave chat</string>
     <string name="leaving_chat">Leaving chat...</string>
     <string name="promote_admin_before_leaving">Promote another admin before leaving</string>
     <string name="export_conversation_transcript">Export Conversation Transcript</string>
@@ -996,6 +1001,7 @@
     <string name="group_image_search_privacy">Web search sends your query and IP address to DuckDuckGo and image hosts.</string>
     <string name="group_image_search_apply">Use this image</string>
     <string name="group_image_choose_photo">Choose from photos</string>
+    <string name="toast_couldnt_upload_group_image">Couldn\'t upload the group photo.</string>
     <string name="group_image_search_enter_query">Enter a search term.</string>
     <string name="group_image_search_unavailable">Image search is temporarily unavailable.</string>
     <string name="group_image_search_bad_response">Image search returned an unexpected response.</string>

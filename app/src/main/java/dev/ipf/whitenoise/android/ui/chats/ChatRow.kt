@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +55,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.chatListItemEvicted
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -236,7 +238,8 @@ internal fun ChatRow(
             else -> Modifier.clickable(onClick = onClick)
         }
     val pinned = item.pinned()
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || pinned
+    val evicted = chatListItemEvicted(item)
+    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || pinned || evicted
     val actionColors = accountActionColors(appState)
     Box(modifier = rowModifier) {
         ChatRowLayout(
@@ -356,6 +359,7 @@ internal fun ChatRow(
                             unreadMention = item.unreadMention,
                             actionColors = actionColors,
                             pinned = pinned,
+                            evicted = evicted,
                         )
                     }
                 } else {
@@ -442,13 +446,39 @@ internal fun PinnedBadge(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Quiet status marker for a conversation the local account was evicted from.
+ * Deliberately a tonal label rather than a [Badge]: the accent colours next to
+ * it carry unread alerts, and this is a settled state, not something to act on.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun EvictedLabel(modifier: Modifier = Modifier) {
+    val description = stringResource(R.string.chat_row_removed_description)
+    Surface(
+        // Merge the chip's text in so the status is one focus stop reading the
+        // full description, not "Removed" announced again right after it.
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = description },
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            text = stringResource(R.string.chat_row_removed_badge),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
 @Composable
 internal fun MentionBadge(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.chat_list_mention_badge)
     // Tertiary accent so a mention reads as distinct from the primary-colored
     // unread count sitting beside it.
     Badge(
-        modifier = modifier.semantics { contentDescription = description },
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = description },
         containerColor = MaterialTheme.colorScheme.tertiary,
         contentColor = MaterialTheme.colorScheme.onTertiary,
     ) {

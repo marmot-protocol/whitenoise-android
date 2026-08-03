@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
@@ -54,6 +55,17 @@ import kotlinx.coroutines.flow.filter
 import java.util.Locale
 
 internal fun localeInvariantFold(value: String): String = value.lowercase(Locale.ROOT)
+
+/**
+ * Deliberately narrower than `ChatListItem.removedFromGroup`, which answers
+ * "is the row inert" for badge suppression. Only the engine's authoritative
+ * `selfMembership` counts here, so a voluntary exit, an in-flight leave, a
+ * disband, or a roster that hasn't loaded self yet never reads as an eviction —
+ * an eviction is the one membership change the user gets no other signal for.
+ */
+internal fun chatListItemEvicted(item: ChatListItem): Boolean =
+    item.group.selfMembership == SelfMembershipFfi.REMOVED ||
+        item.projection?.selfMembership == SelfMembershipFfi.REMOVED
 
 // At least as long as the truncated id prefix shown in group details, so a
 // copied prefix matches while short hex-looking words ("cafe") stay plain text.

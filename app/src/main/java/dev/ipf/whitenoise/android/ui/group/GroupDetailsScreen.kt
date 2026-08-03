@@ -177,6 +177,7 @@ internal fun conversationTranscriptShareIntent(
 
 @Composable
 internal fun GroupDetailsLocalDeleteControl(
+    isDm: Boolean,
     readOnlyInvite: Boolean,
     isSelfMember: Boolean,
     membersVerified: Boolean,
@@ -186,17 +187,20 @@ internal fun GroupDetailsLocalDeleteControl(
 ) {
     if (readOnlyInvite || isSelfMember || !membersVerified) return
     var confirmOpen by remember { mutableStateOf(false) }
+    val deleteLabel = if (isDm) R.string.chat_row_action_delete_chat else R.string.chat_row_action_delete_group
+    val dialogTitle = if (isDm) R.string.delete_chat_dialog_title else R.string.delete_group_dialog_title
+    val dialogMessage = if (isDm) R.string.delete_chat_dialog_message else R.string.delete_group_dialog_message
     DangerActionRow(
         icon = Icons.Default.Delete,
-        title = stringResource(R.string.chat_row_action_delete_group),
+        title = stringResource(deleteLabel),
         enabled = enabled,
         inProgress = inProgress,
         onClick = { confirmOpen = true },
     )
     if (confirmOpen) {
         ConfirmDialog(
-            title = stringResource(R.string.delete_group_dialog_title),
-            message = stringResource(R.string.delete_group_dialog_message),
+            title = stringResource(dialogTitle),
+            message = stringResource(dialogMessage),
             confirmLabel = stringResource(R.string.delete_group_confirm),
             onConfirm = {
                 confirmOpen = false
@@ -748,18 +752,16 @@ internal fun GroupDetailsScreen(
                             )
                         }
                         if (!readOnlyInvite && controller.isSelfMember) {
+                            val leaveLabel =
+                                when {
+                                    activeMutation?.action == GroupMutationAction.Leave -> R.string.leaving_chat
+                                    isDm -> R.string.leave_chat
+                                    else -> R.string.leave_group
+                                }
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        stringResource(
-                                            if (activeMutation?.action ==
-                                                GroupMutationAction.Leave
-                                            ) {
-                                                R.string.leaving_chat
-                                            } else {
-                                                R.string.leave_chat
-                                            },
-                                        ),
+                                        stringResource(leaveLabel),
                                         style = MaterialTheme.typography.bodyLarge,
                                     )
                                 },
@@ -1412,6 +1414,7 @@ internal fun GroupDetailsScreen(
                     }
                 }
                 GroupDetailsLocalDeleteControl(
+                    isDm = isDm,
                     readOnlyInvite = readOnlyInvite,
                     isSelfMember = controller.isSelfMember,
                     membersVerified = controller.membersVerified,

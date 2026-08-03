@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">Закрепить</string>
     <string name="chat_row_action_unpin">Открепить</string>
     <string name="chat_pinned_badge">Закреплено</string>
+    <string name="chat_row_removed_badge">Исключены</string>
+    <string name="chat_row_removed_description">Вас исключили из этого чата</string>
     <string name="chat_row_action_move_up">Переместить вверх</string>
     <string name="chat_row_action_move_down">Переместить вниз</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
     <string name="chat_row_action_mark_unread">Отметить непрочитанным</string>
     <string name="chat_row_marked_unread">Отмечено как непрочитанное</string>
     <string name="chat_row_action_delete_group">Удалить группу</string>
+    <string name="chat_row_action_delete_chat">Удалить чат</string>
+    <string name="delete_chat_dialog_title">Удалить чат?</string>
+    <string name="delete_chat_dialog_message">Удалить этот чат с этого устройства? Если вы ещё участник, сначала вы покинете чат.</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
     <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>
     <string name="delete_group_confirm">Удалить</string>
@@ -208,7 +213,7 @@
     <string name="unarchive_chat">Разархивировать</string>
     <string name="archiving_chat">Архивирование чата...</string>
     <string name="restoring_chat">Восстановление чата...</string>
-    <string name="leave_chat">Покинуть группу</string>
+    <string name="leave_chat">Покинуть чат</string>
     <string name="leaving_chat">Выход из чата...</string>
     <string name="promote_admin_before_leaving">Повысьте другого администратора перед уходом</string>
     <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
@@ -796,6 +801,7 @@
     <string name="group_image_search_privacy">Веб-поиск передаёт ваш запрос и IP-адрес DuckDuckGo и серверам изображений.</string>
     <string name="group_image_search_apply">Использовать это изображение</string>
     <string name="group_image_choose_photo">Выбрать из фотографий</string>
+    <string name="toast_couldnt_upload_group_image">Не удалось загрузить фото группы.</string>
     <string name="group_image_search_enter_query">Введите поисковый запрос.</string>
     <string name="group_image_search_unavailable">Поиск изображений временно недоступен.</string>
     <string name="group_image_search_bad_response">Поиск изображений вернул неожиданный ответ.</string>

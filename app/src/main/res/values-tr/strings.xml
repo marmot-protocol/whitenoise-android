@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">Sabitle</string>
     <string name="chat_row_action_unpin">Sabitlemeyi kaldır</string>
     <string name="chat_pinned_badge">Sabitlendi</string>
+    <string name="chat_row_removed_badge">Çıkarıldınız</string>
+    <string name="chat_row_removed_description">Bu sohbetten çıkarıldınız</string>
     <string name="chat_row_action_move_up">Yukarı taşı</string>
     <string name="chat_row_action_move_down">Aşağı taşı</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
     <string name="chat_row_action_mark_unread">Okunmadı olarak işaretle</string>
     <string name="chat_row_marked_unread">Okunmadı olarak işaretlendi</string>
     <string name="chat_row_action_delete_group">Grubu sil</string>
+    <string name="chat_row_action_delete_chat">Sohbeti sil</string>
+    <string name="delete_chat_dialog_title">Sohbet silinsin mi?</string>
+    <string name="delete_chat_dialog_message">Bu sohbet bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce sohbetten çıkarsınız.</string>
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
     <string name="delete_group_dialog_message">Bu grup bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce gruptan çıkarsınız.</string>
     <string name="delete_group_confirm">Sil</string>
@@ -194,7 +199,7 @@
     <string name="unarchive_chat">Arşivden çıkar</string>
     <string name="archiving_chat">Sohbet arşivleniyor...</string>
     <string name="restoring_chat">Sohbet geri yükleniyor...</string>
-    <string name="leave_chat">Gruptan ayrıl</string>
+    <string name="leave_chat">Sohbetten ayrıl</string>
     <string name="leaving_chat">Sohbetten ayrılınıyor...</string>
     <string name="promote_admin_before_leaving">Ayrılmadan önce başka bir yöneticinin terfisini alın</string>
     <string name="export_conversation_transcript">Konuşma dökümünü dışa aktar</string>
@@ -768,6 +773,7 @@
     <string name="group_image_search_privacy">Web araması, sorgunuzu ve IP adresinizi DuckDuckGo\'ya ve görsel sunucularına gönderir.</string>
     <string name="group_image_search_apply">Bu görseli kullan</string>
     <string name="group_image_choose_photo">Fotoğraflardan seç</string>
+    <string name="toast_couldnt_upload_group_image">Grup fotoğrafı yüklenemedi.</string>
     <string name="group_image_search_enter_query">Bir arama terimi girin.</string>
     <string name="group_image_search_unavailable">Görsel araması geçici olarak kullanılamıyor.</string>
     <string name="group_image_search_bad_response">Görsel araması beklenmeyen bir yanıt döndürdü.</string>

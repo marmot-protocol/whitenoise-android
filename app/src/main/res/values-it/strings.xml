@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">Fissa</string>
     <string name="chat_row_action_unpin">Non fissare</string>
     <string name="chat_pinned_badge">Fissata</string>
+    <string name="chat_row_removed_badge">Rimosso</string>
+    <string name="chat_row_removed_description">Sei stato rimosso da questa chat</string>
     <string name="chat_row_action_move_up">Sposta su</string>
     <string name="chat_row_action_move_down">Sposta giù</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
     <string name="chat_row_action_mark_unread">Segna come non letto</string>
     <string name="chat_row_marked_unread">Segnato come non letto</string>
     <string name="chat_row_action_delete_group">Elimina gruppo</string>
+    <string name="chat_row_action_delete_chat">Elimina chat</string>
+    <string name="delete_chat_dialog_title">Eliminare la chat?</string>
+    <string name="delete_chat_dialog_message">Rimuovere questa chat da questo dispositivo? Se sei ancora un membro, uscirai prima dalla chat.</string>
     <string name="delete_group_dialog_title">Eliminare il gruppo?</string>
     <string name="delete_group_dialog_message">Rimuovere questo gruppo da questo dispositivo? Se sei ancora un membro, uscirai prima dal gruppo.</string>
     <string name="delete_group_confirm">Elimina</string>
@@ -194,7 +199,7 @@
     <string name="unarchive_chat">Rimuovi dall’archivio</string>
     <string name="archiving_chat">Archiviazione chat...</string>
     <string name="restoring_chat">Ripristino chat...</string>
-    <string name="leave_chat">Lascia il gruppo</string>
+    <string name="leave_chat">Esci dalla chat</string>
     <string name="leaving_chat">Uscita dalla chat...</string>
     <string name="promote_admin_before_leaving">Promuovi un altro amministratore prima di lasciare</string>
     <string name="export_conversation_transcript">Esporta trascrizione della conversazione</string>
@@ -768,6 +773,7 @@
     <string name="group_image_search_privacy">La ricerca web invia la query e l’indirizzo IP a DuckDuckGo e ai server delle immagini.</string>
     <string name="group_image_search_apply">Usa questa immagine</string>
     <string name="group_image_choose_photo">Scegli dalle foto</string>
+    <string name="toast_couldnt_upload_group_image">Impossibile caricare la foto del gruppo.</string>
     <string name="group_image_search_enter_query">Inserisci un termine di ricerca.</string>
     <string name="group_image_search_unavailable">Ricerca immagini temporaneamente non disponibile.</string>
     <string name="group_image_search_bad_response">La ricerca immagini ha restituito una risposta imprevista.</string>
