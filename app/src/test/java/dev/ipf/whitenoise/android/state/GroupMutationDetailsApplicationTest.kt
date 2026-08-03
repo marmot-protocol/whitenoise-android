@@ -10,10 +10,32 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GroupMutationDetailsApplicationTest {
+    @Test
+    fun publicAvatarReplacesEncryptedImageInLocalGroupState() {
+        val original = group(admins = emptyList()).copy(imageHashHex = "ab".repeat(32))
+
+        val updated = groupWithPublicAvatar(original, "https://blossom.example/avatar.jpg")
+
+        assertEquals("https://blossom.example/avatar.jpg", updated.avatarUrl)
+        assertNull(updated.imageHashHex)
+    }
+
+    @Test
+    fun clearingPublicAvatarDoesNotInventAnEncryptedImageRemoval() {
+        val encryptedHash = "ab".repeat(32)
+        val original = group(admins = emptyList()).copy(imageHashHex = encryptedHash)
+
+        val updated = groupWithPublicAvatar(original, null)
+
+        assertNull(updated.avatarUrl)
+        assertEquals(encryptedHash, updated.imageHashHex)
+    }
+
     @Test
     fun detailedProjectionIncludesRemoteAdminMemberWhenSameEpochChangeLands() {
         val authoritative = group(admins = listOf("alice", "bob", "carol"))

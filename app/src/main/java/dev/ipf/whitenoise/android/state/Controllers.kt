@@ -4630,6 +4630,17 @@ private const val TIMELINE_BATCH_DRAIN_MS = 6L
 // guards against a burst of never-echoed sends leaking entries.
 private const val SEND_TRACE_MAX_TRACKED = 64
 
+internal fun groupWithPublicAvatar(
+    group: AppGroupRecordFfi,
+    avatarUrl: String?,
+): AppGroupRecordFfi =
+    group.copy(
+        avatarUrl = avatarUrl,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = if (avatarUrl != null) null else group.imageHashHex,
+    )
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -7331,10 +7342,19 @@ class ConversationController(
                     appState.marmotIo {
                         updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
                     }
+                    // A public avatar supersedes the encrypted member-only
+                    // component. Remove that component after the public URL is
+                    // durable so clearing the URL on another client cannot
+                    // resurrect an obsolete private image.
+                    if (normalized != null && group.imageHashHex != null) {
+                        appState.marmotIo {
+                            clearGroupImage(account, group.groupIdHex)
+                        }
+                    }
                 }
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
-                group = group.copy(avatarUrl = normalized, avatarDim = null, avatarThumbhash = null)
+                group = groupWithPublicAvatar(group, normalized)
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {

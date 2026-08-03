@@ -1172,6 +1172,12 @@ internal fun networkDisplayNameFallback(
 
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 
+internal fun appStateScopeExceptionHandler(
+    report: (Throwable) -> Unit = { throwable ->
+        Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
+    },
+): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
+
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 private data class AccountBubbleColorSlot(
@@ -1868,18 +1874,15 @@ class WhiteNoiseAppState private constructor(
      * which on the main thread kills the process. Only covers `launch`; `async`
      * parks its failure in the `Deferred` until `await()`.
      */
-    internal val appStateScopeExceptionHandler =
-        CoroutineExceptionHandler { _, throwable ->
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
-        }
+    private val scopeExceptionHandler = appStateScopeExceptionHandler()
 
     private val profileScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + appStateScopeExceptionHandler)
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + appStateScopeExceptionHandler)
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val notificationScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + appStateScopeExceptionHandler)
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
