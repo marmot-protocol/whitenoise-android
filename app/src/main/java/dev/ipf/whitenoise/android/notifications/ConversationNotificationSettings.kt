@@ -58,10 +58,12 @@ internal fun openConversationNotificationSettings(
     parent: NotificationChannelSpec? = null,
     conversationTitle: String? = null,
     conversationAvatarUrl: String? = null,
+    primaryVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
 ) {
     val shortcutId = conversationShortcutId(accountRef, groupIdHex)
     val targetParent = parent ?: ConversationNotificationChannels.primaryMessageParent(isDm)
     var channelConversationTitle = conversationTitle
+    var activeChannelId: String? = null
     if (shortcutId != null) {
         conversationTitle?.trim()?.takeIf(String::isNotEmpty)?.let { title ->
             // The settings screen may be opened before this chat has ever
@@ -100,17 +102,33 @@ internal fun openConversationNotificationSettings(
             conversationShortcutId = shortcutId,
             isDm = isDm,
             conversationTitle = channelConversationTitle,
+            primaryVibrationPattern = primaryVibrationPattern,
         )
+        val targetPattern =
+            if (targetParent == ConversationNotificationChannels.primaryMessageParent(isDm)) {
+                primaryVibrationPattern
+            } else {
+                ConversationVibrationPattern.SYSTEM_DEFAULT
+            }
+        activeChannelId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = targetParent.id,
+                conversationShortcutId = shortcutId,
+                conversationTitle = channelConversationTitle,
+                vibrationPattern = targetPattern,
+            )
     }
     val preferred =
         conversationNotificationSettingsIntent(
             context = context,
             accountRef = accountRef,
             groupIdHex = groupIdHex,
-            // Android resolves a conversation from its typed parent channel
-            // plus the shortcut ID. Supplying the child ID would incorrectly
-            // ask the platform to find a conversation beneath a child.
-            channelId = targetParent.id,
+            // Point directly at the active child version so a custom vibration
+            // selection never opens a stale sibling channel. The conversation
+            // id remains attached for OEM settings apps that use it to render
+            // the richer per-conversation surface.
+            channelId = activeChannelId ?: targetParent.id,
         )
     if (context.tryStartActivity(preferred)) return
     if (preferred.action != Settings.ACTION_APP_NOTIFICATION_SETTINGS && context.tryStartActivity(appNotificationSettingsIntent(context))) return

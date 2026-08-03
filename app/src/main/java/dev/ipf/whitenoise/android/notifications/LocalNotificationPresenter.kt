@@ -86,6 +86,7 @@ class LocalNotificationPresenter(
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
+    private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
 
     // Conversation channels we've already created in this process, so the hot
     // post path skips the get-or-create Binder round-trip after the first post.
@@ -338,10 +339,19 @@ class LocalNotificationPresenter(
                     null
                 }
             val messagingShortcutId = channelShortcutId.takeIf { decision.style == NotificationStyleChoice.Messaging }
+            val vibrationPattern =
+                if (
+                    decision.channelId == NotificationChannelSpec.DIRECT_MESSAGES.id ||
+                    decision.channelId == NotificationChannelSpec.GROUP_MESSAGES.id
+                ) {
+                    conversationVibrationPreferences.pattern(update.accountRef, update.groupIdHex)
+                } else {
+                    ConversationVibrationPattern.SYSTEM_DEFAULT
+                }
             val channelId =
                 if (channelShortcutId != null) {
                     withContext(Dispatchers.Default) {
-                        ensureConversationChannel(decision.channelId, channelShortcutId)
+                        ensureConversationChannel(decision.channelId, channelShortcutId, vibrationPattern)
                     } ?: decision.channelId
                 } else {
                     decision.channelId
@@ -990,14 +1000,26 @@ class LocalNotificationPresenter(
     private fun ensureConversationChannel(
         parentChannelId: String,
         conversationShortcutId: String,
+        vibrationPattern: ConversationVibrationPattern,
     ): String? {
-        val conversationChannelId = ConversationNotificationChannels.conversationChannelId(parentChannelId, conversationShortcutId)
+        val conversationChannelId =
+            ConversationNotificationChannels.conversationChannelId(
+                parentChannelId,
+                conversationShortcutId,
+                vibrationPattern,
+            )
         if (conversationChannelId in ensuredConversationChannels) {
             val manager = context.getSystemService(NotificationManager::class.java)
             if (manager?.getNotificationChannel(conversationChannelId) != null) return conversationChannelId
             ensuredConversationChannels.remove(conversationChannelId)
         }
-        val created = ConversationNotificationChannels.ensureConversationChannel(context, parentChannelId, conversationShortcutId)
+        val created =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = parentChannelId,
+                conversationShortcutId = conversationShortcutId,
+                vibrationPattern = vibrationPattern,
+            )
         if (created != null) ensuredConversationChannels.add(created)
         return created
     }

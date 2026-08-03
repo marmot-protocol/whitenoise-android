@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,16 +26,27 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
+import dev.ipf.whitenoise.android.notifications.EffectiveConversationVibration
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -57,10 +69,37 @@ internal fun ConversationNotificationSettingsScreen(
     isMuted: Boolean,
     muteExpiryMillis: Long?,
     notifyForMode: ChatNotifyMode,
+    vibrationPattern: ConversationVibrationPattern,
     onBack: () -> Unit,
     onToggleMute: (Boolean) -> Unit,
     onChooseNotifyFor: () -> Unit,
+    onChooseVibrationPattern: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var resumeGeneration by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) resumeGeneration += 1
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val effectiveVibration =
+        remember(appState.activeAccountRef, groupIdHex, isDm, vibrationPattern, resumeGeneration) {
+            val shortcutId = appState.activeAccountRef?.let { conversationShortcutId(it, groupIdHex) }
+            if (shortcutId == null) {
+                EffectiveConversationVibration(vibrationPattern, enabled = true, overriddenByAndroid = false)
+            } else {
+                ConversationNotificationChannels.effectiveVibration(
+                    context = context,
+                    conversationShortcutId = shortcutId,
+                    isDm = isDm,
+                    selectedPattern = vibrationPattern,
+                )
+            }
+        }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -93,6 +132,12 @@ internal fun ConversationNotificationSettingsScreen(
                 value = notificationModeLabel(notifyForMode),
                 onClick = onChooseNotifyFor,
             )
+            SettingsActionRow(
+                icon = Icons.Default.Vibration,
+                title = stringResource(R.string.vibration_pattern),
+                value = effectiveVibrationLabel(effectiveVibration, vibrationPattern),
+                onClick = onChooseVibrationPattern,
+            )
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.padding(top = Dimens.spaceSm),
@@ -104,6 +149,7 @@ internal fun ConversationNotificationSettingsScreen(
                 conversationTitle = conversationTitle,
                 conversationAvatarUrl = conversationAvatarUrl,
                 isDm = isDm,
+                primaryVibrationPattern = vibrationPattern,
             )
         }
     }
@@ -117,6 +163,7 @@ private fun NotificationCategoriesSection(
     conversationTitle: String,
     conversationAvatarUrl: String?,
     isDm: Boolean,
+    primaryVibrationPattern: ConversationVibrationPattern,
 ) {
     val context = LocalContext.current
     ConversationNotificationChannels.relevantParents(isDm).forEach { parent ->
@@ -135,12 +182,29 @@ private fun NotificationCategoriesSection(
                             parent = parent,
                             conversationTitle = conversationTitle,
                             conversationAvatarUrl = conversationAvatarUrl,
+                            primaryVibrationPattern = primaryVibrationPattern,
                         )
                     }
                 },
         )
     }
 }
+
+@Composable
+private fun effectiveVibrationLabel(
+    effective: EffectiveConversationVibration,
+    selected: ConversationVibrationPattern,
+): String =
+    when {
+        !effective.enabled -> stringResource(R.string.vibration_pattern_off_in_android_settings)
+        effective.pattern == null -> stringResource(R.string.vibration_pattern_custom_in_android_settings)
+        effective.overriddenByAndroid ->
+            stringResource(
+                R.string.vibration_pattern_android_override,
+                vibrationPatternLabel(effective.pattern),
+            )
+        else -> vibrationPatternLabel(selected)
+    }
 
 @Composable
 private fun mutedUntilLabel(expiryMillis: Long): String =

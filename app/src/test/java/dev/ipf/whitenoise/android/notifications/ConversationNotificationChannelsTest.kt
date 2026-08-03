@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.notifications
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.net.Uri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -30,6 +32,198 @@ class ConversationNotificationChannelsTest {
         assertEquals(id, ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-abc"))
         assertNotEquals(id, ConversationNotificationChannels.conversationChannelId("mentions", "conversation-abc"))
         assertNotEquals(id, ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-xyz"))
+    }
+
+    @Test
+    fun customPatternsResolveToStableBoundedChannelVersions() {
+        val defaultId =
+            ConversationNotificationChannels.conversationChannelId(
+                "messages_group",
+                "conversation-abc",
+                ConversationVibrationPattern.SYSTEM_DEFAULT,
+            )
+        val shortId =
+            ConversationNotificationChannels.conversationChannelId(
+                "messages_group",
+                "conversation-abc",
+                ConversationVibrationPattern.SHORT,
+            )
+
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-abc"),
+            defaultId,
+        )
+        assertNotEquals(defaultId, shortId)
+        assertEquals(
+            shortId,
+            ConversationNotificationChannels.conversationChannelId(
+                "messages_group",
+                "conversation-abc",
+                ConversationVibrationPattern.SHORT,
+            ),
+        )
+        assertEquals(
+            4,
+            ConversationVibrationPattern.entries
+                .map {
+                    ConversationNotificationChannels.conversationChannelId("messages_group", "conversation-abc", it)
+                }.toSet()
+                .size,
+        )
+    }
+
+    @Test
+    fun api34UsesWaveformAndApi35UsesVibrationEffectWithWaveformFallback() {
+        val api34 = NotificationChannel("api34", "API 34", NotificationManager.IMPORTANCE_DEFAULT)
+        val api35 = NotificationChannel("api35", "API 35", NotificationManager.IMPORTANCE_DEFAULT)
+        val fallback = NotificationChannel("fallback", "Fallback", NotificationManager.IMPORTANCE_DEFAULT)
+
+        applyConversationVibration(api34, ConversationVibrationPattern.DOUBLE, sdkInt = 34)
+        applyConversationVibration(api35, ConversationVibrationPattern.DOUBLE, sdkInt = 35)
+        applyConversationVibration(
+            fallback,
+            ConversationVibrationPattern.DOUBLE,
+            sdkInt = 35,
+            vibrationEffectFactory = { null },
+        )
+
+        assertEquals(listOf(0L, 100L, 100L, 100L), api34.vibrationPattern!!.toList())
+        assertNotNull(api35.vibrationEffect)
+        assertEquals(listOf(0L, 100L, 100L, 100L), fallback.vibrationPattern!!.toList())
+    }
+
+    @Test
+    fun changingPatternCreatesANewChannelAndCopiesUnrelatedAlertSettings() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-versioned"
+        val originalId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+                vibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+            )!!
+        val original = manager.getNotificationChannel(originalId)
+        val customSound = Uri.parse("content://test/custom-sound")
+        original.setSound(customSound, original.audioAttributes)
+        original.enableLights(true)
+        original.lightColor = 0x00ff00
+        original.setShowBadge(false)
+        manager.createNotificationChannel(original)
+
+        val customId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+                vibrationPattern = ConversationVibrationPattern.DOUBLE,
+                sourceVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+            )!!
+
+        assertNotEquals(originalId, customId)
+        assertNotNull(manager.getNotificationChannel(originalId))
+        assertEquals(listOf(0L, 150L), manager.getNotificationChannel(originalId).vibrationPattern!!.toList())
+        val custom = manager.getNotificationChannel(customId)
+        assertEquals(original.importance, custom.importance)
+        assertEquals(original.sound, custom.sound)
+        assertEquals(original.canShowBadge(), custom.canShowBadge())
+        assertEquals(original.shouldShowLights(), custom.shouldShowLights())
+        assertEquals(original.lightColor, custom.lightColor)
+        assertEquals(listOf(0L, 100L, 100L, 100L), custom.vibrationPattern!!.toList())
+    }
+
+    @Test
+    fun customPatternOnlyVersionsThePrimaryMessageChannel() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-primary-only"
+
+        ConversationNotificationChannels.ensureConversationChannels(
+            context = context,
+            conversationShortcutId = shortcut,
+            isDm = false,
+            primaryVibrationPattern = ConversationVibrationPattern.LONG,
+        )
+
+        assertNotNull(
+            conversationChannel(
+                "messages_group",
+                shortcut,
+                ConversationVibrationPattern.LONG,
+            ),
+        )
+        assertNull(
+            conversationChannel(
+                "mentions",
+                shortcut,
+                ConversationVibrationPattern.LONG,
+            ),
+        )
+        assertNotNull(conversationChannel("mentions", shortcut))
+    }
+
+    @Test
+    fun effectiveVibrationReflectsAndroidDisablingTheActiveChannel() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-effective"
+        val channelId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+                vibrationPattern = ConversationVibrationPattern.DOUBLE,
+            )!!
+
+        val selected =
+            ConversationNotificationChannels.effectiveVibration(
+                context = context,
+                conversationShortcutId = shortcut,
+                isDm = false,
+                selectedPattern = ConversationVibrationPattern.DOUBLE,
+            )
+        assertEquals(ConversationVibrationPattern.DOUBLE, selected.pattern)
+        assertTrue(selected.enabled)
+
+        val disabled = manager.getNotificationChannel(channelId)
+        disabled.enableVibration(false)
+        manager.createNotificationChannel(disabled)
+
+        val effective =
+            ConversationNotificationChannels.effectiveVibration(
+                context = context,
+                conversationShortcutId = shortcut,
+                isDm = false,
+                selectedPattern = ConversationVibrationPattern.DOUBLE,
+            )
+        assertFalse(effective.enabled)
+        assertNull(effective.pattern)
+        assertTrue(effective.overriddenByAndroid)
+    }
+
+    @Test
+    fun systemDefaultEffectiveStateReflectsAnAndroidWaveformOverride() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-default-overridden"
+        val channelId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+            )!!
+        val overridden = manager.getNotificationChannel(channelId)
+        overridden.vibrationPattern = ConversationVibrationPattern.SHORT.waveform
+        manager.createNotificationChannel(overridden)
+
+        val effective =
+            ConversationNotificationChannels.effectiveVibration(
+                context = context,
+                conversationShortcutId = shortcut,
+                isDm = false,
+                selectedPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+            )
+
+        assertEquals(ConversationVibrationPattern.SHORT, effective.pattern)
+        assertTrue(effective.enabled)
+        assertTrue(effective.overriddenByAndroid)
     }
 
     @Test
@@ -288,7 +482,8 @@ class ConversationNotificationChannelsTest {
     private fun conversationChannel(
         parentChannelId: String,
         shortcut: String,
+        vibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
     ) = manager.getNotificationChannel(
-        ConversationNotificationChannels.conversationChannelId(parentChannelId, shortcut),
+        ConversationNotificationChannels.conversationChannelId(parentChannelId, shortcut, vibrationPattern),
     )
 }
