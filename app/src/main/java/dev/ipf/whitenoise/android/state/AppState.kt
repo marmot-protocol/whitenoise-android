@@ -128,6 +128,7 @@ import dev.ipf.whitenoise.android.updates.shouldPostAppUpdateNotification
 import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -1169,6 +1170,14 @@ internal fun networkDisplayNameFallback(
     shortNpub: (String) -> String,
 ): String = accountLabel?.takeIf { it.isNotBlank() } ?: shortNpub(accountIdHex)
 
+private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
+
+internal fun appStateScopeExceptionHandler(
+    report: (Throwable) -> Unit = { throwable ->
+        Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
+    },
+): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
+
 private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
 
 private data class AccountBubbleColorSlot(
@@ -1859,10 +1868,21 @@ class WhiteNoiseAppState private constructor(
         )
     private val shareShortcutPublisher = ShareShortcutPublisher(appContext)
 
-    private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /**
+     * `SupervisorJob` isolates siblings but does not swallow exceptions — an
+     * uncaught throw in a direct child reaches `Thread.uncaughtExceptionHandler`,
+     * which on the main thread kills the process. Only covers `launch`; `async`
+     * parks its failure in the `Deferred` until `await()`.
+     */
+    private val scopeExceptionHandler = appStateScopeExceptionHandler()
+
+    private val profileScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
-    private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mutationsScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
+    private val notificationScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler)
     private var accountCatchUpJob: Job? = null
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 

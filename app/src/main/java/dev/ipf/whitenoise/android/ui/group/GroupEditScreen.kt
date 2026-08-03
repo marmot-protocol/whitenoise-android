@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,6 +63,13 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 
+/**
+ * The URL a Blossom upload may be published under. Throws rather than fall
+ * back, so a host that answers with anything but a safe HTTPS URL can never
+ * become the group's public avatar.
+ */
+internal fun safeAvatarUploadUrl(url: String): String = ProfileSanitizer.imageUrl(url) ?: error("unsafe upload URL")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GroupEditScreen(
@@ -118,6 +126,67 @@ internal fun GroupEditScreen(
                 throw cancelled
             } catch (_: Exception) {
                 appState.present(R.string.toast_couldnt_prepare_image, copyable = true)
+            } finally {
+                imageSaving = false
+            }
+        }
+    }
+
+    fun setPublicAvatarUrl(url: String) {
+        if (imageSaving || controller.mutationInFlight) return
+        // Same HTTPS/credential/loopback policy the upload path enforces, but a
+        // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
+        val safeUrl = ProfileSanitizer.imageUrl(url)
+        if (safeUrl == null) {
+            appState.present(R.string.profile_picture_invalid, copyable = true)
+            return
+        }
+        imageSaving = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            try {
+                if (controller.updateGroupAvatarUrl(safeUrl)) showImageSearch = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                appState.present(R.string.toast_couldnt_upload_group_image, copyable = true)
+            } finally {
+                imageSaving = false
+            }
+        }
+    }
+
+    // A device photo becomes a public avatar by uploading the plaintext bytes
+    // to Blossom first: the encrypted group image is unreadable to anyone
+    // outside the group, so invite previews and QR codes can't render it.
+    fun uploadPublicAvatar(uri: Uri) {
+        val accountRef = appState.activeAccountRef ?: return
+        if (imageSaving || controller.mutationInFlight) return
+        imageSaving = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            var prepared = false
+            try {
+                val draft = GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
+                prepared = true
+                val uploaded =
+                    appState.marmotIo {
+                        uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
+                    }
+                if (controller.updateGroupAvatarUrl(safeAvatarUploadUrl(uploaded))) {
+                    showImageSearch = false
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                appState.present(
+                    if (prepared) {
+                        R.string.toast_couldnt_upload_group_image
+                    } else {
+                        R.string.toast_couldnt_prepare_image
+                    },
+                    copyable = true,
+                )
             } finally {
                 imageSaving = false
             }
@@ -301,15 +370,10 @@ internal fun GroupEditScreen(
             urlLabel = stringResource(R.string.group_avatar_url),
             applyInFlight = imageSaving || controller.mutationInFlight,
             onApply = { picked ->
-                updateImage {
-                    picked?.let { GroupImageDraftProcessor.fromRemoteUrl(it) }
-                }
+                // Removal clears both the public URL and any encrypted image.
+                if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
             },
-            onPickPhoto = { uri ->
-                updateImage {
-                    GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri)
-                }
-            },
+            onPickPhoto = { uri -> uploadPublicAvatar(uri) },
             onDismiss = { showImageSearch = false },
         )
     }

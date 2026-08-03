@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">Fijar</string>
     <string name="chat_row_action_unpin">Dejar de fijar</string>
     <string name="chat_pinned_badge">Fijado</string>
+    <string name="chat_row_removed_badge">Expulsado</string>
+    <string name="chat_row_removed_description">Te han expulsado de este chat</string>
     <string name="chat_row_action_move_up">Subir</string>
     <string name="chat_row_action_move_down">Bajar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>
     <string name="chat_row_action_mark_unread">Marcar como no leído</string>
     <string name="chat_row_marked_unread">Marcado como no leído</string>
     <string name="chat_row_action_delete_group">Eliminar grupo</string>
+    <string name="chat_row_action_delete_chat">Eliminar chat</string>
+    <string name="delete_chat_dialog_title">¿Eliminar chat?</string>
+    <string name="delete_chat_dialog_message">¿Quitar este chat de este dispositivo? Si aún eres miembro, primero saldrás del chat.</string>
     <string name="delete_group_dialog_title">¿Eliminar grupo?</string>
     <string name="delete_group_dialog_message">¿Quitar este grupo de este dispositivo? Si aún eres miembro, primero saldrás del grupo.</string>
     <string name="delete_group_confirm">Eliminar</string>
@@ -194,7 +199,7 @@
     <string name="unarchive_chat">Desarchivar</string>
     <string name="archiving_chat">Archivando chat...</string>
     <string name="restoring_chat">Restaurando chat...</string>
-    <string name="leave_chat">Salir del grupo</string>
+    <string name="leave_chat">Salir del chat</string>
     <string name="leaving_chat">Saliendo del chat...</string>
     <string name="promote_admin_before_leaving">Promocionar a otro administrador antes de irse</string>
     <string name="export_conversation_transcript">Exportar transcripción de la conversación</string>
@@ -768,6 +773,7 @@
     <string name="group_image_search_privacy">La búsqueda web envía tu consulta y dirección IP a DuckDuckGo y a los servidores de imágenes.</string>
     <string name="group_image_search_apply">Usar esta imagen</string>
     <string name="group_image_choose_photo">Elegir de Fotos</string>
+    <string name="toast_couldnt_upload_group_image">No se pudo subir la foto del grupo.</string>
     <string name="group_image_search_enter_query">Introduce un término de búsqueda.</string>
     <string name="group_image_search_unavailable">La búsqueda de imágenes no está disponible temporalmente.</string>
     <string name="group_image_search_bad_response">La búsqueda de imágenes devolvió una respuesta inesperada.</string>

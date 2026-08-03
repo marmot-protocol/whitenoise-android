@@ -98,6 +98,7 @@ object ConversationNotificationChannels {
         val displayName = conversationChannelDisplayName(parent.name, conversationTitle)
         val existing = manager.getNotificationChannel(conversationChannelId)
         if (existing != null) {
+            var republish = false
             // Android permits an app to refresh a channel's user-visible name
             // while retaining every user-controlled alerting override. This
             // upgrades channels created before profile/group metadata resolved.
@@ -108,8 +109,13 @@ object ConversationNotificationChannels {
                 existing.name.toString() != displayName.toString()
             ) {
                 existing.name = displayName
-                manager.createNotificationChannel(existing)
+                republish = true
             }
+            if (shouldDowngradeImportance(existing, parent)) {
+                existing.importance = parent.importance
+                republish = true
+            }
+            if (republish) manager.createNotificationChannel(existing)
             return conversationChannelId
         }
         manager.createNotificationChannel(
@@ -117,6 +123,18 @@ object ConversationNotificationChannels {
         )
         return conversationChannelId
     }
+
+    /**
+     * Android only re-applies importance on an existing channel when the new
+     * value is strictly lower and the user has never set it themselves; every
+     * other field of the update is discarded. Mirroring that rule here keeps a
+     * lowered parent default propagating to untouched conversation children
+     * while a customised child is left exactly as the user left it.
+     */
+    internal fun shouldDowngradeImportance(
+        existing: NotificationChannel,
+        parent: NotificationChannel,
+    ): Boolean = !existing.hasUserSetImportance() && parent.importance < existing.importance
 
     internal fun conversationChannelDisplayName(
         parentName: CharSequence,
@@ -147,7 +165,8 @@ object ConversationNotificationChannels {
             lightColor = parent.lightColor
             enableVibration(parent.shouldVibrate())
             vibrationPattern = parent.vibrationPattern
-            setBypassDnd(parent.canBypassDnd())
+            // No setBypassDnd: the platform ignores it unless the app holds
+            // Do Not Disturb policy access, which this app never requests.
             lockscreenVisibility = parent.lockscreenVisibility
         }
 }

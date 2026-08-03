@@ -47,12 +47,17 @@
     <string name="chat_row_action_pin">Épingler</string>
     <string name="chat_row_action_unpin">Désépingler</string>
     <string name="chat_pinned_badge">Épinglé</string>
+    <string name="chat_row_removed_badge">Retiré</string>
+    <string name="chat_row_removed_description">Vous avez été retiré de cette conversation</string>
     <string name="chat_row_action_move_up">Monter</string>
     <string name="chat_row_action_move_down">Descendre</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
     <string name="chat_row_action_mark_unread">Marquer comme non lu</string>
     <string name="chat_row_marked_unread">Marqué comme non lu</string>
     <string name="chat_row_action_delete_group">Supprimer le groupe</string>
+    <string name="chat_row_action_delete_chat">Supprimer la conversation</string>
+    <string name="delete_chat_dialog_title">Supprimer la conversation ?</string>
+    <string name="delete_chat_dialog_message">Retirer cette conversation de cet appareil ? Si vous êtes encore membre, vous quitterez d\'abord la conversation.</string>
     <string name="delete_group_dialog_title">Supprimer le groupe ?</string>
     <string name="delete_group_dialog_message">Retirer ce groupe de cet appareil ? Si vous êtes encore membre, vous quitterez d\'abord le groupe.</string>
     <string name="delete_group_confirm">Supprimer</string>
@@ -194,7 +199,7 @@
     <string name="unarchive_chat">Désarchiver</string>
     <string name="archiving_chat">Archivage du chat...</string>
     <string name="restoring_chat">Restauration du chat...</string>
-    <string name="leave_chat">Quitter le groupe</string>
+    <string name="leave_chat">Quitter la conversation</string>
     <string name="leaving_chat">Sortie du chat...</string>
     <string name="promote_admin_before_leaving">Promouvoir un autre administrateur avant de partir</string>
     <string name="export_conversation_transcript">Exporter le transcript de la conversation</string>
@@ -768,6 +773,7 @@
     <string name="group_image_search_privacy">La recherche web envoie votre requête et votre adresse IP à DuckDuckGo et aux serveurs d’images.</string>
     <string name="group_image_search_apply">Utiliser cette image</string>
     <string name="group_image_choose_photo">Choisir dans les photos</string>
+    <string name="toast_couldnt_upload_group_image">Impossible de téléverser la photo du groupe.</string>
     <string name="group_image_search_enter_query">Saisissez un terme de recherche.</string>
     <string name="group_image_search_unavailable">Recherche d\'images temporairement indisponible.</string>
     <string name="group_image_search_bad_response">Réponse inattendue de la recherche d\'images.</string>

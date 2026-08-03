@@ -4630,6 +4630,18 @@ private const val TIMELINE_BATCH_DRAIN_MS = 6L
 // guards against a burst of never-echoed sends leaking entries.
 private const val SEND_TRACE_MAX_TRACKED = 64
 
+internal fun groupWithPublicAvatar(
+    group: AppGroupRecordFfi,
+    avatarUrl: String?,
+    encryptedImageCleared: Boolean = true,
+): AppGroupRecordFfi =
+    group.copy(
+        avatarUrl = avatarUrl,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = if (avatarUrl != null && encryptedImageCleared) null else group.imageHashHex,
+    )
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -7326,15 +7338,34 @@ class ConversationController(
             // private hosts). We only set the URL here; dim/thumbhash are
             // optimization hints we don't compute on Android, so clear them.
             val normalized = url?.trim()?.takeIf { it.isNotEmpty() }
+            var encryptedImageCleared = group.imageHashHex == null || normalized == null
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo {
                         updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
                     }
+                    // A public avatar supersedes the encrypted member-only
+                    // component. Remove that component after the public URL is
+                    // durable so clearing the URL on another client cannot
+                    // resurrect an obsolete private image.
+                    if (normalized != null && group.imageHashHex != null) {
+                        encryptedImageCleared =
+                            runCatchingCancellable {
+                                appState.marmotIo {
+                                    clearGroupImage(account, group.groupIdHex)
+                                }
+                            }.onFailure {
+                                Log.w(
+                                    "DMConversation",
+                                    "encrypted avatar cleanup failed group=${group.groupIdHex.take(8)}",
+                                    it,
+                                )
+                            }.isSuccess
+                    }
                 }
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
-                group = group.copy(avatarUrl = normalized, avatarDim = null, avatarThumbhash = null)
+                group = groupWithPublicAvatar(group, normalized, encryptedImageCleared)
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {
