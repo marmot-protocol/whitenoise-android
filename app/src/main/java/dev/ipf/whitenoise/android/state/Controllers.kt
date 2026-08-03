@@ -2095,7 +2095,12 @@ internal fun reduceGroupRosterLoadState(
                 GroupRosterLoadState.LOADING
             }
         GroupRosterRefreshEvent.SUCCEEDED -> GroupRosterLoadState.READY
-        GroupRosterRefreshEvent.FAILED -> GroupRosterLoadState.FAILED
+        GroupRosterRefreshEvent.FAILED ->
+            if (current == GroupRosterLoadState.READY) {
+                current
+            } else {
+                GroupRosterLoadState.FAILED
+            }
         GroupRosterRefreshEvent.INCONSISTENT -> GroupRosterLoadState.INCONSISTENT
     }
 

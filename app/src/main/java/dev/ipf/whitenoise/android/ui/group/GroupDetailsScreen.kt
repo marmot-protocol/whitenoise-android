@@ -217,46 +217,6 @@ internal fun GroupDetailsLocalDeleteControl(
 private const val GROUP_MEMBERS_PREVIEW_COUNT = 6
 private const val SHARED_GROUPS_PREVIEW_COUNT = 3
 
-@Composable
-@Suppress("FunctionNaming")
-internal fun GroupRosterLoadStatus(
-    state: GroupRosterLoadState,
-    onRetry: () -> Unit,
-) {
-    when (state) {
-        GroupRosterLoadState.LOADING ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                Text(
-                    stringResource(R.string.members),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        GroupRosterLoadState.FAILED,
-        GroupRosterLoadState.INCONSISTENT,
-        ->
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                horizontalAlignment = Alignment.Start,
-            ) {
-                Text(
-                    stringResource(R.string.couldnt_load_conversation),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onRetry) {
-                    Text(stringResource(R.string.retry))
-                }
-            }
-        GroupRosterLoadState.READY -> Unit
-    }
-}
-
 internal fun directDetailsSharedGroups(
     groups: List<ChatListItem>,
     currentGroupIdHex: String,
@@ -1202,7 +1162,10 @@ internal fun GroupDetailsScreen(
                                 value = memberQuery,
                                 onValueChange = { memberQuery = it },
                                 placeholder = stringResource(R.string.search_members),
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
+                                modifier =
+                                    Modifier
+                                        .padding(horizontal = Dimens.spaceLg)
+                                        .padding(bottom = Dimens.spaceSm),
                             )
                         }
                         if (canEdit) {
@@ -1257,7 +1220,8 @@ internal fun GroupDetailsScreen(
                                             .orEmpty()
                                             .contains(memberNeedle, ignoreCase = true)
                                     }
-                                membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
+                                membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT ->
+                                    displayedMembers
                                 else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
                             }
                         if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
@@ -1296,7 +1260,10 @@ internal fun GroupDetailsScreen(
                                     if (rowMutation != null) {
                                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                     } else if (controller.isAdmin(member)) {
-                                        Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                        Surface(
+                                            shape = PillShape,
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        ) {
                                             Text(
                                                 stringResource(R.string.admin),
                                                 style = MaterialTheme.typography.labelSmall,

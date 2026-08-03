@@ -64,6 +64,16 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun verifiedRosterSurvivesATransientRefreshFailure() {
+        val tracker = GroupRosterLoadTracker(GroupRosterLoadState.READY)
+
+        tracker.transition(GroupRosterRefreshEvent.STARTED)
+        tracker.transition(GroupRosterRefreshEvent.FAILED)
+
+        assertEquals(GroupRosterLoadState.READY, tracker.state)
+    }
+
+    @Test
     fun cancelledRetryRestoresItsPreviousRetryableState() {
         val tracker = GroupRosterLoadTracker(GroupRosterLoadState.FAILED)
         tracker.transition(GroupRosterRefreshEvent.STARTED)
@@ -380,7 +390,7 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
-    fun conversationSeedDoesNotAssumeMemberWithoutRoster() {
+    fun conversationSeedUsesProjectedMemberWithoutRoster() {
         val seed =
             conversationMembershipSeed(
                 initialGroup = group(admins = listOf("alice"), selfMembership = SelfMembershipFfi.MEMBER),
@@ -388,8 +398,8 @@ class GroupMutationDetailsApplicationTest {
                 activeAccountIdHex = "alice",
             )
 
-        assertFalse(seed.seededMembershipKnown)
-        assertFalse(seed.seededSelfMember)
+        assertTrue(seed.seededMembershipKnown)
+        assertTrue(seed.seededSelfMember)
         assertFalse(seed.membersVerified)
         assertFalse(seed.membersLoaded)
         assertEquals(emptyList<AppGroupMemberRecordFfi>(), seed.members)
