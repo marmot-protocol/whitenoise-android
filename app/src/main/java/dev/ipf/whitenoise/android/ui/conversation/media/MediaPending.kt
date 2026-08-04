@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -53,6 +54,7 @@ internal fun MediaPendingPlaceholder(
     pendingAttachments: List<PendingAttachment>,
     failed: Boolean,
     onRetry: (() -> Unit)? = null,
+    attachedToCaption: Boolean = false,
 ) {
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
@@ -72,6 +74,7 @@ internal fun MediaPendingPlaceholder(
                     failed = failed,
                     statusLabel = statusLabel,
                     onRetry = onRetry,
+                    attachedToCaption = attachedToCaption,
                 )
             }
         }
@@ -80,8 +83,8 @@ internal fun MediaPendingPlaceholder(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {

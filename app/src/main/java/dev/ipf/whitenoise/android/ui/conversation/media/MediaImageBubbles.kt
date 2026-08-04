@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
@@ -165,6 +167,7 @@ internal fun MediaImageBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
+    attachedToCaption: Boolean = false,
 ) {
     val record = item.record
     val key = record.messageIdHex
@@ -263,8 +266,8 @@ internal fun MediaImageBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = visualMediaBubbleShape(attachedToCaption),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         // Single source of truth for image-bubble shape: portraits become
         // uniform-width cards (capped height), landscapes fill the bubble
         // width. Used by both the confirmed bubble and the optimistic
@@ -449,6 +452,7 @@ internal fun MediaVisualGridBubble(
     mine: Boolean,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
+    attachedToCaption: Boolean = false,
 ) {
     val record = item.record
     // Show up to four tiles before collapsing the remainder into a "+N"
@@ -493,8 +497,8 @@ internal fun MediaVisualGridBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = visualMediaBubbleShape(attachedToCaption),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
@@ -519,6 +523,9 @@ internal fun MediaVisualGridBubble(
         )
     }
 }
+
+@Suppress("MaxLineLength")
+internal fun visualMediaBubbleShape(attachedToCaption: Boolean): Shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp)
 
 /**
  * One tile of the album grid: square thumbnail + per-tile download state.

@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -25,6 +27,27 @@ class TimelineRecordRenderEqualityTest {
         val laterObservation = record().copy(timelineAt = 99uL, receivedAt = 100uL)
 
         assertTrue(timelineRecordsRenderEqual(first, laterObservation))
+    }
+
+    @Test
+    fun markdownHydrationInvalidatesRenderedRecord() {
+        val withoutTokens = record()
+        val withTokens =
+            record().copy(
+                contentTokens =
+                    MarkdownDocumentFfi(
+                        truncated = false,
+                        blocks =
+                            listOf(
+                                MarkdownBlockFfi.Paragraph(
+                                    listOf(MarkdownInlineFfi.Text("caption")),
+                                ),
+                            ),
+                        blankLinesBefore = byteArrayOf(0),
+                    ),
+            )
+
+        assertFalse(timelineRecordsRenderEqual(withoutTokens, withTokens))
     }
 
     private fun record() =

@@ -196,20 +196,30 @@ class MessageBubbleFrameTest {
         )
 
     @Test
-    fun mediaReplyCaptionKeepsWrapContentWidth() {
+    fun mediaCaptionSharesTheMediaEnvelopeWidth() {
         composeRule.setContent {
             MaterialTheme {
-                Column(Modifier.width(220.dp).testTag(MEDIA_REPLY_COLUMN_TAG)) {
-                    MessageBubbleFrame(
+                Box(Modifier.width(300.dp)) {
+                    MediaCaptionFrame(
                         presentation = messageBubblePresentation(deleted = false, mine = false),
                         highlighted = false,
                         mine = false,
                         mentionedSelf = false,
                         mentionedYouLabel = "Mentioned you",
-                        modifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),
+                        alignEnd = false,
+                        modifier = Modifier.testTag(MEDIA_REPLY_COLUMN_TAG),
+                        contentModifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),
+                        media = { Box(Modifier.width(220.dp).height(100.dp).testTag(MEDIA_REPLY_MEDIA_TAG)) },
                     ) {
                         BubbleFooterLayout(
-                            footer = { Box(Modifier.width(58.dp).height(12.dp)) },
+                            footer = {
+                                Box(
+                                    Modifier
+                                        .width(58.dp)
+                                        .height(12.dp)
+                                        .testTag(MEDIA_REPLY_FOOTER_TAG),
+                                )
+                            },
                             modifier =
                                 messageBubbleBodyModifier(
                                     hasReplyPreview = true,
@@ -225,9 +235,36 @@ class MessageBubbleFrameTest {
         }
 
         composeRule.runOnIdle {
-            val mediaColumnBounds = composeRule.onNodeWithTag(MEDIA_REPLY_COLUMN_TAG).fetchSemanticsNode().boundsInRoot
+            val mediaBounds = composeRule.onNodeWithTag(MEDIA_REPLY_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
             val captionBounds = composeRule.onNodeWithTag(MEDIA_REPLY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
-            assertTrue(captionBounds.width < mediaColumnBounds.width)
+            val footerBounds = composeRule.onNodeWithTag(MEDIA_REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(mediaBounds.width, captionBounds.width, 1f)
+            assertEquals(mediaBounds.bottom, captionBounds.top, 0.1f)
+            assertEquals(captionBounds.right - 14f, footerBounds.right, 1f)
+        }
+    }
+
+    @Test
+    fun mediaItemsKeepTheirSpacingAndCaptionHasNoExternalGap() {
+        composeRule.setContent {
+            MediaSupplementEnvelope(
+                alignEnd = false,
+                media = {
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(FIRST_MEDIA_TAG))
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(SECOND_MEDIA_TAG))
+                },
+                supplement = {
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(MEDIA_SUPPLEMENT_TAG))
+                },
+            )
+        }
+
+        composeRule.runOnIdle {
+            val first = composeRule.onNodeWithTag(FIRST_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            val second = composeRule.onNodeWithTag(SECOND_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            val supplement = composeRule.onNodeWithTag(MEDIA_SUPPLEMENT_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(6f, second.top - first.bottom, 0.1f)
+            assertEquals(0f, supplement.top - second.bottom, 0.1f)
         }
     }
 
@@ -261,11 +298,16 @@ class MessageBubbleFrameTest {
         const val PLAIN_TAG = "custom-plain-bubble"
         const val CUSTOM_BACKGROUND = 0xFF336699
         const val MENTION_ACCENT = 0xFF006780
+        const val FIRST_MEDIA_TAG = "first-media"
+        const val SECOND_MEDIA_TAG = "second-media"
+        const val MEDIA_SUPPLEMENT_TAG = "media-supplement"
         const val OPAQUE_WHITE = 0xFFFFFFFF
         const val REPLY_BUBBLE_TAG = "reply-bubble"
         const val REPLY_FOOTER_TAG = "reply-footer"
         const val MEDIA_REPLY_COLUMN_TAG = "media-reply-column"
+        const val MEDIA_REPLY_MEDIA_TAG = "media-reply-media"
         const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
+        const val MEDIA_REPLY_FOOTER_TAG = "media-reply-footer"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"
     }

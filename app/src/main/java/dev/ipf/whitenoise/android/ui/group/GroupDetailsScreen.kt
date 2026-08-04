@@ -682,6 +682,7 @@ internal fun GroupDetailsScreen(
                 )
             },
             confirmIcon = Icons.Default.Check,
+            confirmLabel = stringResource(R.string.add_member),
             busy = adding || controller.mutationInFlight,
             autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
