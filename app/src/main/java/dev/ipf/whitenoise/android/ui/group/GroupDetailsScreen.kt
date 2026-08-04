@@ -262,10 +262,9 @@ internal fun GroupDetailsScreen(
     var showMuteDurationDialog by remember { mutableStateOf(false) }
     var showNotifyForDialog by remember { mutableStateOf(false) }
     var showVibrationPatternDialog by remember { mutableStateOf(false) }
-    // Auto-opened straight from the empty-group "Add members" CTA: render the
-    // picker on the first frame (no details-screen flash) and route its Back to
-    // the conversation instead of to the details body underneath.
-    var showAddMember by remember { mutableStateOf(autoOpenAddMember) }
+    // A requested picker stays closed until the roster is authoritative. This
+    // avoids excluding candidates against a stale or empty member snapshot.
+    var showAddMember by remember { mutableStateOf(false) }
     val addMemberAutoOpened = remember { autoOpenAddMember }
     var membersExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var memberSearchOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -291,11 +290,6 @@ internal fun GroupDetailsScreen(
         if (autoOpenTransferAdmin && controller.isSoleAdminWithOtherMembers) {
             showTransferAdmin = true
         }
-    }
-    // Clear the parent trigger once on entry so re-opening details later doesn't
-    // re-auto-open the picker. The picker is already shown via the initial state.
-    LaunchedEffect(Unit) {
-        if (autoOpenAddMember) onAutoOpenAddMemberConsumed()
     }
     // Disband eligibility, blockers, and any in-flight request are
     // engine-authoritative; fetch on entry and again whenever the group
@@ -323,10 +317,23 @@ internal fun GroupDetailsScreen(
         }
     val clipboard = LocalClipboardManager.current
     val readOnlyInvite = controller.group.pendingConfirmation
+    val isDm = controller.isDm
+    val groupTerminal = controller.group.disbanding || controller.group.disbanded
+    val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
+    val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
+    val canAdministerMembers = !isDm && canEdit && rosterReady
+    val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+    LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
+        if (autoOpenAddMember && canAdministerMembers) {
+            showAddMember = true
+            onAutoOpenAddMemberConsumed()
+        }
+    }
+    LaunchedEffect(canAdministerMembers) {
+        if (!canAdministerMembers) showAddMember = false
+    }
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
-    val isDm = controller.isDm
-    val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
     val conversationTitle = controller.title(groupTitleCopy)
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     val dmPeerAccountIdHex =
@@ -652,7 +659,7 @@ internal fun GroupDetailsScreen(
         return
     }
 
-    if (showAddMember) {
+    if (showAddMember && canAdministerMembers) {
         // remember scoped to this branch: the selection resets every time the
         // picker is reopened.
         val addSelection = remember { mutableStateListOf<RecipientSearch.Candidate>() }
@@ -669,7 +676,8 @@ internal fun GroupDetailsScreen(
                     if (addMemberAutoOpened) onBack() else showAddMember = false
                 }
             },
-            onConfirm = {
+            onConfirm = confirm@{
+                if (!canAdministerMembers) return@confirm
                 val refs = addSelection.map { it.accountIdHex }
                 // Members are added as regular members; admin is granted
                 // per-member afterward from the profile sheet. The old bulk
@@ -831,9 +839,6 @@ internal fun GroupDetailsScreen(
         // converges and forever after it lands; don't advertise actions that
         // can only fail. Local-only actions (archive, local delete) keep the
         // plain in-flight gate.
-        val groupTerminal = controller.group.disbanding || controller.group.disbanded
-        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
-        val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
         Column(
             Modifier
@@ -900,17 +905,13 @@ internal fun GroupDetailsScreen(
                     enabled = false,
                     modifier = Modifier.weight(1f),
                 )
-                if (!isDm && canEdit) {
-                    QuickActionButton(
-                        icon = Icons.Default.PersonAdd,
-                        label = stringResource(R.string.quick_action_add),
-                        onClick = {
-                            showAddMember = true
-                        },
-                        enabled = !mutationsBlocked,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                GroupDetailsAddMemberAction(
+                    visible = !isDm && canEdit,
+                    rosterState = controller.memberRosterState,
+                    mutationsBlocked = mutationsBlocked,
+                    onClick = { showAddMember = true },
+                    modifier = Modifier.weight(1f),
+                )
                 if (onOpenSearch != null) {
                     QuickActionButton(
                         icon = Icons.Default.Search,

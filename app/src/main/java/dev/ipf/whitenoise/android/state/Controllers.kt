@@ -2427,13 +2427,15 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
     AppliedGroupDetails(
         group = details.group,
         members =
-            details.members.map {
-                AppGroupMemberRecordFfi(
-                    memberIdHex = it.memberIdHex,
-                    account = it.account,
-                    local = it.local,
-                )
-            },
+            GroupProjector.identityDistinctMembers(
+                details.members.map { member ->
+                    AppGroupMemberRecordFfi(
+                        memberIdHex = member.memberIdHex,
+                        account = member.account,
+                        local = member.local,
+                    )
+                },
+            ),
     )
 
 internal fun resolveAuthoritativeGroupRoster(
@@ -2457,7 +2459,7 @@ internal fun resolveAuthoritativeGroupRoster(
             !activeJoinedGroup -> null
             uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
             !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            uniqueMemberCount.toLong() !=
+            details.members.size.toLong() !=
                 details.mlsState.memberCount.toLong() -> GroupRosterInvariant.MEMBER_COUNT_MISMATCH
             else -> null
         }
@@ -8536,11 +8538,28 @@ class ConversationController(
         appState.present(title, AppText.Plain(message), copyable = true)
     }
 
+    private fun canAdministerMembersFromAuthoritativeRoster(): Boolean =
+        memberRosterState == GroupRosterLoadState.READY &&
+            !isDm &&
+            isSelfMember &&
+            isSelfAdmin &&
+            !group.pendingConfirmation &&
+            !group.disbanding &&
+            !group.disbanded
+
+    private fun authoritativeAdministrationTarget(targetMemberIdHex: String): AppGroupMemberRecordFfi? {
+        if (!canAdministerMembersFromAuthoritativeRoster() || targetMemberIdHex.isBlank()) return null
+        return members.singleOrNull { member ->
+            member.memberIdHex.equals(targetMemberIdHex, ignoreCase = true)
+        }
+    }
+
     suspend fun inviteMembers(
         memberRefs: List<String>,
         addAsAdmin: Boolean = false,
-    ): Boolean =
-        withMutationLockResult(false) {
+    ): Boolean {
+        if (!canAdministerMembersFromAuthoritativeRoster()) return false
+        return withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val refs =
@@ -8560,17 +8579,23 @@ class ConversationController(
                 var inviteSent = false
                 try {
                     val adminTargets = if (addAsAdmin) refs else emptyList()
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        val inviteResult =
-                            appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
-                        applyMutationDetails(account, inviteResult.details)
-                        inviteSent = true
-                        adminTargets.forEach { target ->
-                            val promoteResult =
-                                appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
-                            applyMutationDetails(account, promoteResult.details)
+                    val inviteCommitted =
+                        appState.withGroupCommitLock(account, group.groupIdHex) {
+                            if (!canAdministerMembersFromAuthoritativeRoster()) {
+                                return@withGroupCommitLock false
+                            }
+                            val inviteResult =
+                                appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
+                            applyMutationDetails(account, inviteResult.details)
+                            inviteSent = true
+                            adminTargets.forEach { target ->
+                                val promoteResult =
+                                    appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                                applyMutationDetails(account, promoteResult.details)
+                            }
+                            true
                         }
-                    }
+                    if (!inviteCommitted) return@track false
                     appState.present(R.string.toast_invite_sent)
                     true
                 } catch (throwable: Throwable) {
@@ -8581,7 +8606,11 @@ class ConversationController(
                         // partial success and leave the row-level Admin switch as the
                         // retry path once the member appears in details.
                         lastMutationError = "Invite sent, but admin promotion failed: $message"
-                        appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message), copyable = true)
+                        appState.present(
+                            R.string.toast_invite_sent_but_couldnt_add_admin,
+                            AppText.Plain(message),
+                            copyable = true,
+                        )
                         true
                     } else if (isDuplicateSignatureKeyError(message)) {
                         // MLS rejected the add commit because the proposed member
@@ -8603,6 +8632,7 @@ class ConversationController(
                 }
             }
         }
+    }
 
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
@@ -10528,7 +10558,7 @@ class ConversationController(
             "DMConversation",
             "joined roster invariant" +
                 " reason=${invariant.name.lowercase()}" +
-                " rows=${resolution.applied.members.size}" +
+                " rows=${details.members.size}" +
                 " unique=${resolution.uniqueMemberCount}" +
                 " mls=${resolution.mlsMemberCount}" +
                 " cached_unique=${cachedIds.size}" +
