@@ -239,7 +239,11 @@ class ProfileStartGroupNavigationTest {
     }
 
     private fun assertSelectedMemberPicker(fixture: HandoffFixture) {
-        composeRule.onAllNodesWithText(app.getString(R.string.one_member)).onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
+        composeRule
+            .onAllNodesWithText(app.resources.getQuantityString(R.plurals.selected_members_count, 1, 1))
+            .onFirst()
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText(fixture.targetLabel).onFirst().assertIsDisplayed()
         composeRule.onNodeWithContentDescription(app.getString(R.string.back)).assertIsEnabled()
     }
@@ -260,7 +264,9 @@ class ProfileStartGroupNavigationTest {
 
     private fun assertNoProfileOrPickerOverlay(fixture: HandoffFixture) {
         assertProfileOverlayAbsent(fixture)
-        composeRule.onNodeWithText(app.getString(R.string.one_member)).assertDoesNotExist()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.selected_members_count, 1, 1))
+            .assertDoesNotExist()
         composeRule.onNodeWithContentDescription(app.getString(R.string.back)).assertDoesNotExist()
         assertOwnerSurfaceVisible(fixture)
         composeRule.runOnIdle { assertNull(fixture.appState.pendingProfileNpub) }
