@@ -138,17 +138,17 @@ class NotificationReactionWorker(
                     },
                 )
             }
-        val outcome =
-            when (sendAttempt) {
-                NotificationReactionSendAttempt.Locked -> return lockedReactionResult(retryStore, retryKey)
-                is NotificationReactionSendAttempt.Completed -> sendAttempt.outcome
-            }
-        return when (outcome) {
-            NotificationReactionSendOutcome.Sent ->
-                completedReactionResult(application, input, retryStore, retryKey, dismissBaselineMs)
-            NotificationReactionSendOutcome.RetryableFailure -> retryableReactionFailureResult(retryStore, retryKey)
-            NotificationReactionSendOutcome.NonRetryableFailure ->
-                terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+        return when (sendAttempt) {
+            NotificationReactionSendAttempt.Locked -> lockedReactionResult(retryStore, retryKey)
+            is NotificationReactionSendAttempt.Completed ->
+                when (sendAttempt.outcome) {
+                    NotificationReactionSendOutcome.Sent ->
+                        completedReactionResult(application, input, retryStore, retryKey, dismissBaselineMs)
+                    NotificationReactionSendOutcome.RetryableFailure ->
+                        retryableReactionFailureResult(retryStore, retryKey)
+                    NotificationReactionSendOutcome.NonRetryableFailure ->
+                        terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+                }
         }
     }
 
