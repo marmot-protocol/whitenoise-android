@@ -2688,7 +2688,10 @@ internal fun ConversationScreen(
                             val layoutInfo = listState.layoutInfo
                             ConversationInitialAnchorLayout(
                                 viewportHeight = layoutInfo.viewportSize.height,
-                                targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                                targetItemSize =
+                                    layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.index == targetIndex }
+                                        ?.size,
                             )
                         },
                     )
