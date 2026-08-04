@@ -33,7 +33,7 @@ ktlint = "1.5.0"
 ktlintGradle = "14.2.0"
 # Detekt 2 supports this project's Kotlin 2.4 / AGP 9 built-in Kotlin stack.
 detekt = "2.0.0-alpha.5"
-firebaseBom = "34.16.0"
+firebaseBom = "34.17.0"
 googleServices = "4.5.0"
 playServicesBase = "18.10.0"
 ossLicensesPlugin = "0.13.0"
