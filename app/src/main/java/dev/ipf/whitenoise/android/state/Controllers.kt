@@ -974,6 +974,7 @@ private fun timelineRecordContentEqual(
     b: TimelineMessageRecordFfi,
 ): Boolean =
     a.plaintext == b.plaintext &&
+        markdownDocumentsRenderEqual(a.contentTokens, b.contentTokens) &&
         a.tags == b.tags &&
         a.replyToMessageIdHex == b.replyToMessageIdHex &&
         a.replyPreview == b.replyPreview &&
@@ -984,6 +985,14 @@ private fun timelineRecordContentEqual(
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
         a.reactions == b.reactions
+
+private fun markdownDocumentsRenderEqual(
+    a: MarkdownDocumentFfi,
+    b: MarkdownDocumentFfi,
+): Boolean =
+    a.truncated == b.truncated &&
+        a.blocks == b.blocks &&
+        a.blankLinesBefore.contentEquals(b.blankLinesBefore)
 
 /**
  * Local optimistic state for an in-flight edit of one's own message: the new
@@ -4802,6 +4811,24 @@ internal fun needsTimelineMarkdownHydration(record: TimelineMessageRecordFfi): B
 
 internal fun TimelineMessageRecordFfi.withMarkdownTokens(document: MarkdownDocumentFfi) = copy(contentTokens = document)
 
+/**
+ * Publish locally available timeline rows before enriching them. The returned
+ * job is lifecycle-bound to [scope], so leaving the conversation cancels both
+ * parsing and the eventual apply without holding the first visible frame.
+ */
+internal fun publishTimelineBeforeMarkdownHydration(
+    scope: CoroutineScope,
+    records: List<TimelineMessageRecordFfi>,
+    publish: () -> Unit,
+    hydrate: suspend (List<TimelineMessageRecordFfi>) -> List<TimelineMessageRecordFfi>,
+    applyHydrated: (List<TimelineMessageRecordFfi>) -> Unit,
+): Job? {
+    publish()
+    val pending = records.filter(::needsTimelineMarkdownHydration)
+    if (pending.isEmpty()) return null
+    return scope.launch { applyHydrated(hydrate(pending)) }
+}
+
 private fun AppGroupRecordFfi.debugSummary(): String =
     "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +
         "welcomer=${welcomerAccountIdHex?.take(8)} relays=${relays.size} name=${name.ifBlank { "<blank>" }}"
@@ -8453,7 +8480,7 @@ class ConversationController(
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
-        val hydratedMessages = hydrateTimelineMarkdown(page.messages)
+        val pageMessages = page.messages
         if (replaceWindow) {
             timelineRecords.clear()
             timelineItemsById.clear()
@@ -8474,7 +8501,7 @@ class ConversationController(
             optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
             durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
         }
-        hydratedMessages.forEach { record ->
+        pageMessages.forEach { record ->
             val actionRecord =
                 upsertProjectedRecord(
                     record,
@@ -8510,7 +8537,7 @@ class ConversationController(
         // observe ProfilePresentation.Empty and pop the name/avatar in a frame
         // later. Blocking here guarantees the cache is populated before publish,
         // so the first composition paints the sender metadata. See #609.
-        appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(hydratedMessages))
+        appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(pageMessages))
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
             hasMoreAfter = page.hasMoreAfter
@@ -8529,14 +8556,29 @@ class ConversationController(
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
         // re-projected every held record on each page load. See #74.
-        publishTimelineFromIndexes()
-        return hydratedMessages
+        publishTimelinePageBeforeMarkdownHydration(pageMessages)
+        return pageMessages
             .map { TimelineProjector.toAppMessageRecord(it) }
             .filter { MessageProjector.isStreamStart(it) }
             .mapNotNull { MessageProjector.streamId(it) }
             // Don't relaunch a watcher for a stream whose final record was in
             // this same page — it was just marked removed. See #25.
             .filterNot { it in removedStreamIds }
+    }
+
+    private fun publishTimelinePageBeforeMarkdownHydration(records: List<TimelineMessageRecordFfi>) {
+        val scope = conversationScope
+        if (scope == null) {
+            publishTimelineFromIndexes()
+            return
+        }
+        publishTimelineBeforeMarkdownHydration(
+            scope = scope,
+            records = records,
+            publish = ::publishTimelineFromIndexes,
+            hydrate = ::hydrateTimelineMarkdown,
+            applyHydrated = ::applyHydratedTimelineMarkdown,
+        )
     }
 
     private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
@@ -8669,6 +8711,21 @@ class ConversationController(
                     }
                 }.awaitAll()
         }
+    }
+
+    private fun applyHydratedTimelineMarkdown(records: List<TimelineMessageRecordFfi>) {
+        assertMainThread { "applyHydratedTimelineMarkdown" }
+        var changed = false
+        records.forEach { hydrated ->
+            val document = hydrated.contentTokens.takeIf { it.blocks.isNotEmpty() } ?: return@forEach
+            val current = timelineRecords[hydrated.messageIdHex] ?: return@forEach
+            if (!needsTimelineMarkdownHydration(current) || current.plaintext != hydrated.plaintext) {
+                return@forEach
+            }
+            upsertProjectedRecord(current.withMarkdownTokens(document))
+            changed = true
+        }
+        if (changed) publishTimelineFromIndexes()
     }
 
     private fun applyChatListProjection(

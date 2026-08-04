@@ -5,6 +5,9 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,6 +46,35 @@ class TimelineMarkdownHydrationTest {
         val deleted = timelineRecord("deleted", "https://example.com").copy(deleted = true)
         assertFalse(needsTimelineMarkdownHydration(deleted))
     }
+
+    @Test
+    fun timelinePublishesBeforeMarkdownHydrationCompletes() =
+        runTest {
+            val releaseHydration = CompletableDeferred<Unit>()
+            val events = mutableListOf<String>()
+            val records = listOf(timelineRecord("confirmed", "See https://example.com"))
+
+            val job =
+                publishTimelineBeforeMarkdownHydration(
+                    scope = this,
+                    records = records,
+                    publish = { events += "published" },
+                    hydrate = { pending ->
+                        events += "hydrating"
+                        releaseHydration.await()
+                        pending
+                    },
+                    applyHydrated = { events += "hydrated" },
+                )
+
+            assertEquals(listOf("published"), events)
+            yield()
+            assertEquals(listOf("published", "hydrating"), events)
+
+            releaseHydration.complete(Unit)
+            job?.join()
+            assertEquals(listOf("published", "hydrating", "hydrated"), events)
+        }
 
     private fun timelineRecord(
         messageIdHex: String,
