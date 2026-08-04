@@ -1241,6 +1241,9 @@
     <string name="tts_bar_play">Retomar leitura</string>
     <string name="tts_bar_skip_previous">Frase anterior</string>
     <string name="tts_bar_skip_next">Próxima frase</string>
+    <string name="tts_bar_previous_message">Mensagem anterior</string>
+    <string name="tts_bar_next_message">Próxima mensagem</string>
+    <string name="tts_bar_progress">Frase %1$d de %2$d, mensagem %3$d de %4$d</string>
     <string name="tts_bar_stop">Parar leitura</string>
     <string name="tts_bar_error">Não foi possível ler em voz alta</string>
     <string name="tts_auto_read_title">Ler mensagens em voz alta</string>

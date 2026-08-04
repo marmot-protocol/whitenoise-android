@@ -6,7 +6,18 @@ internal fun speakingTts(
     messageIndex: Int = 0,
     messageCount: Int = 1,
     messagePreview: String = "",
-): TtsState.Speaking = TtsState.Speaking(chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
+    sentenceIndex: Int = 0,
+    sentenceCount: Int = 1,
+): TtsState.Speaking =
+    TtsState.Speaking(
+        chunkIndex = chunkIndex,
+        chunkCount = chunkCount,
+        messageIndex = messageIndex,
+        messageCount = messageCount,
+        sentenceIndexWithinMessage = sentenceIndex,
+        sentenceCountWithinMessage = sentenceCount,
+        messagePreview = messagePreview,
+    )
 
 internal fun pausedTts(
     chunkIndex: Int,
@@ -14,7 +25,18 @@ internal fun pausedTts(
     messageIndex: Int = 0,
     messageCount: Int = 1,
     messagePreview: String = "",
-): TtsState.Paused = TtsState.Paused(chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
+    sentenceIndex: Int = 0,
+    sentenceCount: Int = 1,
+): TtsState.Paused =
+    TtsState.Paused(
+        chunkIndex = chunkIndex,
+        chunkCount = chunkCount,
+        messageIndex = messageIndex,
+        messageCount = messageCount,
+        sentenceIndexWithinMessage = sentenceIndex,
+        sentenceCountWithinMessage = sentenceCount,
+        messagePreview = messagePreview,
+    )
 
 internal fun idleTts(
     chunkIndex: Int,
@@ -22,7 +44,18 @@ internal fun idleTts(
     messageIndex: Int = 0,
     messageCount: Int = 1,
     messagePreview: String = "",
-): TtsState.Idle = TtsState.Idle(chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
+    sentenceIndex: Int = 0,
+    sentenceCount: Int = 0,
+): TtsState.Idle =
+    TtsState.Idle(
+        chunkIndex = chunkIndex,
+        chunkCount = chunkCount,
+        messageIndex = messageIndex,
+        messageCount = messageCount,
+        sentenceIndexWithinMessage = sentenceIndex,
+        sentenceCountWithinMessage = sentenceCount,
+        messagePreview = messagePreview,
+    )
 
 internal fun errorTts(
     error: TtsError,
@@ -31,4 +64,16 @@ internal fun errorTts(
     messageIndex: Int = 0,
     messageCount: Int = 1,
     messagePreview: String = "",
-): TtsState.Error = TtsState.Error(error, chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
+    sentenceIndex: Int = 0,
+    sentenceCount: Int = 0,
+): TtsState.Error =
+    TtsState.Error(
+        error = error,
+        chunkIndex = chunkIndex,
+        chunkCount = chunkCount,
+        messageIndex = messageIndex,
+        messageCount = messageCount,
+        sentenceIndexWithinMessage = sentenceIndex,
+        sentenceCountWithinMessage = sentenceCount,
+        messagePreview = messagePreview,
+    )

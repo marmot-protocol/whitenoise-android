@@ -67,7 +67,41 @@ class TtsChunkerTest {
     }
 
     @Test
-    fun leadingChunkReserveShrinksOnlyTheFirstOutputChunk() {
+    fun sentenceIndicesGroupSplitChunksByLogicalSentence() {
+        val chunks =
+            TtsChunker.chunk(
+                text = "alpha beta gamma delta. Ok.",
+                locale = Locale.US,
+                maxChunkLength = 12,
+            )
+
+        assertEquals(listOf("alpha beta", "gamma delta.", "Ok."), chunks.map(TtsChunk::text))
+        assertEquals(listOf(0, 0, 1), chunks.map(TtsChunk::sentenceIndex))
+        assertEquals(listOf(0, 1, 2), chunks.map(TtsChunk::index))
+    }
+
+    @Test
+    fun everySentenceFirstChunkKeepsTheAnnouncementReserve() {
+        val reserve = 8
+        val maxChunkLength = 20
+
+        val chunks =
+            TtsChunker.chunk(
+                text = "One. Alpha beta gamma delta epsilon zeta",
+                locale = Locale.US,
+                maxChunkLength = maxChunkLength,
+                leadingChunkReserve = reserve,
+            )
+
+        val firstChunkLimit = maxChunkLength - reserve
+        val sentenceFirstChunks =
+            chunks.groupBy(TtsChunk::sentenceIndex).values.map { sentence -> sentence.first() }
+        assertTrue(sentenceFirstChunks.size > 1)
+        assertTrue(sentenceFirstChunks.all { it.text.length <= firstChunkLimit })
+    }
+
+    @Test
+    fun leadingChunkReserveKeepsMidSentenceChunksAtFullLength() {
         val text = "alpha beta gamma delta epsilon zeta eta theta"
         val reserve = 10
         val maxChunkLength = 20

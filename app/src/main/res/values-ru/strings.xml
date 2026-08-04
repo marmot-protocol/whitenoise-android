@@ -1287,6 +1287,9 @@
     <string name="tts_bar_play">Продолжить чтение</string>
     <string name="tts_bar_skip_previous">Предыдущее предложение</string>
     <string name="tts_bar_skip_next">Следующее предложение</string>
+    <string name="tts_bar_previous_message">Предыдущее сообщение</string>
+    <string name="tts_bar_next_message">Следующее сообщение</string>
+    <string name="tts_bar_progress">Предложение %1$d из %2$d, сообщение %3$d из %4$d</string>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_error">Не удалось прочитать вслух</string>
     <string name="tts_auto_read_title">Читать сообщения вслух</string>

@@ -1239,6 +1239,9 @@
     <string name="tts_bar_play">Okumaya devam et</string>
     <string name="tts_bar_skip_previous">Önceki cümle</string>
     <string name="tts_bar_skip_next">Sonraki cümle</string>
+    <string name="tts_bar_previous_message">Önceki mesaj</string>
+    <string name="tts_bar_next_message">Sonraki mesaj</string>
+    <string name="tts_bar_progress">Cümle %1$d/%2$d, mesaj %3$d/%4$d</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
     <string name="tts_bar_error">Sesli okunamadı</string>
     <string name="tts_auto_read_title">Mesajları sesli oku</string>

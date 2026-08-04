@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
@@ -37,11 +39,12 @@ import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 /**
  * Read-aloud transport strip rendered beneath the conversation's top bar in
  * every top-bar state (default, selection, search): speech continues through
- * all of them, so the controls must too. Message-level navigation with
- * sentence-granular pause/resume — no scrub gesture, since the framework
- * offers no utterance-internal seek.
+ * all of them, so the controls must too. Sentence and message navigation are
+ * separate actions on their own row, so the layout stays usable at narrow
+ * widths and large font scales without clipping. No scrub gesture, since the
+ * framework offers no utterance-internal seek.
  */
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming")
 @Composable
 internal fun TtsTransportBar(
     appState: WhiteNoiseAppState,
@@ -52,94 +55,152 @@ internal fun TtsTransportBar(
     if (current is TtsState.Idle) return
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
 
+    TtsTransportBarContent(
+        state = current,
+        rateLabel = ttsRateLabel(rateOverride ?: appState.ttsRatePreferences.resolvedRate()),
+        onPause = { appState.ttsController.pause() },
+        onResume = { appState.ttsController.resume() },
+        onPreviousSentence = { appState.ttsController.skipPreviousSentence() },
+        onNextSentence = { appState.ttsController.skipNextSentence() },
+        onPreviousMessage = { appState.ttsController.skipPreviousMessage() },
+        onNextMessage = { appState.ttsController.skipNextMessage() },
+        onCycleRate = { appState.setTtsRateOverride(nextTtsPresetRate(rateOverride)) },
+        onStop = { appState.stopSpeaking() },
+        modifier = modifier,
+    )
+}
+
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Composable
+internal fun TtsTransportBarContent(
+    state: TtsState,
+    rateLabel: String,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onPreviousSentence: () -> Unit,
+    onNextSentence: () -> Unit,
+    onPreviousMessage: () -> Unit,
+    onNextMessage: () -> Unit,
+    onCycleRate: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isError = state is TtsState.Error
+    val navigationEnabled = ttsNavigationEnabled(state)
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.VolumeUp,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-            when (current) {
-                is TtsState.Speaking ->
-                    IconButton(onClick = { appState.ttsController.pause() }) {
-                        Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.tts_bar_pause))
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    val preview = if (isError) stringResource(R.string.tts_bar_error) else state.messagePreview
+                    if (preview.isNotBlank()) {
+                        Text(
+                            text = preview,
+                            style = MaterialTheme.typography.bodySmall,
+                            color =
+                                if (isError) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                is TtsState.Paused ->
-                    IconButton(onClick = { appState.ttsController.resume() }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.tts_bar_play))
+                    if (!isError && ttsSentenceCount(state) > 0 && ttsMessageCount(state) > 0) {
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.tts_bar_progress,
+                                    ttsSentenceIndex(state) + 1,
+                                    ttsSentenceCount(state),
+                                    ttsMessageIndex(state) + 1,
+                                    ttsMessageCount(state),
+                                ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                is TtsState.Error, is TtsState.Idle -> Unit
-            }
-            IconButton(onClick = { appState.ttsController.skipPrevious() }, enabled = current !is TtsState.Error) {
-                Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.tts_bar_skip_previous))
-            }
-            IconButton(onClick = { appState.ttsController.skipNext() }, enabled = current !is TtsState.Error) {
-                Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.tts_bar_skip_next))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                val preview =
-                    if (current is TtsState.Error) {
-                        stringResource(R.string.tts_bar_error)
-                    } else {
-                        current.messagePreview
-                    }
-                if (preview.isNotBlank()) {
-                    Text(
-                        text = preview,
-                        style = MaterialTheme.typography.bodySmall,
-                        color =
-                            if (current is TtsState.Error) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (current !is TtsState.Error) {
-                    val messageCount = ttsMessageCount(current)
-                    val messageIndex = ttsMessageIndex(current)
-                    if (messageCount > 0) {
+                    if (!isError && ttsMessageCount(state) > 0) {
                         LinearProgressIndicator(
-                            progress = { (messageIndex + 1).toFloat() / messageCount },
+                            progress = { (ttsMessageIndex(state) + 1).toFloat() / ttsMessageCount(state) },
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         )
                     }
                 }
-            }
-            if (current !is TtsState.Error) {
-                TextButton(onClick = { appState.setTtsRateOverride(nextTtsPresetRate(rateOverride)) }) {
-                    Text(ttsRateLabel(rateOverride ?: appState.ttsRatePreferences.resolvedRate()))
+                if (!isError) {
+                    TextButton(onClick = onCycleRate) { Text(rateLabel) }
+                }
+                IconButton(onClick = onStop) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.tts_bar_stop))
                 }
             }
-            IconButton(onClick = { appState.stopSpeaking() }) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.tts_bar_stop))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                IconButton(onClick = onPreviousMessage, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        contentDescription = stringResource(R.string.tts_bar_previous_message),
+                    )
+                }
+                IconButton(onClick = onPreviousSentence, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.NavigateBefore,
+                        contentDescription = stringResource(R.string.tts_bar_skip_previous),
+                    )
+                }
+                when (state) {
+                    is TtsState.Speaking ->
+                        IconButton(onClick = onPause) {
+                            Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.tts_bar_pause))
+                        }
+                    else ->
+                        IconButton(onClick = onResume, enabled = state is TtsState.Paused) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.tts_bar_play),
+                            )
+                        }
+                }
+                IconButton(onClick = onNextSentence, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.NavigateNext,
+                        contentDescription = stringResource(R.string.tts_bar_skip_next),
+                    )
+                }
+                IconButton(onClick = onNextMessage, enabled = navigationEnabled) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        contentDescription = stringResource(R.string.tts_bar_next_message),
+                    )
+                }
             }
         }
     }
 }
 
-internal fun ttsMessageIndex(state: TtsState): Int =
-    when (state) {
-        is TtsState.Speaking -> state.messageIndex
-        is TtsState.Paused -> state.messageIndex
-        is TtsState.Error -> state.messageIndex
-        is TtsState.Idle -> state.messageIndex
-    }
+internal fun ttsMessageIndex(state: TtsState): Int = state.messageIndex
 
-internal fun ttsMessageCount(state: TtsState): Int =
-    when (state) {
-        is TtsState.Speaking -> state.messageCount
-        is TtsState.Paused -> state.messageCount
-        is TtsState.Error -> state.messageCount
-        is TtsState.Idle -> state.messageCount
-    }
+internal fun ttsMessageCount(state: TtsState): Int = state.messageCount
+
+internal fun ttsSentenceIndex(state: TtsState): Int = state.sentenceIndexWithinMessage
+
+internal fun ttsSentenceCount(state: TtsState): Int = state.sentenceCountWithinMessage
+
+internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
 
 /** Cycles the preset list; from the System default it starts at 1×. */
 internal fun nextTtsPresetRate(currentOverride: Float?): Float {

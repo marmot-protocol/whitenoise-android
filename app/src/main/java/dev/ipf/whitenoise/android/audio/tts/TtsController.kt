@@ -159,25 +159,32 @@ class TtsController internal constructor(
     }
 
     @Synchronized
-    fun skipNext() {
-        if (!prepareToSkip()) return
-        queue.skipNext()
+    fun skipNextMessage() {
+        if (!canNavigate()) return
+        queue.skipNextMessage()
     }
 
     @Synchronized
-    fun skipPrevious() {
-        if (!prepareToSkip()) return
-        queue.skipPrevious()
+    fun skipPreviousMessage() {
+        if (!canNavigate()) return
+        queue.skipPreviousMessage()
     }
 
-    private fun prepareToSkip(): Boolean =
-        when (state.value) {
-            is TtsState.Speaking -> true
-            is TtsState.Paused -> acquireAudioFocus()
-            is TtsState.Idle,
-            is TtsState.Error,
-            -> false
-        }
+    @Synchronized
+    fun skipNextSentence() {
+        if (!canNavigate()) return
+        queue.skipNextSentence()
+    }
+
+    @Synchronized
+    fun skipPreviousSentence() {
+        if (!canNavigate()) return
+        queue.skipPreviousSentence()
+    }
+
+    // Navigation never acquires audio focus: while paused it only repositions
+    // the queue, and speech starts again on resume().
+    private fun canNavigate(): Boolean = state.value is TtsState.Speaking || state.value is TtsState.Paused
 
     private fun acquireAudioFocus(): Boolean =
         audioFocus.acquire(
@@ -242,7 +249,8 @@ class TtsController internal constructor(
                 senderKey = senderKey,
                 senderDisplayName = announcementName,
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
-                chunks = chunks.map { chunk -> TtsChunk(text = chunk.text, index = 0) },
+                // The queue reflattens indices itself; sentence identity must survive.
+                chunks = chunks.map { chunk -> chunk.copy(index = 0) },
             )
         }
     }

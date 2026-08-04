@@ -10,6 +10,8 @@ sealed interface TtsState {
     val chunkCount: Int
     val messageIndex: Int
     val messageCount: Int
+    val sentenceIndexWithinMessage: Int
+    val sentenceCountWithinMessage: Int
     val messagePreview: String
 
     data class Idle(
@@ -17,6 +19,8 @@ sealed interface TtsState {
         override val chunkCount: Int = 0,
         override val messageIndex: Int = 0,
         override val messageCount: Int = 0,
+        override val sentenceIndexWithinMessage: Int = 0,
+        override val sentenceCountWithinMessage: Int = 0,
         override val messagePreview: String = "",
     ) : TtsState
 
@@ -25,6 +29,8 @@ sealed interface TtsState {
         override val chunkCount: Int,
         override val messageIndex: Int,
         override val messageCount: Int,
+        override val sentenceIndexWithinMessage: Int,
+        override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
     ) : TtsState
 
@@ -33,6 +39,8 @@ sealed interface TtsState {
         override val chunkCount: Int,
         override val messageIndex: Int,
         override val messageCount: Int,
+        override val sentenceIndexWithinMessage: Int,
+        override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
     ) : TtsState
 
@@ -42,6 +50,8 @@ sealed interface TtsState {
         override val chunkCount: Int,
         override val messageIndex: Int,
         override val messageCount: Int,
+        override val sentenceIndexWithinMessage: Int,
+        override val sentenceCountWithinMessage: Int,
         override val messagePreview: String,
     ) : TtsState
 }
@@ -66,11 +76,25 @@ internal class TtsPlaybackQueue(
     private var messages: List<TtsQueuedMessage> = emptyList()
     private var chunks: List<TtsChunk> = emptyList()
     private var messageFirstChunkIndex: IntArray = intArrayOf()
+    private var messageSentenceCount: IntArray = intArrayOf()
     private var currentIndex = 0
     private var generation = 0L
     private var refreshAtNextBoundary = false
     private var announceSenderForCurrentMessage = false
     private var senderAnnouncedAtMessageIndex: Int? = null
+    private var pendingResumeAnnouncement: SenderAnnouncement? = null
+
+    /** How a repositioned target treats its message's sender announcement. */
+    private enum class SenderAnnouncement {
+        // The target crossed into another message: announce its sender once.
+        Announce,
+
+        // The target stayed inside its message: never repeat the announcement.
+        Suppress,
+
+        // Not a user navigation: keep the sender-change playback heuristic.
+        Natural,
+    }
 
     /**
      * Applies changed enqueue-time parameters (speech rate) at the next chunk
@@ -90,6 +114,7 @@ internal class TtsPlaybackQueue(
         currentIndex = 0
         announceSenderForCurrentMessage = false
         senderAnnouncedAtMessageIndex = null
+        pendingResumeAnnouncement = null
         if (chunks.isEmpty()) {
             _state.value = TtsState.Idle()
             return
@@ -137,6 +162,8 @@ internal class TtsPlaybackQueue(
             chunkCount = chunkCount,
             messageIndex = 0,
             messageCount = messageCount,
+            sentenceIndex = 0,
+            sentenceCount = 0,
             messagePreview = messagePreview,
         )
     }
@@ -146,17 +173,34 @@ internal class TtsPlaybackQueue(
         stopEngine()
         generation += 1
         currentIndex = speaking.chunkIndex
+        pendingResumeAnnouncement = null
         publishPaused(currentIndex)
     }
 
     fun resume() {
         val paused = _state.value as? TtsState.Paused ?: return
         currentIndex = paused.chunkIndex
-        announceSenderForCurrentMessage = false
-        // The previous engine queue was stopped by pause(). Recompute sender
-        // narration when the paused sentence is the first chunk of a message;
-        // otherwise a changed speaker can resume without their announcement.
-        senderAnnouncedAtMessageIndex = null
+        when (pendingResumeAnnouncement) {
+            SenderAnnouncement.Announce -> {
+                announceSenderForCurrentMessage = true
+                senderAnnouncedAtMessageIndex = null
+            }
+
+            SenderAnnouncement.Suppress -> {
+                announceSenderForCurrentMessage = false
+                senderAnnouncedAtMessageIndex = messageIndexForChunk(currentIndex)
+            }
+
+            // The previous engine queue was stopped by pause(). Recompute
+            // sender narration when the paused sentence is the first chunk of
+            // a message; otherwise a changed speaker can resume without their
+            // announcement.
+            else -> {
+                announceSenderForCurrentMessage = false
+                senderAnnouncedAtMessageIndex = null
+            }
+        }
+        pendingResumeAnnouncement = null
         enqueueFromCurrentIndex()
     }
 
@@ -166,46 +210,49 @@ internal class TtsPlaybackQueue(
         messages = emptyList()
         chunks = emptyList()
         messageFirstChunkIndex = intArrayOf()
+        messageSentenceCount = intArrayOf()
         currentIndex = 0
         announceSenderForCurrentMessage = false
         senderAnnouncedAtMessageIndex = null
+        pendingResumeAnnouncement = null
         _state.value = TtsState.Idle()
     }
 
-    fun skipNext() {
-        if (_state.value !is TtsState.Speaking && _state.value !is TtsState.Paused) return
-        val currentMessage = messageIndexForChunk(currentIndex)
-        val nextMessage = currentMessage + 1
+    fun skipNextMessage() {
+        if (!isNavigable()) return
+        val nextMessage = messageIndexForChunk(currentIndex) + 1
         if (nextMessage >= messages.size) {
-            stopEngine()
-            generation += 1
-            val completedCount = chunks.size
-            val completedMessages = messages.size
-            val lastPreview = messages.lastOrNull()?.preview.orEmpty()
-            messages = emptyList()
-            chunks = emptyList()
-            messageFirstChunkIndex = intArrayOf()
-            currentIndex = completedCount
-            announceSenderForCurrentMessage = false
-            _state.value =
-                TtsState.Idle(
-                    chunkIndex = completedCount,
-                    chunkCount = completedCount,
-                    messageIndex = completedMessages,
-                    messageCount = completedMessages,
-                    messagePreview = lastPreview,
-                )
-            onTerminal()
+            completeThroughNavigation()
             return
         }
-        requeueFrom(firstChunkIndexOfMessage(nextMessage), announceSender = true)
+        moveTo(firstChunkIndexOfMessage(nextMessage), SenderAnnouncement.Announce)
     }
 
-    fun skipPrevious() {
-        if (_state.value !is TtsState.Speaking && _state.value !is TtsState.Paused) return
-        val currentMessage = messageIndexForChunk(currentIndex)
-        val previousMessage = (currentMessage - 1).coerceAtLeast(0)
-        requeueFrom(firstChunkIndexOfMessage(previousMessage), announceSender = true)
+    fun skipPreviousMessage() {
+        if (!isNavigable()) return
+        val previousMessage = (messageIndexForChunk(currentIndex) - 1).coerceAtLeast(0)
+        moveTo(firstChunkIndexOfMessage(previousMessage), SenderAnnouncement.Announce)
+    }
+
+    fun skipNextSentence() {
+        if (!isNavigable()) return
+        val target = firstChunkIndexAfterSentenceContaining(currentIndex)
+        if (target >= chunks.size) {
+            completeThroughNavigation()
+            return
+        }
+        moveTo(target, announcementForTarget(target))
+    }
+
+    fun skipPreviousSentence() {
+        if (!isNavigable()) return
+        val currentSentenceStart = firstChunkIndexOfSentenceContaining(currentIndex)
+        if (currentSentenceStart == 0) {
+            moveTo(0, SenderAnnouncement.Announce)
+            return
+        }
+        val target = firstChunkIndexOfSentenceContaining(currentSentenceStart - 1)
+        moveTo(target, announcementForTarget(target))
     }
 
     fun onDone(utteranceId: String?) {
@@ -213,30 +260,14 @@ internal class TtsPlaybackQueue(
         if (_state.value !is TtsState.Speaking || completedIndex != currentIndex) return
         val next = completedIndex + 1
         if (next >= chunks.size) {
-            val completedCount = chunks.size
-            val completedMessages = messages.size
-            val lastPreview = messages.lastOrNull()?.preview.orEmpty()
-            messages = emptyList()
-            chunks = emptyList()
-            messageFirstChunkIndex = intArrayOf()
-            currentIndex = completedCount
-            announceSenderForCurrentMessage = false
-            _state.value =
-                TtsState.Idle(
-                    chunkIndex = completedCount,
-                    chunkCount = completedCount,
-                    messageIndex = completedMessages,
-                    messageCount = completedMessages,
-                    messagePreview = lastPreview,
-                )
-            onTerminal()
+            finishPlayback()
         } else {
             currentIndex = next
             announceSenderForCurrentMessage = false
             publishSpeaking(currentIndex)
             if (refreshAtNextBoundary) {
                 refreshAtNextBoundary = false
-                requeueFrom(next, announceSender = false)
+                requeueFrom(next, SenderAnnouncement.Natural)
             }
         }
     }
@@ -262,8 +293,76 @@ internal class TtsPlaybackQueue(
             chunkCount = chunks.size,
             messageIndex = messageIndex,
             messageCount = messages.size,
+            sentenceIndex = chunks[failedIndex].sentenceIndex,
+            sentenceCount = messageSentenceCount[messageIndex],
             messagePreview = messages.getOrNull(messageIndex)?.preview.orEmpty(),
         )
+    }
+
+    private fun isNavigable(): Boolean = _state.value is TtsState.Speaking || _state.value is TtsState.Paused
+
+    private fun announcementForTarget(target: Int): SenderAnnouncement =
+        if (messageIndexForChunk(target) != messageIndexForChunk(currentIndex)) {
+            SenderAnnouncement.Announce
+        } else {
+            SenderAnnouncement.Suppress
+        }
+
+    /**
+     * Repositions playback. While speaking the engine queue restarts at the
+     * target immediately; while paused only the position and progress move —
+     * no chunk is enqueued and the target's announcement decision is held
+     * until resume(). An Announce earned by crossing a message boundary
+     * survives later same-message repositions: that message's sender has
+     * still never been spoken.
+     */
+    private fun moveTo(
+        index: Int,
+        announcement: SenderAnnouncement,
+    ) {
+        if (_state.value is TtsState.Paused) {
+            currentIndex = index
+            pendingResumeAnnouncement =
+                when {
+                    announcement == SenderAnnouncement.Announce -> SenderAnnouncement.Announce
+                    pendingResumeAnnouncement == SenderAnnouncement.Announce -> SenderAnnouncement.Announce
+                    else -> SenderAnnouncement.Suppress
+                }
+            publishPaused(index)
+        } else {
+            requeueFrom(index, announcement)
+        }
+    }
+
+    private fun completeThroughNavigation() {
+        stopEngine()
+        generation += 1
+        finishPlayback()
+    }
+
+    private fun finishPlayback() {
+        val completedCount = chunks.size
+        val completedMessages = messages.size
+        val lastPreview = messages.lastOrNull()?.preview.orEmpty()
+        val lastSentenceCount = messageSentenceCount.lastOrNull() ?: 0
+        messages = emptyList()
+        chunks = emptyList()
+        messageFirstChunkIndex = intArrayOf()
+        messageSentenceCount = intArrayOf()
+        currentIndex = completedCount
+        announceSenderForCurrentMessage = false
+        pendingResumeAnnouncement = null
+        _state.value =
+            TtsState.Idle(
+                chunkIndex = completedCount,
+                chunkCount = completedCount,
+                messageIndex = completedMessages,
+                messageCount = completedMessages,
+                sentenceIndexWithinMessage = lastSentenceCount,
+                sentenceCountWithinMessage = lastSentenceCount,
+                messagePreview = lastPreview,
+            )
+        onTerminal()
     }
 
     private fun fail(
@@ -272,6 +371,8 @@ internal class TtsPlaybackQueue(
         chunkCount: Int,
         messageIndex: Int,
         messageCount: Int,
+        sentenceIndex: Int,
+        sentenceCount: Int,
         messagePreview: String,
     ) {
         stopEngine()
@@ -279,22 +380,35 @@ internal class TtsPlaybackQueue(
         messages = emptyList()
         chunks = emptyList()
         messageFirstChunkIndex = intArrayOf()
+        messageSentenceCount = intArrayOf()
         currentIndex = chunkIndex
         announceSenderForCurrentMessage = false
-        _state.value = TtsState.Error(error, chunkIndex, chunkCount, messageIndex, messageCount, messagePreview)
+        pendingResumeAnnouncement = null
+        _state.value =
+            TtsState.Error(
+                error = error,
+                chunkIndex = chunkIndex,
+                chunkCount = chunkCount,
+                messageIndex = messageIndex,
+                messageCount = messageCount,
+                sentenceIndexWithinMessage = sentenceIndex,
+                sentenceCountWithinMessage = sentenceCount,
+                messagePreview = messagePreview,
+            )
         onTerminal()
     }
 
     private fun requeueFrom(
         index: Int,
-        announceSender: Boolean,
+        announcement: SenderAnnouncement,
     ) {
         stopEngine()
         generation += 1
         refreshAtNextBoundary = false
         currentIndex = index
-        announceSenderForCurrentMessage = announceSender
-        senderAnnouncedAtMessageIndex = null
+        announceSenderForCurrentMessage = announcement == SenderAnnouncement.Announce
+        senderAnnouncedAtMessageIndex =
+            if (announcement == SenderAnnouncement.Suppress) messageIndexForChunk(index) else null
         enqueueFromCurrentIndex()
     }
 
@@ -311,9 +425,9 @@ internal class TtsPlaybackQueue(
                 onError(utteranceId, result)
                 break
             }
-            if (chunk.index == firstChunkIndexOfMessage(messageIndexForChunk(chunk.index))) {
-                announceSenderForCurrentMessage = false
-            }
+            // Only the requeue target may carry a forced announcement; later
+            // chunks fall back to the sender-change playback heuristic.
+            announceSenderForCurrentMessage = false
         }
     }
 
@@ -321,9 +435,11 @@ internal class TtsPlaybackQueue(
         val messageIndex = messageIndexForChunk(chunk.index)
         val message = messages[messageIndex]
         val isFirstChunkOfMessage = chunk.index == firstChunkIndexOfMessage(messageIndex)
+        // A cross-message sentence skip can target a mid-message sentence, so
+        // a forced announcement attaches to the target chunk itself.
+        val forcedAtTarget = announceSenderForCurrentMessage && chunk.index == currentIndex
         val announced =
-            isFirstChunkOfMessage &&
-                shouldAnnounceSender(messageIndex) &&
+            (forcedAtTarget || (isFirstChunkOfMessage && shouldAnnounceSender(messageIndex))) &&
                 message.senderDisplayName.isNotBlank()
         if (!announced) return chunk
         senderAnnouncedAtMessageIndex = messageIndex
@@ -353,10 +469,12 @@ internal class TtsPlaybackQueue(
 
     private fun rebuildFlatChunks() {
         val firstIndices = mutableListOf<Int>()
+        val sentenceCounts = mutableListOf<Int>()
         val flat = mutableListOf<TtsChunk>()
         var nextIndex = 0
         for (message in messages) {
             firstIndices += nextIndex
+            sentenceCounts += (message.chunks.maxOfOrNull(TtsChunk::sentenceIndex) ?: -1) + 1
             for (chunk in message.chunks) {
                 flat += chunk.copy(index = nextIndex)
                 nextIndex += 1
@@ -364,6 +482,7 @@ internal class TtsPlaybackQueue(
         }
         chunks = flat
         messageFirstChunkIndex = firstIndices.toIntArray()
+        messageSentenceCount = sentenceCounts.toIntArray()
     }
 
     private fun messageIndexForChunk(chunkIndex: Int): Int {
@@ -376,6 +495,25 @@ internal class TtsPlaybackQueue(
 
     private fun firstChunkIndexOfMessage(messageIndex: Int): Int = messageFirstChunkIndex[messageIndex]
 
+    private fun inSameSentence(
+        first: Int,
+        second: Int,
+    ): Boolean =
+        messageIndexForChunk(first) == messageIndexForChunk(second) &&
+            chunks[first].sentenceIndex == chunks[second].sentenceIndex
+
+    private fun firstChunkIndexOfSentenceContaining(chunkIndex: Int): Int {
+        var index = chunkIndex
+        while (index > 0 && inSameSentence(index - 1, chunkIndex)) index -= 1
+        return index
+    }
+
+    private fun firstChunkIndexAfterSentenceContaining(chunkIndex: Int): Int {
+        var index = chunkIndex + 1
+        while (index < chunks.size && inSameSentence(index, chunkIndex)) index += 1
+        return index
+    }
+
     private fun publishSpeaking(chunkIndex: Int) {
         val messageIndex = messageIndexForChunk(chunkIndex)
         _state.value =
@@ -384,6 +522,8 @@ internal class TtsPlaybackQueue(
                 chunkCount = chunks.size,
                 messageIndex = messageIndex,
                 messageCount = messages.size,
+                sentenceIndexWithinMessage = chunks[chunkIndex].sentenceIndex,
+                sentenceCountWithinMessage = messageSentenceCount[messageIndex],
                 messagePreview = messages[messageIndex].preview,
             )
     }
@@ -396,6 +536,8 @@ internal class TtsPlaybackQueue(
                 chunkCount = chunks.size,
                 messageIndex = messageIndex,
                 messageCount = messages.size,
+                sentenceIndexWithinMessage = chunks[chunkIndex].sentenceIndex,
+                sentenceCountWithinMessage = messageSentenceCount[messageIndex],
                 messagePreview = messages[messageIndex].preview,
             )
     }

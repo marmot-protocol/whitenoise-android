@@ -1239,6 +1239,9 @@
     <string name="tts_bar_play">Vorlesen fortsetzen</string>
     <string name="tts_bar_skip_previous">Vorheriger Satz</string>
     <string name="tts_bar_skip_next">Nächster Satz</string>
+    <string name="tts_bar_previous_message">Vorherige Nachricht</string>
+    <string name="tts_bar_next_message">Nächste Nachricht</string>
+    <string name="tts_bar_progress">Satz %1$d von %2$d, Nachricht %3$d von %4$d</string>
     <string name="tts_bar_stop">Vorlesen beenden</string>
     <string name="tts_bar_error">Vorlesen fehlgeschlagen</string>
     <string name="tts_auto_read_title">Nachrichten vorlesen</string>
