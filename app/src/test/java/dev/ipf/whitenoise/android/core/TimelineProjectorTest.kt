@@ -40,6 +40,24 @@ class TimelineProjectorTest {
     }
 
     @Test
+    fun projectedMediaKeepsExactCaptionAndDoesNotInventOneForBlankPlaintext() {
+        val mediaTag = MessageTagFfi(listOf("imeta", "m application/pdf", "filename report.pdf"))
+        val captioned =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(plaintext = "Quarterly report", tags = listOf(mediaTag)),
+            )
+        val intentionallyBlank =
+            TimelineProjector.toAppMessageRecord(
+                timelineRecord(plaintext = "", tags = listOf(mediaTag)),
+            )
+
+        assertEquals("Quarterly report", captioned.plaintext)
+        assertEquals("Quarterly report", MessageProjector.mediaCaption(captioned))
+        assertEquals("", intentionallyBlank.plaintext)
+        assertNull(MessageProjector.mediaCaption(intentionallyBlank))
+    }
+
+    @Test
     fun projectedRecordProvidesBodyReplyPreviewAndReactionTallies() {
         val record =
             timelineRecord(
@@ -415,6 +433,7 @@ class TimelineProjectorTest {
         invalidationStatus: String? = null,
         direction: String = "received",
         mediaJson: String? = null,
+        tags: List<MessageTagFfi> = emptyList(),
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -424,7 +443,7 @@ class TimelineProjectorTest {
         plaintext = plaintext,
         contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
         kind = 9uL,
-        tags = emptyList<MessageTagFfi>(),
+        tags = tags,
         timelineAt = timelineAt,
         receivedAt = timelineAt,
         replyToMessageIdHex = replyPreview?.messageIdHex,

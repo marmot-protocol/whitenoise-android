@@ -1044,6 +1044,11 @@ internal fun MessageBubble(
                             ?.values
                             ?.getOrNull(1)
                     }
+                val mediaCaption =
+                    MessageProjector.mediaCaption(
+                        message = record,
+                        body = editState?.latestText ?: record.plaintext,
+                    )
                 // Visual attachments (image + video) ride one bubble:
                 // a singleton routes to its dedicated bubble, a multi
                 // goes to MediaVisualGridBubble which mixes image
@@ -1059,7 +1064,7 @@ internal fun MessageBubble(
                     !deleted &&
                         invalidationWarning == null &&
                         visualAttachments.size == 1 &&
-                        (editState?.latestText ?: record.plaintext).isBlank()
+                        mediaCaption == null
                 val anyConfirmedMedia =
                     imageAttachments.isNotEmpty() ||
                         audioAttachments.isNotEmpty() ||
@@ -1165,7 +1170,8 @@ internal fun MessageBubble(
                     !deleted &&
                         invalidationWarning == null &&
                         !anyConfirmedMedia &&
-                        pendingVisualRefs.size == 1
+                        pendingVisualRefs.size == 1 &&
+                        mediaCaption == null
                 val showPendingPlaceholder =
                     !deleted &&
                         !anyConfirmedMedia &&
@@ -1379,12 +1385,14 @@ internal fun MessageBubble(
                                         attachedToCaption = attachedToCaption,
                                     )
                                 }
-                                MediaFooterOverlay(
-                                    timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                    showStatus = true,
-                                    status = item.status,
-                                    showRetention = retentionIndicatorVisible(record.retentionSeconds),
-                                )
+                                if (footerOnPendingVisual) {
+                                    MediaFooterOverlay(
+                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                        showStatus = true,
+                                        status = item.status,
+                                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
+                                    )
+                                }
                             }
                         } else {
                             MediaVisualGridBubble(
@@ -1414,16 +1422,11 @@ internal fun MessageBubble(
                     }
                 }
                 // Body text policy:
-                // - Pending optimistic with an attachment: placeholder
-                //   composable already renders, suppress text.
-                // - Confirmed media (imeta tag present): render the
-                //   user-typed caption, edit-overlay-aware so a
-                //   subsequent edit on a media bubble updates the
-                //   caption in place. We deliberately don't use
-                //   `displayedBody` directly because MessageProjector
-                //   falls back to the imeta filename for a blank
-                //   caption — fine for chat-list previews, wrong for
-                //   a bubble already showing the image inline.
+                // - Pending and confirmed media render the user-authored
+                //   caption throughout the upload/reconciliation lifecycle.
+                //   Synthetic pending placeholders and confirmed filename
+                //   fallbacks stay hidden because the attachment is already
+                //   visible in the same bubble.
                 // - Non-media: render displayedBody (covers reactions,
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
@@ -1434,9 +1437,8 @@ internal fun MessageBubble(
                         // The contact card / location bubble / user card carry
                         // the body, so the raw caption/link/npub text is hidden.
                         sharedContact != null || sharedLocation != null || sharedUser != null -> null
-                        mediaPendingName != null && !anyConfirmedMedia -> null
-                        anyConfirmedMedia ->
-                            (editState?.latestText ?: record.plaintext).takeIf(String::isNotBlank)
+                        mediaPendingName != null && !anyConfirmedMedia -> mediaCaption
+                        anyConfirmedMedia -> mediaCaption
                         else -> displayedBody
                     }
                 val bodyOrWarningInsideBubble =

@@ -447,6 +447,75 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun mediaCaptionKeepsOneLogicalCaptionAcrossPendingAttachmentKinds() {
+        val pendingCaptionedImage =
+            message(
+                id = "pending-captioned-image",
+                plaintext = "Sunset from the train",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "sunset.jpg", "image/jpeg"))),
+            )
+        val pendingCaptionedDocument =
+            message(
+                id = "pending-captioned-document",
+                plaintext = "Quarterly report",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "report.pdf", "application/pdf"))),
+            )
+        val pendingCaptionedAlbum =
+            message(
+                id = "pending-captioned-album",
+                plaintext = "Trip highlights",
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("_media_pending", "one.jpg", "image/jpeg")),
+                        MessageTagFfi(listOf("_media_pending", "two.mp4", "video/mp4")),
+                    ),
+            )
+
+        assertEquals(
+            "Sunset from the train",
+            MessageProjector.mediaCaption(pendingCaptionedImage),
+        )
+        assertEquals(
+            "Quarterly report",
+            MessageProjector.mediaCaption(pendingCaptionedDocument),
+        )
+        assertEquals(
+            "Trip highlights",
+            MessageProjector.mediaCaption(pendingCaptionedAlbum),
+        )
+    }
+
+    @Test
+    fun mediaCaptionSkipsSyntheticPendingLabelsAndIntentionalBlanks() {
+        val pendingImageWithoutCaption =
+            message(
+                id = "pending-image-without-caption",
+                plaintext = "📎 sunset.jpg",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "sunset.jpg", "image/jpeg"))),
+            )
+        val pendingAlbumWithoutCaption =
+            message(
+                id = "pending-album-without-caption",
+                plaintext = "📎 2 attachments",
+                tags =
+                    listOf(
+                        MessageTagFfi(listOf("_media_pending", "one.jpg", "image/jpeg")),
+                        MessageTagFfi(listOf("_media_pending", "report.pdf", "application/pdf")),
+                    ),
+            )
+        val confirmedImageWithoutCaption =
+            message(
+                id = "confirmed-image-without-caption",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m image/jpeg", "filename sunset.jpg"))),
+            )
+
+        assertNull(MessageProjector.mediaCaption(pendingImageWithoutCaption))
+        assertNull(MessageProjector.mediaCaption(pendingAlbumWithoutCaption))
+        assertNull(MessageProjector.mediaCaption(confirmedImageWithoutCaption))
+    }
+
+    @Test
     fun normalizeForwardTargetsDeDupesDropsBlanksAndKeepsOrder() {
         val targets =
             MessageProjector.normalizeForwardTargets(
