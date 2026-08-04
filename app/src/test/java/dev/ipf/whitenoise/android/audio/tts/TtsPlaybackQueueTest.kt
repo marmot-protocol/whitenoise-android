@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -142,5 +143,47 @@ class TtsPlaybackQueueTest {
             speakingTts(1, 2, 0, 1, "One. Two.", sentenceIndex = 1, sentenceCount = 2),
             queue.state.value,
         )
+    }
+
+    @Test
+    fun pauseClearsAPendingRateRefreshSoResumeDoesNotRestartAtTheBoundary() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessage("", "", "One.", "Two.", "Three.")))
+        queue.refreshPendingChunksAtNextBoundary()
+        queue.pause()
+        queue.resume()
+        val enqueuedAfterResume = harness.enqueued.size
+        val stopsAfterResume = harness.stopCalls
+
+        // First utterance of the resumed generation completes — a leaked
+        // refresh flag would needlessly stop and re-enqueue everything here.
+        queue.onDone(harness.utteranceId(3))
+
+        assertEquals(
+            speakingTts(1, 3, 0, 1, "One. Two. Three.", sentenceIndex = 1, sentenceCount = 3),
+            queue.state.value,
+        )
+        assertEquals(enqueuedAfterResume, harness.enqueued.size)
+        assertEquals(stopsAfterResume, harness.stopCalls)
+    }
+
+    @Test
+    fun aMessageWithoutChunksCannotEnterTheQueue() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        val empty =
+            TtsQueuedMessage(
+                senderKey = "alice",
+                senderDisplayName = "Alice",
+                preview = "",
+                chunks = emptyList(),
+            )
+
+        assertThrows(IllegalArgumentException::class.java) { queue.start(listOf(empty)) }
+
+        val appendHarness = TtsQueueHarness()
+        appendHarness.queue.start(ttsMessages(ttsMessage("bob", "Bob", "One.")))
+        assertThrows(IllegalArgumentException::class.java) { appendHarness.queue.append(listOf(empty)) }
     }
 }

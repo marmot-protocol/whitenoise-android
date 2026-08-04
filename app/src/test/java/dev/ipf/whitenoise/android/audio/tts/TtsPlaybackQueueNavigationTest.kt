@@ -128,7 +128,7 @@ class TtsPlaybackQueueNavigationTest {
     }
 
     @Test
-    fun skipPreviousMessageAtFirstMessageRestartsThatMessage() {
+    fun skipPreviousMessageAtFirstMessageRestartsItWithoutReannouncingTheSender() {
         val harness = TtsQueueHarness()
         val queue = harness.queue
         queue.start(
@@ -144,7 +144,9 @@ class TtsPlaybackQueueNavigationTest {
             speakingTts(0, 2, 0, 2, "One."),
             queue.state.value,
         )
-        assertEquals("Alice: One.", harness.lastSpokenTexts(2).first())
+        // Alice was announced when the session started — a same-message
+        // restart never repeats the prefix.
+        assertEquals("One.", harness.lastSpokenTexts(2).first())
     }
 
     @Test
@@ -320,7 +322,9 @@ class TtsPlaybackQueueNavigationTest {
             speakingTts(0, 2, 0, 1, "One. Two.", sentenceIndex = 0, sentenceCount = 2),
             queue.state.value,
         )
-        assertEquals("Alice: One.", harness.lastSpokenTexts(2).first())
+        // The start already announced Alice — repeated presses at the queue
+        // head restart the sentence without re-announcing her.
+        assertEquals("One.", harness.lastSpokenTexts(2).first())
     }
 
     @Test
@@ -541,5 +545,124 @@ class TtsPlaybackQueueNavigationTest {
                 .last()
                 .first.text,
         )
+    }
+
+    @Test
+    fun skipNextSentenceFromASplitSentenceStartLandsOnTheFollowingSentence() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(
+            ttsMessages(
+                ttsMessageWithChunks(
+                    senderKey = "alice",
+                    senderDisplayName = "Alice",
+                    preview = "Long sentence. Short.",
+                    chunks = listOf("Long part one" to 0, "long part two" to 0, "Short." to 1),
+                ),
+            ),
+        )
+        assertEquals(
+            speakingTts(0, 3, 0, 1, "Long sentence. Short.", sentenceIndex = 0, sentenceCount = 2),
+            queue.state.value,
+        )
+
+        queue.skipNextSentence()
+
+        // Both chunks of the split sentence are skipped in one step, never
+        // just the next raw chunk.
+        assertEquals(
+            speakingTts(2, 3, 0, 1, "Long sentence. Short.", sentenceIndex = 1, sentenceCount = 2),
+            queue.state.value,
+        )
+        assertEquals(
+            "Short.",
+            harness.enqueued
+                .last()
+                .first.text,
+        )
+    }
+
+    @Test
+    fun pausedNoOpPreviousTapAtTheHeadKeepsTheSuppressedResume() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessage("alice", "Alice", "One.", "Two.")))
+        queue.onDone(harness.utteranceId(0))
+        queue.pause()
+        queue.skipPreviousSentence()
+        assertEquals(
+            pausedTts(0, 2, 0, 1, "One. Two.", sentenceIndex = 0, sentenceCount = 2),
+            queue.state.value,
+        )
+
+        // Already at the queue head — the tap moves nothing and must not
+        // upgrade the pending suppression.
+        queue.skipPreviousSentence()
+
+        assertEquals(
+            pausedTts(0, 2, 0, 1, "One. Two.", sentenceIndex = 0, sentenceCount = 2),
+            queue.state.value,
+        )
+
+        queue.resume()
+
+        assertEquals("One.", harness.lastSpokenTexts(2).first())
+    }
+
+    @Test
+    fun pausedRoundTripBackToThePausedMessageResumesWithoutReannouncing() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(
+            ttsMessages(
+                ttsMessage("bob", "Bob", "One."),
+                ttsMessage("alice", "Alice", "Two."),
+            ),
+        )
+        queue.onDone(harness.utteranceId(0))
+        queue.pause()
+
+        queue.skipPreviousMessage()
+        queue.skipNextMessage()
+        assertEquals(
+            pausedTts(1, 2, 1, 2, "Two."),
+            queue.state.value,
+        )
+
+        queue.resume()
+
+        // Alice was already heard when playback paused inside her message, so
+        // the round trip resumes without her prefix.
+        assertEquals(
+            "Two.",
+            harness.enqueued
+                .last()
+                .first.text,
+        )
+    }
+
+    @Test
+    fun appendWhilePausedRefreshesCountsWithoutEnqueuingUntilResume() {
+        val harness = TtsQueueHarness()
+        val queue = harness.queue
+        queue.start(ttsMessages(ttsMessage("alice", "Alice", "First.")))
+        queue.pause()
+        val enqueuedBeforeAppend = harness.enqueued.size
+
+        queue.append(ttsMessages(ttsMessage("bob", "Bob", "Second.", "Third.")))
+
+        assertEquals(
+            pausedTts(0, 3, 0, 2, "First.", sentenceIndex = 0, sentenceCount = 1),
+            queue.state.value,
+        )
+        assertEquals(enqueuedBeforeAppend, harness.enqueued.size)
+
+        queue.resume()
+
+        assertEquals(
+            speakingTts(0, 3, 0, 2, "First.", sentenceIndex = 0, sentenceCount = 1),
+            queue.state.value,
+        )
+        assertEquals(listOf(0, 1, 2), harness.enqueued.takeLast(3).map { it.first.index })
     }
 }

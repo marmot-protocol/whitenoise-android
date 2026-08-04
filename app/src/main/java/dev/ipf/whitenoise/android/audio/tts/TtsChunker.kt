@@ -36,9 +36,9 @@ object TtsChunker {
     ): List<TtsChunk> {
         require(maxChunkLength > 0) { "maxChunkLength must be positive" }
         require(leadingChunkReserve >= 0) { "leadingChunkReserve must be non-negative" }
-        require(leadingChunkReserve < maxChunkLength) {
-            "leadingChunkReserve must be less than maxChunkLength"
-        }
+        // An oversized sender label degrades to a tighter first chunk instead
+        // of crashing speak() over a long display name.
+        val boundedReserve = leadingChunkReserve.coerceAtMost(maxChunkLength - 1)
         if (text.isBlank()) return emptyList()
 
         val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
@@ -64,7 +64,7 @@ object TtsChunker {
         // Every sentence-first chunk keeps the reserve, not just the message's
         // opening chunk: any logical sentence can become a navigation target,
         // and a cross-message target absorbs the sender announcement inline.
-        val firstChunkMaxLength = maxChunkLength - leadingChunkReserve
+        val firstChunkMaxLength = maxChunkLength - boundedReserve
         return sentences
             .flatMapIndexed { sentenceIndex, sentence ->
                 splitLongSentence(

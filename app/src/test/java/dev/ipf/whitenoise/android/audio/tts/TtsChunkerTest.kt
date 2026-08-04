@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
@@ -123,16 +122,18 @@ class TtsChunkerTest {
     }
 
     @Test
-    fun leadingChunkReserveMustLeaveRoomForSpeech() {
+    fun anOversizedLeadingChunkReserveDegradesInsteadOfFailing() {
         listOf(20, 21).forEach { reserve ->
-            assertThrows(IllegalArgumentException::class.java) {
+            val chunks =
                 TtsChunker.chunk(
                     text = "speech",
                     locale = Locale.US,
                     maxChunkLength = 20,
                     leadingChunkReserve = reserve,
                 )
-            }
+
+            assertEquals("speech", chunks.joinToString("", transform = TtsChunk::text))
+            assertTrue(chunks.all { it.text.length <= 20 })
         }
     }
 

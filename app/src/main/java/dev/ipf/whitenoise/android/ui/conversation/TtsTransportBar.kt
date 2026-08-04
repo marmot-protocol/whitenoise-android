@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -132,9 +133,14 @@ internal fun TtsTransportBarContent(
                         )
                     }
                     if (!isError && ttsMessageCount(state) > 0) {
+                        // The progress text above already narrates the position.
                         LinearProgressIndicator(
                             progress = { (ttsMessageIndex(state) + 1).toFloat() / ttsMessageCount(state) },
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                                    .clearAndSetSemantics {},
                         )
                     }
                 }
@@ -167,13 +173,17 @@ internal fun TtsTransportBarContent(
                         IconButton(onClick = onPause) {
                             Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.tts_bar_pause))
                         }
-                    else ->
-                        IconButton(onClick = onResume, enabled = state is TtsState.Paused) {
+                    is TtsState.Paused ->
+                        IconButton(onClick = onResume) {
                             Icon(
                                 Icons.Default.PlayArrow,
                                 contentDescription = stringResource(R.string.tts_bar_play),
                             )
                         }
+                    // Error clears the queue, so a disabled resume slot could
+                    // never enable — render no control rather than lie to
+                    // accessibility focus.
+                    else -> Unit
                 }
                 IconButton(onClick = onNextSentence, enabled = navigationEnabled) {
                     Icon(

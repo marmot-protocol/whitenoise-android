@@ -249,7 +249,7 @@ class TtsController internal constructor(
                 senderKey = senderKey,
                 senderDisplayName = announcementName,
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
-                // The queue reflattens indices itself; sentence identity must survive.
+                // The queue reflattens indices itself — sentence identity must survive.
                 chunks = chunks.map { chunk -> chunk.copy(index = 0) },
             )
         }

@@ -6,11 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -24,6 +27,7 @@ import dev.ipf.whitenoise.android.audio.tts.pausedTts
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,6 +105,10 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        // Error clears the queue, so no play or pause control may exist —
+        // a permanently disabled resume slot would lie to accessibility focus.
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_play)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertDoesNotExist()
         composeRule.onNodeWithText(label(R.string.tts_bar_error)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).performClick()
         assertEquals(true, stopped)
@@ -110,16 +118,32 @@ class TtsTransportBarTest {
     fun narrowWidthAndLargeFontKeepEveryActionVisible() {
         renderBar(
             state = speakingTts(4, 20, 1, 12, "A long preview", sentenceIndex = 2, sentenceCount = 8),
-            barWidth = 220,
+            barWidth = 320,
             fontScale = 2f,
         )
 
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsDisplayed()
+        val barBounds = composeRule.onNodeWithTag(BAR_TAG).getUnclippedBoundsInRoot()
+        listOf(
+            R.string.tts_bar_previous_message,
+            R.string.tts_bar_skip_previous,
+            R.string.tts_bar_pause,
+            R.string.tts_bar_skip_next,
+            R.string.tts_bar_next_message,
+            R.string.tts_bar_stop,
+        ).forEach { resId ->
+            val action = composeRule.onNodeWithContentDescription(label(resId))
+            action.assertIsDisplayed()
+            // Unclipped bounds inside the bar prove the action is fully
+            // visible — assertIsDisplayed alone passes on partial clipping.
+            val bounds = action.getUnclippedBoundsInRoot()
+            assertTrue(
+                "${label(resId)} must sit fully inside the bar, was $bounds within $barBounds",
+                bounds.left >= barBounds.left &&
+                    bounds.right <= barBounds.right &&
+                    bounds.top >= barBounds.top &&
+                    bounds.bottom <= barBounds.bottom,
+            )
+        }
     }
 
     @Suppress("LongParameterList")
@@ -149,7 +173,7 @@ class TtsTransportBarTest {
                         onNextMessage = onNextMessage,
                         onCycleRate = {},
                         onStop = onStop,
-                        modifier = Modifier.width(barWidth.dp),
+                        modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
                     )
                 }
             }
@@ -167,5 +191,9 @@ class TtsTransportBarTest {
             LocalDensity provides Density(density = current.density, fontScale = fontScale),
             content = content,
         )
+    }
+
+    private companion object {
+        const val BAR_TAG = "tts-transport-bar"
     }
 }

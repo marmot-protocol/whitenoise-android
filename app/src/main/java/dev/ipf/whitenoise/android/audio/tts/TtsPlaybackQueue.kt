@@ -83,6 +83,7 @@ internal class TtsPlaybackQueue(
     private var announceSenderForCurrentMessage = false
     private var senderAnnouncedAtMessageIndex: Int? = null
     private var pendingResumeAnnouncement: SenderAnnouncement? = null
+    private var messageIndexAtPause: Int? = null
 
     /** How a repositioned target treats its message's sender announcement. */
     private enum class SenderAnnouncement {
@@ -115,6 +116,7 @@ internal class TtsPlaybackQueue(
         announceSenderForCurrentMessage = false
         senderAnnouncedAtMessageIndex = null
         pendingResumeAnnouncement = null
+        messageIndexAtPause = null
         if (chunks.isEmpty()) {
             _state.value = TtsState.Idle()
             return
@@ -172,15 +174,29 @@ internal class TtsPlaybackQueue(
         val speaking = _state.value as? TtsState.Speaking ?: return
         stopEngine()
         generation += 1
+        // Resume re-reads the rate per utterance anyway, a leaked flag would
+        // only force a needless engine restart at the first boundary.
+        refreshAtNextBoundary = false
         currentIndex = speaking.chunkIndex
         pendingResumeAnnouncement = null
+        messageIndexAtPause = messageIndexForChunk(currentIndex)
         publishPaused(currentIndex)
     }
 
     fun resume() {
         val paused = _state.value as? TtsState.Paused ?: return
         currentIndex = paused.chunkIndex
-        when (pendingResumeAnnouncement) {
+        // A deferred Announce that navigated back to the message interrupted
+        // by pause() would repeat a sender the listener already heard, so it
+        // demotes to Suppress. A genuinely unheard sender keeps its Announce.
+        val backAtPausedMessage = messageIndexForChunk(currentIndex) == messageIndexAtPause
+        val announcement =
+            if (pendingResumeAnnouncement == SenderAnnouncement.Announce && backAtPausedMessage) {
+                SenderAnnouncement.Suppress
+            } else {
+                pendingResumeAnnouncement
+            }
+        when (announcement) {
             SenderAnnouncement.Announce -> {
                 announceSenderForCurrentMessage = true
                 senderAnnouncedAtMessageIndex = null
@@ -193,7 +209,7 @@ internal class TtsPlaybackQueue(
 
             // The previous engine queue was stopped by pause(). Recompute
             // sender narration when the paused sentence is the first chunk of
-            // a message; otherwise a changed speaker can resume without their
+            // a message — otherwise a changed speaker can resume without their
             // announcement.
             else -> {
                 announceSenderForCurrentMessage = false
@@ -215,6 +231,7 @@ internal class TtsPlaybackQueue(
         announceSenderForCurrentMessage = false
         senderAnnouncedAtMessageIndex = null
         pendingResumeAnnouncement = null
+        messageIndexAtPause = null
         _state.value = TtsState.Idle()
     }
 
@@ -231,7 +248,8 @@ internal class TtsPlaybackQueue(
     fun skipPreviousMessage() {
         if (!isNavigable()) return
         val previousMessage = (messageIndexForChunk(currentIndex) - 1).coerceAtLeast(0)
-        moveTo(firstChunkIndexOfMessage(previousMessage), SenderAnnouncement.Announce)
+        val target = firstChunkIndexOfMessage(previousMessage)
+        moveTo(target, announcementForTarget(target))
     }
 
     fun skipNextSentence() {
@@ -248,7 +266,7 @@ internal class TtsPlaybackQueue(
         if (!isNavigable()) return
         val currentSentenceStart = firstChunkIndexOfSentenceContaining(currentIndex)
         if (currentSentenceStart == 0) {
-            moveTo(0, SenderAnnouncement.Announce)
+            moveTo(0, announcementForTarget(0))
             return
         }
         val target = firstChunkIndexOfSentenceContaining(currentSentenceStart - 1)
@@ -310,7 +328,7 @@ internal class TtsPlaybackQueue(
 
     /**
      * Repositions playback. While speaking the engine queue restarts at the
-     * target immediately; while paused only the position and progress move —
+     * target immediately. While paused only the position and progress move —
      * no chunk is enqueued and the target's announcement decision is held
      * until resume(). An Announce earned by crossing a message boundary
      * survives later same-message repositions: that message's sender has
@@ -321,6 +339,9 @@ internal class TtsPlaybackQueue(
         announcement: SenderAnnouncement,
     ) {
         if (_state.value is TtsState.Paused) {
+            // A tap that does not move the position must not disturb the
+            // pending resume announcement.
+            if (index == currentIndex) return
             currentIndex = index
             pendingResumeAnnouncement =
                 when {
@@ -352,6 +373,7 @@ internal class TtsPlaybackQueue(
         currentIndex = completedCount
         announceSenderForCurrentMessage = false
         pendingResumeAnnouncement = null
+        messageIndexAtPause = null
         _state.value =
             TtsState.Idle(
                 chunkIndex = completedCount,
@@ -384,6 +406,7 @@ internal class TtsPlaybackQueue(
         currentIndex = chunkIndex
         announceSenderForCurrentMessage = false
         pendingResumeAnnouncement = null
+        messageIndexAtPause = null
         _state.value =
             TtsState.Error(
                 error = error,
@@ -425,7 +448,7 @@ internal class TtsPlaybackQueue(
                 onError(utteranceId, result)
                 break
             }
-            // Only the requeue target may carry a forced announcement; later
+            // Only the requeue target may carry a forced announcement — later
             // chunks fall back to the sender-change playback heuristic.
             announceSenderForCurrentMessage = false
         }
@@ -473,6 +496,9 @@ internal class TtsPlaybackQueue(
         val flat = mutableListOf<TtsChunk>()
         var nextIndex = 0
         for (message in messages) {
+            // An empty message would duplicate first-chunk indices and alias
+            // navigation targets.
+            require(message.chunks.isNotEmpty()) { "queued messages must contain at least one chunk" }
             firstIndices += nextIndex
             sentenceCounts += (message.chunks.maxOfOrNull(TtsChunk::sentenceIndex) ?: -1) + 1
             for (chunk in message.chunks) {
