@@ -37,4 +37,15 @@ class ReplySwipeTest {
         assertEquals(0f, gesture.visualOffset(maxOffset = 80f))
         assertFalse(gesture.shouldTriggerReply(threshold = 64f))
     }
+
+    @Test
+    fun gestureAccumulatorTriggersReplyForMostlyHorizontalRightwardMovement() {
+        val gesture =
+            ReplySwipeGesture()
+                .dragBy(deltaX = 36f, deltaY = 6f)
+                .dragBy(deltaX = 36f, deltaY = 6f)
+
+        assertEquals(72f, gesture.visualOffset(maxOffset = 80f))
+        assertTrue(gesture.shouldTriggerReply(threshold = 64f))
+    }
 }

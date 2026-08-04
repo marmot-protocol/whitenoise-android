@@ -124,6 +124,25 @@ class ConversationUnreadTest {
     }
 
     @Test
+    fun optimisticAnchorRebasesToConfirmedCandidateInTheSameSlot() {
+        val durableId = "11".repeat(32)
+        val confirmedId = "22".repeat(32)
+        val optimisticId = "123e4567-e89b-12d3-a456-426614174000"
+        val timeline = listOf(received(durableId), sent(confirmedId))
+
+        val anchor =
+            advanceConversationReadAnchor(
+                timeline = timeline,
+                currentUiAnchorId = optimisticId,
+                durableAnchorId = durableId,
+                candidateIndex = 1,
+            )
+
+        assertEquals(confirmedId, anchor)
+        assertEquals(0, countUnreadIncoming(timeline, anchor))
+    }
+
+    @Test
     fun reconciledEntryUnreadClearsInflatedProjectionWhenLoadedAnchorIsAtBottom() {
         val timeline = listOf(received("r1"), received("r2"), received("r3"))
 

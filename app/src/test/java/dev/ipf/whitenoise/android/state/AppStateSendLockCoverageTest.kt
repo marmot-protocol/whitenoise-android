@@ -280,10 +280,10 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun conversationReadAnchorUsesHoistedRenderedTimeline() {
+    fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
         val source = conversationScreenSource().readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorEffectIndex = source.indexOf("LaunchedEffect(controller, currentHighestVisibleTimelineIndex,")
+        val readAnchorEffectIndex = source.indexOf("val currentHighestVisibleMessageId =")
         val readAnchorEffect =
             source.substring(
                 readAnchorEffectIndex,
@@ -294,6 +294,7 @@ class AppStateSendLockCoverageTest {
             "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorEffectIndex &&
+                "currentHighestVisibleMessageId," in readAnchorEffect &&
                 "advanceConversationReadAnchor(" in readAnchorEffect &&
                 "durableAnchorId = controller.lastReadMessageId" in readAnchorEffect &&
                 "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorEffect,

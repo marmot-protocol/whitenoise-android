@@ -266,6 +266,42 @@ private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETA
 // controller can ever hold.
 private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
+/** Whether adjacent timeline items participate in one visible message-bubble sender run. */
+internal fun conversationBubbleRowsShareSenderRun(
+    first: TimelineMessage,
+    second: TimelineMessage,
+    streamingDebugEnabled: Boolean,
+    deletedMessageIds: Set<String>,
+): Boolean =
+    timelineItemRendersAsConversationBubble(first, streamingDebugEnabled, deletedMessageIds) &&
+        timelineItemRendersAsConversationBubble(second, streamingDebugEnabled, deletedMessageIds) &&
+        GroupProjector.messagesShareTranscriptSenderRun(
+            firstSender = first.record.sender,
+            firstRecordedAt = first.record.recordedAt,
+            secondSender = second.record.sender,
+            secondRecordedAt = second.record.recordedAt,
+            sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
+        )
+
+private fun timelineItemRendersAsConversationBubble(
+    item: TimelineMessage,
+    streamingDebugEnabled: Boolean,
+    deletedMessageIds: Set<String>,
+): Boolean =
+    when (timelineRowKind(item.record, streamingDebugEnabled)) {
+        TimelineRowKind.Bubble -> true
+        TimelineRowKind.AgentOperation ->
+            !shouldRenderDedicatedAgentOperationRow(
+                projectedDeleted = item.projected?.deleted == true,
+                optimisticallyDeleted = MessageProjector.isDeleted(item.record.messageIdHex, deletedMessageIds),
+                invalidated = item.projected?.invalidationStatus != null,
+            ) ||
+                AgentOperationProjector.project(item.record) == null
+        TimelineRowKind.GroupSystem,
+        TimelineRowKind.DebugRow,
+        -> false
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationScreen(
@@ -919,7 +955,17 @@ internal fun ConversationScreen(
                 .coerceAtMost(renderedSize - 1)
         }
     }
-    LaunchedEffect(controller, currentHighestVisibleTimelineIndex, controller.lastReadMessageId) {
+    val currentHighestVisibleMessageId =
+        renderedTimeline
+            .getOrNull(currentHighestVisibleTimelineIndex)
+            ?.record
+            ?.messageIdHex
+    LaunchedEffect(
+        controller,
+        currentHighestVisibleTimelineIndex,
+        currentHighestVisibleMessageId,
+        controller.lastReadMessageId,
+    ) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
         // Monotonic advance only — scroll-up keeps the existing anchor so the
@@ -3532,27 +3578,21 @@ internal fun ConversationScreen(
                                         val newer = renderedTimeline.getOrNull(index + 1)
                                         val sameSenderAsOlderBubble =
                                             older?.let { candidate ->
-                                                timelineRowKind(candidate.record, appState.streamingDebugEnabled) ==
-                                                    TimelineRowKind.Bubble &&
-                                                    GroupProjector.messagesShareTranscriptSenderRun(
-                                                        firstSender = candidate.record.sender,
-                                                        firstRecordedAt = candidate.record.recordedAt,
-                                                        secondSender = item.record.sender,
-                                                        secondRecordedAt = item.record.recordedAt,
-                                                        sameDay = !differentDay(candidate.record.recordedAt, item.record.recordedAt),
-                                                    )
+                                                conversationBubbleRowsShareSenderRun(
+                                                    first = candidate,
+                                                    second = item,
+                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                    deletedMessageIds = controller.deletedMessageIds,
+                                                )
                                             } == true
                                         val sameSenderAsNewerBubble =
                                             newer?.let { candidate ->
-                                                timelineRowKind(candidate.record, appState.streamingDebugEnabled) ==
-                                                    TimelineRowKind.Bubble &&
-                                                    GroupProjector.messagesShareTranscriptSenderRun(
-                                                        firstSender = item.record.sender,
-                                                        firstRecordedAt = item.record.recordedAt,
-                                                        secondSender = candidate.record.sender,
-                                                        secondRecordedAt = candidate.record.recordedAt,
-                                                        sameDay = !differentDay(item.record.recordedAt, candidate.record.recordedAt),
-                                                    )
+                                                conversationBubbleRowsShareSenderRun(
+                                                    first = item,
+                                                    second = candidate,
+                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                    deletedMessageIds = controller.deletedMessageIds,
+                                                )
                                             } == true
                                         val senderDecoration =
                                             GroupProjector.transcriptSenderDecoration(

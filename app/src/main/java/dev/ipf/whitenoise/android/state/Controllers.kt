@@ -2019,7 +2019,19 @@ internal fun advanceConversationReadAnchor(
 ): String? {
     val baseline = currentUiAnchorId ?: durableAnchorId
     if (!baseline.isNullOrBlank() && timeline.none { it.record.messageIdHex == baseline }) {
-        return baseline
+        // A local send first renders with a UUID, then keeps the same list slot
+        // while convergence replaces it with the confirmed 64-hex id. Rebase
+        // that transient UI-only anchor through the durable watermark instead
+        // of preserving a UUID that can never be found or marked read.
+        return if (currentUiAnchorId != null && isOptimisticMessageId(currentUiAnchorId)) {
+            nextReadAnchor(
+                timeline = timeline,
+                currentAnchorId = durableAnchorId,
+                candidateIndex = candidateIndex,
+            )
+        } else {
+            baseline
+        }
     }
     return nextReadAnchor(
         timeline = timeline,
@@ -2027,6 +2039,11 @@ internal fun advanceConversationReadAnchor(
         candidateIndex = candidateIndex,
     )
 }
+
+private val OPTIMISTIC_TIMELINE_MESSAGE_ID =
+    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+private fun isOptimisticMessageId(messageId: String): Boolean = OPTIMISTIC_TIMELINE_MESSAGE_ID.matches(messageId)
 
 /**
  * Whether send-time disappearing expiry should stay suspended for [record]
