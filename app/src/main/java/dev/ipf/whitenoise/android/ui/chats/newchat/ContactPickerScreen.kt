@@ -193,7 +193,8 @@ internal fun ContactPickerScreen(
                 SelectedMemberSummary(
                     members = selected,
                     appState = appState,
-                    onClick = { reviewingSelection = true },
+                    onClick = { if (!busy) reviewingSelection = true },
+                    enabled = !busy,
                 )
             }
             LazyColumn(

@@ -57,6 +57,28 @@ class SelectedMembersReviewScreenTest {
     }
 
     @Test
+    fun busySummaryCannotOpenReview() {
+        var opens = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMemberSummary(
+                    members = members,
+                    appState = appState(),
+                    onClick = { opens += 1 },
+                    enabled = false,
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText(context.getString(R.string.selected))
+            .assertIsNotEnabled()
+            .performClick()
+
+        assertEquals(0, opens)
+    }
+
+    @Test
     fun reviewShowsFullIdentityRowsAndLargeRemoveActions() {
         var removed: RecipientSearch.Candidate? = null
         var confirmed = false

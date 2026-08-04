@@ -95,14 +95,15 @@ internal fun MediaSupplementEnvelope(
     media: @Composable ColumnScope.() -> Unit,
     supplement: @Composable ColumnScope.() -> Unit,
 ) {
-    val gap = 2.dp
+    val supplementGap = 2.dp
+    val mediaItemGap = 6.dp
     SubcomposeLayout(modifier) { constraints ->
         val relaxedConstraints = constraints.copy(minWidth = 0, minHeight = 0)
         val mediaPlaceable =
             subcompose(MediaEnvelopeSlot.Media) {
                 Column(
                     horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(mediaItemGap),
                     content = media,
                 )
             }.single().measure(relaxedConstraints)
@@ -118,7 +119,7 @@ internal fun MediaSupplementEnvelope(
                 ),
             )
 
-        val gapPx = if (supplementPlaceable.height > 0) gap.roundToPx() else 0
+        val gapPx = if (supplementPlaceable.height > 0) supplementGap.roundToPx() else 0
         val measuredHeight = mediaPlaceable.height + gapPx + supplementPlaceable.height
         layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
             val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0

@@ -239,6 +239,30 @@ class MessageBubbleFrameTest {
     }
 
     @Test
+    fun mediaItemsKeepTheirSpacingSeparateFromTheSupplementGap() {
+        composeRule.setContent {
+            MediaSupplementEnvelope(
+                alignEnd = false,
+                media = {
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(FIRST_MEDIA_TAG))
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(SECOND_MEDIA_TAG))
+                },
+                supplement = {
+                    Box(Modifier.width(20.dp).height(10.dp).testTag(MEDIA_SUPPLEMENT_TAG))
+                },
+            )
+        }
+
+        composeRule.runOnIdle {
+            val first = composeRule.onNodeWithTag(FIRST_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            val second = composeRule.onNodeWithTag(SECOND_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
+            val supplement = composeRule.onNodeWithTag(MEDIA_SUPPLEMENT_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(6f, second.top - first.bottom, 0.1f)
+            assertEquals(2f, supplement.top - second.bottom, 0.1f)
+        }
+    }
+
+    @Test
     fun nonReplyFooterKeepsNaturalWidth() {
         composeRule.setContent {
             Column(Modifier.width(220.dp).testTag(NON_REPLY_COLUMN_TAG)) {
@@ -268,6 +292,9 @@ class MessageBubbleFrameTest {
         const val PLAIN_TAG = "custom-plain-bubble"
         const val CUSTOM_BACKGROUND = 0xFF336699
         const val MENTION_ACCENT = 0xFF006780
+        const val FIRST_MEDIA_TAG = "first-media"
+        const val SECOND_MEDIA_TAG = "second-media"
+        const val MEDIA_SUPPLEMENT_TAG = "media-supplement"
         const val OPAQUE_WHITE = 0xFFFFFFFF
         const val REPLY_BUBBLE_TAG = "reply-bubble"
         const val REPLY_FOOTER_TAG = "reply-footer"
