@@ -80,7 +80,7 @@ class SelectedMembersReviewScreenTest {
 
     @Test
     fun reviewShowsFullIdentityRowsAndLargeRemoveActions() {
-        var removed: RecipientSearch.Candidate? = null
+        val removed = mutableListOf<RecipientSearch.Candidate>()
         var confirmed = false
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -89,17 +89,19 @@ class SelectedMembersReviewScreenTest {
                     appState = appState(),
                     busy = false,
                     onBack = {},
-                    onRemove = { removed = it },
+                    onRemove = { removed += it },
                     onConfirm = { confirmed = true },
                 )
             }
         }
 
-        composeRule
-            .onAllNodesWithContentDescription(context.getString(R.string.remove_member))
-            .assertCountEquals(2)[0]
-            .performClick()
-        assertEquals(members.first(), removed)
+        val removeActions =
+            composeRule
+                .onAllNodesWithContentDescription(context.getString(R.string.remove_member))
+                .assertCountEquals(2)
+        removeActions[0].performClick()
+        removeActions[1].performClick()
+        assertEquals(members, removed)
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.next)).performClick()
         assertEquals(true, confirmed)
@@ -126,6 +128,7 @@ class SelectedMembersReviewScreenTest {
         composeRule
             .onAllNodesWithContentDescription(context.getString(R.string.remove_member))[0]
             .assertIsNotEnabled()
+            .performClick()
 
         assertEquals(false, confirmed)
         assertEquals(false, removed)
