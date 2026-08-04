@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,6 +91,7 @@ internal fun MediaVoiceBubble(
     appState: WhiteNoiseAppState,
     mine: Boolean,
     onLongPress: () -> Unit = {},
+    attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -247,8 +249,8 @@ internal fun MediaVoiceBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(18.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(18.dp),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material.icons.Icons
@@ -253,9 +252,10 @@ internal fun ColumnScope.messageBubbleBodyModifier(
 ): Modifier =
     Modifier
         .align(Alignment.Start)
-        // Only the text-only reply frame contains the quote that widens this
-        // same bubble. Media replies render their quote outside the caption.
-        .then(if (hasReplyPreview && !hasMedia) Modifier.fillMaxWidth() else Modifier)
+        // A text-only reply fills the quote-widened bubble. A media caption
+        // fills the media card so its time/status cluster reaches the same
+        // trailing edge as an ordinary full-width bubble footer.
+        .then(if (hasMedia || hasReplyPreview) Modifier.fillMaxWidth() else Modifier)
 
 internal enum class MessageAttachmentSaveOutcome {
     Complete,
@@ -1172,12 +1172,10 @@ internal fun MessageBubble(
                         pendingAudio.isEmpty() &&
                         pendingVisualRefs.isEmpty() &&
                         mediaPendingName != null
-                // #527: media (images/video, audio, files) renders on its OWN,
-                // outside the colored message bubble. `hasMedia` decides whether
-                // this row splits into standalone media + an optional caption
-                // bubble, or stays a single text bubble. Deleted and persisted
-                // failure tombstones stay single bubbles; convergence-invalidated
-                // messages retain local media.
+                // `hasMedia` decides whether this row renders a media card with
+                // an optional integrated caption, or stays a text-only bubble.
+                // Deleted and persisted-failure tombstones stay text bubbles;
+                // convergence-invalidated messages retain local media.
                 val hasMedia =
                     !deleted &&
                         !persistedFailure &&
@@ -1189,12 +1187,11 @@ internal fun MessageBubble(
                                 sharedLocation != null ||
                                 sharedUser != null
                         )
-                // The media-rendering blocks. Each child keeps its own rounded
-                // media Surface, so calling this directly in the row Column (not
-                // inside the colored bubble Surface) gives every attachment its
-                // own object (#527). Behavior — download gating, single-visual
-                // footer overlay, tap-to-open viewers, upload/failed/retry — is
-                // unchanged from the in-bubble version.
+                // Detached media keeps its own rounded Surface. When a caption
+                // is attached, each child delegates its corners and border to
+                // the shared frame so the result is one continuous message card.
+                // Download gating, footer overlays, viewers, and retry behavior
+                // remain owned by the media children.
                 // Long-press on any media tile opens the action menu (not the
                 // viewer); anchored to the bubble top like the accessibility
                 // long-click path. Hoisted so every media call site shares one
@@ -1209,7 +1206,7 @@ internal fun MessageBubble(
                             }
                         }
                     }
-                val mediaBlocks: @Composable ColumnScope.() -> Unit = {
+                val mediaBlocks: @Composable ColumnScope.(attachedToCaption: Boolean) -> Unit = { attachedToCaption ->
                     if (sharedLocation != null) {
                         val shareContext = LocalContext.current
                         LocationMessageBubble(
@@ -1252,6 +1249,7 @@ internal fun MessageBubble(
                                         controller = controller,
                                         appState = appState,
                                         onLongPress = onMediaLongPress,
+                                        attachedToCaption = attachedToCaption,
                                     )
                                 } else {
                                     MediaImageBubble(
@@ -1262,6 +1260,7 @@ internal fun MessageBubble(
                                         appState = appState,
                                         mine = mine,
                                         onLongPress = onMediaLongPress,
+                                        attachedToCaption = attachedToCaption,
                                     )
                                 }
                                 if (footerOnVisualMedia) {
@@ -1281,6 +1280,7 @@ internal fun MessageBubble(
                                 appState = appState,
                                 mine = mine,
                                 onLongPress = onMediaLongPress,
+                                attachedToCaption = attachedToCaption,
                             )
                         }
                     }
@@ -1294,6 +1294,7 @@ internal fun MessageBubble(
                                 controller = controller,
                                 appState = appState,
                                 onLongPress = onMediaLongPress,
+                                attachedToCaption = attachedToCaption,
                             )
                         }
                     }
@@ -1311,6 +1312,7 @@ internal fun MessageBubble(
                                 controller = controller,
                                 appState = appState,
                                 onLongPress = onMediaLongPress,
+                                attachedToCaption = attachedToCaption,
                             )
                         }
                     }
@@ -1338,6 +1340,7 @@ internal fun MessageBubble(
                                 controller = controller,
                                 appState = appState,
                                 onLongPress = onMediaLongPress,
+                                attachedToCaption = attachedToCaption,
                             )
                         }
                     }
@@ -1361,6 +1364,7 @@ internal fun MessageBubble(
                                         uploading = !uploadFailed,
                                         uploadFailed = uploadFailed,
                                         onRetryUpload = if (uploadFailed) retryUpload else null,
+                                        attachedToCaption = attachedToCaption,
                                     )
                                 } else {
                                     MediaImageBubble(
@@ -1372,6 +1376,7 @@ internal fun MessageBubble(
                                         mine = true,
                                         onLongPress = onMediaLongPress,
                                         uploading = !uploadFailed,
+                                        attachedToCaption = attachedToCaption,
                                     )
                                 }
                                 MediaFooterOverlay(
@@ -1390,6 +1395,7 @@ internal fun MessageBubble(
                                 mine = true,
                                 onLongPress = onMediaLongPress,
                                 uploading = !uploadFailed,
+                                attachedToCaption = attachedToCaption,
                             )
                         }
                     }
@@ -1397,6 +1403,7 @@ internal fun MessageBubble(
                         MediaPendingPlaceholder(
                             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
                             failed = item.status == MessageStatus.Failed,
+                            attachedToCaption = attachedToCaption,
                             onRetry =
                                 if (mine && item.status == MessageStatus.Failed) {
                                     { appState.launchMutation { controller.retryFailedSend(item) } }
@@ -1488,10 +1495,9 @@ internal fun MessageBubble(
                     SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
                 // The body/caption text + inline footer, plus the failed-send
                 // retry row. Hoisted into a lambda so it can render either inside
-                // the single text bubble (no media) or inside the caption bubble
-                // just below standalone media (#527). When there is no body text
-                // it falls through to the footer-only / retry handling exactly as
-                // before.
+                // the text-only bubble or inside the caption region of the shared
+                // media card. Without body text it falls through to the existing
+                // footer-only / retry handling.
                 val bodyFooterAndRetry: @Composable ColumnScope.() -> Unit = {
                     if (bodyTextToRender != null) {
                         // Markdown only when the tokens describe exactly
@@ -1676,8 +1682,8 @@ internal fun MessageBubble(
                     }
                 }
                 // The sender-name label (group chats only). Rendered above the
-                // media + caption when media is present (#527), or as the first
-                // child of the single text bubble otherwise.
+                // shared media card when media is present, or as the first child
+                // of the text-only bubble otherwise.
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
                         Text(
@@ -1706,7 +1712,7 @@ internal fun MessageBubble(
                 }
                 // The reply quote card. Self-contained (own translucent Surface),
                 // so it renders correctly whether inside the text bubble or
-                // standalone above the media (#527).
+                // standalone above the media card.
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
                         val useCustomFillColors = insideBubble && customBubbleColorActive
@@ -1729,10 +1735,10 @@ internal fun MessageBubble(
                             // Fill the content width: in the text bubble the
                             // column is sized to its widest child (IntrinsicSize.Max
                             // below) so the quote matches the bubble instead of
-                            // hugging its own text (#428); above standalone media
-                            // it lines up with the media's width (#527). A short
-                            // quote + short reply still keeps a narrow bubble
-                            // because the widest child is then small (#208 preserved).
+                            // hugging its own text; above a media card it lines up
+                            // with the media width. A short quote + short reply
+                            // still keeps a narrow bubble because the widest child
+                            // is then small.
                             fillWidth = true,
                             mentionDisplayName =
                                 remember(appState, appState.profileRevisionForCompose) {
@@ -1745,10 +1751,10 @@ internal fun MessageBubble(
                     }
                 }
                 if (hasMedia) {
-                    // Media remains directly interactive, while a caption now
-                    // shares the media's width and sits in a tight bottom strip.
-                    // The shared envelope plus one footer makes the pair read as
-                    // one message instead of two adjacent bubbles.
+                    // Signal and Telegram treat media plus caption as one message
+                    // surface. The media owns no internal corners or border when
+                    // a caption is present; the shared frame owns the continuous
+                    // outer shape, color, border, and single footer.
                     Column(
                         modifier = Modifier.offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
@@ -1756,33 +1762,24 @@ internal fun MessageBubble(
                     ) {
                         senderNameLabel(false)
                         replyPreviewCard(false)
-                        MediaSupplementEnvelope(
-                            alignEnd = mine,
-                            media = mediaBlocks,
-                        ) {
-                            // Rounded media keeps its established hit target and
-                            // crop; the shallow top corners visually attach this
-                            // full-width caption strip to it without clipping the
-                            // viewer surface.
-                            if (bodyOrWarningInsideBubble) {
-                                MessageBubbleFrame(
-                                    presentation = bubblePresentation,
-                                    highlighted = highlighted,
-                                    mine = mine,
-                                    mentionedSelf = mentionedSelf,
-                                    mentionedYouLabel = mentionedYouLabel,
-                                    modifier = textSelectionBoundsModifier.fillMaxWidth(),
-                                    shape =
-                                        RoundedCornerShape(
-                                            topStart = 6.dp,
-                                            topEnd = 6.dp,
-                                            bottomStart = 18.dp,
-                                            bottomEnd = 18.dp,
-                                        ),
-                                ) {
-                                    bodyFooterAndRetry()
-                                }
-                            } else {
+                        if (bodyOrWarningInsideBubble) {
+                            MediaCaptionFrame(
+                                presentation = bubblePresentation,
+                                highlighted = highlighted,
+                                mine = mine,
+                                mentionedSelf = mentionedSelf,
+                                mentionedYouLabel = mentionedYouLabel,
+                                alignEnd = mine,
+                                contentModifier = textSelectionBoundsModifier,
+                                media = { mediaBlocks(true) },
+                            ) {
+                                bodyFooterAndRetry()
+                            }
+                        } else {
+                            MediaSupplementEnvelope(
+                                alignEnd = mine,
+                                media = { mediaBlocks(false) },
+                            ) {
                                 // No caption: the footer (time/status) for audio,
                                 // file, or multi-visual media still needs a home —
                                 // and so does the failed-send retry row.

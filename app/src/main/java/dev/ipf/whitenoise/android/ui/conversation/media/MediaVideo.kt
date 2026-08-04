@@ -338,6 +338,7 @@ internal fun MediaVideoBubble(
     uploading: Boolean = false,
     uploadFailed: Boolean = false,
     onRetryUpload: (() -> Unit)? = null,
+    attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -482,8 +483,8 @@ internal fun MediaVideoBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = visualMediaBubbleShape(attachedToCaption),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier = imageBubbleSizing(bubbleAspectRatio),
     ) {
         Box(contentAlignment = Alignment.Center) {

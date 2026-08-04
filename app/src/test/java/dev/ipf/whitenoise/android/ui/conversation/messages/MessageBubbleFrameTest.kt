@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -201,30 +200,34 @@ class MessageBubbleFrameTest {
         composeRule.setContent {
             MaterialTheme {
                 Box(Modifier.width(300.dp)) {
-                    MediaSupplementEnvelope(
+                    MediaCaptionFrame(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
                         alignEnd = false,
                         modifier = Modifier.testTag(MEDIA_REPLY_COLUMN_TAG),
+                        contentModifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),
                         media = { Box(Modifier.width(220.dp).height(100.dp).testTag(MEDIA_REPLY_MEDIA_TAG)) },
                     ) {
-                        MessageBubbleFrame(
-                            presentation = messageBubblePresentation(deleted = false, mine = false),
-                            highlighted = false,
-                            mine = false,
-                            mentionedSelf = false,
-                            mentionedYouLabel = "Mentioned you",
-                            modifier = Modifier.fillMaxWidth().testTag(MEDIA_REPLY_CAPTION_TAG),
+                        BubbleFooterLayout(
+                            footer = {
+                                Box(
+                                    Modifier
+                                        .width(58.dp)
+                                        .height(12.dp)
+                                        .testTag(MEDIA_REPLY_FOOTER_TAG),
+                                )
+                            },
+                            modifier =
+                                messageBubbleBodyModifier(
+                                    hasReplyPreview = true,
+                                    hasMedia = true,
+                                ),
+                            lastLineWidth = 24,
                         ) {
-                            BubbleFooterLayout(
-                                footer = { Box(Modifier.width(58.dp).height(12.dp)) },
-                                modifier =
-                                    messageBubbleBodyModifier(
-                                        hasReplyPreview = true,
-                                        hasMedia = true,
-                                    ),
-                                lastLineWidth = 24,
-                            ) {
-                                Box(Modifier.width(24.dp).height(20.dp))
-                            }
+                            Box(Modifier.width(24.dp).height(20.dp))
                         }
                     }
                 }
@@ -234,12 +237,15 @@ class MessageBubbleFrameTest {
         composeRule.runOnIdle {
             val mediaBounds = composeRule.onNodeWithTag(MEDIA_REPLY_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
             val captionBounds = composeRule.onNodeWithTag(MEDIA_REPLY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
+            val footerBounds = composeRule.onNodeWithTag(MEDIA_REPLY_FOOTER_TAG).fetchSemanticsNode().boundsInRoot
             assertEquals(mediaBounds.width, captionBounds.width, 1f)
+            assertEquals(mediaBounds.bottom, captionBounds.top, 0.1f)
+            assertEquals(captionBounds.right - 14f, footerBounds.right, 1f)
         }
     }
 
     @Test
-    fun mediaItemsKeepTheirSpacingSeparateFromTheSupplementGap() {
+    fun mediaItemsKeepTheirSpacingAndCaptionHasNoExternalGap() {
         composeRule.setContent {
             MediaSupplementEnvelope(
                 alignEnd = false,
@@ -258,7 +264,7 @@ class MessageBubbleFrameTest {
             val second = composeRule.onNodeWithTag(SECOND_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
             val supplement = composeRule.onNodeWithTag(MEDIA_SUPPLEMENT_TAG).fetchSemanticsNode().boundsInRoot
             assertEquals(6f, second.top - first.bottom, 0.1f)
-            assertEquals(2f, supplement.top - second.bottom, 0.1f)
+            assertEquals(0f, supplement.top - second.bottom, 0.1f)
         }
     }
 
@@ -301,6 +307,7 @@ class MessageBubbleFrameTest {
         const val MEDIA_REPLY_COLUMN_TAG = "media-reply-column"
         const val MEDIA_REPLY_MEDIA_TAG = "media-reply-media"
         const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
+        const val MEDIA_REPLY_FOOTER_TAG = "media-reply-footer"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"
     }

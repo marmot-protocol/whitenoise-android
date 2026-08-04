@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -68,13 +69,74 @@ internal fun MessageBubbleFrame(
         tonalElevation = if (mine) 1.dp else 0.dp,
     ) {
         Column(
-            modifier =
-                mentionModifier
-                    .then(contentModifier)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = bubbleContentModifier(mentionModifier, contentModifier),
+            verticalArrangement = bubbleContentArrangement,
             content = content,
         )
+    }
+}
+
+/**
+ * One message surface for media and its caption/footer.
+ *
+ * The media is measured first so the caption adopts its width, but both are
+ * clipped and bordered by this single outer surface. Attached media uses
+ * square internal corners; the outer surface owns all four visible corners.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun MediaCaptionFrame(
+    presentation: BubblePresentation,
+    highlighted: Boolean,
+    mine: Boolean,
+    mentionedSelf: Boolean,
+    mentionedYouLabel: String,
+    alignEnd: Boolean,
+    modifier: Modifier = Modifier,
+    contentModifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(18.dp),
+    media: @Composable ColumnScope.() -> Unit,
+    caption: @Composable ColumnScope.() -> Unit,
+) {
+    val highlightModifier =
+        messageTargetHighlightModifier(
+            highlighted = highlighted,
+            customBorderArgb = presentation.borderOverrideArgb,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+    val mentionModifier =
+        messageMentionRailModifier(
+            mentionedSelf = mentionedSelf,
+            mentionedYouLabel = mentionedYouLabel,
+            accentArgb = presentation.mentionAccentArgb,
+        )
+
+    Surface(
+        modifier = modifier.then(highlightModifier),
+        color = colorFromArgb(presentation.backgroundArgb),
+        contentColor = colorFromArgb(presentation.contentArgb),
+        shape = shape,
+        border =
+            messageBubbleBorder(
+                highlighted = highlighted,
+                mine = mine,
+                customArgb = presentation.borderOverrideArgb,
+                persistedFailure = presentation.suppressBorder,
+            ),
+        tonalElevation = if (mine) 1.dp else 0.dp,
+    ) {
+        MediaSupplementEnvelope(
+            alignEnd = alignEnd,
+            media = media,
+        ) {
+            Column(modifier = contentModifier.fillMaxWidth()) {
+                Column(
+                    modifier = bubbleContentModifier(mentionModifier, Modifier),
+                    verticalArrangement = bubbleContentArrangement,
+                    content = caption,
+                )
+            }
+        }
     }
 }
 
@@ -95,7 +157,6 @@ internal fun MediaSupplementEnvelope(
     media: @Composable ColumnScope.() -> Unit,
     supplement: @Composable ColumnScope.() -> Unit,
 ) {
-    val supplementGap = 2.dp
     val mediaItemGap = 6.dp
     SubcomposeLayout(modifier) { constraints ->
         val relaxedConstraints = constraints.copy(minWidth = 0, minHeight = 0)
@@ -119,12 +180,11 @@ internal fun MediaSupplementEnvelope(
                 ),
             )
 
-        val gapPx = if (supplementPlaceable.height > 0) supplementGap.roundToPx() else 0
-        val measuredHeight = mediaPlaceable.height + gapPx + supplementPlaceable.height
+        val measuredHeight = mediaPlaceable.height + supplementPlaceable.height
         layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
             val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0
             mediaPlaceable.placeRelative(mediaX, 0)
-            supplementPlaceable.placeRelative(0, mediaPlaceable.height + gapPx)
+            supplementPlaceable.placeRelative(0, mediaPlaceable.height)
         }
     }
 }
@@ -133,6 +193,16 @@ private enum class MediaEnvelopeSlot {
     Media,
     Supplement,
 }
+
+private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
+
+private fun bubbleContentModifier(
+    mentionModifier: Modifier,
+    contentModifier: Modifier,
+): Modifier =
+    mentionModifier
+        .then(contentModifier)
+        .padding(horizontal = 14.dp, vertical = 10.dp)
 
 @Composable
 @Suppress("FunctionNaming")

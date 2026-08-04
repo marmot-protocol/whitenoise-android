@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -68,6 +69,7 @@ internal fun MediaFileBubble(
     appState: WhiteNoiseAppState,
     mine: Boolean,
     onLongPress: () -> Unit = {},
+    attachedToCaption: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -121,8 +123,8 @@ internal fun MediaFileBubble(
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .widthIn(max = 360.dp)
@@ -289,11 +291,12 @@ internal fun PendingFilePill(
     failed: Boolean,
     statusLabel: String,
     onRetry: (() -> Unit)? = null,
+    attachedToCaption: Boolean = false,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+        shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
+        border = if (attachedToCaption) null else amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .fillMaxWidth()
