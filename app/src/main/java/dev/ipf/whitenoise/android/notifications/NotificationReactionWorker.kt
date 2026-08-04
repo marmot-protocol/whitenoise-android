@@ -29,6 +29,24 @@ internal enum class NotificationReactionSendOutcome {
     NonRetryableFailure,
 }
 
+internal sealed interface NotificationReactionSendAttempt {
+    data object Locked : NotificationReactionSendAttempt
+
+    data class Completed(
+        val outcome: NotificationReactionSendOutcome,
+    ) : NotificationReactionSendAttempt
+}
+
+internal suspend fun attemptNotificationReactionSend(
+    notificationActionsAllowed: () -> Boolean,
+    sendReaction: suspend () -> NotificationReactionSendOutcome,
+): NotificationReactionSendAttempt =
+    if (notificationActionsAllowed()) {
+        NotificationReactionSendAttempt.Completed(sendReaction())
+    } else {
+        NotificationReactionSendAttempt.Locked
+    }
+
 private sealed interface NotificationReactionInput {
     data class Ready(
         val action: NotificationAction,
@@ -104,16 +122,26 @@ class NotificationReactionWorker(
             return retryableReactionFailureResult(retryStore, retryKey)
         }
 
-        val outcome =
+        val sendAttempt =
             withContext(Dispatchers.Main.immediate) {
-                application.appState.sendNotificationReaction(
-                    accountRef = input.action.target.accountRef,
-                    groupIdHex = input.action.target.groupIdHex,
-                    messageIdHex =
-                        input.action.target.messageIdHex
-                            .orEmpty(),
-                    reaction = input.reaction,
+                attemptNotificationReactionSend(
+                    notificationActionsAllowed = { application.appState.notificationActionsAllowed },
+                    sendReaction = {
+                        application.appState.sendNotificationReaction(
+                            accountRef = input.action.target.accountRef,
+                            groupIdHex = input.action.target.groupIdHex,
+                            messageIdHex =
+                                input.action.target.messageIdHex
+                                    .orEmpty(),
+                            reaction = input.reaction,
+                        )
+                    },
                 )
+            }
+        val outcome =
+            when (sendAttempt) {
+                NotificationReactionSendAttempt.Locked -> return lockedReactionResult(retryStore, retryKey)
+                is NotificationReactionSendAttempt.Completed -> sendAttempt.outcome
             }
         return when (outcome) {
             NotificationReactionSendOutcome.Sent ->

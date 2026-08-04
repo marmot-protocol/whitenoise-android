@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.work.BackoffPolicy
 import androidx.work.NetworkType
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -90,6 +91,27 @@ class NotificationQuickReactionTest {
     fun notificationIdentifiersUseStableLowercaseAsciiHex() {
         assertEquals("000f10ff", byteArrayOf(0x00, 0x0f, 0x10, 0xff.toByte()).toLowercaseHexString())
     }
+
+    @Test
+    fun appLockTransitionAfterPreflightBlocksReactionSend() =
+        runTest {
+            var actionsAllowed = true
+            var sendCount = 0
+
+            assertTrue(actionsAllowed)
+            actionsAllowed = false
+            val attempt =
+                attemptNotificationReactionSend(
+                    notificationActionsAllowed = { actionsAllowed },
+                    sendReaction = {
+                        sendCount += 1
+                        NotificationReactionSendOutcome.Sent
+                    },
+                )
+
+            assertEquals(NotificationReactionSendAttempt.Locked, attempt)
+            assertEquals(0, sendCount)
+        }
 
     @Test
     fun reactionWorkerEncryptsPayloadAndUsesBoundedNetworkBackoff() {
