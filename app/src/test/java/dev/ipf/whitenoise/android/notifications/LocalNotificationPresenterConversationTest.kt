@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGO
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -411,6 +412,28 @@ class LocalNotificationPresenterConversationTest {
                 .single()
                 .notification.channelId,
         )
+    }
+
+    @Test
+    fun groupMessageOffersReplyAndTheFirstTwoCustomizedQuickReactions() {
+        RecentEmojiPreferences.saveQuickReactions(context, listOf("🥳", "🔥", "😂", "👍"))
+        try {
+            presenter.ensureChannels()
+
+            runBlocking {
+                presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+            }
+
+            assertEquals(
+                listOf(context.getString(R.string.reply), "🥳", "🔥"),
+                manager.activeNotifications
+                    .single()
+                    .notification.actions
+                    .map { it.title.toString() },
+            )
+        } finally {
+            RecentEmojiPreferences.resetQuickReactions(context)
+        }
     }
 
     @Test
