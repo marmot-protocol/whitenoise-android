@@ -16,7 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
@@ -237,7 +239,13 @@ internal fun BubbleCollapsibleFooterLayout(
     Layout(
         modifier = modifier.clipToBounds(),
         content = {
-            Box { content() }
+            Box(
+                Modifier.drawWithContent {
+                    clipRect(bottom = maxBodyHeight.toPx()) {
+                        this@drawWithContent.drawContent()
+                    }
+                },
+            ) { content() }
             readMore()
             footer()
         },

@@ -1,18 +1,27 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import com.github.takahirom.roborazzi.RoborazziOptions
+import com.github.takahirom.roborazzi.RoborazziTaskType
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,8 +30,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class BubbleCollapsibleFooterLayoutTest {
     @get:Rule
@@ -159,5 +171,44 @@ class BubbleCollapsibleFooterLayoutTest {
         composeRule.waitForIdle()
 
         assertEquals(contentHeight, layoutHeight)
+    }
+
+    @Test
+    @OptIn(ExperimentalRoborazziApi::class)
+    fun overflowingBodyIsClippedBeforeFooterRow() {
+        composeRule.setContent {
+            BubbleCollapsibleFooterLayout(
+                maxBodyHeight = 8.dp,
+                readMore = { Spacer(Modifier.size(4.dp).background(Color.Green)) },
+                footer = { Spacer(Modifier.size(4.dp).background(Color.Blue)) },
+                modifier =
+                    Modifier
+                        .width(40.dp)
+                        .background(Color.Black)
+                        .testTag("clipped-body"),
+            ) {
+                Spacer(
+                    Modifier
+                        .width(40.dp)
+                        .height(9.dp)
+                        .background(Color.Red),
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val bodyCap = with(composeRule.density) { 8.dp.roundToPx() }
+        val captureFile = File.createTempFile("clipped-body", ".png")
+        composeRule
+            .onNodeWithTag("clipped-body")
+            .captureRoboImage(
+                captureFile,
+                RoborazziOptions(taskType = RoborazziTaskType.Record),
+            )
+        val image = BitmapFactory.decodeFile(captureFile.absolutePath)
+        val footerGapPixel = image.getPixel(image.width / 2, bodyCap)
+        captureFile.delete()
+
+        assertEquals(Color.Black.toArgb(), footerGapPixel)
     }
 }

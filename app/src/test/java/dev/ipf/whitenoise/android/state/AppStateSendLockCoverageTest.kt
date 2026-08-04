@@ -283,21 +283,24 @@ class AppStateSendLockCoverageTest {
     fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
         val source = conversationScreenSource().readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorEffectIndex = source.indexOf("val currentHighestVisibleMessageId =")
-        val readAnchorEffect =
+        val readAnchorHelperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
+        val readAnchorHelper =
             source.substring(
-                readAnchorEffectIndex,
-                source.indexOf("DisposableEffect(controller)", readAnchorEffectIndex),
+                readAnchorHelperIndex,
+                source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", readAnchorHelperIndex),
             )
+        val readAnchorCallIndex = source.indexOf("rememberConversationReadAnchor(", renderedTimelineIndex)
+        val readAnchorCall = source.substring(readAnchorCallIndex, source.indexOf(")", readAnchorCallIndex) + 1)
 
         assertTrue(
             "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
-                renderedTimelineIndex < readAnchorEffectIndex &&
-                "currentHighestVisibleMessageId," in readAnchorEffect &&
-                "advanceConversationReadAnchor(" in readAnchorEffect &&
-                "durableAnchorId = controller.lastReadMessageId" in readAnchorEffect &&
-                "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorEffect,
+                renderedTimelineIndex < readAnchorCallIndex &&
+                "renderedTimeline = renderedTimeline" in readAnchorCall &&
+                "currentHighestVisibleMessageId," in readAnchorHelper &&
+                "advanceConversationReadAnchor(" in readAnchorHelper &&
+                "durableAnchorId = controller.lastReadMessageId" in readAnchorHelper &&
+                "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorHelper,
         )
     }
 
