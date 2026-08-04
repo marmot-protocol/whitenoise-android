@@ -328,6 +328,22 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun conversationHistoryReanchorIgnoresSameRowHydration() {
+        val source = conversationScreenSource().readText().replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "startup materialization and same-row media hydration must not restart durable history anchoring",
+            "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
+                "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
+                "scrollCoordinator.commitInitialAnchor(" in source &&
+                "postInitialReanchorGate.commit(" in source &&
+                "postInitialReanchorGate.onStructure(" in source &&
+                "initialTimelineAnchored && structureChanged" in source &&
+                "LaunchedEffect(controller, renderedTimeline, olderHeaderCount" !in source,
+        )
+    }
+
+    @Test
     fun voiceAutoChainSkipsDerivedEditRows() {
         val source = conversationScreenSource().readText()
         val autoChain =

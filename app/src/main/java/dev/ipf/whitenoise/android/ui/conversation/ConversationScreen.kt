@@ -518,6 +518,10 @@ internal fun ConversationScreen(
                     },
             )
         }
+    val postInitialReanchorGate =
+        remember(controller, listState) {
+            ConversationPostInitialReanchorGate()
+        }
     val bottomChromeHeightObserver =
         remember(chat.id) {
             ConversationBottomChromeHeightObserver()
@@ -758,6 +762,10 @@ internal fun ConversationScreen(
     val renderedTimeline =
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        }
+    val renderedTimelineAnchorKeys =
+        remember(renderedTimeline) {
+            renderedTimeline.map { it.id to it.record.messageIdHex }
         }
     val selectableMessageProjections =
         remember(
@@ -2538,13 +2546,10 @@ internal fun ConversationScreen(
             }
         }
     }
-    LaunchedEffect(listState, scrollCoordinator) {
-        var previousViewportHeight: Int? = null
+    LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
-            val previous = previousViewportHeight
-            previousViewportHeight = viewportHeight
-            val unchangedOrUninitialized = previous == null || previous == viewportHeight
-            if (unchangedOrUninitialized || !currentInitialTimelineAnchored || currentImeIsOpen) {
+            val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
+            if (!viewportChanged || !currentInitialTimelineAnchored || currentImeIsOpen) {
                 return@collect
             }
             when (scrollCoordinator.mode) {
@@ -2590,18 +2595,25 @@ internal fun ConversationScreen(
                 }
             }.filterNotNull()
                 .first()
-        scrollCoordinator.programmaticJump(
+        val resultingMode =
+            ConversationScrollMode.ReadingHistory(
+                restore.anchorMessageIdHex,
+                restore.firstVisibleItemScrollOffset,
+            )
+        scrollCoordinator.commitInitialAnchor(
             targetMessageId = restore.anchorMessageIdHex,
             reason = ConversationScrollReason.SavedRestore,
-            resultingMode =
-                ConversationScrollMode.ReadingHistory(
-                    restore.anchorMessageIdHex,
-                    restore.firstVisibleItemScrollOffset,
-                ),
-        ) {
-            scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
-        }
-        initialTimelineAnchored = true
+            resultingMode = resultingMode,
+            targetIndex = targetIndex,
+            pixelOffset = restore.firstVisibleItemScrollOffset,
+            captureLayout = {
+                val layoutInfo = listState.layoutInfo
+                ConversationInitialAnchorLayout(
+                    viewportHeight = layoutInfo.viewportSize.height,
+                    targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                )
+            },
+        )
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -2614,6 +2626,15 @@ internal fun ConversationScreen(
                 messageId = restoredItem?.record?.messageIdHex ?: restore.anchorMessageIdHex,
             ),
         )
+        postInitialReanchorGate.commit(
+            structure =
+                ConversationTimelineStructure(
+                    rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
+                    olderHeaderCount = restoredOlderHeaderCount,
+                ),
+            viewportHeight = listState.layoutInfo.viewportSize.height,
+        )
+        initialTimelineAnchored = true
         lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
     LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
@@ -2651,13 +2672,19 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     }
-                scrollCoordinator.programmaticJump(
+                scrollCoordinator.commitInitialAnchor(
                     targetMessageId = unreadId,
                     reason = ConversationScrollReason.InitialAnchor,
                     resultingMode = resultingMode,
-                ) {
-                    scrollToItem(targetIndex)
-                }
+                    targetIndex = targetIndex,
+                    captureLayout = {
+                        val layoutInfo = listState.layoutInfo
+                        ConversationInitialAnchorLayout(
+                            viewportHeight = layoutInfo.viewportSize.height,
+                            targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                        )
+                    },
+                )
                 if (resultingMode is ConversationScrollMode.ReadingHistory) {
                     val unreadItem = renderedTimeline.getOrNull(renderedUnreadIndex)
                     scrollCoordinator.settleReadingAt(
@@ -2669,6 +2696,14 @@ internal fun ConversationScreen(
                         ),
                     )
                 }
+                postInitialReanchorGate.commit(
+                    structure =
+                        ConversationTimelineStructure(
+                            rowKeys = renderedTimelineAnchorKeys,
+                            olderHeaderCount = olderHeaderCount,
+                        ),
+                    viewportHeight = listState.layoutInfo.viewportSize.height,
+                )
                 initialTimelineAnchored = true
                 lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
@@ -2693,11 +2728,24 @@ internal fun ConversationScreen(
         }
     }
 
-    // Re-resolve the durable history anchor whenever row/header composition
-    // changes. Stable message identity, not the old lazy-list index, owns the
-    // restoration after pagination, hydration, separators, or tail appends.
-    LaunchedEffect(controller, renderedTimeline, olderHeaderCount, initialTimelineAnchored) {
-        if (initialTimelineAnchored) {
+    // Re-resolve the durable history anchor only when the list structure or
+    // header changes. Same-row projection and media hydration must not restart
+    // anchoring after the conversation is already visible.
+    LaunchedEffect(
+        controller,
+        renderedTimelineAnchorKeys,
+        olderHeaderCount,
+        initialTimelineAnchored,
+        postInitialReanchorGate,
+    ) {
+        val structureChanged =
+            postInitialReanchorGate.onStructure(
+                ConversationTimelineStructure(
+                    rowKeys = renderedTimelineAnchorKeys,
+                    olderHeaderCount = olderHeaderCount,
+                ),
+            )
+        if (initialTimelineAnchored && structureChanged) {
             scrollCoordinator.reanchorReadingHistory(::resolveScrollAnchorIndex)
         }
     }
@@ -2725,13 +2773,13 @@ internal fun ConversationScreen(
         }
     }
 
-    fun reanchorNewestAfterBottomInputChange() {
+    fun reanchorNewestAfterBottomInputChange(frameCount: Int = 24) {
         if (!initialTimelineAnchored) return
         scope.launch {
             scrollCoordinator.followTailIfAllowed(
                 resolveTailIndex = { currentTailIndex },
                 reason = ConversationScrollReason.BottomInput,
-                frameCount = 24,
+                frameCount = frameCount,
             )
         }
     }
@@ -3206,7 +3254,7 @@ internal fun ConversationScreen(
                     .fillMaxWidth()
                     .onSizeChanged { size ->
                         if (bottomChromeHeightObserver.onMeasured(size.height)) {
-                            reanchorNewestAfterBottomInputChange()
+                            reanchorNewestAfterBottomInputChange(frameCount = 1)
                         }
                         val chromeBottom = chromeInsets.getBottom(density)
                         snackbarBottomInset.value =
@@ -3397,7 +3445,7 @@ internal fun ConversationScreen(
                                         }
                                         composerFocused = focused
                                     },
-                                    onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
+                                    onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
                                     onKeyboardRestoreFromCustomInput = {
                                         suppressNextImeOpenReanchor.set(true)
                                     },

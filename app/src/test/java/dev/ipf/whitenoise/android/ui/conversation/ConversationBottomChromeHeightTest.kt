@@ -133,7 +133,7 @@ class ConversationBottomChromeHeightTest {
                         coordinator.followTailIfAllowed(
                             resolveTailIndex = { listState.layoutInfo.totalItemsCount - 1 },
                             reason = ConversationScrollReason.BottomInput,
-                            frameCount = 24,
+                            frameCount = 1,
                         )
                     }
                 }
