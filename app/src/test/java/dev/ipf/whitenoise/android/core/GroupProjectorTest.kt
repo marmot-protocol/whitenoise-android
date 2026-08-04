@@ -653,10 +653,89 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun transcriptSenderAvatarOnlyShowsForOtherMembersInLargerGroups() {
-        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 2, mine = false))
-        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = true))
-        assertTrue(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = false))
+    fun transcriptSenderAvatarUsesConversationKindInsteadOfHeadcount() {
+        val namedTwoMemberGroupIsDm =
+            GroupProjector.isDm(
+                conversationKind = ChatConversationKindFfi.GROUP,
+                memberCount = 2,
+                name = "Group 2",
+            )
+
+        assertFalse(namedTwoMemberGroupIsDm)
+        assertTrue(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = namedTwoMemberGroupIsDm, mine = false))
+        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = true, mine = false))
+        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(isDm = false, mine = true))
+    }
+
+    @Test
+    fun transcriptSenderDecorationUsesOneIdentityAtEachEndOfAConsecutiveRun() {
+        assertEquals(
+            TranscriptSenderDecoration(showName = true, showAvatar = false),
+            GroupProjector.transcriptSenderDecoration(
+                isDm = false,
+                mine = false,
+                sameSenderAsOlderBubble = false,
+                sameSenderAsNewerBubble = true,
+            ),
+        )
+        assertEquals(
+            TranscriptSenderDecoration(showName = false, showAvatar = true),
+            GroupProjector.transcriptSenderDecoration(
+                isDm = false,
+                mine = false,
+                sameSenderAsOlderBubble = true,
+                sameSenderAsNewerBubble = false,
+            ),
+        )
+        assertEquals(
+            TranscriptSenderDecoration(showName = false, showAvatar = false),
+            GroupProjector.transcriptSenderDecoration(
+                isDm = false,
+                mine = true,
+                sameSenderAsOlderBubble = false,
+                sameSenderAsNewerBubble = false,
+            ),
+        )
+    }
+
+    @Test
+    fun transcriptSenderRunRequiresSameSenderDayAndThreeMinuteWindow() {
+        assertTrue(
+            GroupProjector.messagesShareTranscriptSenderRun(
+                firstSender = "alice",
+                firstRecordedAt = 100uL,
+                secondSender = "ALICE",
+                secondRecordedAt = 280uL,
+                sameDay = true,
+            ),
+        )
+        assertFalse(
+            GroupProjector.messagesShareTranscriptSenderRun(
+                firstSender = "alice",
+                firstRecordedAt = 100uL,
+                secondSender = "alice",
+                secondRecordedAt = 281uL,
+                sameDay = true,
+            ),
+        )
+        assertFalse(
+            GroupProjector.messagesShareTranscriptSenderRun(
+                firstSender = "alice",
+                firstRecordedAt = 100uL,
+                secondSender = "bob",
+                secondRecordedAt = 101uL,
+                sameDay = true,
+            ),
+        )
+        assertFalse(
+            GroupProjector.messagesShareTranscriptSenderRun(
+                firstSender = "alice",
+                firstRecordedAt = 100uL,
+                secondSender = "alice",
+                secondRecordedAt = 101uL,
+                sameDay = false,
+            ),
+        )
     }
 
     @Test

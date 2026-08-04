@@ -82,7 +82,7 @@ internal fun AgentOperationTimelineRow(
     val record = item.record
     val mine = controller.isMessageMine(record)
     val senderName = appState.displayName(record.sender)
-    val showSender = GroupProjector.shouldShowTranscriptSenderAvatar(controller.memberCount, mine)
+    val showSender = GroupProjector.shouldShowTranscriptSenderAvatar(controller.isDm, mine)
     val deleteCapability =
         if (readOnly) {
             MessageDeleteCapability(canDeleteForMe = false, canDeleteForEveryone = false)

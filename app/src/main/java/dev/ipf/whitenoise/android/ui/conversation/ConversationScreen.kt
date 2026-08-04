@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -3528,6 +3529,38 @@ internal fun ConversationScreen(
                                             }
                                             TimelineRowKind.Bubble -> Unit
                                         }
+                                        val newer = renderedTimeline.getOrNull(index + 1)
+                                        val sameSenderAsOlderBubble =
+                                            older?.let { candidate ->
+                                                timelineRowKind(candidate.record, appState.streamingDebugEnabled) ==
+                                                    TimelineRowKind.Bubble &&
+                                                    GroupProjector.messagesShareTranscriptSenderRun(
+                                                        firstSender = candidate.record.sender,
+                                                        firstRecordedAt = candidate.record.recordedAt,
+                                                        secondSender = item.record.sender,
+                                                        secondRecordedAt = item.record.recordedAt,
+                                                        sameDay = !differentDay(candidate.record.recordedAt, item.record.recordedAt),
+                                                    )
+                                            } == true
+                                        val sameSenderAsNewerBubble =
+                                            newer?.let { candidate ->
+                                                timelineRowKind(candidate.record, appState.streamingDebugEnabled) ==
+                                                    TimelineRowKind.Bubble &&
+                                                    GroupProjector.messagesShareTranscriptSenderRun(
+                                                        firstSender = item.record.sender,
+                                                        firstRecordedAt = item.record.recordedAt,
+                                                        secondSender = candidate.record.sender,
+                                                        secondRecordedAt = candidate.record.recordedAt,
+                                                        sameDay = !differentDay(item.record.recordedAt, candidate.record.recordedAt),
+                                                    )
+                                            } == true
+                                        val senderDecoration =
+                                            GroupProjector.transcriptSenderDecoration(
+                                                isDm = controller.isDm,
+                                                mine = controller.isMessageMine(item.record),
+                                                sameSenderAsOlderBubble = sameSenderAsOlderBubble,
+                                                sameSenderAsNewerBubble = sameSenderAsNewerBubble,
+                                            )
                                         val messageId = item.record.messageIdHex
                                         val ownsActionMenu = openActionMenuId == messageId
                                         DismissMessageActionMenuOnDispose(
@@ -3618,6 +3651,8 @@ internal fun ConversationScreen(
                                             },
                                             mentionCandidates = mentionPicker.candidates,
                                             mentionPickerEnabled = mentionPicker.enabled,
+                                            showSenderName = senderDecoration.showName,
+                                            showSenderAvatar = senderDecoration.showAvatar,
                                             collapseLongMessages = collapseLongMessages,
                                             readOnly = controller.group.pendingConfirmation,
                                         )

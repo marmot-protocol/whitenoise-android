@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -50,7 +49,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -60,7 +58,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -76,6 +73,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -87,7 +85,7 @@ import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
-import dev.ipf.whitenoise.android.core.ReplySwipe
+import dev.ipf.whitenoise.android.core.ReplySwipeGesture
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.retentionIndicatorVisible
@@ -330,6 +328,8 @@ internal fun MessageBubble(
     onDeclineInvite: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
+    showSenderName: Boolean = false,
+    showSenderAvatar: Boolean = false,
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
 ) {
@@ -547,9 +547,9 @@ internal fun MessageBubble(
                 )
             }
         }
-    val showSenderAvatar =
+    val reserveSenderAvatarSlot =
         GroupProjector.shouldShowTranscriptSenderAvatar(
-            memberCount = controller.memberCount,
+            isDm = controller.isDm,
             mine = mine,
         )
     // Match the timestamp to the bubble's visual cue. AMOLED uses the same
@@ -716,9 +716,13 @@ internal fun MessageBubble(
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
-        val messageGroupMaxWidth = (maxWidth * 0.95f - selectionGutterWidth).coerceAtLeast(0.dp)
-        val senderAvatarWidth = if (showSenderAvatar) 40.dp else 0.dp
-        val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
+        val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
+        val bubbleColumnMaxWidth =
+            messageBubbleColumnMaxWidth(
+                containerWidth = maxWidth,
+                selectionGutterWidth = selectionGutterWidth,
+                senderAvatarSlotWidth = senderAvatarSlotWidth,
+            )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || readOnly || textSelectionMode
 
@@ -751,19 +755,32 @@ internal fun MessageBubble(
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                                var gesture = ReplySwipeGesture()
                                 detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        gesture = ReplySwipeGesture()
+                                    },
                                     onHorizontalDrag = { change, dragAmount ->
-                                        val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
+                                        gesture =
+                                            gesture.dragBy(
+                                                deltaX = dragAmount,
+                                                deltaY = change.position.y - change.previousPosition.y,
+                                            )
+                                        val next = gesture.visualOffset(maxSwipeOffsetPx)
                                         if (next != swipeDrag || dragAmount > 0f) change.consume()
                                         swipeDrag = next
                                     },
                                     onDragEnd = {
-                                        if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
+                                        if (gesture.shouldTriggerReply(threshold = replySwipeThresholdPx)) {
                                             beginReply()
                                         }
+                                        gesture = ReplySwipeGesture()
                                         swipeDrag = 0f
                                     },
-                                    onDragCancel = { swipeDrag = 0f },
+                                    onDragCancel = {
+                                        gesture = ReplySwipeGesture()
+                                        swipeDrag = 0f
+                                    },
                                 )
                             }
                         },
@@ -866,19 +883,30 @@ internal fun MessageBubble(
                 // stays at the row's leading edge for both message directions.
                 if (mine) Spacer(Modifier.weight(1f))
             }
-            if (showSenderAvatar) {
+            if (reserveSenderAvatarSlot) {
                 Box(
                     modifier =
                         Modifier
-                            .clip(CircleShape)
-                            .clickable(enabled = !textSelectionMode) { appState.presentProfile(appState.npub(record.sender)) },
+                            .size(32.dp)
+                            .align(Alignment.Bottom),
                 ) {
-                    Avatar(
-                        title = appState.displayName(record.sender),
-                        seed = record.sender,
-                        size = 32.dp,
-                        pictureUrl = appState.avatarUrl(record.sender),
-                    )
+                    if (showSenderAvatar) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(enabled = !textSelectionMode) {
+                                        appState.presentProfile(appState.npub(record.sender))
+                                    },
+                        ) {
+                            Avatar(
+                                title = appState.displayName(record.sender),
+                                seed = record.sender,
+                                size = 32.dp,
+                                pictureUrl = appState.avatarUrl(record.sender),
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
             }
@@ -1448,19 +1476,6 @@ internal fun MessageBubble(
                 var lastLineLayout by remember(record.messageIdHex, bodyTextToRender) {
                     mutableStateOf<TextLayoutResult?>(null)
                 }
-                // Overflow decision is derived from a measurement of the FULL
-                // body only. Keeping it separate from lastLineLayout (which
-                // the currently-rendered text updates) avoids a recompose
-                // loop: once we clip, the clipped text no longer overflows,
-                // which would otherwise flip the decision back and forth.
-                // Key it on the rendered text too: edit overlays can swap in a
-                // shorter body before the next Text measurement, and an old
-                // layout's line end must not index into the new string. Width is
-                // also part of the measurement: a body that overflows in portrait
-                // can fit after the same composition is resized to landscape.
-                var bodyFullLayout by remember(record.messageIdHex, bodyTextToRender, bubbleColumnMaxWidth) {
-                    mutableStateOf<TextLayoutResult?>(null)
-                }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
@@ -1490,52 +1505,17 @@ internal fun MessageBubble(
                                 !persistedFailure &&
                                 markdownDocument.blocks.isNotEmpty() &&
                                 bodyTextToRender == record.plaintext
-                        // Markdown can't be cleanly truncated to a line
-                        // count mid-document, so clip to the height of
-                        // MESSAGE_COLLAPSE_LINE_LIMIT body-large lines.
-                        // The natural height is measured on the inner
-                        // content (clipToBounds is visual only and doesn't
-                        // constrain it); the overflow flag latches true so
-                        // applying the cap can't shrink the measurement and
-                        // flip it back.
+                        // Markdown can't be cleanly truncated mid-document.
+                        // Probe one pixel past the collapsed height inside the
+                        // footer layout so overflow and the final visible row
+                        // height are both decided in the same measure pass.
                         val lineHeightPx =
                             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
-                        val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
-                        val maxBodyHeightDp = with(density) { maxBodyHeightPx.toDp() }
-                        // Reset the one-way latch whenever the rendered body or its
-                        // available width changes, then measure the natural height
-                        // again before deciding whether to apply the cap.
-                        var markdownOverflows by
-                            remember(record.messageIdHex, bodyTextToRender, bubbleColumnMaxWidth) {
-                                mutableStateOf(false)
-                            }
-                        val collapseMarkdown = renderMarkdownBody && collapsible && markdownOverflows
-                        val plainTextOverflows =
-                            !renderMarkdownBody &&
-                                collapsible &&
-                                bodyFullLayout?.let {
-                                    it.hasVisualOverflow && it.lineCount > MESSAGE_COLLAPSE_LINE_LIMIT
-                                } == true
-                        val collapsedBody = collapseMarkdown || plainTextOverflows
+                        val maxBodyHeightDp =
+                            with(density) { (lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT).toDp() }
                         val messageBody: @Composable () -> Unit = {
                             if (renderMarkdownBody) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .onSizeChanged {
-                                                if (collapsible && it.height > maxBodyHeightPx) {
-                                                    markdownOverflows = true
-                                                }
-                                            }.then(
-                                                if (collapseMarkdown) {
-                                                    Modifier
-                                                        .heightIn(max = maxBodyHeightDp)
-                                                        .clipToBounds()
-                                                } else {
-                                                    Modifier
-                                                },
-                                            ),
-                                ) {
+                                Box {
                                     // Mention names resolve through the profile
                                     // cache; npub/nprofile taps stay in-app via
                                     // the profile sheet (never an external nostr:
@@ -1575,32 +1555,6 @@ internal fun MessageBubble(
                                         onCopyLink = ::copyMarkdownLink,
                                     )
                                 }
-                            } else if (plainTextOverflows) {
-                                val layout = bodyFullLayout!!
-                                // Cut at the last fully-visible line and trim trailing
-                                // whitespace. Read More now lives in the bottom footer
-                                // row, so the body text has no inline link or tap span;
-                                // long-press anywhere on the bubble still falls through
-                                // to the action menu rather than expanding the bubble.
-                                val clippedText =
-                                    remember(bodyTextToRender, layout) {
-                                        clippedMessageBodyText(
-                                            bodyText = bodyTextToRender,
-                                            lineEnd = layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true),
-                                        )
-                                    }
-                                Text(
-                                    clippedText,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = plainTextSelectionModifier,
-                                    // Footer geometry follows the clipped text's
-                                    // real last line, not the full measurement.
-                                    onTextLayout = {
-                                        lastLineLayout = it
-                                        plainTextLayoutTracker.layoutResult = it
-                                        reportPlainTextLayoutIfReady()
-                                    },
-                                )
                             } else {
                                 Text(
                                     bodyTextToRender,
@@ -1609,7 +1563,6 @@ internal fun MessageBubble(
                                     maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
                                     onTextLayout = {
                                         lastLineLayout = it
-                                        bodyFullLayout = it
                                         plainTextLayoutTracker.layoutResult = it
                                         reportPlainTextLayoutIfReady()
                                     },
@@ -1651,11 +1604,16 @@ internal fun MessageBubble(
                                 hasReplyPreview = replyPreview != null,
                                 hasMedia = hasMedia,
                             )
-                        if (collapsedBody) {
-                            BubbleCollapsedFooterLayout(
+                        if (collapsible) {
+                            BubbleCollapsibleFooterLayout(
+                                maxBodyHeight = maxBodyHeightDp,
                                 readMore = readMoreFooter,
                                 footer = inlineFooter,
                                 modifier = bodyModifier,
+                                lastLineWidth =
+                                    lastLineLayout?.let { layout ->
+                                        if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
+                                    },
                             ) {
                                 selectableMessageBody()
                             }
@@ -1720,7 +1678,7 @@ internal fun MessageBubble(
                 // media + caption when media is present (#527), or as the first
                 // child of the single text bubble otherwise.
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
-                    if (showSenderAvatar) {
+                    if (showSenderName) {
                         Text(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
@@ -2156,11 +2114,17 @@ internal fun MessageBubble(
     }
 }
 
-internal fun clippedMessageBodyText(
-    bodyText: String,
-    lineEnd: Int,
-): String = bodyText.substring(0, lineEnd.coerceIn(0, bodyText.length)).trimEnd()
-
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
 private const val MESSAGE_COLLAPSE_LINE_LIMIT = 18
+
+private val MessageBubbleOppositeGutter = 48.dp
+private val MessageBubbleSenderAvatarSlotWidth = 40.dp
+
+internal fun messageBubbleColumnMaxWidth(
+    containerWidth: Dp,
+    selectionGutterWidth: Dp,
+    senderAvatarSlotWidth: Dp,
+): Dp =
+    (containerWidth - MessageBubbleOppositeGutter - selectionGutterWidth - senderAvatarSlotWidth)
+        .coerceAtLeast(0.dp)
