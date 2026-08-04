@@ -161,6 +161,44 @@ class ConversationNearBottomTest {
     }
 
     @Test
+    fun shortTailRemainsNearBottomWhileItIsStillVisible() {
+        val listState = LazyListState()
+        val timelineSize = 3
+        val firstTimelineIndex = 2
+        val tailListIndex = timelineSize + 1
+
+        composeRule.setContent {
+            TimelineHarness(
+                listState = listState,
+                timelineSize = timelineSize,
+                modifier = Modifier.height(100.dp),
+            )
+        }
+        composeRule.waitForIdle()
+
+        val rowSize =
+            listState.layoutInfo.visibleItemsInfo
+                .single { it.index == firstTimelineIndex }
+                .size
+        scrollTo(listState, firstTimelineIndex, rowSize * 2 / 5)
+
+        val layoutInfo = listState.layoutInfo
+        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+        val lastVisible = layoutInfo.visibleItemsInfo.last()
+        val tailDistanceFromViewport =
+            lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
+
+        assertEquals(tailListIndex, lastVisible.index)
+        assertTrue(lastVisible.size < viewportHeight)
+        assertTrue(tailDistanceFromViewport > viewportHeight / 4)
+        assertTrue(tailDistanceFromViewport <= lastVisible.size)
+        assertTrue(
+            "A normal tail row remains near-bottom while any part is visible",
+            isNearBottom(listState, timelineSize, hasOlderHeader = true),
+        )
+    }
+
+    @Test
     fun tallTailShowsJumpButtonBeforeItsBodyLeavesTheViewport() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val jumpToNewestLabel = context.getString(R.string.jump_to_newest)
