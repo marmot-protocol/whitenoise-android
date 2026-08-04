@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -847,6 +848,141 @@ class NotificationTargetTest {
             )
         assertEquals(NotificationNavStep.MissingConversation, step)
     }
+
+    @Test
+    fun nav_inviteAuthoritativelyUnavailable_dominatesStalePresentRow() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteRowMembershipOpenable = true,
+                inviteAuthoritativelyUnavailable = true,
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun inviteAuthoritativeGroupAvailability_terminalMembershipDominatesStalePendingConfirmation() {
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.LEFT,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.REMOVED,
+            ),
+        )
+    }
+
+    @Test
+    fun nav_invitePresentRow_terminalMembership_isMissingConversation_notOpen() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        assertEquals(
+            NotificationNavStep.MissingConversation,
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteRowMembershipOpenable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun nav_messageAbsentGroup_unchangedWhenInviteMembershipFlagFalse() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-other"),
+                inviteRowMembershipOpenable = false,
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun inviteAuthoritativeProbeRetry_allowsBoundedInconclusiveAttempts() {
+        assertTrue(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 0))
+        assertTrue(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 2))
+        assertFalse(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 3))
+    }
+
+    @Test
+    fun inviteAuthoritativeProbe_transientFailureThenSuccess_retriesAndOpens() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.Runtime("busy")),
+                        Result.success(true),
+                    ),
+                )
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.OpenConversation,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(listOf(250L), delays)
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_transientFailureThenAuthoritativeAbsence_retriesAndStops() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.Runtime("busy")),
+                        Result.success(false),
+                    ),
+                )
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Unavailable,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = {},
+                ),
+            )
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_exhaustedTransientFailuresRemainInconclusive() =
+        runTest {
+            var calls = 0
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    load = {
+                        calls += 1
+                        Result.failure(MarmotKitException.Runtime("busy"))
+                    },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(3, calls)
+            assertEquals(listOf(250L, 500L), delays)
+        }
 
     // ---- helpers ------------------------------------------------------------
 

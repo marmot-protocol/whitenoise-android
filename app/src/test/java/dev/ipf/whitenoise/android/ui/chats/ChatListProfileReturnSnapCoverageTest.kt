@@ -116,14 +116,24 @@ class ChatListProfileReturnSnapCoverageTest {
     fun nonListConversationOpensDoNotConsumeStaleReturnHead() {
         val mainShell = mainShellSource().readText()
 
+        val notificationCommitBlock =
+            mainShell.requiredSection(
+                start = "fun commitNotificationConversationOpen(chatItem: ChatListItem) {",
+                end = "\n        fun fallBackToChatList() {",
+            )
+        assertTrue(
+            "shared notification-open commit must reset armed return-head provenance",
+            Regex("""resetChatListReturnHeadSnap\(""").containsMatchIn(notificationCommitBlock),
+        )
+
         val notificationOpenBlock =
             mainShell.requiredSection(
                 start = "is NotificationNavStep.OpenConversation -> {",
                 end = "\n            NotificationNavStep.MissingAccount -> {",
             )
         assertTrue(
-            "notification opens must reset armed return-head provenance",
-            Regex("""resetChatListReturnHeadSnap\(""").containsMatchIn(notificationOpenBlock),
+            "notification opens must use the shared state commit",
+            Regex("""commitNotificationConversationOpen\(""").containsMatchIn(notificationOpenBlock),
         )
 
         val restoreBlock =

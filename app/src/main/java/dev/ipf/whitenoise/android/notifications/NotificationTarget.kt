@@ -7,6 +7,8 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.state.nextRetryBackoffMillis
+import kotlinx.coroutines.delay
 
 /** What a tapped notification should open. */
 enum class NotificationTargetKind { MESSAGE, INVITE }
@@ -74,8 +76,9 @@ sealed interface NotificationNavStep {
  * @param inviteRowMaterialized true when the invite's group id is present on the
  *   live chat-list backing rows, even if the debounced [availableGroupIds]
  *   snapshot has not caught up yet.
- * @param inviteAuthoritativelyUnavailable true only after a targeted authoritative
- *   read proves the invite is gone (withdrawn/declined/deleted).
+ * @param inviteRowMembershipOpenable when an invite row is reachable, false if
+ *   terminal self-membership (LEFT/REMOVED) proves the invite is no longer
+ *   openable even though the archived row still exists.
  */
 fun resolveNotificationNav(
     target: NotificationTarget,
@@ -84,21 +87,31 @@ fun resolveNotificationNav(
     chatListReady: Boolean,
     availableGroupIds: Set<String>,
     inviteRowMaterialized: Boolean = false,
+    inviteRowMembershipOpenable: Boolean = true,
     inviteAuthoritativelyUnavailable: Boolean = false,
 ): NotificationNavStep {
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
     if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
     if (!chatListReady) return NotificationNavStep.AwaitChatList
-    val groupPresent =
+    if (target.kind == NotificationTargetKind.MESSAGE) {
+        if (target.groupIdHex in availableGroupIds) {
+            return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
+        }
+        return NotificationNavStep.MissingConversation
+    }
+    if (inviteAuthoritativelyUnavailable) {
+        return NotificationNavStep.MissingConversation
+    }
+    val inviteRowReachable =
         target.groupIdHex in availableGroupIds ||
-            (target.kind == NotificationTargetKind.INVITE && inviteRowMaterialized)
-    if (groupPresent) {
+            inviteRowMaterialized
+    if (inviteRowReachable) {
+        if (!inviteRowMembershipOpenable) {
+            return NotificationNavStep.MissingConversation
+        }
         return NotificationNavStep.OpenConversation(target.groupIdHex, target.messageIdHex)
     }
-    if (target.kind == NotificationTargetKind.INVITE && !inviteAuthoritativelyUnavailable) {
-        return NotificationNavStep.AwaitInviteRow
-    }
-    return NotificationNavStep.MissingConversation
+    return NotificationNavStep.AwaitInviteRow
 }
 
 /** Outcome of a targeted authoritative read while routing an invite notification (#1767). */
@@ -134,18 +147,54 @@ internal fun classifyInviteAuthoritativeLoad(result: Result<Boolean>): Notificat
 internal fun inviteAuthoritativeGroupAvailable(
     pendingConfirmation: Boolean,
     selfMembership: SelfMembershipFfi,
-): Boolean = pendingConfirmation || selfMembership == SelfMembershipFfi.MEMBER
+): Boolean =
+    when (selfMembership) {
+        SelfMembershipFfi.LEFT, SelfMembershipFfi.REMOVED -> false
+        else -> pendingConfirmation || selfMembership == SelfMembershipFfi.MEMBER
+    }
 
-/** Authoritative invite probe state for notification routing (#1767). */
-internal enum class NotificationInviteAuthoritativeProbeState {
-    /** No authoritative read attempted for the current invite target yet. */
-    NotProbed,
+/** Max inconclusive authoritative invite probes before releasing the route (#1767). */
+internal const val NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES = 3
 
-    /** Read failed inconclusively; keep waiting for the live chat-list row. */
-    Inconclusive,
+internal const val NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_INITIAL_BACKOFF_MILLIS = 250L
 
-    /** Authoritative read proves the invite is gone. */
-    Unavailable,
+internal const val NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_MAX_BACKOFF_MILLIS = 2_000L
+
+internal fun inviteAuthoritativeProbeShouldRetry(
+    inconclusiveOutcomes: Int,
+    maxInconclusiveOutcomes: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES,
+): Boolean = inconclusiveOutcomes < maxInconclusiveOutcomes
+
+internal fun inviteAuthoritativeProbeBackoffMillis(
+    inconclusiveOutcomes: Int,
+    initialMillis: Long = NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_INITIAL_BACKOFF_MILLIS,
+    maxMillis: Long = NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_MAX_BACKOFF_MILLIS,
+): Long {
+    var delayMillis = initialMillis
+    repeat((inconclusiveOutcomes - 1).coerceAtLeast(0)) {
+        delayMillis = nextRetryBackoffMillis(delayMillis, maxMillis)
+    }
+    return delayMillis
+}
+
+internal suspend fun retryInviteAuthoritativeLoad(
+    maxInconclusiveOutcomes: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES,
+    load: suspend () -> Result<Boolean>,
+    sleep: suspend (Long) -> Unit = { delay(it) },
+): NotificationInviteAuthoritativeOutcome {
+    var inconclusiveOutcomes = 0
+    while (true) {
+        when (val outcome = classifyInviteAuthoritativeLoad(load())) {
+            NotificationInviteAuthoritativeOutcome.Inconclusive -> {
+                inconclusiveOutcomes += 1
+                if (!inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes, maxInconclusiveOutcomes)) {
+                    return outcome
+                }
+                sleep(inviteAuthoritativeProbeBackoffMillis(inconclusiveOutcomes))
+            }
+            else -> return outcome
+        }
+    }
 }
 
 /** The activity's pending inbound-intent routing: a tapped-notification target,
