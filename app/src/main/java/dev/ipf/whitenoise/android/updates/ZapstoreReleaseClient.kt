@@ -127,6 +127,14 @@ class ZapstoreReleaseClient(
                                 finish(Result.failure(IOException("Zapstore relay request failed", t)))
                             }
 
+                            override fun onClosing(
+                                webSocket: WebSocket,
+                                code: Int,
+                                reason: String,
+                            ) {
+                                finish(Result.success(events.toList()))
+                            }
+
                             override fun onClosed(
                                 webSocket: WebSocket,
                                 code: Int,

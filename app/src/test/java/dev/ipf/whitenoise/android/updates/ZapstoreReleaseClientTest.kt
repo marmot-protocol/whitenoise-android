@@ -117,6 +117,24 @@ class ZapstoreReleaseClientTest {
     }
 
     @Test
+    fun fetchEventsCompletesOnServerInitiatedWebSocketClose() {
+        val relay =
+            enqueueRelay { webSocket, request ->
+                val subscriptionId = request.getString(1)
+                webSocket.send(eventMessage(subscriptionId, eventJson("a".repeat(64))))
+                webSocket.close(1000, "done")
+            }
+
+        val events = runBlocking { client.fetchEvents(FILTER) }
+
+        assertEquals(listOf("a".repeat(64)), events.map(NostrEvent::id))
+        relay.awaitClosing()
+        assertEquals(1, relay.closingCount.get())
+        assertEquals(1, webSocketFactory.socket.closeCalls.get())
+        assertEquals(0, webSocketFactory.socket.cancelCalls.get())
+    }
+
+    @Test
     fun fetchEventsReportsRelayFailureAndClosesOnce() {
         enqueueRelay { webSocket, _ -> webSocket.cancel() }
 
