@@ -36,16 +36,20 @@ class SelectedMembersReviewScreenTest {
     @Test
     fun summaryOpensReviewWithoutChangingTheSelection() {
         var opens = 0
+        val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
                 SelectedMemberSummary(
                     members = members,
-                    appState = appState(),
+                    appState = state,
                     onClick = { opens += 1 },
                 )
             }
         }
 
+        composeRule
+            .onNodeWithText(members.joinToString { member -> state.displayName(member.accountIdHex) })
+            .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.selected)).assertIsDisplayed().performClick()
 
         assertEquals(1, opens)

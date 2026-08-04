@@ -84,12 +84,7 @@ internal fun SelectedMemberSummary(
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.selected), style = MaterialTheme.typography.labelLarge)
                 Text(
-                    contactPickerTopBarTitle(
-                        pickerTitle = "",
-                        selectedCount = members.size,
-                        oneMember = stringResource(R.string.one_member),
-                        membersFormat = stringResource(R.string.members_count),
-                    ),
+                    members.joinToString { member -> appState.displayName(member.accountIdHex) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f),
                     maxLines = 1,
