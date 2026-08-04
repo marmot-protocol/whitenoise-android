@@ -70,33 +70,24 @@ object ConversationNotificationChannels {
                 conversationShortcutId,
                 selectedPattern,
             )
-        val channel =
-            manager?.getNotificationChannel(channelId)
-                ?: return EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
-        if (!channel.shouldVibrate()) {
-            return EffectiveConversationVibration(pattern = null, enabled = false, overriddenByAndroid = true)
-        }
-        if (selectedPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
-            val parent = manager.getNotificationChannel(primaryMessageParent(isDm).id)
-            val stillMatchesParent =
-                parent != null &&
-                    parent.shouldVibrate() == channel.shouldVibrate() &&
-                    nullableWaveformsEqual(parent.vibrationPattern, channel.vibrationPattern)
-            if (stillMatchesParent) {
-                return EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
+        val channel = manager?.getNotificationChannel(channelId)
+        return when {
+            channel == null ->
+                EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
+            !channel.shouldVibrate() ->
+                EffectiveConversationVibration(pattern = null, enabled = false, overriddenByAndroid = true)
+            selectedPattern == ConversationVibrationPattern.SYSTEM_DEFAULT &&
+                channel.matchesParentVibration(manager, primaryMessageParent(isDm).id) ->
+                EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
+            else -> {
+                val effectivePattern = channel.recognizedVibrationPattern()
+                EffectiveConversationVibration(
+                    pattern = effectivePattern,
+                    enabled = true,
+                    overriddenByAndroid = effectivePattern != selectedPattern,
+                )
             }
         }
-        val effectivePattern =
-            channel.vibrationPattern?.let { actual ->
-                ConversationVibrationPattern.entries.firstOrNull { candidate ->
-                    candidate.waveform?.contentEquals(actual) == true
-                }
-            }
-        return EffectiveConversationVibration(
-            pattern = effectivePattern,
-            enabled = true,
-            overriddenByAndroid = effectivePattern != selectedPattern,
-        )
     }
 
     /**
@@ -279,6 +270,22 @@ object ConversationNotificationChannels {
             lockscreenVisibility = source.lockscreenVisibility
         }
 }
+
+private fun NotificationChannel.matchesParentVibration(
+    manager: NotificationManager,
+    parentChannelId: String,
+): Boolean {
+    val parent = manager.getNotificationChannel(parentChannelId) ?: return false
+    return parent.shouldVibrate() == shouldVibrate() &&
+        nullableWaveformsEqual(parent.vibrationPattern, vibrationPattern)
+}
+
+private fun NotificationChannel.recognizedVibrationPattern(): ConversationVibrationPattern? =
+    vibrationPattern?.let { actual ->
+        ConversationVibrationPattern.entries.firstOrNull { candidate ->
+            candidate.waveform?.contentEquals(actual) == true
+        }
+    }
 
 private fun nullableWaveformsEqual(
     first: LongArray?,

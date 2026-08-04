@@ -13,9 +13,12 @@ enum class ConversationVibrationPattern(
     internal val waveform: LongArray?,
 ) {
     SYSTEM_DEFAULT(channelToken = "default", waveform = null),
-    SHORT(channelToken = "short", waveform = longArrayOf(0L, 100L)),
-    DOUBLE(channelToken = "double", waveform = longArrayOf(0L, 100L, 100L, 100L)),
-    LONG(channelToken = "long", waveform = longArrayOf(0L, 400L)),
+    SHORT(channelToken = "short", waveform = longArrayOf(VIBRATION_START_DELAY_MS, SHORT_PULSE_MS)),
+    DOUBLE(
+        channelToken = "double",
+        waveform = longArrayOf(VIBRATION_START_DELAY_MS, SHORT_PULSE_MS, BETWEEN_PULSES_DELAY_MS, SHORT_PULSE_MS),
+    ),
+    LONG(channelToken = "long", waveform = longArrayOf(VIBRATION_START_DELAY_MS, LONG_PULSE_MS)),
 }
 
 /** Device-local, per-account/per-conversation vibration selection. */
@@ -74,18 +77,22 @@ class ConversationVibrationPreferences(
         fun compositeKeyOrNull(
             accountRef: String?,
             groupIdHex: String?,
-        ): String? {
-            val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
-            val group =
-                groupIdHex
-                    ?.trim()
-                    ?.takeIf(String::isNotEmpty)
-                    ?.lowercase(Locale.ROOT)
-                    ?: return null
-            return "$account|$group"
-        }
+        ): String? =
+            accountRef
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?.let { account ->
+                    groupIdHex
+                        ?.trim()
+                        ?.takeIf(String::isNotEmpty)
+                        ?.lowercase(Locale.ROOT)
+                        ?.let { group -> "$account|$group" }
+                }
 
-        private fun encodeSelection(entry: Map.Entry<String, ConversationVibrationPattern>): String = "${entry.value.name}$FIELD_SEPARATOR${entry.key}"
+        private fun encodeSelection(entry: Map.Entry<String, ConversationVibrationPattern>): String {
+            val pattern = entry.value.name
+            return "$pattern$FIELD_SEPARATOR${entry.key}"
+        }
 
         private fun readSelections(preferences: SharedPreferences): Map<String, ConversationVibrationPattern> =
             preferences
@@ -99,3 +106,8 @@ class ConversationVibrationPreferences(
                 }.toMap()
     }
 }
+
+private const val VIBRATION_START_DELAY_MS = 0L
+private const val SHORT_PULSE_MS = 100L
+private const val BETWEEN_PULSES_DELAY_MS = 100L
+private const val LONG_PULSE_MS = 400L

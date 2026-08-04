@@ -58,7 +58,7 @@ private const val MILLIS_PER_SECOND = 1_000L
 private val MUTE_ROW_MIN_HEIGHT = 56.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming") // Jetpack Compose screen functions use UpperCamelCase.
+@Suppress("FunctionNaming", "LongMethod") // Compose screen owns one cohesive settings surface.
 @Composable
 internal fun ConversationNotificationSettingsScreen(
     appState: WhiteNoiseAppState,

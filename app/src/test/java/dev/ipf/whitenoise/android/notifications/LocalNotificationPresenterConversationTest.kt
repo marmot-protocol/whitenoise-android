@@ -43,6 +43,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@Suppress("LargeClass") // Conversation-channel integration scenarios share one expensive presenter fixture.
 class LocalNotificationPresenterConversationTest {
     private val context: Context
         get() = RuntimeEnvironment.getApplication()
