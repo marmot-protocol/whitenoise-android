@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -196,28 +197,34 @@ class MessageBubbleFrameTest {
         )
 
     @Test
-    fun mediaReplyCaptionKeepsWrapContentWidth() {
+    fun mediaCaptionSharesTheMediaEnvelopeWidth() {
         composeRule.setContent {
             MaterialTheme {
-                Column(Modifier.width(220.dp).testTag(MEDIA_REPLY_COLUMN_TAG)) {
-                    MessageBubbleFrame(
-                        presentation = messageBubblePresentation(deleted = false, mine = false),
-                        highlighted = false,
-                        mine = false,
-                        mentionedSelf = false,
-                        mentionedYouLabel = "Mentioned you",
-                        modifier = Modifier.testTag(MEDIA_REPLY_CAPTION_TAG),
+                Box(Modifier.width(300.dp)) {
+                    MediaSupplementEnvelope(
+                        alignEnd = false,
+                        modifier = Modifier.testTag(MEDIA_REPLY_COLUMN_TAG),
+                        media = { Box(Modifier.width(220.dp).height(100.dp)) },
                     ) {
-                        BubbleFooterLayout(
-                            footer = { Box(Modifier.width(58.dp).height(12.dp)) },
-                            modifier =
-                                messageBubbleBodyModifier(
-                                    hasReplyPreview = true,
-                                    hasMedia = true,
-                                ),
-                            lastLineWidth = 24,
+                        MessageBubbleFrame(
+                            presentation = messageBubblePresentation(deleted = false, mine = false),
+                            highlighted = false,
+                            mine = false,
+                            mentionedSelf = false,
+                            mentionedYouLabel = "Mentioned you",
+                            modifier = Modifier.fillMaxWidth().testTag(MEDIA_REPLY_CAPTION_TAG),
                         ) {
-                            Box(Modifier.width(24.dp).height(20.dp))
+                            BubbleFooterLayout(
+                                footer = { Box(Modifier.width(58.dp).height(12.dp)) },
+                                modifier =
+                                    messageBubbleBodyModifier(
+                                        hasReplyPreview = true,
+                                        hasMedia = true,
+                                    ),
+                                lastLineWidth = 24,
+                            ) {
+                                Box(Modifier.width(24.dp).height(20.dp))
+                            }
                         }
                     }
                 }
@@ -227,7 +234,7 @@ class MessageBubbleFrameTest {
         composeRule.runOnIdle {
             val mediaColumnBounds = composeRule.onNodeWithTag(MEDIA_REPLY_COLUMN_TAG).fetchSemanticsNode().boundsInRoot
             val captionBounds = composeRule.onNodeWithTag(MEDIA_REPLY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
-            assertTrue(captionBounds.width < mediaColumnBounds.width)
+            assertEquals(mediaColumnBounds.width, captionBounds.width, 1f)
         }
     }
 

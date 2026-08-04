@@ -75,12 +75,33 @@ internal fun ContactPickerScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
+    // The selection itself is owned by the caller and is not saveable. Keep
+    // this transient navigation state in the same lifetime so process
+    // recreation cannot restore an empty review screen over a rebuilt picker.
+    var reviewingSelection by remember { mutableStateOf(false) }
     val resolution = rememberRecipientResolution(query, appState)
 
     // Installed unconditionally: a disabled handler would let back fall
     // through to the Activity while a mutation is mid-flight.
     BackHandler {
-        if (!busy) onBack()
+        if (!busy) {
+            if (reviewingSelection) reviewingSelection = false else onBack()
+        }
+    }
+
+    if (reviewingSelection) {
+        SelectedMembersReviewScreen(
+            members = selected,
+            appState = appState,
+            busy = busy,
+            onBack = { reviewingSelection = false },
+            onRemove = { member ->
+                selected.removeAll { it.accountIdHex.equals(member.accountIdHex, ignoreCase = true) }
+                if (selected.isEmpty()) reviewingSelection = false
+            },
+            onConfirm = onConfirm,
+        )
+        return
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
@@ -169,12 +190,10 @@ internal fun ContactPickerScreen(
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
             AnimatedVisibility(visible = selected.isNotEmpty()) {
-                SelectedMemberRail(
+                SelectedMemberSummary(
                     members = selected,
                     appState = appState,
-                    onRemove = { member ->
-                        selected.removeAll { it.accountIdHex == member.accountIdHex }
-                    },
+                    onClick = { reviewingSelection = true },
                 )
             }
             LazyColumn(

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material.icons.Icons
@@ -1744,9 +1745,10 @@ internal fun MessageBubble(
                     }
                 }
                 if (hasMedia) {
-                    // #527: media renders on its OWN, outside the colored bubble.
-                    // The sender label and reply quote sit above the media, then
-                    // the caption (if any) follows in its own bubble just below.
+                    // Media remains directly interactive, while a caption now
+                    // shares the media's width and sits in a tight bottom strip.
+                    // The shared envelope plus one footer makes the pair read as
+                    // one message instead of two adjacent bubbles.
                     Column(
                         modifier = Modifier.offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
@@ -1754,26 +1756,38 @@ internal fun MessageBubble(
                     ) {
                         senderNameLabel(false)
                         replyPreviewCard(false)
-                        mediaBlocks()
-                        // A caption or convergence warning gets the same colored
-                        // bubble look as a plain text message below the media.
-                        if (bodyOrWarningInsideBubble) {
-                            MessageBubbleFrame(
-                                presentation = bubblePresentation,
-                                highlighted = highlighted,
-                                mine = mine,
-                                mentionedSelf = mentionedSelf,
-                                mentionedYouLabel = mentionedYouLabel,
-                                modifier = textSelectionBoundsModifier,
-                            ) {
+                        MediaSupplementEnvelope(
+                            alignEnd = mine,
+                            media = mediaBlocks,
+                        ) {
+                            // Rounded media keeps its established hit target and
+                            // crop; the shallow top corners visually attach this
+                            // full-width caption strip to it without clipping the
+                            // viewer surface.
+                            if (bodyOrWarningInsideBubble) {
+                                MessageBubbleFrame(
+                                    presentation = bubblePresentation,
+                                    highlighted = highlighted,
+                                    mine = mine,
+                                    mentionedSelf = mentionedSelf,
+                                    mentionedYouLabel = mentionedYouLabel,
+                                    modifier = textSelectionBoundsModifier.fillMaxWidth(),
+                                    shape =
+                                        RoundedCornerShape(
+                                            topStart = 6.dp,
+                                            topEnd = 6.dp,
+                                            bottomStart = 18.dp,
+                                            bottomEnd = 18.dp,
+                                        ),
+                                ) {
+                                    bodyFooterAndRetry()
+                                }
+                            } else {
+                                // No caption: the footer (time/status) for audio,
+                                // file, or multi-visual media still needs a home —
+                                // and so does the failed-send retry row.
                                 bodyFooterAndRetry()
                             }
-                        } else {
-                            // No caption: the footer (time/status) for audio,
-                            // file, or multi-visual media still needs a home —
-                            // and so does the failed-send retry row. Render them
-                            // directly below the media, un-bubbled.
-                            bodyFooterAndRetry()
                         }
                     }
                 } else {

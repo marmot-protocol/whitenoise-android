@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -16,9 +17,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 
 /** Shared frame for caption and plain-text bubbles. */
@@ -32,6 +37,7 @@ internal fun MessageBubbleFrame(
     mentionedYouLabel: String,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val highlightModifier =
@@ -51,7 +57,7 @@ internal fun MessageBubbleFrame(
         modifier = modifier.then(highlightModifier),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
-        shape = RoundedCornerShape(18.dp),
+        shape = shape,
         border =
             messageBubbleBorder(
                 highlighted = highlighted,
@@ -70,6 +76,61 @@ internal fun MessageBubbleFrame(
             content = content,
         )
     }
+}
+
+/**
+ * Measures media first, then gives its supplement exactly the same width.
+ *
+ * Media children intentionally retain their existing sizing policy: a
+ * landscape image, grid, or voice note may consume the available width while
+ * a portrait image can keep its fixed card width. Measuring the caption from
+ * intrinsic widths would collapse fill-width media to its loading indicator,
+ * so the real media measurement is the source of truth instead.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun MediaSupplementEnvelope(
+    alignEnd: Boolean,
+    modifier: Modifier = Modifier,
+    media: @Composable ColumnScope.() -> Unit,
+    supplement: @Composable ColumnScope.() -> Unit,
+) {
+    val gap = 2.dp
+    SubcomposeLayout(modifier) { constraints ->
+        val relaxedConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val mediaPlaceable =
+            subcompose(MediaEnvelopeSlot.Media) {
+                Column(
+                    horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    content = media,
+                )
+            }.single().measure(relaxedConstraints)
+        val envelopeWidth = constraints.constrainWidth(mediaPlaceable.width)
+
+        val supplementPlaceable =
+            subcompose(MediaEnvelopeSlot.Supplement) {
+                Column(content = supplement)
+            }.single().measure(
+                relaxedConstraints.copy(
+                    minWidth = envelopeWidth,
+                    maxWidth = envelopeWidth,
+                ),
+            )
+
+        val gapPx = if (supplementPlaceable.height > 0) gap.roundToPx() else 0
+        val measuredHeight = mediaPlaceable.height + gapPx + supplementPlaceable.height
+        layout(envelopeWidth, constraints.constrainHeight(measuredHeight)) {
+            val mediaX = if (alignEnd) envelopeWidth - mediaPlaceable.width else 0
+            mediaPlaceable.placeRelative(mediaX, 0)
+            supplementPlaceable.placeRelative(0, mediaPlaceable.height + gapPx)
+        }
+    }
+}
+
+private enum class MediaEnvelopeSlot {
+    Media,
+    Supplement,
 }
 
 @Composable
