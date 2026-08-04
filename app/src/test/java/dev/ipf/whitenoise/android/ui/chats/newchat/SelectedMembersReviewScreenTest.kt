@@ -1,11 +1,12 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Context
-import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -50,7 +51,12 @@ class SelectedMembersReviewScreenTest {
         composeRule
             .onNodeWithText(members.joinToString { member -> state.displayName(member.accountIdHex) })
             .assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.selected)).assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithText(context.resources.getQuantityString(R.plurals.selected_members_count, 2, 2))
+            .assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
+            .performClick()
 
         assertEquals(1, opens)
         assertEquals(2, members.size)
@@ -71,7 +77,7 @@ class SelectedMembersReviewScreenTest {
         }
 
         composeRule
-            .onNodeWithText(context.getString(R.string.selected))
+            .onNodeWithContentDescription(context.getString(R.string.review_selected_members))
             .assertIsNotEnabled()
             .performClick()
 
@@ -82,28 +88,33 @@ class SelectedMembersReviewScreenTest {
     fun reviewShowsFullIdentityRowsAndLargeRemoveActions() {
         val removed = mutableListOf<RecipientSearch.Candidate>()
         var confirmed = false
+        val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
                 SelectedMembersReviewScreen(
                     members = members,
-                    appState = appState(),
+                    appState = state,
                     busy = false,
                     onBack = {},
                     onRemove = { removed += it },
                     onConfirm = { confirmed = true },
+                    confirmIcon = Icons.AutoMirrored.Filled.Send,
+                    confirmLabel = context.getString(R.string.send),
                 )
             }
         }
 
-        val removeActions =
+        composeRule.onNodeWithText(context.getString(R.string.review_selection)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).assertIsDisplayed()
+        members.forEach { member ->
             composeRule
-                .onAllNodesWithContentDescription(context.getString(R.string.remove_member))
-                .assertCountEquals(2)
-        removeActions[0].performClick()
-        removeActions[1].performClick()
+                .onNodeWithContentDescription(
+                    context.getString(R.string.remove_member_named, state.displayName(member.accountIdHex)),
+                ).performClick()
+        }
         assertEquals(members, removed)
 
-        composeRule.onNodeWithContentDescription(context.getString(R.string.next)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.send)).performClick()
         assertEquals(true, confirmed)
     }
 
@@ -111,23 +122,27 @@ class SelectedMembersReviewScreenTest {
     fun busyReviewCannotConfirmOrRemoveMembers() {
         var removed = false
         var confirmed = false
+        val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
                 SelectedMembersReviewScreen(
                     members = members,
-                    appState = appState(),
+                    appState = state,
                     busy = true,
                     onBack = {},
                     onRemove = { removed = true },
                     onConfirm = { confirmed = true },
+                    confirmIcon = Icons.Default.Check,
+                    confirmLabel = context.getString(R.string.add_member),
                 )
             }
         }
 
         composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsNotEnabled().performClick()
         composeRule
-            .onAllNodesWithContentDescription(context.getString(R.string.remove_member))[0]
-            .assertIsNotEnabled()
+            .onNodeWithContentDescription(
+                context.getString(R.string.remove_member_named, state.displayName(members.first().accountIdHex)),
+            ).assertIsNotEnabled()
             .performClick()
 
         assertEquals(false, confirmed)
