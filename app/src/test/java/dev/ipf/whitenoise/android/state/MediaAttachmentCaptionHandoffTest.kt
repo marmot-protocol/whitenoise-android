@@ -315,6 +315,20 @@ class MediaAttachmentCaptionHandoffTest {
         )
     }
 
+    @Test
+    fun conversationControllerProjectedReplyPreviewDerivesMediaCaptionHandoffFromTarget() {
+        val body = controllersSource().readText().functionBody("replyPreview")
+
+        assertTrue(
+            "embedded projected replies must derive bounded caption handoff from the loaded target",
+            "TimelineMediaCaption.handoffPlaintext(projectedTarget, target)" in body,
+        )
+        assertTrue(
+            "handoff must be threaded into TimelineProjector.replyPreview",
+            "mediaCaptionHandoff = mediaCaptionHandoff" in body,
+        )
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private fun controllersSource(): File =

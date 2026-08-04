@@ -380,6 +380,30 @@ class TimelineProjectorTest {
     }
 
     @Test
+    fun projectedReplyPreviewPrefersReconciledMediaCaptionHandoffOverFilenameFallback() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "",
+                        media = listOf(mediaAttachment(fileName = "photo.jpg", mediaType = "image/jpeg")),
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(
+                sender = "alice",
+                body = "launch diagram",
+                mediaKind = ReplyMediaKind.Photo,
+            ),
+            TimelineProjector.replyPreview(
+                record = record,
+                mediaCaptionHandoff = "launch diagram",
+            ),
+        )
+    }
+
+    @Test
     fun replyPreviewRetainsLegacyMediaKindWhenTypedAttachmentIsUnavailable() {
         val record =
             timelineRecord(

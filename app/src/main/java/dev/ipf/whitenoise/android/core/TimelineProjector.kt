@@ -171,14 +171,22 @@ object TimelineProjector {
     fun replyPreview(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
+        mediaCaptionHandoff: String? = null,
     ): TimelineReplyDisplay? {
         val preview = record.replyPreview ?: return null
-        val mediaFallback = if (preview.deleted) null else typedReplyMediaFallback(preview.media)
+        val effectivePreview =
+            preview.copy(
+                plaintext = preview.plaintext.takeIf { it.isNotBlank() } ?: mediaCaptionHandoff.orEmpty(),
+            )
+        val mediaFallback =
+            if (effectivePreview.deleted) null else typedReplyMediaFallback(effectivePreview.media)
+        val warning =
+            if (effectivePreview.deleted) null else invalidationWarning(effectivePreview.invalidationStatus, copy)
         return TimelineReplyDisplay(
-            sender = preview.sender,
-            body = preview.displayBody(copy, mediaFallback),
-            mediaKind = replyPreviewMediaKind(preview.deleted, mediaFallback, preview.mediaJson),
-            warning = if (preview.deleted) null else invalidationWarning(preview.invalidationStatus, copy),
+            sender = effectivePreview.sender,
+            body = effectivePreview.displayBody(copy, mediaFallback),
+            mediaKind = replyPreviewMediaKind(effectivePreview.deleted, mediaFallback, effectivePreview.mediaJson),
+            warning = warning,
         )
     }
 

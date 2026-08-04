@@ -8407,7 +8407,20 @@ class ConversationController(
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): TimelineReplyDisplay? {
         item.projected?.let { record ->
-            TimelineProjector.replyPreview(record, copy)?.let { preview -> return preview }
+            val target = record.replyPreview?.messageIdHex?.let { messageById[it] }
+            val mediaCaptionHandoff =
+                target?.let { target ->
+                    timelineRecords[target.messageIdHex]?.let { projectedTarget ->
+                        TimelineMediaCaption.handoffPlaintext(projectedTarget, target)
+                    }
+                }
+            val preview =
+                TimelineProjector.replyPreview(
+                    record = record,
+                    copy = copy,
+                    mediaCaptionHandoff = mediaCaptionHandoff,
+                )
+            if (preview != null) return preview
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
