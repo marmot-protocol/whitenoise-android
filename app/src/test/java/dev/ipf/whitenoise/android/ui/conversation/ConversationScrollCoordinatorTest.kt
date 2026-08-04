@@ -186,17 +186,19 @@ class ConversationScrollCoordinatorTest {
                 )
             var frame = -1
 
-            coordinator.commitInitialAnchor(
-                targetMessageId = "reader",
-                reason = ConversationScrollReason.SavedRestore,
-                resultingMode = ConversationScrollMode.ReadingHistory("reader", 33),
-                targetIndex = 18,
-                pixelOffset = 33,
-                captureLayout = { layouts[frame.coerceAtLeast(0)] },
-                maxSettleFrames = layouts.size,
-                awaitFrame = { frame++ },
-            )
+            val committed =
+                coordinator.commitInitialAnchor(
+                    targetMessageId = "reader",
+                    reason = ConversationScrollReason.SavedRestore,
+                    resultingMode = ConversationScrollMode.ReadingHistory("reader", 33),
+                    targetIndex = 18,
+                    pixelOffset = 33,
+                    captureLayout = { layouts[frame.coerceAtLeast(0)] },
+                    maxSettleFrames = layouts.size,
+                    awaitFrame = { frame++ },
+                )
 
+            assertTrue(committed)
             assertEquals(
                 listOf(
                     ScrollWrite.Snap(18, 33),
@@ -204,6 +206,33 @@ class ConversationScrollCoordinatorTest {
                 ),
                 writer.writes,
             )
+        }
+
+    @Test
+    fun initialAnchorDoesNotCommitWhenLayoutNeverStabilizes() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var targetSize = 100
+
+            val committed =
+                coordinator.commitInitialAnchor(
+                    targetMessageId = null,
+                    reason = ConversationScrollReason.InitialAnchor,
+                    resultingMode = ConversationScrollMode.FollowingTail,
+                    targetIndex = 24,
+                    captureLayout = {
+                        ConversationInitialAnchorLayout(
+                            viewportHeight = 600,
+                            targetItemSize = targetSize++,
+                        )
+                    },
+                    maxSettleFrames = 3,
+                    awaitFrame = {},
+                )
+
+            assertFalse(committed)
+            assertEquals(listOf(ScrollWrite.Snap(24, 0)), writer.writes)
         }
 
     @Test

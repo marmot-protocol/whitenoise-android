@@ -380,7 +380,8 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
 /**
  * Positions an initial target while the transcript is hidden, waits until both
  * the viewport and target row have stable measured geometry, then commits the
- * same position once more. Callers may safely reveal after this returns.
+ * same position once more. Callers may safely reveal only when this returns
+ * true; false means geometry did not stabilize within this attempt.
  */
 internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
     targetMessageId: String?,
@@ -391,26 +392,33 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
     captureLayout: () -> ConversationInitialAnchorLayout,
     maxSettleFrames: Int = 24,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
-): Boolean =
-    programmaticJump(
-        targetMessageId = targetMessageId,
-        reason = reason,
-        resultingMode = resultingMode,
-    ) {
-        scrollToItem(targetIndex, pixelOffset)
-        awaitStableInitialAnchorLayout(
-            captureLayout = captureLayout,
-            maxFrames = maxSettleFrames,
-            awaitFrame = awaitFrame,
-        )
-        scrollToItem(targetIndex, pixelOffset)
-    }
+): Boolean {
+    var layoutStabilized = false
+    val commandCompleted =
+        programmaticJump(
+            targetMessageId = targetMessageId,
+            reason = reason,
+            resultingMode = resultingMode,
+        ) {
+            scrollToItem(targetIndex, pixelOffset)
+            layoutStabilized =
+                awaitStableInitialAnchorLayout(
+                    captureLayout = captureLayout,
+                    maxFrames = maxSettleFrames,
+                    awaitFrame = awaitFrame,
+                )
+            if (layoutStabilized) {
+                scrollToItem(targetIndex, pixelOffset)
+            }
+        }
+    return commandCompleted && layoutStabilized
+}
 
 private suspend fun awaitStableInitialAnchorLayout(
     captureLayout: () -> ConversationInitialAnchorLayout,
     maxFrames: Int,
     awaitFrame: suspend () -> Unit,
-) {
+): Boolean {
     var previous: ConversationInitialAnchorLayout? = null
     var stableFrames = 0
     repeat(maxFrames.coerceAtLeast(1)) {
@@ -422,9 +430,10 @@ private suspend fun awaitStableInitialAnchorLayout(
             } else {
                 0
             }
-        if (stableFrames >= 1) return
+        if (stableFrames >= 1) return true
         previous = current
     }
+    return false
 }
 
 internal suspend fun ConversationScrollCoordinator.restoreViewport(

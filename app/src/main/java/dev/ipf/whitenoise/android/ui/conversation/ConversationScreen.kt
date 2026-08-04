@@ -2600,20 +2600,26 @@ internal fun ConversationScreen(
                 restore.anchorMessageIdHex,
                 restore.firstVisibleItemScrollOffset,
             )
-        scrollCoordinator.commitInitialAnchor(
-            targetMessageId = restore.anchorMessageIdHex,
-            reason = ConversationScrollReason.SavedRestore,
-            resultingMode = resultingMode,
-            targetIndex = targetIndex,
-            pixelOffset = restore.firstVisibleItemScrollOffset,
-            captureLayout = {
-                val layoutInfo = listState.layoutInfo
-                ConversationInitialAnchorLayout(
-                    viewportHeight = layoutInfo.viewportSize.height,
-                    targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
-                )
-            },
-        )
+        while (
+            !scrollCoordinator.commitInitialAnchor(
+                targetMessageId = restore.anchorMessageIdHex,
+                reason = ConversationScrollReason.SavedRestore,
+                resultingMode = resultingMode,
+                targetIndex = targetIndex,
+                pixelOffset = restore.firstVisibleItemScrollOffset,
+                captureLayout = {
+                    val layoutInfo = listState.layoutInfo
+                    ConversationInitialAnchorLayout(
+                        viewportHeight = layoutInfo.viewportSize.height,
+                        targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                    )
+                },
+            )
+        ) {
+            // Keep the loading surface visible. Each attempt yields through its
+            // frame window, and cancellation still follows the LaunchedEffect.
+            withFrameNanos { }
+        }
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -2672,19 +2678,24 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     }
-                scrollCoordinator.commitInitialAnchor(
-                    targetMessageId = unreadId,
-                    reason = ConversationScrollReason.InitialAnchor,
-                    resultingMode = resultingMode,
-                    targetIndex = targetIndex,
-                    captureLayout = {
-                        val layoutInfo = listState.layoutInfo
-                        ConversationInitialAnchorLayout(
-                            viewportHeight = layoutInfo.viewportSize.height,
-                            targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
-                        )
-                    },
-                )
+                while (
+                    !scrollCoordinator.commitInitialAnchor(
+                        targetMessageId = unreadId,
+                        reason = ConversationScrollReason.InitialAnchor,
+                        resultingMode = resultingMode,
+                        targetIndex = targetIndex,
+                        captureLayout = {
+                            val layoutInfo = listState.layoutInfo
+                            ConversationInitialAnchorLayout(
+                                viewportHeight = layoutInfo.viewportSize.height,
+                                targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                            )
+                        },
+                    )
+                ) {
+                    // Do not reveal until the target and viewport are stable.
+                    withFrameNanos { }
+                }
                 if (resultingMode is ConversationScrollMode.ReadingHistory) {
                     val unreadItem = renderedTimeline.getOrNull(renderedUnreadIndex)
                     scrollCoordinator.settleReadingAt(
