@@ -1132,7 +1132,7 @@
     <string name="vibration_pattern_short">Kısa</string>
     <string name="vibration_pattern_double">Çift</string>
     <string name="vibration_pattern_long">Uzun</string>
-    <string name="preview_vibration_pattern">%1$s titreşimini önizle</string>
+    <string name="preview_vibration_pattern">%1$s titreşimi önizle</string>
     <string name="vibration_pattern_off_in_android_settings">Android ayarlarında kapalı</string>
     <string name="vibration_pattern_custom_in_android_settings">Android ayarlarında özel</string>
     <string name="vibration_pattern_android_override">%1$s · Android ayarları</string>
