@@ -297,6 +297,7 @@ class AppStateSendLockCoverageTest {
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorCallIndex &&
                 "renderedTimeline = renderedTimeline" in readAnchorCall &&
+                "remember(listState, renderedSize, hasOlderHeader)" in readAnchorHelper &&
                 "currentHighestVisibleMessageId," in readAnchorHelper &&
                 "advanceConversationReadAnchor(" in readAnchorHelper &&
                 "durableAnchorId = controller.lastReadMessageId" in readAnchorHelper &&

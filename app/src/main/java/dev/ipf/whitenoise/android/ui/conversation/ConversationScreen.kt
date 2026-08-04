@@ -353,7 +353,7 @@ private fun rememberConversationReadAnchor(
 ): MutableState<String?> {
     val readAnchor = remember(controller) { mutableStateOf(controller.lastReadMessageId) }
     val renderedSize = renderedTimeline.size
-    val currentHighestVisibleTimelineIndex by remember(renderedSize, hasOlderHeader) {
+    val currentHighestVisibleTimelineIndex by remember(listState, renderedSize, hasOlderHeader) {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
             if (visible.isEmpty()) return@derivedStateOf -1
