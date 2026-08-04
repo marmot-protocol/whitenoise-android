@@ -20,8 +20,8 @@ class MessageMultiSelectCoverageTest {
 
         assertTrue(source.contains("selectedMessages"))
         assertTrue(source.contains("MessageSelectionBar("))
-        assertTrue(source.contains("batchCopyText(selectedActionItems)"))
-        assertTrue(source.contains("batchForwardBodies(selectedActionItems)"))
+        assertTrue(source.contains("batchCopyText(actionItems)"))
+        assertTrue(source.contains("batchForwardBodies(actionItems)"))
         assertTrue(source.contains("selectionMode ->"))
         assertTrue(source.contains("if (initialTimelineAnchored && !selectionMode)"))
     }
@@ -32,7 +32,10 @@ class MessageMultiSelectCoverageTest {
         val controllerIdentity = "chat.id, appState.activeAccountRef, appState.runtimeGeneration"
 
         assertTrue(source.contains("val selectedMessages = remember($controllerIdentity)"))
-        assertTrue(source.contains("val selectedSelections by remember($controllerIdentity)"))
+        assertTrue(source.contains("rememberConversationBatchSelectionUiState("))
+        assertTrue(source.contains("chatId = chat.id"))
+        assertTrue(source.contains("activeAccountRef = appState.activeAccountRef"))
+        assertTrue(source.contains("runtimeGeneration = appState.runtimeGeneration"))
         assertTrue(source.contains("var batchForwardSheetOpen by remember($controllerIdentity)"))
         assertTrue(source.contains("var showBatchDeleteConfirm by remember($controllerIdentity)"))
     }
@@ -43,26 +46,24 @@ class MessageMultiSelectCoverageTest {
 
         assertTrue(
             source.contains(
-                "val selectedActionItems = remember(selectedSelections, appState.profileRevisionForCompose) { " +
-                    "selectedSelections.map { selection -> " +
-                    "selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId)) } }",
+                "return remember(selections, appState.profileRevisionForCompose) { " +
+                    "val actionItems = selections.map { selection -> " +
+                    "selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId)) }",
             ),
         )
         assertTrue(
             source.contains(
-                "val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }",
+                "copyText = batchCopyText(actionItems)",
             ),
         )
         assertTrue(
             source.contains(
-                "val selectedForwardBodies = remember(selectedActionItems) { " +
-                    "batchForwardBodies(selectedActionItems) }",
+                "forwardBodies = batchForwardBodies(actionItems)",
             ),
         )
         assertTrue(
             source.contains(
-                "val selectedDeleteBreakdown = remember(selectedActionItems) { " +
-                    "batchDeleteBreakdown(selectedActionItems) }",
+                "deleteBreakdown = batchDeleteBreakdown(actionItems)",
             ),
         )
     }

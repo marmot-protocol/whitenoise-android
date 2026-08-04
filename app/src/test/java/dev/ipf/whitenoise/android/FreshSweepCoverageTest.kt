@@ -49,9 +49,9 @@ class FreshSweepCoverageTest {
         assertFalse("profile changes must not re-project forward text", "MessageProjector.forwardableText" in selectableBlock)
         assertTrue("invalid ids must be memoized", "remember(renderedTimeline, selectableMessages)" in block)
 
-        val actionItemsStart = source.indexOf("val selectedActionItems =")
-        assertTrue("selected action items block must exist", actionItemsStart >= 0)
-        val actionItemsEnd = source.indexOf("val selectedCopyText", actionItemsStart)
+        val actionItemsStart = source.indexOf("private fun rememberConversationBatchSelectionUiState(")
+        assertTrue("batch selection UI state helper must exist", actionItemsStart >= 0)
+        val actionItemsEnd = source.indexOf("/**\n * Read anchor", actionItemsStart)
         val actionItemsBlock = source.substring(actionItemsStart, actionItemsEnd)
         assertTrue(
             "profile changes must refresh names for the selected set",
@@ -59,6 +59,7 @@ class FreshSweepCoverageTest {
         )
         assertTrue("names resolve lazily on the selected set", "appState.displayName(" in actionItemsBlock)
         assertFalse("selection must not re-project copy text", "MessageProjector.copyableText" in actionItemsBlock)
+        assertTrue("copy text must derive from cached action items", "batchCopyText(actionItems)" in actionItemsBlock)
     }
 
     @Test

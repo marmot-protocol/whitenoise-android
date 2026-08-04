@@ -343,6 +343,16 @@ internal fun MediaVideoBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
     val epoch = reference.sourceEpoch
+    val cachedThumbnail =
+        remember(pillKey) {
+            controller.thumbnailFor(messageIdHex, attachmentIndex)
+        }
+    val bubbleAspectRatio =
+        rememberMediaBubbleAspectRatio(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            dim = reference.dim,
+        )
     val playbackRecoveryJob =
         remember(pillKey, epoch, reference.mediaType) {
             mutableStateOf<Job?>(null)
@@ -369,7 +379,7 @@ internal fun MediaVideoBubble(
     // thumbhash before the frame is re-extracted, even though the video is
     // already downloaded.
     var posterBitmap by remember(pillKey, epoch) {
-        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+        mutableStateOf(cachedThumbnail?.asImageBitmap())
     }
     var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
     var playerOpen by remember(pillKey) { mutableStateOf(false) }
@@ -474,7 +484,7 @@ internal fun MediaVideoBubble(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
         border = amoledSurfaceBorderStroke(),
-        modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
+        modifier = imageBubbleSizing(bubbleAspectRatio),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val poster = posterBitmap

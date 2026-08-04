@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -63,6 +64,7 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -115,6 +117,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -265,6 +268,126 @@ private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETA
 // controller can ever hold.
 private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
+/** Whether adjacent timeline items participate in one visible message-bubble sender run. */
+internal fun conversationBubbleRowsShareSenderRun(
+    first: TimelineMessage,
+    second: TimelineMessage,
+    streamingDebugEnabled: Boolean,
+    deletedMessageIds: Set<String>,
+): Boolean =
+    timelineItemRendersAsConversationBubble(first, streamingDebugEnabled, deletedMessageIds) &&
+        timelineItemRendersAsConversationBubble(second, streamingDebugEnabled, deletedMessageIds) &&
+        GroupProjector.messagesShareTranscriptSenderRun(
+            firstSender = first.record.sender,
+            firstRecordedAt = first.record.recordedAt,
+            secondSender = second.record.sender,
+            secondRecordedAt = second.record.recordedAt,
+            sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
+        )
+
+private fun timelineItemRendersAsConversationBubble(
+    item: TimelineMessage,
+    streamingDebugEnabled: Boolean,
+    deletedMessageIds: Set<String>,
+): Boolean =
+    when (timelineRowKind(item.record, streamingDebugEnabled)) {
+        TimelineRowKind.Bubble -> true
+        TimelineRowKind.AgentOperation ->
+            !shouldRenderDedicatedAgentOperationRow(
+                projectedDeleted = item.projected?.deleted == true,
+                optimisticallyDeleted = MessageProjector.isDeleted(item.record.messageIdHex, deletedMessageIds),
+                invalidated = item.projected?.invalidationStatus != null,
+            ) ||
+                AgentOperationProjector.project(item.record) == null
+        TimelineRowKind.GroupSystem,
+        TimelineRowKind.DebugRow,
+        -> false
+    }
+
+private data class ConversationBatchSelectionUiState(
+    val selections: List<BatchMessageSelection>,
+    val actionItems: List<BatchMessageActionItem>,
+    val copyText: String,
+    val forwardBodies: List<String>,
+    val deleteBreakdown: BatchDeleteBreakdown,
+)
+
+@Composable
+private fun rememberConversationBatchSelectionUiState(
+    selectedMessages: Map<String, BatchMessageSelection>,
+    chatId: String,
+    activeAccountRef: String?,
+    runtimeGeneration: Int,
+    appState: WhiteNoiseAppState,
+): ConversationBatchSelectionUiState {
+    val selections by
+        remember(chatId, activeAccountRef, runtimeGeneration) {
+            derivedStateOf { orderedBatchSelections(selectedMessages.values) }
+        }
+    return remember(selections, appState.profileRevisionForCompose) {
+        val actionItems =
+            selections.map { selection ->
+                selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
+            }
+        ConversationBatchSelectionUiState(
+            selections = selections,
+            actionItems = actionItems,
+            copyText = batchCopyText(actionItems),
+            forwardBodies = batchForwardBodies(actionItems),
+            deleteBreakdown = batchDeleteBreakdown(actionItems),
+        )
+    }
+}
+
+/**
+ * Read anchor stored as the message id of the deepest row the user has
+ * settled on. The candidate id is a key so an optimistic UUID being replaced
+ * in the same list slot still advances the anchor to the confirmed message.
+ */
+@Composable
+private fun rememberConversationReadAnchor(
+    controller: ConversationController,
+    renderedTimeline: List<TimelineMessage>,
+    listState: LazyListState,
+    hasOlderHeader: Boolean,
+): MutableState<String?> {
+    val readAnchor = remember(controller) { mutableStateOf(controller.lastReadMessageId) }
+    val renderedSize = renderedTimeline.size
+    val currentHighestVisibleTimelineIndex by remember(listState, renderedSize, hasOlderHeader) {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            if (visible.isEmpty()) return@derivedStateOf -1
+            val olderHeader = if (hasOlderHeader) 1 else 0
+            // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
+            val firstTimelineListIndex = 1 + olderHeader
+            (visible.last().index - firstTimelineListIndex)
+                .coerceAtMost(renderedSize - 1)
+        }
+    }
+    val currentHighestVisibleMessageId =
+        renderedTimeline
+            .getOrNull(currentHighestVisibleTimelineIndex)
+            ?.record
+            ?.messageIdHex
+    LaunchedEffect(
+        controller,
+        currentHighestVisibleTimelineIndex,
+        currentHighestVisibleMessageId,
+        controller.lastReadMessageId,
+    ) {
+        val idx = currentHighestVisibleTimelineIndex
+        if (idx < 0) return@LaunchedEffect
+        readAnchor.value =
+            advanceConversationReadAnchor(
+                timeline = renderedTimeline,
+                currentUiAnchorId = readAnchor.value,
+                durableAnchorId = controller.lastReadMessageId,
+                candidateIndex = idx,
+            )
+    }
+    return readAnchor
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationScreen(
@@ -394,6 +517,10 @@ internal fun ConversationScreen(
                         ConversationScrollMode.FollowingTail
                     },
             )
+        }
+    val postInitialReanchorGate =
+        remember(controller, listState) {
+            ConversationPostInitialReanchorGate()
         }
     val bottomChromeHeightObserver =
         remember(chat.id) {
@@ -636,6 +763,10 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
+    val renderedTimelineAnchorKeys =
+        remember(renderedTimeline) {
+            renderedTimeline.map { it.id to it.record.messageIdHex }
+        }
     val selectableMessageProjections =
         remember(
             renderedTimeline,
@@ -840,19 +971,14 @@ internal fun ConversationScreen(
     LaunchedEffect(selectionMode) {
         if (selectionMode) clearTextSelection()
     }
-    val selectedSelections by
-        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
-            derivedStateOf { orderedBatchSelections(selectedMessages.values) }
-        }
-    val selectedActionItems =
-        remember(selectedSelections, appState.profileRevisionForCompose) {
-            selectedSelections.map { selection ->
-                selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
-            }
-        }
-    val selectedCopyText = remember(selectedActionItems) { batchCopyText(selectedActionItems) }
-    val selectedForwardBodies = remember(selectedActionItems) { batchForwardBodies(selectedActionItems) }
-    val selectedDeleteBreakdown = remember(selectedActionItems) { batchDeleteBreakdown(selectedActionItems) }
+    val batchSelectionUi =
+        rememberConversationBatchSelectionUiState(
+            selectedMessages = selectedMessages,
+            chatId = chat.id,
+            activeAccountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            appState = appState,
+        )
     val renderedSize = renderedTimeline.size
     val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
     val nearBottom =
@@ -898,41 +1024,13 @@ internal fun ConversationScreen(
             }
         }
     }
-    // Read anchor stored as the message id of the deepest row the user has
-    // settled on. Looked up live each time so load-older prepends shift both
-    // the candidate and the anchor by the same offset — position comparisons
-    // stay valid. Anchored on id (not recordedAt) to survive same-second
-    // collisions: send() stamps with nowSeconds(), so multiple messages can
-    // share a recordedAt and a strict-`>` filter would under-count.
-    var readAnchorMessageId by remember(controller) { mutableStateOf(controller.lastReadMessageId) }
-    val currentHighestVisibleTimelineIndex by remember(renderedSize, hasOlderHeader) {
-        derivedStateOf {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            if (visible.isEmpty()) return@derivedStateOf -1
-            val olderHeader = if (hasOlderHeader) 1 else 0
-            // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
-            val firstTimelineListIndex = 1 + olderHeader
-            // Visible rows index into the rendered (edit-filtered) list, so clamp
-            // to its last index, not the longer unfiltered timeline's.
-            (visible.last().index - firstTimelineListIndex)
-                .coerceAtMost(renderedSize - 1)
-        }
-    }
-    LaunchedEffect(controller, currentHighestVisibleTimelineIndex, controller.lastReadMessageId) {
-        val idx = currentHighestVisibleTimelineIndex
-        if (idx < 0) return@LaunchedEffect
-        // Monotonic advance only — scroll-up keeps the existing anchor so the
-        // read pointer never moves backwards. See [nextReadAnchor]. Resolve the
-        // visible row against the filtered (rendered) list it indexes into, not
-        // the unfiltered timeline.
-        readAnchorMessageId =
-            advanceConversationReadAnchor(
-                timeline = renderedTimeline,
-                currentUiAnchorId = readAnchorMessageId,
-                durableAnchorId = controller.lastReadMessageId,
-                candidateIndex = idx,
-            )
-    }
+    var readAnchorMessageId by
+        rememberConversationReadAnchor(
+            controller = controller,
+            renderedTimeline = renderedTimeline,
+            listState = listState,
+            hasOlderHeader = hasOlderHeader,
+        )
     DisposableEffect(controller) {
         onDispose {
             val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
@@ -2448,13 +2546,10 @@ internal fun ConversationScreen(
             }
         }
     }
-    LaunchedEffect(listState, scrollCoordinator) {
-        var previousViewportHeight: Int? = null
+    LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
-            val previous = previousViewportHeight
-            previousViewportHeight = viewportHeight
-            val unchangedOrUninitialized = previous == null || previous == viewportHeight
-            if (unchangedOrUninitialized || !currentInitialTimelineAnchored || currentImeIsOpen) {
+            val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
+            if (!viewportChanged || !currentInitialTimelineAnchored || currentImeIsOpen) {
                 return@collect
             }
             when (scrollCoordinator.mode) {
@@ -2500,18 +2595,31 @@ internal fun ConversationScreen(
                 }
             }.filterNotNull()
                 .first()
-        scrollCoordinator.programmaticJump(
-            targetMessageId = restore.anchorMessageIdHex,
-            reason = ConversationScrollReason.SavedRestore,
-            resultingMode =
-                ConversationScrollMode.ReadingHistory(
-                    restore.anchorMessageIdHex,
-                    restore.firstVisibleItemScrollOffset,
-                ),
+        val resultingMode =
+            ConversationScrollMode.ReadingHistory(
+                restore.anchorMessageIdHex,
+                restore.firstVisibleItemScrollOffset,
+            )
+        while (
+            !scrollCoordinator.commitInitialAnchor(
+                targetMessageId = restore.anchorMessageIdHex,
+                reason = ConversationScrollReason.SavedRestore,
+                resultingMode = resultingMode,
+                targetIndex = targetIndex,
+                pixelOffset = restore.firstVisibleItemScrollOffset,
+                captureLayout = {
+                    val layoutInfo = listState.layoutInfo
+                    ConversationInitialAnchorLayout(
+                        viewportHeight = layoutInfo.viewportSize.height,
+                        targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
+                    )
+                },
+            )
         ) {
-            scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
+            // Keep the loading surface visible. Each attempt yields through its
+            // frame window, and cancellation still follows the LaunchedEffect.
+            withFrameNanos { }
         }
-        initialTimelineAnchored = true
         val restoredRendered =
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         val restoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
@@ -2524,6 +2632,15 @@ internal fun ConversationScreen(
                 messageId = restoredItem?.record?.messageIdHex ?: restore.anchorMessageIdHex,
             ),
         )
+        postInitialReanchorGate.commit(
+            structure =
+                ConversationTimelineStructure(
+                    rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
+                    olderHeaderCount = restoredOlderHeaderCount,
+                ),
+            viewportHeight = listState.layoutInfo.viewportSize.height,
+        )
+        initialTimelineAnchored = true
         lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
     LaunchedEffect(controller, latestTimelineItemId, notificationOpenRequestId) {
@@ -2561,12 +2678,26 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     }
-                scrollCoordinator.programmaticJump(
-                    targetMessageId = unreadId,
-                    reason = ConversationScrollReason.InitialAnchor,
-                    resultingMode = resultingMode,
+                while (
+                    !scrollCoordinator.commitInitialAnchor(
+                        targetMessageId = unreadId,
+                        reason = ConversationScrollReason.InitialAnchor,
+                        resultingMode = resultingMode,
+                        targetIndex = targetIndex,
+                        captureLayout = {
+                            val layoutInfo = listState.layoutInfo
+                            ConversationInitialAnchorLayout(
+                                viewportHeight = layoutInfo.viewportSize.height,
+                                targetItemSize =
+                                    layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.index == targetIndex }
+                                        ?.size,
+                            )
+                        },
+                    )
                 ) {
-                    scrollToItem(targetIndex)
+                    // Do not reveal until the target and viewport are stable.
+                    withFrameNanos { }
                 }
                 if (resultingMode is ConversationScrollMode.ReadingHistory) {
                     val unreadItem = renderedTimeline.getOrNull(renderedUnreadIndex)
@@ -2579,6 +2710,14 @@ internal fun ConversationScreen(
                         ),
                     )
                 }
+                postInitialReanchorGate.commit(
+                    structure =
+                        ConversationTimelineStructure(
+                            rowKeys = renderedTimelineAnchorKeys,
+                            olderHeaderCount = olderHeaderCount,
+                        ),
+                    viewportHeight = listState.layoutInfo.viewportSize.height,
+                )
                 initialTimelineAnchored = true
                 lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
@@ -2603,11 +2742,24 @@ internal fun ConversationScreen(
         }
     }
 
-    // Re-resolve the durable history anchor whenever row/header composition
-    // changes. Stable message identity, not the old lazy-list index, owns the
-    // restoration after pagination, hydration, separators, or tail appends.
-    LaunchedEffect(controller, renderedTimeline, olderHeaderCount, initialTimelineAnchored) {
-        if (initialTimelineAnchored) {
+    // Re-resolve the durable history anchor only when the list structure or
+    // header changes. Same-row projection and media hydration must not restart
+    // anchoring after the conversation is already visible.
+    LaunchedEffect(
+        controller,
+        renderedTimelineAnchorKeys,
+        olderHeaderCount,
+        initialTimelineAnchored,
+        postInitialReanchorGate,
+    ) {
+        val structureChanged =
+            postInitialReanchorGate.onStructure(
+                ConversationTimelineStructure(
+                    rowKeys = renderedTimelineAnchorKeys,
+                    olderHeaderCount = olderHeaderCount,
+                ),
+            )
+        if (initialTimelineAnchored && structureChanged) {
             scrollCoordinator.reanchorReadingHistory(::resolveScrollAnchorIndex)
         }
     }
@@ -2635,13 +2787,13 @@ internal fun ConversationScreen(
         }
     }
 
-    fun reanchorNewestAfterBottomInputChange() {
+    fun reanchorNewestAfterBottomInputChange(frameCount: Int = 24) {
         if (!initialTimelineAnchored) return
         scope.launch {
             scrollCoordinator.followTailIfAllowed(
                 resolveTailIndex = { currentTailIndex },
                 reason = ConversationScrollReason.BottomInput,
-                frameCount = 24,
+                frameCount = frameCount,
             )
         }
     }
@@ -2814,11 +2966,11 @@ internal fun ConversationScreen(
     val composerAttachmentSheet = rememberComposerAttachmentSheetState()
 
     val openDetailsDescription = stringResource(R.string.details)
-    LaunchedEffect(selectedForwardBodies.isEmpty()) {
+    LaunchedEffect(batchSelectionUi.forwardBodies.isEmpty()) {
         batchForwardSheetOpen =
             batchForwardSheetOpenForBodies(
                 currentlyOpen = batchForwardSheetOpen,
-                forwardBodies = selectedForwardBodies,
+                forwardBodies = batchSelectionUi.forwardBodies,
             )
     }
     Scaffold(
@@ -2838,18 +2990,18 @@ internal fun ConversationScreen(
             Column {
                 if (selectionMode) {
                     MessageSelectionBar(
-                        count = selectedActionItems.size,
-                        canCopy = selectedCopyText.isNotBlank(),
-                        canForward = selectedForwardBodies.isNotEmpty(),
+                        count = batchSelectionUi.actionItems.size,
+                        canCopy = batchSelectionUi.copyText.isNotBlank(),
+                        canForward = batchSelectionUi.forwardBodies.isNotEmpty(),
                         onClose = { selectedMessages.clear() },
                         onCopy = {
-                            if (selectedCopyText.isNotBlank()) {
-                                clipboard.setText(AnnotatedString(selectedCopyText))
+                            if (batchSelectionUi.copyText.isNotBlank()) {
+                                clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
                                 selectedMessages.clear()
                             }
                         },
                         onForward = {
-                            if (selectedForwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                            if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
                         },
                         onDelete = { showBatchDeleteConfirm = true },
                     )
@@ -3116,7 +3268,7 @@ internal fun ConversationScreen(
                     .fillMaxWidth()
                     .onSizeChanged { size ->
                         if (bottomChromeHeightObserver.onMeasured(size.height)) {
-                            reanchorNewestAfterBottomInputChange()
+                            reanchorNewestAfterBottomInputChange(frameCount = 1)
                         }
                         val chromeBottom = chromeInsets.getBottom(density)
                         snackbarBottomInset.value =
@@ -3307,7 +3459,7 @@ internal fun ConversationScreen(
                                         }
                                         composerFocused = focused
                                     },
-                                    onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
+                                    onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
                                     onKeyboardRestoreFromCustomInput = {
                                         suppressNextImeOpenReanchor.set(true)
                                     },
@@ -3528,6 +3680,32 @@ internal fun ConversationScreen(
                                             }
                                             TimelineRowKind.Bubble -> Unit
                                         }
+                                        val newer = renderedTimeline.getOrNull(index + 1)
+                                        val sameSenderAsOlderBubble =
+                                            older?.let { candidate ->
+                                                conversationBubbleRowsShareSenderRun(
+                                                    first = candidate,
+                                                    second = item,
+                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                    deletedMessageIds = controller.deletedMessageIds,
+                                                )
+                                            } == true
+                                        val sameSenderAsNewerBubble =
+                                            newer?.let { candidate ->
+                                                conversationBubbleRowsShareSenderRun(
+                                                    first = item,
+                                                    second = candidate,
+                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
+                                                    deletedMessageIds = controller.deletedMessageIds,
+                                                )
+                                            } == true
+                                        val senderDecoration =
+                                            GroupProjector.transcriptSenderDecoration(
+                                                isDm = controller.isDm,
+                                                mine = controller.isMessageMine(item.record),
+                                                sameSenderAsOlderBubble = sameSenderAsOlderBubble,
+                                                sameSenderAsNewerBubble = sameSenderAsNewerBubble,
+                                            )
                                         val messageId = item.record.messageIdHex
                                         val ownsActionMenu = openActionMenuId == messageId
                                         DismissMessageActionMenuOnDispose(
@@ -3618,6 +3796,8 @@ internal fun ConversationScreen(
                                             },
                                             mentionCandidates = mentionPicker.candidates,
                                             mentionPickerEnabled = mentionPicker.enabled,
+                                            showSenderName = senderDecoration.showName,
+                                            showSenderAvatar = senderDecoration.showAvatar,
                                             collapseLongMessages = collapseLongMessages,
                                             readOnly = controller.group.pendingConfirmation,
                                         )
@@ -3722,26 +3902,26 @@ internal fun ConversationScreen(
         }
     }
 
-    if (batchForwardSheetOpen && selectedForwardBodies.isNotEmpty()) {
+    if (batchForwardSheetOpen && batchSelectionUi.forwardBodies.isNotEmpty()) {
         ForwardMessageSheet(
             appState = appState,
-            body = selectedForwardBodies.joinToString("\n"),
+            body = batchSelectionUi.forwardBodies.joinToString("\n"),
             originGroupIdHex = controller.group.groupIdHex,
             onDismiss = { batchForwardSheetOpen = false },
             onForward = { targetGroupIds ->
-                appState.forwardTexts(targetGroupIds, selectedForwardBodies)
+                appState.forwardTexts(targetGroupIds, batchSelectionUi.forwardBodies)
                 selectedMessages.clear()
             },
         )
     }
 
-    if (showBatchDeleteConfirm && selectedActionItems.isNotEmpty()) {
+    if (showBatchDeleteConfirm && batchSelectionUi.actionItems.isNotEmpty()) {
         val runBatchDelete: (BatchDeleteScope) -> Unit = { scope ->
             // In-flight guard on top of the mutation's own idempotency: a
             // second tap before the first completes is dropped.
             if (!batchDeleteInFlight) {
                 batchDeleteInFlight = true
-                val selections = selectedSelections
+                val selections = batchSelectionUi.selections
                 appState.launchMutation {
                     try {
                         val result =
@@ -3772,8 +3952,8 @@ internal fun ConversationScreen(
             }
         }
         BatchMessageDeleteDialog(
-            selectedCount = selectedActionItems.size,
-            breakdown = selectedDeleteBreakdown,
+            selectedCount = batchSelectionUi.actionItems.size,
+            breakdown = batchSelectionUi.deleteBreakdown,
             deleteInFlight = batchDeleteInFlight,
             onDeleteForEveryone = { runBatchDelete(BatchDeleteScope.EVERYONE) },
             onDeleteForMe = { runBatchDelete(BatchDeleteScope.LOCAL_ONLY) },

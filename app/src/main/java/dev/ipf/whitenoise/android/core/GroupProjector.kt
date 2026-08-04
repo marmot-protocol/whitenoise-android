@@ -23,7 +23,14 @@ data class GroupTitleCopy(
     }
 }
 
+data class TranscriptSenderDecoration(
+    val showName: Boolean,
+    val showAvatar: Boolean,
+)
+
 object GroupProjector {
+    private const val TranscriptSenderRunWindowSeconds = 180uL
+
     fun displayTitle(
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
@@ -118,9 +125,40 @@ object GroupProjector {
     }
 
     fun shouldShowTranscriptSenderAvatar(
-        memberCount: Int,
+        isDm: Boolean,
         mine: Boolean,
-    ): Boolean = !mine && memberCount > 2
+    ): Boolean = !mine && !isDm
+
+    fun transcriptSenderDecoration(
+        isDm: Boolean,
+        mine: Boolean,
+        sameSenderAsOlderBubble: Boolean,
+        sameSenderAsNewerBubble: Boolean,
+    ): TranscriptSenderDecoration {
+        val showSenderIdentity = shouldShowTranscriptSenderAvatar(isDm = isDm, mine = mine)
+        return TranscriptSenderDecoration(
+            showName = showSenderIdentity && !sameSenderAsOlderBubble,
+            showAvatar = showSenderIdentity && !sameSenderAsNewerBubble,
+        )
+    }
+
+    fun messagesShareTranscriptSenderRun(
+        firstSender: String,
+        firstRecordedAt: ULong,
+        secondSender: String,
+        secondRecordedAt: ULong,
+        sameDay: Boolean,
+    ): Boolean {
+        val elapsed =
+            if (firstRecordedAt >= secondRecordedAt) {
+                firstRecordedAt - secondRecordedAt
+            } else {
+                secondRecordedAt - firstRecordedAt
+            }
+        return sameDay &&
+            firstSender.equals(secondSender, ignoreCase = true) &&
+            elapsed <= TranscriptSenderRunWindowSeconds
+    }
 
     /**
      * A conversation is a DM when it has exactly two members **and** no group

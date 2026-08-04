@@ -143,6 +143,18 @@ internal fun aspectRatioFromDim(dim: String?): Float? {
     return (w.toFloat() / h.toFloat()).coerceIn(0.4f, 2.5f)
 }
 
+internal fun initialMediaBubbleAspectRatio(dim: String?): Float? = aspectRatioFromDim(dim)
+
+@Composable
+internal fun rememberMediaBubbleAspectRatio(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    dim: String?,
+): Float? =
+    remember(messageIdHex, attachmentIndex) {
+        initialMediaBubbleAspectRatio(dim)
+    }
+
 @Composable
 internal fun MediaImageBubble(
     item: TimelineMessage,
@@ -156,6 +168,16 @@ internal fun MediaImageBubble(
 ) {
     val record = item.record
     val key = record.messageIdHex
+    val cachedThumbnail =
+        remember(key, attachmentIndex) {
+            controller.thumbnailFor(key, attachmentIndex)
+        }
+    val bubbleAspectRatio =
+        rememberMediaBubbleAspectRatio(
+            messageIdHex = key,
+            attachmentIndex = attachmentIndex,
+            dim = reference.dim,
+        )
     // Decode-state keys split into two buckets:
     //   - Bytes-level state (bitmap, failed, reloadToken): keyed on
     //     `sourceEpoch` so a typed-reference upgrade from imeta-fallback
@@ -172,7 +194,7 @@ internal fun MediaImageBubble(
     var presentation by remember(key, attachmentIndex, epoch) {
         val cached =
             if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
-                controller.thumbnailFor(key, attachmentIndex)
+                cachedThumbnail
             } else {
                 null
             }
@@ -248,7 +270,7 @@ internal fun MediaImageBubble(
         // width. Used by both the confirmed bubble and the optimistic
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
-        modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
+        modifier = imageBubbleSizing(bubbleAspectRatio),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = presentation

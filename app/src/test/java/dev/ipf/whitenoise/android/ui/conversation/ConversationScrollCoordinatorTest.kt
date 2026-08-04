@@ -170,6 +170,96 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun initialHistoryAnchorCommitsAgainOnlyAfterTargetGeometryIsStable() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 33),
+                )
+            val layouts =
+                listOf(
+                    ConversationInitialAnchorLayout(viewportHeight = 0, targetItemSize = null),
+                    ConversationInitialAnchorLayout(viewportHeight = 600, targetItemSize = 240),
+                    ConversationInitialAnchorLayout(viewportHeight = 600, targetItemSize = 240),
+                )
+            var frame = -1
+
+            val committed =
+                coordinator.commitInitialAnchor(
+                    targetMessageId = "reader",
+                    reason = ConversationScrollReason.SavedRestore,
+                    resultingMode = ConversationScrollMode.ReadingHistory("reader", 33),
+                    targetIndex = 18,
+                    pixelOffset = 33,
+                    captureLayout = { layouts[frame.coerceAtLeast(0)] },
+                    maxSettleFrames = layouts.size,
+                    awaitFrame = { frame++ },
+                )
+
+            assertTrue(committed)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(18, 33),
+                    ScrollWrite.Snap(18, 33),
+                ),
+                writer.writes,
+            )
+        }
+
+    @Test
+    fun initialAnchorDoesNotCommitWhenLayoutNeverStabilizes() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var targetSize = 100
+
+            val committed =
+                coordinator.commitInitialAnchor(
+                    targetMessageId = null,
+                    reason = ConversationScrollReason.InitialAnchor,
+                    resultingMode = ConversationScrollMode.FollowingTail,
+                    targetIndex = 24,
+                    captureLayout = {
+                        ConversationInitialAnchorLayout(
+                            viewportHeight = 600,
+                            targetItemSize = targetSize++,
+                        )
+                    },
+                    maxSettleFrames = 3,
+                    awaitFrame = {},
+                )
+
+            assertFalse(committed)
+            assertEquals(listOf(ScrollWrite.Snap(24, 0)), writer.writes)
+        }
+
+    @Test
+    fun postInitialReanchorGateIgnoresCommittedStartupBaseline() {
+        val gate = ConversationPostInitialReanchorGate()
+        val initial =
+            ConversationTimelineStructure(
+                rowKeys = listOf("msg:1" to "1", "msg:2" to "2"),
+                olderHeaderCount = 0,
+            )
+
+        assertFalse(gate.onStructure(initial))
+        assertFalse(gate.onViewportHeight(600))
+
+        gate.commit(initial, viewportHeight = 600)
+
+        assertFalse(gate.onStructure(initial))
+        assertFalse(gate.onViewportHeight(600))
+        assertTrue(
+            gate.onStructure(
+                initial.copy(rowKeys = initial.rowKeys + ("msg:3" to "3")),
+            ),
+        )
+        assertTrue(gate.onViewportHeight(540))
+    }
+
+    @Test
     fun newMessageArrivalDoesNotFollowTailWhileReadingHistory() =
         runTest {
             val writer = RecordingScrollWriter()
