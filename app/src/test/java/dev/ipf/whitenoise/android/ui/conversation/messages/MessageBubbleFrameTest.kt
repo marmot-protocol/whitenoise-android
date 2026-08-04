@@ -204,7 +204,7 @@ class MessageBubbleFrameTest {
                     MediaSupplementEnvelope(
                         alignEnd = false,
                         modifier = Modifier.testTag(MEDIA_REPLY_COLUMN_TAG),
-                        media = { Box(Modifier.width(220.dp).height(100.dp)) },
+                        media = { Box(Modifier.width(220.dp).height(100.dp).testTag(MEDIA_REPLY_MEDIA_TAG)) },
                     ) {
                         MessageBubbleFrame(
                             presentation = messageBubblePresentation(deleted = false, mine = false),
@@ -232,9 +232,9 @@ class MessageBubbleFrameTest {
         }
 
         composeRule.runOnIdle {
-            val mediaColumnBounds = composeRule.onNodeWithTag(MEDIA_REPLY_COLUMN_TAG).fetchSemanticsNode().boundsInRoot
+            val mediaBounds = composeRule.onNodeWithTag(MEDIA_REPLY_MEDIA_TAG).fetchSemanticsNode().boundsInRoot
             val captionBounds = composeRule.onNodeWithTag(MEDIA_REPLY_CAPTION_TAG).fetchSemanticsNode().boundsInRoot
-            assertEquals(mediaColumnBounds.width, captionBounds.width, 1f)
+            assertEquals(mediaBounds.width, captionBounds.width, 1f)
         }
     }
 
@@ -299,6 +299,7 @@ class MessageBubbleFrameTest {
         const val REPLY_BUBBLE_TAG = "reply-bubble"
         const val REPLY_FOOTER_TAG = "reply-footer"
         const val MEDIA_REPLY_COLUMN_TAG = "media-reply-column"
+        const val MEDIA_REPLY_MEDIA_TAG = "media-reply-media"
         const val MEDIA_REPLY_CAPTION_TAG = "media-reply-caption"
         const val NON_REPLY_COLUMN_TAG = "non-reply-column"
         const val NON_REPLY_BODY_TAG = "non-reply-body"
