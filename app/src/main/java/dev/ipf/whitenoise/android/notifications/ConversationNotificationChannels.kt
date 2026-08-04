@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -203,18 +204,15 @@ object ConversationNotificationChannels {
         // never delete the old child, because that would erase its user-owned
         // settings and any notification still routed through it.
         val source =
-            if (vibrationPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
-                parent
-            } else {
-                manager.getNotificationChannel(
-                    conversationChannelId(parentChannelId, conversationShortcutId, sourceVibrationPattern),
-                ) ?: manager.getNotificationChannel(
-                    conversationChannelId(parentChannelId, conversationShortcutId),
-                ) ?: parent
-            }
+            manager.getNotificationChannel(
+                conversationChannelId(parentChannelId, conversationShortcutId, sourceVibrationPattern),
+            ) ?: manager.getNotificationChannel(
+                conversationChannelId(parentChannelId, conversationShortcutId),
+            ) ?: parent
         manager.createNotificationChannel(
             conversationChannel(
                 source = source,
+                parent = parent,
                 parentChannelId = parentChannelId,
                 conversationChannelId = conversationChannelId,
                 conversationShortcutId = conversationShortcutId,
@@ -252,6 +250,7 @@ object ConversationNotificationChannels {
     // the OS settings without affecting the parent or its other conversations.
     private fun conversationChannel(
         source: NotificationChannel,
+        parent: NotificationChannel,
         parentChannelId: String,
         conversationChannelId: String,
         conversationShortcutId: String,
@@ -266,10 +265,13 @@ object ConversationNotificationChannels {
             setSound(source.sound, source.audioAttributes)
             enableLights(source.shouldShowLights())
             lightColor = source.lightColor
-            enableVibration(source.shouldVibrate())
-            this.vibrationPattern = source.vibrationPattern
             setAllowBubbles(source.canBubble())
-            applyConversationVibration(this, vibrationPattern)
+            if (vibrationPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
+                enableVibration(parent.shouldVibrate())
+                this.vibrationPattern = parent.vibrationPattern
+            } else {
+                applyConversationVibration(this, vibrationPattern)
+            }
             // Preserve an effective DND bypass when the OS grants this app
             // policy access. Without that special access Android ignores the
             // request, but the old channel remains intact and is never deleted.
@@ -294,7 +296,13 @@ data class EffectiveConversationVibration(
     val overriddenByAndroid: Boolean,
 )
 
-/** Applies a custom waveform through the newest portable channel API. */
+/**
+ * Applies a custom waveform through the newest portable channel API.
+ *
+ * The injectable sdkInt makes both branches unit-testable; production uses
+ * Build.VERSION.SDK_INT, so the API-35 call remains guarded at runtime.
+ */
+@SuppressLint("NewApi")
 internal fun applyConversationVibration(
     channel: NotificationChannel,
     pattern: ConversationVibrationPattern,

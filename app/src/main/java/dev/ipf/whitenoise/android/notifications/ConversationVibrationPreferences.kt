@@ -24,7 +24,6 @@ class ConversationVibrationPreferences(
     private val preferences: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
-    private val mutationLock = Any()
     private val _state = MutableStateFlow(readSelections(preferences))
     val state: StateFlow<Map<String, ConversationVibrationPattern>> = _state.asStateFlow()
 
@@ -47,14 +46,20 @@ class ConversationVibrationPreferences(
     ) {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return
         synchronized(mutationLock) {
-            val current = _state.value
+            // Multiple process-lifetime entry points own store instances. Use
+            // the shared lock and latest persisted snapshot for this whole-set
+            // read-modify-write so one instance cannot erase another's update.
+            val current = readSelections(preferences)
             val updated =
                 if (pattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
                     current - key
                 } else {
                     current + (key to pattern)
                 }
-            if (updated == current) return
+            if (updated == current) {
+                _state.value = current
+                return
+            }
             _state.value = updated
             preferences.edit().putStringSet(KEY_SELECTIONS, updated.map(::encodeSelection).toSet()).apply()
         }
@@ -64,6 +69,7 @@ class ConversationVibrationPreferences(
         private const val PREFERENCES_NAME = "whitenoise.conversation_vibration"
         private const val KEY_SELECTIONS = "selections"
         private const val FIELD_SEPARATOR = "\u0000"
+        private val mutationLock = Any()
 
         fun compositeKeyOrNull(
             accountRef: String?,

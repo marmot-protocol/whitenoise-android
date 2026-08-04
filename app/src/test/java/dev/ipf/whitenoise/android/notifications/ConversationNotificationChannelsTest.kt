@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -73,6 +74,7 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
+    @SuppressLint("NewApi")
     fun api34UsesWaveformAndApi35UsesVibrationEffectWithWaveformFallback() {
         val api34 = NotificationChannel("api34", "API 34", NotificationManager.IMPORTANCE_DEFAULT)
         val api35 = NotificationChannel("api35", "API 35", NotificationManager.IMPORTANCE_DEFAULT)
@@ -130,6 +132,40 @@ class ConversationNotificationChannelsTest {
         assertEquals(original.shouldShowLights(), custom.shouldShowLights())
         assertEquals(original.lightColor, custom.lightColor)
         assertEquals(listOf(0L, 100L, 100L, 100L), custom.vibrationPattern!!.toList())
+    }
+
+    @Test
+    fun returningToSystemDefaultKeepsConversationOverridesAndRestoresParentVibration() {
+        NotificationChannels.ensureChannels(context)
+        val shortcut = "conversation-return-default"
+        val customId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+                vibrationPattern = ConversationVibrationPattern.DOUBLE,
+            )!!
+        val custom = manager.getNotificationChannel(customId)
+        val customSound = Uri.parse("content://test/conversation-sound")
+        custom.setSound(customSound, custom.audioAttributes)
+        custom.setShowBadge(false)
+        manager.createNotificationChannel(custom)
+
+        val defaultId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context = context,
+                parentChannelId = "messages_group",
+                conversationShortcutId = shortcut,
+                vibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+                sourceVibrationPattern = ConversationVibrationPattern.DOUBLE,
+            )!!
+
+        val restored = manager.getNotificationChannel(defaultId)
+        val parent = manager.getNotificationChannel("messages_group")
+        assertEquals(customSound, restored.sound)
+        assertFalse(restored.canShowBadge())
+        assertEquals(parent.shouldVibrate(), restored.shouldVibrate())
+        assertEquals(parent.vibrationPattern!!.toList(), restored.vibrationPattern!!.toList())
     }
 
     @Test

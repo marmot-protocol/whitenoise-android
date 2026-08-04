@@ -1170,6 +1170,16 @@
     <string name="notify_nothing">Ничего</string>
     <string name="notify_muted_until">Отключено до %1$s</string>
     <string name="customize_sound_vibration">Настроить звук и вибрацию</string>
+    <string name="vibration_pattern">Схема вибрации</string>
+    <string name="vibration_pattern_description">Выберите схему для новых сообщений в этом чате. Предпросмотр воспроизводится один раз.</string>
+    <string name="vibration_pattern_system_default">Системная</string>
+    <string name="vibration_pattern_short">Короткая</string>
+    <string name="vibration_pattern_double">Двойная</string>
+    <string name="vibration_pattern_long">Длинная</string>
+    <string name="preview_vibration_pattern">Предпросмотр вибрации «%1$s»</string>
+    <string name="vibration_pattern_off_in_android_settings">Отключено в настройках Android</string>
+    <string name="vibration_pattern_custom_in_android_settings">Изменено в настройках Android</string>
+    <string name="vibration_pattern_android_override">%1$s · Настройки Android</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>

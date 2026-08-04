@@ -77,4 +77,17 @@ class ConversationVibrationPreferencesTest {
         assertEquals(ConversationVibrationPattern.SYSTEM_DEFAULT, preferences.pattern("account-a", "group-a"))
         assertEquals(emptyMap<String, ConversationVibrationPattern>(), preferences.state.value)
     }
+
+    @Test
+    fun staleStoreInstanceDoesNotEraseAnotherInstancesSelection() {
+        val first = ConversationVibrationPreferences(context)
+        val stale = ConversationVibrationPreferences(context)
+
+        first.setPattern("account-a", "group-a", ConversationVibrationPattern.SHORT)
+        stale.setPattern("account-b", "group-b", ConversationVibrationPattern.LONG)
+
+        val reloaded = ConversationVibrationPreferences(context)
+        assertEquals(ConversationVibrationPattern.SHORT, reloaded.pattern("account-a", "group-a"))
+        assertEquals(ConversationVibrationPattern.LONG, reloaded.pattern("account-b", "group-b"))
+    }
 }

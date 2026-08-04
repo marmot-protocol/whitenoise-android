@@ -1358,6 +1358,7 @@ class WhiteNoiseAppState private constructor(
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
+    private val conversationVibrationChannelMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val appUpdateRepository = AppUpdateRepository(appContext)
@@ -4183,22 +4184,37 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
-        val previous = conversationVibrationPreferences.pattern(accountRef, groupIdHex)
-        if (previous == pattern) return
-        NotificationChannels.ensureChannels(appContext)
-        val activeChannelId =
-            ConversationNotificationChannels.ensureConversationChannel(
-                context = appContext,
-                parentChannelId = ConversationNotificationChannels.primaryMessageParent(isDm).id,
-                conversationShortcutId = shortcutId,
-                conversationTitle = conversationTitle,
-                vibrationPattern = pattern,
-                sourceVibrationPattern = previous,
-            )
-        // Never persist an app-only value when Android could not create the
-        // channel that future posts and settings links need to use.
-        if (activeChannelId != null) {
-            conversationVibrationPreferences.setPattern(accountRef, groupIdHex, pattern)
+        mutationsScope.launch {
+            // Channel creation performs NotificationManager Binder calls. Keep
+            // them off the UI dispatcher and serialize rapid choices so an
+            // older operation cannot overwrite the newest persisted choice.
+            conversationVibrationChannelMutex.withLock {
+                val previous = conversationVibrationPreferences.pattern(accountRef, groupIdHex)
+                if (previous == pattern) return@withLock
+                val activeChannelId =
+                    withContext(Dispatchers.Default) {
+                        runCatchingCancellable {
+                            NotificationChannels.ensureChannels(appContext)
+                            ConversationNotificationChannels.ensureConversationChannel(
+                                context = appContext,
+                                parentChannelId = ConversationNotificationChannels.primaryMessageParent(isDm).id,
+                                conversationShortcutId = shortcutId,
+                                conversationTitle = conversationTitle,
+                                vibrationPattern = pattern,
+                                sourceVibrationPattern = previous,
+                            )
+                        }.onFailure { error ->
+                            appStateDebug(error) {
+                                "conversation vibration channel failed group=${groupIdHex.take(8)}"
+                            }
+                        }.getOrNull()
+                    }
+                // Never persist an app-only value when Android could not create
+                // the channel that future posts and settings links need.
+                if (activeChannelId != null) {
+                    conversationVibrationPreferences.setPattern(accountRef, groupIdHex, pattern)
+                }
+            }
         }
     }
 
