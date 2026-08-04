@@ -262,6 +262,7 @@ internal fun GroupDetailsScreen(
     var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showMuteDurationDialog by remember { mutableStateOf(false) }
     var showNotifyForDialog by remember { mutableStateOf(false) }
+    var showVibrationPatternDialog by remember { mutableStateOf(false) }
     // Auto-opened straight from the empty-group "Add members" CTA: render the
     // picker on the first frame (no details-screen flash) and route its Back to
     // the conversation instead of to the details body underneath.
@@ -366,10 +367,15 @@ internal fun GroupDetailsScreen(
             }
         }
     val chatNotificationState by appState.chatMutePreferences.state.collectAsState()
+    val vibrationSelections by appState.conversationVibrationPreferences.state.collectAsState()
     val notificationModes = chatNotificationState.notificationModes
     val conversationNotifyMode =
         remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
             appState.conversationNotifyMode(controller.group.groupIdHex)
+        }
+    val conversationVibrationPattern =
+        remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
+            appState.conversationVibrationPattern(controller.group.groupIdHex)
         }
     val engineMuted =
         controller.latestChatListRow?.muted
@@ -574,6 +580,7 @@ internal fun GroupDetailsScreen(
             isMuted = conversationMuted,
             muteExpiryMillis = conversationMuteExpiry,
             notifyForMode = conversationRestoreMode,
+            vibrationPattern = conversationVibrationPattern,
             onBack = { showNotificationSettings = false },
             onToggleMute = { turnOn ->
                 if (turnOn) {
@@ -584,6 +591,7 @@ internal fun GroupDetailsScreen(
                 }
             },
             onChooseNotifyFor = { showNotifyForDialog = true },
+            onChooseVibrationPattern = { showVibrationPatternDialog = true },
         )
         if (showMuteDurationDialog) {
             MuteDurationDialog(
@@ -601,6 +609,21 @@ internal fun GroupDetailsScreen(
                 onSelect = { mode ->
                     showNotifyForDialog = false
                     appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
+                },
+            )
+        }
+        if (showVibrationPatternDialog) {
+            VibrationPatternDialog(
+                currentPattern = conversationVibrationPattern,
+                onDismiss = { showVibrationPatternDialog = false },
+                onSelect = { pattern ->
+                    showVibrationPatternDialog = false
+                    appState.setConversationVibrationPattern(
+                        groupIdHex = controller.group.groupIdHex,
+                        isDm = isDm,
+                        conversationTitle = conversationTitle,
+                        pattern = pattern,
+                    )
                 },
             )
         }

@@ -97,7 +97,7 @@ class ConversationNotificationSettingsTest {
         val expectedChannelId = ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.GROUP_MESSAGES.id, shortcutId!!)
         val started = Shadows.shadowOf(app).nextStartedActivity
         assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, started.action)
-        assertEquals(NotificationChannelSpec.GROUP_MESSAGES.id, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+        assertEquals(expectedChannelId, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
         assertEquals(shortcutId, started.getStringExtra(Settings.EXTRA_CONVERSATION_ID))
         // Multi-parent: both the message and mention conversation channels were created.
         assertNotNull(manager.getNotificationChannel(expectedChannelId))
@@ -120,7 +120,10 @@ class ConversationNotificationSettingsTest {
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val started = Shadows.shadowOf(app).nextStartedActivity
         assertEquals(
-            NotificationChannelSpec.DIRECT_MESSAGES.id,
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.DIRECT_MESSAGES.id,
+                shortcutId,
+            ),
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
         )
         val conversationChannelId =
@@ -166,7 +169,10 @@ class ConversationNotificationSettingsTest {
         val shortcutId = conversationShortcutId("account-a", "group-a")!!
         val started = Shadows.shadowOf(app).nextStartedActivity
         assertEquals(
-            NotificationChannelSpec.AGENT_ACTIVITY.id,
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.AGENT_ACTIVITY.id,
+                shortcutId,
+            ),
             started.getStringExtra(Settings.EXTRA_CHANNEL_ID),
         )
         assertNotNull(
@@ -179,6 +185,33 @@ class ConversationNotificationSettingsTest {
                     ),
                 ),
         )
+    }
+
+    @Test
+    fun primarySettingsDeepLinkTargetsTheSelectedVibrationChannelVersion() {
+        val app = RuntimeEnvironment.getApplication()
+        val manager = app.getSystemService(NotificationManager::class.java)
+        NotificationChannels.ensureChannels(app)
+
+        openConversationNotificationSettings(
+            context = app,
+            accountRef = "account-vibration",
+            groupIdHex = "group-vibration",
+            isDm = false,
+            primaryVibrationPattern = ConversationVibrationPattern.DOUBLE,
+        )
+
+        val shortcutId = conversationShortcutId("account-vibration", "group-vibration")!!
+        val activeId =
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+                ConversationVibrationPattern.DOUBLE,
+            )
+        val started = Shadows.shadowOf(app).nextStartedActivity
+        assertEquals(activeId, started.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+        assertEquals(shortcutId, started.getStringExtra(Settings.EXTRA_CONVERSATION_ID))
+        assertNotNull(manager.getNotificationChannel(activeId))
     }
 
     @Test

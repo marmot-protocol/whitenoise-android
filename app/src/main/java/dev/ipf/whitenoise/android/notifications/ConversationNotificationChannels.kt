@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
 
 /**
  * Per-conversation notification channels.
@@ -36,7 +39,15 @@ object ConversationNotificationChannels {
     fun conversationChannelId(
         parentChannelId: String,
         conversationShortcutId: String,
-    ): String = "$parentChannelId:$CONVERSATION_CHANNEL_INFIX:$conversationShortcutId"
+        vibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+    ): String {
+        val base = "$parentChannelId:$CONVERSATION_CHANNEL_INFIX:$conversationShortcutId"
+        return if (vibrationPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
+            base
+        } else {
+            "$base:vibration:${vibrationPattern.channelToken}"
+        }
+    }
 
     /**
      * The default parent for callers that want the conversation's ordinary
@@ -44,6 +55,40 @@ object ConversationNotificationChannels {
      */
     fun primaryMessageParent(isDm: Boolean): NotificationChannelSpec =
         if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
+
+    /** Reads the active channel back from Android, including OS-side edits. */
+    fun effectiveVibration(
+        context: Context,
+        conversationShortcutId: String,
+        isDm: Boolean,
+        selectedPattern: ConversationVibrationPattern,
+    ): EffectiveConversationVibration {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channelId =
+            conversationChannelId(
+                primaryMessageParent(isDm).id,
+                conversationShortcutId,
+                selectedPattern,
+            )
+        val channel = manager?.getNotificationChannel(channelId)
+        return when {
+            channel == null ->
+                EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
+            !channel.shouldVibrate() ->
+                EffectiveConversationVibration(pattern = null, enabled = false, overriddenByAndroid = true)
+            selectedPattern == ConversationVibrationPattern.SYSTEM_DEFAULT &&
+                channel.matchesParentVibration(manager, primaryMessageParent(isDm).id) ->
+                EffectiveConversationVibration(selectedPattern, enabled = true, overriddenByAndroid = false)
+            else -> {
+                val effectivePattern = channel.recognizedVibrationPattern()
+                EffectiveConversationVibration(
+                    pattern = effectivePattern,
+                    enabled = true,
+                    overriddenByAndroid = effectivePattern != selectedPattern,
+                )
+            }
+        }
+    }
 
     /**
      * Every notification type that can be scoped to a conversation. Keeping this
@@ -65,10 +110,24 @@ object ConversationNotificationChannels {
         conversationShortcutId: String,
         isDm: Boolean,
         conversationTitle: String? = null,
+        primaryVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+        sourceVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val primaryParent = primaryMessageParent(isDm)
         relevantParents(isDm).forEach { parent ->
-            ensureConversationChannel(manager, parent.id, conversationShortcutId, conversationTitle)
+            val vibrationPattern =
+                if (parent == primaryParent) primaryVibrationPattern else ConversationVibrationPattern.SYSTEM_DEFAULT
+            val sourcePattern =
+                if (parent == primaryParent) sourceVibrationPattern else ConversationVibrationPattern.SYSTEM_DEFAULT
+            ensureConversationChannel(
+                manager = manager,
+                parentChannelId = parent.id,
+                conversationShortcutId = conversationShortcutId,
+                conversationTitle = conversationTitle,
+                vibrationPattern = vibrationPattern,
+                sourceVibrationPattern = sourcePattern,
+            )
         }
     }
 
@@ -82,9 +141,18 @@ object ConversationNotificationChannels {
         parentChannelId: String,
         conversationShortcutId: String,
         conversationTitle: String? = null,
+        vibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
+        sourceVibrationPattern: ConversationVibrationPattern = ConversationVibrationPattern.SYSTEM_DEFAULT,
     ): String? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
-        return ensureConversationChannel(manager, parentChannelId, conversationShortcutId, conversationTitle)
+        return ensureConversationChannel(
+            manager = manager,
+            parentChannelId = parentChannelId,
+            conversationShortcutId = conversationShortcutId,
+            conversationTitle = conversationTitle,
+            vibrationPattern = vibrationPattern,
+            sourceVibrationPattern = sourceVibrationPattern,
+        )
     }
 
     private fun ensureConversationChannel(
@@ -92,8 +160,10 @@ object ConversationNotificationChannels {
         parentChannelId: String,
         conversationShortcutId: String,
         conversationTitle: String?,
+        vibrationPattern: ConversationVibrationPattern,
+        sourceVibrationPattern: ConversationVibrationPattern,
     ): String? {
-        val conversationChannelId = conversationChannelId(parentChannelId, conversationShortcutId)
+        val conversationChannelId = conversationChannelId(parentChannelId, conversationShortcutId, vibrationPattern)
         val parent = manager.getNotificationChannel(parentChannelId) ?: return null
         val displayName = conversationChannelDisplayName(parent.name, conversationTitle)
         val existing = manager.getNotificationChannel(conversationChannelId)
@@ -118,8 +188,28 @@ object ConversationNotificationChannels {
             if (republish) manager.createNotificationChannel(existing)
             return conversationChannelId
         }
+        // A channel's alert behavior is immutable after creation. Custom
+        // choices therefore get one of three bounded, deterministic channel
+        // versions. Clone the previously active child when available so sound,
+        // importance, lights, badge, and other effective OS choices carry over;
+        // never delete the old child, because that would erase its user-owned
+        // settings and any notification still routed through it.
+        val source =
+            manager.getNotificationChannel(
+                conversationChannelId(parentChannelId, conversationShortcutId, sourceVibrationPattern),
+            ) ?: manager.getNotificationChannel(
+                conversationChannelId(parentChannelId, conversationShortcutId),
+            ) ?: parent
         manager.createNotificationChannel(
-            conversationChannel(parent, conversationChannelId, conversationShortcutId, displayName),
+            conversationChannel(
+                source = source,
+                parent = parent,
+                parentChannelId = parentChannelId,
+                conversationChannelId = conversationChannelId,
+                conversationShortcutId = conversationShortcutId,
+                displayName = displayName,
+                vibrationPattern = vibrationPattern,
+            ),
         )
         return conversationChannelId
     }
@@ -150,23 +240,94 @@ object ConversationNotificationChannels {
     // channel at creation time; the user can then diverge per conversation from
     // the OS settings without affecting the parent or its other conversations.
     private fun conversationChannel(
+        source: NotificationChannel,
         parent: NotificationChannel,
+        parentChannelId: String,
         conversationChannelId: String,
         conversationShortcutId: String,
         displayName: CharSequence,
+        vibrationPattern: ConversationVibrationPattern,
     ): NotificationChannel =
-        NotificationChannel(conversationChannelId, displayName, parent.importance).apply {
-            setConversationId(parent.id, conversationShortcutId)
-            group = parent.group
-            description = parent.description
-            setShowBadge(parent.canShowBadge())
-            setSound(parent.sound, parent.audioAttributes)
-            enableLights(parent.shouldShowLights())
-            lightColor = parent.lightColor
-            enableVibration(parent.shouldVibrate())
-            vibrationPattern = parent.vibrationPattern
-            // No setBypassDnd: the platform ignores it unless the app holds
-            // Do Not Disturb policy access, which this app never requests.
-            lockscreenVisibility = parent.lockscreenVisibility
+        NotificationChannel(conversationChannelId, displayName, source.importance).apply {
+            setConversationId(parentChannelId, conversationShortcutId)
+            group = source.group
+            description = source.description
+            setShowBadge(source.canShowBadge())
+            setSound(source.sound, source.audioAttributes)
+            enableLights(source.shouldShowLights())
+            lightColor = source.lightColor
+            setAllowBubbles(source.canBubble())
+            if (vibrationPattern == ConversationVibrationPattern.SYSTEM_DEFAULT) {
+                enableVibration(parent.shouldVibrate())
+                this.vibrationPattern = parent.vibrationPattern
+            } else {
+                applyConversationVibration(this, vibrationPattern)
+            }
+            // Preserve an effective DND bypass when the OS grants this app
+            // policy access. Without that special access Android ignores the
+            // request, but the old channel remains intact and is never deleted.
+            if (source.canBypassDnd()) runCatching { setBypassDnd(true) }
+            lockscreenVisibility = source.lockscreenVisibility
         }
+}
+
+private fun NotificationChannel.matchesParentVibration(
+    manager: NotificationManager,
+    parentChannelId: String,
+): Boolean {
+    val parent = manager.getNotificationChannel(parentChannelId) ?: return false
+    return parent.shouldVibrate() == shouldVibrate() &&
+        nullableWaveformsEqual(parent.vibrationPattern, vibrationPattern)
+}
+
+private fun NotificationChannel.recognizedVibrationPattern(): ConversationVibrationPattern? =
+    vibrationPattern?.let { actual ->
+        ConversationVibrationPattern.entries.firstOrNull { candidate ->
+            candidate.waveform?.contentEquals(actual) == true
+        }
+    }
+
+private fun nullableWaveformsEqual(
+    first: LongArray?,
+    second: LongArray?,
+): Boolean =
+    when {
+        first == null -> second == null
+        second == null -> false
+        else -> first.contentEquals(second)
+    }
+
+data class EffectiveConversationVibration(
+    val pattern: ConversationVibrationPattern?,
+    val enabled: Boolean,
+    val overriddenByAndroid: Boolean,
+)
+
+/**
+ * Applies a custom waveform through the newest portable channel API.
+ *
+ * The injectable sdkInt makes both branches unit-testable; production uses
+ * Build.VERSION.SDK_INT, so the API-35 call remains guarded at runtime.
+ */
+@SuppressLint("NewApi")
+internal fun applyConversationVibration(
+    channel: NotificationChannel,
+    pattern: ConversationVibrationPattern,
+    sdkInt: Int = Build.VERSION.SDK_INT,
+    vibrationEffectFactory: (LongArray) -> VibrationEffect? = { waveform ->
+        VibrationEffect.createWaveform(waveform, -1)
+    },
+) {
+    val waveform = pattern.waveform ?: return
+    channel.enableVibration(true)
+    if (sdkInt >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        // These patterns use only timings, not device-specific primitives. If
+        // an OEM rejects effect construction, retain the API-26 waveform path.
+        val effect = runCatching { vibrationEffectFactory(waveform.copyOf()) }.getOrNull()
+        if (effect != null) {
+            channel.setVibrationEffect(effect)
+            return
+        }
+    }
+    channel.vibrationPattern = waveform.copyOf()
 }

@@ -1128,6 +1128,16 @@
     <string name="notify_nothing">Nada</string>
     <string name="notify_muted_until">Silenciado hasta las %1$s</string>
     <string name="customize_sound_vibration">Personalizar sonido y vibración</string>
+    <string name="vibration_pattern">Patrón de vibración</string>
+    <string name="vibration_pattern_description">Elige un patrón para los mensajes nuevos de este chat. La vista previa se reproduce una vez.</string>
+    <string name="vibration_pattern_system_default">Predeterminado del sistema</string>
+    <string name="vibration_pattern_short">Corta</string>
+    <string name="vibration_pattern_double">Doble</string>
+    <string name="vibration_pattern_long">Larga</string>
+    <string name="preview_vibration_pattern">Probar vibración %1$s</string>
+    <string name="vibration_pattern_off_in_android_settings">Desactivada en los ajustes de Android</string>
+    <string name="vibration_pattern_custom_in_android_settings">Personalizada en los ajustes de Android</string>
+    <string name="vibration_pattern_android_override">%1$s · Ajustes de Android</string>
     <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostrar un acceso «Leer más» para los mensajes largos en este chat</string>
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>

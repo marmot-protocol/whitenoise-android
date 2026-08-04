@@ -1106,6 +1106,16 @@
     <string name="notify_nothing">無</string>
     <string name="notify_muted_until">靜音至 %1$s</string>
     <string name="customize_sound_vibration">自訂音效與震動</string>
+    <string name="vibration_pattern">震動模式</string>
+    <string name="vibration_pattern_description">為此聊天中的新訊息選擇震動模式。預覽只播放一次。</string>
+    <string name="vibration_pattern_system_default">系統預設</string>
+    <string name="vibration_pattern_short">短</string>
+    <string name="vibration_pattern_double">雙重</string>
+    <string name="vibration_pattern_long">長</string>
+    <string name="preview_vibration_pattern">預覽「%1$s」震動</string>
+    <string name="vibration_pattern_off_in_android_settings">已在 Android 設定中關閉</string>
+    <string name="vibration_pattern_custom_in_android_settings">已在 Android 設定中自訂</string>
+    <string name="vibration_pattern_android_override">%1$s · Android 設定</string>
     <string name="chat_muted_badge">已靜音</string>
     <string name="collapse_long_messages_subtitle">在此聊天中為長訊息顯示「閱讀更多」捷徑</string>
     <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>

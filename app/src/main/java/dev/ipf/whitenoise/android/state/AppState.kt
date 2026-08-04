@@ -89,9 +89,13 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
+import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
+import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCompletionStore
 import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryBoundary
@@ -103,6 +107,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
@@ -1353,6 +1358,8 @@ class WhiteNoiseAppState private constructor(
     private val nativePushSyncMutex = Mutex()
     private val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
+    private val conversationVibrationChannelMutex = Mutex()
+    internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -4161,6 +4168,54 @@ class WhiteNoiseAppState private constructor(
     fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
         val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
         return chatMutePreferences.mode(accountRef, groupIdHex)
+    }
+
+    fun conversationVibrationPattern(groupIdHex: String): ConversationVibrationPattern {
+        val accountRef = activeAccountRef ?: return ConversationVibrationPattern.SYSTEM_DEFAULT
+        return conversationVibrationPreferences.pattern(accountRef, groupIdHex)
+    }
+
+    /** Creates the immutable target channel before making it the persisted active choice. */
+    fun setConversationVibrationPattern(
+        groupIdHex: String,
+        isDm: Boolean,
+        conversationTitle: String,
+        pattern: ConversationVibrationPattern,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
+        mutationsScope.launch {
+            // Channel creation performs NotificationManager Binder calls. Keep
+            // them off the UI dispatcher and serialize rapid choices so an
+            // older operation cannot overwrite the newest persisted choice.
+            conversationVibrationChannelMutex.withLock {
+                val previous = conversationVibrationPreferences.pattern(accountRef, groupIdHex)
+                if (previous == pattern) return@withLock
+                val activeChannelId =
+                    withContext(Dispatchers.Default) {
+                        runCatchingCancellable {
+                            NotificationChannels.ensureChannels(appContext)
+                            ConversationNotificationChannels.ensureConversationChannel(
+                                context = appContext,
+                                parentChannelId = ConversationNotificationChannels.primaryMessageParent(isDm).id,
+                                conversationShortcutId = shortcutId,
+                                conversationTitle = conversationTitle,
+                                vibrationPattern = pattern,
+                                sourceVibrationPattern = previous,
+                            )
+                        }.onFailure { error ->
+                            appStateDebug(error) {
+                                "conversation vibration channel failed group=${groupIdHex.take(8)}"
+                            }
+                        }.getOrNull()
+                    }
+                // Never persist an app-only value when Android could not create
+                // the channel that future posts and settings links need.
+                if (activeChannelId != null) {
+                    conversationVibrationPreferences.setPattern(accountRef, groupIdHex, pattern)
+                }
+            }
+        }
     }
 
     /** The All/Only-mentions preference to show when the chat isn't muted. */

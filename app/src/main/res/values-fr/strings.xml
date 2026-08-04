@@ -1128,6 +1128,16 @@
     <string name="notify_nothing">Rien</string>
     <string name="notify_muted_until">En sourdine jusqu\'à %1$s</string>
     <string name="customize_sound_vibration">Personnaliser le son et les vibrations</string>
+    <string name="vibration_pattern">Schéma de vibration</string>
+    <string name="vibration_pattern_description">Choisissez un schéma pour les nouveaux messages de cette discussion. L’aperçu est joué une fois.</string>
+    <string name="vibration_pattern_system_default">Valeur par défaut du système</string>
+    <string name="vibration_pattern_short">Courte</string>
+    <string name="vibration_pattern_double">Deux vibrations</string>
+    <string name="vibration_pattern_long">Longue</string>
+    <string name="preview_vibration_pattern">Tester la vibration %1$s</string>
+    <string name="vibration_pattern_off_in_android_settings">Désactivée dans les paramètres Android</string>
+    <string name="vibration_pattern_custom_in_android_settings">Personnalisée dans les paramètres Android</string>
+    <string name="vibration_pattern_android_override">%1$s · Paramètres Android</string>
     <string name="chat_muted_badge">En sourdine</string>
     <string name="collapse_long_messages_subtitle">Afficher un raccourci « Lire la suite » pour les longs messages de cette discussion</string>
     <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>
