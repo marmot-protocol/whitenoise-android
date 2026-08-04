@@ -36,7 +36,10 @@ internal interface TtsHistoryPager {
 
     suspend fun loadNewer(): Boolean
 
-    suspend fun ensureLoaded(messageIdHex: String): Boolean
+    suspend fun ensureLoaded(
+        messageIdHex: String,
+        timelineAt: ULong,
+    ): Boolean
 
     suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry?
 }
@@ -45,7 +48,7 @@ internal interface TtsHistoryPager {
  * Routes transport navigation for the active read-aloud queue and, for
  * conversation-backed sessions, resolves edge hits by paging the canonical
  * timeline instead of letting the queue complete early. All entry points run
- * on the main thread; page loads run in [scope] guarded by a generation that
+ * on the main thread — page loads run in [scope] guarded by a generation that
  * every invalidation (stop, replacement, conversation switch) advances.
  */
 class TtsHistorySession internal constructor(
@@ -66,6 +69,11 @@ class TtsHistorySession internal constructor(
     private var pendingLoad: Job? = null
     private var liveTailAttached = true
 
+    // The live conversation tail as last verified against the timeline. A
+    // genuine arrival keeps this id in the loaded window, a window trim drops
+    // it — that asymmetry is what tells the two apart at append time.
+    private var lastKnownTimelineTailId: String? = null
+
     init {
         scope.launch {
             controller.state.collect { state ->
@@ -82,7 +90,18 @@ class TtsHistorySession internal constructor(
     ) {
         invalidatePending()
         conversation = SessionConversation(accountRef, groupIdHex)
-        liveTailAttached = true
+        val timelineTailId =
+            resolvePager(accountRef, groupIdHex)
+                ?.timelineRecords()
+                ?.lastOrNull()
+                ?.messageIdHex
+        // A capped backlog start queues only the oldest slice, leaving the
+        // queue tail mid-history. Claiming the live tail there would splice
+        // arrivals next to unrelated old messages and strand the unqueued
+        // remainder — the newer-edge walk pages it instead and reattaches
+        // once the queue tail really is the timeline tail.
+        liveTailAttached = timelineTailId != null && timelineTailId == controller.queuedMessageIds().lastOrNull()
+        lastKnownTimelineTailId = timelineTailId
     }
 
     /** Queue stopped or replaced by non-conversation speech: paging detaches. */
@@ -90,14 +109,32 @@ class TtsHistorySession internal constructor(
         invalidatePending()
         conversation = null
         liveTailAttached = true
+        lastKnownTimelineTailId = null
     }
 
     /**
-     * Live continuation may extend only a session whose newer edge still is
-     * the live tail — after paging away, an arriving message would otherwise
-     * splice next to an unrelated older neighbour.
+     * Gate for one live-continuation append. Extends only a session whose
+     * newer edge still is the live tail — after paging away, an arriving
+     * message would otherwise splice next to an unrelated older neighbour.
+     * A timeline-window trim also moves the window's last id without any
+     * arrival, so acceptance additionally requires the last verified tail to
+     * still be present in the loaded window (advancing it on success), and
+     * refuses while an edge load owns the window.
      */
-    fun allowsLiveAppend(): Boolean = conversation == null || liveTailAttached
+    fun allowsLiveAppend(): Boolean {
+        val convo = conversation ?: return true
+        val consultTimeline = liveTailAttached && _edgeState.value !is TtsHistoryEdgeState.Loading
+        val records =
+            if (consultTimeline) {
+                resolvePager(convo.accountRef, convo.groupIdHex)?.timelineRecords().orEmpty()
+            } else {
+                emptyList()
+            }
+        val knownTail = lastKnownTimelineTailId
+        val accepted = knownTail != null && records.any { it.messageIdHex == knownTail }
+        if (accepted) lastKnownTimelineTailId = records.last().messageIdHex
+        return accepted
+    }
 
     fun nextMessage() {
         navigate(TtsWindowSentenceTarget.First) { defer -> controller.skipNextMessage(defer) }
@@ -150,21 +187,23 @@ class TtsHistorySession internal constructor(
         _edgeState.value = TtsHistoryEdgeState.Loading(direction)
         pendingLoad =
             scope.launch {
+                var pager: TtsHistoryPager? = null
                 val result =
                     try {
-                        val pager = resolvePager(convo.accountRef, convo.groupIdHex)
-                        val queuedIds = controller.queuedMessageIds().filter(String::isNotEmpty)
-                        val anchorId =
+                        pager = resolvePager(convo.accountRef, convo.groupIdHex)
+                        val queued = controller.queuedMessagesSnapshot().filter { it.messageIdHex.isNotEmpty() }
+                        val anchor =
                             if (direction == TtsHistoryDirection.Older) {
-                                queuedIds.firstOrNull()
+                                queued.firstOrNull()
                             } else {
-                                queuedIds.lastOrNull()
+                                queued.lastOrNull()
                             }
-                        if (pager == null || anchorId == null) {
+                        val resolvedPager = pager
+                        if (resolvedPager == null || anchor == null) {
                             TtsHistoryEdgeWalk.Result.Failed
                         } else {
-                            TtsHistoryEdgeWalk(pager, direction) { startedGeneration != generation }
-                                .run(anchorId)
+                            TtsHistoryEdgeWalk(resolvedPager, direction) { startedGeneration != generation }
+                                .run(anchor.messageIdHex, anchor.timelineAt)
                         }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
@@ -174,7 +213,8 @@ class TtsHistorySession internal constructor(
                 if (startedGeneration != generation || conversation != convo) return@launch
                 when (result) {
                     is TtsHistoryEdgeWalk.Result.Found -> {
-                        applyProjection(direction, targetSentence, result)
+                        // Found is only reachable through a resolved pager.
+                        pager?.let { applyProjection(it, direction, targetSentence, result) }
                         _edgeState.value = null
                     }
 
@@ -196,6 +236,7 @@ class TtsHistorySession internal constructor(
     }
 
     private fun applyProjection(
+        pager: TtsHistoryPager,
         direction: TtsHistoryDirection,
         targetSentence: TtsWindowSentenceTarget,
         found: TtsHistoryEdgeWalk.Result.Found,
@@ -214,9 +255,15 @@ class TtsHistorySession internal constructor(
             when (direction) {
                 // Evicting the newest edge detaches the session from the live tail.
                 TtsHistoryDirection.Older -> liveTailAttached && tailAfter == tailBefore
-                // Reattached only once a newer load consumed everything known.
-                TtsHistoryDirection.Newer ->
-                    found.exhaustedLoadedTimeline && !found.hasMoreBeyondEdge
+                // Reattached only when the queue tail is the timeline's live
+                // tail RIGHT NOW — a walk-time snapshot would miss an arrival
+                // that landed between the walk and this apply.
+                TtsHistoryDirection.Newer -> {
+                    val timelineTailId = pager.timelineRecords().lastOrNull()?.messageIdHex
+                    val attached = !pager.hasMoreAfter && timelineTailId != null && timelineTailId == tailAfter
+                    if (attached) lastKnownTimelineTailId = timelineTailId
+                    attached
+                }
             }
     }
 
@@ -241,8 +288,6 @@ private class TtsHistoryEdgeWalk(
     sealed interface Result {
         data class Found(
             val entries: List<TtsSpeakableEntry>,
-            val exhaustedLoadedTimeline: Boolean,
-            val hasMoreBeyondEdge: Boolean,
         ) : Result
 
         data object EndOfHistory : Result
@@ -254,19 +299,23 @@ private class TtsHistoryEdgeWalk(
         data object Stale : Result
     }
 
-    suspend fun run(anchorId: String): Result {
+    suspend fun run(
+        anchorId: String,
+        anchorTimelineAt: ULong,
+    ): Result {
         var anchorRecoveryAttempted = false
         var pagesLoaded = 0
         var result: Result? = null
         while (result == null) {
             val records = pager.timelineRecords()
-            val anchorIndex = records.indexOfFirst { it.messageIdHex.equals(anchorId, ignoreCase = true) }
+            val anchorIndex = records.indexOfFirst { it.messageIdHex == anchorId }
             result =
                 if (anchorIndex < 0) {
                     // The queue window and the timeline window drifted apart
                     // (the chat was scrolled elsewhere while listening). One
                     // recovery walk toward the anchor, then retryable failure.
-                    recoverAnchor(anchorId, anchorRecoveryAttempted).also { anchorRecoveryAttempted = true }
+                    recoverAnchor(anchorId, anchorTimelineAt, anchorRecoveryAttempted)
+                        .also { anchorRecoveryAttempted = true }
                 } else {
                     val found = projectBeyond(records, anchorIndex)
                     when {
@@ -285,10 +334,11 @@ private class TtsHistoryEdgeWalk(
 
     private suspend fun recoverAnchor(
         anchorId: String,
+        anchorTimelineAt: ULong,
         alreadyAttempted: Boolean,
     ): Result? =
         when {
-            alreadyAttempted || !pager.ensureLoaded(anchorId) -> Result.Failed
+            alreadyAttempted || !pager.ensureLoaded(anchorId, anchorTimelineAt) -> Result.Failed
             isStale() -> Result.Stale
             else -> null
         }
@@ -319,21 +369,13 @@ private class TtsHistoryEdgeWalk(
                 TtsHistoryDirection.Older -> records.subList(0, anchorIndex).asReversed()
             }
         val nearestFirst = mutableListOf<TtsSpeakableEntry>()
-        var exhausted = true
-        for ((position, record) in beyond.withIndex()) {
+        for (record in beyond) {
             pager.projectSpeakable(record)?.let(nearestFirst::add)
-            if (nearestFirst.size >= EDGE_FILL_TARGET_MESSAGES && position < beyond.lastIndex) {
-                exhausted = false
-                break
-            }
+            if (nearestFirst.size >= EDGE_FILL_TARGET_MESSAGES) break
         }
         if (nearestFirst.isEmpty()) return null
         val ordered = if (direction == TtsHistoryDirection.Older) nearestFirst.asReversed() else nearestFirst
-        return Result.Found(
-            entries = ordered.toList(),
-            exhaustedLoadedTimeline = exhausted,
-            hasMoreBeyondEdge = hasMore(),
-        )
+        return Result.Found(entries = ordered.toList())
     }
 }
 

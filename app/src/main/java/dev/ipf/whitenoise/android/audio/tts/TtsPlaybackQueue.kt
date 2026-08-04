@@ -328,14 +328,16 @@ internal class TtsPlaybackQueue(
      * Replaces the queued message window while a session is active, landing on
      * [targetMessageIdHex]. Bookkeeping is re-derived from message identity
      * because positions are not stable across prepends or eviction. While
-     * speaking the engine restarts at the target; while paused only the cursor
-     * moves, exactly like a paused navigation tap.
+     * speaking the engine restarts at the target — while paused only the
+     * cursor moves, exactly like a paused navigation tap.
      */
     fun replaceWindow(
         window: List<TtsQueuedMessage>,
         targetMessageIdHex: String,
         targetSentence: TtsWindowSentenceTarget,
     ): Boolean {
+        // An empty target would alias every ad-hoc message in the window.
+        require(targetMessageIdHex.isNotEmpty()) { "window replacement needs a concrete target id" }
         val current = _state.value
         val active = current is TtsState.Speaking || current is TtsState.Paused
         val targetMessage = window.indexOfFirst { it.messageIdHex == targetMessageIdHex }
@@ -366,8 +368,6 @@ internal class TtsPlaybackQueue(
     }
 
     fun queuedMessagesSnapshot(): List<TtsQueuedMessage> = messages
-
-    fun currentMessageIdHex(): String? = if (isNavigable()) messageIdAt(messageIndexForChunk(currentIndex)) else null
 
     private fun targetChunkFor(
         messageIndex: Int,

@@ -7,6 +7,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -160,6 +164,11 @@ class TtsTransportBarTest {
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
         composeRule.onNodeWithText(label(R.string.tts_bar_history_loading)).assertIsDisplayed()
+        // The status text must be a polite live region, or TalkBack never
+        // narrates the state change to a listener who cannot see the bar.
+        composeRule
+            .onNodeWithText(label(R.string.tts_bar_history_loading))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         // Playback control stays live: only navigation waits for the page.
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertIsEnabled()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsEnabled()

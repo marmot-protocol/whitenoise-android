@@ -3,12 +3,14 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.speech.tts.TextToSpeech
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -192,6 +194,31 @@ class TtsHistorySessionTest {
         }
 
     @Test
+    fun aTapWhileAPageJobIsGenuinelyInFlightStartsNoSecondJob() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m2")
+            harness.pager.olderPages.addLast(listOf(harness.record("m1")))
+            harness.speakConversation("m2")
+            val gate = CompletableDeferred<Unit>()
+            harness.pager.loadOlderGate = gate
+
+            harness.session.previousMessage()
+            // The job is now suspended INSIDE loadOlder, not merely scheduled —
+            // a second tap here exercises the concurrent-jobs guard for real.
+            runCurrent()
+            assertEquals(1, harness.pager.loadOlderCalls)
+            harness.session.previousMessage()
+            runCurrent()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(1, harness.pager.loadOlderCalls)
+            assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
+            assertEquals(0, (harness.controller.state.value as TtsState.Speaking).messageIndex)
+        }
+
+    @Test
     fun stopMidLoadCancelsThePageJobAndDropsItsCompletion() =
         runTest {
             val harness = SessionHarness(this)
@@ -223,6 +250,51 @@ class TtsHistorySessionTest {
 
             assertNull(harness.session.edgeState.value)
             assertEquals(listOf("m9"), harness.controller.queuedMessageIds())
+        }
+
+    @Test
+    fun anInvalidationWhileTheJobIsMidFlightLeavesItsLateCompletionInert() =
+        runTest {
+            val harness = SessionHarness(this)
+            // The anchor is missing from the loaded window and unrecoverable,
+            // so the walk would end in a retryable failure — but a new manual
+            // start lands while the job is mid-flight, so that late failure
+            // belongs to a dead generation and must not surface.
+            harness.loadTimeline("t1")
+            harness.speakConversation("m2")
+            harness.pager.onEnsureLoaded = { harness.speakConversation("m9") }
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertNull(harness.session.edgeState.value)
+            assertEquals(listOf("m9"), harness.controller.queuedMessageIds())
+            assertTrue(harness.controller.state.value is TtsState.Speaking)
+        }
+
+    @Test
+    fun naturalCompletionDetachesTheSessionWithoutAnExplicitClear() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2")
+            // Queue tail m1 is not the timeline tail, so the session starts
+            // detached — only the completion collector can restore appends.
+            harness.speakConversation("m1")
+            advanceUntilIdle()
+            assertFalse(harness.session.allowsLiveAppend())
+
+            var next = 0
+            while (harness.controller.state.value is TtsState.Speaking) {
+                harness.engine.complete(next)
+                next += 1
+            }
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            advanceUntilIdle()
+
+            assertTrue(harness.session.allowsLiveAppend())
+            harness.session.nextMessage()
+            advanceUntilIdle()
+            assertEquals(0, harness.pager.loadNewerCalls)
         }
 
     @Test
@@ -258,12 +330,14 @@ class TtsHistorySessionTest {
     fun pagingAwayFromTheLiveTailRefusesLiveAppends() =
         runTest {
             val harness = SessionHarness(this)
-            val queued = (11..61).map { "m%02d".format(it) }
+            val queued = (11..60).map { "m%02d".format(it) }
             val older = (1..10).map { "m%02d".format(it) }
             harness.loadTimeline(*(older + queued).toTypedArray())
-            harness.speakConversation(*queued.take(50).toTypedArray())
-            assertTrue(harness.controller.appendSpeech(harness.entry("m61"), Locale.US))
+            harness.speakConversation(*queued.toTypedArray())
             assertTrue(harness.session.allowsLiveAppend())
+            harness.pager.loaded.add(harness.record("m61"))
+            assertTrue(harness.session.allowsLiveAppend())
+            assertTrue(harness.controller.appendSpeech(harness.entry("m61"), Locale.US))
 
             harness.session.previousMessage()
             advanceUntilIdle()
@@ -273,6 +347,89 @@ class TtsHistorySessionTest {
             assertEquals(TTS_HISTORY_WINDOW_MAX_MESSAGES, harness.controller.queuedMessageIds().size)
             assertEquals("m01", harness.controller.queuedMessageIds().first())
             assertFalse(harness.session.allowsLiveAppend())
+        }
+
+    @Test
+    fun aTimelineWindowTrimIsNotMistakenForALiveArrival() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2", "m3")
+            harness.speakConversation("m1", "m2", "m3")
+            assertTrue(harness.session.allowsLiveAppend())
+
+            // Paging the chat older replaces the subscription window and trims
+            // the newest rows — the window's new last id is an OLD message.
+            harness.pager.loaded.removeAll { it.messageIdHex == "m3" }
+            harness.pager.loaded.add(0, harness.record("m0"))
+
+            assertFalse(harness.session.allowsLiveAppend())
+        }
+
+    @Test
+    fun aGenuineArrivalKeepsAppendsFlowingAndAdvancesTheKnownTail() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2")
+            harness.speakConversation("m1", "m2")
+
+            harness.pager.loaded.add(harness.record("m3"))
+            assertTrue(harness.session.allowsLiveAppend())
+
+            // The verified tail moved to m3, so a trim dropping m3 now refuses.
+            harness.pager.loaded.removeAll { it.messageIdHex == "m3" }
+            assertFalse(harness.session.allowsLiveAppend())
+        }
+
+    @Test
+    fun appendsAreRefusedWhileAnEdgeLoadOwnsTheWindow() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m2")
+            harness.pager.olderPages.addLast(listOf(harness.record("m1")))
+            harness.speakConversation("m2")
+            val gate = CompletableDeferred<Unit>()
+            harness.pager.loadOlderGate = gate
+
+            harness.session.previousMessage()
+            assertFalse(harness.session.allowsLiveAppend())
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(harness.session.allowsLiveAppend())
+        }
+
+    @Test
+    fun cappedBacklogStartBeginsDetachedAndTheNewerEdgeReachesTheRemainder() =
+        runTest {
+            val harness = SessionHarness(this)
+            val ids = (1..60).map { "m%02d".format(it) }
+            harness.loadTimeline(*ids.toTypedArray())
+            harness.speakConversation(*ids.toTypedArray())
+            assertEquals(TTS_AUTO_READ_MAX_MESSAGES, harness.controller.queuedMessageIds().size)
+
+            // The queue tail is unread #50, not the live tail — an arrival must
+            // not splice mid-history where it would strand #51..N forever.
+            assertFalse(harness.session.allowsLiveAppend())
+            harness.pager.loaded.add(harness.record("m61"))
+            assertFalse(harness.session.allowsLiveAppend())
+
+            repeat(49) { harness.session.nextMessage() }
+            harness.session.nextMessage()
+            advanceUntilIdle()
+
+            val state = harness.controller.state.value as TtsState.Speaking
+            assertEquals("Text m51.", state.messagePreview)
+            assertEquals("m60", harness.controller.queuedMessageIds().last())
+        }
+
+    @Test
+    fun anUncappedBacklogStartStaysAttachedToTheLiveTail() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2", "m3")
+            harness.speakConversation("m1", "m2", "m3")
+
+            assertTrue(harness.session.allowsLiveAppend())
         }
 
     @Test
@@ -311,6 +468,113 @@ class TtsHistorySessionTest {
                 TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older),
                 harness.session.edgeState.value,
             )
+            assertEquals(stateBefore, harness.controller.state.value)
+        }
+
+    @Test
+    fun anAnchorOlderThanTheLoadedWindowRecoversByPagingOlder() =
+        runTest {
+            val harness = SessionHarness(this)
+            // The chat was scrolled newer while listening: the window moved
+            // past the anchor, which now sits in unloaded older history.
+            harness.loadTimeline("m5", "m6")
+            harness.pager.olderPages.addLast(
+                listOf(harness.record("m2"), harness.record("m3"), harness.record("m4")),
+            )
+            harness.speakConversation("m3")
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertNull(harness.session.edgeState.value)
+            assertEquals(listOf("m2", "m3"), harness.controller.queuedMessageIds())
+            assertEquals("Text m2.", (harness.controller.state.value as TtsState.Speaking).messagePreview)
+        }
+
+    @Test
+    fun anAnchorNewerThanTheLoadedWindowRecoversByPagingNewer() =
+        runTest {
+            val harness = SessionHarness(this)
+            // The chat was scrolled older while listening: only paging NEWER
+            // can bring the window back to the anchor.
+            harness.loadTimeline("m1", "m2")
+            harness.pager.newerPages.addLast(
+                listOf(harness.record("m3"), harness.record("m4"), harness.record("m5")),
+            )
+            harness.speakConversation("m5")
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertNull(harness.session.edgeState.value)
+            assertTrue(harness.pager.loadNewerCalls >= 1)
+            assertEquals(0, harness.pager.loadOlderCalls)
+            assertEquals(listOf("m1", "m2", "m3", "m4", "m5"), harness.controller.queuedMessageIds())
+            assertEquals("Text m4.", (harness.controller.state.value as TtsState.Speaking).messagePreview)
+        }
+
+    @Test
+    fun anUnrecoverableAnchorFailsRetryably() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("t1")
+            harness.speakConversation("m2")
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertEquals(
+                TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older),
+                harness.session.edgeState.value,
+            )
+            assertEquals(listOf("m2"), harness.controller.queuedMessageIds())
+        }
+
+    @Test
+    fun anArrivalDuringANewerEdgeWalkNeverYieldsAFalseReattachment() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2")
+            // Detached start: the queue holds m1 while the timeline tail is m2.
+            harness.speakConversation("m1")
+            harness.pager.onProjectSpeakable = { id ->
+                if (id == "m2") {
+                    harness.pager.loaded.add(harness.record("m3"))
+                    harness.pager.onProjectSpeakable = null
+                }
+            }
+
+            harness.session.nextMessage()
+            advanceUntilIdle()
+
+            // The arrival landed between the walk and the apply: the final
+            // window may not hold it, so the session must stay detached.
+            assertFalse(harness.session.allowsLiveAppend())
+
+            harness.session.nextMessage()
+            advanceUntilIdle()
+
+            assertEquals(listOf("m1", "m2", "m3"), harness.controller.queuedMessageIds())
+            assertTrue(harness.session.allowsLiveAppend())
+        }
+
+    @Test
+    fun aLongRunOfUnspeakableHistorySilentlyStopsAtThePageBound() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m9")
+            harness.speakConversation("m9")
+            repeat(7) { page ->
+                harness.pager.olderPages.addLast(listOf(harness.unspeakableRecord("u$page")))
+            }
+            val stateBefore = harness.controller.state.value
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertNull(harness.session.edgeState.value)
+            assertEquals(6, harness.pager.loadOlderCalls)
+            assertEquals(listOf("m9"), harness.controller.queuedMessageIds())
             assertEquals(stateBefore, harness.controller.state.value)
         }
 
@@ -353,6 +617,7 @@ class TtsHistorySessionTest {
                 senderDisplayName = "N$id",
                 text = "Text $id.",
                 messageIdHex = id,
+                timelineAt = timelinePosition(id),
             )
 
         fun record(id: String): AppMessageRecordFfi {
@@ -380,9 +645,13 @@ class TtsHistorySessionTest {
                 sourceEpoch = null,
                 retentionSeconds = null,
                 retentionExpiresAt = null,
-                recordedAt = 1uL,
+                recordedAt = timelinePosition(id),
                 receivedAt = 1uL,
             )
+
+        // Fake ids carry their timeline order in their digits, so recovery
+        // direction decisions mirror the production timestamp comparison.
+        private fun timelinePosition(id: String): ULong = id.filter(Char::isDigit).toULongOrNull() ?: 1uL
     }
 
     private class FakeHistoryPager : TtsHistoryPager {
@@ -394,6 +663,17 @@ class TtsHistorySessionTest {
         var loadOlderCalls = 0
         var loadNewerCalls = 0
 
+        // Suspends loadOlder after counting the call, so a test can hold a
+        // page job genuinely in flight instead of merely scheduled.
+        var loadOlderGate: CompletableDeferred<Unit>? = null
+
+        // Runs synchronously inside ensureLoaded, from the job's own stack.
+        var onEnsureLoaded: (() -> Unit)? = null
+
+        // Runs before each projection, letting a test inject a live arrival
+        // mid-walk.
+        var onProjectSpeakable: ((String) -> Unit)? = null
+
         override val hasMoreBefore: Boolean get() = olderPages.isNotEmpty()
         override val hasMoreAfter: Boolean get() = newerPages.isNotEmpty()
 
@@ -401,6 +681,7 @@ class TtsHistorySessionTest {
 
         override suspend fun loadOlder(): Boolean {
             loadOlderCalls += 1
+            loadOlderGate?.await()
             val failing = failNextOlderLoads > 0
             if (failing) failNextOlderLoads -= 1
             val page = if (failing) null else olderPages.removeFirstOrNull()
@@ -415,17 +696,38 @@ class TtsHistorySessionTest {
             return page != null
         }
 
-        override suspend fun ensureLoaded(id: String): Boolean = loaded.any { it.messageIdHex == id }
+        // Mirrors the production two-direction recovery: page toward the
+        // target's timeline position until present or that side is exhausted.
+        override suspend fun ensureLoaded(
+            messageIdHex: String,
+            timelineAt: ULong,
+        ): Boolean {
+            onEnsureLoaded?.invoke()
+            while (loaded.none { it.messageIdHex == messageIdHex }) {
+                val advanced =
+                    when {
+                        loaded.isEmpty() -> false
+                        timelineAt < loaded.first().recordedAt -> loadOlder()
+                        timelineAt > loaded.last().recordedAt -> loadNewer()
+                        else -> false
+                    }
+                if (!advanced) break
+            }
+            return loaded.any { it.messageIdHex == messageIdHex }
+        }
 
-        override suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry? =
-            speakableTextById[record.messageIdHex]?.let { text ->
+        override suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry? {
+            onProjectSpeakable?.invoke(record.messageIdHex)
+            return speakableTextById[record.messageIdHex]?.let { text ->
                 TtsSpeakableEntry(
                     senderKey = record.sender,
                     senderDisplayName = "N${record.messageIdHex}",
                     text = text,
                     messageIdHex = record.messageIdHex,
+                    timelineAt = record.recordedAt,
                 )
             }
+        }
     }
 
     private class FakeSessionEngine : TtsSpeechEngine {

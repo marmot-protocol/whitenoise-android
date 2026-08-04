@@ -8,7 +8,9 @@ enum class TtsHistoryDirection {
 
 // Upper bound on queued messages a paged read-aloud session may hold. Keeps
 // the decrypted-text projection bounded no matter how far the user pages —
-// evicted messages reload from the canonical timeline on demand.
+// evicted messages reload from the canonical timeline on demand. Sized as the
+// auto-read start cap (50) plus one edge fill (10), so the first extension of
+// a maximal backlog never evicts.
 internal const val TTS_HISTORY_WINDOW_MAX_MESSAGES = 60
 
 /** Pure merge of a loaded history page into the bounded read-aloud window. */

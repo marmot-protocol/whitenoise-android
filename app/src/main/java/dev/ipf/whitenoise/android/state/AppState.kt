@@ -1473,7 +1473,10 @@ class WhiteNoiseAppState private constructor(
 
             override suspend fun loadNewer(): Boolean = controller.loadNewerTimelinePage()
 
-            override suspend fun ensureLoaded(id: String): Boolean = controller.loadUntilMessageAvailable(id)
+            override suspend fun ensureLoaded(
+                id: String,
+                timelineAt: ULong,
+            ): Boolean = controller.loadTimelineMessageAvailable(id, timelineAt)
 
             override suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry? =
                 projectTtsSpeakableEntry(

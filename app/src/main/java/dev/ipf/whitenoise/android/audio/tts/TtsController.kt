@@ -191,6 +191,10 @@ class TtsController internal constructor(
     @Synchronized
     internal fun queuedMessageIds(): List<String> = queue.queuedMessagesSnapshot().map(TtsQueuedMessage::messageIdHex)
 
+    /** Queued window in playback order, for edge-walk anchoring by id + timeline position. */
+    @Synchronized
+    internal fun queuedMessagesSnapshot(): List<TtsQueuedMessage> = queue.queuedMessagesSnapshot()
+
     /**
      * Extends an active session's window with freshly projected history and
      * repositions onto [targetMessageIdHex]. Deliberately NOT routed through
@@ -287,6 +291,7 @@ class TtsController internal constructor(
                 // The queue reflattens indices itself — sentence identity must survive.
                 chunks = chunks.map { chunk -> chunk.copy(index = 0) },
                 messageIdHex = messageIdHex,
+                timelineAt = timelineAt,
             )
         }
     }

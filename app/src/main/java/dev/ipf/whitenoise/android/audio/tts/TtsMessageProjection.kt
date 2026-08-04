@@ -52,6 +52,7 @@ internal suspend fun projectTtsSpeakableEntry(
                 senderDisplayName = senderDisplayName,
                 text = it,
                 messageIdHex = message.messageIdHex,
+                timelineAt = message.recordedAt,
             )
         }
 }

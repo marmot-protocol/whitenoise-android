@@ -8285,6 +8285,17 @@ class ConversationController(
         return timelineRecords.containsKey(match.messageIdHex)
     }
 
+    /**
+     * Move the bounded window toward a message at a known timeline position,
+     * paging in whichever direction it lies — [loadUntilMessageAvailable]
+     * only walks older, so it can never reach a target newer than the loaded
+     * window and drags the window further away with each retry.
+     */
+    suspend fun loadTimelineMessageAvailable(
+        messageIdHex: String,
+        timelineAt: ULong,
+    ): Boolean = loadSearchResultMessageAvailable(ConversationSearchMatch(messageIdHex, timelineAt))
+
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
     /**
