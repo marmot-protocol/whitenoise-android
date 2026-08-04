@@ -28,10 +28,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -55,19 +59,23 @@ internal fun TtsTransportBar(
     val current = state
     if (current is TtsState.Idle) return
     val rateOverride by appState.ttsRatePreferences.rateOverride.collectAsState()
+    val historyEdge by appState.ttsHistorySession.edgeState.collectAsState()
 
     TtsTransportBarContent(
         state = current,
         rateLabel = ttsRateLabel(rateOverride ?: appState.ttsRatePreferences.resolvedRate()),
         onPause = { appState.ttsController.pause() },
         onResume = { appState.ttsController.resume() },
-        onPreviousSentence = { appState.ttsController.skipPreviousSentence() },
-        onNextSentence = { appState.ttsController.skipNextSentence() },
-        onPreviousMessage = { appState.ttsController.skipPreviousMessage() },
-        onNextMessage = { appState.ttsController.skipNextMessage() },
+        // Navigation routes through the history session so an edge tap pages
+        // the conversation instead of completing or clamping the queue.
+        onPreviousSentence = { appState.ttsHistorySession.previousSentence() },
+        onNextSentence = { appState.ttsHistorySession.nextSentence() },
+        onPreviousMessage = { appState.ttsHistorySession.previousMessage() },
+        onNextMessage = { appState.ttsHistorySession.nextMessage() },
         onCycleRate = { appState.setTtsRateOverride(nextTtsPresetRate(rateOverride)) },
         onStop = { appState.stopSpeaking() },
         modifier = modifier,
+        historyEdge = historyEdge,
     )
 }
 
@@ -85,9 +93,10 @@ internal fun TtsTransportBarContent(
     onCycleRate: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    historyEdge: TtsHistoryEdgeState? = null,
 ) {
     val isError = state is TtsState.Error
-    val navigationEnabled = ttsNavigationEnabled(state)
+    val navigationEnabled = ttsNavigationEnabled(state, historyEdge)
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
             Row(
@@ -143,6 +152,7 @@ internal fun TtsTransportBarContent(
                                     .clearAndSetSemantics {},
                         )
                     }
+                    HistoryEdgeStatus(historyEdge)
                 }
                 if (!isError) {
                     TextButton(onClick = onCycleRate) { Text(rateLabel) }
@@ -211,6 +221,41 @@ internal fun ttsSentenceIndex(state: TtsState): Int = state.sentenceIndexWithinM
 internal fun ttsSentenceCount(state: TtsState): Int = state.sentenceCountWithinMessage
 
 internal fun ttsNavigationEnabled(state: TtsState): Boolean = state !is TtsState.Error && state !is TtsState.Idle
+
+// A pending edge load owns the cursor: every navigation action disables so
+// duplicate or conflicting requests can't queue up behind it.
+internal fun ttsNavigationEnabled(
+    state: TtsState,
+    historyEdge: TtsHistoryEdgeState?,
+): Boolean = ttsNavigationEnabled(state) && historyEdge !is TtsHistoryEdgeState.Loading
+
+// Compact status line for a pending or failed history edge load, announced
+// politely so TalkBack narrates the state change without stealing focus.
+@Suppress("FunctionNaming")
+@Composable
+private fun HistoryEdgeStatus(historyEdge: TtsHistoryEdgeState?) {
+    val (text, color) =
+        when (historyEdge) {
+            is TtsHistoryEdgeState.Loading ->
+                stringResource(R.string.tts_bar_history_loading) to MaterialTheme.colorScheme.onSurfaceVariant
+
+            is TtsHistoryEdgeState.Failed ->
+                stringResource(R.string.tts_bar_history_error) to MaterialTheme.colorScheme.error
+
+            null -> return
+        }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            Modifier
+                .padding(top = 2.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+    )
+}
 
 /** Cycles the preset list; from the System default it starts at 1×. */
 internal fun nextTtsPresetRate(currentOverride: Float?): Float {

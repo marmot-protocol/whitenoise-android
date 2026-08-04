@@ -59,3 +59,10 @@ internal fun ttsMessageWithChunks(
     )
 
 internal fun ttsMessages(vararg messages: TtsQueuedMessage): List<TtsQueuedMessage> = messages.toList()
+
+internal fun ttsMessageWithId(
+    messageIdHex: String,
+    senderKey: String,
+    senderDisplayName: String,
+    vararg sentences: String,
+): TtsQueuedMessage = ttsMessage(senderKey, senderDisplayName, *sentences).copy(messageIdHex = messageIdHex)

@@ -8218,6 +8218,16 @@ class ConversationController(
         loadOlderPage()
     }
 
+    /** True when the canonical timeline holds more history after the loaded window. */
+    val hasMoreAfterTimeline: Boolean
+        get() = hasMoreAfter
+
+    /** Pages the subscription window older; true when the window actually advanced. */
+    suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
+
+    /** Pages the subscription window newer; true when the window actually advanced. */
+    suspend fun loadNewerTimelinePage(): Boolean = loadNewerPage()
+
     suspend fun loadUntilMessageAvailable(
         messageIdHex: String,
         maxOlderPages: Int = ReplyNavigation.MaxOlderPages,

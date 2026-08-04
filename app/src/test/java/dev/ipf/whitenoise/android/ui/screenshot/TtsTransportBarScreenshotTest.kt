@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.audio.tts.TtsError
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryDirection
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.errorTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
@@ -86,6 +88,42 @@ class TtsTransportBarScreenshotTest {
         capture("tts_transport_bar_error_amoled")
     }
 
+    @Test
+    fun ttsTransportBarHistoryLoadingLight() {
+        render(speaking(), darkTheme = false, amoled = false, historyEdge = loadingEdge())
+        capture("tts_transport_bar_history_loading_light")
+    }
+
+    @Test
+    fun ttsTransportBarHistoryLoadingDark() {
+        render(speaking(), darkTheme = true, amoled = false, historyEdge = loadingEdge())
+        capture("tts_transport_bar_history_loading_dark")
+    }
+
+    @Test
+    fun ttsTransportBarHistoryLoadingAmoled() {
+        render(speaking(), darkTheme = true, amoled = true, historyEdge = loadingEdge())
+        capture("tts_transport_bar_history_loading_amoled")
+    }
+
+    @Test
+    fun ttsTransportBarHistoryErrorLight() {
+        render(paused(), darkTheme = false, amoled = false, historyEdge = failedEdge())
+        capture("tts_transport_bar_history_error_light")
+    }
+
+    @Test
+    fun ttsTransportBarHistoryErrorDark() {
+        render(paused(), darkTheme = true, amoled = false, historyEdge = failedEdge())
+        capture("tts_transport_bar_history_error_dark")
+    }
+
+    @Test
+    fun ttsTransportBarHistoryErrorAmoled() {
+        render(paused(), darkTheme = true, amoled = true, historyEdge = failedEdge())
+        capture("tts_transport_bar_history_error_amoled")
+    }
+
     private val preview = "Alice: The quick brown fox jumps over it"
 
     private fun speaking(): TtsState = speakingTts(4, 20, 1, 12, preview, sentenceIndex = 2, sentenceCount = 8)
@@ -104,10 +142,15 @@ class TtsTransportBarScreenshotTest {
             sentenceCount = 8,
         )
 
+    private fun loadingEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older)
+
+    private fun failedEdge(): TtsHistoryEdgeState = TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older)
+
     private fun render(
         state: TtsState,
         darkTheme: Boolean,
         amoled: Boolean,
+        historyEdge: TtsHistoryEdgeState? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
@@ -123,6 +166,7 @@ class TtsTransportBarScreenshotTest {
                     onCycleRate = {},
                     onStop = {},
                     modifier = Modifier.width(360.dp).testTag(TAG),
+                    historyEdge = historyEdge,
                 )
             }
         }

@@ -1246,6 +1246,8 @@
     <string name="tts_bar_progress">Phrase %1$d sur %2$d, message %3$d sur %4$d</string>
     <string name="tts_bar_stop">Arrêter la lecture</string>
     <string name="tts_bar_error">Lecture à voix haute impossible</string>
+    <string name="tts_bar_history_loading">Chargement d\'autres messages…</string>
+    <string name="tts_bar_history_error">Impossible de charger d\'autres messages. Touchez à nouveau pour réessayer.</string>
     <string name="tts_auto_read_title">Lire les messages à voix haute</string>
     <string name="tts_auto_read_subtitle">Lire les messages non lus à l\'ouverture de cette discussion</string>
     <string name="tts_settings_rate_system">Système (suivre le réglage de l\'appareil)</string>

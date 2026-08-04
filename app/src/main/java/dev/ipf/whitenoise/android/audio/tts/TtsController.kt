@@ -45,6 +45,10 @@ class TtsController internal constructor(
     private val speechRate: () -> Float = { 1.0f },
 ) {
     private var engine: TtsSpeechEngine? = null
+
+    // Locale of the active queue, retained so history pages loaded mid-session
+    // chunk with the same sentence iterator the session started with.
+    private var queueLocale: Locale = Locale.getDefault()
     private val queue =
         TtsPlaybackQueue(
             stopEngine = { engine?.stop() },
@@ -93,6 +97,7 @@ class TtsController internal constructor(
         val messages = entries.toQueuedMessages(locale)
         if (messages.isEmpty()) return false
         if (!acquireAudioFocus()) return false
+        queueLocale = locale
 
         val languageStatus = activeEngine.setLanguage(locale)
         if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
@@ -159,27 +164,57 @@ class TtsController internal constructor(
     }
 
     @Synchronized
-    fun skipNextMessage() {
-        if (!canNavigate()) return
-        queue.skipNextMessage()
+    fun skipNextMessage(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!canNavigate()) return TtsNavigationOutcome.Inactive
+        return queue.skipNextMessage(deferAtEdge)
     }
 
     @Synchronized
-    fun skipPreviousMessage() {
-        if (!canNavigate()) return
-        queue.skipPreviousMessage()
+    fun skipPreviousMessage(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!canNavigate()) return TtsNavigationOutcome.Inactive
+        return queue.skipPreviousMessage(deferAtEdge)
     }
 
     @Synchronized
-    fun skipNextSentence() {
-        if (!canNavigate()) return
-        queue.skipNextSentence()
+    fun skipNextSentence(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!canNavigate()) return TtsNavigationOutcome.Inactive
+        return queue.skipNextSentence(deferAtEdge)
     }
 
     @Synchronized
-    fun skipPreviousSentence() {
-        if (!canNavigate()) return
-        queue.skipPreviousSentence()
+    fun skipPreviousSentence(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!canNavigate()) return TtsNavigationOutcome.Inactive
+        return queue.skipPreviousSentence(deferAtEdge)
+    }
+
+    /** Message ids of the queued window in playback order, empty ids included. */
+    @Synchronized
+    internal fun queuedMessageIds(): List<String> = queue.queuedMessagesSnapshot().map(TtsQueuedMessage::messageIdHex)
+
+    /**
+     * Extends an active session's window with freshly projected history and
+     * repositions onto [targetMessageIdHex]. Deliberately NOT routed through
+     * [boundedSpeakableEntries]: the auto-read hazard cap must not silently
+     * end a history session the user is steering — this window is bounded by
+     * [TTS_HISTORY_WINDOW_MAX_MESSAGES] eviction instead.
+     */
+    @Synchronized
+    internal fun extendReadAloudWindow(
+        direction: TtsHistoryDirection,
+        entries: List<TtsSpeakableEntry>,
+        targetMessageIdHex: String,
+        targetSentence: TtsWindowSentenceTarget,
+    ): Boolean {
+        if (!canNavigate()) return false
+        val incoming = entries.mapNotNull { it.toQueuedMessage(queueLocale) }
+        val merged =
+            TtsHistoryWindow.merge(
+                existing = queue.queuedMessagesSnapshot(),
+                incoming = incoming,
+                direction = direction,
+                targetMessageIdHex = targetMessageIdHex,
+            )
+        return queue.replaceWindow(merged, targetMessageIdHex, targetSentence)
     }
 
     // Navigation never acquires audio focus: while paused it only repositions
@@ -251,6 +286,7 @@ class TtsController internal constructor(
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
                 // The queue reflattens indices itself — sentence identity must survive.
                 chunks = chunks.map { chunk -> chunk.copy(index = 0) },
+                messageIdHex = messageIdHex,
             )
         }
     }

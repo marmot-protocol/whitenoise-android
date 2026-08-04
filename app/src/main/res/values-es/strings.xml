@@ -1246,6 +1246,8 @@
     <string name="tts_bar_progress">Frase %1$d de %2$d, mensaje %3$d de %4$d</string>
     <string name="tts_bar_stop">Detener lectura</string>
     <string name="tts_bar_error">No se pudo leer en voz alta</string>
+    <string name="tts_bar_history_loading">Cargando más mensajes…</string>
+    <string name="tts_bar_history_error">No se pudieron cargar más mensajes. Toca de nuevo para reintentar.</string>
     <string name="tts_auto_read_title">Leer mensajes en voz alta</string>
     <string name="tts_auto_read_subtitle">Leer los mensajes no leídos al abrir este chat</string>
     <string name="tts_settings_rate_system">Sistema (seguir el ajuste del dispositivo)</string>

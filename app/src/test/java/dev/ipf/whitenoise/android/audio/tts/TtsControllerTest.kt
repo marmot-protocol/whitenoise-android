@@ -441,6 +441,73 @@ class TtsControllerTest {
     }
 
     @Test
+    fun historyWindowExtensionIgnoresTheAutoReadCapAndEvictsAtItsOwnBound() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val initial = (1..55).map { entryWithId("m%02d".format(it)) }
+        assertTrue(controller.speak(initial, Locale.US))
+        assertEquals(TTS_AUTO_READ_MAX_MESSAGES, controller.queuedMessageIds().size)
+
+        val newer = (51..65).map { entryWithId("m%02d".format(it)) }
+        val extended =
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Newer,
+                entries = newer,
+                targetMessageIdHex = "m51",
+                targetSentence = TtsWindowSentenceTarget.First,
+            )
+
+        assertTrue(extended)
+        // 50 + 15 exceeds the history bound, so the oldest head evicts — the
+        // deliberate session is capped by eviction, never by the auto-read cap.
+        assertEquals(TTS_HISTORY_WINDOW_MAX_MESSAGES, controller.queuedMessageIds().size)
+        assertEquals("m06", controller.queuedMessageIds().first())
+        assertEquals("m65", controller.queuedMessageIds().last())
+        val state = controller.state.value as TtsState.Speaking
+        assertEquals(45, state.messageIndex)
+        assertEquals("Text m51.", state.messagePreview)
+    }
+
+    @Test
+    fun historyWindowExtensionRefusesWhenNoSessionIsActive() {
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(FakeTtsSpeechEngine())
+
+        assertFalse(
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Older,
+                entries = listOf(entryWithId("m1")),
+                targetMessageIdHex = "m1",
+                targetSentence = TtsWindowSentenceTarget.First,
+            ),
+        )
+    }
+
+    @Test
+    fun deferredMessageNavigationReportsEdgesThroughTheController() {
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(FakeTtsSpeechEngine())
+        controller.speak(listOf(entryWithId("m1")), Locale.US)
+
+        assertEquals(TtsNavigationOutcome.AtOlderEdge, controller.skipPreviousMessage(deferAtEdge = true))
+        assertEquals(TtsNavigationOutcome.AtNewerEdge, controller.skipNextMessage(deferAtEdge = true))
+        assertTrue(controller.state.value is TtsState.Speaking)
+
+        controller.stop()
+
+        assertEquals(TtsNavigationOutcome.Inactive, controller.skipNextMessage(deferAtEdge = true))
+    }
+
+    private fun entryWithId(id: String): TtsSpeakableEntry =
+        TtsSpeakableEntry(
+            senderKey = "alice",
+            senderDisplayName = "Alice",
+            text = "Text $id.",
+            messageIdHex = id,
+        )
+
+    @Test
     fun appendNeverResurrectsAnIdleSession() {
         val engine = FakeTtsSpeechEngine()
         val controller = controller(FakeTtsAudioFocus())

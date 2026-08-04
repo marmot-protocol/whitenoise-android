@@ -6,4 +6,7 @@ internal data class TtsQueuedMessage(
     val senderDisplayName: String,
     val preview: String,
     val chunks: List<TtsChunk>,
+    // Stable conversation identity, empty for ad-hoc speech. Window mutations
+    // key their bookkeeping on this, never on flattened positions.
+    val messageIdHex: String = "",
 )

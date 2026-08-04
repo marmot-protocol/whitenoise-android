@@ -62,6 +62,25 @@ enum class TtsError {
 }
 
 /**
+ * What a navigation request did. Edge outcomes are only reported when the
+ * caller asked for edge deferral — they mean the queue deliberately did NOT
+ * complete or clamp, leaving the cursor for a history load to resolve.
+ */
+enum class TtsNavigationOutcome {
+    Moved,
+    Completed,
+    AtOlderEdge,
+    AtNewerEdge,
+    Inactive,
+}
+
+/** Which sentence of the target message a window replacement lands on. */
+internal enum class TtsWindowSentenceTarget {
+    First,
+    Last,
+}
+
+/**
  * Pure message-aware sentence queue. The Android TTS owner supplies the two
  * engine operations so queue/progress behavior remains deterministic in tests.
  */
@@ -134,8 +153,17 @@ internal class TtsPlaybackQueue(
     fun append(moreMessages: List<TtsQueuedMessage>): Boolean {
         val current = _state.value
         val active = current is TtsState.Speaking || current is TtsState.Paused
-        if (moreMessages.isEmpty() || !active) return false
-        val appended = appendMessages(moreMessages)
+        // A live echo can race a history load that already queued the same
+        // message — identity wins over arrival order.
+        val queuedIds = messages.mapNotNullTo(hashSetOf()) { it.messageIdHex.takeIf(String::isNotEmpty) }
+        val newMessages =
+            if (active) {
+                moreMessages.filter { it.messageIdHex.isEmpty() || queuedIds.add(it.messageIdHex) }
+            } else {
+                emptyList()
+            }
+        if (newMessages.isEmpty()) return false
+        val appended = appendMessages(newMessages)
         if (current is TtsState.Speaking) {
             publishSpeaking(currentIndex)
             for (chunk in appended) {
@@ -235,43 +263,130 @@ internal class TtsPlaybackQueue(
         _state.value = TtsState.Idle()
     }
 
-    fun skipNextMessage() {
-        if (!isNavigable()) return
+    fun skipNextMessage(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!isNavigable()) return TtsNavigationOutcome.Inactive
         val nextMessage = messageIndexForChunk(currentIndex) + 1
-        if (nextMessage >= messages.size) {
-            completeThroughNavigation()
-            return
+        return when {
+            nextMessage >= messages.size && deferAtEdge -> TtsNavigationOutcome.AtNewerEdge
+            nextMessage >= messages.size -> {
+                completeThroughNavigation()
+                TtsNavigationOutcome.Completed
+            }
+
+            else -> {
+                moveTo(firstChunkIndexOfMessage(nextMessage), SenderAnnouncement.Announce)
+                TtsNavigationOutcome.Moved
+            }
         }
-        moveTo(firstChunkIndexOfMessage(nextMessage), SenderAnnouncement.Announce)
     }
 
-    fun skipPreviousMessage() {
-        if (!isNavigable()) return
-        val previousMessage = (messageIndexForChunk(currentIndex) - 1).coerceAtLeast(0)
-        val target = firstChunkIndexOfMessage(previousMessage)
-        moveTo(target, announcementForTarget(target))
+    fun skipPreviousMessage(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!isNavigable()) return TtsNavigationOutcome.Inactive
+        val currentMessage = messageIndexForChunk(currentIndex)
+        return if (currentMessage == 0 && deferAtEdge) {
+            TtsNavigationOutcome.AtOlderEdge
+        } else {
+            val target = firstChunkIndexOfMessage((currentMessage - 1).coerceAtLeast(0))
+            moveTo(target, announcementForTarget(target))
+            TtsNavigationOutcome.Moved
+        }
     }
 
-    fun skipNextSentence() {
-        if (!isNavigable()) return
+    fun skipNextSentence(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!isNavigable()) return TtsNavigationOutcome.Inactive
         val target = firstChunkIndexAfterSentenceContaining(currentIndex)
-        if (target >= chunks.size) {
-            completeThroughNavigation()
-            return
+        return when {
+            target >= chunks.size && deferAtEdge -> TtsNavigationOutcome.AtNewerEdge
+            target >= chunks.size -> {
+                completeThroughNavigation()
+                TtsNavigationOutcome.Completed
+            }
+
+            else -> {
+                moveTo(target, announcementForTarget(target))
+                TtsNavigationOutcome.Moved
+            }
         }
-        moveTo(target, announcementForTarget(target))
     }
 
-    fun skipPreviousSentence() {
-        if (!isNavigable()) return
-        val currentSentenceStart = firstChunkIndexOfSentenceContaining(currentIndex)
-        if (currentSentenceStart == 0) {
-            moveTo(0, announcementForTarget(0))
-            return
+    fun skipPreviousSentence(deferAtEdge: Boolean = false): TtsNavigationOutcome {
+        if (!isNavigable()) return TtsNavigationOutcome.Inactive
+        // Only the very first chunk is a genuine boundary crossing — anywhere
+        // later in the first sentence, "previous" restarts that sentence.
+        return if (currentIndex == 0 && deferAtEdge) {
+            TtsNavigationOutcome.AtOlderEdge
+        } else {
+            val currentSentenceStart = firstChunkIndexOfSentenceContaining(currentIndex)
+            val target =
+                if (currentSentenceStart == 0) 0 else firstChunkIndexOfSentenceContaining(currentSentenceStart - 1)
+            moveTo(target, announcementForTarget(target))
+            TtsNavigationOutcome.Moved
         }
-        val target = firstChunkIndexOfSentenceContaining(currentSentenceStart - 1)
-        moveTo(target, announcementForTarget(target))
     }
+
+    /**
+     * Replaces the queued message window while a session is active, landing on
+     * [targetMessageIdHex]. Bookkeeping is re-derived from message identity
+     * because positions are not stable across prepends or eviction. While
+     * speaking the engine restarts at the target; while paused only the cursor
+     * moves, exactly like a paused navigation tap.
+     */
+    fun replaceWindow(
+        window: List<TtsQueuedMessage>,
+        targetMessageIdHex: String,
+        targetSentence: TtsWindowSentenceTarget,
+    ): Boolean {
+        val current = _state.value
+        val active = current is TtsState.Speaking || current is TtsState.Paused
+        val targetMessage = window.indexOfFirst { it.messageIdHex == targetMessageIdHex }
+        if (!active || targetMessage < 0) return false
+        val currentMessageId = messageIdAt(messageIndexForChunk(currentIndex))
+        val announcedId = senderAnnouncedAtMessageIndex?.let(::messageIdAt)
+        val pausedId = messageIndexAtPause?.let(::messageIdAt)
+        messages = window
+        rebuildFlatChunks()
+        senderAnnouncedAtMessageIndex = announcedId?.let(::messageIndexOf)
+        messageIndexAtPause = pausedId?.let(::messageIndexOf)
+        val targetChunk = targetChunkFor(targetMessage, targetSentence)
+        val announcement =
+            if (targetMessageIdHex == currentMessageId) SenderAnnouncement.Suppress else SenderAnnouncement.Announce
+        if (current is TtsState.Paused) {
+            currentIndex = targetChunk
+            pendingResumeAnnouncement =
+                when {
+                    announcement == SenderAnnouncement.Announce -> SenderAnnouncement.Announce
+                    pendingResumeAnnouncement == SenderAnnouncement.Announce -> SenderAnnouncement.Announce
+                    else -> SenderAnnouncement.Suppress
+                }
+            publishPaused(targetChunk)
+        } else {
+            requeueFrom(targetChunk, announcement)
+        }
+        return true
+    }
+
+    fun queuedMessagesSnapshot(): List<TtsQueuedMessage> = messages
+
+    fun currentMessageIdHex(): String? = if (isNavigable()) messageIdAt(messageIndexForChunk(currentIndex)) else null
+
+    private fun targetChunkFor(
+        messageIndex: Int,
+        targetSentence: TtsWindowSentenceTarget,
+    ): Int {
+        val firstChunk = firstChunkIndexOfMessage(messageIndex)
+        if (targetSentence == TtsWindowSentenceTarget.First) return firstChunk
+        val lastChunk =
+            if (messageIndex == messages.lastIndex) {
+                chunks.lastIndex
+            } else {
+                firstChunkIndexOfMessage(messageIndex + 1) - 1
+            }
+        return firstChunkIndexOfSentenceContaining(lastChunk)
+    }
+
+    private fun messageIdAt(index: Int): String? = messages.getOrNull(index)?.messageIdHex?.takeIf(String::isNotEmpty)
+
+    private fun messageIndexOf(id: String): Int? = messages.indexOfFirst { it.messageIdHex == id }.takeIf { it >= 0 }
 
     fun onDone(utteranceId: String?) {
         val completedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
@@ -512,9 +627,20 @@ internal class TtsPlaybackQueue(
     }
 
     private fun messageIndexForChunk(chunkIndex: Int): Int {
+        // Binary search over the sorted first-chunk offsets: this projection
+        // runs once per chunk on every requeue, so a linear scan would go
+        // quadratic as the paged window grows.
+        var low = 0
+        var high = messageFirstChunkIndex.size - 1
         var messageIndex = 0
-        for (index in messageFirstChunkIndex.indices) {
-            if (messageFirstChunkIndex[index] <= chunkIndex) messageIndex = index
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (messageFirstChunkIndex[mid] <= chunkIndex) {
+                messageIndex = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
         }
         return messageIndex
     }

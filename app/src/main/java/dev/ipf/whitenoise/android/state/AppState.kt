@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
@@ -62,9 +63,12 @@ import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionSnapshot
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryPager
+import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -1418,6 +1422,7 @@ class WhiteNoiseAppState private constructor(
             // previous auto-read session: a failed start (blank text, no
             // engine) leaves the old queue playing and still owned.
             ttsAutoReadSessionKey = null
+            ttsHistorySession.onSessionCleared()
         }
         return started
     }
@@ -1430,8 +1435,61 @@ class WhiteNoiseAppState private constructor(
     ): Boolean {
         val owner = ttsAutoReadSessionKeyFor(activeAccountRef, groupIdHex) ?: return false
         val started = speakAloud(entries, locale)
-        if (started) ttsAutoReadSessionKey = owner
+        if (started) {
+            ttsAutoReadSessionKey = owner
+            ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
+        }
         return started
+    }
+
+    /**
+     * History paging for the read-aloud transport. The backing conversation
+     * controller is resolved per edge request, so a controller recreated by
+     * navigation keeps serving the same playback session.
+     */
+    val ttsHistorySession: TtsHistorySession by lazy {
+        TtsHistorySession(
+            controller = ttsController,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + scopeExceptionHandler),
+            resolvePager = ::ttsHistoryPagerFor,
+        )
+    }
+
+    private fun ttsHistoryPagerFor(
+        accountRef: String?,
+        groupIdHex: String,
+    ): TtsHistoryPager? {
+        val controller =
+            synchronized(conversationControllerLock) {
+                newestMatchingController(conversationControllers) { it.matchesConversation(accountRef, groupIdHex) }
+            } ?: return null
+        return object : TtsHistoryPager {
+            override val hasMoreBefore: Boolean get() = controller.hasMoreBefore
+            override val hasMoreAfter: Boolean get() = controller.hasMoreAfterTimeline
+
+            override fun timelineRecords(): List<AppMessageRecordFfi> = controller.timeline.map { it.record }
+
+            override suspend fun loadOlder(): Boolean = controller.loadOlderTimelinePage()
+
+            override suspend fun loadNewer(): Boolean = controller.loadNewerTimelinePage()
+
+            override suspend fun ensureLoaded(id: String): Boolean = controller.loadUntilMessageAvailable(id)
+
+            override suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry? =
+                projectTtsSpeakableEntry(
+                    message = record,
+                    editedText = controller.editsByTarget[record.messageIdHex]?.latestText,
+                    senderDisplayName = displayName(record.sender),
+                    parseMarkdown = { parseMarkdownOrEmpty(it) },
+                    mentionDisplayName = ::mentionDisplayName,
+                    isGroupMember =
+                        if (controller.membersLoaded) {
+                            { bech32 -> isRosterMember(bech32, controller.members) }
+                        } else {
+                            null
+                        },
+                )
+        }
     }
 
     internal val ttsAutoReadPreferences = TtsAutoReadPreferences(appContext)
@@ -1453,11 +1511,18 @@ class WhiteNoiseAppState private constructor(
     fun appendSpeech(
         entry: TtsSpeakableEntry,
         locale: java.util.Locale,
-    ): Boolean = ttsController.appendSpeech(entry, locale)
+    ): Boolean {
+        // A session paged away from the live tail must not have arrivals
+        // spliced next to unrelated older history — they stay reachable
+        // through next-message paging instead.
+        if (!ttsHistorySession.allowsLiveAppend()) return false
+        return ttsController.appendSpeech(entry, locale)
+    }
 
     fun stopSpeaking() {
         ttsController.stop()
         ttsAutoReadSessionKey = null
+        ttsHistorySession.onSessionCleared()
     }
 
     fun setTtsRateOverride(rate: Float?) {

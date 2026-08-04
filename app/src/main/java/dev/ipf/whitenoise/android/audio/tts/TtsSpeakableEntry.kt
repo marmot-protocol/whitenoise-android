@@ -5,6 +5,8 @@ data class TtsSpeakableEntry(
     val senderKey: String,
     val senderDisplayName: String,
     val text: String,
+    // Stable conversation identity, empty for ad-hoc speech (previews, tests).
+    val messageIdHex: String = "",
 )
 
 // A hazard bound, not a feature knob: an inflated unread count would anchor

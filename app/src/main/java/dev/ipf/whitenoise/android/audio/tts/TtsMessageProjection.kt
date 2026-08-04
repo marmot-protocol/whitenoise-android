@@ -51,6 +51,7 @@ internal suspend fun projectTtsSpeakableEntry(
                 senderKey = message.sender,
                 senderDisplayName = senderDisplayName,
                 text = it,
+                messageIdHex = message.messageIdHex,
             )
         }
 }

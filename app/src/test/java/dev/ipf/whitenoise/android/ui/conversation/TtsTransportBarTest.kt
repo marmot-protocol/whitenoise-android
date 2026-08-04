@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsError
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryDirection
+import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.errorTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
@@ -146,6 +148,38 @@ class TtsTransportBarTest {
         }
     }
 
+    @Test
+    fun pendingEdgeLoadDisablesNavigationAndAnnouncesTheLoadingState() {
+        renderBar(
+            state = speakingTts(1, 4, 0, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            historyEdge = TtsHistoryEdgeState.Loading(TtsHistoryDirection.Older),
+        )
+
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_previous)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_skip_next)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_next_message)).assertIsNotEnabled()
+        composeRule.onNodeWithText(label(R.string.tts_bar_history_loading)).assertIsDisplayed()
+        // Playback control stays live: only navigation waits for the page.
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_pause)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).assertIsEnabled()
+    }
+
+    @Test
+    fun failedEdgeLoadKeepsNavigationEnabledForRetryAndShowsTheError() {
+        var previousTaps = 0
+        renderBar(
+            state = pausedTts(1, 4, 0, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            onPreviousMessage = { previousTaps += 1 },
+            historyEdge = TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older),
+        )
+
+        composeRule.onNodeWithText(label(R.string.tts_bar_history_error)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(label(R.string.tts_bar_previous_message)).performClick()
+        assertEquals(1, previousTaps)
+    }
+
     @Suppress("LongParameterList")
     private fun renderBar(
         state: TtsState,
@@ -158,6 +192,7 @@ class TtsTransportBarTest {
         onPreviousMessage: () -> Unit = {},
         onNextMessage: () -> Unit = {},
         onStop: () -> Unit = {},
+        historyEdge: TtsHistoryEdgeState? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -174,6 +209,7 @@ class TtsTransportBarTest {
                         onCycleRate = {},
                         onStop = onStop,
                         modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
+                        historyEdge = historyEdge,
                     )
                 }
             }
