@@ -6,21 +6,16 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
@@ -50,8 +45,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.onboarding.PublicIdentifierFieldTrailingAction
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -184,65 +177,6 @@ internal fun ContactRow(
             }
         }
         trailing?.invoke()
-    }
-}
-
-@Composable
-internal fun SelectedMemberRail(
-    members: List<RecipientSearch.Candidate>,
-    appState: WhiteNoiseAppState,
-    onRemove: (RecipientSearch.Candidate) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-    ) {
-        items(members, key = { it.accountIdHex }) { member ->
-            val name = appState.displayName(member.accountIdHex)
-            val removeLabel = stringResource(R.string.remove_member)
-            Column(
-                modifier =
-                    Modifier
-                        .width(64.dp)
-                        .animateItem()
-                        .clickable(role = Role.Button, onClickLabel = removeLabel) { onRemove(member) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-            ) {
-                Box {
-                    Avatar(
-                        title = name,
-                        seed = member.accountIdHex,
-                        size = 56.dp,
-                        pictureUrl = appState.avatarUrl(member.accountIdHex),
-                    )
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Text(
-                    name,
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
     }
 }
 

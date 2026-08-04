@@ -416,6 +416,24 @@ object MessageProjector {
         return body.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * User-authored caption shown with confirmed or pending media. Pending rows
+     * reuse [AppMessageRecordFfi.plaintext] for a synthetic attachment label
+     * when no caption was entered; that transport placeholder must not become a
+     * visible caption.
+     */
+    fun mediaCaption(
+        message: AppMessageRecordFfi,
+        body: String = message.plaintext,
+    ): String? {
+        val pending = isPendingMedia(message)
+        return body.takeIf {
+            (isMedia(message) || pending) &&
+                it.isNotBlank() &&
+                (!pending || it != pendingMediaPlaceholder(message))
+        }
+    }
+
     /** Read-aloud is deliberately available for exactly the text Copy exposes. */
     fun canSpeak(
         message: AppMessageRecordFfi,

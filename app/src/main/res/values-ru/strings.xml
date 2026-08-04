@@ -667,6 +667,12 @@
     <string name="just_you">Только вы</string>
     <string name="one_member">1 участник</string>
     <string name="members_count">%1$d участников</string>
+    <plurals name="selected_members_count">
+        <item quantity="one">Выбрано: %1$d</item>
+        <item quantity="few">Выбрано: %1$d</item>
+        <item quantity="many">Выбрано: %1$d</item>
+        <item quantity="other">Выбрано: %1$d</item>
+    </plurals>
     <string name="appearance">Оформление</string>
     <string name="appearance_settings_subtitle">Тема и язык</string>
     <string name="data_and_storage">Данные и хранилище</string>
@@ -700,6 +706,9 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Выбрано</string>
+    <string name="review_selection">Проверить выбор</string>
+    <string name="review_selected_members">Проверить выбранных участников</string>
+    <string name="remove_member_named">Удалить %1$s</string>
     <string name="select">Выбрать</string>
     <plurals name="batch_delete_title">
         <item quantity="one">Удалить %1$d сообщение?</item>

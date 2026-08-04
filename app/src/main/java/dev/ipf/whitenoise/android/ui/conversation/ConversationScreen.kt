@@ -4031,6 +4031,7 @@ internal fun ConversationScreen(
                 picked.forEach { sendSharedUser(it) }
             },
             confirmIcon = Icons.AutoMirrored.Filled.Send,
+            confirmLabel = stringResource(R.string.send),
             autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes = setOfNotNull(activeHex),
         )

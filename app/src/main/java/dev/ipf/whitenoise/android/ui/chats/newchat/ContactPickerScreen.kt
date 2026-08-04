@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -61,6 +62,7 @@ internal fun ContactPickerScreen(
     onBack: () -> Unit,
     onConfirm: () -> Unit,
     confirmIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowForward,
+    confirmLabel: String = stringResource(R.string.next),
     busy: Boolean = false,
     // When true the confirm FAB is enabled with no members selected, so the
     // group-creation flow can proceed to naming and create a name-first group
@@ -75,12 +77,35 @@ internal fun ContactPickerScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
+    // The selection itself is owned by the caller and is not saveable. Keep
+    // this transient navigation state in the same lifetime so process
+    // recreation cannot restore an empty review screen over a rebuilt picker.
+    var reviewingSelection by remember { mutableStateOf(false) }
     val resolution = rememberRecipientResolution(query, appState)
 
     // Installed unconditionally: a disabled handler would let back fall
     // through to the Activity while a mutation is mid-flight.
     BackHandler {
-        if (!busy) onBack()
+        if (!busy) {
+            if (reviewingSelection) reviewingSelection = false else onBack()
+        }
+    }
+
+    if (reviewingSelection) {
+        SelectedMembersReviewScreen(
+            members = selected,
+            appState = appState,
+            busy = busy,
+            onBack = { reviewingSelection = false },
+            onRemove = { member ->
+                selected.removeAll { it.accountIdHex.equals(member.accountIdHex, ignoreCase = true) }
+                if (selected.isEmpty()) reviewingSelection = false
+            },
+            onConfirm = onConfirm,
+            confirmIcon = confirmIcon,
+            confirmLabel = confirmLabel,
+        )
+        return
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
@@ -115,14 +140,20 @@ internal fun ContactPickerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        contactPickerTopBarTitle(
-                            pickerTitle = title,
-                            selectedCount = selected.size,
-                            oneMember = stringResource(R.string.one_member),
-                            membersFormat = stringResource(R.string.members_count),
-                        ),
-                    )
+                    Column {
+                        Text(title)
+                        if (selected.isNotEmpty()) {
+                            Text(
+                                pluralStringResource(
+                                    R.plurals.selected_members_count,
+                                    selected.size,
+                                    selected.size,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = !busy) {
@@ -150,7 +181,7 @@ internal fun ContactPickerScreen(
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
-                    Icon(confirmIcon, contentDescription = stringResource(R.string.next))
+                    Icon(confirmIcon, contentDescription = confirmLabel)
                 }
             }
         },
@@ -169,12 +200,11 @@ internal fun ContactPickerScreen(
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
             AnimatedVisibility(visible = selected.isNotEmpty()) {
-                SelectedMemberRail(
+                SelectedMemberSummary(
                     members = selected,
                     appState = appState,
-                    onRemove = { member ->
-                        selected.removeAll { it.accountIdHex == member.accountIdHex }
-                    },
+                    onClick = { if (!busy) reviewingSelection = true },
+                    enabled = !busy,
                 )
             }
             LazyColumn(
@@ -280,18 +310,6 @@ internal fun ContactPickerScreen(
         )
     }
 }
-
-internal fun contactPickerTopBarTitle(
-    pickerTitle: String,
-    selectedCount: Int,
-    oneMember: String,
-    membersFormat: String,
-): String =
-    when (selectedCount) {
-        0 -> pickerTitle
-        1 -> oneMember
-        else -> String.format(membersFormat, selectedCount)
-    }
 
 internal fun shouldAutoSelectResolvedIdentifier(
     autoSelectResolvedIdentifier: Boolean,

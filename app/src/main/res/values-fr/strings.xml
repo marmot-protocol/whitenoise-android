@@ -645,6 +645,10 @@
     <string name="just_you">Juste vous</string>
     <string name="one_member">1 membre</string>
     <string name="members_count">%1$d membres</string>
+    <plurals name="selected_members_count">
+        <item quantity="one">%1$d sélectionné</item>
+        <item quantity="other">%1$d sélectionnés</item>
+    </plurals>
     <string name="appearance">Apparence</string>
     <string name="appearance_settings_subtitle">Thème et langue</string>
     <string name="data_and_storage">Données et stockage</string>
@@ -678,6 +682,9 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Sélectionné</string>
+    <string name="review_selection">Vérifier la sélection</string>
+    <string name="review_selected_members">Vérifier les membres sélectionnés</string>
+    <string name="remove_member_named">Retirer %1$s</string>
     <string name="select">Sélectionner</string>
     <plurals name="batch_delete_title">
         <item quantity="one">Supprimer %1$d message ?</item>
