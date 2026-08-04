@@ -62,13 +62,18 @@ class NotificationReactionWorker(
         input: NotificationReactionInput.Ready,
         retryStore: NotificationActionRetryStore,
         retryKey: String,
-    ): Result =
-        when {
-            !application.appState.notificationActionsAllowed -> lockedReactionResult(retryStore, retryKey)
+    ): Result {
+        val actionsAllowed =
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.notificationActionsAllowed
+            }
+        return when {
+            !actionsAllowed -> lockedReactionResult(retryStore, retryKey)
             retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS ->
                 terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
             else -> sendReaction(application, input, retryStore, retryKey)
         }
+    }
 
     private suspend fun lockedReactionResult(
         retryStore: NotificationActionRetryStore,
@@ -224,7 +229,6 @@ class NotificationReactionWorker(
         private const val KEY_REACTION_CIPHERTEXT = "reaction_ciphertext"
         private const val MAX_SEND_ATTEMPTS = 3
         private const val BACKOFF_DELAY_SECONDS = 30L
-        private const val HEX_BYTE_MASK = 0xff
 
         suspend fun enqueue(
             context: Context,
@@ -266,10 +270,7 @@ class NotificationReactionWorker(
                     reaction,
                 ).joinToString("\u0000")
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-            return "notification_reaction_" +
-                buildString(digest.size * 2) {
-                    digest.forEach { byte -> append("%02x".format(byte.toInt() and HEX_BYTE_MASK)) }
-                }
+            return "notification_reaction_" + digest.toLowercaseHexString()
         }
 
         internal fun notificationReactionRequest(

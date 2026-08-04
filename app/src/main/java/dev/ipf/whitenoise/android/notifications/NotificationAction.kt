@@ -152,11 +152,18 @@ object NotificationActions {
 
     private fun reactionDiscriminator(reaction: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(reaction.toByteArray())
-        return buildString(digest.size * 2) {
-            digest.forEach { byte -> append("%02x".format(byte.toInt() and HEX_BYTE_MASK)) }
-        }
+        return digest.toLowercaseHexString()
     }
 }
+
+internal fun ByteArray.toLowercaseHexString(): String =
+    buildString(size * 2) {
+        this@toLowercaseHexString.forEach { byte ->
+            val value = byte.toInt() and HEX_BYTE_MASK
+            append(HEX_DIGITS[value ushr HEX_NIBBLE_SHIFT])
+            append(HEX_DIGITS[value and HEX_NIBBLE_MASK])
+        }
+    }
 
 internal fun normalizeNotificationReaction(raw: String?): String? {
     val reaction = raw?.trim()?.takeIf(String::isNotEmpty) ?: return null
@@ -166,3 +173,6 @@ internal fun normalizeNotificationReaction(raw: String?): String? {
 
 private const val MAX_NOTIFICATION_REACTION_CODE_POINTS = 32
 private const val HEX_BYTE_MASK = 0xff
+private const val HEX_NIBBLE_SHIFT = 4
+private const val HEX_NIBBLE_MASK = 0x0f
+private const val HEX_DIGITS = "0123456789abcdef"

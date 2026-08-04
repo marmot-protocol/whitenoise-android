@@ -431,6 +431,12 @@ class LocalNotificationPresenter(
                         builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                     }
                     if (!redactContent) {
+                        val quickReactions =
+                            if (decision.actions.contains(NotificationActionKind.REACT)) {
+                                withContext(Dispatchers.Default) { notificationQuickReactionChoices(context) }
+                            } else {
+                                emptyList()
+                            }
                         NotificationActions
                             .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                             ?.let { actionTarget ->
@@ -438,7 +444,7 @@ class LocalNotificationPresenter(
                                     when (action) {
                                         NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
                                         NotificationActionKind.REACT ->
-                                            notificationQuickReactionChoices(context).forEach { reaction ->
+                                            quickReactions.forEach { reaction ->
                                                 builder.addAction(reactionNotificationAction(actionTarget, reaction))
                                             }
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))

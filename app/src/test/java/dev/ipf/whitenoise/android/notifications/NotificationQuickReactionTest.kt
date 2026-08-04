@@ -87,6 +87,11 @@ class NotificationQuickReactionTest {
     }
 
     @Test
+    fun notificationIdentifiersUseStableLowercaseAsciiHex() {
+        assertEquals("000f10ff", byteArrayOf(0x00, 0x0f, 0x10, 0xff.toByte()).toLowercaseHexString())
+    }
+
+    @Test
     fun reactionWorkerEncryptsPayloadAndUsesBoundedNetworkBackoff() {
         val reaction = "🔥 plaintext sentinel"
         val routingAction =
@@ -110,7 +115,9 @@ class NotificationQuickReactionTest {
         assertEquals(BackoffPolicy.EXPONENTIAL, request.workSpec.backoffPolicy)
         assertEquals(30_000L, request.workSpec.backoffDelayDuration)
         assertFalse(input.keyValueMap.values.any { it == reaction })
-        assertFalse(input.toByteArray().toString(Charsets.ISO_8859_1).contains(reaction))
+        val serializedInput = input.toByteArray().asList()
+        val plaintextBytes = reaction.toByteArray(Charsets.UTF_8).asList()
+        assertFalse(serializedInput.windowed(plaintextBytes.size).any { it == plaintextBytes })
         assertEquals(reaction, cipher.decrypt(restored, requestId, routingAction))
         val workName = NotificationReactionWorker.notificationReactionWorkName(routingAction, reaction)
         assertFalse(workName.contains(reaction))
