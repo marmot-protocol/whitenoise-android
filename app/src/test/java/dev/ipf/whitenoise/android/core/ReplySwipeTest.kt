@@ -24,4 +24,28 @@ class ReplySwipeTest {
         assertEquals(36f, ReplySwipe.visualOffset(totalX = 36f, maxOffset = 80f))
         assertEquals(80f, ReplySwipe.visualOffset(totalX = 120f, maxOffset = 80f))
     }
+
+    @Test
+    fun gestureAccumulatorPreservesVerticalMovementForTheReplyDecision() {
+        val gesture =
+            ReplySwipeGesture()
+                .dragBy(deltaX = 36f, deltaY = -44f)
+                .dragBy(deltaX = 36f, deltaY = -44f)
+
+        assertEquals(72f, gesture.totalX)
+        assertEquals(-88f, gesture.totalY)
+        assertEquals(0f, gesture.visualOffset(maxOffset = 80f))
+        assertFalse(gesture.shouldTriggerReply(threshold = 64f))
+    }
+
+    @Test
+    fun gestureAccumulatorTriggersReplyForMostlyHorizontalRightwardMovement() {
+        val gesture =
+            ReplySwipeGesture()
+                .dragBy(deltaX = 36f, deltaY = 6f)
+                .dragBy(deltaX = 36f, deltaY = 6f)
+
+        assertEquals(72f, gesture.visualOffset(maxOffset = 80f))
+        assertTrue(gesture.shouldTriggerReply(threshold = 64f))
+    }
 }

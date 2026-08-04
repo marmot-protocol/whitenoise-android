@@ -93,6 +93,48 @@ internal data class ConversationScrollBookmark(
     internal val intentRevision: Long,
 )
 
+internal data class ConversationTimelineStructure(
+    val rowKeys: List<Pair<String, String>>,
+    val olderHeaderCount: Int,
+)
+
+internal data class ConversationInitialAnchorLayout(
+    val viewportHeight: Int,
+    val targetItemSize: Int?,
+) {
+    val isReady: Boolean
+        get() = viewportHeight > 0 && targetItemSize != null
+}
+
+/**
+ * Baselines layout state at the hidden initial anchor. Startup materialization
+ * is not a post-open change and must not trigger another visible scroll.
+ */
+internal class ConversationPostInitialReanchorGate {
+    private var structure: ConversationTimelineStructure? = null
+    private var viewportHeight: Int? = null
+
+    fun commit(
+        structure: ConversationTimelineStructure,
+        viewportHeight: Int,
+    ) {
+        this.structure = structure
+        this.viewportHeight = viewportHeight
+    }
+
+    fun onStructure(structure: ConversationTimelineStructure): Boolean {
+        val previous = this.structure ?: return false
+        this.structure = structure
+        return structure != previous
+    }
+
+    fun onViewportHeight(viewportHeight: Int): Boolean {
+        val previous = this.viewportHeight ?: return false
+        this.viewportHeight = viewportHeight
+        return viewportHeight != previous
+    }
+}
+
 internal class ConversationScrollIntentToken internal constructor(
     internal val revision: Long,
 )
@@ -334,6 +376,65 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
     ) {
         animateScrollToItem(targetIndex)
     }
+
+/**
+ * Positions an initial target while the transcript is hidden, waits until both
+ * the viewport and target row have stable measured geometry, then commits the
+ * same position once more. Callers may safely reveal only when this returns
+ * true; false means geometry did not stabilize within this attempt.
+ */
+internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
+    targetMessageId: String?,
+    reason: ConversationScrollReason,
+    resultingMode: ConversationScrollMode,
+    targetIndex: Int,
+    pixelOffset: Int = 0,
+    captureLayout: () -> ConversationInitialAnchorLayout,
+    maxSettleFrames: Int = 24,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+): Boolean {
+    var layoutStabilized = false
+    val commandCompleted =
+        programmaticJump(
+            targetMessageId = targetMessageId,
+            reason = reason,
+            resultingMode = resultingMode,
+        ) {
+            scrollToItem(targetIndex, pixelOffset)
+            layoutStabilized =
+                awaitStableInitialAnchorLayout(
+                    captureLayout = captureLayout,
+                    maxFrames = maxSettleFrames,
+                    awaitFrame = awaitFrame,
+                )
+            if (layoutStabilized) {
+                scrollToItem(targetIndex, pixelOffset)
+            }
+        }
+    return commandCompleted && layoutStabilized
+}
+
+private suspend fun awaitStableInitialAnchorLayout(
+    captureLayout: () -> ConversationInitialAnchorLayout,
+    maxFrames: Int,
+    awaitFrame: suspend () -> Unit,
+): Boolean {
+    var previous: ConversationInitialAnchorLayout? = null
+    var stableFrames = 0
+    repeat(maxFrames.coerceAtLeast(1)) {
+        awaitFrame()
+        val current = captureLayout()
+        stableFrames =
+            if (current.isReady && current == previous) {
+                stableFrames + 1
+            } else {
+                0
+            }
+        if (stableFrames >= 1) return true
+        previous = current
+    }
+    return false
+}
 
 internal suspend fun ConversationScrollCoordinator.restoreViewport(
     snapshot: ConversationScrollBookmark,

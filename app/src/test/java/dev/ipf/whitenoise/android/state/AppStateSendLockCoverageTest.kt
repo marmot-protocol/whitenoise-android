@@ -280,23 +280,28 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
-    fun conversationReadAnchorUsesHoistedRenderedTimeline() {
+    fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
         val source = conversationScreenSource().readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorEffectIndex = source.indexOf("LaunchedEffect(controller, currentHighestVisibleTimelineIndex,")
-        val readAnchorEffect =
+        val readAnchorHelperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
+        val readAnchorHelper =
             source.substring(
-                readAnchorEffectIndex,
-                source.indexOf("DisposableEffect(controller)", readAnchorEffectIndex),
+                readAnchorHelperIndex,
+                source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", readAnchorHelperIndex),
             )
+        val readAnchorCallIndex = source.indexOf("rememberConversationReadAnchor(", renderedTimelineIndex)
+        val readAnchorCall = source.substring(readAnchorCallIndex, source.indexOf(")", readAnchorCallIndex) + 1)
 
         assertTrue(
             "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
-                renderedTimelineIndex < readAnchorEffectIndex &&
-                "advanceConversationReadAnchor(" in readAnchorEffect &&
-                "durableAnchorId = controller.lastReadMessageId" in readAnchorEffect &&
-                "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorEffect,
+                renderedTimelineIndex < readAnchorCallIndex &&
+                "renderedTimeline = renderedTimeline" in readAnchorCall &&
+                "remember(listState, renderedSize, hasOlderHeader)" in readAnchorHelper &&
+                "currentHighestVisibleMessageId," in readAnchorHelper &&
+                "advanceConversationReadAnchor(" in readAnchorHelper &&
+                "durableAnchorId = controller.lastReadMessageId" in readAnchorHelper &&
+                "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorHelper,
         )
     }
 
@@ -319,6 +324,23 @@ class AppStateSendLockCoverageTest {
                 entrySnapshotIndex < scrollRestoreIndex &&
                 "entryUnreadCount = entryUnreadCount" in
                 source.substring(scrollRestoreIndex, source.indexOf("val positionalScrollRestore", scrollRestoreIndex)),
+        )
+    }
+
+    @Test
+    fun conversationHistoryReanchorIgnoresSameRowHydration() {
+        val source = conversationScreenSource().readText().replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "startup materialization and same-row media hydration must not restart durable history anchoring",
+            "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
+                "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
+                "scrollCoordinator.commitInitialAnchor(" in source &&
+                Regex("while \\(\\s*!scrollCoordinator\\.commitInitialAnchor\\(").findAll(source).count() == 2 &&
+                "postInitialReanchorGate.commit(" in source &&
+                "postInitialReanchorGate.onStructure(" in source &&
+                "initialTimelineAnchored && structureChanged" in source &&
+                "LaunchedEffect(controller, renderedTimeline, olderHeaderCount" !in source,
         )
     }
 

@@ -15,12 +15,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -165,32 +172,46 @@ internal fun BubbleFooterLayout(
     ) { measurables, constraints ->
         val footerPlaceable = measurables[1].measure(Constraints())
         val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
-        val gap = BubbleFooterGap.roundToPx()
-        val lastRight = (lastLineWidth ?: contentPlaceable.width).coerceIn(0, contentPlaceable.width)
-        val inline = lastRight + gap + footerPlaceable.width <= constraints.maxWidth
-        if (inline) {
-            val width =
-                bubbleFooterInlineWidth(
-                    contentWidth = contentPlaceable.width,
-                    lastLineRight = lastRight,
-                    footerWidth = footerPlaceable.width,
-                    minWidth = constraints.minWidth,
-                    maxWidth = constraints.maxWidth,
-                    gap = gap,
-                )
-            layout(width, contentPlaceable.height) {
-                contentPlaceable.place(0, 0)
-                footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height - footerPlaceable.height)
-            }
-        } else {
-            val width =
-                maxOf(contentPlaceable.width, footerPlaceable.width, constraints.minWidth)
-                    .coerceAtMost(constraints.maxWidth)
-            layout(width, contentPlaceable.height + footerPlaceable.height) {
-                contentPlaceable.place(0, 0)
-                footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height)
-            }
+        layoutMeasuredBubbleFooter(
+            constraints = constraints,
+            content = contentPlaceable,
+            footer = footerPlaceable,
+            lastLineWidth = lastLineWidth,
+            gap = BubbleFooterGap.roundToPx(),
+        )
+    }
+}
+
+private fun MeasureScope.layoutMeasuredBubbleFooter(
+    constraints: Constraints,
+    content: Placeable,
+    footer: Placeable,
+    lastLineWidth: Int?,
+    gap: Int,
+): MeasureResult {
+    val lastRight = (lastLineWidth ?: content.width).coerceIn(0, content.width)
+    val inline = lastRight + gap + footer.width <= constraints.maxWidth
+    if (inline) {
+        val width =
+            bubbleFooterInlineWidth(
+                contentWidth = content.width,
+                lastLineRight = lastRight,
+                footerWidth = footer.width,
+                minWidth = constraints.minWidth,
+                maxWidth = constraints.maxWidth,
+                gap = gap,
+            )
+        return layout(width, content.height) {
+            content.place(0, 0)
+            footer.place(width - footer.width, content.height - footer.height)
         }
+    }
+    val width =
+        maxOf(content.width, footer.width, constraints.minWidth)
+            .coerceAtMost(constraints.maxWidth)
+    return layout(width, content.height + footer.height) {
+        content.place(0, 0)
+        footer.place(width - footer.width, content.height)
     }
 }
 
@@ -205,73 +226,114 @@ internal fun bubbleFooterInlineWidth(
     maxOf(contentWidth, lastLineRight + gap + footerWidth, minWidth)
         .coerceAtMost(maxWidth)
 
-/**
- * Lays collapsed body text above a bottom row with Read More pinned start and
- * the regular footer pinned end. The row stays as narrow as its content unless
- * the body is wider, preserving wrap-content bubbles while keeping the two
- * affordances on the same baseline.
- */
 @Composable
-internal fun BubbleCollapsedFooterLayout(
+@Suppress("FunctionNaming") // Compose UI entry points use PascalCase.
+internal fun BubbleCollapsibleFooterLayout(
+    maxBodyHeight: Dp,
     readMore: @Composable () -> Unit,
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    lastLineWidth: Int? = null,
     content: @Composable () -> Unit,
 ) {
     Layout(
-        modifier = modifier,
+        modifier = modifier.clipToBounds(),
         content = {
-            Box { content() }
+            Box(
+                Modifier.drawWithContent {
+                    clipRect(bottom = maxBodyHeight.toPx()) {
+                        this@drawWithContent.drawContent()
+                    }
+                },
+            ) { content() }
             readMore()
             footer()
         },
     ) { measurables, constraints ->
-        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
-        val readMorePlaceable = measurables[1].measure(Constraints())
-        val footerPlaceable = measurables[2].measure(Constraints())
+        val maxBodyHeightPx = maxBodyHeight.roundToPx()
+        val probeHeight = (maxBodyHeightPx + 1).coerceAtMost(constraints.maxHeight)
+        val contentPlaceable =
+            measurables[0].measure(
+                constraints.copy(
+                    minWidth = 0,
+                    minHeight = 0,
+                    maxHeight = probeHeight,
+                ),
+            )
+        val footerPlaceable =
+            measurables[2].measure(Constraints())
         val gap = BubbleFooterGap.roundToPx()
-        val width =
-            bubbleCollapsedFooterWidth(
-                contentWidth = contentPlaceable.width,
-                readMoreWidth = readMorePlaceable.width,
-                footerWidth = footerPlaceable.width,
-                minWidth = constraints.minWidth,
-                maxWidth = constraints.maxWidth,
+        if (contentPlaceable.height <= maxBodyHeightPx) {
+            layoutMeasuredBubbleFooter(
+                constraints = constraints,
+                content = contentPlaceable,
+                footer = footerPlaceable,
+                lastLineWidth = lastLineWidth,
                 gap = gap,
             )
-        val rowFits =
-            collapsedFooterFitsOnOneRow(
-                containerWidth = width,
-                readMoreWidth = readMorePlaceable.width,
-                footerWidth = footerPlaceable.width,
-                gap = gap,
-            )
-        if (rowFits) {
-            val readMoreBaseline = readMorePlaceable[FirstBaseline]
-            val footerBaseline = footerPlaceable[FirstBaseline]
-            val rowMetrics =
-                collapsedFooterRowMetrics(
-                    readMoreHeight = readMorePlaceable.height,
-                    readMoreBaseline = readMoreBaseline,
-                    footerHeight = footerPlaceable.height,
-                    footerBaseline = footerBaseline,
-                )
-
-            layout(width, contentPlaceable.height + rowMetrics.height) {
-                contentPlaceable.placeRelative(0, 0)
-                readMorePlaceable.placeRelative(0, contentPlaceable.height + rowMetrics.readMoreY)
-                footerPlaceable.placeRelative(width - footerPlaceable.width, contentPlaceable.height + rowMetrics.footerY)
-            }
         } else {
-            layout(width, contentPlaceable.height + readMorePlaceable.height + footerPlaceable.height) {
-                contentPlaceable.placeRelative(0, 0)
-                readMorePlaceable.placeRelative(0, contentPlaceable.height)
-                footerPlaceable.placeRelative(
-                    (width - footerPlaceable.width).coerceAtLeast(0),
-                    contentPlaceable.height + readMorePlaceable.height,
-                )
-            }
+            val readMorePlaceable =
+                measurables[1].measure(Constraints())
+            layoutCollapsedBubbleFooter(
+                constraints = constraints,
+                content = contentPlaceable,
+                readMore = readMorePlaceable,
+                footer = footerPlaceable,
+                visibleContentHeight = maxBodyHeightPx,
+                gap = gap,
+            )
         }
+    }
+}
+
+private fun MeasureScope.layoutCollapsedBubbleFooter(
+    constraints: Constraints,
+    content: Placeable,
+    readMore: Placeable,
+    footer: Placeable,
+    visibleContentHeight: Int,
+    gap: Int,
+): MeasureResult {
+    val width =
+        bubbleCollapsedFooterWidth(
+            contentWidth = content.width,
+            readMoreWidth = readMore.width,
+            footerWidth = footer.width,
+            minWidth = constraints.minWidth,
+            maxWidth = constraints.maxWidth,
+            gap = gap,
+        )
+    val rowFits =
+        collapsedFooterFitsOnOneRow(
+            containerWidth = width,
+            readMoreWidth = readMore.width,
+            footerWidth = footer.width,
+            gap = gap,
+        )
+    if (rowFits) {
+        val rowMetrics =
+            collapsedFooterRowMetrics(
+                readMoreHeight = readMore.height,
+                readMoreBaseline = readMore[FirstBaseline],
+                footerHeight = footer.height,
+                footerBaseline = footer[FirstBaseline],
+            )
+        return layout(width, visibleContentHeight + rowMetrics.height) {
+            content.placeRelative(0, 0)
+            readMore.placeRelative(0, visibleContentHeight + rowMetrics.readMoreY)
+            footer.placeRelative(
+                width - footer.width,
+                visibleContentHeight + rowMetrics.footerY,
+            )
+        }
+    }
+    return layout(width, visibleContentHeight + readMore.height + footer.height) {
+        content.placeRelative(0, 0)
+        readMore.placeRelative(0, visibleContentHeight)
+        footer.placeRelative(
+            (width - footer.width).coerceAtLeast(0),
+            visibleContentHeight + readMore.height,
+        )
     }
 }
 
