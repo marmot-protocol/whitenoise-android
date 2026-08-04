@@ -1128,6 +1128,16 @@
     <string name="notify_nothing">Niente</string>
     <string name="notify_muted_until">Silenziato fino alle %1$s</string>
     <string name="customize_sound_vibration">Personalizza suono e vibrazione</string>
+    <string name="vibration_pattern">Schema di vibrazione</string>
+    <string name="vibration_pattern_description">Scegli uno schema per i nuovi messaggi in questa chat. L’anteprima viene riprodotta una volta.</string>
+    <string name="vibration_pattern_system_default">Predefinito di sistema</string>
+    <string name="vibration_pattern_short">Breve</string>
+    <string name="vibration_pattern_double">Doppia</string>
+    <string name="vibration_pattern_long">Lunga</string>
+    <string name="preview_vibration_pattern">Prova la vibrazione %1$s</string>
+    <string name="vibration_pattern_off_in_android_settings">Disattivata nelle impostazioni Android</string>
+    <string name="vibration_pattern_custom_in_android_settings">Personalizzata nelle impostazioni Android</string>
+    <string name="vibration_pattern_android_override">%1$s · Impostazioni Android</string>
     <string name="chat_muted_badge">Silenziato</string>
     <string name="collapse_long_messages_subtitle">Mostra una scorciatoia «Leggi tutto» per i messaggi lunghi in questa chat</string>
     <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>

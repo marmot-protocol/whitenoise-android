@@ -1126,6 +1126,16 @@
     <string name="notify_nothing">Hiçbiri</string>
     <string name="notify_muted_until">%1$s tarihine kadar sessiz</string>
     <string name="customize_sound_vibration">Ses ve titreşimi özelleştir</string>
+    <string name="vibration_pattern">Titreşim deseni</string>
+    <string name="vibration_pattern_description">Bu sohbetteki yeni mesajlar için bir desen seçin. Önizleme bir kez oynatılır.</string>
+    <string name="vibration_pattern_system_default">Sistem varsayılanı</string>
+    <string name="vibration_pattern_short">Kısa</string>
+    <string name="vibration_pattern_double">Çift</string>
+    <string name="vibration_pattern_long">Uzun</string>
+    <string name="preview_vibration_pattern">%1$s titreşimi önizle</string>
+    <string name="vibration_pattern_off_in_android_settings">Android ayarlarında kapalı</string>
+    <string name="vibration_pattern_custom_in_android_settings">Android ayarlarında özel</string>
+    <string name="vibration_pattern_android_override">%1$s · Android ayarları</string>
     <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>

@@ -43,6 +43,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@Suppress("LargeClass") // Conversation-channel integration scenarios share one expensive presenter fixture.
 class LocalNotificationPresenterConversationTest {
     private val context: Context
         get() = RuntimeEnvironment.getApplication()
@@ -58,6 +59,11 @@ class LocalNotificationPresenterConversationTest {
     fun setUp() {
         manager.cancelAll()
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.SYSTEM_DEFAULT,
+        )
         publishedShortcut = null
         publishedShortcutCount = 0
         presenter =
@@ -221,6 +227,189 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(
             "message",
             notification.extras.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX),
+        )
+    }
+
+    @Test
+    fun futurePrimaryMessagesUseTheSelectedVersionedVibrationChannel() {
+        presenter.ensureChannels()
+        // The presenter already exists: changing the preference must reroute it
+        // without requiring a process restart.
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.DOUBLE,
+        )
+
+        runBlocking {
+            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+                ConversationVibrationPattern.DOUBLE,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun changingPatternReroutesAnExistingConversationCardToTheActiveChannel() {
+        presenter.ensureChannels()
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update(isMention = false, messageIdHex = "first"),
+                    previewTextOverride = "first",
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.DOUBLE,
+        )
+
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update(isMention = false, messageIdHex = "second"),
+                    previewTextOverride = "second",
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        val active = manager.activeNotifications.single().notification
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+                ConversationVibrationPattern.DOUBLE,
+            ),
+            active.channelId,
+        )
+        assertEquals(
+            listOf("first", "second"),
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(active)
+                ?.messages
+                ?.map { it.text.toString() },
+        )
+    }
+
+    @Test
+    fun mentionChannelRemainsIndependentOfThePrimaryVibrationChoice() {
+        presenter.ensureChannels()
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.LONG,
+        )
+
+        runBlocking {
+            presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" })
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.MENTIONS.id,
+                shortcutId,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun systemDefaultRoutesBackToTheLegacyConversationChannel() {
+        presenter.ensureChannels()
+        val preferences = ConversationVibrationPreferences(context)
+        preferences.setPattern("account-a", "group-a", ConversationVibrationPattern.DOUBLE)
+        preferences.setPattern("account-a", "group-a", ConversationVibrationPattern.SYSTEM_DEFAULT)
+
+        runBlocking {
+            presenter.show(update(isMention = false), previewTextOverride = "hi", shortNpub = { "npub1test" })
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun processRestartKeepsPostingThroughThePersistedSelection() {
+        presenter.ensureChannels()
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.LONG,
+        )
+        val restartedPresenter = LocalNotificationPresenter(context)
+
+        runBlocking {
+            restartedPresenter.show(
+                update(isMention = false),
+                previewTextOverride = "hi",
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val shortcutId = conversationShortcutId("account-a", "group-a")!!
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+                ConversationVibrationPattern.LONG,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
+        )
+    }
+
+    @Test
+    fun accountSwitchDoesNotReuseAnotherAccountsSelectionForTheSameGroup() {
+        presenter.ensureChannels()
+        ConversationVibrationPreferences(context).setPattern(
+            "account-a",
+            "group-a",
+            ConversationVibrationPattern.DOUBLE,
+        )
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, accountRef = "account-b"),
+                previewTextOverride = "hi",
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val shortcutId = conversationShortcutId("account-b", "group-a")!!
+        assertEquals(
+            ConversationNotificationChannels.conversationChannelId(
+                NotificationChannelSpec.GROUP_MESSAGES.id,
+                shortcutId,
+            ),
+            manager.activeNotifications
+                .single()
+                .notification.channelId,
         )
     }
 
@@ -641,13 +830,14 @@ class LocalNotificationPresenterConversationTest {
         messageIdHex: String = "message",
         reactionEmoji: String? = null,
         trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
+        accountRef: String = "account-a",
     ) = NotificationUpdateFfi(
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,
         trafficClass = trafficClass,
-        accountRef = "account-a",
-        accountIdHex = "account-a",
+        accountRef = accountRef,
+        accountIdHex = accountRef,
         groupIdHex = "group-a",
         groupName = "General",
         isDm = false,
