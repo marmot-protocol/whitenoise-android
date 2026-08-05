@@ -26,9 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -216,7 +216,7 @@ internal fun ComposerPill(
                 modifier = Modifier.size(36.dp),
             ) {
                 Icon(
-                    if (emojiPickerOpen) Icons.Default.Keyboard else Icons.Default.EmojiEmotions,
+                    if (emojiPickerOpen) Icons.Default.Keyboard else Icons.Outlined.EmojiEmotions,
                     contentDescription =
                         stringResource(
                             if (emojiPickerOpen) {
