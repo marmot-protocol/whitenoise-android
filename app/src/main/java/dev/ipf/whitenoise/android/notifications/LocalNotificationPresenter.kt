@@ -431,12 +431,22 @@ class LocalNotificationPresenter(
                         builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
                     }
                     if (!redactContent) {
+                        val quickReactions =
+                            if (decision.actions.contains(NotificationActionKind.REACT)) {
+                                withContext(Dispatchers.Default) { notificationQuickReactionChoices(context) }
+                            } else {
+                                emptyList()
+                            }
                         NotificationActions
                             .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                             ?.let { actionTarget ->
                                 decision.actions.forEach { action ->
                                     when (action) {
                                         NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
+                                        NotificationActionKind.REACT ->
+                                            quickReactions.forEach { reaction ->
+                                                builder.addAction(reactionNotificationAction(actionTarget, reaction))
+                                            }
                                         NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
                                     }
                                 }
@@ -1076,13 +1086,27 @@ class LocalNotificationPresenter(
             .setShowsUserInterface(false)
             .build()
 
+    private fun reactionNotificationAction(
+        actionTarget: NotificationActionTarget,
+        reaction: String,
+    ): NotificationCompat.Action =
+        NotificationCompat
+            .Action
+            .Builder(
+                R.drawable.ic_stat_whitenoise,
+                reaction,
+                actionPendingIntent(actionTarget, NotificationActionKind.REACT, reaction),
+            ).setShowsUserInterface(false)
+            .build()
+
     private fun actionPendingIntent(
         actionTarget: NotificationActionTarget,
         kind: NotificationActionKind,
+        reaction: String? = null,
     ): PendingIntent {
         val actionIntent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(this, kind, actionTarget)
+                NotificationActions.applyToIntent(this, kind, actionTarget, reaction)
             }
         val mutableFlag =
             if (kind == NotificationActionKind.REPLY) {
@@ -1092,7 +1116,7 @@ class LocalNotificationPresenter(
             }
         return PendingIntent.getBroadcast(
             context,
-            NotificationActions.requestCode(kind, actionTarget.notificationTag),
+            NotificationActions.requestCode(kind, actionTarget.notificationTag, reaction),
             actionIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
         )

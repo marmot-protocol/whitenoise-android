@@ -32,6 +32,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     withTimeoutOrNull(GO_ASYNC_BUDGET_MS) {
                         when (action.kind) {
                             NotificationActionKind.REPLY -> enqueueReplyAction(context.applicationContext, action, intent)
+                            NotificationActionKind.REACT -> enqueueReactionAction(context.applicationContext, action)
                             NotificationActionKind.MARK_READ -> enqueueMarkReadAction(context.applicationContext, action)
                         }
                         true
@@ -83,6 +84,22 @@ class NotificationActionReceiver : BroadcastReceiver() {
         if (!enqueued) {
             withContext(Dispatchers.Main.immediate) {
                 Toast.makeText(appContext, R.string.toast_send_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private suspend fun enqueueReactionAction(
+        appContext: Context,
+        action: NotificationAction,
+    ) {
+        val reaction = action.reaction ?: return
+        val enqueued =
+            withContext(Dispatchers.IO) {
+                NotificationReactionWorker.enqueue(appContext, action, reaction)
+            }
+        if (!enqueued) {
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(appContext, R.string.toast_reaction_failed, Toast.LENGTH_LONG).show()
             }
         }
     }

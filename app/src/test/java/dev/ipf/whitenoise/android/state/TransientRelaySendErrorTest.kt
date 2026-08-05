@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -151,6 +152,18 @@ class TransientRelaySendErrorTest {
         assertEquals(
             NotificationReplySendOutcome.NonRetryableFailure,
             notificationReplySendFailureOutcome(MarmotKitException.UnknownGroup("abc123")),
+        )
+    }
+
+    @Test
+    fun notificationReactionOutcomeRetriesOnlyProvenConnectGaps() {
+        assertEquals(
+            NotificationReactionSendOutcome.RetryableFailure,
+            notificationReactionSendFailureOutcome(RuntimeException("connection refused")),
+        )
+        assertEquals(
+            NotificationReactionSendOutcome.NonRetryableFailure,
+            notificationReactionSendFailureOutcome(RuntimeException("send event timed out")),
         )
     }
 

@@ -55,7 +55,7 @@ internal fun decideNotificationPost(
         style = style,
         actions =
             when (style) {
-                NotificationStyleChoice.Messaging -> listOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ)
+                NotificationStyleChoice.Messaging -> listOf(NotificationActionKind.REPLY, NotificationActionKind.REACT)
                 else -> emptyList()
             },
         historyCap =

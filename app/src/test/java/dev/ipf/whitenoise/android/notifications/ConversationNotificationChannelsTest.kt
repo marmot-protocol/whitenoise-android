@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -438,6 +439,24 @@ class ConversationNotificationChannelsTest {
     }
 
     @Test
+    fun conversationChannelCopiesAnEffectiveParentDndBypass() {
+        Shadows.shadowOf(manager).setNotificationPolicyAccessGranted(true)
+        NotificationChannels.ensureChannels(context)
+        val parent = manager.getNotificationChannel("messages_group")
+        parent.setBypassDnd(true)
+        manager.createNotificationChannel(parent)
+
+        val convId =
+            ConversationNotificationChannels.ensureConversationChannel(
+                context,
+                "messages_group",
+                "conversation-dnd-parent",
+            )
+
+        assertTrue(manager.getNotificationChannel(convId!!).canBypassDnd())
+    }
+
+    @Test
     fun creationStillClonesTheParentImportanceEvenWhenItIsHigherThanTheDefault() {
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-create-high"
@@ -461,11 +480,13 @@ class ConversationNotificationChannelsTest {
 
     @Test
     fun conversationChannelWithAUserSetImportanceIsLeftAloneWhenTheParentDrops() {
+        Shadows.shadowOf(manager).setNotificationPolicyAccessGranted(true)
         NotificationChannels.ensureChannels(context)
         val shortcut = "conversation-user-set"
         val convId = ConversationNotificationChannels.ensureConversationChannel(context, "messages_group", shortcut)!!
         val customised = manager.getNotificationChannel(convId)
         customised.enableVibration(false)
+        customised.setBypassDnd(true)
         customised.markImportanceUserSet()
         manager.createNotificationChannel(customised)
         lowerParentImportance("messages_group", NotificationManager.IMPORTANCE_LOW)
@@ -480,6 +501,7 @@ class ConversationNotificationChannelsTest {
         val updated = manager.getNotificationChannel(convId)
         assertEquals(NotificationManager.IMPORTANCE_HIGH, updated.importance)
         assertEquals(false, updated.shouldVibrate())
+        assertTrue(updated.canBypassDnd())
         // A permitted rename still lands; only the importance is off limits.
         assertEquals("Green Orca · Group messages", updated.name.toString())
     }
