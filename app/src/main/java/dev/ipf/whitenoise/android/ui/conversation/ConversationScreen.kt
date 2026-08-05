@@ -2427,13 +2427,12 @@ internal fun ConversationScreen(
     // #589: app-switch resume handling. Two bugs surfaced when returning to a
     // chat after backgrounding the app:
     //
-    //   Case A (keyboard was OPEN on leave): the bottom scroll anchor was
-    //   computed against the pre-resume viewport before the keyboard inset
-    //   re-applied, so the latest bubble landed clipped behind the keyboard.
-    //   The existing imeIsOpen chase above does NOT re-fire here because
-    //   imeIsOpen never transitions (it was already true), so we add a
-    //   resume-triggered re-anchor that waits for the IME inset to settle and
-    //   then re-snaps to the newest row — reusing the 24-frame chase idiom.
+    //   Case A (keyboard was OPEN on leave): restoring the pause-time viewport
+    //   bookmark before the keyboard inset re-applied could clip the tail or
+    //   shift a reader's mid-history position. The existing imeIsOpen chase
+    //   above does NOT re-fire here because imeIsOpen never transitions (it was
+    //   already true), so resume waits for the inset to settle before restoring
+    //   that bookmark — reusing the 24-frame chase idiom.
     //
     //   Case B (keyboard was CLOSED on leave): Android/Compose restores the
     //   BasicTextField focus and IME visibility on its own, popping a keyboard

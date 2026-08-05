@@ -31,6 +31,8 @@ internal fun ConversationComposerLifecycleEffect(
     val currentOnPause by rememberUpdatedState(onPause)
     val currentOnResume by rememberUpdatedState(onResume)
 
+    // Disposal belongs to the observer key that installed it. Do not redirect it
+    // to a replacement key's callback through rememberUpdatedState.
     DisposableEffect(observerKey, lifecycleOwner) {
         if (lifecycleOwner == null) {
             onDispose { }

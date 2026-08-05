@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -158,6 +159,9 @@ class ConversationComposerLifecycleTest {
         composeRule.runOnIdle {
             lifecycleOwner.handle(Lifecycle.Event.ON_START)
             lifecycleOwner.handle(Lifecycle.Event.ON_RESUME)
+        }
+        assertTrue(clearFocus)
+        composeRule.runOnIdle {
             lifecycleOwner.handle(Lifecycle.Event.ON_PAUSE)
             searchOpen = true
         }
