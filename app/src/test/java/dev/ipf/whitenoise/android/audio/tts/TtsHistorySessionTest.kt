@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.speech.tts.TextToSpeech
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.state.canonicalTimelineRecords
+import dev.ipf.whitenoise.android.state.localTimelineMessage
+import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -381,6 +384,26 @@ class TtsHistorySessionTest {
         }
 
     @Test
+    fun aLocalOnlyTailIsNeverTrackedAsTheLiveTimelineTail() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.loadTimeline("m1", "m2")
+            // An in-flight send sits at the window tail under a temp id that
+            // disappears once its projection lands.
+            harness.loadLocalOnlyRow("temp1")
+            harness.speakConversation("m1", "m2")
+
+            harness.pager.loaded.removeAll { it.messageIdHex == "temp1" }
+            harness.pager.loaded.add(harness.record("m3"))
+
+            assertTrue(harness.session.allowsLiveAppend())
+
+            // The tracked tail advanced onto the arrival, so a trim of it refuses.
+            harness.pager.loaded.removeAll { it.messageIdHex == "m3" }
+            assertFalse(harness.session.allowsLiveAppend())
+        }
+
+    @Test
     fun appendsAreRefusedWhileAnEdgeLoadOwnsTheWindow() =
         runTest {
             val harness = SessionHarness(this)
@@ -578,6 +601,27 @@ class TtsHistorySessionTest {
             assertEquals(stateBefore, harness.controller.state.value)
         }
 
+    @Test
+    fun oneEdgeRequestCapsHowManyRecordsItTriesToProject() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.pager.loaded += (1..250).map { harness.unspeakableRecord("u%03d".format(it)) }
+            harness.loadTimeline("m999")
+            harness.speakConversation("m999")
+
+            harness.session.previousMessage()
+            advanceUntilIdle()
+
+            assertEquals(200, harness.pager.projectSpeakableCalls)
+            // Exhausting the cap reads exactly like the end of nearby history:
+            // no error state, no window change, the first message restarts.
+            assertNull(harness.session.edgeState.value)
+            assertEquals(listOf("m999"), harness.controller.queuedMessageIds())
+            val state = harness.controller.state.value
+            assertTrue(state is TtsState.Speaking)
+            assertEquals(0, state.chunkIndex)
+        }
+
     private class SessionHarness(
         testScope: TestScope,
     ) {
@@ -604,6 +648,12 @@ class TtsHistorySessionTest {
 
         fun loadTimeline(vararg ids: String) {
             pager.loaded += ids.map(::record)
+        }
+
+        /** Appends a speakable row the engine has NOT projected yet. */
+        fun loadLocalOnlyRow(id: String) {
+            pager.localOnlyIds += id
+            pager.loaded += record(id)
         }
 
         fun speakConversation(vararg ids: String) {
@@ -656,12 +706,14 @@ class TtsHistorySessionTest {
 
     private class FakeHistoryPager : TtsHistoryPager {
         val loaded = mutableListOf<AppMessageRecordFfi>()
+        val localOnlyIds = mutableSetOf<String>()
         val olderPages = ArrayDeque<List<AppMessageRecordFfi>>()
         val newerPages = ArrayDeque<List<AppMessageRecordFfi>>()
         val speakableTextById = mutableMapOf<String, String>()
         var failNextOlderLoads = 0
         var loadOlderCalls = 0
         var loadNewerCalls = 0
+        var projectSpeakableCalls = 0
 
         // Suspends loadOlder after counting the call, so a test can hold a
         // page job genuinely in flight instead of merely scheduled.
@@ -677,7 +729,19 @@ class TtsHistorySessionTest {
         override val hasMoreBefore: Boolean get() = olderPages.isNotEmpty()
         override val hasMoreAfter: Boolean get() = newerPages.isNotEmpty()
 
-        override fun timelineRecords(): List<AppMessageRecordFfi> = loaded.toList()
+        // Routed through the production filter, like the real pager: the loaded
+        // window interleaves local-only rows with projected ones and only the
+        // projected ids survive reconciliation.
+        override fun timelineRecords(): List<AppMessageRecordFfi> =
+            canonicalTimelineRecords(
+                loaded.map { record ->
+                    if (record.messageIdHex in localOnlyIds) {
+                        localTimelineMessage(record)
+                    } else {
+                        projectedTimelineMessage(record)
+                    }
+                },
+            )
 
         override suspend fun loadOlder(): Boolean {
             loadOlderCalls += 1
@@ -717,6 +781,7 @@ class TtsHistorySessionTest {
         }
 
         override suspend fun projectSpeakable(record: AppMessageRecordFfi): TtsSpeakableEntry? {
+            projectSpeakableCalls += 1
             onProjectSpeakable?.invoke(record.messageIdHex)
             return speakableTextById[record.messageIdHex]?.let { text ->
                 TtsSpeakableEntry(

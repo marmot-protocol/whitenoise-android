@@ -369,7 +369,7 @@ private class TtsHistoryEdgeWalk(
                 TtsHistoryDirection.Older -> records.subList(0, anchorIndex).asReversed()
             }
         val nearestFirst = mutableListOf<TtsSpeakableEntry>()
-        for (record in beyond) {
+        for (record in beyond.take(MAX_PROJECTION_ATTEMPTS_PER_REQUEST)) {
             pager.projectSpeakable(record)?.let(nearestFirst::add)
             if (nearestFirst.size >= EDGE_FILL_TARGET_MESSAGES) break
         }
@@ -386,3 +386,10 @@ private const val MAX_EDGE_PAGES_PER_REQUEST = 6
 // How many speakable messages one edge request projects into the window —
 // enough to keep taps cheap without prefetching meaningful history.
 private const val EDGE_FILL_TARGET_MESSAGES = 10
+
+// Projection attempts one scan of the window may spend hunting for those
+// speakable records. Sized to a full live timeline window, so a realistic
+// window is scanned whole while an unbounded run of unspeakable records
+// cannot pile up projection work on the main thread per tap. Exhausting it
+// reads exactly like finding nothing more nearby.
+private const val MAX_PROJECTION_ATTEMPTS_PER_REQUEST = 200

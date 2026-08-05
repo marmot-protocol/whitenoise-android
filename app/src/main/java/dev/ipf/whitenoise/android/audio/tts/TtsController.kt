@@ -209,16 +209,22 @@ class TtsController internal constructor(
         targetMessageIdHex: String,
         targetSentence: TtsWindowSentenceTarget,
     ): Boolean {
-        if (!canNavigate()) return false
-        val incoming = entries.mapNotNull { it.toQueuedMessage(queueLocale) }
-        val merged =
-            TtsHistoryWindow.merge(
-                existing = queue.queuedMessagesSnapshot(),
-                incoming = incoming,
-                direction = direction,
-                targetMessageIdHex = targetMessageIdHex,
-            )
-        return queue.replaceWindow(merged, targetMessageIdHex, targetSentence)
+        val incoming =
+            if (canNavigate()) entries.mapNotNull { it.toQueuedMessage(queueLocale) } else emptyList()
+        // An empty extension has nothing to land on, so repositioning onto the
+        // existing target would jump playback without adding any history.
+        return if (incoming.isEmpty()) {
+            false
+        } else {
+            val merged =
+                TtsHistoryWindow.merge(
+                    existing = queue.queuedMessagesSnapshot(),
+                    incoming = incoming,
+                    direction = direction,
+                    targetMessageIdHex = targetMessageIdHex,
+                )
+            queue.replaceWindow(merged, targetMessageIdHex, targetSentence)
+        }
     }
 
     // Navigation never acquires audio focus: while paused it only repositions

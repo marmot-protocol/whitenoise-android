@@ -1778,6 +1778,15 @@ internal fun adjacentTimelineInversions(ordered: List<TimelineMessage>): List<Ti
 private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
 
 /**
+ * Records of the rows the engine actually projected, in window order.
+ * Optimistic sends and stream-debug rows carry synthetic ids that vanish on
+ * reconciliation or cleanup, so anything tracking timeline identity across
+ * time — paging anchors, tail watermarks — must never see them.
+ */
+internal fun canonicalTimelineRecords(items: List<TimelineMessage>): List<AppMessageRecordFfi> =
+    items.filter { it.projected != null }.map(TimelineMessage::record)
+
+/**
  * Oldest live timeline message ids to drop so at most [maxLiveItems] non-[protectedIds]
  * rows remain. Deliberately-loaded history (captured when the user scrolls up via
  * [loadOlderPage]) is never trimmed; only rows added by live Upserts after that are

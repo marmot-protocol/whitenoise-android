@@ -1467,7 +1467,7 @@ class WhiteNoiseAppState private constructor(
             override val hasMoreBefore: Boolean get() = controller.hasMoreBefore
             override val hasMoreAfter: Boolean get() = controller.hasMoreAfterTimeline
 
-            override fun timelineRecords(): List<AppMessageRecordFfi> = controller.timeline.map { it.record }
+            override fun timelineRecords(): List<AppMessageRecordFfi> = canonicalTimelineRecords(controller.timeline)
 
             override suspend fun loadOlder(): Boolean = controller.loadOlderTimelinePage()
 

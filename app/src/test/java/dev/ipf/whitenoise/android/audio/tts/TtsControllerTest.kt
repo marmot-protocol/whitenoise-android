@@ -485,6 +485,40 @@ class TtsControllerTest {
     }
 
     @Test
+    fun historyWindowExtensionRefusesAnEmptyExtensionInsteadOfMovingTheCursor() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        assertTrue(controller.speak(listOf(entryWithId("m1"), entryWithId("m2")), Locale.US))
+        controller.skipNextMessage()
+        val stateBefore = controller.state.value
+        val spokenBefore = engine.spoken.size
+
+        // Nothing in the page projected to speech, so the extension is empty
+        // while its target is already queued.
+        assertFalse(
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Older,
+                entries =
+                    listOf(
+                        TtsSpeakableEntry(
+                            senderKey = "alice",
+                            senderDisplayName = "Alice",
+                            text = "   ",
+                            messageIdHex = "m1",
+                        ),
+                    ),
+                targetMessageIdHex = "m1",
+                targetSentence = TtsWindowSentenceTarget.First,
+            ),
+        )
+
+        assertEquals(listOf("m1", "m2"), controller.queuedMessageIds())
+        assertEquals(stateBefore, controller.state.value)
+        assertEquals(spokenBefore, engine.spoken.size)
+    }
+
+    @Test
     fun deferredMessageNavigationReportsEdgesThroughTheController() {
         val controller = controller(FakeTtsAudioFocus())
         controller.attachEngine(FakeTtsSpeechEngine())
