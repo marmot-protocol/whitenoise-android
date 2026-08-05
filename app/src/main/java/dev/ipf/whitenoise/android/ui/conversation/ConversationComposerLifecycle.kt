@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposer
  * Keeps the conversation's long-lived lifecycle observer wired to the latest
  * Compose focus ownership instead of the values captured when it was installed.
  */
+@Suppress("FunctionNaming")
 @Composable
 internal fun ConversationComposerLifecycleEffect(
     observerKey: Any?,

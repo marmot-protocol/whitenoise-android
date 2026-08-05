@@ -245,6 +245,8 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
+private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
+
 // Foreground catch-up normally materializes almost immediately. Keep the
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
@@ -2481,7 +2483,7 @@ internal fun ConversationScreen(
                     var lastInset = -1
                     var stableFrames = 0
                     var settleFrame = 0
-                    while (settleFrame < 24 && stableFrames < 2) {
+                    while (settleFrame < RESUME_IME_SETTLE_MAX_FRAMES && stableFrames < 2) {
                         withFrameNanos { }
                         val current = imeInsets.getBottom(density)
                         if (current == lastInset) {
