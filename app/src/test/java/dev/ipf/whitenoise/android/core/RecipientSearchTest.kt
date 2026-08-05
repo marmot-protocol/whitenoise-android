@@ -186,8 +186,14 @@ class RecipientSearchTest {
                 searchProfile = profile(displayName = "Jäck", nip05 = "jack@example.com"),
             )
 
-        assertEquals(listOf(hex), RecipientSearch.browse("jack", listOf(discovered), null).map { it.accountIdHex })
-        assertEquals(listOf(hex), RecipientSearch.browse("example.com", listOf(discovered), null).map { it.accountIdHex })
+        assertEquals(
+            listOf(hex),
+            RecipientSearch.browse("jack", listOf(discovered), null).map { it.accountIdHex },
+        )
+        assertEquals(
+            listOf(hex),
+            RecipientSearch.browse("example.com", listOf(discovered), null).map { it.accountIdHex },
+        )
     }
 
     @Test
@@ -207,6 +213,29 @@ class RecipientSearchTest {
         assertEquals(listOf(bob, alice), merged.map { it.accountIdHex.lowercase() })
         assertEquals("dm-alice", merged.last().existingDmGroupIdHex)
         assertEquals(1u.toUByte(), merged.last().searchRadius)
+    }
+
+    @Test
+    fun discoveryOnlyNameMatchKeepsKnownDmProvenance() {
+        val hex = "a".repeat(64)
+        val known =
+            candidate(hex, "Alice").copy(
+                source = RecipientSearch.Source.InDm,
+                existingDmGroupIdHex = "dm-alice",
+            )
+        val discovered =
+            candidate(hex, "Jack").copy(
+                searchProfile = profile(displayName = "Jack"),
+            )
+
+        val match =
+            RecipientSearch
+                .mergeAndBrowse("jack", listOf(known), listOf(discovered), activeAccountIdHex = null)
+                .single()
+
+        assertEquals(RecipientSearch.Source.InDm, match.source)
+        assertEquals("dm-alice", match.existingDmGroupIdHex)
+        assertEquals("Jack", match.searchProfile?.displayName)
     }
 
     @Test

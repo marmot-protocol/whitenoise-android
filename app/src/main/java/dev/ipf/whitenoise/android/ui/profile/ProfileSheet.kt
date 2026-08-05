@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.profile
 
 import android.content.Intent
@@ -190,12 +192,14 @@ internal suspend fun loadProfileFollowing(
     previous: Boolean?,
     load: suspend () -> Boolean,
 ): Boolean =
-    try {
-        load()
-    } catch (error: Throwable) {
-        rethrowIfCancellation(error)
-        previous ?: false
-    }
+    runCatching { load() }
+        .fold(
+            onSuccess = { it },
+            onFailure = { error ->
+                rethrowIfCancellation(error)
+                previous ?: false
+            },
+        )
 
 internal fun profileSharedGroupVisible(
     memberCount: Int,
@@ -207,9 +211,13 @@ internal fun profileConversationChoiceEligible(
     targetAccountIdHex: String,
     activeAccountIdHex: String?,
 ): Boolean {
-    val active = activeAccountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return false
-    val target = targetAccountIdHex.trim().lowercase().takeIf { it.isNotEmpty() } ?: return false
-    return memberIds.mapTo(HashSet()) { it.trim().lowercase() } == setOf(active, target)
+    val active = activeAccountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+    val target = targetAccountIdHex.trim().lowercase().takeIf { it.isNotEmpty() }
+    return if (active == null || target == null) {
+        false
+    } else {
+        memberIds.mapTo(HashSet()) { it.trim().lowercase() } == setOf(active, target)
+    }
 }
 
 @Composable
@@ -683,7 +691,10 @@ internal fun ProfileSheet(
                 Column(Modifier.fillMaxWidth()) {
                     SettingsActionRow(
                         icon = if (following == true) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
-                        title = stringResource(if (following == true) R.string.profile_unfollow else R.string.profile_follow),
+                        title =
+                            stringResource(
+                                if (following == true) R.string.profile_unfollow else R.string.profile_follow,
+                            ),
                         enabled = following != null && !followBusy && !creatingChat,
                         inProgress = following == null || followBusy,
                         onClick = {
@@ -692,11 +703,12 @@ internal fun ProfileSheet(
                             followBusy = true
                             appState.launchMutation {
                                 try {
-                                    appState.setProfileFollowing(hex!!, desired)
-                                    following = desired
-                                } catch (error: Throwable) {
-                                    rethrowIfCancellation(error)
-                                    appState.present(R.string.profile_follow_failed)
+                                    runCatching { appState.setProfileFollowing(hex!!, desired) }
+                                        .onSuccess { following = desired }
+                                        .onFailure { error ->
+                                            rethrowIfCancellation(error)
+                                            appState.present(R.string.profile_follow_failed)
+                                        }
                                 } finally {
                                     followBusy = false
                                 }
@@ -776,6 +788,7 @@ internal fun ProfileSheet(
 }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun ProfileBannerImage(bannerUrl: String) {
     var image by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
     LaunchedEffect(bannerUrl) {
@@ -804,6 +817,7 @@ private fun ProfileBannerImage(bannerUrl: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileConversationChooserSheet(
     appState: WhiteNoiseAppState,
     recipientName: String,

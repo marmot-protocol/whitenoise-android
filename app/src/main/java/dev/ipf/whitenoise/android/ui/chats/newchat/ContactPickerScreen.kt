@@ -116,22 +116,19 @@ internal fun ContactPickerScreen(
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
     val userSearch by rememberRecipientUserSearchState(query, appState)
-    val localMatches =
-        remember(query, candidates, activeHex, excludeAccountIdHexes) {
+    val matches =
+        remember(query, candidates, userSearch.candidates, activeHex, excludeAccountIdHexes) {
             if (identifierQuery) {
                 emptyList()
             } else {
-                RecipientSearch.browse(query, candidates, activeHex, excludeAccountIdHexes)
+                RecipientSearch.mergeAndBrowse(
+                    query = query,
+                    known = candidates,
+                    discovered = userSearch.candidates,
+                    activeAccountIdHex = activeHex,
+                    excludeAccountIdHexes = excludeAccountIdHexes,
+                )
             }
-        }
-    val matches =
-        remember(localMatches, userSearch.candidates, activeHex, excludeAccountIdHexes) {
-            RecipientSearch.merge(
-                known = localMatches,
-                discovered = userSearch.candidates,
-                activeAccountIdHex = activeHex,
-                excludeAccountIdHexes = excludeAccountIdHexes,
-            )
         }
     val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
     val canConfirm = (allowEmptyConfirm || selected.isNotEmpty()) && !busy

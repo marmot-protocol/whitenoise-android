@@ -64,6 +64,9 @@ class ProfileParityTest {
 
         assertEquals("Jack", selectedMemberDisplayName(candidate))
         assertEquals(remoteAvatar, selectedMemberAvatarUrl(candidate, localAvatarUrl = null))
-        assertEquals("https://example.com/local.png", selectedMemberAvatarUrl(candidate, "https://example.com/local.png"))
+        assertEquals(
+            "https://example.com/local.png",
+            selectedMemberAvatarUrl(candidate, "https://example.com/local.png"),
+        )
     }
 }

@@ -123,6 +123,21 @@ object RecipientSearch {
             ).map { it.value }
     }
 
+    /** Enrich known people before filtering so discovery-only matches retain local chat provenance. */
+    fun mergeAndBrowse(
+        query: String,
+        known: List<Candidate>,
+        discovered: List<Candidate>,
+        activeAccountIdHex: String?,
+        excludeAccountIdHexes: Set<String> = emptySet(),
+    ): List<Candidate> =
+        browse(
+            query = query,
+            candidates = merge(known, discovered, activeAccountIdHex, excludeAccountIdHexes),
+            activeAccountIdHex = activeAccountIdHex,
+            excludeAccountIdHexes = excludeAccountIdHexes,
+        )
+
     fun discoveredCandidates(
         results: List<UserDirectorySearchResultFfi>,
         followedAccountIds: Set<String>,
@@ -177,11 +192,18 @@ object RecipientSearch {
         candidate: Candidate,
         needle: String,
     ): Boolean {
-        val nip05 = candidate.searchProfile?.nip05?.let(::folded)
-        if (nip05?.contains(needle) == true) return true
-        if (needle.length < 4) return false
-        return candidate.npub.lowercase(Locale.ROOT).startsWith(needle) ||
-            candidate.accountIdHex.lowercase(Locale.ROOT).startsWith(needle)
+        val nip05Matches =
+            candidate.searchProfile
+                ?.nip05
+                ?.let(::folded)
+                ?.contains(needle) == true
+        val identityPrefixMatches =
+            needle.length >= MIN_IDENTITY_QUERY_LENGTH &&
+                (
+                    candidate.npub.lowercase(Locale.ROOT).startsWith(needle) ||
+                        candidate.accountIdHex.lowercase(Locale.ROOT).startsWith(needle)
+                )
+        return nip05Matches || identityPrefixMatches
     }
 
     private fun matchQualityRank(quality: MatchQualityFfi): Int =
@@ -196,9 +218,9 @@ object RecipientSearch {
             MatchedFieldFfi.NAME -> 0
             MatchedFieldFfi.NIP05 -> 1
             MatchedFieldFfi.DISPLAY_NAME -> 2
-            MatchedFieldFfi.ABOUT -> 3
-            MatchedFieldFfi.NPUB -> 4
-            MatchedFieldFfi.PUBKEY -> 5
+            MatchedFieldFfi.ABOUT -> MATCHED_FIELD_ABOUT_RANK
+            MatchedFieldFfi.NPUB -> MATCHED_FIELD_NPUB_RANK
+            MatchedFieldFfi.PUBKEY -> MATCHED_FIELD_PUBKEY_RANK
         }
 
     private fun String.normalized(): String = trim().lowercase(Locale.ROOT)
@@ -208,4 +230,9 @@ object RecipientSearch {
             .normalize(value.trim(), java.text.Normalizer.Form.NFD)
             .replace("\\p{M}+".toRegex(), "")
             .lowercase(Locale.ROOT)
+
+    private const val MIN_IDENTITY_QUERY_LENGTH = 4
+    private const val MATCHED_FIELD_ABOUT_RANK = 3
+    private const val MATCHED_FIELD_NPUB_RANK = 4
+    private const val MATCHED_FIELD_PUBKEY_RANK = 5
 }

@@ -53,34 +53,36 @@ internal fun RecipientSearchProgress.withTrigger(trigger: SearchUpdateTriggerFfi
     }
 
 internal suspend fun loadRecipientSearchFollowIds(load: suspend () -> List<String>): Set<String> =
-    try {
-        load().mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) }
-    } catch (error: Throwable) {
-        rethrowIfCancellation(error)
-        emptySet()
-    }
+    runCatching { load() }
+        .fold(
+            onSuccess = { ids -> ids.mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) } },
+            onFailure = { error ->
+                rethrowIfCancellation(error)
+                emptySet()
+            },
+        )
 
 internal suspend fun <T : AutoCloseable, R> withClosedRecipientSearchSubscription(
     open: suspend () -> T,
     consume: suspend (T) -> R,
 ): R {
     val subscription = open()
-    var primaryFailure: Throwable? = null
-    return try {
-        consume(subscription)
-    } catch (error: Throwable) {
-        primaryFailure = error
-        throw error
-    } finally {
-        try {
-            withContext(NonCancellable + Dispatchers.IO) { subscription.close() }
-        } catch (closeFailure: Throwable) {
-            primaryFailure?.addSuppressed(closeFailure) ?: throw closeFailure
+    val consumption = runCatching { consume(subscription) }
+    val closeFailure =
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { subscription.close() }.exceptionOrNull()
         }
+    val primaryFailure = consumption.exceptionOrNull()
+    if (primaryFailure != null) {
+        closeFailure?.let(primaryFailure::addSuppressed)
+        throw primaryFailure
     }
+    closeFailure?.let { throw it }
+    return consumption.getOrThrow()
 }
 
 @Composable
+@Suppress("FunctionNaming")
 internal fun UserSearchStatusRow(
     @StringRes messageRes: Int,
     showProgress: Boolean = false,
@@ -119,7 +121,11 @@ internal fun rememberRecipientUserSearchState(
         key1 = trimmed,
         key2 = Triple(activeAccountRef, activeAccountIdHex, appState.relationshipRevision),
     ) {
-        if (trimmed.isEmpty() || !isPlainNameQuery(trimmed) || activeAccountRef == null || activeAccountIdHex == null) {
+        if (trimmed.isEmpty() || !isPlainNameQuery(trimmed)) {
+            value = RecipientUserSearchState()
+            return@produceState
+        }
+        if (activeAccountRef == null || activeAccountIdHex == null) {
             value = RecipientUserSearchState()
             return@produceState
         }
@@ -145,7 +151,7 @@ internal fun rememberRecipientUserSearchState(
                 consume = { activeSubscription ->
                     val aggregate = ArrayList<UserDirectorySearchResultFfi>()
                     var progress = RecipientSearchProgress()
-                    while (true) {
+                    while (!progress.completed) {
                         val update = appState.marmotIo { activeSubscription.nextUpdate() } ?: break
                         aggregate += update.newResults
                         progress = progress.withTrigger(update.trigger)
@@ -156,7 +162,6 @@ internal fun rememberRecipientUserSearchState(
                                 isIncomplete = progress.isIncomplete,
                                 failed = progress.failed,
                             )
-                        if (progress.completed) break
                     }
                 },
             )
@@ -170,5 +175,5 @@ internal fun rememberRecipientUserSearchState(
 }
 
 private const val USER_SEARCH_DEBOUNCE_MILLIS = 300L
-private val USER_SEARCH_RADIUS_START: UByte = 1u
-private val USER_SEARCH_RADIUS_END: UByte = 2u
+private const val USER_SEARCH_RADIUS_START: UByte = 1u
+private const val USER_SEARCH_RADIUS_END: UByte = 2u

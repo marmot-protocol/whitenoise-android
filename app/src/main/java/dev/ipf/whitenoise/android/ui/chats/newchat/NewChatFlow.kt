@@ -353,21 +353,18 @@ private fun NewMessageScreen(
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
     val resolution = rememberRecipientResolution(query, appState)
     val userSearch by rememberRecipientUserSearchState(query, appState)
-    val localMatches =
-        remember(query, candidates, activeHex) {
+    val matches =
+        remember(query, candidates, userSearch.candidates, activeHex) {
             if (identifierQuery) {
                 emptyList()
             } else {
-                RecipientSearch.browse(query, candidates, activeHex)
+                RecipientSearch.mergeAndBrowse(
+                    query = query,
+                    known = candidates,
+                    discovered = userSearch.candidates,
+                    activeAccountIdHex = activeHex,
+                )
             }
-        }
-    val matches =
-        remember(localMatches, userSearch.candidates, activeHex) {
-            RecipientSearch.merge(
-                known = localMatches,
-                discovered = userSearch.candidates,
-                activeAccountIdHex = activeHex,
-            )
         }
 
     fun openOrCreateChat(
