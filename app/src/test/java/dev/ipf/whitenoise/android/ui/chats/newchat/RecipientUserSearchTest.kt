@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -53,6 +54,49 @@ class RecipientUserSearchTest {
         }
 
     @Test
+    fun closeFailureIsSuppressedWithoutReplacingCancellation() =
+        runTest {
+            val closeFailure = IllegalStateException("close failed")
+            val subscription = RecordingCloseable(closeFailure)
+            val cancellation = CancellationException("left screen")
+            var failure: Throwable? = null
+            try {
+                withClosedRecipientSearchSubscription(
+                    open = { subscription },
+                    consume = { throw cancellation },
+                )
+            } catch (error: Throwable) {
+                failure = error
+            }
+
+            val thrown = requireNotNull(failure)
+            assertSame(cancellation, thrown)
+            val suppressed = thrown.suppressed.single()
+            assertTrue(suppressed is IllegalStateException)
+            assertEquals(closeFailure.message, suppressed.message)
+            assertTrue(subscription.closed)
+        }
+
+    @Test
+    fun closeFailurePropagatesWhenConsumeSucceeds() =
+        runTest {
+            val closeFailure = IllegalStateException("close failed")
+            var failure: Throwable? = null
+            try {
+                withClosedRecipientSearchSubscription(
+                    open = { RecordingCloseable(closeFailure) },
+                    consume = { "done" },
+                )
+            } catch (error: Throwable) {
+                failure = error
+            }
+
+            val thrown = requireNotNull(failure)
+            assertTrue(thrown is IllegalStateException)
+            assertEquals(closeFailure.message, thrown.message)
+        }
+
+    @Test
     fun followReadFailureFallsBackButCancellationPropagates() =
         runTest {
             assertTrue(loadRecipientSearchFollowIds { error("cache unavailable") }.isEmpty())
@@ -82,11 +126,14 @@ class RecipientUserSearchTest {
         assertTrue(partial.withTrigger(SearchUpdateTriggerFfi.SearchCompleted).completed)
     }
 
-    private class RecordingCloseable : AutoCloseable {
+    private class RecordingCloseable(
+        private val closeFailure: Throwable? = null,
+    ) : AutoCloseable {
         var closed = false
 
         override fun close() {
             closed = true
+            closeFailure?.let { throw it }
         }
     }
 }

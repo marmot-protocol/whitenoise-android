@@ -355,7 +355,7 @@ private fun NewMessageScreen(
     val userSearch by rememberRecipientUserSearchState(query, appState)
     val localMatches =
         remember(query, candidates, activeHex) {
-            if (query.isNotBlank() && !isPlainNameQuery(query)) {
+            if (identifierQuery) {
                 emptyList()
             } else {
                 RecipientSearch.browse(query, candidates, activeHex)
@@ -573,7 +573,11 @@ private fun NewMessageScreen(
                             } else {
                                 Text(
                                     stringResource(
-                                        if (userSearch.failed) R.string.user_search_failed else R.string.no_matches,
+                                        when {
+                                            userSearch.failed -> R.string.user_search_failed
+                                            userSearch.isIncomplete -> R.string.user_search_incomplete
+                                            else -> R.string.no_matches
+                                        },
                                     ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

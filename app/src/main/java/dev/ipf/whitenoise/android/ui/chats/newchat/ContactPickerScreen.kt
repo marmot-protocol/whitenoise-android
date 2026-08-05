@@ -118,7 +118,7 @@ internal fun ContactPickerScreen(
     val userSearch by rememberRecipientUserSearchState(query, appState)
     val localMatches =
         remember(query, candidates, activeHex, excludeAccountIdHexes) {
-            if (query.isNotBlank() && !isPlainNameQuery(query)) {
+            if (identifierQuery) {
                 emptyList()
             } else {
                 RecipientSearch.browse(query, candidates, activeHex, excludeAccountIdHexes)
@@ -283,6 +283,7 @@ internal fun ContactPickerScreen(
                                     when {
                                         query.isBlank() -> R.string.recipient_search_empty_hint
                                         userSearch.failed -> R.string.user_search_failed
+                                        userSearch.isIncomplete -> R.string.user_search_incomplete
                                         else -> R.string.no_matches
                                     },
                                 ),

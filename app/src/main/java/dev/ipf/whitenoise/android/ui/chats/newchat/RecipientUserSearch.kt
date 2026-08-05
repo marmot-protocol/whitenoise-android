@@ -65,10 +65,18 @@ internal suspend fun <T : AutoCloseable, R> withClosedRecipientSearchSubscriptio
     consume: suspend (T) -> R,
 ): R {
     val subscription = open()
+    var primaryFailure: Throwable? = null
     return try {
         consume(subscription)
+    } catch (error: Throwable) {
+        primaryFailure = error
+        throw error
     } finally {
-        withContext(NonCancellable + Dispatchers.IO) { subscription.close() }
+        try {
+            withContext(NonCancellable + Dispatchers.IO) { subscription.close() }
+        } catch (closeFailure: Throwable) {
+            primaryFailure?.addSuppressed(closeFailure) ?: throw closeFailure
+        }
     }
 }
 
