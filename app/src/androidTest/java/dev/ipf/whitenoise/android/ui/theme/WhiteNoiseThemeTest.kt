@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -53,6 +55,7 @@ class WhiteNoiseThemeTest {
         composeRule.setContent {
             WhiteNoiseTheme(
                 darkTheme = false,
+                dynamicColor = true,
                 accentColorArgb = 0xFFFFC107,
             ) {
                 val colorScheme = MaterialTheme.colorScheme
@@ -69,6 +72,35 @@ class WhiteNoiseThemeTest {
             assertEquals(Color.Black, s.onPrimaryContainer)
             assertEquals(accent, s.inversePrimary)
             assertEquals(accent, s.surfaceTint)
+        }
+    }
+
+    @Test
+    fun dynamicPrimaryRolesArePreservedWithoutCustomAccent() {
+        var scheme: ColorScheme? = null
+        val expected =
+            dynamicLightColorScheme(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+            )
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = false,
+                dynamicColor = true,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val actual = requireNotNull(scheme)
+            assertEquals(expected.primary, actual.primary)
+            assertEquals(expected.onPrimary, actual.onPrimary)
+            assertEquals(expected.primaryContainer, actual.primaryContainer)
+            assertEquals(expected.onPrimaryContainer, actual.onPrimaryContainer)
+            assertEquals(expected.inversePrimary, actual.inversePrimary)
+            assertEquals(expected.surfaceTint, actual.surfaceTint)
         }
     }
 

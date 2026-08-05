@@ -177,29 +177,39 @@ fun WhiteNoiseTheme(
             baseColorScheme
         }
     val resolvedAccent =
-        resolveActionColorArgb(
-            customArgb = accentColorArgb,
-            defaultContainerArgb = Highlight.toArgb().toLong() and 0xFFFFFFFFL,
-            defaultContentArgb = OnHighlight.toArgb().toLong() and 0xFFFFFFFFL,
-        )
-    val accent = Color(resolvedAccent.container)
-    val onAccent = Color(resolvedAccent.content)
+        accentColorArgb?.let {
+            resolveActionColorArgb(
+                customArgb = it,
+                defaultContainerArgb = amoledAdjusted.primary.toArgb().toLong() and 0xFFFFFFFFL,
+                defaultContentArgb = amoledAdjusted.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
+            )
+        }
     val colorScheme =
-        amoledAdjusted.copy(
-            primary = accent,
-            onPrimary = onAccent,
-            primaryContainer = accent,
-            onPrimaryContainer = onAccent,
-            inversePrimary = accent,
-            // M3 tonal elevation tints elevated surfaces toward `surfaceTint`
-            // (the active accent color), which lifts dialogs, menus, app bars and
-            // any `Surface(tonalElevation = …)` — e.g. the chat-bubble
-            // long-press reaction/actions popup — off pure black into a
-            // an accent-tinted gray. On AMOLED the tint must be transparent so the
-            // elevation overlay is a no-op and every elevated surface stays
-            // #000000 (#446). Outside AMOLED the account accent is kept.
-            surfaceTint = if (amoledActive) Color.Transparent else accent,
-        )
+        if (resolvedAccent == null) {
+            if (amoledActive) {
+                amoledAdjusted.copy(surfaceTint = Color.Transparent)
+            } else {
+                amoledAdjusted
+            }
+        } else {
+            val accent = Color(resolvedAccent.container)
+            val onAccent = Color(resolvedAccent.content)
+            amoledAdjusted.copy(
+                primary = accent,
+                onPrimary = onAccent,
+                primaryContainer = accent,
+                onPrimaryContainer = onAccent,
+                inversePrimary = accent,
+                // M3 tonal elevation tints elevated surfaces toward `surfaceTint`
+                // (the active accent color), which lifts dialogs, menus, app bars
+                // and any `Surface(tonalElevation = …)` — e.g. the chat-bubble
+                // long-press reaction/actions popup — off pure black into an
+                // accent-tinted gray. On AMOLED the tint must be transparent so
+                // the elevation overlay is a no-op and every elevated surface
+                // stays #000000 (#446).
+                surfaceTint = if (amoledActive) Color.Transparent else accent,
+            )
+        }
 
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
         MaterialTheme(
