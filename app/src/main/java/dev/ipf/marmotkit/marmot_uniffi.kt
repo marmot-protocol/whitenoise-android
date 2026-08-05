@@ -1137,18 +1137,406 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+// For large crates we prevent `MethodTooLargeException` (see #2340)
+// N.B. the name of the extension is very misleading, since it is 
+// rather `InterfaceTooLargeException`, caused by too many methods 
+// in the interface for large crates.
+//
+// By splitting the otherwise huge interface into two parts
+// * UniffiLib 
+// * IntegrityCheckingUniffiLib (this)
+// we allow for ~2x as many methods in the UniffiLib interface.
+// 
+// The `ffi_uniffi_contract_version` method and all checksum methods are put 
+// into `IntegrityCheckingUniffiLib` and these methods are called only once,
+// when the library is loaded.
+internal interface IntegrityCheckingUniffiLib : Library {
+    // Integrity check functions only
+    fun uniffi_marmot_uniffi_checksum_func_parse_media_imeta_tag(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_stream_id_hex(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next_update(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_snapshot(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_chatssubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_chatssubscription_snapshot(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_eventssubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_public_key(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_sign_event(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_encrypt(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_decrypt(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_encrypt(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_decrypt(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_snapshot(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_accept_group_invite(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_follows(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_id_hex(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_inbox_relays(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_key_packages(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_nip65_relays(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_acknowledge_disband_failure(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_build_media_imeta_tag(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_catch_up_accounts(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_chat_list(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_chat_notification_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_classify_relay_endpoints(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_clear_chat_muted(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_clear_group_image(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_clear_push_registration(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_collect_notifications_after_wake(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_create_group(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_create_group_with_initial_image(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_create_identity(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_decline_group_invite(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_delete_account_key_package(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_delete_group_local(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message_draft(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin_detailed(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_disband_group(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_display_name(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_follow_user(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_maintenance_status(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_members(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_mls_state(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members_detailed(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_is_following(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_is_stopping(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_key_package_maintenance_status(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_leave_group(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_list_accounts(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_list_media(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_login(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_login_external_signer(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_message_draft(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_message_drafts(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_messages(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_normalize_member_ref(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_notification_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_npub(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_parse_markdown(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_pause_maintenance(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_periodic_maintenance_policy(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_tracker_update(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin_detailed(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_publish_new_key_package(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_publish_relay_lists(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_publish_user_profile(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_push_registration(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_react_to_message(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_record_host_performance(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_register_external_signer(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_relay_health(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_relay_telemetry_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_remove_account(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_resume_maintenance(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_retired_relay_hosts(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_retry_group_convergence(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_run_due_maintenance(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_save_message_draft(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_schedule_group_self_update(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_search_users(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_send_text(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_inbox_relays(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_manually_unread(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_muted(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_pinned(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_local_notifications_enabled(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_periodic_maintenance_policy(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_pinned_chat_order(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_shutdown(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_sign_in_account(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_start(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chats(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_events(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_group_state(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_messages(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_notifications(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_sweep_expired_retention(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_unfollow_user(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_avatar_url(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_image(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_upload_media(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_upload_profile_image(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_upsert_push_registration(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile_website(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_marmot_watch_agent_text_stream(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_messagessubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_messagessubscription_snapshot(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_notificationssubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_next(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_next_update(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_paginate_backwards(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_paginate_forwards(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_snapshot(
+): Short
+fun uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update(
+): Short
+fun uniffi_marmot_uniffi_checksum_constructor_marmot_new(
+): Short
+fun uniffi_marmot_uniffi_checksum_constructor_marmot_new_with_cursor_persistence(
+): Short
+fun ffi_marmot_uniffi_uniffi_contract_version(
+): Int
+
+}
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
-
 internal interface UniffiLib : Library {
     companion object {
         internal val INSTANCE: UniffiLib by lazy {
-            loadIndirect<UniffiLib>(componentName = "marmot_uniffi")
-            .also { lib: UniffiLib ->
-                uniffiCheckContractApiVersion(lib)
-                uniffiCheckApiChecksums(lib)
-                uniffiCallbackInterfaceExternalAccountSignerFfi.register(lib)
+            val componentName = "marmot_uniffi"
+            // For large crates we prevent `MethodTooLargeException` (see #2340)
+            // N.B. the name of the extension is very misleading, since it is 
+            // rather `InterfaceTooLargeException`, caused by too many methods 
+            // in the interface for large crates.
+            //
+            // By splitting the otherwise huge interface into two parts
+            // * UniffiLib (this)
+            // * IntegrityCheckingUniffiLib
+            // And all checksum methods are put into `IntegrityCheckingUniffiLib`
+            // we allow for ~2x as many methods in the UniffiLib interface.
+            // 
+            // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
+            // so that we can (optionally!) call `uniffiCheckApiChecksums`...
+            loadIndirect<IntegrityCheckingUniffiLib>(componentName)
+                .also { lib: IntegrityCheckingUniffiLib ->
+                    uniffiCheckContractApiVersion(lib)
+                    uniffiCheckApiChecksums(lib)
                 }
+            // ... and then we load the library as `UniffiLib`
+            // N.B. we cannot use `loadIndirect` once and then try to cast it to `UniffiLib`
+            // => results in `java.lang.ClassCastException: com.sun.proxy.$Proxy cannot be cast to ...`
+            // error. So we must call `loadIndirect` twice. For crates large enough
+            // to trigger this issue, the performance impact is negligible, running on
+            // a macOS M1 machine the `loadIndirect` call takes ~50ms.
+            val lib = loadIndirect<UniffiLib>(componentName)
+            // No need to check the contract version and checksums, since 
+            // we already did that with `IntegrityCheckingUniffiLib` above.
+            uniffiCallbackInterfaceExternalAccountSignerFfi.register(lib)
+            // Loading of library with integrity check done.
+            lib
         }
         
         // The Cleaner for the whole library
@@ -1157,869 +1545,523 @@ internal interface UniffiLib : Library {
         }
     }
 
+    // FFI functions
     fun uniffi_marmot_uniffi_fn_clone_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_stream_id_hex(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next_update(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_chatssubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_chatssubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_eventssubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_clone_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_init_callback_vtable_externalaccountsignerffi(`vtable`: UniffiVTableCallbackInterfaceExternalAccountSignerFfi,
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_public_key(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_sign_event(`ptr`: Pointer,`unsignedEventJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`encryptedContent`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_constructor_marmot_new(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_constructor_marmot_new_with_cursor_persistence(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,`cursorPersistence`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_method_marmot_accept_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_follows(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_id_hex(`ptr`: Pointer,`reference`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_key_packages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_unread_summary(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_acknowledge_disband_failure(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_build_media_imeta_tag(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_catch_up_accounts(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_chat_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_classify_relay_endpoints(`ptr`: Pointer,`endpoints`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_clear_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_clear_group_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_clear_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_collect_notifications_after_wake(`ptr`: Pointer,`maxWaitMs`: Int,`source`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_create_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_create_group_with_initial_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,`initialImage`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_create_identity(`ptr`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_decline_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_account_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`eventIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_group_local(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_disband_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_enable_group_disbanding(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_export_encrypted_secret_key(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_follow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_management_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_mls_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_push_debug_info(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_invite_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_is_following(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun uniffi_marmot_uniffi_fn_method_marmot_is_stopping(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun uniffi_marmot_uniffi_fn_method_marmot_key_package_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_leave_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_list_accounts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_list_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_login(`ptr`: Pointer,`identity`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_login_external_signer(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`signer`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_message_drafts(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_normalize_member_ref(`ptr`: Pointer,`memberRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_parse_markdown(`ptr`: Pointer,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_pause_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_periodic_maintenance_policy(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_publish_new_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_publish_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_publish_user_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`profile`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_quarantined_groups(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_record_host_performance(`ptr`: Pointer,`operation`: RustBuffer.ByValue,`durationMs`: Long,`outcome`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_register_external_signer(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`signer`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_relay_health(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_remove_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_remove_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_remove_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`endpoints`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_reply_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_republish_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_resume_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_retired_relay_hosts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_retry_group_convergence(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_reveal_nsec(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_run_due_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_save_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`replyToMessageIdHex`: RustBuffer.ByValue,`mediaAttachments`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_schedule_group_self_update(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_search_users(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,`radiusStart`: Byte,`radiusEnd`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_secure_delete_expired(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`attachments`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_send_text(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_manually_unread(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`manuallyUnread`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`mutedUntilMs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_pinned(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`pinned`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_native_push_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_periodic_maintenance_policy(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`policy`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_pinned_chat_order(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`orderedGroupIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_shutdown(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_sign_in_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_sign_out(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`deleteKeyPackages`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_sign_out_and_wipe(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_start(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_start_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`quicCandidates`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chats(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_events(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_group_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_notifications(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_sweep_expired_retention(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`nowMs`: Long,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_unfollow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_update_group_avatar_url(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`dim`: RustBuffer.ByValue,`thumbhash`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_update_group_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`plaintext`: RustBuffer.ByValue,`mediaType`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_update_group_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_update_message_retention(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`disappearingMessageSecs`: Long,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_upload_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`request`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_upload_profile_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,`mediaType`: RustBuffer.ByValue,`blossomServer`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_upsert_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`platform`: RustBuffer.ByValue,`rawToken`: RustBuffer.ByValue,`serverPubkeyHex`: RustBuffer.ByValue,`relayHint`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_user_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_user_profile_website(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_watch_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`serverCertDer`: RustBuffer.ByValue,`insecureLocal`: Byte,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_clone_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_messagessubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_messagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_notificationssubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_clone_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next_update(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_paginate_backwards(`ptr`: Pointer,`count`: Int,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_paginate_forwards(`ptr`: Pointer,`count`: Int,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_usersearchsubscription_next_update(`ptr`: Pointer,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_func_parse_media_imeta_tag(`tag`: RustBuffer.ByValue,`sourceEpoch`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun ffi_marmot_uniffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_u8(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_u8(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_marmot_uniffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_i8(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_i8(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_marmot_uniffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_u16(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_u16(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_marmot_uniffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_i16(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_i16(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_marmot_uniffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_u32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_u32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_marmot_uniffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_i32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_i32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_marmot_uniffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_u64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_u64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_marmot_uniffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_i64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_i64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_marmot_uniffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_f32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_f32(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Float
-    fun ffi_marmot_uniffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_f64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_f64(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Double
-    fun ffi_marmot_uniffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun ffi_marmot_uniffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_cancel_void(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_free_void(`handle`: Long,
-    ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_checksum_func_parse_media_imeta_tag(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_stream_id_hex(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_next_update(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_chatlistsubscription_snapshot(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_chatssubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_chatssubscription_snapshot(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_eventssubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_public_key(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_sign_event(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_encrypt(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_decrypt(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_encrypt(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_decrypt(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_snapshot(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_accept_group_invite(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_follows(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_id_hex(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_inbox_relays(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_key_packages(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_nip65_relays(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_acknowledge_disband_failure(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_build_media_imeta_tag(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_catch_up_accounts(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_chat_list(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_chat_notification_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_classify_relay_endpoints(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_clear_chat_muted(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_clear_group_image(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_clear_push_registration(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_collect_notifications_after_wake(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_create_group(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_create_group_with_initial_image(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_create_identity(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_decline_group_invite(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_account_key_package(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_group_local(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message_draft(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin_detailed(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_disband_group(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_display_name(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_follow_user(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_maintenance_status(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_members(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_mls_state(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_push_debug_info(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_initialize_chat_read_state(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_invite_members_detailed(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_is_following(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_is_stopping(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_key_package_maintenance_status(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_leave_group(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_list_accounts(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_list_media(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_login(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_login_external_signer(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_message_draft(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_message_drafts(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_messages(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_normalize_member_ref(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_notification_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_npub(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_parse_markdown(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_pause_maintenance(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_periodic_maintenance_policy(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_tracker_update(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin_detailed(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_publish_new_key_package(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_publish_relay_lists(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_publish_user_profile(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_push_registration(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_react_to_message(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_record_host_performance(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_register_external_signer(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_relay_health(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_relay_telemetry_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_remove_account(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_resume_maintenance(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_retired_relay_hosts(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_retry_group_convergence(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_run_due_maintenance(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_save_message_draft(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_schedule_group_self_update(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_search_users(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_send_text(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_inbox_relays(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_manually_unread(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_muted(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_chat_pinned(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_local_notifications_enabled(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_periodic_maintenance_policy(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_pinned_chat_order(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_shutdown(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_sign_in_account(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_start(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_start_agent_text_stream(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chat_list(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_chats(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_events(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_group_state(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_messages(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_notifications(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_sweep_expired_retention(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_unfollow_user(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_unreact_from_message(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_avatar_url(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_image(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_upload_media(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_upload_profile_image(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_upsert_push_registration(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile_website(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_watch_agent_text_stream(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_messagessubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_messagessubscription_snapshot(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_notificationssubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_next(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_next_update(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_paginate_backwards(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_paginate_forwards(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_timelinemessagessubscription_snapshot(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_constructor_marmot_new(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_constructor_marmot_new_with_cursor_persistence(
-    ): Short
-    fun ffi_marmot_uniffi_uniffi_contract_version(
-    ): Int
-    
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_stream_id_hex(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next_update(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_chatssubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_chatssubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_eventssubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_clone_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_init_callback_vtable_externalaccountsignerffi(`vtable`: UniffiVTableCallbackInterfaceExternalAccountSignerFfi,
+): Unit
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_public_key(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_sign_event(`ptr`: Pointer,`unsignedEventJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`encryptedContent`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_constructor_marmot_new(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_constructor_marmot_new_with_cursor_persistence(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,`cursorPersistence`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_method_marmot_accept_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_account_follows(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_account_id_hex(`ptr`: Pointer,`reference`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_account_key_packages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_account_unread_summary(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_acknowledge_disband_failure(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_build_media_imeta_tag(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_catch_up_accounts(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_chat_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_classify_relay_endpoints(`ptr`: Pointer,`endpoints`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_clear_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_clear_group_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_clear_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_collect_notifications_after_wake(`ptr`: Pointer,`maxWaitMs`: Int,`source`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_create_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_create_group_with_initial_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,`initialImage`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_create_identity(`ptr`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_decline_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_delete_account_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`eventIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_delete_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_delete_group_local(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_delete_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_delete_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_disband_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_enable_group_disbanding(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_export_encrypted_secret_key(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_follow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_management_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_mls_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_group_push_debug_info(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_invite_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_is_following(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun uniffi_marmot_uniffi_fn_method_marmot_is_stopping(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun uniffi_marmot_uniffi_fn_method_marmot_key_package_maintenance_status(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_leave_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_list_accounts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_list_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_login(`ptr`: Pointer,`identity`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_login_external_signer(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`signer`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_message_drafts(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_normalize_member_ref(`ptr`: Pointer,`memberRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_parse_markdown(`ptr`: Pointer,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_pause_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_periodic_maintenance_policy(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_publish_new_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_publish_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_publish_user_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`profile`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_quarantined_groups(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_record_host_performance(`ptr`: Pointer,`operation`: RustBuffer.ByValue,`durationMs`: Long,`outcome`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_register_external_signer(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`signer`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_relay_health(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_remove_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_remove_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_remove_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`endpoints`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_reply_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_republish_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_resume_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_retired_relay_hosts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_retry_group_convergence(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_reveal_nsec(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_run_due_maintenance(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_save_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`replyToMessageIdHex`: RustBuffer.ByValue,`mediaAttachments`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_schedule_group_self_update(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_search_users(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,`radiusStart`: Byte,`radiusEnd`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_secure_delete_expired(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`attachments`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_send_text(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_manually_unread(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`manuallyUnread`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_muted(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`mutedUntilMs`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_chat_pinned(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`pinned`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_native_push_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_periodic_maintenance_policy(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`policy`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_pinned_chat_order(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`orderedGroupIds`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_shutdown(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_sign_in_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_sign_out(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`deleteKeyPackages`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_sign_out_and_wipe(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_start(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_start_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`quicCandidates`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chats(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_events(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_group_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_notifications(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_sweep_expired_retention(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`nowMs`: Long,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_unfollow_user(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`userRef`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_update_group_avatar_url(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`dim`: RustBuffer.ByValue,`thumbhash`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_update_group_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`plaintext`: RustBuffer.ByValue,`mediaType`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_update_group_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_update_message_retention(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`disappearingMessageSecs`: Long,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_upload_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`request`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_upload_profile_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,`mediaType`: RustBuffer.ByValue,`blossomServer`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_upsert_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`platform`: RustBuffer.ByValue,`rawToken`: RustBuffer.ByValue,`serverPubkeyHex`: RustBuffer.ByValue,`relayHint`: RustBuffer.ByValue,
+): Long
+fun uniffi_marmot_uniffi_fn_method_marmot_user_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_user_profile_website(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_method_marmot_watch_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`serverCertDer`: RustBuffer.ByValue,`insecureLocal`: Byte,
+): Long
+fun uniffi_marmot_uniffi_fn_clone_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_messagessubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_messagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_notificationssubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_clone_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next_update(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_paginate_backwards(`ptr`: Pointer,`count`: Int,
+): Long
+fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_paginate_forwards(`ptr`: Pointer,`count`: Int,
+): Long
+fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_marmot_uniffi_fn_clone_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_marmot_uniffi_fn_free_usersearchsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_marmot_uniffi_fn_method_usersearchsubscription_next_update(`ptr`: Pointer,
+): Long
+fun uniffi_marmot_uniffi_fn_func_parse_media_imeta_tag(`tag`: RustBuffer.ByValue,`sourceEpoch`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_marmot_uniffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_marmot_uniffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_marmot_uniffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun ffi_marmot_uniffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_marmot_uniffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_u8(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_u8(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun ffi_marmot_uniffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_i8(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_i8(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun ffi_marmot_uniffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_u16(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_u16(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+fun ffi_marmot_uniffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_i16(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_i16(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+fun ffi_marmot_uniffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_u32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_u32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+fun ffi_marmot_uniffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_i32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_i32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+fun ffi_marmot_uniffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_u64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_u64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+fun ffi_marmot_uniffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_i64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_i64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+fun ffi_marmot_uniffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_f32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_f32(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Float
+fun ffi_marmot_uniffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_f64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_f64(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Double
+fun ffi_marmot_uniffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_pointer(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_pointer(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun ffi_marmot_uniffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_rust_buffer(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_rust_buffer(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_marmot_uniffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_cancel_void(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_free_void(`handle`: Long,
+): Unit
+fun ffi_marmot_uniffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+
 }
 
-private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
+private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
-    val bindings_contract_version = 26
+    val bindings_contract_version = 29
     // Get the scaffolding contract version by calling the into the dylib
     val scaffolding_contract_version = lib.ffi_marmot_uniffi_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
         throw RuntimeException("UniFFI contract version mismatch: try cleaning and rebuilding your project")
     }
 }
-
 @Suppress("UNUSED_PARAMETER")
-private fun uniffiCheckApiChecksums(lib: UniffiLib) {
+private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_func_parse_media_imeta_tag() != 37522.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2182,7 +2224,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_enable_group_disbanding() != 25467.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 16556.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 6808.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_follow_user() != 26050.toShort()) {
@@ -2530,12 +2572,19 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_usersearchsubscription_next_update() != 9602.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new() != 56105.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new() != 53434.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_constructor_marmot_new_with_cursor_persistence() != 18903.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+}
+
+/**
+ * @suppress
+ */
+public fun uniffiEnsureInitialized() {
+    UniffiLib.INSTANCE
 }
 
 // Async support
@@ -2595,8 +2644,33 @@ interface Disposable {
     fun destroy()
     companion object {
         fun destroy(vararg args: Any?) {
-            args.filterIsInstance<Disposable>()
-                .forEach(Disposable::destroy)
+            for (arg in args) {
+                when (arg) {
+                    is Disposable -> arg.destroy()
+                    is ArrayList<*> -> {
+                        for (idx in arg.indices) {
+                            val element = arg[idx]
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Map<*, *> -> {
+                        for (element in arg.values) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Iterable<*> -> {
+                        for (element in arg) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -2621,7 +2695,102 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
  *
  * @suppress
  * */
-object NoPointer
+object NoPointer// Magic number for the Rust proxy to call using the same mechanism as every other method,
+// to free the callback once it's dropped by Rust.
+internal const val IDX_CALLBACK_FREE = 0
+// Callback return codes
+internal const val UNIFFI_CALLBACK_SUCCESS = 0
+internal const val UNIFFI_CALLBACK_ERROR = 1
+internal const val UNIFFI_CALLBACK_UNEXPECTED_ERROR = 2
+
+/**
+ * @suppress
+ */
+public abstract class FfiConverterCallbackInterface<CallbackInterface: Any>: FfiConverter<CallbackInterface, Long> {
+    internal val handleMap = UniffiHandleMap<CallbackInterface>()
+
+    internal fun drop(handle: Long) {
+        handleMap.remove(handle)
+    }
+
+    override fun lift(value: Long): CallbackInterface {
+        return handleMap.get(value)
+    }
+
+    override fun read(buf: ByteBuffer) = lift(buf.getLong())
+
+    override fun lower(value: CallbackInterface) = handleMap.insert(value)
+
+    override fun allocationSize(value: CallbackInterface) = 8UL
+
+    override fun write(value: CallbackInterface, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+/**
+ * The cleaner interface for Object finalization code to run.
+ * This is the entry point to any implementation that we're using.
+ *
+ * The cleaner registers objects and returns cleanables, so now we are
+ * defining a `UniffiCleaner` with a `UniffiClenaer.Cleanable` to abstract the
+ * different implmentations available at compile time.
+ *
+ * @suppress
+ */
+interface UniffiCleaner {
+    interface Cleanable {
+        fun clean()
+    }
+
+    fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable
+
+    companion object
+}
+
+// The fallback Jna cleaner, which is available for both Android, and the JVM.
+private class UniffiJnaCleaner : UniffiCleaner {
+    private val cleaner = com.sun.jna.internal.Cleaner.getCleaner()
+
+    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
+        UniffiJnaCleanable(cleaner.register(value, cleanUpTask))
+}
+
+private class UniffiJnaCleanable(
+    private val cleanable: com.sun.jna.internal.Cleaner.Cleanable,
+) : UniffiCleaner.Cleanable {
+    override fun clean() = cleanable.clean()
+}
+
+
+// We decide at uniffi binding generation time whether we were
+// using Android or not.
+// There are further runtime checks to chose the correct implementation
+// of the cleaner.
+
+
+private fun UniffiCleaner.Companion.create(): UniffiCleaner =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        AndroidSystemCleaner()
+    } else {
+        UniffiJnaCleaner()
+    }
+
+// The SystemCleaner, available from API Level 33.
+// Some API Level 33 OSes do not support using it, so we require API Level 34.
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private class AndroidSystemCleaner : UniffiCleaner {
+    val cleaner = android.system.SystemCleaner.cleaner()
+
+    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
+        AndroidSystemCleanable(cleaner.register(value, cleanUpTask))
+}
+
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private class AndroidSystemCleanable(
+    private val cleanable: java.lang.ref.Cleaner.Cleanable,
+) : UniffiCleaner.Cleanable {
+    override fun clean() = cleanable.clean()
+}
 
 /**
  * @suppress
@@ -2960,69 +3129,6 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 
 
 /**
- * The cleaner interface for Object finalization code to run.
- * This is the entry point to any implementation that we're using.
- *
- * The cleaner registers objects and returns cleanables, so now we are
- * defining a `UniffiCleaner` with a `UniffiClenaer.Cleanable` to abstract the
- * different implmentations available at compile time.
- *
- * @suppress
- */
-interface UniffiCleaner {
-    interface Cleanable {
-        fun clean()
-    }
-
-    fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable
-
-    companion object
-}
-
-// The fallback Jna cleaner, which is available for both Android, and the JVM.
-private class UniffiJnaCleaner : UniffiCleaner {
-    private val cleaner = com.sun.jna.internal.Cleaner.getCleaner()
-
-    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        UniffiJnaCleanable(cleaner.register(value, cleanUpTask))
-}
-
-private class UniffiJnaCleanable(
-    private val cleanable: com.sun.jna.internal.Cleaner.Cleanable,
-) : UniffiCleaner.Cleanable {
-    override fun clean() = cleanable.clean()
-}
-
-// We decide at uniffi binding generation time whether we were
-// using Android or not.
-// There are further runtime checks to chose the correct implementation
-// of the cleaner.
-
-
-private fun UniffiCleaner.Companion.create(): UniffiCleaner =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        AndroidSystemCleaner()
-    } else {
-        UniffiJnaCleaner()
-    }
-
-// The SystemCleaner, available from API Level 33.
-// Some API Level 33 OSes do not support using it, so we require API Level 34.
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-private class AndroidSystemCleaner : UniffiCleaner {
-    val cleaner = android.system.SystemCleaner.cleaner()
-
-    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        AndroidSystemCleanable(cleaner.register(value, cleanUpTask))
-}
-
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-private class AndroidSystemCleanable(
-    private val cleanable: java.lang.ref.Cleaner.Cleanable,
-) : UniffiCleaner.Cleanable {
-    override fun clean() = cleanable.clean()
-}
-/**
  * A live agent-text-stream watch. Drive `next()` in a `while let` loop to fill
  * a bubble; it yields `Chunk` deltas then a terminal `Finished`/`Failed`,
  * after which it returns `None`.
@@ -3044,7 +3150,8 @@ public interface AgentStreamSubscriptionInterface {
  * a bubble; it yields `Chunk` deltas then a terminal `Finished`/`Failed`,
  * after which it returns `None`.
  */
-open class AgentStreamSubscription: Disposable, AutoCloseable, AgentStreamSubscriptionInterface {
+open class AgentStreamSubscription: Disposable, AutoCloseable, AgentStreamSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -3325,7 +3432,8 @@ public interface ChatListSubscriptionInterface {
     companion object
 }
 
-open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscriptionInterface {
+open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -3621,7 +3729,8 @@ public interface ChatsSubscriptionInterface {
     companion object
 }
 
-open class ChatsSubscription: Disposable, AutoCloseable, ChatsSubscriptionInterface {
+open class ChatsSubscription: Disposable, AutoCloseable, ChatsSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -3888,7 +3997,8 @@ public interface EventsSubscriptionInterface {
  * `RecvError::Lagged` is non-fatal — the iOS side will catch back up via
  * the per-account chats/messages subscriptions).
  */
-open class EventsSubscription: Disposable, AutoCloseable, EventsSubscriptionInterface {
+open class EventsSubscription: Disposable, AutoCloseable, EventsSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -4159,7 +4269,8 @@ public interface ExternalAccountSignerFfi {
     companion object
 }
 
-open class ExternalAccountSignerFfiImpl: Disposable, AutoCloseable, ExternalAccountSignerFfi {
+open class ExternalAccountSignerFfiImpl: Disposable, AutoCloseable, ExternalAccountSignerFfi
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -4343,38 +4454,7 @@ open class ExternalAccountSignerFfiImpl: Disposable, AutoCloseable, ExternalAcco
     companion object
     
 }
-// Magic number for the Rust proxy to call using the same mechanism as every other method,
-// to free the callback once it's dropped by Rust.
-internal const val IDX_CALLBACK_FREE = 0
-// Callback return codes
-internal const val UNIFFI_CALLBACK_SUCCESS = 0
-internal const val UNIFFI_CALLBACK_ERROR = 1
-internal const val UNIFFI_CALLBACK_UNEXPECTED_ERROR = 2
 
-/**
- * @suppress
- */
-public abstract class FfiConverterCallbackInterface<CallbackInterface: Any>: FfiConverter<CallbackInterface, Long> {
-    internal val handleMap = UniffiHandleMap<CallbackInterface>()
-
-    internal fun drop(handle: Long) {
-        handleMap.remove(handle)
-    }
-
-    override fun lift(value: Long): CallbackInterface {
-        return handleMap.get(value)
-    }
-
-    override fun read(buf: ByteBuffer) = lift(buf.getLong())
-
-    override fun lower(value: CallbackInterface) = handleMap.insert(value)
-
-    override fun allocationSize(value: CallbackInterface) = 8UL
-
-    override fun write(value: CallbackInterface, buf: ByteBuffer) {
-        buf.putLong(lower(value))
-    }
-}
 
 // Put the implementation in an object so we don't pollute the top-level namespace
 internal object uniffiCallbackInterfaceExternalAccountSignerFfi {
@@ -4644,7 +4724,8 @@ public interface GroupStateSubscriptionInterface {
     companion object
 }
 
-open class GroupStateSubscription: Disposable, AutoCloseable, GroupStateSubscriptionInterface {
+open class GroupStateSubscription: Disposable, AutoCloseable, GroupStateSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -5127,7 +5208,9 @@ public interface MarmotInterface {
      * `ncryptsec1...` bech32 backup string (mdk#544).
      *
      * SENSITIVE: the passphrase is accepted as an owned FFI string and zeroed
-     * on return by the Rust boundary. The encrypted export is logged to the
+     * on return by the Rust boundary. This cannot wipe the caller's original
+     * host-language string, which remains a separate host-side responsibility
+     * and should be kept transient. The encrypted export is logged to the
      * per-account audit log, but unlike `reveal_nsec` it does not downgrade the
      * account's NIP-49 KEY_SECURITY_BYTE because raw plaintext key material is
      * not returned to the host app.
@@ -5828,7 +5911,8 @@ public interface MarmotInterface {
     companion object
 }
 
-open class Marmot: Disposable, AutoCloseable, MarmotInterface {
+open class Marmot: Disposable, AutoCloseable, MarmotInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -5851,8 +5935,11 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * platform keyring (Keychain on Apple platforms, Android's native
      * keyring on Android) via the default keychain-backed account home —
      * not in a plaintext file. Fallible because initializing the platform
-     * secret store can fail. Call [`Marmot::start`] before subscribing to
-     * events.
+     * secret store can fail or another process may own the same root
+     * ([`MarmotKitError::RuntimeBusy`]). Root ownership is nonblocking and
+     * remains held until the final `Marmot`/runtime handle is dropped, even
+     * after [`Marmot::shutdown`]. Call [`Marmot::start`] before subscribing
+     * to events.
      */
     constructor(`rootPath`: kotlin.String, `relayUrls`: List<kotlin.String>) :
         this(
@@ -6747,7 +6834,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * `ncryptsec1...` bech32 backup string (mdk#544).
      *
      * SENSITIVE: the passphrase is accepted as an owned FFI string and zeroed
-     * on return by the Rust boundary. The encrypted export is logged to the
+     * on return by the Rust boundary. This cannot wipe the caller's original
+     * host-language string, which remains a separate host-side responsibility
+     * and should be kept transient. The encrypted export is logged to the
      * per-account audit log, but unlike `reveal_nsec` it does not downgrade the
      * account's NIP-49 KEY_SECURITY_BYTE because raw plaintext key material is
      * not returned to the host app.
@@ -9399,7 +9488,8 @@ public interface MessagesSubscriptionInterface {
     companion object
 }
 
-open class MessagesSubscription: Disposable, AutoCloseable, MessagesSubscriptionInterface {
+open class MessagesSubscription: Disposable, AutoCloseable, MessagesSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -9654,7 +9744,8 @@ public interface NotificationsSubscriptionInterface {
     companion object
 }
 
-open class NotificationsSubscription: Disposable, AutoCloseable, NotificationsSubscriptionInterface {
+open class NotificationsSubscription: Disposable, AutoCloseable, NotificationsSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -9948,7 +10039,8 @@ public interface TimelineMessagesSubscriptionInterface {
  * task while `paginate_backwards`/`paginate_forwards` runs on another without
  * either blocking the other.
  */
-open class TimelineMessagesSubscription: Disposable, AutoCloseable, TimelineMessagesSubscriptionInterface {
+open class TimelineMessagesSubscription: Disposable, AutoCloseable, TimelineMessagesSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -10307,7 +10399,8 @@ public interface UserSearchSubscriptionInterface {
  * Unlike the runtime subscriptions above there is no `snapshot()`: a search
  * has no initial state, only results that arrive as each radius resolves.
  */
-open class UserSearchSubscription: Disposable, AutoCloseable, UserSearchSubscriptionInterface {
+open class UserSearchSubscription: Disposable, AutoCloseable, UserSearchSubscriptionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -14522,7 +14615,8 @@ public object FfiConverterTypeRuntimeProjectionUpdateFfi: FfiConverterRustBuffer
 data class SecureDeleteExpiredResultFfi (
     var `prunedMessages`: kotlin.ULong, 
     var `secretsDeleted`: kotlin.ULong, 
-    var `mediaCiphertextSha256`: List<kotlin.String>
+    var `mediaCiphertextSha256`: List<kotlin.String>, 
+    var `erasurePending`: kotlin.Boolean
 ) {
     
     companion object
@@ -14537,19 +14631,22 @@ public object FfiConverterTypeSecureDeleteExpiredResultFfi: FfiConverterRustBuff
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
     override fun allocationSize(value: SecureDeleteExpiredResultFfi) = (
             FfiConverterULong.allocationSize(value.`prunedMessages`) +
             FfiConverterULong.allocationSize(value.`secretsDeleted`) +
-            FfiConverterSequenceString.allocationSize(value.`mediaCiphertextSha256`)
+            FfiConverterSequenceString.allocationSize(value.`mediaCiphertextSha256`) +
+            FfiConverterBoolean.allocationSize(value.`erasurePending`)
     )
 
     override fun write(value: SecureDeleteExpiredResultFfi, buf: ByteBuffer) {
             FfiConverterULong.write(value.`prunedMessages`, buf)
             FfiConverterULong.write(value.`secretsDeleted`, buf)
             FfiConverterSequenceString.write(value.`mediaCiphertextSha256`, buf)
+            FfiConverterBoolean.write(value.`erasurePending`, buf)
     }
 }
 
@@ -16201,6 +16298,17 @@ sealed class GroupEventKindFfi {
         companion object
     }
     
+    /**
+     * A transport object was released because a local resource budget was
+     * exhausted. This does not assert protocol invalidity; exact-id
+     * redelivery remains eligible.
+     */
+    data class TransportObjectResourceRefused(
+        val `messageIdHex`: kotlin.String, 
+        val `resource`: kotlin.String) : GroupEventKindFfi() {
+        companion object
+    }
+    
     data class MessageReceived(
         val `senderIdHex`: kotlin.String, 
         val `epoch`: kotlin.ULong) : GroupEventKindFfi() {
@@ -16289,47 +16397,51 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
                 )
-            3 -> GroupEventKindFfi.MessageReceived(
+            3 -> GroupEventKindFfi.TransportObjectResourceRefused(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                )
+            4 -> GroupEventKindFfi.MessageReceived(
                 FfiConverterString.read(buf),
                 FfiConverterULong.read(buf),
                 )
-            4 -> GroupEventKindFfi.AppMessageInvalidated(
+            5 -> GroupEventKindFfi.AppMessageInvalidated(
                 FfiConverterString.read(buf),
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
                 )
-            5 -> GroupEventKindFfi.GroupStateChanged(
+            6 -> GroupEventKindFfi.GroupStateChanged(
                 FfiConverterULong.read(buf),
                 FfiConverterOptionalString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
                 )
-            6 -> GroupEventKindFfi.GroupHydrationQuarantined(
+            7 -> GroupEventKindFfi.GroupHydrationQuarantined(
                 FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.read(buf),
                 )
-            7 -> GroupEventKindFfi.EpochChanged(
+            8 -> GroupEventKindFfi.EpochChanged(
                 FfiConverterULong.read(buf),
                 FfiConverterULong.read(buf),
                 )
-            8 -> GroupEventKindFfi.ForkRecovered(
+            9 -> GroupEventKindFfi.ForkRecovered(
                 FfiConverterULong.read(buf),
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 )
-            9 -> GroupEventKindFfi.CommitRolledBack(
+            10 -> GroupEventKindFfi.CommitRolledBack(
                 FfiConverterString.read(buf),
                 )
-            10 -> GroupEventKindFfi.GroupStateInvalidated(
+            11 -> GroupEventKindFfi.GroupStateInvalidated(
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            11 -> GroupEventKindFfi.GroupUnrecoverable
-            12 -> GroupEventKindFfi.PendingCommitRecovered(
+            12 -> GroupEventKindFfi.GroupUnrecoverable
+            13 -> GroupEventKindFfi.PendingCommitRecovered(
                 FfiConverterULong.read(buf),
                 )
-            13 -> GroupEventKindFfi.GroupHydrationRecovered(
+            14 -> GroupEventKindFfi.GroupHydrationRecovered(
                 FfiConverterULong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -16349,6 +16461,14 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 4UL
                 + FfiConverterString.allocationSize(value.`viaWelcomeHex`)
                 + FfiConverterOptionalString.allocationSize(value.`welcomerIdHex`)
+            )
+        }
+        is GroupEventKindFfi.TransportObjectResourceRefused -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`messageIdHex`)
+                + FfiConverterString.allocationSize(value.`resource`)
             )
         }
         is GroupEventKindFfi.MessageReceived -> {
@@ -16453,14 +16573,20 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterOptionalString.write(value.`welcomerIdHex`, buf)
                 Unit
             }
-            is GroupEventKindFfi.MessageReceived -> {
+            is GroupEventKindFfi.TransportObjectResourceRefused -> {
                 buf.putInt(3)
+                FfiConverterString.write(value.`messageIdHex`, buf)
+                FfiConverterString.write(value.`resource`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.MessageReceived -> {
+                buf.putInt(4)
                 FfiConverterString.write(value.`senderIdHex`, buf)
                 FfiConverterULong.write(value.`epoch`, buf)
                 Unit
             }
             is GroupEventKindFfi.AppMessageInvalidated -> {
-                buf.putInt(4)
+                buf.putInt(5)
                 FfiConverterString.write(value.`messageIdHex`, buf)
                 FfiConverterULong.write(value.`epoch`, buf)
                 FfiConverterString.write(value.`reason`, buf)
@@ -16468,7 +16594,7 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 Unit
             }
             is GroupEventKindFfi.GroupStateChanged -> {
-                buf.putInt(5)
+                buf.putInt(6)
                 FfiConverterULong.write(value.`epoch`, buf)
                 FfiConverterOptionalString.write(value.`actorIdHex`, buf)
                 FfiConverterString.write(value.`change`, buf)
@@ -16476,46 +16602,46 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 Unit
             }
             is GroupEventKindFfi.GroupHydrationQuarantined -> {
-                buf.putInt(6)
+                buf.putInt(7)
                 FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.write(value.`reason`, buf)
                 Unit
             }
             is GroupEventKindFfi.EpochChanged -> {
-                buf.putInt(7)
+                buf.putInt(8)
                 FfiConverterULong.write(value.`from`, buf)
                 FfiConverterULong.write(value.`to`, buf)
                 Unit
             }
             is GroupEventKindFfi.ForkRecovered -> {
-                buf.putInt(8)
+                buf.putInt(9)
                 FfiConverterULong.write(value.`sourceEpoch`, buf)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 Unit
             }
             is GroupEventKindFfi.CommitRolledBack -> {
-                buf.putInt(9)
+                buf.putInt(10)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupStateInvalidated -> {
-                buf.putInt(10)
+                buf.putInt(11)
                 FfiConverterULong.write(value.`epoch`, buf)
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupUnrecoverable -> {
-                buf.putInt(11)
+                buf.putInt(12)
                 Unit
             }
             is GroupEventKindFfi.PendingCommitRecovered -> {
-                buf.putInt(12)
+                buf.putInt(13)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupHydrationRecovered -> {
-                buf.putInt(13)
+                buf.putInt(14)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
@@ -16777,7 +16903,11 @@ public object FfiConverterTypeMarkdownAlignmentFfi: FfiConverterRustBuffer<Markd
 enum class MarkdownAutolinkKindFfi {
     
     URI,
-    EMAIL;
+    EMAIL,
+    /**
+     * Bare `www.` host/path text. Hosts synthesize `https://` for navigation.
+     */
+    WWW;
     companion object
 }
 
@@ -17590,6 +17720,22 @@ sealed class MarmotEventFfi {
         companion object
     }
     
+    /**
+     * This device armed `arms` epoch-gap history backfills for the group
+     * without catching up: it is still stalled at `stalled_epoch` while the
+     * group has moved on. Surface it as "this group cannot catch up; re-syncing
+     * is recommended"; the sanctioned repair is rotating this device's key
+     * package and re-activating transport, which is the host app's call.
+     */
+    data class EpochStallEscalated(
+        val `accountIdHex`: kotlin.String, 
+        val `accountLabel`: kotlin.String, 
+        val `groupIdHex`: kotlin.String, 
+        val `stalledEpoch`: kotlin.ULong, 
+        val `arms`: kotlin.UInt) : MarmotEventFfi() {
+        companion object
+    }
+    
 
     
     companion object
@@ -17638,6 +17784,13 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
+                )
+            9 -> MarmotEventFfi.EpochStallEscalated(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterULong.read(buf),
+                FfiConverterUInt.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -17714,6 +17867,17 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 + FfiConverterString.allocationSize(value.`recipientHex`)
             )
         }
+        is MarmotEventFfi.EpochStallEscalated -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`accountIdHex`)
+                + FfiConverterString.allocationSize(value.`accountLabel`)
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+                + FfiConverterULong.allocationSize(value.`stalledEpoch`)
+                + FfiConverterUInt.allocationSize(value.`arms`)
+            )
+        }
     }
 
     override fun write(value: MarmotEventFfi, buf: ByteBuffer) {
@@ -17770,6 +17934,15 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`messageIdHex`, buf)
                 FfiConverterString.write(value.`recipientHex`, buf)
+                Unit
+            }
+            is MarmotEventFfi.EpochStallEscalated -> {
+                buf.putInt(9)
+                FfiConverterString.write(value.`accountIdHex`, buf)
+                FfiConverterString.write(value.`accountLabel`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterULong.write(value.`stalledEpoch`, buf)
+                FfiConverterUInt.write(value.`arms`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -17896,6 +18069,27 @@ sealed class MarmotKitException: kotlin.Exception() {
     }
     
     class TransportClosed(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
+    /**
+     * Another process or runtime owns the shared Marmot root. This is a typed,
+     * retryable/fallback signal for the iOS foreground app and NSE; neither
+     * host should open an unleased runtime after receiving it.
+     */
+    class RuntimeBusy(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
+    /**
+     * Another client or managed worker in this runtime currently owns the
+     * account's in-memory engine session. Retry only after that owner closes.
+     */
+    class AccountSessionBusy(
         ) : MarmotKitException() {
         override val message
             get() = ""
@@ -18192,66 +18386,68 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 )
             12 -> MarmotKitException.FollowListUnavailable()
             13 -> MarmotKitException.TransportClosed()
-            14 -> MarmotKitException.RuntimeStopping()
-            15 -> MarmotKitException.AccountCatchUp(
+            14 -> MarmotKitException.RuntimeBusy()
+            15 -> MarmotKitException.AccountSessionBusy()
+            16 -> MarmotKitException.RuntimeStopping()
+            17 -> MarmotKitException.AccountCatchUp(
                 FfiConverterString.read(buf),
                 )
-            16 -> MarmotKitException.NotGroupAdmin(
+            18 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            17 -> MarmotKitException.AdminCannotSelfRemove(
+            19 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            18 -> MarmotKitException.LeaveAlreadyRequested(
+            20 -> MarmotKitException.LeaveAlreadyRequested(
                 FfiConverterString.read(buf),
                 )
-            19 -> MarmotKitException.WouldRemoveLastAdmin(
+            21 -> MarmotKitException.WouldRemoveLastAdmin(
                 FfiConverterString.read(buf),
                 )
-            20 -> MarmotKitException.DisbandingUnsupportedMembers(
+            22 -> MarmotKitException.DisbandingUnsupportedMembers(
                 FfiConverterString.read(buf),
                 FfiConverterSequenceString.read(buf),
                 )
-            21 -> MarmotKitException.DisbandingNotEnabled(
+            23 -> MarmotKitException.DisbandingNotEnabled(
                 FfiConverterString.read(buf),
                 )
-            22 -> MarmotKitException.GroupDisbanding(
+            24 -> MarmotKitException.GroupDisbanding(
                 FfiConverterString.read(buf),
                 )
-            23 -> MarmotKitException.MemberNotInGroup(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            24 -> MarmotKitException.AlreadyAdmin(
+            25 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            25 -> MarmotKitException.NotAdmin(
+            26 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            26 -> MarmotKitException.StorageBusy(
+            27 -> MarmotKitException.NotAdmin(
+                FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            27 -> MarmotKitException.SecretNotFound(
+            28 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            28 -> MarmotKitException.KeystoreUnavailable(
+            29 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            29 -> MarmotKitException.EmptyPassphrase()
-            30 -> MarmotKitException.EncryptionFailed(
+            30 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            31 -> MarmotKitException.Io(
+            31 -> MarmotKitException.EmptyPassphrase()
+            32 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            32 -> MarmotKitException.ExternalSignerUnavailable(
+            33 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            33 -> MarmotKitException.ExternalSignerMismatch()
-            34 -> MarmotKitException.ExternalSignerRejected()
-            35 -> MarmotKitException.Runtime(
+            34 -> MarmotKitException.ExternalSignerUnavailable(
+                FfiConverterString.read(buf),
+                )
+            35 -> MarmotKitException.ExternalSignerMismatch()
+            36 -> MarmotKitException.ExternalSignerRejected()
+            37 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -18320,6 +18516,14 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 4UL
             )
             is MarmotKitException.TransportClosed -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is MarmotKitException.RuntimeBusy -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is MarmotKitException.AccountSessionBusy -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -18501,113 +18705,121 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 buf.putInt(13)
                 Unit
             }
-            is MarmotKitException.RuntimeStopping -> {
+            is MarmotKitException.RuntimeBusy -> {
                 buf.putInt(14)
                 Unit
             }
-            is MarmotKitException.AccountCatchUp -> {
+            is MarmotKitException.AccountSessionBusy -> {
                 buf.putInt(15)
+                Unit
+            }
+            is MarmotKitException.RuntimeStopping -> {
+                buf.putInt(16)
+                Unit
+            }
+            is MarmotKitException.AccountCatchUp -> {
+                buf.putInt(17)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(16)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AdminCannotSelfRemove -> {
-                buf.putInt(17)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(18)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.WouldRemoveLastAdmin -> {
+            is MarmotKitException.AdminCannotSelfRemove -> {
                 buf.putInt(19)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.DisbandingUnsupportedMembers -> {
+            is MarmotKitException.LeaveAlreadyRequested -> {
                 buf.putInt(20)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.WouldRemoveLastAdmin -> {
+                buf.putInt(21)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.DisbandingUnsupportedMembers -> {
+                buf.putInt(22)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterSequenceString.write(value.`memberIdsHex`, buf)
                 Unit
             }
             is MarmotKitException.DisbandingNotEnabled -> {
-                buf.putInt(21)
+                buf.putInt(23)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.GroupDisbanding -> {
-                buf.putInt(22)
+                buf.putInt(24)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.MemberNotInGroup -> {
-                buf.putInt(23)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                FfiConverterString.write(value.`memberIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.AlreadyAdmin -> {
-                buf.putInt(24)
-                FfiConverterString.write(value.`groupIdHex`, buf)
-                FfiConverterString.write(value.`memberIdHex`, buf)
-                Unit
-            }
-            is MarmotKitException.NotAdmin -> {
                 buf.putInt(25)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.StorageBusy -> {
+            is MarmotKitException.AlreadyAdmin -> {
                 buf.putInt(26)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.SecretNotFound -> {
+            is MarmotKitException.NotAdmin -> {
                 buf.putInt(27)
-                FfiConverterString.write(value.`details`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.KeystoreUnavailable -> {
+            is MarmotKitException.StorageBusy -> {
                 buf.putInt(28)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.EmptyPassphrase -> {
+            is MarmotKitException.SecretNotFound -> {
                 buf.putInt(29)
+                FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.EncryptionFailed -> {
+            is MarmotKitException.KeystoreUnavailable -> {
                 buf.putInt(30)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Io -> {
+            is MarmotKitException.EmptyPassphrase -> {
                 buf.putInt(31)
+                Unit
+            }
+            is MarmotKitException.EncryptionFailed -> {
+                buf.putInt(32)
+                FfiConverterString.write(value.`details`, buf)
+                Unit
+            }
+            is MarmotKitException.Io -> {
+                buf.putInt(33)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerUnavailable -> {
-                buf.putInt(32)
+                buf.putInt(34)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(33)
+                buf.putInt(35)
                 Unit
             }
             is MarmotKitException.ExternalSignerRejected -> {
-                buf.putInt(34)
+                buf.putInt(36)
                 Unit
             }
             is MarmotKitException.Runtime -> {
-                buf.putInt(35)
+                buf.putInt(37)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
