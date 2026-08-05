@@ -1249,10 +1249,10 @@
     <string name="notification_channel_app_updates_description">Уведомления о версиях Zapstore</string>
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
-    <string name="action_color">Цвет действий</string>
-    <string name="action_color_subtitle">Выберите цвет профиля для кнопок «Новое сообщение», «Отправить» и индикаторов непрочитанного. Цвета для светлой, тёмной и AMOLED-тем сохраняются отдельно.</string>
-    <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её цвет действий.</string>
-    <string name="action_color_swatch_content_description">Цвет действий %1$s</string>
+    <string name="action_color">Акцентный цвет приложения</string>
+    <string name="action_color_subtitle">Выберите акцентный цвет этой учётной записи для кнопок, выбранных элементов и индикаторов непрочитанного. Цвета для светлой, тёмной и AMOLED-тем сохраняются отдельно.</string>
+    <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>
+    <string name="action_color_swatch_content_description">Акцентный цвет приложения %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Выберите цвета по умолчанию для текущей темы. Светлая, тёмная и AMOLED-тема хранят цвета отдельно.</string>
     <string name="chat_bubble_colors_chat_subtitle">Измените цвета сообщений только для этой беседы. Сбросьте настройки, чтобы использовать значения оформления.</string>
     <string name="bubble_color_preview">Предпросмотр</string>

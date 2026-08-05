@@ -14,8 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.state.AppFont
+import dev.ipf.whitenoise.android.state.resolveActionColorArgb
 
 // Locked brand scheme — a monochrome-cyan palette over neutral surfaces. Every
 // role is defined explicitly so nothing falls back to the M3 baseline (which is
@@ -114,6 +116,9 @@ private val ShapeScheme =
 fun WhiteNoiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     amoled: Boolean = false,
+    // The active account's accent. A null value preserves the locked brand
+    // cyan, while a custom value drives primary actions and selected states.
+    accentColorArgb: Long? = null,
     // The app ships a locked brand palette, so dynamic (wallpaper-derived)
     // color is off by default. The path is kept for anyone who opts in.
     dynamicColor: Boolean = false,
@@ -150,7 +155,7 @@ fun WhiteNoiseTheme(
             // so keep those black/readable here instead of inheriting the
             // light inverse surface from the regular dark scheme. Text follows
             // the selected scheme's `onSurface` (including dynamic opt-ins),
-            // while snackbar actions keep the fixed brand highlight.
+            // while snackbar actions follow the active account accent.
             baseColorScheme.copy(
                 background = Color.Black,
                 surface = Color.Black,
@@ -171,20 +176,29 @@ fun WhiteNoiseTheme(
         } else {
             baseColorScheme
         }
+    val resolvedAccent =
+        resolveActionColorArgb(
+            customArgb = accentColorArgb,
+            defaultContainerArgb = Highlight.toArgb().toLong() and 0xFFFFFFFFL,
+            defaultContentArgb = OnHighlight.toArgb().toLong() and 0xFFFFFFFFL,
+        )
+    val accent = Color(resolvedAccent.container)
+    val onAccent = Color(resolvedAccent.content)
     val colorScheme =
         amoledAdjusted.copy(
-            primary = Highlight,
-            onPrimary = OnHighlight,
-            primaryContainer = Highlight,
-            onPrimaryContainer = OnHighlight,
+            primary = accent,
+            onPrimary = onAccent,
+            primaryContainer = accent,
+            onPrimaryContainer = onAccent,
+            inversePrimary = accent,
             // M3 tonal elevation tints elevated surfaces toward `surfaceTint`
-            // (the cyan brand color), which lifts dialogs, menus, app bars and
+            // (the active accent color), which lifts dialogs, menus, app bars and
             // any `Surface(tonalElevation = …)` — e.g. the chat-bubble
             // long-press reaction/actions popup — off pure black into a
-            // cyan-gray. On AMOLED the tint must be transparent so the
+            // an accent-tinted gray. On AMOLED the tint must be transparent so the
             // elevation overlay is a no-op and every elevated surface stays
-            // #000000 (#446). Outside AMOLED the brand tint is kept.
-            surfaceTint = if (amoledActive) Color.Transparent else Highlight,
+            // #000000 (#446). Outside AMOLED the account accent is kept.
+            surfaceTint = if (amoledActive) Color.Transparent else accent,
         )
 
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {

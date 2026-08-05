@@ -46,6 +46,54 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    @Test
+    fun customAccentDrivesPrimaryRolesAndSurfaceTint() {
+        var scheme: ColorScheme? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = false,
+                accentColorArgb = 0xFFFFC107,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val s = requireNotNull(scheme)
+            val accent = Color(0xFFFFC107)
+            assertEquals(accent, s.primary)
+            assertEquals(Color.Black, s.onPrimary)
+            assertEquals(accent, s.primaryContainer)
+            assertEquals(Color.Black, s.onPrimaryContainer)
+            assertEquals(accent, s.inversePrimary)
+            assertEquals(accent, s.surfaceTint)
+        }
+    }
+
+    @Test
+    fun customAccentKeepsAmoledSurfaceTintTransparent() {
+        var scheme: ColorScheme? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = true,
+                amoled = true,
+                accentColorArgb = 0xFFFFC107,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val s = requireNotNull(scheme)
+            assertEquals(Color(0xFFFFC107), s.primary)
+            assertEquals(Color.Transparent, s.surfaceTint)
+        }
+    }
+
     /**
      * AMOLED audit (#446): with the AMOLED theme selected, every full-screen and
      * elevated surface token must paint pure #000000, and `surfaceTint` must be

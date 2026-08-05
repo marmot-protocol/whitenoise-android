@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
@@ -96,6 +97,10 @@ class MainActivity : FragmentActivity() {
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
+                accentColorArgb =
+                    state.actionColorArgb(
+                        BubbleTheme.resolve(state.themeMode, systemDarkTheme),
+                    ),
                 fontScale = state.fontScale.factor,
                 appFont = state.appFont,
             ) {
