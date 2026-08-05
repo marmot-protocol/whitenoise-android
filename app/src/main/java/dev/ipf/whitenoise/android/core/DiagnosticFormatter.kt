@@ -33,6 +33,11 @@ object DiagnosticFormatter {
                 "[${event.accountLabel}] error: ${redactError(event.message)}"
             is MarmotEventFfi.AgentStreamActivity ->
                 "[${event.accountLabel}] agent stream activity"
+            is MarmotEventFfi.EpochStallEscalated ->
+                // hex group id only — epoch and arm count carry no content.
+                "[${event.accountLabel}] epoch stall escalated in ${IdentityFormatter.short(
+                    event.groupIdHex,
+                )} epoch=${event.stalledEpoch} arms=${event.arms}"
             is MarmotEventFfi.WelcomeDeliveryPending ->
                 // hex ids only (recipient pubkey + group id) — no secret content;
                 // shortened like the other arms so this stays capture-safe.
