@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -51,6 +52,13 @@ import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
+
+internal fun selectedMemberDisplayName(member: RecipientSearch.Candidate): String = member.displayName
+
+internal fun selectedMemberAvatarUrl(
+    member: RecipientSearch.Candidate,
+    localAvatarUrl: String?,
+): String? = localAvatarUrl ?: ProfileSanitizer.imageUrl(member.searchProfile?.picture)
 
 @Composable
 @Suppress("FunctionNaming")
@@ -90,10 +98,10 @@ internal fun SelectedMemberSummary(
                 members.take(SUMMARY_AVATAR_COUNT).forEachIndexed { index, member ->
                     Box(modifier = Modifier.padding(start = (index * SUMMARY_AVATAR_OVERLAP_DP).dp)) {
                         Avatar(
-                            title = appState.displayName(member.accountIdHex),
+                            title = selectedMemberDisplayName(member),
                             seed = member.accountIdHex,
                             size = 32.dp,
-                            pictureUrl = appState.avatarUrl(member.accountIdHex),
+                            pictureUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                         )
                     }
                 }
@@ -105,7 +113,7 @@ internal fun SelectedMemberSummary(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    members.joinToString { member -> appState.displayName(member.accountIdHex) },
+                    members.joinToString { member -> selectedMemberDisplayName(member) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -188,10 +196,10 @@ internal fun SelectedMembersReviewScreen(
         ) {
             items(members, key = { it.accountIdHex }) { member ->
                 ContactRow(
-                    title = appState.displayName(member.accountIdHex),
+                    title = selectedMemberDisplayName(member),
                     subtitle = IdentityFormatter.short(member.npub),
                     avatarSeed = member.accountIdHex,
-                    avatarUrl = appState.avatarUrl(member.accountIdHex),
+                    avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                     trailing = {
                         FilledTonalIconButton(
                             onClick = { onRemove(member) },
@@ -203,7 +211,7 @@ internal fun SelectedMembersReviewScreen(
                                 contentDescription =
                                     stringResource(
                                         R.string.remove_member_named,
-                                        appState.displayName(member.accountIdHex),
+                                        selectedMemberDisplayName(member),
                                     ),
                             )
                         }

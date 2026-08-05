@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.MatchQualityFfi
+import dev.ipf.marmotkit.MatchedFieldFfi
+import dev.ipf.marmotkit.UserDirectorySearchResultFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch.Candidate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -173,4 +177,82 @@ class RecipientSearchTest {
         val browsed = RecipientSearch.browse("alice", candidates, activeAccountIdHex = null)
         assertEquals(listOf(prefixHex, containedHex), browsed.map { it.accountIdHex })
     }
+
+    @Test
+    fun browseMatchesDiscoveryProfileNip05AndDiacritics() {
+        val hex = "d".repeat(64)
+        val discovered =
+            candidate(hex, "Fallback").copy(
+                searchProfile = profile(displayName = "Jäck", nip05 = "jack@example.com"),
+            )
+
+        assertEquals(listOf(hex), RecipientSearch.browse("jack", listOf(discovered), null).map { it.accountIdHex })
+        assertEquals(listOf(hex), RecipientSearch.browse("example.com", listOf(discovered), null).map { it.accountIdHex })
+    }
+
+    @Test
+    fun mergePreservesKnownChatProvenanceAndRanksFollowedFirst() {
+        val alice = "a".repeat(64)
+        val bob = "b".repeat(64)
+        val knownAlice =
+            candidate(alice, "Alice").copy(
+                source = RecipientSearch.Source.InDm,
+                existingDmGroupIdHex = "dm-alice",
+            )
+        val discoveredAlice = candidate(alice.uppercase(), "Alice Remote").copy(searchRadius = 1u)
+        val followedBob = candidate(bob, "Bob").copy(searchRadius = 2u, isFollowing = true)
+
+        val merged = RecipientSearch.merge(listOf(knownAlice), listOf(discoveredAlice, followedBob), null)
+
+        assertEquals(listOf(bob, alice), merged.map { it.accountIdHex.lowercase() })
+        assertEquals("dm-alice", merged.last().existingDmGroupIdHex)
+        assertEquals(1u.toUByte(), merged.last().searchRadius)
+    }
+
+    @Test
+    fun discoveryResultsDeduplicateBestRadiusAndPrioritizeFollows() {
+        val alice = "a".repeat(64)
+        val bob = "b".repeat(64)
+        val candidates =
+            RecipientSearch.discoveredCandidates(
+                results =
+                    listOf(
+                        searchResult(alice, radius = 2u, quality = MatchQualityFfi.PREFIX),
+                        searchResult(alice.uppercase(), radius = 1u, quality = MatchQualityFfi.EXACT),
+                        searchResult(bob, radius = 2u, quality = MatchQualityFfi.CONTAINS),
+                    ),
+                followedAccountIds = setOf(bob),
+            )
+
+        assertEquals(listOf(bob, alice), candidates.map { it.accountIdHex })
+        assertEquals(1u.toUByte(), candidates.last().searchRadius)
+        assertTrue(candidates.first().isFollowing)
+    }
+
+    private fun searchResult(
+        hex: String,
+        radius: UByte,
+        quality: MatchQualityFfi,
+    ) = UserDirectorySearchResultFfi(
+        accountIdHex = hex,
+        npub = "npub1${hex.lowercase()}",
+        radius = radius,
+        matchedField = MatchedFieldFfi.DISPLAY_NAME,
+        matchQuality = quality,
+        providerRank = null,
+        profile = profile(displayName = "Person"),
+    )
+
+    private fun profile(
+        displayName: String,
+        nip05: String? = null,
+    ) = UserProfileMetadataFfi(
+        name = null,
+        displayName = displayName,
+        about = null,
+        picture = null,
+        banner = null,
+        nip05 = nip05,
+        lud16 = null,
+    )
 }

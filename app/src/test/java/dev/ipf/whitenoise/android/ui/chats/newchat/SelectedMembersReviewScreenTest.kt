@@ -49,7 +49,7 @@ class SelectedMembersReviewScreenTest {
         }
 
         composeRule
-            .onNodeWithText(members.joinToString { member -> state.displayName(member.accountIdHex) })
+            .onNodeWithText(members.joinToString { member -> member.displayName })
             .assertIsDisplayed()
         composeRule
             .onNodeWithText(context.resources.getQuantityString(R.plurals.selected_members_count, 2, 2))
@@ -109,7 +109,7 @@ class SelectedMembersReviewScreenTest {
         members.forEach { member ->
             composeRule
                 .onNodeWithContentDescription(
-                    context.getString(R.string.remove_member_named, state.displayName(member.accountIdHex)),
+                    context.getString(R.string.remove_member_named, member.displayName),
                 ).performClick()
         }
         assertEquals(members, removed)
@@ -141,7 +141,7 @@ class SelectedMembersReviewScreenTest {
         composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsNotEnabled().performClick()
         composeRule
             .onNodeWithContentDescription(
-                context.getString(R.string.remove_member_named, state.displayName(members.first().accountIdHex)),
+                context.getString(R.string.remove_member_named, members.first().displayName),
             ).assertIsNotEnabled()
             .performClick()
 

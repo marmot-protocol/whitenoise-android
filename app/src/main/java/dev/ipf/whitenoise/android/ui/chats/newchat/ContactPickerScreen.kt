@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -114,13 +115,23 @@ internal fun ContactPickerScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
-    val matches =
+    val userSearch by rememberRecipientUserSearchState(query, appState)
+    val localMatches =
         remember(query, candidates, activeHex, excludeAccountIdHexes) {
             if (query.isNotBlank() && !isPlainNameQuery(query)) {
                 emptyList()
             } else {
                 RecipientSearch.browse(query, candidates, activeHex, excludeAccountIdHexes)
             }
+        }
+    val matches =
+        remember(localMatches, userSearch.candidates, activeHex, excludeAccountIdHexes) {
+            RecipientSearch.merge(
+                known = localMatches,
+                discovered = userSearch.candidates,
+                activeAccountIdHex = activeHex,
+                excludeAccountIdHexes = excludeAccountIdHexes,
+            )
         }
     val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
     val canConfirm = (allowEmptyConfirm || selected.isNotEmpty()) && !busy
@@ -264,29 +275,59 @@ internal fun ContactPickerScreen(
                     }
                 } else if (identifierQuery || matches.isEmpty()) {
                     item {
-                        Text(
-                            stringResource(
-                                if (query.isBlank()) R.string.recipient_search_empty_hint else R.string.no_matches,
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                        )
+                        if (!identifierQuery && userSearch.isSearching) {
+                            UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
+                        } else {
+                            Text(
+                                stringResource(
+                                    when {
+                                        query.isBlank() -> R.string.recipient_search_empty_hint
+                                        userSearch.failed -> R.string.user_search_failed
+                                        else -> R.string.no_matches
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
                     }
                 } else {
                     item { SectionHeader(stringResource(R.string.contacts)) }
                     items(matches, key = { it.accountIdHex }) { candidate ->
                         val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
                         ContactRow(
-                            title = appState.displayName(candidate.accountIdHex),
-                            subtitle = IdentityFormatter.short(candidate.npub),
+                            title = candidate.displayName,
+                            subtitle =
+                                when {
+                                    candidate.isFollowing -> stringResource(R.string.user_search_following)
+                                    candidate.searchProfile != null -> stringResource(R.string.user_search_network)
+                                    else -> IdentityFormatter.short(candidate.npub)
+                                },
                             avatarSeed = candidate.accountIdHex,
-                            avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                            avatarUrl =
+                                appState.avatarUrl(candidate.accountIdHex)
+                                    ?: ProfileSanitizer.imageUrl(candidate.searchProfile?.picture),
                             enabled = !busy,
                             onClick = { toggle(candidate) },
-                            onLongClick = { appState.presentProfile(candidate.npub) },
+                            onLongClick = {
+                                if (candidate.searchProfile != null) {
+                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+                                } else {
+                                    appState.presentProfile(candidate.npub)
+                                }
+                            },
                             trailing = { SelectionIndicator(selected = isSelected) },
                         )
+                    }
+                    if (userSearch.isSearching) {
+                        item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
+                    } else if (userSearch.failed || userSearch.isIncomplete) {
+                        item {
+                            UserSearchStatusRow(
+                                if (userSearch.failed) R.string.user_search_failed else R.string.user_search_incomplete,
+                            )
+                        }
                     }
                 }
             }

@@ -484,10 +484,10 @@ internal fun NewGroupSetupScreen(
             }
             items(members, key = { it.accountIdHex }) { member ->
                 ContactRow(
-                    title = appState.displayName(member.accountIdHex),
+                    title = selectedMemberDisplayName(member),
                     subtitle = IdentityFormatter.short(member.npub),
                     avatarSeed = member.accountIdHex,
-                    avatarUrl = appState.avatarUrl(member.accountIdHex),
+                    avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                 )
             }
         }

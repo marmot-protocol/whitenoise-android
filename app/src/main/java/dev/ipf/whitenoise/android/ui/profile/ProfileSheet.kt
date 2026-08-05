@@ -1,12 +1,16 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import android.content.Intent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -28,6 +32,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
@@ -58,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -73,9 +80,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -83,6 +92,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -94,6 +104,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.inviteShareIntent
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -173,6 +184,32 @@ internal fun runProfileSheetAdminMutation(
         }
     }
     return true
+}
+
+internal suspend fun loadProfileFollowing(
+    previous: Boolean?,
+    load: suspend () -> Boolean,
+): Boolean =
+    try {
+        load()
+    } catch (error: Throwable) {
+        rethrowIfCancellation(error)
+        previous ?: false
+    }
+
+internal fun profileSharedGroupVisible(
+    memberCount: Int,
+    groupName: String,
+): Boolean = memberCount > 2 || (memberCount == 2 && groupName.isNotBlank())
+
+internal fun profileConversationChoiceEligible(
+    memberIds: List<String>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+): Boolean {
+    val active = activeAccountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return false
+    val target = targetAccountIdHex.trim().lowercase().takeIf { it.isNotEmpty() } ?: return false
+    return memberIds.mapTo(HashSet()) { it.trim().lowercase() } == setOf(active, target)
 }
 
 @Composable
@@ -269,8 +306,11 @@ internal fun ProfileSheet(
         if (resolved != null) appState.refreshProfile(resolved)
     }
 
-    val profile = hex?.let { appState.userProfile(it) }
-    val title = hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
+    val profile = hex?.let { appState.userProfile(it) } ?: appState.pendingProfileMetadata
+    val profileName =
+        ProfileSanitizer.displayName(profile?.displayName)
+            ?: ProfileSanitizer.displayName(profile?.name)
+    val title = profileName ?: hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
@@ -278,6 +318,7 @@ internal fun ProfileSheet(
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val bannerUrl = ProfileSanitizer.imageUrl(profile?.banner)
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = ProfileSanitizer.about(profile?.about)
     val nip05 =
@@ -285,6 +326,13 @@ internal fun ProfileSheet(
             ?.nip05
             ?.trim()
             ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
+    var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }
+    LaunchedEffect(nip05) {
+        nip05ResolvedHex = nip05?.let { Nip05Resolver.resolve(it) }
+    }
+    val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, hex)
+    val lightningAddress = profile?.lud16?.trim()?.takeIf { ProfileFieldValidation.isAcceptableLud16(it) }
+    val activeAccountHex = appState.activeAccount?.accountIdHex
     // The named, multi-member groups this account shares with the active user.
     // The whole derivation — the O(groups) `sharedGroupsWith` projection/scan
     // and the filter + list allocation — is memoized, keyed on `hex` and the
@@ -297,21 +345,34 @@ internal fun ProfileSheet(
     // sibling sheets in this file (TransferAdminSheet, ReactionDetailsSheet,
     // ForwardSheet).
     val sharedGroups =
-        remember(hex, appState.chatListItems) {
+        remember(hex, appState.chatListItems, appState.archivedChatListItems) {
             // Only named, multi-member groups belong in this list: the 1:1 DM is
             // reached via the Message button, and an unnamed group would just
             // read as "Group of N people".
             hex
                 ?.let { appState.sharedGroupsWith(it) }
                 .orEmpty()
-                .filter { it.memberCount > 2 && it.group.name.isNotBlank() }
+                .filter { profileSharedGroupVisible(it.memberCount, it.group.name) }
         }
-    // The existing 1:1 DM with this person, if any — the confirmed two-member
-    // group with them. Drives the Message button: open it when present,
-    // otherwise start a new DM.
-    val directMessageGroup =
-        remember(npub, appState.chatListItems) {
-            appState.existingDirectChat(npub)
+    val conversationChoices =
+        remember(hex, appState.chatListItems, appState.archivedChatListItems) {
+            hex
+                ?.let { target ->
+                    appState
+                        .sharedGroupsWith(target)
+                        .filter { item ->
+                            val memberIds =
+                                item.memberSnapshot
+                                    ?.members
+                                    ?.map { it.memberIdHex }
+                                    .orEmpty()
+                            profileConversationChoiceEligible(memberIds, target, activeAccountHex)
+                        }
+                }.orEmpty()
+                .sortedWith(
+                    compareByDescending<ChatListItem> { it.latestAt ?: 0uL }
+                        .thenBy { it.group.groupIdHex },
+                )
         }
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
@@ -320,12 +381,22 @@ internal fun ProfileSheet(
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
+    var showConversationChooser by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
-    val activeAccountHex = appState.activeAccount?.accountIdHex
     // UI guard covers both profile actions, including "Start new group". The
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    var following by remember(npub) { mutableStateOf<Boolean?>(null) }
+    var followBusy by remember(npub) { mutableStateOf(false) }
+    LaunchedEffect(hex, appState.activeAccountRef, appState.relationshipRevision) {
+        following =
+            hex
+                ?.takeUnless { targetIsSelf }
+                ?.let { target ->
+                    loadProfileFollowing(following) { appState.isFollowingProfile(target) }
+                }
+    }
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
     val addableGroups =
@@ -405,6 +476,25 @@ internal fun ProfileSheet(
         }
     }
 
+    if (showConversationChooser) {
+        ProfileConversationChooserSheet(
+            appState = appState,
+            recipientName = displayTitle,
+            targetAccountIdHex = hex,
+            choices = conversationChoices,
+            onOpen = { choice ->
+                showConversationChooser = false
+                onOpenGroup(choice, false)
+            },
+            onStartNew = {
+                showConversationChooser = false
+                openOrCreateProfileChat()
+            },
+            onDismiss = { showConversationChooser = false },
+        )
+        return
+    }
+
     ModalBottomSheet(
         onDismissRequest = { if (!creatingChat) onDismiss() },
         sheetState = sheetState,
@@ -419,6 +509,9 @@ internal fun ProfileSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (bannerUrl != null) {
+                ProfileBannerImage(bannerUrl)
+            }
             Box(
                 modifier =
                     Modifier
@@ -438,14 +531,19 @@ internal fun ProfileSheet(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(displayTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                if (contactNickname != null && title != displayTitle) {
+                    Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (nip05 != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
+                        if (nip05Verified) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = stringResource(R.string.profile_nip05_verified),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                         Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -495,9 +593,8 @@ internal fun ProfileSheet(
                     // with a spinner until the conversation is ready, then navigate
                     // straight in — no dismiss-into-a-blank-gap.
                     onClick = {
-                        val existing = directMessageGroup
-                        if (existing != null) {
-                            onOpenGroup(existing, false)
+                        if (conversationChoices.isNotEmpty()) {
+                            showConversationChooser = true
                         } else {
                             openOrCreateProfileChat()
                         }
@@ -553,6 +650,13 @@ internal fun ProfileSheet(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                    if (lightningAddress != null) {
+                        CopyableValueRow(
+                            label = stringResource(R.string.lightning),
+                            value = lightningAddress,
+                            clipboard = clipboard,
+                        )
+                    }
                     SectionCard(title = stringResource(R.string.profile_shared_groups)) {
                         if (sharedGroups.isEmpty()) {
                             Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -577,6 +681,28 @@ internal fun ProfileSheet(
             }
             if (hex != null && !targetIsSelf) {
                 Column(Modifier.fillMaxWidth()) {
+                    SettingsActionRow(
+                        icon = if (following == true) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
+                        title = stringResource(if (following == true) R.string.profile_unfollow else R.string.profile_follow),
+                        enabled = following != null && !followBusy && !creatingChat,
+                        inProgress = following == null || followBusy,
+                        onClick = {
+                            if (followBusy) return@SettingsActionRow
+                            val desired = following != true
+                            followBusy = true
+                            appState.launchMutation {
+                                try {
+                                    appState.setProfileFollowing(hex!!, desired)
+                                    following = desired
+                                } catch (error: Throwable) {
+                                    rethrowIfCancellation(error)
+                                    appState.present(R.string.profile_follow_failed)
+                                } finally {
+                                    followBusy = false
+                                }
+                            }
+                        },
+                    )
                     SettingsActionRow(
                         icon = Icons.Default.Edit,
                         title =
@@ -646,6 +772,114 @@ internal fun ProfileSheet(
             onDismiss = { fullPictureOpen = false },
             securePolicy = securePolicy,
         )
+    }
+}
+
+@Composable
+private fun ProfileBannerImage(bannerUrl: String) {
+    var image by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
+    LaunchedEffect(bannerUrl) {
+        if (image == null) image = AvatarImageLoader.load(bannerUrl)
+    }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLg)
+                .aspectRatio(2f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        image?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } ?: CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ProfileConversationChooserSheet(
+    appState: WhiteNoiseAppState,
+    recipientName: String,
+    targetAccountIdHex: String?,
+    choices: List<ChatListItem>,
+    onOpen: (ChatListItem) -> Unit,
+    onStartNew: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val titleCopy = rememberGroupTitleCopy()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = amoledSheetContainerColor(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = Dimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+            ) {
+                Text(
+                    stringResource(R.string.profile_conversations_with, recipientName),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.profile_choose_conversation),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                items(choices, key = { it.group.groupIdHex }) { choice ->
+                    val named = choice.group.name.isNotBlank()
+                    val title =
+                        if (named) {
+                            chatListItemDisplayTitle(choice, appState, titleCopy)
+                        } else {
+                            stringResource(R.string.profile_conversation)
+                        }
+                    ListItem(
+                        modifier = Modifier.clickable(role = Role.Button) { onOpen(choice) },
+                        leadingContent = {
+                            GroupAvatar(
+                                appState = appState,
+                                group = choice.group,
+                                title = if (named) title else recipientName,
+                                seed = if (named) choice.group.groupIdHex else targetAccountIdHex.orEmpty(),
+                                size = 44.dp,
+                                fallbackPictureUrl =
+                                    if (named || targetAccountIdHex == null) {
+                                        null
+                                    } else {
+                                        appState.avatarUrl(targetAccountIdHex)
+                                    },
+                            )
+                        },
+                        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = {
+                            if (choice.group.archived) Text(stringResource(R.string.archived))
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+                item {
+                    SettingsActionRow(
+                        icon = Icons.Default.Edit,
+                        title = stringResource(R.string.profile_start_new_conversation),
+                        onClick = onStartNew,
+                    )
+                }
+            }
+        }
     }
 }
 

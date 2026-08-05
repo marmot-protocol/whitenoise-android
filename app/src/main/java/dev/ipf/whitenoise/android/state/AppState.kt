@@ -1754,6 +1754,13 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
+    /** Ephemeral metadata carried by a live user-directory result. */
+    var pendingProfileMetadata by mutableStateOf<UserProfileMetadataFfi?>(null)
+        private set
+
+    var relationshipRevision by mutableStateOf(0L)
+        private set
+
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
         private set
 
@@ -6232,12 +6239,38 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfileMetadata = null
         pendingProfileNpub = link.npub
         return true
     }
 
     fun presentProfile(npub: String) {
+        pendingProfileMetadata = null
         pendingProfileNpub = npub
+    }
+
+    fun presentDiscoveredProfile(
+        npub: String,
+        profile: UserProfileMetadataFfi?,
+    ) {
+        pendingProfileMetadata = profile
+        pendingProfileNpub = npub
+    }
+
+    suspend fun isFollowingProfile(userRef: String): Boolean {
+        val account = activeAccountRef ?: return false
+        return marmotIo { isFollowing(account, userRef) }
+    }
+
+    suspend fun setProfileFollowing(
+        userRef: String,
+        following: Boolean,
+    ) {
+        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
+        marmotIo {
+            if (following) followUser(account, userRef) else unfollowUser(account, userRef)
+        }
+        relationshipRevision += 1L
     }
 
     /**
@@ -6306,6 +6339,7 @@ class WhiteNoiseAppState private constructor(
 
     fun clearPresentedProfile() {
         pendingProfileNpub = null
+        pendingProfileMetadata = null
     }
 
     /**
