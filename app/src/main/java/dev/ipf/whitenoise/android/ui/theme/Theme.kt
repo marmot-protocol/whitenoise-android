@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
@@ -17,7 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.state.AppFont
+import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.state.resolveActionColorArgb
+
+private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
 
 // Locked brand scheme — a monochrome-cyan palette over neutral surfaces. Every
 // role is defined explicitly so nothing falls back to the M3 baseline (which is
@@ -112,6 +117,63 @@ private val ShapeScheme =
         extraLarge = RoundedCornerShape(Radii.xl),
     )
 
+private fun ColorScheme.withAmoledSurfaces(amoledActive: Boolean): ColorScheme {
+    if (!amoledActive) return this
+
+    // Every full-screen and elevated surface stays pure black. Snackbars use
+    // inverse roles, so keep those black/readable too (#446).
+    return copy(
+        background = Color.Black,
+        surface = Color.Black,
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = Color.Black,
+        surfaceContainer = Color.Black,
+        surfaceContainerHigh = Color.Black,
+        surfaceContainerHighest = Color.Black,
+        surfaceVariant = Color.Black,
+        surfaceBright = Color.Black,
+        surfaceDim = Color.Black,
+        outline = AmoledEmphasizedSurfaceBorder,
+        outlineVariant = AmoledSurfaceBorder,
+        inverseSurface = Color.Black,
+        inverseOnSurface = onSurface,
+        inversePrimary = Highlight,
+        surfaceTint = Color.Transparent,
+    )
+}
+
+private fun ColorScheme.withAccountAccent(
+    accentColorArgb: Long?,
+    amoledActive: Boolean,
+): ColorScheme {
+    val resolvedAccent =
+        accentColorArgb?.let {
+            resolveActionColorArgb(
+                customArgb = it,
+                defaultContainerArgb = primary.toOpaqueArgb(),
+                defaultContentArgb = onPrimary.toOpaqueArgb(),
+            )
+        } ?: return this
+    val accent = Color(resolvedAccent.container)
+    val onAccent = Color(resolvedAccent.content)
+    val safeInversePrimary =
+        accent.takeIf {
+            contrastRatio(it.toOpaqueArgb(), inverseSurface.toOpaqueArgb()) >= WCAG_AA_NORMAL_TEXT_CONTRAST
+        } ?: inversePrimary
+    return copy(
+        primary = accent,
+        onPrimary = onAccent,
+        primaryContainer = accent,
+        onPrimaryContainer = onAccent,
+        inversePrimary = safeInversePrimary,
+        // AMOLED elevation must remain untinted; other themes follow the
+        // active account accent for Material tonal elevation.
+        surfaceTint = if (amoledActive) Color.Transparent else accent,
+    )
+}
+
+private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
+
 @Composable
 fun WhiteNoiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -140,76 +202,10 @@ fun WhiteNoiseTheme(
             else -> LightColorScheme
         }
     val amoledActive = darkTheme && amoled
-    val amoledAdjusted =
-        if (amoledActive) {
-            // True-black AMOLED audit (#446): every full-screen and elevated
-            // surface token paints pure #000000 so nothing reads as a lifted
-            // gray panel on the black canvas. The M3 container roles drive the
-            // elevated components directly — ModalBottomSheet/sheets use
-            // surfaceContainerLow, DropdownMenu/menus use surfaceContainer,
-            // AlertDialog uses surfaceContainerHigh — so they must be black too,
-            // not the near-black grays they used to be. Boundaries for elevated
-            // components on the black canvas come from the outline tokens, not a
-            // lifted fill. Snackbars are the odd M3 case: their container uses
-            // `inverseSurface` and their text/action colors use inverse tokens,
-            // so keep those black/readable here instead of inheriting the
-            // light inverse surface from the regular dark scheme. Text follows
-            // the selected scheme's `onSurface` (including dynamic opt-ins),
-            // while snackbar actions follow the active account accent.
-            baseColorScheme.copy(
-                background = Color.Black,
-                surface = Color.Black,
-                surfaceContainerLowest = Color.Black,
-                surfaceContainerLow = Color.Black,
-                surfaceContainer = Color.Black,
-                surfaceContainerHigh = Color.Black,
-                surfaceContainerHighest = Color.Black,
-                surfaceVariant = Color.Black,
-                surfaceBright = Color.Black,
-                surfaceDim = Color.Black,
-                outline = AmoledEmphasizedSurfaceBorder,
-                outlineVariant = AmoledSurfaceBorder,
-                inverseSurface = Color.Black,
-                inverseOnSurface = baseColorScheme.onSurface,
-                inversePrimary = Highlight,
-            )
-        } else {
-            baseColorScheme
-        }
-    val resolvedAccent =
-        accentColorArgb?.let {
-            resolveActionColorArgb(
-                customArgb = it,
-                defaultContainerArgb = amoledAdjusted.primary.toArgb().toLong() and 0xFFFFFFFFL,
-                defaultContentArgb = amoledAdjusted.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
-            )
-        }
     val colorScheme =
-        if (resolvedAccent == null) {
-            if (amoledActive) {
-                amoledAdjusted.copy(surfaceTint = Color.Transparent)
-            } else {
-                amoledAdjusted
-            }
-        } else {
-            val accent = Color(resolvedAccent.container)
-            val onAccent = Color(resolvedAccent.content)
-            amoledAdjusted.copy(
-                primary = accent,
-                onPrimary = onAccent,
-                primaryContainer = accent,
-                onPrimaryContainer = onAccent,
-                inversePrimary = accent,
-                // M3 tonal elevation tints elevated surfaces toward `surfaceTint`
-                // (the active accent color), which lifts dialogs, menus, app bars
-                // and any `Surface(tonalElevation = …)` — e.g. the chat-bubble
-                // long-press reaction/actions popup — off pure black into an
-                // accent-tinted gray. On AMOLED the tint must be transparent so
-                // the elevation overlay is a no-op and every elevated surface
-                // stays #000000 (#446).
-                surfaceTint = if (amoledActive) Color.Transparent else accent,
-            )
-        }
+        baseColorScheme
+            .withAmoledSurfaces(amoledActive)
+            .withAccountAccent(accentColorArgb, amoledActive)
 
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
         MaterialTheme(

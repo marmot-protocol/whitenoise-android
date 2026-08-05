@@ -3,13 +3,20 @@ package dev.ipf.whitenoise.android.ui.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.contrastRatio
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+
+private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
 
 class WhiteNoiseThemeTest {
     @get:Rule
@@ -126,6 +133,16 @@ class WhiteNoiseThemeTest {
         }
     }
 
+    @Test
+    fun blackAccentKeepsInversePrimaryReadableAcrossThemes() {
+        assertInversePrimaryContrast(Color.Black)
+    }
+
+    @Test
+    fun whiteAccentKeepsInversePrimaryReadableAcrossThemes() {
+        assertInversePrimaryContrast(Color.White)
+    }
+
     /**
      * AMOLED audit (#446): with the AMOLED theme selected, every full-screen and
      * elevated surface token must paint pure #000000, and `surfaceTint` must be
@@ -194,4 +211,50 @@ class WhiteNoiseThemeTest {
             assertEquals(expected, primaryContainer)
         }
     }
+
+    private fun assertInversePrimaryContrast(accent: Color) {
+        val captured = CapturedSchemes()
+        composeRule.setContent { CaptureAccentSchemes(accent, captured) }
+
+        composeRule.runOnIdle {
+            listOf(captured.light, captured.dark, captured.amoled).forEach { capturedScheme ->
+                val scheme = requireNotNull(capturedScheme)
+                assertEquals(accent, scheme.primary)
+                val ratio =
+                    contrastRatio(
+                        scheme.inversePrimary.toOpaqueArgb(),
+                        scheme.inverseSurface.toOpaqueArgb(),
+                    )
+                assertTrue("inversePrimary contrast was $ratio", ratio >= WCAG_AA_NORMAL_TEXT_CONTRAST)
+            }
+        }
+    }
 }
+
+private data class CapturedSchemes(
+    var light: ColorScheme? = null,
+    var dark: ColorScheme? = null,
+    var amoled: ColorScheme? = null,
+)
+
+@Composable
+private fun CaptureAccentSchemes(
+    accent: Color,
+    captured: CapturedSchemes,
+) {
+    val accentArgb = accent.toOpaqueArgb()
+    WhiteNoiseTheme(darkTheme = false, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.light = scheme }
+    }
+    WhiteNoiseTheme(darkTheme = true, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.dark = scheme }
+    }
+    WhiteNoiseTheme(darkTheme = true, amoled = true, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.amoled = scheme }
+    }
+}
+
+private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
