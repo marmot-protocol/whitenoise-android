@@ -4,11 +4,10 @@ import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.ConversationBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.conversationBackAction
-import dev.ipf.whitenoise.android.ui.conversation.shouldClearComposerFocusAfterImeDismissal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ConversationBackFocusTest {
     @Test
@@ -112,39 +111,19 @@ class ConversationBackFocusTest {
     }
 
     @Test
-    fun imeTargetClosingClearsFocusedComposerWhileConversationIsResumed() {
-        assertTrue(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = true,
-                imeTargetIsOpen = false,
-                composerFocused = true,
-                lifecycleResumed = true,
-            ),
-        )
-    }
+    fun imeTargetClosureDoesNotActAsAComposerDismissalSignal() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing ConversationScreen.kt source file")
 
-    @Test
-    fun imeTargetOpeningDoesNotClearNewComposerFocus() {
         assertFalse(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = false,
-                imeTargetIsOpen = true,
-                composerFocused = true,
-                lifecycleResumed = true,
-            ),
+            "IME target closure is also emitted during keyboard-to-voice handoff",
+            source.contains("WindowInsets.imeAnimationTarget"),
         )
-    }
-
-    @Test
-    fun backgroundImeDismissalPreservesFocusForResumeRestoration() {
-        assertFalse(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = true,
-                imeTargetIsOpen = false,
-                composerFocused = true,
-                lifecycleResumed = false,
-            ),
-        )
+        assertFalse(source.contains("shouldClearComposerFocusAfterImeDismissal"))
     }
 }
 
