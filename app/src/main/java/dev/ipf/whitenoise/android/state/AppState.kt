@@ -96,6 +96,7 @@ import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
+import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCompletionStore
 import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryBoundary
@@ -108,6 +109,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundServ
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
@@ -423,6 +425,13 @@ internal fun notificationReplySendFailureOutcome(throwable: Throwable): Notifica
         NotificationReplySendOutcome.RetryableFailure
     } else {
         NotificationReplySendOutcome.NonRetryableFailure
+    }
+
+internal fun notificationReactionSendFailureOutcome(throwable: Throwable): NotificationReactionSendOutcome =
+    if (isTransientRelaySendError(throwable)) {
+        NotificationReactionSendOutcome.RetryableFailure
+    } else {
+        NotificationReactionSendOutcome.NonRetryableFailure
     }
 
 private fun missingKeyPackageFailureDetail(
@@ -5172,6 +5181,32 @@ class WhiteNoiseAppState private constructor(
         }.onFailure {
             appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
         }.getOrElse(::notificationReplySendFailureOutcome)
+    }
+
+    internal suspend fun sendNotificationReaction(
+        accountRef: String,
+        groupIdHex: String,
+        messageIdHex: String,
+        reaction: String,
+    ): NotificationReactionSendOutcome {
+        val emoji = normalizeNotificationReaction(reaction)
+        val validTarget =
+            accountRef.isNotBlank() &&
+                groupIdHex.isNotBlank() &&
+                ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)
+        if (!validTarget || emoji == null) {
+            return NotificationReactionSendOutcome.NonRetryableFailure
+        }
+        return runCatchingCancellable {
+            withGroupCommitLock(accountRef, groupIdHex) {
+                marmotIo { reactToMessage(accountRef, groupIdHex, messageIdHex, emoji) }
+                NotificationReactionSendOutcome.Sent
+            }
+        }.onFailure {
+            appStateDebug(it) {
+                "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"
+            }
+        }.getOrElse(::notificationReactionSendFailureOutcome)
     }
 
     private suspend fun notificationReplyCommitState(

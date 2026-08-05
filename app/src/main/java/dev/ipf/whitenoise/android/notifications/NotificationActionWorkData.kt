@@ -17,6 +17,7 @@ internal object NotificationActionWorkData {
             KEY_ACTION to
                 when (action.kind) {
                     NotificationActionKind.REPLY -> NotificationActions.ACTION_REPLY
+                    NotificationActionKind.REACT -> NotificationActions.ACTION_REACT
                     NotificationActionKind.MARK_READ -> NotificationActions.ACTION_MARK_READ
                 },
             KEY_ACCOUNT_REF to action.target.accountRef,
