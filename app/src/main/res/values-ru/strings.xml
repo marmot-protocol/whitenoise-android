@@ -1203,6 +1203,15 @@
     <string name="onboarding_slogan_uncensorable">Нецензурируемый</string>
     <string name="onboarding_slogan_secure_messaging">Безопасный Мессенджер</string>
     <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
+    <string name="sign_in_error_setup_retry">Настройка аккаунта не завершилась. Нажмите «Войти» ещё раз, чтобы продолжить её.</string>
+    <string name="sign_in_error_setup_key_package_retry">Настройка аккаунта ещё завершается. Нажмите «Войти» ещё раз, чтобы её закончить.</string>
+    <string name="sign_in_error_setup_unexpected_state">Неожиданное состояние аккаунта, вход остановлен. Ничего не изменено.</string>
+    <string name="sign_in_error_setup_recovery_declined">Восстановление отменено. Ничего не изменено.</string>
+    <string name="sign_in_error_setup_recovery_failed">Восстановление не завершилось. Нажмите «Войти», чтобы повторить попытку.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Неожиданное состояние аккаунта после восстановления, вход остановлен. Часть восстановления могла уже быть применена.</string>
+    <string name="sign_in_recovery_title">Восстановить этот аккаунт?</string>
+    <string name="sign_in_recovery_message">Настройка аккаунта не завершилась, и это устройство не может подтвердить, что для него не был опубликован пакет ключей. Восстановление удаляет незавершённую настройку и выполняет вход заново. Если пакет ключей был опубликован, он может остаться бесхозным на реле.</string>
+    <string name="sign_in_recovery_confirm">Восстановить</string>
     <string name="group_add_members_after_create">Участников можно добавить после создания группы.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Вы единственный админ. %1$s станет админом, а вы покинете группу.</string>
     <string name="app_updates">Обновления приложения</string>

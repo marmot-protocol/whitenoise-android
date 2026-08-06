@@ -1137,6 +1137,15 @@
     <string name="onboarding_slogan_uncensorable">抗審查</string>
     <string name="onboarding_slogan_secure_messaging">安全通訊</string>
     <string name="sign_in_error_public_key">這是公鑰。請輸入你的私鑰（nsec）登入。</string>
+    <string name="sign_in_error_setup_retry">帳號設定未完成。請再次點按登入以繼續設定。</string>
+    <string name="sign_in_error_setup_key_package_retry">帳號設定仍在完成中。請再次點按登入以完成設定。</string>
+    <string name="sign_in_error_setup_unexpected_state">帳號狀態異常，登入已停止。未做任何變更。</string>
+    <string name="sign_in_error_setup_recovery_declined">已取消復原。未做任何變更。</string>
+    <string name="sign_in_error_setup_recovery_failed">復原未完成。請點按登入重試。</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">復原後帳號狀態異常，登入已停止。部分復原可能已生效。</string>
+    <string name="sign_in_recovery_title">要復原此帳號嗎？</string>
+    <string name="sign_in_recovery_message">帳號設定未完成，且本裝置無法證明未曾為其發布過金鑰套件。復原會清除未完成的設定並重新登入。若曾發布過金鑰套件，它可能會遺留在中繼站上無人認領。</string>
+    <string name="sign_in_recovery_confirm">復原</string>
     <string name="group_add_members_after_create">建立群組後可以新增成員。</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">你是唯一的管理員。%1$s 將成為管理員，你將退出群組。</string>
     <string name="app_updates">應用程式更新</string>
