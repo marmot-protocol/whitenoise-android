@@ -78,9 +78,9 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
-    // The key an acknowledged recovery already ran for. Holding the value the
-    // field still holds adds no exposure, and it stops a failed recovery from
-    // steering the user through the consent prompt again on every retry.
+    // The key an acknowledged recovery already ran for, cleared as soon as the
+    // field changes, so it never outlives the attempt it belongs to. It stops a
+    // failed recovery from steering the user through the prompt on every retry.
     var recoveryConsentedFor by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -123,6 +123,9 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
         onIdentityChange = {
             identity = it
             importErrorRes = null
+            // Editing the field ends the attempt the acknowledgement belonged to,
+            // so the key it held must not outlive it.
+            recoveryConsentedFor = null
         },
         onImportErrorChange = { importErrorRes = it },
         onCreateIdentity = {

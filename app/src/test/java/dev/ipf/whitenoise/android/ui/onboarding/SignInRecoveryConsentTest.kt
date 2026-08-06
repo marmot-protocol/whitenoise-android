@@ -210,4 +210,18 @@ class SignInRecoveryConsentTest {
 
         assertEquals(listOf(nsec, otherNsec), engine.recoveries.map { it.nsec })
     }
+
+    @Test
+    fun editingTheFieldEndsTheAcknowledgementItBelongedTo() {
+        val engine = recoveryRequiredEngine { MarmotKitException.AccountSetupRecoveryRequired() }
+        openSignIn(engine)
+        signIn(nsec)
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription(string(R.string.clear)).performClick()
+        signIn(nsec)
+
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertExists()
+    }
 }
