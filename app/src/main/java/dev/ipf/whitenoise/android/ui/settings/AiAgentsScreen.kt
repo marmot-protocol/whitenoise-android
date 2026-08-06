@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,35 +55,6 @@ import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import kotlinx.coroutines.launch
 
-internal data class AgentConnector(
-    val id: String,
-    @StringRes val nameRes: Int,
-    @StringRes val subtitleRes: Int,
-    @StringRes val promptRes: Int,
-)
-
-internal val agentConnectors =
-    listOf(
-        AgentConnector(
-            id = "hermes",
-            nameRes = R.string.agent_connector_hermes_name,
-            subtitleRes = R.string.agent_connector_hermes_subtitle,
-            promptRes = R.string.agent_connector_hermes_prompt,
-        ),
-        AgentConnector(
-            id = "openclaw",
-            nameRes = R.string.agent_connector_openclaw_name,
-            subtitleRes = R.string.agent_connector_openclaw_subtitle,
-            promptRes = R.string.agent_connector_openclaw_prompt,
-        ),
-        AgentConnector(
-            id = "opencode",
-            nameRes = R.string.agent_connector_opencode_name,
-            subtitleRes = R.string.agent_connector_opencode_subtitle,
-            promptRes = R.string.agent_connector_opencode_prompt,
-        ),
-    )
-
 internal const val AI_AGENTS_CONTENT_TAG = "ai-agents-content"
 internal const val AI_AGENTS_SCREEN_TAG = "ai-agents-screen"
 internal const val AI_AGENTS_BACK_TAG = "ai-agents-back"
@@ -98,6 +68,7 @@ internal fun agentConnectorToggleTag(id: String): String = "ai-agents-connector-
 internal fun agentConnectorCopyTag(id: String): String = "ai-agents-connector-$id-copy"
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming")
 @Composable
 internal fun AiAgentsScreen(
     appState: WhiteNoiseAppState,
@@ -124,6 +95,7 @@ internal fun AiAgentsScreen(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun AiAgentsContent(
     npub: String?,
@@ -252,6 +224,7 @@ internal fun AiAgentsContent(
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun ManualCopyNpubDisabledRow() {
     val noActiveAccountMessage = stringResource(R.string.no_active_account_period)
@@ -274,6 +247,7 @@ private fun ManualCopyNpubDisabledRow() {
     }
 }
 
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun AgentConnectorRow(
     connector: AgentConnector,

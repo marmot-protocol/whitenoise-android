@@ -192,12 +192,13 @@ class AiAgentsScreenTest {
         cache.put(accountIdHex, npub)
     }
 
-    private fun clipboardText(): String? {
-        val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = clipboard.primaryClip ?: return null
-        if (clip.itemCount == 0) return null
-        return clip.getItemAt(0).coerceToText(app).toString()
-    }
+    private fun clipboardText(): String? =
+        (app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+            .primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(app)
+            ?.toString()
 
     private fun clearClipboard() {
         val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

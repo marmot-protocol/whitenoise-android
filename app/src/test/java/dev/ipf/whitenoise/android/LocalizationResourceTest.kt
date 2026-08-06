@@ -221,6 +221,53 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun agentConnectorPromptsAreEvergreenAcrossAllLocales() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+
+        val promptKeys =
+            listOf(
+                "agent_connector_hermes_prompt",
+                "agent_connector_openclaw_prompt",
+                "agent_connector_opencode_prompt",
+            )
+
+        val resourceFiles =
+            buildList {
+                add(File(resDir, "values/strings.xml"))
+                resDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isDirectory && it.name.startsWith("values-") }
+                    .map { File(it, "strings.xml") }
+                    .filter { it.exists() }
+                    .forEach { add(it) }
+            }
+
+        val offenders =
+            resourceFiles.flatMap { file ->
+                val strings = stringValues(file)
+                promptKeys.mapNotNull { key ->
+                    val value = strings[key] ?: return@mapNotNull "${file.path}: missing $key"
+                    val violations = agentConnectorPromptViolations(value)
+                    if (violations.isEmpty()) {
+                        null
+                    } else {
+                        "${file.path}: $key (${violations.joinToString(", ")})"
+                    }
+                }
+            }
+
+        assertTrue(
+            "Agent connector prompts must link the MDK connector guide, include %1\$s, " +
+                "and avoid install commands or operational mechanics. Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
     fun relayListLabelsDescribeUserVisibleBehavior() {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
@@ -444,7 +491,42 @@ class LocalizationResourceTest {
         }
     }
 
+    private fun agentConnectorPromptViolations(prompt: String): List<String> {
+        val violations = mutableListOf<String>()
+        if (!prompt.contains(AGENT_CONNECTOR_DOCS_URL)) {
+            violations += "missing canonical docs URL"
+        }
+        if (!prompt.contains("%1\$s")) {
+            violations += "missing %1\$s placeholder"
+        }
+        agentConnectorForbiddenPatterns.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(prompt)) {
+                violations += label
+            }
+        }
+        return violations
+    }
+
     private companion object {
+        const val AGENT_CONNECTOR_DOCS_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
+
+        val agentConnectorForbiddenPatterns =
+            listOf(
+                "curl" to Regex("""\bcurl\b""", RegexOption.IGNORE_CASE),
+                "pipe-to-bash" to Regex("""\|\s*bash"""),
+                "--yes" to Regex("""--yes\b"""),
+                "--allow-welcomer" to Regex("""--allow-welcomer\b"""),
+                "release download URL" to
+                    Regex("""mdk/releases/download""", RegexOption.IGNORE_CASE),
+                "shell script" to Regex("""\.sh\b"""),
+                "connector executable or service name" to
+                    Regex("""\bwn-(?:agent|opencode)(?:-[a-z0-9-]+)?\b""", RegexOption.IGNORE_CASE),
+                "gateway run" to Regex("""gateway\s+run""", RegexOption.IGNORE_CASE),
+                "bootstrap.json" to Regex("""bootstrap\.json"""),
+                "home path" to Regex("""~\/"""),
+            )
+
         // Matches raw NIP specification identifiers in user-visible copy:
         // "NIP-05", "NIP_44", "NIP 65", "NIP - 65", "NIP65", etc., plus the
         // deprecated "NIP-EE" naming. Case-insensitive. The leading `\b` plus

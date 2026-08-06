@@ -1290,13 +1290,13 @@
     <string name="agent_connector_hide_prompt_cd">隱藏 %1$s 設定提示</string>
     <string name="agent_connector_hermes_name">Hermes 代理</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的終端代理</string>
-    <string name="agent_connector_hermes_prompt">將此 Hermes 安裝連接到 White Noise（Marmot）。以非互動方式執行官方安裝程式，並將我的 npub 加入允許清單： `curl -fsSL https://github.com/marmot-protocol/mdk/releases/download/wn-agent-latest/install-hermes-marmot.sh | bash -s -- --yes --allow-welcomer %1$s` — 它會安裝 wn-agent、啟用 Hermes Marmot 外掛、啟動 wn-agent-hermes 服務並自動完成帳戶引導 (details: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md). 依照安裝程式輸出的後續步驟操作，包括重新啟動 Hermes 閘道（`hermes gateway run`）以載入外掛。然後確認連接器健康（服務在執行、我的 npub 在 welcomer 允許清單中），並僅回覆 ~/.marmot-agents/hermes/bootstrap.json 中的代理 npub——不要其他內容。</string>
+    <string name="agent_connector_hermes_prompt">將此 Hermes 安裝連接到 White Noise（Marmot）。請遵循官方 Hermes 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
     <string name="agent_connector_openclaw_name">OpenClaw 助手</string>
     <string name="agent_connector_openclaw_subtitle">自架個人 AI 助手</string>
-    <string name="agent_connector_openclaw_prompt">將此 OpenClaw 執行個體連接到 White Noise（Marmot）。以非互動方式執行官方安裝程式，並將我的 npub 加入允許清單： `curl -fsSL https://github.com/marmot-protocol/mdk/releases/download/wn-agent-latest/install-openclaw-marmot.sh | bash -s -- --yes --allow-welcomer %1$s` — 它會安裝 wn-agent、啟用 OpenClaw Marmot 頻道、啟動 wn-agent-openclaw 服務並自動完成帳戶引導 (details: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md). 依照安裝程式輸出的後續步驟操作，包括重新啟動 OpenClaw 閘道（`openclaw gateway run`）以載入頻道。然後確認連接器健康（服務在執行、我的 npub 在 welcomer 允許清單中），並僅回覆 ~/.marmot-agents/openclaw/bootstrap.json 中的代理 npub——不要其他內容。</string>
+    <string name="agent_connector_openclaw_prompt">將此 OpenClaw 執行個體連接到 White Noise（Marmot）。請遵循官方 OpenClaw 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
     <string name="agent_connector_opencode_name">OpenCode 代理</string>
     <string name="agent_connector_opencode_subtitle">開源程式設計代理</string>
-    <string name="agent_connector_opencode_prompt">將此 OpenCode harness 連接到 White Noise（Marmot）。以非互動方式執行官方安裝程式，並將我的 npub 加入允許清單： `curl -fsSL https://github.com/marmot-protocol/mdk/releases/download/wn-agent-latest/install-opencode-marmot.sh | bash -s -- --yes --allow-welcomer %1$s` — 它會安裝 wn-opencode harness、啟動 wn-opencode 與 wn-agent-harnesses 服務並自動完成帳戶引導 (details: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md). 然後確認連接器健康（服務在執行、我的 npub 在 welcomer 允許清單中），並僅回覆 ~/.marmot-agents/harnesses/bootstrap.json 中的代理 npub——不要其他內容。</string>
+    <string name="agent_connector_opencode_prompt">將此 OpenCode harness 連接到 White Noise（Marmot）。請遵循官方 OpenCode 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
     <string name="account_and_keys">帳號與金鑰</string>
     <string name="account_keys_settings_subtitle">npub · 備份 · 登出</string>
     <string name="composer">輸入框</string>
