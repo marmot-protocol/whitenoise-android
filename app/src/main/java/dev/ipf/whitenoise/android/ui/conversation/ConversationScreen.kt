@@ -1095,11 +1095,12 @@ internal fun ConversationScreen(
     }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
-    // composer's BasicTextField; `composerFocused` mirrors the live focus
-    // edge reported by `onFocusChanged`; `wasComposerFocusedOnPause` snapshots
-    // that edge on ON_PAUSE so resume can restore the exact keyboard state the
-    // user left with (Case B). Keyed on chat.id so a conversation switch
-    // doesn't carry the previous chat's keyboard state across.
+    // composer's BasicTextField, `composerFocused` mirrors the live focus edge
+    // reported by `onFocusChanged`. Keyed on chat.id so a conversation switch
+    // doesn't carry the previous chat's keyboard state across — the ON_PAUSE
+    // snapshot that decides restore-vs-clear lives in
+    // ConversationComposerLifecycleEffect instead, scoped to the observer it
+    // installed rather than to chat.id.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
     var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
