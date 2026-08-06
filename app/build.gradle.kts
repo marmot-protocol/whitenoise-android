@@ -157,8 +157,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 34
         targetSdk = 36
-        versionCode = 7
-        versionName = "2026.7.6"
+        versionCode = 8
+        versionName = "2026.8.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
