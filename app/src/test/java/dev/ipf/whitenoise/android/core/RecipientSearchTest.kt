@@ -239,6 +239,105 @@ class RecipientSearchTest {
     }
 
     @Test
+    fun engineMatchOnAFieldTheLocalFilterCannotSeeIsKept() {
+        // The engine matched this person on their `about` text. Nothing in the
+        // name/nip05 the client can read contains the needle.
+        val hex = "d".repeat(64)
+        val discovered =
+            candidate(hex, "Zed").copy(
+                searchProfile = profile(displayName = "Zed"),
+            )
+
+        val matches =
+            RecipientSearch.mergeAndBrowse(
+                query = "photographer",
+                known = emptyList(),
+                discovered = listOf(discovered),
+                activeAccountIdHex = null,
+            )
+
+        assertEquals(listOf(hex), matches.map { it.accountIdHex })
+    }
+
+    @Test
+    fun engineMatchWithNoPublishedProfileIsKept() {
+        val hex = "e".repeat(64)
+        // discoveredCandidates falls back to the short npub when there is no
+        // kind:0, and a short npub can never contain a name needle.
+        val discovered =
+            RecipientSearch.discoveredCandidates(
+                results = listOf(searchResult(hex, radius = 1u, quality = MatchQualityFfi.EXACT, profile = null)),
+                followedAccountIds = emptySet(),
+            )
+
+        val matches =
+            RecipientSearch.mergeAndBrowse(
+                query = "alice",
+                known = emptyList(),
+                discovered = discovered,
+                activeAccountIdHex = null,
+            )
+
+        assertEquals(listOf(hex), matches.map { it.accountIdHex })
+    }
+
+    @Test
+    fun nameMatchesStillOutrankEngineOnlyMatches() {
+        val named = "a".repeat(64)
+        val engineOnly = "b".repeat(64)
+        val matches =
+            RecipientSearch.mergeAndBrowse(
+                query = "alice",
+                known = listOf(candidate(named, "Alice Smith")),
+                discovered = listOf(candidate(engineOnly, "Zed").copy(searchProfile = profile("Zed"))),
+                activeAccountIdHex = null,
+            )
+
+        assertEquals(listOf(named, engineOnly), matches.map { it.accountIdHex })
+    }
+
+    @Test
+    fun followedLocalContactIsFlaggedAndRanksAboveFollowedRemotes() {
+        val localFollowed = "a".repeat(64)
+        val remoteFollowed = "b".repeat(64)
+        val known =
+            listOf(
+                candidate("c".repeat(64), "Alan"),
+                candidate(localFollowed, "Alice").copy(source = RecipientSearch.Source.InDm),
+            )
+        val discovered = candidate(remoteFollowed, "Alicia").copy(isFollowing = true)
+
+        val matches =
+            RecipientSearch.mergeAndBrowse(
+                query = "al",
+                known = known,
+                discovered = listOf(discovered),
+                activeAccountIdHex = null,
+                // Upper-case to prove the comparison normalizes both sides.
+                followedAccountIds = setOf(localFollowed.uppercase(), remoteFollowed.uppercase()),
+            )
+
+        assertEquals(
+            listOf(localFollowed, remoteFollowed, "c".repeat(64)),
+            matches.map { it.accountIdHex },
+        )
+        assertTrue(matches.first().isFollowing)
+        assertEquals(RecipientSearch.Source.InDm, matches.first().source)
+    }
+
+    @Test
+    fun discoveryFollowFlagIgnoresCasingOfTheFollowList() {
+        val bob = "b".repeat(64)
+        val candidates =
+            RecipientSearch.discoveredCandidates(
+                results = listOf(searchResult(bob, radius = 1u, quality = MatchQualityFfi.EXACT)),
+                followedAccountIds = setOf(bob.uppercase()),
+            )
+
+        assertTrue(candidates.single().isFollowing)
+    }
+
+    @Test
     fun discoveryResultsDeduplicateBestRadiusAndPrioritizeFollows() {
         val alice = "a".repeat(64)
         val bob = "b".repeat(64)
@@ -262,6 +361,7 @@ class RecipientSearchTest {
         hex: String,
         radius: UByte,
         quality: MatchQualityFfi,
+        profile: UserProfileMetadataFfi? = profile(displayName = "Person"),
     ) = UserDirectorySearchResultFfi(
         accountIdHex = hex,
         npub = "npub1${hex.lowercase()}",
@@ -269,7 +369,7 @@ class RecipientSearchTest {
         matchedField = MatchedFieldFfi.DISPLAY_NAME,
         matchQuality = quality,
         providerRank = null,
-        profile = profile(displayName = "Person"),
+        profile = profile,
     )
 
     private fun profile(

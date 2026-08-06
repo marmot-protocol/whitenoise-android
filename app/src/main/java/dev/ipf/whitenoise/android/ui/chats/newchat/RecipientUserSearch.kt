@@ -6,7 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.SearchUpdateTriggerFfi
 import dev.ipf.marmotkit.UserDirectorySearchResultFfi
+import dev.ipf.marmotkit.UserSearchUpdateFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
@@ -34,6 +36,8 @@ internal data class RecipientUserSearchState(
     val isSearching: Boolean = false,
     val isIncomplete: Boolean = false,
     val failed: Boolean = false,
+    /** The account's whole follow list, so local contacts can be flagged too. */
+    val followedAccountIds: Set<String> = emptySet(),
 )
 
 internal data class RecipientSearchProgress(
@@ -62,6 +66,30 @@ internal suspend fun loadRecipientSearchFollowIds(load: suspend () -> List<Strin
             },
         )
 
+/** Fold the streamed batches into one aggregate view, emitting after each step. */
+internal suspend fun aggregateRecipientSearchUpdates(
+    nextUpdate: suspend () -> UserSearchUpdateFfi?,
+    followedAccountIds: Set<String>,
+    emit: (RecipientUserSearchState) -> Unit,
+) {
+    val aggregate = ArrayList<UserDirectorySearchResultFfi>()
+    var progress = RecipientSearchProgress()
+    while (!progress.completed) {
+        val update = nextUpdate() ?: break
+        aggregate += update.newResults
+        progress = progress.withTrigger(update.trigger)
+        emit(
+            RecipientUserSearchState(
+                candidates = RecipientSearch.discoveredCandidates(aggregate, followedAccountIds),
+                isSearching = !progress.completed,
+                isIncomplete = progress.isIncomplete,
+                failed = progress.failed,
+                followedAccountIds = followedAccountIds,
+            ),
+        )
+    }
+}
+
 internal suspend fun <T : AutoCloseable, R> withClosedRecipientSearchSubscription(
     open: suspend () -> T,
     consume: suspend (T) -> R,
@@ -81,6 +109,7 @@ internal suspend fun <T : AutoCloseable, R> withClosedRecipientSearchSubscriptio
     return consumption.getOrThrow()
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming")
 internal fun UserSearchStatusRow(
@@ -93,7 +122,7 @@ internal fun UserSearchStatusRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showProgress) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            LoadingIndicator(modifier = Modifier.size(18.dp))
         }
         Text(
             stringResource(messageRes),
@@ -137,6 +166,7 @@ internal fun rememberRecipientUserSearchState(
                 loadRecipientSearchFollowIds {
                     appState.marmotIo { accountFollows(activeAccountRef) }
                 }
+            value = value.copy(followedAccountIds = followedIds)
             withClosedRecipientSearchSubscription(
                 open = {
                     appState.marmotIo {
@@ -149,20 +179,11 @@ internal fun rememberRecipientUserSearchState(
                     }
                 },
                 consume = { activeSubscription ->
-                    val aggregate = ArrayList<UserDirectorySearchResultFfi>()
-                    var progress = RecipientSearchProgress()
-                    while (!progress.completed) {
-                        val update = appState.marmotIo { activeSubscription.nextUpdate() } ?: break
-                        aggregate += update.newResults
-                        progress = progress.withTrigger(update.trigger)
-                        value =
-                            RecipientUserSearchState(
-                                candidates = RecipientSearch.discoveredCandidates(aggregate, followedIds),
-                                isSearching = !progress.completed,
-                                isIncomplete = progress.isIncomplete,
-                                failed = progress.failed,
-                            )
-                    }
+                    aggregateRecipientSearchUpdates(
+                        nextUpdate = { appState.marmotIo { activeSubscription.nextUpdate() } },
+                        followedAccountIds = followedIds,
+                        emit = { value = it },
+                    )
                 },
             )
             if (value.isSearching) value = value.copy(isSearching = false)

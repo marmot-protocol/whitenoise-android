@@ -59,10 +59,15 @@ object RecipientSearch {
         candidates: List<Candidate>,
         activeAccountIdHex: String?,
         excludeAccountIdHexes: Set<String> = emptySet(),
+        // Ids the engine already matched against this query. The local filter
+        // only sees names and nip05, so it must not re-judge a result matched on
+        // a field it can't read (about) or one with no published profile at all.
+        preMatchedAccountIdHexes: Set<String> = emptySet(),
     ): List<Candidate> {
         val needle = folded(query)
         val active = activeAccountIdHex?.trim()?.lowercase(Locale.ROOT)
         val excluded = excludeAccountIdHexes.mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) }
+        val preMatched = preMatchedAccountIdHexes.mapTo(HashSet()) { it.normalized() }
         val seen = HashSet<String>()
         val prefix = ArrayList<Candidate>()
         val contained = ArrayList<Candidate>()
@@ -86,6 +91,7 @@ object RecipientSearch {
                 names.any { it.startsWith(needle) } -> prefix.add(candidate)
                 names.any { it.contains(needle) } -> contained.add(candidate)
                 matchesIdentity(candidate, needle) -> contained.add(candidate)
+                hex in preMatched -> contained.add(candidate)
             }
         }
         return prefix + contained
@@ -97,9 +103,11 @@ object RecipientSearch {
         discovered: List<Candidate>,
         activeAccountIdHex: String?,
         excludeAccountIdHexes: Set<String> = emptySet(),
+        followedAccountIds: Set<String> = emptySet(),
     ): List<Candidate> {
         val active = activeAccountIdHex?.normalized()
         val excluded = excludeAccountIdHexes.mapTo(HashSet()) { it.normalized() }
+        val followed = followedAccountIds.mapTo(HashSet()) { it.normalized() }
         val discoveredById = discovered.associateBy { it.accountIdHex.normalized() }
         val seen = HashSet<String>()
         val mergedKnown =
@@ -116,6 +124,15 @@ object RecipientSearch {
             .filter { candidate ->
                 val id = candidate.accountIdHex.normalized()
                 id.isNotEmpty() && id != active && id !in excluded && seen.add(id)
+            }.map { candidate ->
+                // The follow list covers everyone, not just whoever the directory
+                // happened to return, so a followed local contact ranks and reads
+                // the same as a followed remote.
+                if (candidate.isFollowing || candidate.accountIdHex.normalized() !in followed) {
+                    candidate
+                } else {
+                    candidate.copy(isFollowing = true)
+                }
             }.withIndex()
             .sortedWith(
                 compareByDescending<IndexedValue<Candidate>> { it.value.isFollowing }
@@ -130,19 +147,22 @@ object RecipientSearch {
         discovered: List<Candidate>,
         activeAccountIdHex: String?,
         excludeAccountIdHexes: Set<String> = emptySet(),
+        followedAccountIds: Set<String> = emptySet(),
     ): List<Candidate> =
         browse(
             query = query,
-            candidates = merge(known, discovered, activeAccountIdHex, excludeAccountIdHexes),
+            candidates = merge(known, discovered, activeAccountIdHex, excludeAccountIdHexes, followedAccountIds),
             activeAccountIdHex = activeAccountIdHex,
             excludeAccountIdHexes = excludeAccountIdHexes,
+            preMatchedAccountIdHexes = discovered.mapTo(HashSet()) { it.accountIdHex.normalized() },
         )
 
     fun discoveredCandidates(
         results: List<UserDirectorySearchResultFfi>,
         followedAccountIds: Set<String>,
-    ): List<Candidate> =
-        sortedUniqueResults(results, followedAccountIds).map { result ->
+    ): List<Candidate> {
+        val followed = followedAccountIds.mapTo(HashSet()) { it.normalized() }
+        return sortedUniqueResults(results, followed).map { result ->
             Candidate(
                 accountIdHex = result.accountIdHex.normalized(),
                 displayName =
@@ -152,9 +172,10 @@ object RecipientSearch {
                 npub = result.npub,
                 searchProfile = result.profile,
                 searchRadius = result.radius,
-                isFollowing = result.accountIdHex.normalized() in followedAccountIds,
+                isFollowing = result.accountIdHex.normalized() in followed,
             )
         }
+    }
 
     internal fun sortedUniqueResults(
         results: List<UserDirectorySearchResultFfi>,

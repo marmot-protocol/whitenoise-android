@@ -42,9 +42,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
@@ -65,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -188,18 +191,42 @@ internal fun runProfileSheetAdminMutation(
     return true
 }
 
+/**
+ * Null means the follow status is unknown — an initial read failure must not be
+ * reported as "not following", or the sheet offers the opposite mutation.
+ */
 internal suspend fun loadProfileFollowing(
     previous: Boolean?,
     load: suspend () -> Boolean,
-): Boolean =
+): Boolean? =
     runCatching { load() }
         .fold(
             onSuccess = { it },
             onFailure = { error ->
                 rethrowIfCancellation(error)
-                previous ?: false
+                previous
             },
         )
+
+internal data class ProfileFollowRowState(
+    val enabled: Boolean,
+    val inProgress: Boolean,
+    val showsUnfollow: Boolean,
+)
+
+internal fun profileFollowRowState(
+    following: Boolean?,
+    loading: Boolean,
+    busy: Boolean,
+    creatingChat: Boolean,
+): ProfileFollowRowState =
+    ProfileFollowRowState(
+        enabled = following != null && !loading && !busy && !creatingChat,
+        // Unknown-after-failure is a settled state, not a pending one — spinning
+        // on it would be indistinguishable from a read that never returns.
+        inProgress = loading || busy,
+        showsUnfollow = following == true,
+    )
 
 internal fun profileSharedGroupVisible(
     memberCount: Int,
@@ -210,7 +237,11 @@ internal fun profileConversationChoiceEligible(
     memberIds: List<String>,
     targetAccountIdHex: String,
     activeAccountIdHex: String?,
+    pendingConfirmation: Boolean,
 ): Boolean {
+    // An unaccepted invite is not a conversation the account can open or send
+    // into, so it must not be offered as one.
+    if (pendingConfirmation) return false
     val active = activeAccountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
     val target = targetAccountIdHex.trim().lowercase().takeIf { it.isNotEmpty() }
     return if (active == null || target == null) {
@@ -374,7 +405,12 @@ internal fun ProfileSheet(
                                     ?.members
                                     ?.map { it.memberIdHex }
                                     .orEmpty()
-                            profileConversationChoiceEligible(memberIds, target, activeAccountHex)
+                            profileConversationChoiceEligible(
+                                memberIds = memberIds,
+                                targetAccountIdHex = target,
+                                activeAccountIdHex = activeAccountHex,
+                                pendingConfirmation = item.group.pendingConfirmation,
+                            )
                         }
                 }.orEmpty()
                 .sortedWith(
@@ -396,14 +432,21 @@ internal fun ProfileSheet(
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
     var following by remember(npub) { mutableStateOf<Boolean?>(null) }
+    var followLoading by remember(npub) { mutableStateOf(false) }
     var followBusy by remember(npub) { mutableStateOf(false) }
     LaunchedEffect(hex, appState.activeAccountRef, appState.relationshipRevision) {
-        following =
-            hex
-                ?.takeUnless { targetIsSelf }
-                ?.let { target ->
-                    loadProfileFollowing(following) { appState.isFollowingProfile(target) }
-                }
+        val target = hex?.takeUnless { targetIsSelf }
+        if (target == null) {
+            following = null
+            followLoading = false
+            return@LaunchedEffect
+        }
+        followLoading = true
+        try {
+            following = loadProfileFollowing(following) { appState.isFollowingProfile(target) }
+        } finally {
+            followLoading = false
+        }
     }
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
@@ -688,15 +731,22 @@ internal fun ProfileSheet(
                 Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (hex != null && !targetIsSelf) {
+                val followRow =
+                    profileFollowRowState(
+                        following = following,
+                        loading = followLoading,
+                        busy = followBusy,
+                        creatingChat = creatingChat,
+                    )
                 Column(Modifier.fillMaxWidth()) {
                     SettingsActionRow(
-                        icon = if (following == true) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
+                        icon = if (followRow.showsUnfollow) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
                         title =
                             stringResource(
-                                if (following == true) R.string.profile_unfollow else R.string.profile_follow,
+                                if (followRow.showsUnfollow) R.string.profile_unfollow else R.string.profile_follow,
                             ),
-                        enabled = following != null && !followBusy && !creatingChat,
-                        inProgress = following == null || followBusy,
+                        enabled = followRow.enabled,
+                        inProgress = followRow.inProgress,
                         onClick = {
                             if (followBusy) return@SettingsActionRow
                             val desired = following != true
@@ -787,13 +837,29 @@ internal fun ProfileSheet(
     }
 }
 
+/**
+ * [AvatarImageLoader.load] answers null both while it is working and when the
+ * fetch failed, so completion has to be tracked separately: a banner that will
+ * never arrive is dropped instead of spinning forever.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming")
-private fun ProfileBannerImage(bannerUrl: String) {
-    var image by remember(bannerUrl) { mutableStateOf(AvatarImageLoader.peek(bannerUrl)) }
+internal fun ProfileBannerImage(
+    bannerUrl: String,
+    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
+    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+) {
+    var image by remember(bannerUrl) { mutableStateOf(peek(bannerUrl)) }
+    var settled by remember(bannerUrl) { mutableStateOf(image != null) }
     LaunchedEffect(bannerUrl) {
-        if (image == null) image = AvatarImageLoader.load(bannerUrl)
+        if (image == null) {
+            image = load(bannerUrl)
+            settled = true
+        }
     }
+    val bitmap = image
+    if (bitmap == null && settled) return
     Box(
         modifier =
             Modifier
@@ -801,19 +867,25 @@ private fun ProfileBannerImage(bannerUrl: String) {
                 .padding(horizontal = Dimens.spaceLg)
                 .aspectRatio(2f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .testTag(PROFILE_BANNER_TAG),
         contentAlignment = Alignment.Center,
     ) {
-        image?.let {
+        if (bitmap != null) {
             Image(
-                bitmap = it,
+                bitmap = bitmap,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } ?: CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            LoadingIndicator(modifier = Modifier.size(20.dp).testTag(PROFILE_BANNER_LOADING_TAG))
+        }
     }
 }
+
+internal const val PROFILE_BANNER_TAG = "profile-banner"
+internal const val PROFILE_BANNER_LOADING_TAG = "profile-banner-loading"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

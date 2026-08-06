@@ -353,16 +353,19 @@ private fun NewMessageScreen(
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
     val resolution = rememberRecipientResolution(query, appState)
     val userSearch by rememberRecipientUserSearchState(query, appState)
+    val discovered = userSearch.candidates
+    val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, userSearch.candidates, activeHex) {
+        remember(query, candidates, discovered, followedIds, activeHex) {
             if (identifierQuery) {
                 emptyList()
             } else {
                 RecipientSearch.mergeAndBrowse(
                     query = query,
                     known = candidates,
-                    discovered = userSearch.candidates,
+                    discovered = discovered,
                     activeAccountIdHex = activeHex,
+                    followedAccountIds = followedIds,
                 )
             }
         }
@@ -433,6 +436,7 @@ private fun NewMessageScreen(
                                 .orEmpty(),
                         targetAccountIdHex = candidate.accountIdHex,
                         activeAccountIdHex = activeHex,
+                        pendingConfirmation = item.group.pendingConfirmation,
                     )
                 }
         if (choices.isEmpty()) {
@@ -674,6 +678,7 @@ private fun NewMessageScreen(
                                     .orEmpty(),
                             targetAccountIdHex = target.accountIdHex,
                             activeAccountIdHex = activeHex,
+                            pendingConfirmation = item.group.pendingConfirmation,
                         )
                     }.sortedWith(
                         compareByDescending<ChatListItem> { it.latestAt ?: 0uL }

@@ -63,6 +63,24 @@ class SelectedMembersReviewScreenTest {
     }
 
     @Test
+    fun summaryNameSwitchesOffTheFrozenPlaceholderWhenTheProfileResolves() {
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMemberSummary(
+                    members = listOf(frozenPlaceholderMember),
+                    appState = state,
+                    onClick = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(frozenPlaceholderMember.displayName).assertIsDisplayed()
+        state.setContactNickname(frozenPlaceholderMember.accountIdHex, "Camille Example")
+        composeRule.onNodeWithText("Camille Example").assertIsDisplayed()
+    }
+
+    @Test
     fun busySummaryCannotOpenReview() {
         var opens = 0
         composeRule.setContent {
@@ -174,6 +192,10 @@ class SelectedMembersReviewScreenTest {
                 RecipientSearch.Candidate("a".repeat(64), "Alexandria Example", "npub1alexandria"),
                 RecipientSearch.Candidate("b".repeat(64), "Benjamin Example", "npub1benjamin"),
             )
+
+        // What the picker captures for a pasted npub whose profile hasn't loaded.
+        val frozenPlaceholderMember =
+            RecipientSearch.Candidate("c".repeat(64), "npub1camil…example", "npub1camilleexample")
 
         object EmptyDraftPersistence : DraftPersistence {
             override fun read(): Map<String, String> = emptyMap()

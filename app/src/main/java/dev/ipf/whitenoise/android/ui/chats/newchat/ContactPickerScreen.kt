@@ -116,17 +116,20 @@ internal fun ContactPickerScreen(
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
     val userSearch by rememberRecipientUserSearchState(query, appState)
+    val discovered = userSearch.candidates
+    val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, userSearch.candidates, activeHex, excludeAccountIdHexes) {
+        remember(query, candidates, discovered, followedIds, activeHex, excludeAccountIdHexes) {
             if (identifierQuery) {
                 emptyList()
             } else {
                 RecipientSearch.mergeAndBrowse(
                     query = query,
                     known = candidates,
-                    discovered = userSearch.candidates,
+                    discovered = discovered,
                     activeAccountIdHex = activeHex,
                     excludeAccountIdHexes = excludeAccountIdHexes,
+                    followedAccountIds = followedIds,
                 )
             }
         }

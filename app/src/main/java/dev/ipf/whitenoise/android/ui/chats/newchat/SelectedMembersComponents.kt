@@ -53,7 +53,29 @@ import dev.ipf.whitenoise.android.ui.theme.Radii
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
 
-internal fun selectedMemberDisplayName(member: RecipientSearch.Candidate): String = member.displayName
+/**
+ * Selection holds a frozen [RecipientSearch.Candidate], so the name it captured
+ * can be a short-npub placeholder taken before the profile resolved. Prefer the
+ * live lookup and keep the captured/ephemeral name only as a fallback.
+ */
+internal fun selectedMemberDisplayName(
+    member: RecipientSearch.Candidate,
+    liveDisplayName: String?,
+): String =
+    liveDisplayName?.takeIf { it.isNotBlank() }
+        ?: ProfileSanitizer.displayName(member.searchProfile?.displayName)
+        ?: ProfileSanitizer.displayName(member.searchProfile?.name)
+        ?: member.displayName
+
+internal fun selectedMemberDisplayName(
+    member: RecipientSearch.Candidate,
+    appState: WhiteNoiseAppState,
+): String {
+    val live = appState.contactDisplayNameCachedOrNull(member.accountIdHex)
+    // Same in-composition prefetch appState.displayName() would have done.
+    if (live == null) appState.requestProfile(member.accountIdHex)
+    return selectedMemberDisplayName(member, live)
+}
 
 internal fun selectedMemberAvatarUrl(
     member: RecipientSearch.Candidate,
@@ -98,7 +120,7 @@ internal fun SelectedMemberSummary(
                 members.take(SUMMARY_AVATAR_COUNT).forEachIndexed { index, member ->
                     Box(modifier = Modifier.padding(start = (index * SUMMARY_AVATAR_OVERLAP_DP).dp)) {
                         Avatar(
-                            title = selectedMemberDisplayName(member),
+                            title = selectedMemberDisplayName(member, appState),
                             seed = member.accountIdHex,
                             size = 32.dp,
                             pictureUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
@@ -113,7 +135,7 @@ internal fun SelectedMemberSummary(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    members.joinToString { member -> selectedMemberDisplayName(member) },
+                    members.joinToString { member -> selectedMemberDisplayName(member, appState) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -195,8 +217,9 @@ internal fun SelectedMembersReviewScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->
+                val memberName = selectedMemberDisplayName(member, appState)
                 ContactRow(
-                    title = selectedMemberDisplayName(member),
+                    title = memberName,
                     subtitle = IdentityFormatter.short(member.npub),
                     avatarSeed = member.accountIdHex,
                     avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
@@ -208,11 +231,7 @@ internal fun SelectedMembersReviewScreen(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription =
-                                    stringResource(
-                                        R.string.remove_member_named,
-                                        selectedMemberDisplayName(member),
-                                    ),
+                                contentDescription = stringResource(R.string.remove_member_named, memberName),
                             )
                         }
                     },
