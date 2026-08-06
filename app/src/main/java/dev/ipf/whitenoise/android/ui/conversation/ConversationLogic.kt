@@ -188,10 +188,11 @@ internal fun isNearBottom(
     // only a small no-flicker zone near the real tail; a full viewport delays
     // the FAB until too much of an expanded message has already scrolled away.
     val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    if (lastVisible.size <= viewportHeight) return true
     val tailDistanceFromViewport =
         lastVisible.offset + lastVisible.size - layoutInfo.viewportEndOffset
     val oversizedTailThreshold = viewportHeight / 4
-    return tailDistanceFromViewport <= minOf(lastVisible.size, oversizedTailThreshold)
+    return tailDistanceFromViewport <= oversizedTailThreshold
 }
 
 /**
