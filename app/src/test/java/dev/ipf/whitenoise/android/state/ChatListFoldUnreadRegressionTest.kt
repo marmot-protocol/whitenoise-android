@@ -371,6 +371,55 @@ class ChatListFoldUnreadRegressionTest {
     }
 
     @Test
+    fun matchingReadWatermarkAfterMarkRead_normalizesStaleUnreadFields() {
+        val current =
+            row(
+                messageId = idTail,
+                lastMessageAt = 200uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = idTail,
+            )
+        val staleDelayedRows =
+            listOf(
+                row(
+                    messageId = idTail,
+                    lastMessageAt = 200uL,
+                    unreadCount = 3uL,
+                    lastReadTimelineAt = 200uL,
+                    lastReadMessageIdHex = idTail,
+                    unreadMentionCount = 2uL,
+                    unreadMention = true,
+                ).copy(manuallyMarkedUnread = true),
+                row(
+                    messageId = idTail,
+                    lastMessageAt = 200uL,
+                    unreadCount = 0uL,
+                    lastReadTimelineAt = 200uL,
+                    lastReadMessageIdHex = idTail,
+                    unreadMentionCount = 2uL,
+                    unreadMention = true,
+                ),
+            )
+
+        staleDelayedRows.forEach { staleDelayed ->
+            val folded =
+                reduceSubscriptionChatListRow(
+                    current,
+                    staleDelayed,
+                    ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+                )
+
+            assertEquals(0uL, folded.unreadCount)
+            assertEquals(false, folded.hasUnread)
+            assertNull(folded.firstUnreadMessageIdHex)
+            assertEquals(0uL, folded.unreadMentionCount)
+            assertEquals(false, folded.unreadMention)
+            assertEquals(staleDelayed.manuallyMarkedUnread, folded.manuallyMarkedUnread)
+        }
+    }
+
+    @Test
     fun equalTimestampLowerReadMessageId_keepsCurrentWatermarkAndUnread() {
         val current =
             row(
