@@ -1239,8 +1239,13 @@
     <string name="tts_bar_play">Vorlesen fortsetzen</string>
     <string name="tts_bar_skip_previous">Vorheriger Satz</string>
     <string name="tts_bar_skip_next">Nächster Satz</string>
+    <string name="tts_bar_previous_message">Vorherige Nachricht</string>
+    <string name="tts_bar_next_message">Nächste Nachricht</string>
+    <string name="tts_bar_progress">Satz %1$d von %2$d, Nachricht %3$d von %4$d</string>
     <string name="tts_bar_stop">Vorlesen beenden</string>
     <string name="tts_bar_error">Vorlesen fehlgeschlagen</string>
+    <string name="tts_bar_history_loading">Weitere Nachrichten werden geladen…</string>
+    <string name="tts_bar_history_error">Weitere Nachrichten konnten nicht geladen werden. Zum Wiederholen erneut tippen.</string>
     <string name="tts_auto_read_title">Nachrichten vorlesen</string>
     <string name="tts_auto_read_subtitle">Ungelesene Nachrichten beim Öffnen dieses Chats vorlesen</string>
     <string name="tts_settings_rate_system">System (Geräteeinstellung folgen)</string>

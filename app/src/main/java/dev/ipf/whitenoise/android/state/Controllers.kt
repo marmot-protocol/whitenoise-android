@@ -1778,6 +1778,15 @@ internal fun adjacentTimelineInversions(ordered: List<TimelineMessage>): List<Ti
 private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
 
 /**
+ * Records of the rows the engine actually projected, in window order.
+ * Optimistic sends and stream-debug rows carry synthetic ids that vanish on
+ * reconciliation or cleanup, so anything tracking timeline identity across
+ * time — paging anchors, tail watermarks — must never see them.
+ */
+internal fun canonicalTimelineRecords(items: List<TimelineMessage>): List<AppMessageRecordFfi> =
+    items.filter { it.projected != null }.map(TimelineMessage::record)
+
+/**
  * Oldest live timeline message ids to drop so at most [maxLiveItems] non-[protectedIds]
  * rows remain. Deliberately-loaded history (captured when the user scrolls up via
  * [loadOlderPage]) is never trimmed; only rows added by live Upserts after that are
@@ -8218,6 +8227,16 @@ class ConversationController(
         loadOlderPage()
     }
 
+    /** True when the canonical timeline holds more history after the loaded window. */
+    val hasMoreAfterTimeline: Boolean
+        get() = hasMoreAfter
+
+    /** Pages the subscription window older; true when the window actually advanced. */
+    suspend fun loadOlderTimelinePage(): Boolean = loadOlderPage()
+
+    /** Pages the subscription window newer; true when the window actually advanced. */
+    suspend fun loadNewerTimelinePage(): Boolean = loadNewerPage()
+
     suspend fun loadUntilMessageAvailable(
         messageIdHex: String,
         maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
@@ -8274,6 +8293,17 @@ class ConversationController(
         }
         return timelineRecords.containsKey(match.messageIdHex)
     }
+
+    /**
+     * Move the bounded window toward a message at a known timeline position,
+     * paging in whichever direction it lies — [loadUntilMessageAvailable]
+     * only walks older, so it can never reach a target newer than the loaded
+     * window and drags the window further away with each retry.
+     */
+    suspend fun loadTimelineMessageAvailable(
+        messageIdHex: String,
+        timelineAt: ULong,
+    ): Boolean = loadSearchResultMessageAvailable(ConversationSearchMatch(messageIdHex, timelineAt))
 
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 

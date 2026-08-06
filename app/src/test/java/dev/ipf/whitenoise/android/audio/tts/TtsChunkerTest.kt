@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
@@ -67,7 +66,41 @@ class TtsChunkerTest {
     }
 
     @Test
-    fun leadingChunkReserveShrinksOnlyTheFirstOutputChunk() {
+    fun sentenceIndicesGroupSplitChunksByLogicalSentence() {
+        val chunks =
+            TtsChunker.chunk(
+                text = "alpha beta gamma delta. Ok.",
+                locale = Locale.US,
+                maxChunkLength = 12,
+            )
+
+        assertEquals(listOf("alpha beta", "gamma delta.", "Ok."), chunks.map(TtsChunk::text))
+        assertEquals(listOf(0, 0, 1), chunks.map(TtsChunk::sentenceIndex))
+        assertEquals(listOf(0, 1, 2), chunks.map(TtsChunk::index))
+    }
+
+    @Test
+    fun everySentenceFirstChunkKeepsTheAnnouncementReserve() {
+        val reserve = 8
+        val maxChunkLength = 20
+
+        val chunks =
+            TtsChunker.chunk(
+                text = "One. Alpha beta gamma delta epsilon zeta",
+                locale = Locale.US,
+                maxChunkLength = maxChunkLength,
+                leadingChunkReserve = reserve,
+            )
+
+        val firstChunkLimit = maxChunkLength - reserve
+        val sentenceFirstChunks =
+            chunks.groupBy(TtsChunk::sentenceIndex).values.map { sentence -> sentence.first() }
+        assertTrue(sentenceFirstChunks.size > 1)
+        assertTrue(sentenceFirstChunks.all { it.text.length <= firstChunkLimit })
+    }
+
+    @Test
+    fun leadingChunkReserveKeepsMidSentenceChunksAtFullLength() {
         val text = "alpha beta gamma delta epsilon zeta eta theta"
         val reserve = 10
         val maxChunkLength = 20
@@ -89,16 +122,18 @@ class TtsChunkerTest {
     }
 
     @Test
-    fun leadingChunkReserveMustLeaveRoomForSpeech() {
+    fun anOversizedLeadingChunkReserveDegradesInsteadOfFailing() {
         listOf(20, 21).forEach { reserve ->
-            assertThrows(IllegalArgumentException::class.java) {
+            val chunks =
                 TtsChunker.chunk(
                     text = "speech",
                     locale = Locale.US,
                     maxChunkLength = 20,
                     leadingChunkReserve = reserve,
                 )
-            }
+
+            assertEquals("speech", chunks.joinToString("", transform = TtsChunk::text))
+            assertTrue(chunks.all { it.text.length <= 20 })
         }
     }
 

@@ -6,4 +6,11 @@ internal data class TtsQueuedMessage(
     val senderDisplayName: String,
     val preview: String,
     val chunks: List<TtsChunk>,
+    // Stable conversation identity, empty for ad-hoc speech. Window mutations
+    // key their bookkeeping on this, never on flattened positions.
+    val messageIdHex: String = "",
+    // Timeline position of the source record, 0 for ad-hoc speech — edge
+    // walks anchor recovery on it when the loaded window no longer holds
+    // the anchor id.
+    val timelineAt: ULong = 0uL,
 )

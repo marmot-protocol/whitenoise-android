@@ -4,10 +4,16 @@ import android.speech.tts.TextToSpeech
 import java.text.BreakIterator
 import java.util.Locale
 
-/** One engine-safe piece of speakable text and its position in the final queue. */
+/**
+ * One engine-safe piece of speakable text and its position in the final queue.
+ * [sentenceIndex] identifies the logical sentence within its message: a long
+ * sentence split into several engine-safe chunks keeps one shared index, so
+ * navigation and progress count sentences, never raw chunks.
+ */
 data class TtsChunk(
     val text: String,
     val index: Int,
+    val sentenceIndex: Int = 0,
 )
 
 object TtsChunker {
@@ -30,9 +36,9 @@ object TtsChunker {
     ): List<TtsChunk> {
         require(maxChunkLength > 0) { "maxChunkLength must be positive" }
         require(leadingChunkReserve >= 0) { "leadingChunkReserve must be non-negative" }
-        require(leadingChunkReserve < maxChunkLength) {
-            "leadingChunkReserve must be less than maxChunkLength"
-        }
+        // An oversized sender label degrades to a tighter first chunk instead
+        // of crashing speak() over a long display name.
+        val boundedReserve = leadingChunkReserve.coerceAtMost(maxChunkLength - 1)
         if (text.isBlank()) return emptyList()
 
         val iterator = BreakIterator.getSentenceInstance(locale).apply { setText(text) }
@@ -55,16 +61,21 @@ object TtsChunker {
         }
         pendingPrefix.trim().takeIf(String::isNotEmpty)?.let(sentences::add)
 
-        val firstChunkMaxLength = maxChunkLength - leadingChunkReserve
+        // Every sentence-first chunk keeps the reserve, not just the message's
+        // opening chunk: any logical sentence can become a navigation target,
+        // and a cross-message target absorbs the sender announcement inline.
+        val firstChunkMaxLength = maxChunkLength - boundedReserve
         return sentences
             .flatMapIndexed { sentenceIndex, sentence ->
                 splitLongSentence(
                     sentence = sentence,
                     maxChunkLength = maxChunkLength,
-                    firstChunkMaxLength = if (sentenceIndex == 0) firstChunkMaxLength else maxChunkLength,
-                )
-            }.filter(String::isNotBlank)
-            .mapIndexed { index, chunk -> TtsChunk(text = chunk, index = index) }
+                    firstChunkMaxLength = firstChunkMaxLength,
+                ).map { piece -> sentenceIndex to piece }
+            }.filter { (_, piece) -> piece.isNotBlank() }
+            .mapIndexed { index, (sentenceIndex, piece) ->
+                TtsChunk(text = piece, index = index, sentenceIndex = sentenceIndex)
+            }
     }
 
     private fun String.endsWithCommonTitleAbbreviation(locale: Locale): Boolean =
