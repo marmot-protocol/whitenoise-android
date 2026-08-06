@@ -2,12 +2,21 @@ package dev.ipf.whitenoise.android.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
+import dev.ipf.whitenoise.android.state.contrastRatio
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+
+private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
 
 class WhiteNoiseThemeTest {
     @get:Rule
@@ -44,6 +53,94 @@ class WhiteNoiseThemeTest {
             assertEquals(expected, darkPrimary)
             assertEquals(expected, darkPrimaryContainer)
         }
+    }
+
+    @Test
+    fun customAccentDrivesPrimaryRolesAndSurfaceTint() {
+        var scheme: ColorScheme? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = false,
+                dynamicColor = true,
+                accentColorArgb = 0xFFFFC107,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val s = requireNotNull(scheme)
+            val accent = Color(0xFFFFC107)
+            assertEquals(accent, s.primary)
+            assertEquals(Color.Black, s.onPrimary)
+            assertEquals(accent, s.primaryContainer)
+            assertEquals(Color.Black, s.onPrimaryContainer)
+            assertEquals(accent, s.inversePrimary)
+            assertEquals(accent, s.surfaceTint)
+        }
+    }
+
+    @Test
+    fun dynamicPrimaryRolesArePreservedWithoutCustomAccent() {
+        var scheme: ColorScheme? = null
+        val expected =
+            dynamicLightColorScheme(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+            )
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = false,
+                dynamicColor = true,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val actual = requireNotNull(scheme)
+            assertEquals(expected.primary, actual.primary)
+            assertEquals(expected.onPrimary, actual.onPrimary)
+            assertEquals(expected.primaryContainer, actual.primaryContainer)
+            assertEquals(expected.onPrimaryContainer, actual.onPrimaryContainer)
+            assertEquals(expected.inversePrimary, actual.inversePrimary)
+            assertEquals(expected.surfaceTint, actual.surfaceTint)
+        }
+    }
+
+    @Test
+    fun customAccentKeepsAmoledSurfaceTintTransparent() {
+        var scheme: ColorScheme? = null
+
+        composeRule.setContent {
+            WhiteNoiseTheme(
+                darkTheme = true,
+                amoled = true,
+                accentColorArgb = 0xFFFFC107,
+            ) {
+                val colorScheme = MaterialTheme.colorScheme
+                SideEffect { scheme = colorScheme }
+            }
+        }
+
+        composeRule.runOnIdle {
+            val s = requireNotNull(scheme)
+            assertEquals(Color(0xFFFFC107), s.primary)
+            assertEquals(Color.Transparent, s.surfaceTint)
+        }
+    }
+
+    @Test
+    fun blackAccentKeepsInversePrimaryReadableAcrossThemes() {
+        assertInversePrimaryContrast(Color.Black)
+    }
+
+    @Test
+    fun whiteAccentKeepsInversePrimaryReadableAcrossThemes() {
+        assertInversePrimaryContrast(Color.White)
     }
 
     /**
@@ -114,4 +211,50 @@ class WhiteNoiseThemeTest {
             assertEquals(expected, primaryContainer)
         }
     }
+
+    private fun assertInversePrimaryContrast(accent: Color) {
+        val captured = CapturedSchemes()
+        composeRule.setContent { CaptureAccentSchemes(accent, captured) }
+
+        composeRule.runOnIdle {
+            listOf(captured.light, captured.dark, captured.amoled).forEach { capturedScheme ->
+                val scheme = requireNotNull(capturedScheme)
+                assertEquals(accent, scheme.primary)
+                val ratio =
+                    contrastRatio(
+                        scheme.inversePrimary.toOpaqueArgb(),
+                        scheme.inverseSurface.toOpaqueArgb(),
+                    )
+                assertTrue("inversePrimary contrast was $ratio", ratio >= WCAG_AA_NORMAL_TEXT_CONTRAST)
+            }
+        }
+    }
 }
+
+private data class CapturedSchemes(
+    var light: ColorScheme? = null,
+    var dark: ColorScheme? = null,
+    var amoled: ColorScheme? = null,
+)
+
+@Composable
+private fun CaptureAccentSchemes(
+    accent: Color,
+    captured: CapturedSchemes,
+) {
+    val accentArgb = accent.toOpaqueArgb()
+    WhiteNoiseTheme(darkTheme = false, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.light = scheme }
+    }
+    WhiteNoiseTheme(darkTheme = true, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.dark = scheme }
+    }
+    WhiteNoiseTheme(darkTheme = true, amoled = true, accentColorArgb = accentArgb) {
+        val scheme = MaterialTheme.colorScheme
+        SideEffect { captured.amoled = scheme }
+    }
+}
+
+private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
