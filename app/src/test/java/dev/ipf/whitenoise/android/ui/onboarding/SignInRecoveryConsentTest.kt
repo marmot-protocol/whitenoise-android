@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.content.Context
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MarmotKitException
@@ -14,6 +16,7 @@ import dev.ipf.whitenoise.android.state.RecordingIdentityLoginCalls
 import dev.ipf.whitenoise.android.state.RecoveryCall
 import dev.ipf.whitenoise.android.state.signInTestAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,7 +46,9 @@ class SignInRecoveryConsentTest {
 
     private fun string(res: Int): String = app.getString(res)
 
-    private fun recoveryRequiredEngine(recoveryFails: () -> Throwable = { MarmotKitException.Runtime("no") }) =
+    private fun recoveryRequiredEngine() = recoveryRequiredEngine { MarmotKitException.Runtime("no") }
+
+    private fun recoveryRequiredEngine(recoveryFails: suspend () -> Throwable) =
         RecordingIdentityLoginCalls(
             loginFails = { MarmotKitException.AccountSetupRecoveryRequired() },
             recoveryFails = recoveryFails,
@@ -107,6 +112,30 @@ class SignInRecoveryConsentTest {
     }
 
     @Test
+    fun aSecondConfirmWhileTheFirstRecoveryIsStillRunningRecoversOnce() {
+        val inFlight = CompletableDeferred<Unit>()
+        val engine =
+            recoveryRequiredEngine {
+                inFlight.await()
+                MarmotKitException.Runtime("no")
+            }
+        openSignIn(engine)
+        signIn(nsec)
+
+        // Holding the clock keeps the dialog attached, so both confirms reach the
+        // same composition — the window a user's second tap actually lands in.
+        composeRule.mainClock.autoAdvance = false
+        val confirm = composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm))
+        confirm.performSemanticsAction(SemanticsActions.OnClick)
+        confirm.performSemanticsAction(SemanticsActions.OnClick)
+
+        assertEquals(1, engine.recoveries.size)
+        inFlight.complete(Unit)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+    }
+
+    @Test
     fun decliningRecoversNothingAndSaysSo() {
         val engine = recoveryRequiredEngine()
         openSignIn(engine)
@@ -134,7 +163,7 @@ class SignInRecoveryConsentTest {
 
     @Test
     fun aFailedRecoveryReportsItselfWithoutReArmingTheConsentPrompt() {
-        val engine = recoveryRequiredEngine(recoveryFails = { MarmotKitException.AccountSetupRecoveryRequired() })
+        val engine = recoveryRequiredEngine { MarmotKitException.AccountSetupRecoveryRequired() }
         openSignIn(engine)
         signIn(nsec)
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
@@ -166,7 +195,7 @@ class SignInRecoveryConsentTest {
 
     @Test
     fun aDifferentKeyStillGetsItsOwnConsentPrompt() {
-        val engine = recoveryRequiredEngine(recoveryFails = { MarmotKitException.AccountSetupRecoveryRequired() })
+        val engine = recoveryRequiredEngine { MarmotKitException.AccountSetupRecoveryRequired() }
         openSignIn(engine)
         signIn(nsec)
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()

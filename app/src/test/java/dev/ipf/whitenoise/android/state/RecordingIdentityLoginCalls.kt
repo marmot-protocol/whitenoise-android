@@ -25,8 +25,8 @@ internal data class RecoveryCall(
  * engine work the JVM tests have no stand-in for.
  */
 internal class RecordingIdentityLoginCalls(
-    private val loginFails: () -> Throwable,
-    private val recoveryFails: () -> Throwable = { MarmotKitException.Runtime("recovery failed") },
+    private val loginFails: suspend () -> Throwable,
+    private val recoveryFails: suspend () -> Throwable = { MarmotKitException.Runtime("recovery failed") },
 ) : IdentityLoginCalls {
     val logins = mutableListOf<LoginCall>()
     val recoveries = mutableListOf<RecoveryCall>()
