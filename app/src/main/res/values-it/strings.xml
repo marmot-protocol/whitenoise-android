@@ -1159,6 +1159,15 @@
     <string name="onboarding_slogan_uncensorable">Incensurabile</string>
     <string name="onboarding_slogan_secure_messaging">Messaggistica Sicura</string>
     <string name="sign_in_error_public_key">Questa è una chiave pubblica. Inserisci la tua chiave segreta (nsec) per accedere.</string>
+    <string name="sign_in_error_setup_retry">La configurazione dell’account non è stata completata. Tocca di nuovo Accedi per riprenderla.</string>
+    <string name="sign_in_error_setup_key_package_retry">La configurazione dell’account è ancora in corso. Tocca di nuovo Accedi per completarla.</string>
+    <string name="sign_in_error_setup_unexpected_state">Stato dell’account inatteso, quindi l’accesso è stato interrotto. Non è stato modificato nulla.</string>
+    <string name="sign_in_error_setup_recovery_declined">Recupero annullato. Non è stato modificato nulla.</string>
+    <string name="sign_in_error_setup_recovery_failed">Il recupero non è andato a buon fine. Tocca Accedi per riprovare.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Stato dell’account inatteso dopo il recupero, quindi l’accesso è stato interrotto. Parte del recupero potrebbe essere già stata applicata.</string>
+    <string name="sign_in_recovery_title">Recuperare questo account?</string>
+    <string name="sign_in_recovery_message">La configurazione dell’account non è stata completata e questo dispositivo non può dimostrare che non sia stato pubblicato alcun pacchetto chiavi per esso. Il recupero rimuove la configurazione incompleta e ti fa accedere di nuovo. Se un pacchetto chiavi è stato pubblicato, può restare orfano sui relay.</string>
+    <string name="sign_in_recovery_confirm">Recupera</string>
     <string name="group_add_members_after_create">Puoi aggiungere membri dopo aver creato il gruppo.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Sei l\'unico admin. %1$s diventa admin e tu esci dal gruppo.</string>
     <string name="app_updates">Aggiornamenti dell\'app</string>

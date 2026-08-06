@@ -1137,6 +1137,15 @@
     <string name="onboarding_slogan_uncensorable">防审查</string>
     <string name="onboarding_slogan_secure_messaging">安全通讯</string>
     <string name="sign_in_error_public_key">这是公钥。请输入你的私钥（nsec）登录。</string>
+    <string name="sign_in_error_setup_retry">账号设置未完成。请再次点按登录以继续设置。</string>
+    <string name="sign_in_error_setup_key_package_retry">账号设置仍在完成中。请再次点按登录以完成设置。</string>
+    <string name="sign_in_error_setup_unexpected_state">账号状态异常，登录已停止。未做任何更改。</string>
+    <string name="sign_in_error_setup_recovery_declined">已取消恢复。未做任何更改。</string>
+    <string name="sign_in_error_setup_recovery_failed">恢复未完成。请点按登录重试。</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">恢复后账号状态异常，登录已停止。部分恢复可能已生效。</string>
+    <string name="sign_in_recovery_title">要恢复此账号吗？</string>
+    <string name="sign_in_recovery_message">账号设置未完成，且本设备无法证明未曾为其发布过密钥包。恢复会清除未完成的设置并重新登录。如果曾发布过密钥包，它可能会遗留在中继上无人认领。</string>
+    <string name="sign_in_recovery_confirm">恢复</string>
     <string name="group_add_members_after_create">创建群组后可以添加成员。</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">你是唯一的管理员。%1$s 将成为管理员，你将退出群组。</string>
     <string name="app_updates">应用更新</string>

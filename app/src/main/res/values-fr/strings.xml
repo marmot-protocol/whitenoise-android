@@ -1159,6 +1159,15 @@
     <string name="onboarding_slogan_uncensorable">Incensurable</string>
     <string name="onboarding_slogan_secure_messaging">Messagerie Sécurisée</string>
     <string name="sign_in_error_public_key">Ceci est une clé publique. Saisissez votre clé secrète (nsec) pour vous connecter.</string>
+    <string name="sign_in_error_setup_retry">La configuration du compte n’est pas allée au bout. Touchez à nouveau Se connecter pour la reprendre.</string>
+    <string name="sign_in_error_setup_key_package_retry">La configuration du compte est encore en cours. Touchez à nouveau Se connecter pour la terminer.</string>
+    <string name="sign_in_error_setup_unexpected_state">État de compte inattendu, la connexion a été interrompue. Rien n’a été modifié.</string>
+    <string name="sign_in_error_setup_recovery_declined">Récupération annulée. Rien n’a été modifié.</string>
+    <string name="sign_in_error_setup_recovery_failed">La récupération n’a pas abouti. Touchez Se connecter pour réessayer.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">État de compte inattendu après la récupération, la connexion a été interrompue. Une partie de la récupération a peut-être déjà été appliquée.</string>
+    <string name="sign_in_recovery_title">Récupérer ce compte ?</string>
+    <string name="sign_in_recovery_message">La configuration du compte n’est pas allée au bout, et cet appareil ne peut pas prouver qu’aucun paquet de clés n’a été publié pour lui. La récupération supprime la configuration incomplète et vous reconnecte. Si un paquet de clés a été publié, il peut rester orphelin sur les relais.</string>
+    <string name="sign_in_recovery_confirm">Récupérer</string>
     <string name="group_add_members_after_create">Vous pourrez ajouter des membres après avoir créé le groupe.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Vous êtes le seul administrateur. %1$s devient admin et vous quittez le groupe.</string>
     <string name="app_updates">Mises à jour de l\'application</string>

@@ -1157,6 +1157,15 @@
     <string name="onboarding_slogan_uncensorable">Sansürlenemez</string>
     <string name="onboarding_slogan_secure_messaging">Güvenli Mesajlaşma</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
+    <string name="sign_in_error_setup_retry">Hesap kurulumu tamamlanmadı. Sürdürmek için yeniden Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_key_package_retry">Hesap kurulumu hâlâ tamamlanıyor. Bitirmek için yeniden Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_unexpected_state">Beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Hiçbir şey değiştirilmedi.</string>
+    <string name="sign_in_error_setup_recovery_declined">Kurtarma iptal edildi. Hiçbir şey değiştirilmedi.</string>
+    <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Kurtarmadan sonra beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Kurtarmanın bir kısmı zaten uygulanmış olabilir.</string>
+    <string name="sign_in_recovery_title">Bu hesap kurtarılsın mı?</string>
+    <string name="sign_in_recovery_message">Hesap kurulumu tamamlanmadı ve bu cihaz, hesap için hiçbir anahtar paketinin yayımlanmadığını kanıtlayamıyor. Kurtarma, tamamlanmamış kurulumu siler ve yeniden giriş yapar. Bir anahtar paketi yayımlanmışsa rölelerde sahipsiz kalabilir.</string>
+    <string name="sign_in_recovery_confirm">Kurtar</string>
     <string name="group_add_members_after_create">Üyeleri grubu oluşturduktan sonra ekleyebilirsiniz.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Tek yönetici sensin. %1$s yönetici olur ve siz gruptan ayrılırsınız.</string>
     <string name="app_updates">Uygulama güncellemeleri</string>

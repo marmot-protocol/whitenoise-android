@@ -1159,6 +1159,15 @@
     <string name="onboarding_slogan_uncensorable">Incensurable</string>
     <string name="onboarding_slogan_secure_messaging">Mensajería Segura</string>
     <string name="sign_in_error_public_key">Esa es una clave pública. Introduce tu clave secreta (nsec) para iniciar sesión.</string>
+    <string name="sign_in_error_setup_retry">La configuración de la cuenta no terminó. Toca iniciar sesión otra vez para reanudarla.</string>
+    <string name="sign_in_error_setup_key_package_retry">La configuración de la cuenta aún está terminando. Toca iniciar sesión otra vez para completarla.</string>
+    <string name="sign_in_error_setup_unexpected_state">Estado de cuenta inesperado, así que se detuvo el inicio de sesión. No se cambió nada.</string>
+    <string name="sign_in_error_setup_recovery_declined">Recuperación cancelada. No se cambió nada.</string>
+    <string name="sign_in_error_setup_recovery_failed">La recuperación no se completó. Toca iniciar sesión para intentarlo de nuevo.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Estado de cuenta inesperado tras la recuperación, así que se detuvo el inicio de sesión. Puede que parte de la recuperación ya se haya aplicado.</string>
+    <string name="sign_in_recovery_title">¿Recuperar esta cuenta?</string>
+    <string name="sign_in_recovery_message">La configuración de la cuenta no terminó y este dispositivo no puede demostrar que no se publicó ningún paquete de llaves para ella. La recuperación elimina la configuración incompleta y vuelve a iniciar sesión. Si se publicó un paquete de llaves, puede quedar huérfano en los relés.</string>
+    <string name="sign_in_recovery_confirm">Recuperar</string>
     <string name="group_add_members_after_create">Puedes añadir miembros después de crear el grupo.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Eres el único administrador. %1$s pasa a ser admin y sales del grupo.</string>
     <string name="app_updates">Actualizaciones de la aplicación</string>

@@ -1222,6 +1222,7 @@ class WhiteNoiseAppState private constructor(
     private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
     private val profileDisplayNameReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
+    private val identityLoginCalls: IdentityLoginCalls?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1234,6 +1235,7 @@ class WhiteNoiseAppState private constructor(
             profileReader = null,
             profileDisplayNameReader = null,
             profileRefreshRequest = null,
+            identityLoginCalls = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1248,6 +1250,7 @@ class WhiteNoiseAppState private constructor(
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
+        identityLoginCalls: IdentityLoginCalls? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1256,6 +1259,7 @@ class WhiteNoiseAppState private constructor(
         profileReader = profileReader,
         profileDisplayNameReader = profileDisplayNameReader,
         profileRefreshRequest = profileRefreshRequest,
+        identityLoginCalls = identityLoginCalls,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -3006,32 +3010,92 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Returns whether the import succeeded. Failures are reported to the
-     * caller (not toasted from here) so the identity-entry form can show a
-     * readable inline error next to the field; the raw engine message only
-     * goes to the debug log.
+     * Reports how the import ended. Failures are reported to the caller (not
+     * toasted from here) so the identity-entry form can show a readable inline
+     * error next to the field — the raw engine message only goes to the debug
+     * log.
      */
-    suspend fun importIdentity(identity: String): Boolean {
+    internal suspend fun importIdentity(identity: String): IdentityImportOutcome {
         val trimmed = identity.trim()
-        if (!permitsDirectIdentityImport(trimmed)) return false
+        if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
-            refreshAccounts()
-            setActiveAccount(summary.label)
-            refreshLocalNotificationSettings()
-            phase = AppPhase.Ready
-            present(R.string.toast_identity_imported)
-            warmProfile(summary.accountIdHex)
-            true
+            val summary = engineLogin(trimmed)
+            activateImportedIdentity(summary)
+            IdentityImportOutcome.Success
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            // The submitted nsec can surface in the engine's error text, so
-            // redact before logging (mirrors exportActiveAccountNsec) and don't
-            // pass the raw throwable to the logger, whose stack trace would
-            // echo the unredacted message.
-            appStateDebug { "identity import failed: ${DiagnosticFormatter.redactError(error.readableMessage())}" }
-            false
+            logRedactedIdentityFailure("identity import", error)
+            identityImportOutcome(error)
         }
+    }
+
+    /**
+     * Consent-gated recovery for an account whose pre-journal setup left an
+     * ambiguous partial shape behind. Reachable only after the engine reported
+     * [IdentityImportOutcome.SetupRecoveryRequired] and the user affirmed that
+     * an already-published KeyPackage may be left orphaned — the engine refuses
+     * the rotation without that acknowledgement, so it is never inferred here.
+     *
+     * The one-call engine API clears the partial shape and retries login
+     * itself, so no separate reset step is issued.
+     */
+    internal suspend fun recoverIncompleteIdentitySetup(identity: String): IdentityImportOutcome {
+        val trimmed = identity.trim()
+        if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
+        return try {
+            val summary = engineRecoveringLogin(trimmed)
+            activateImportedIdentity(summary)
+            IdentityImportOutcome.Success
+        } catch (error: Throwable) {
+            rethrowIfCancellation(error)
+            logRedactedIdentityFailure("identity setup recovery", error)
+            identityImportOutcome(error)
+        }
+    }
+
+    private suspend fun engineLogin(nsec: String): AccountSummaryFfi {
+        val relays = MarmotClient.bootstrapRelays
+        val injected = identityLoginCalls
+        if (injected != null) return injected.login(nsec, relays, relays)
+        return marmotIo { login(nsec, relays, relays) }
+    }
+
+    // The acknowledgement is a constant, never derived from state: the only
+    // caller is the consent prompt's confirm action.
+    private suspend fun engineRecoveringLogin(nsec: String): AccountSummaryFfi {
+        val relays = MarmotClient.bootstrapRelays
+        val injected = identityLoginCalls
+        if (injected != null) {
+            return injected.loginRecoveringIncompleteSetup(
+                nsec,
+                relays,
+                relays,
+                acknowledgePossibleKeyPackageOrphan = true,
+            )
+        }
+        return marmotIo {
+            loginRecoveringIncompleteSetup(nsec, relays, relays, acknowledgePossibleKeyPackageOrphan = true)
+        }
+    }
+
+    private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
+        refreshAccounts()
+        setActiveAccount(summary.label)
+        refreshLocalNotificationSettings()
+        phase = AppPhase.Ready
+        present(R.string.toast_identity_imported)
+        warmProfile(summary.accountIdHex)
+    }
+
+    // The submitted nsec can surface in the engine's error text, so redact
+    // before logging (mirrors exportActiveAccountNsec) and don't pass the raw
+    // throwable to the logger, whose stack trace would echo the unredacted
+    // message.
+    private fun logRedactedIdentityFailure(
+        stage: String,
+        error: Throwable,
+    ) {
+        appStateDebug { "$stage failed: ${DiagnosticFormatter.redactError(error.readableMessage())}" }
     }
 
     /** Whether a NIP-55 external signer (Amber) is installed — gates the UI entry point. */
@@ -7192,5 +7256,65 @@ private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotE
 
 /** Whether [WhiteNoiseAppState.importIdentity] may call the engine — direct import is nsec-only. */
 internal fun permitsDirectIdentityImport(trimmed: String): Boolean = IdentityEntryInput.classify(trimmed) == IdentityEntryInput.Kind.SecretKey
+
+/**
+ * How a direct nsec sign-in ended. The engine's account-setup states are kept
+ * apart because each one calls for a different thing from the user: two are
+ * resumable by signing in again, one says the account was never in the state
+ * recovery applies to, and one needs explicit consent before anything rotates.
+ */
+internal sealed interface IdentityImportOutcome {
+    data object Success : IdentityImportOutcome
+
+    /** Input the engine was never asked about, or a failure with no typed meaning. */
+    data object Failed : IdentityImportOutcome
+
+    /** Durable account setup can be resumed by retrying the same sign-in. */
+    data object SetupRetryRequired : IdentityImportOutcome
+
+    /** A recoverable KeyPackage setup state exists, so retry rather than reset. */
+    data object SetupKeyPackageRecoveryAvailable : IdentityImportOutcome
+
+    /** The account was not in the incomplete-setup state the reset applies to. */
+    data object SetupResetNotApplicable : IdentityImportOutcome
+
+    /**
+     * Local evidence cannot prove a previously signed KeyPackage was never
+     * exposed, so the engine forbids rotation until the host passes an explicit
+     * acknowledgement.
+     */
+    data object SetupRecoveryRequired : IdentityImportOutcome
+}
+
+/**
+ * The two engine login entry points behind a direct nsec sign-in. Injectable so
+ * a test can count them: which binding a sign-in reaches is the consent
+ * guarantee, and a source-text guard cannot see a bypass routed through some
+ * other wrapper.
+ */
+internal interface IdentityLoginCalls {
+    suspend fun login(
+        nsec: String,
+        relays: List<String>,
+        keyPackageRelays: List<String>,
+    ): AccountSummaryFfi
+
+    suspend fun loginRecoveringIncompleteSetup(
+        nsec: String,
+        relays: List<String>,
+        keyPackageRelays: List<String>,
+        acknowledgePossibleKeyPackageOrphan: Boolean,
+    ): AccountSummaryFfi
+}
+
+internal fun identityImportOutcome(error: Throwable): IdentityImportOutcome =
+    when (error) {
+        is MarmotKitException.AccountSetupRetryRequired -> IdentityImportOutcome.SetupRetryRequired
+        is MarmotKitException.AccountSetupKeyPackageRecoveryAvailable ->
+            IdentityImportOutcome.SetupKeyPackageRecoveryAvailable
+        is MarmotKitException.AccountSetupResetNotApplicable -> IdentityImportOutcome.SetupResetNotApplicable
+        is MarmotKitException.AccountSetupRecoveryRequired -> IdentityImportOutcome.SetupRecoveryRequired
+        else -> IdentityImportOutcome.Failed
+    }
 
 internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible

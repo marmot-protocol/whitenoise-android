@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
+import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.delay
@@ -76,11 +77,43 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
+    var recoveryConsentVisible by remember { mutableStateOf(false) }
+    // The key an acknowledged recovery already ran for. Holding the value the
+    // field still holds adds no exposure, and it stops a failed recovery from
+    // steering the user through the consent prompt again on every retry.
+    var recoveryConsentedFor by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
     // Signer availability can't change while onboarding is on screen, so read it
     // once (the query hits the PackageManager).
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
+
+    fun applyStep(step: SignInStep) {
+        when (step) {
+            SignInStep.SignedIn -> clearSensitiveClipboard(context)
+            SignInStep.AskRecoveryConsent -> recoveryConsentVisible = true
+            is SignInStep.InlineError -> importErrorRes = step.messageRes
+        }
+    }
+
+    // Shared by the sign-in attempt and the acknowledged recovery: the busy
+    // state flips before the coroutine starts, so the button reads as busy from
+    // the tap onward. The idle guard is what makes a second tap in the frame
+    // before that flip renders — the consent dialog is still attached — reach
+    // no second engine call.
+    fun runStep(step: suspend () -> SignInStep) {
+        if (inFlightAction != OnboardingAction.Idle) return
+        inFlightAction = OnboardingAction.Importing
+        importErrorRes = null
+        scope.launch {
+            try {
+                applyStep(step())
+            } finally {
+                inFlightAction = OnboardingAction.Idle
+            }
+        }
+    }
 
     OnboardingContent(
         identity = identity,
@@ -103,19 +136,23 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             }
         },
         onImportIdentity = { value ->
-            inFlightAction = OnboardingAction.Importing
-            importErrorRes = null
-            scope.launch {
-                try {
-                    if (appState.importIdentity(value)) {
-                        clearSensitiveClipboard(context)
-                    } else {
-                        importErrorRes = importIdentityErrorRes(value)
-                    }
-                } finally {
-                    inFlightAction = OnboardingAction.Idle
-                }
-            }
+            runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
+        },
+        recoveryConsentVisible = recoveryConsentVisible,
+        // The engine needs the same nsec again, so the already-entered value is
+        // reused from the field rather than stashed anywhere new — it leaves
+        // memory with the rest of the onboarding state.
+        onRecoveryConsentConfirm = {
+            recoveryConsentVisible = false
+            val value = identity.trim()
+            recoveryConsentedFor = value
+            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
+        },
+        // Declining reaches no engine call at all: only the prompt closes, and
+        // the entered key and sign-in button stay exactly as they were.
+        onRecoveryConsentDismiss = {
+            recoveryConsentVisible = false
+            importErrorRes = R.string.sign_in_error_setup_recovery_declined
         },
         loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
         amberSignInStage = appState.amberSignInStage,
@@ -149,6 +186,69 @@ internal fun importIdentityErrorRes(identity: String): Int =
         IdentityEntryInput.Kind.EncryptedSecretKey -> R.string.identity_entry_error_import_failed
     }
 
+/** What the sign-in surface should do once the engine has answered. */
+internal sealed interface SignInStep {
+    data object SignedIn : SignInStep
+
+    data class InlineError(
+        val messageRes: Int,
+    ) : SignInStep
+
+    data object AskRecoveryConsent : SignInStep
+}
+
+/**
+ * Each account-setup state gets its own message. The two resumable states point
+ * at the sign-in button the user already has rather than retrying on their
+ * behalf — an automatic retry on this path can loop.
+ *
+ * [recoveryConsentedFor] is the key an acknowledged recovery already ran for.
+ * Asking again for the same key would only walk the user back through the
+ * orphaned-KeyPackage acknowledgement the last round already spent, so the
+ * repeat reads as a recovery that didn't complete.
+ */
+internal fun signInStepFor(
+    outcome: IdentityImportOutcome,
+    identity: String,
+    recoveryConsentedFor: String? = null,
+): SignInStep =
+    when (outcome) {
+        IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupRecoveryRequired ->
+            if (identity == recoveryConsentedFor) {
+                SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
+            } else {
+                SignInStep.AskRecoveryConsent
+            }
+        IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
+        IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
+        IdentityImportOutcome.SetupResetNotApplicable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_unexpected_state)
+        IdentityImportOutcome.Failed -> SignInStep.InlineError(importIdentityErrorRes(identity))
+    }
+
+/**
+ * Outcomes of the acknowledged recovery attempt. The consent was already
+ * carried, so nothing here can ask for it again, and no message may claim the
+ * account is untouched: the engine's recovery may have applied part of its work
+ * before reporting any of these states.
+ */
+internal fun recoveryStepFor(outcome: IdentityImportOutcome): SignInStep =
+    when (outcome) {
+        IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
+        IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
+        IdentityImportOutcome.SetupResetNotApplicable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_recovery_unexpected_state)
+        // The key was well-formed enough for the engine to report a setup state a
+        // moment ago, so a bare failure here is the recovery failing, not a bad key.
+        IdentityImportOutcome.SetupRecoveryRequired,
+        IdentityImportOutcome.Failed,
+        -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
+    }
+
 @Composable
 fun OnboardingContent(
     identity: String,
@@ -163,6 +263,9 @@ fun OnboardingContent(
     amberSignInStage: Int? = null,
     amberSignerAvailable: Boolean = false,
     onLoginWithAmber: () -> Unit = {},
+    recoveryConsentVisible: Boolean = false,
+    onRecoveryConsentConfirm: () -> Unit = {},
+    onRecoveryConsentDismiss: () -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber
@@ -178,6 +281,9 @@ fun OnboardingContent(
             onErrorChange = onImportErrorChange,
             onBack = { signingIn = false },
             onSignIn = { onImportIdentity(identity.trim()) },
+            recoveryConsentVisible = recoveryConsentVisible,
+            onRecoveryConsentConfirm = onRecoveryConsentConfirm,
+            onRecoveryConsentDismiss = onRecoveryConsentDismiss,
         )
         return
     }

@@ -57,7 +57,9 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import dev.ipf.whitenoise.android.ui.onboarding.IdentityEntryForm
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
+import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
+import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,10 +90,13 @@ internal fun AddIdentitySheet(
         importErrorRes = null
         appState.launchMutation {
             try {
-                if (appState.importIdentity(identity)) {
-                    clearSensitiveClipboard(context)
-                } else {
-                    importErrorRes = importIdentityErrorRes(identity)
+                when (val step = signInStepFor(appState.importIdentity(identity), identity)) {
+                    SignInStep.SignedIn -> clearSensitiveClipboard(context)
+                    // Consent-gated setup recovery is offered on the sign-in
+                    // screen only, so this surface keeps the generic message
+                    // rather than opening a prompt with nowhere to go.
+                    SignInStep.AskRecoveryConsent -> importErrorRes = importIdentityErrorRes(identity)
+                    is SignInStep.InlineError -> importErrorRes = step.messageRes
                 }
             } finally {
                 inFlightAction = OnboardingAction.Idle
