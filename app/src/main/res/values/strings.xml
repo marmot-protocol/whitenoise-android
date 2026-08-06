@@ -1293,8 +1293,13 @@
     <string name="tts_bar_play">Resume reading</string>
     <string name="tts_bar_skip_previous">Previous sentence</string>
     <string name="tts_bar_skip_next">Next sentence</string>
+    <string name="tts_bar_previous_message">Previous message</string>
+    <string name="tts_bar_next_message">Next message</string>
+    <string name="tts_bar_progress">Sentence %1$d of %2$d, message %3$d of %4$d</string>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_error">Couldn\'t read aloud</string>
+    <string name="tts_bar_history_loading">Loading more messages…</string>
+    <string name="tts_bar_history_error">Couldn\'t load more messages. Tap again to retry.</string>
     <string name="tts_auto_read_title">Read messages aloud</string>
     <string name="tts_auto_read_subtitle">Read the unread backlog when this chat opens</string>
     <string name="tts_settings_rate_system">System (follow device setting)</string>

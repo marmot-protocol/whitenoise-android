@@ -1241,8 +1241,13 @@
     <string name="tts_bar_play">Riprendi lettura</string>
     <string name="tts_bar_skip_previous">Frase precedente</string>
     <string name="tts_bar_skip_next">Frase successiva</string>
+    <string name="tts_bar_previous_message">Messaggio precedente</string>
+    <string name="tts_bar_next_message">Messaggio successivo</string>
+    <string name="tts_bar_progress">Frase %1$d di %2$d, messaggio %3$d di %4$d</string>
     <string name="tts_bar_stop">Interrompi lettura</string>
     <string name="tts_bar_error">Impossibile leggere ad alta voce</string>
+    <string name="tts_bar_history_loading">Caricamento di altri messaggi…</string>
+    <string name="tts_bar_history_error">Impossibile caricare altri messaggi. Tocca di nuovo per riprovare.</string>
     <string name="tts_auto_read_title">Leggi i messaggi ad alta voce</string>
     <string name="tts_auto_read_subtitle">Leggi i messaggi non letti all\'apertura di questa chat</string>
     <string name="tts_settings_rate_system">Sistema (segui l\'impostazione del dispositivo)</string>

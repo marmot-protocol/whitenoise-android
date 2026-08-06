@@ -5,6 +5,12 @@ data class TtsSpeakableEntry(
     val senderKey: String,
     val senderDisplayName: String,
     val text: String,
+    // Stable conversation identity, empty for ad-hoc speech (previews, tests).
+    val messageIdHex: String = "",
+    // Timeline position of the source record, 0 for ad-hoc speech. Anchor
+    // recovery pages toward this in either direction after the loaded window
+    // drifted away from the queue.
+    val timelineAt: ULong = 0uL,
 )
 
 // A hazard bound, not a feature knob: an inflated unread count would anchor

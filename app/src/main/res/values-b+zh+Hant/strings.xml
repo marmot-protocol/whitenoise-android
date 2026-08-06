@@ -1219,8 +1219,13 @@
     <string name="tts_bar_play">繼續朗讀</string>
     <string name="tts_bar_skip_previous">上一句</string>
     <string name="tts_bar_skip_next">下一句</string>
+    <string name="tts_bar_previous_message">上一則訊息</string>
+    <string name="tts_bar_next_message">下一則訊息</string>
+    <string name="tts_bar_progress">第 %1$d/%2$d 句，第 %3$d/%4$d 則訊息</string>
     <string name="tts_bar_stop">停止朗讀</string>
     <string name="tts_bar_error">無法朗讀</string>
+    <string name="tts_bar_history_loading">正在載入更多訊息…</string>
+    <string name="tts_bar_history_error">無法載入更多訊息。再次點按即可重試。</string>
     <string name="tts_auto_read_title">朗讀訊息</string>
     <string name="tts_auto_read_subtitle">開啟此聊天時朗讀未讀訊息</string>
     <string name="tts_settings_rate_system">系統（跟隨裝置設定）</string>

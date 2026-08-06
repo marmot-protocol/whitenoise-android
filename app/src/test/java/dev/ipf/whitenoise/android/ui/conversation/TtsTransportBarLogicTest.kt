@@ -59,4 +59,28 @@ class TtsTransportBarLogicTest {
         assertEquals(4, ttsMessageIndex(idleTts(8, 8, 4, 5, "Preview")))
         assertEquals(5, ttsMessageCount(idleTts(8, 8, 4, 5, "Preview")))
     }
+
+    @Test
+    fun sentencePositionWithinTheMessageReadsEveryStateVariant() {
+        val speaking = speakingTts(3, 8, 2, 5, "Preview", sentenceIndex = 2, sentenceCount = 4)
+        assertEquals(2, ttsSentenceIndex(speaking))
+        assertEquals(4, ttsSentenceCount(speaking))
+        val paused = pausedTts(3, 8, 2, 5, "Preview", sentenceIndex = 1, sentenceCount = 4)
+        assertEquals(1, ttsSentenceIndex(paused))
+        assertEquals(4, ttsSentenceCount(paused))
+        val error = errorTts(TtsError.Synthesis, 4, 8, 3, 5, "Preview", sentenceIndex = 3, sentenceCount = 6)
+        assertEquals(3, ttsSentenceIndex(error))
+        assertEquals(6, ttsSentenceCount(error))
+        val idle = idleTts(8, 8, 4, 5, "Preview", sentenceIndex = 2, sentenceCount = 2)
+        assertEquals(2, ttsSentenceIndex(idle))
+        assertEquals(2, ttsSentenceCount(idle))
+    }
+
+    @Test
+    fun navigationIsEnabledOnlyWhileSpeakingOrPaused() {
+        assertEquals(true, ttsNavigationEnabled(speakingTts(0, 2)))
+        assertEquals(true, ttsNavigationEnabled(pausedTts(0, 2)))
+        assertEquals(false, ttsNavigationEnabled(errorTts(TtsError.Network, 0, 2)))
+        assertEquals(false, ttsNavigationEnabled(idleTts(0, 0)))
+    }
 }

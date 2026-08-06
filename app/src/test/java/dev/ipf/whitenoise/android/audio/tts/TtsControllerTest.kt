@@ -21,18 +21,18 @@ class TtsControllerTest {
         assertEquals(Locale.US, engine.locale)
         assertEquals(listOf("First sentence.", "Second sentence."), engine.spoken.map { it.text })
         assertEquals(
-            speakingTts(0, 2, 0, 1, "First sentence. Second sentence."),
+            speakingTts(0, 2, 0, 1, "First sentence. Second sentence.", sentenceIndex = 0, sentenceCount = 2),
             controller.state.value,
         )
 
         engine.complete(0)
         assertEquals(
-            speakingTts(1, 2, 0, 1, "First sentence. Second sentence."),
+            speakingTts(1, 2, 0, 1, "First sentence. Second sentence.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
         )
         engine.complete(1)
         assertEquals(
-            idleTts(2, 2, 1, 1, "First sentence. Second sentence."),
+            idleTts(2, 2, 1, 1, "First sentence. Second sentence.", sentenceIndex = 2, sentenceCount = 2),
             controller.state.value,
         )
         assertEquals(1, focus.releaseCalls)
@@ -72,7 +72,7 @@ class TtsControllerTest {
         focus.loseFocus()
 
         assertEquals(
-            pausedTts(1, 2, 0, 1, "First. Second."),
+            pausedTts(1, 2, 0, 1, "First. Second.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
         )
         assertEquals(1, focus.releaseCalls)
@@ -81,17 +81,76 @@ class TtsControllerTest {
 
         assertEquals(2, focus.acquireCalls)
         assertEquals(
-            speakingTts(1, 2, 0, 1, "First. Second."),
+            speakingTts(1, 2, 0, 1, "First. Second.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
         )
         assertEquals("Second.", engine.spoken.last().text)
     }
 
     @Test
-    fun skipNextWhilePausedReacquiresFocusAndStartsNextMessage() {
+    fun pausedNavigationRepositionsWithoutFocusOrSpeechUntilPlay() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()
         val controller = controller(focus)
+        controller.attachEngine(engine)
+        controller.speak(
+            listOf(
+                TtsSpeakableEntry("alice", "Alice", "First."),
+                TtsSpeakableEntry("bob", "Bob", "Second. Third."),
+            ),
+            Locale.US,
+        )
+        controller.pause()
+        val spokenBeforeNavigation = engine.spoken.size
+
+        controller.skipNextMessage()
+        controller.skipNextSentence()
+
+        assertEquals(1, focus.acquireCalls)
+        assertEquals(spokenBeforeNavigation, engine.spoken.size)
+        assertEquals(
+            pausedTts(2, 3, 1, 2, "Second. Third.", sentenceIndex = 1, sentenceCount = 2),
+            controller.state.value,
+        )
+
+        controller.resume()
+
+        assertEquals(2, focus.acquireCalls)
+        assertEquals(
+            speakingTts(2, 3, 1, 2, "Second. Third.", sentenceIndex = 1, sentenceCount = 2),
+            controller.state.value,
+        )
+        assertEquals("Bob: Third.", engine.spoken.last().text)
+    }
+
+    @Test
+    fun sentenceNavigationDelegatesWhileSpeaking() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        controller.speak("First. Second. Third.", Locale.US)
+
+        controller.skipNextSentence()
+
+        assertEquals(
+            speakingTts(1, 3, 0, 1, "First. Second. Third.", sentenceIndex = 1, sentenceCount = 3),
+            controller.state.value,
+        )
+        assertEquals(listOf("Second.", "Third."), engine.spoken.takeLast(2).map { it.text })
+
+        controller.skipPreviousSentence()
+
+        assertEquals(
+            speakingTts(0, 3, 0, 1, "First. Second. Third.", sentenceIndex = 0, sentenceCount = 3),
+            controller.state.value,
+        )
+        assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.takeLast(3).map { it.text })
+    }
+
+    @Test
+    fun messageNavigationDelegatesWhileSpeaking() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
         controller.attachEngine(engine)
         controller.speak(
             listOf(
@@ -100,13 +159,51 @@ class TtsControllerTest {
             ),
             Locale.US,
         )
-        controller.pause()
 
-        controller.skipNext()
+        controller.skipNextMessage()
 
-        assertEquals(2, focus.acquireCalls)
         assertEquals(speakingTts(1, 2, 1, 2, "Second."), controller.state.value)
         assertEquals("Bob: Second.", engine.spoken.last().text)
+
+        controller.skipPreviousMessage()
+
+        assertEquals(speakingTts(0, 2, 0, 2, "First."), controller.state.value)
+        assertEquals(
+            "Alice: First.",
+            engine.spoken
+                .takeLast(2)
+                .first()
+                .text,
+        )
+    }
+
+    @Test
+    fun navigationIsIgnoredWhileIdleAndErrored() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+
+        controller.skipNextSentence()
+        controller.skipPreviousSentence()
+        controller.skipNextMessage()
+        controller.skipPreviousMessage()
+
+        assertTrue(controller.state.value is TtsState.Idle)
+        assertTrue(engine.spoken.isEmpty())
+        assertEquals(0, focus.acquireCalls)
+
+        controller.speak("One.", Locale.US)
+        engine.fail(0, TextToSpeech.ERROR_NETWORK)
+        val errored = controller.state.value
+        val spokenAfterError = engine.spoken.size
+
+        controller.skipNextSentence()
+        controller.skipNextMessage()
+
+        assertEquals(errored, controller.state.value)
+        assertEquals(spokenAfterError, engine.spoken.size)
+        assertEquals(1, focus.acquireCalls)
     }
 
     @Test
@@ -120,7 +217,7 @@ class TtsControllerTest {
         engine.fail(0, TextToSpeech.ERROR_NETWORK)
 
         assertEquals(
-            errorTts(TtsError.Network, 0, 1, 0, 1, "One."),
+            errorTts(TtsError.Network, 0, 1, 0, 1, "One.", sentenceIndex = 0, sentenceCount = 1),
             controller.state.value,
         )
         assertEquals(1, focus.releaseCalls)
@@ -200,7 +297,7 @@ class TtsControllerTest {
         staleCompletion?.invoke(staleId)
 
         assertEquals(
-            speakingTts(0, 2, 0, 1, "New one. New two."),
+            speakingTts(0, 2, 0, 1, "New one. New two.", sentenceIndex = 0, sentenceCount = 2),
             controller.state.value,
         )
         assertEquals(listOf("New one.", "New two."), secondEngine.spoken.map { it.text })
@@ -232,7 +329,7 @@ class TtsControllerTest {
         assertEquals(1.5f, engine.appliedRates.last())
         assertEquals("Second sentence.", engine.spoken.last().text)
         assertEquals(
-            speakingTts(1, 2, 0, 1, "First sentence. Second sentence."),
+            speakingTts(1, 2, 0, 1, "First sentence. Second sentence.", sentenceIndex = 1, sentenceCount = 2),
             controller.state.value,
         )
     }
@@ -264,14 +361,14 @@ class TtsControllerTest {
         assertTrue(controller.appendSpeech(TtsSpeakableEntry("", "", "Third."), Locale.US))
 
         assertEquals(
-            speakingTts(0, 3, 0, 2, "First. Second."),
+            speakingTts(0, 3, 0, 2, "First. Second.", sentenceIndex = 0, sentenceCount = 2),
             controller.state.value,
         )
         assertEquals(listOf("First.", "Second.", "Third."), engine.spoken.map { it.text })
         engine.complete(0)
         engine.complete(1)
         engine.complete(2)
-        assertEquals(idleTts(3, 3, 2, 2, "Third."), controller.state.value)
+        assertEquals(idleTts(3, 3, 2, 2, "Third.", sentenceIndex = 1, sentenceCount = 1), controller.state.value)
     }
 
     @Test
@@ -333,7 +430,7 @@ class TtsControllerTest {
             Locale.US,
         )
         val beforeJumpCount = engine.spoken.size
-        controller.skipNext()
+        controller.skipNextMessage()
         val jumpPayloads = engine.spoken.drop(beforeJumpCount).map { it.text }
         assertTrue(
             "message jumps must keep every engine payload within the limit",
@@ -342,6 +439,107 @@ class TtsControllerTest {
         assertEquals(longBody, bodyTextFromEnginePayloads(jumpPayloads, displayName))
         assertTrue(jumpPayloads.first().startsWith(announcementPrefix))
     }
+
+    @Test
+    fun historyWindowExtensionIgnoresTheAutoReadCapAndEvictsAtItsOwnBound() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        val initial = (1..55).map { entryWithId("m%02d".format(it)) }
+        assertTrue(controller.speak(initial, Locale.US))
+        assertEquals(TTS_AUTO_READ_MAX_MESSAGES, controller.queuedMessageIds().size)
+
+        val newer = (51..65).map { entryWithId("m%02d".format(it)) }
+        val extended =
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Newer,
+                entries = newer,
+                targetMessageIdHex = "m51",
+                targetSentence = TtsWindowSentenceTarget.First,
+            )
+
+        assertTrue(extended)
+        // 50 + 15 exceeds the history bound, so the oldest head evicts — the
+        // deliberate session is capped by eviction, never by the auto-read cap.
+        assertEquals(TTS_HISTORY_WINDOW_MAX_MESSAGES, controller.queuedMessageIds().size)
+        assertEquals("m06", controller.queuedMessageIds().first())
+        assertEquals("m65", controller.queuedMessageIds().last())
+        val state = controller.state.value as TtsState.Speaking
+        assertEquals(45, state.messageIndex)
+        assertEquals("Text m51.", state.messagePreview)
+    }
+
+    @Test
+    fun historyWindowExtensionRefusesWhenNoSessionIsActive() {
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(FakeTtsSpeechEngine())
+
+        assertFalse(
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Older,
+                entries = listOf(entryWithId("m1")),
+                targetMessageIdHex = "m1",
+                targetSentence = TtsWindowSentenceTarget.First,
+            ),
+        )
+    }
+
+    @Test
+    fun historyWindowExtensionRefusesAnEmptyExtensionInsteadOfMovingTheCursor() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(engine)
+        assertTrue(controller.speak(listOf(entryWithId("m1"), entryWithId("m2")), Locale.US))
+        controller.skipNextMessage()
+        val stateBefore = controller.state.value
+        val spokenBefore = engine.spoken.size
+
+        // Nothing in the page projected to speech, so the extension is empty
+        // while its target is already queued.
+        assertFalse(
+            controller.extendReadAloudWindow(
+                direction = TtsHistoryDirection.Older,
+                entries =
+                    listOf(
+                        TtsSpeakableEntry(
+                            senderKey = "alice",
+                            senderDisplayName = "Alice",
+                            text = "   ",
+                            messageIdHex = "m1",
+                        ),
+                    ),
+                targetMessageIdHex = "m1",
+                targetSentence = TtsWindowSentenceTarget.First,
+            ),
+        )
+
+        assertEquals(listOf("m1", "m2"), controller.queuedMessageIds())
+        assertEquals(stateBefore, controller.state.value)
+        assertEquals(spokenBefore, engine.spoken.size)
+    }
+
+    @Test
+    fun deferredMessageNavigationReportsEdgesThroughTheController() {
+        val controller = controller(FakeTtsAudioFocus())
+        controller.attachEngine(FakeTtsSpeechEngine())
+        controller.speak(listOf(entryWithId("m1")), Locale.US)
+
+        assertEquals(TtsNavigationOutcome.AtOlderEdge, controller.skipPreviousMessage(deferAtEdge = true))
+        assertEquals(TtsNavigationOutcome.AtNewerEdge, controller.skipNextMessage(deferAtEdge = true))
+        assertTrue(controller.state.value is TtsState.Speaking)
+
+        controller.stop()
+
+        assertEquals(TtsNavigationOutcome.Inactive, controller.skipNextMessage(deferAtEdge = true))
+    }
+
+    private fun entryWithId(id: String): TtsSpeakableEntry =
+        TtsSpeakableEntry(
+            senderKey = "alice",
+            senderDisplayName = "Alice",
+            text = "Text $id.",
+            messageIdHex = id,
+        )
 
     @Test
     fun appendNeverResurrectsAnIdleSession() {
