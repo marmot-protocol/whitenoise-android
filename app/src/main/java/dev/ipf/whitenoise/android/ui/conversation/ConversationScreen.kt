@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -126,15 +125,12 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
-import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
@@ -181,13 +177,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
-import dev.ipf.whitenoise.android.ui.conversation.media.documentPickTreatAsImage
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
-import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
-import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
-import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
@@ -197,10 +189,6 @@ import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
-import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
-import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
-import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
-import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
@@ -251,20 +239,6 @@ private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
 private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
-
-// Per-file ceiling for a document attachment. Matches the retained-uploads
-// LRU cap so a single oversize pick can't OOM the picker pass before the
-// retained store gets a chance to evict. Anything larger is dropped with a
-// toast — the user can re-pick a smaller file or split the upload.
-private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
-
-// Total bytes cap across one album send. Bound to the retained-uploads LRU
-// cap (NOT independently doubled): exceeding that cap on insert would cause
-// `ByteSizeLruCache` to evict the just-inserted RetainedMediaUpload during
-// its own `put()` pass, breaking retry. Keep the picker ceiling honest with
-// the actual heap budget rather than letting the user pick more than the
-// controller can ever hold.
-private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -1128,6 +1102,13 @@ internal fun ConversationScreen(
     }
 
     val context = LocalContext.current
+    val mediaSender =
+        rememberConversationMediaSender(
+            appState = appState,
+            controller = controller,
+            context = context,
+            onRevealSent = { revealSentMessage() },
+        )
     val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
@@ -1317,29 +1298,6 @@ internal fun ConversationScreen(
         }
     }
 
-    fun sendSharedContact(contact: SharedContact) {
-        appState.launchMutation {
-            val vcardBytes =
-                withContext(Dispatchers.IO) {
-                    buildVCard(contact).toByteArray(Charsets.UTF_8)
-                }
-            // The vCard rides the existing media pipeline as a text/vcard
-            // attachment (portable — any client can save it), and the caption
-            // carries the human-readable name/phone so a peer with no contact
-            // renderer still reads it, and our own bubble draws a card from it.
-            val attachment =
-                PendingAttachment(
-                    plaintextBytes = vcardBytes,
-                    mediaType = VCARD_MIME_TYPE,
-                    fileName = contactVCardFileName(contact),
-                )
-            val caption = formatContactShareText(contact).ifBlank { null }
-            val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
-            revealSentMessage()
-            controller.uploadQueued(seeded)
-        }
-    }
-
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
     // into a per-session temp dir; the file is consumed by `sendVoiceMessage`
@@ -1355,83 +1313,6 @@ internal fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
-
-    fun sendVoiceAttachment(
-        file: java.io.File,
-        durationMs: Long,
-    ) {
-        appState.launchMutation {
-            val bytes =
-                withContext(Dispatchers.IO) {
-                    runCatching { file.readBytes() }.getOrNull()
-                }
-            withContext(Dispatchers.IO) { runCatching { file.delete() } }
-            if (bytes == null || bytes.isEmpty()) return@launchMutation
-            val attachment =
-                PendingAttachment(
-                    plaintextBytes = bytes,
-                    mediaType = dev.ipf.whitenoise.android.audio.VoiceRecorder.MIME_TYPE,
-                    fileName = "voice-${durationMs}ms.${dev.ipf.whitenoise.android.audio.VoiceRecorder.FILE_EXTENSION}",
-                )
-            val seeded = controller.queueAttachments(listOf(attachment), null) ?: return@launchMutation
-            revealSentMessage()
-            controller.uploadQueued(seeded)
-        }
-    }
-
-    fun readImageAttachment(
-        uri: android.net.Uri,
-        remainingBytes: Long,
-    ): ImageAttachmentReadOutcome {
-        val quality = appState.mediaQuality
-        // Animated images (GIF, animated WebP) can't survive the static JPEG
-        // recompress path — it flattens them to a single frame. Preserve them at
-        // any quality; the quality knob only governs static-image downscaling.
-        val animatedSource = MediaPipeline.isAnimatedImageSource(context.contentResolver, uri)
-        if (quality.preservesOriginalImageBytes || animatedSource) {
-            val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
-                is MediaPipeline.OriginalImageReadResult.Success ->
-                    return ImageAttachmentReadOutcome(
-                        PendingAttachment(
-                            plaintextBytes = original.image.bytes,
-                            mediaType = original.image.mediaType,
-                            fileName = original.image.fileName,
-                            dim = original.image.dim,
-                            thumbhash = original.image.thumbhash,
-                        ),
-                    )
-                MediaPipeline.OriginalImageReadResult.TooLarge -> return ImageAttachmentReadOutcome(null, overflowed = true)
-                MediaPipeline.OriginalImageReadResult.Failed,
-                MediaPipeline.OriginalImageReadResult.Unsupported,
-                // Never flatten an animation to JPEG — fail the attachment instead
-                // of silently dropping the animation. Static sources still fall
-                // back to the JPEG re-encode so unsupported containers strip metadata.
-                -> if (animatedSource) return ImageAttachmentReadOutcome(null) else Unit
-            }
-        }
-        val jpeg =
-            MediaPipeline.readDownscaledJpeg(
-                context.contentResolver,
-                uri,
-                maxEdgePx = quality.imageMaxEdgePx,
-                quality = quality.imageJpegQuality,
-            ) ?: return ImageAttachmentReadOutcome(null)
-        if (jpeg.bytes.size.toLong() > remainingBytes) {
-            return ImageAttachmentReadOutcome(null, overflowed = true)
-        }
-        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-        return ImageAttachmentReadOutcome(
-            PendingAttachment(
-                plaintextBytes = jpeg.bytes,
-                mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                fileName = fileName,
-                dim = "${jpeg.width}x${jpeg.height}",
-                thumbhash = jpeg.thumbhash,
-            ),
-        )
-    }
 
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
@@ -1454,7 +1335,7 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> sendVoiceAttachment(file, durationMs) },
+                onRecordingComplete = { file, durationMs -> mediaSender.sendVoiceAttachment(file, durationMs) },
                 onError = { throwable ->
                     if (throwable is IllegalStateException && throwable.message == "voice recording too short") {
                         appState.present(voiceTooShortMsg)
@@ -1529,399 +1410,6 @@ internal fun ConversationScreen(
             }
         onDispose {
             unregister()
-        }
-    }
-
-    // Decode/compress each URI off the main thread, then hand the album to
-    // the controller as a single `sendAttachments(list, caption)` call. One
-    // kind:9 carries N imeta tags; the caption is shared across the whole
-    // album. If any source fails to decode the rest still send (best
-    // effort), but if NONE decode we bail without surfacing an empty send.
-    fun sendPickedMedia(
-        uris: List<android.net.Uri>,
-        caption: String,
-    ) {
-        if (uris.isEmpty()) return
-        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
-        appState.launchMutation {
-            val result =
-                withContext(Dispatchers.Default) {
-                    val out = mutableListOf<PendingAttachment>()
-                    var consumed = 0L
-                    var overflowed = false
-                    for (uri in uris) {
-                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                        if (remaining <= 0L) {
-                            overflowed = true
-                            break
-                        }
-                        val mime = safeGetType(context.contentResolver, uri)
-                        val attachment =
-                            if (mime.startsWith("video/", ignoreCase = true)) {
-                                when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
-                                    is MediaPipeline.VideoReadResult.Success ->
-                                        PendingAttachment(
-                                            plaintextBytes = r.video.bytes,
-                                            mediaType = r.video.mediaType,
-                                            fileName = r.video.fileName,
-                                            dim = "${r.video.width}x${r.video.height}",
-                                            thumbhash = r.video.thumbhash,
-                                        )
-                                    MediaPipeline.VideoReadResult.TooLarge -> {
-                                        overflowed = true
-                                        continue
-                                    }
-                                    MediaPipeline.VideoReadResult.Failed -> continue
-                                }
-                            } else {
-                                val image = readImageAttachment(uri, remaining)
-                                if (image.overflowed) {
-                                    overflowed = true
-                                    continue
-                                }
-                                image.attachment ?: continue
-                            }
-                        consumed += attachment.plaintextBytes.size.toLong()
-                        out += attachment
-                    }
-                    out to overflowed
-                }
-            val attachments = result.first
-            val albumOverflowed = result.second
-            if (attachments.size < uris.size) {
-                val anyVideoPicked =
-                    uris.any {
-                        safeGetType(context.contentResolver, it)
-                            .startsWith("video/", ignoreCase = true)
-                    }
-                appState.present(
-                    when {
-                        albumOverflowed -> R.string.media_album_too_large
-                        anyVideoPicked -> R.string.toast_couldnt_process_video
-                        else -> R.string.toast_couldnt_decode_image
-                    },
-                    // Decode/process failures are diagnostic; the album size
-                    // cap is a fixed validation limit (#796).
-                    copyable = !albumOverflowed,
-                )
-                if (attachments.isEmpty()) return@launchMutation
-            }
-            controller.sendAttachments(attachments, trimmedCaption)
-        }
-    }
-
-    // Read picked document URIs into attachments. Non-image documents are kept
-    // as raw bytes; image/* picks from Files use the same media-quality and
-    // metadata-stripping path as visual image picks before joining the document
-    // send path. MIME comes from the content resolver; filename from
-    // `OpenableColumns.DISPLAY_NAME`.
-    //
-    // Two-layer size guard:
-    //   1. Per-attachment ceiling: skip any single pick that already declares
-    //      a `OpenableColumns.SIZE` greater than [MEDIA_ATTACHMENT_MAX_BYTES],
-    //      OR overruns the cap during a bounded streaming read (no fully-
-    //      buffered `readBytes()` so a 500 MB pick can't OOM the JVM heap
-    //      before the retained-uploads LRU has anything to evict).
-    //   2. Album-total ceiling: stop accumulating once the cumulative payload
-    //      crosses [MEDIA_ALBUM_MAX_TOTAL_BYTES]; remaining picks are dropped.
-    //
-    // Any reject surfaces a single user-visible toast; the rest of the album
-    // continues. If NOTHING survives the gates we bail without an empty send.
-    // Decoded outcome of the document read pass, surfaced so the unified
-    // sendStagedAttachments path can blend its results with the image decode.
-    data class DocumentReadOutcome(
-        val attachments: List<PendingAttachment>,
-        val rejected: Boolean,
-        val albumOverflowed: Boolean,
-        val totalBytes: Long,
-    )
-
-    suspend fun readPickedDocuments(
-        uris: List<android.net.Uri>,
-        bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
-    ): DocumentReadOutcome =
-        withContext(Dispatchers.IO) {
-            val accepted = mutableListOf<PendingAttachment>()
-            var albumBytes = 0L
-            var rejected = false
-            var albumOverflowed = false
-            for (uri in uris) {
-                val reportedMime = safeGetType(context.contentResolver, uri)
-                val resolvedMime =
-                    reportedMime.takeIf { it.isNotBlank() }
-                        ?: "application/octet-stream"
-                val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
-                if (remainingAlbumBudget <= 0L) {
-                    albumOverflowed = true
-                    break
-                }
-                val sniffedImageMime =
-                    if (reportedMime.isBlank() || reportedMime.equals("application/octet-stream", ignoreCase = true)) {
-                        MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
-                    } else {
-                        null
-                    }
-                if (documentPickTreatAsImage(reportedMime, sniffedImageMime)) {
-                    val image = readImageAttachment(uri, remainingAlbumBudget)
-                    if (image.overflowed) {
-                        albumOverflowed = true
-                        continue
-                    }
-                    val attachment = image.attachment
-                    if (attachment == null) {
-                        rejected = true
-                        continue
-                    }
-                    if (attachment.plaintextBytes.isEmpty()) continue
-                    val nextAlbumBytes = albumBytes + attachment.plaintextBytes.size.toLong()
-                    if (nextAlbumBytes > bytesBudget) {
-                        albumOverflowed = true
-                        continue
-                    }
-                    albumBytes = nextAlbumBytes
-                    accepted += attachment
-                    continue
-                }
-                val declaredSize = queryContentSize(context.contentResolver, uri)
-                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-                    rejected = true
-                    continue
-                }
-                val perFileCap =
-                    minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
-                        .coerceAtMost(Int.MAX_VALUE.toLong())
-                        .toInt()
-                val bytes =
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            MediaPipeline.readBoundedBytes(stream, perFileCap)
-                        }
-                    }.getOrNull()
-                if (bytes == null) {
-                    rejected = true
-                    continue
-                }
-                if (bytes.isEmpty()) continue
-                if (albumBytes + bytes.size > bytesBudget) {
-                    albumOverflowed = true
-                    continue
-                }
-                albumBytes += bytes.size
-                val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                accepted +=
-                    PendingAttachment(
-                        plaintextBytes = bytes,
-                        mediaType = resolvedMime,
-                        fileName = name,
-                        dim = null,
-                    )
-            }
-            DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
-        }
-
-    data class VisualReadOutcome(
-        val attachments: List<PendingAttachment>,
-        val albumOverflowed: Boolean,
-    )
-
-    suspend fun readPickedImages(uris: List<android.net.Uri>): VisualReadOutcome =
-        withContext(Dispatchers.Default) {
-            val out = mutableListOf<PendingAttachment>()
-            var consumed = 0L
-            var overflowed = false
-            for (uri in uris) {
-                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                if (remaining <= 0L) {
-                    overflowed = true
-                    break
-                }
-                val mime = safeGetType(context.contentResolver, uri)
-                val attachment =
-                    if (mime.startsWith("video/", ignoreCase = true)) {
-                        // Thread the remaining album budget into the video read so a
-                        // multi-video pick can't accumulate hundreds of MB in heap
-                        // before the cap downstream would reject the tail.
-                        when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
-                            is MediaPipeline.VideoReadResult.Success ->
-                                PendingAttachment(
-                                    plaintextBytes = r.video.bytes,
-                                    mediaType = r.video.mediaType,
-                                    fileName = r.video.fileName,
-                                    dim = "${r.video.width}x${r.video.height}",
-                                    thumbhash = r.video.thumbhash,
-                                )
-                            MediaPipeline.VideoReadResult.TooLarge -> {
-                                overflowed = true
-                                continue
-                            }
-                            MediaPipeline.VideoReadResult.Failed -> continue
-                        }
-                    } else {
-                        val image = readImageAttachment(uri, remaining)
-                        if (image.overflowed) {
-                            overflowed = true
-                            continue
-                        }
-                        image.attachment ?: continue
-                    }
-                consumed += attachment.plaintextBytes.size.toLong()
-                out += attachment
-            }
-            VisualReadOutcome(out, overflowed)
-        }
-
-    // Single-path send used by the unified staging shelf: decodes images
-    // (downscale + JPEG) and documents (raw bytes with cap) in parallel,
-    // concatenates the attachments, and ships them as one kind-9 album.
-    fun sendStagedAttachments(
-        imageUris: List<android.net.Uri>,
-        documentUris: List<android.net.Uri>,
-        caption: String,
-        onAccepted: () -> Unit = {},
-        onRejected: () -> Unit = {},
-        onAfterSend: () -> Unit = {},
-    ) {
-        if (imageUris.isEmpty() && documentUris.isEmpty()) {
-            onRejected()
-            return
-        }
-        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
-        appState.launchMutation {
-            // Enforce the album byte cap on images first so a multi-large-photo
-            // pick can't push the cumulative payload past
-            // MEDIA_ALBUM_MAX_TOTAL_BYTES and evict the retained-uploads LRU
-            // mid-flight (which would break retry). Drop the tail and surface
-            // a single oversize toast.
-            val rawImages = readPickedImages(imageUris)
-            var imageBytes = 0L
-            val acceptedImages = mutableListOf<PendingAttachment>()
-            var imageAlbumOverflowed = rawImages.albumOverflowed
-            for (attachment in rawImages.attachments) {
-                val next = imageBytes + attachment.plaintextBytes.size
-                if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
-                    imageAlbumOverflowed = true
-                    continue
-                }
-                imageBytes = next
-                acceptedImages += attachment
-            }
-            val docBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - imageBytes).coerceAtLeast(0L)
-            val docOutcome =
-                if (documentUris.isEmpty()) {
-                    DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
-                } else {
-                    readPickedDocuments(documentUris, docBudget)
-                }
-            val merged = acceptedImages + docOutcome.attachments
-            val pickHasVideo =
-                imageUris.any {
-                    safeGetType(context.contentResolver, it)
-                        .startsWith("video/", ignoreCase = true)
-                }
-            val visualFailureToast =
-                if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image
-            if (merged.isEmpty()) {
-                // Only surface the visual-decode toast when there were visual
-                // picks to begin with — a document-only send that failed every
-                // file should fall through to the document toasts below
-                // rather than misreporting as an image decode error. And if
-                // the album overflowed the byte budget, surface that
-                // explicitly instead of "couldn't process".
-                if (imageUris.isNotEmpty()) {
-                    val toast =
-                        if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
-                    appState.present(toast, copyable = !imageAlbumOverflowed)
-                    onRejected()
-                    return@launchMutation
-                }
-            }
-            if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
-                appState.present(visualFailureToast, copyable = true)
-            }
-            if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
-                appState.present(R.string.media_album_too_large)
-            } else if (docOutcome.rejected) {
-                appState.present(R.string.media_file_too_large)
-            }
-            if (merged.isEmpty()) {
-                onRejected()
-                return@launchMutation
-            }
-            // Two-phase ship: SEED every send synchronously (so all the
-            // optimistic bubbles appear in the same recomposition pass and
-            // the user sees the queue light up at once), THEN run the
-            // FFI upload+publish for each in pick order (so the post-
-            // confirm timeline keeps the order the user picked).
-            //
-            // Image attachments ride one kind-9 album (the masonry layout
-            // wants multiple tiles in one message). Non-image attachments
-            // ship as their own kind-9 each, because each carries distinct
-            // filename/MIME metadata that doesn't benefit from grid
-            // composition. Caption sticks with images when present;
-            // otherwise it attaches to the first file send.
-            // Backfill thumbhash for any image-typed doc-picker attachments that
-            // lack one. image/* document picks usually arrive here already
-            // processed by the image privacy pipeline; this keeps the renderer
-            // defensive for legacy/raw sources while staying off-main so the
-            // staging-shelf dismiss animation doesn't stutter on multi-image
-            // picks.
-            val readyDocAttachments =
-                if (docOutcome.attachments.isEmpty()) {
-                    emptyList()
-                } else {
-                    withContext(Dispatchers.Default) {
-                        docOutcome.attachments.map { attachment ->
-                            if (!attachment.mediaType.startsWith("image/", ignoreCase = true) ||
-                                attachment.thumbhash != null
-                            ) {
-                                attachment
-                            } else {
-                                val bitmap =
-                                    MediaPipeline.decodeSampledBitmap(
-                                        attachment.plaintextBytes,
-                                        MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                                    )
-                                val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
-                                bitmap?.recycle()
-                                attachment.copy(thumbhash = hash)
-                            }
-                        }
-                    }
-                }
-            // The image picker's multi-select UI groups its picks as one
-            // batch, so they ride one kind-9 album — preserves the masonry
-            // grouping the user opted into. Doc-picker items, by contrast,
-            // are picked one-by-one in order, so each ships as its own
-            // kind-9 in pick position regardless of MIME. Image MIMEs from
-            // the doc picker still render as image bubbles (single-image
-            // variant of the album shape) — same surface, different framing.
-            val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
-            if (acceptedImages.isNotEmpty()) {
-                controller.queueAttachments(acceptedImages, trimmedCaption)?.let(seeded::add)
-            }
-            val captionConsumedByAlbum = acceptedImages.isNotEmpty()
-            readyDocAttachments.forEachIndexed { index, attachment ->
-                val perItemCaption =
-                    if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
-                controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
-            }
-            if (seeded.isEmpty()) {
-                onRejected()
-                return@launchMutation
-            }
-            // Pull the user down to the just-seeded bubbles before the
-            // upload loop suspends — same UX as text-send. Firing after
-            // queueAttachments (the optimistic seed) and before
-            // uploadQueued (the FFI publish) means the scroll lands in the
-            // same frame the bubble appears, instead of waiting on the
-            // relay round-trip.
-            onAccepted()
-            onAfterSend()
-            // Run uploads sequentially so the kind-9 publishes go out in
-            // pick order. The optimistic bubbles are already on screen.
-            for (slot in seeded) {
-                controller.uploadQueued(slot)
-            }
         }
     }
 
@@ -3968,7 +3456,7 @@ internal fun ConversationScreen(
             onDismiss = { pendingContactShare = null },
             onSend = { selected ->
                 pendingContactShare = null
-                sendSharedContact(selected)
+                mediaSender.sendSharedContact(selected)
             },
         )
     }
@@ -4028,7 +3516,7 @@ internal fun ConversationScreen(
                 pendingDocumentUris = emptyList()
             },
             onSend = { caption, onResult ->
-                sendStagedAttachments(
+                mediaSender.sendStagedAttachments(
                     imageUris,
                     documentUris,
                     caption,

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -129,14 +130,5 @@ class MessageAttachmentSaveTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
         ).first(File::exists).readText()
 
-    private fun saveAttachmentsBody(): String {
-        val source = messageBubbleSource()
-        val startMarker = "fun saveAttachments()"
-        val endMarker = "// Split media"
-        val startIndex = source.indexOf(startMarker)
-        assertTrue("saveAttachments delimiter is missing", startIndex >= 0)
-        val endIndex = source.indexOf(endMarker, startIndex + startMarker.length)
-        assertTrue("saveAttachments end delimiter is missing", endIndex > startIndex)
-        return source.substring(startIndex, endIndex)
-    }
+    private fun saveAttachmentsBody(): String = messageBubbleSource().functionBody("saveAttachments")
 }

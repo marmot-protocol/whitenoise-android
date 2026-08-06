@@ -145,7 +145,6 @@ import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -941,6 +940,16 @@ internal fun MessageBubble(
                         sourceEpoch = record.sourceEpoch,
                         projectedMedia = item.projected?.media,
                     )
+                val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
+                val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
+                val imageAttachments = bubbleMedia.images
+                val audioAttachments = bubbleMedia.audio
+                val videoAttachments = bubbleMedia.videos
+                val fileAttachments = bubbleMedia.files
+                val visualAttachments = bubbleMedia.visuals
+                val pendingAudio = bubbleMedia.pendingAudio
+                val pendingVisualRefs = bubbleMedia.pendingVisuals
+                val anyConfirmedMedia = bubbleMedia.hasConfirmedMedia
 
                 fun saveAttachments() {
                     if (mediaReferences.isEmpty() || attachmentSaveInFlight) return
@@ -999,44 +1008,6 @@ internal fun MessageBubble(
                         }
                     }
                 }
-                // Split media into image refs (rendered as a bubble or
-                // 2-col grid) and file refs (a list of pills). Mixed
-                // albums render both: images on top, file pills below.
-                // `IndexedValue` preserves the real protocol-level
-                // attachmentIndex from the full `mediaReferences`
-                // list so per-tile cache lookups never collide across
-                // image and file subsets.
-                val imageAttachments =
-                    remember(mediaReferences) {
-                        mediaReferences
-                            .withIndex()
-                            .filter { (_, ref) -> MediaReferenceSupport.isImageMedia(ref) }
-                            .toList()
-                    }
-                val audioAttachments =
-                    remember(mediaReferences) {
-                        mediaReferences
-                            .withIndex()
-                            .filter { (_, ref) -> MediaReferenceSupport.isAudioMedia(ref) }
-                            .toList()
-                    }
-                val videoAttachments =
-                    remember(mediaReferences) {
-                        mediaReferences
-                            .withIndex()
-                            .filter { (_, ref) -> MediaReferenceSupport.isVideoMedia(ref) }
-                            .toList()
-                    }
-                val fileAttachments =
-                    remember(mediaReferences) {
-                        mediaReferences
-                            .withIndex()
-                            .filter { (_, ref) ->
-                                !MediaReferenceSupport.isImageMedia(ref) &&
-                                    !MediaReferenceSupport.isAudioMedia(ref) &&
-                                    !MediaReferenceSupport.isVideoMedia(ref)
-                            }.toList()
-                    }
                 val mediaPendingName =
                     remember(record.tags) {
                         record.tags
@@ -1049,14 +1020,6 @@ internal fun MessageBubble(
                         message = record,
                         body = editState?.latestText ?: record.plaintext,
                     )
-                // Visual attachments (image + video) ride one bubble:
-                // a singleton routes to its dedicated bubble, a multi
-                // goes to MediaVisualGridBubble which mixes image
-                // and video tiles in pick order.
-                val visualAttachments =
-                    remember(imageAttachments, videoAttachments) {
-                        (imageAttachments + videoAttachments).sortedBy { it.index }
-                    }
                 // An uncaptioned single image/video carries the footer
                 // overlaid on its bottom-right; a caption (if any) takes
                 // it instead via the text path below.
@@ -1065,11 +1028,6 @@ internal fun MessageBubble(
                         invalidationWarning == null &&
                         visualAttachments.size == 1 &&
                         mediaCaption == null
-                val anyConfirmedMedia =
-                    imageAttachments.isNotEmpty() ||
-                        audioAttachments.isNotEmpty() ||
-                        videoAttachments.isNotEmpty() ||
-                        fileAttachments.isNotEmpty()
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
                 // its card draws from the caption without fetching the blob; a
@@ -1110,60 +1068,6 @@ internal fun MessageBubble(
                             parseSharedUserFromText(shareBodyText)
                         } else {
                             null
-                        }
-                    }
-                val pendingAttachmentsForRecord =
-                    remember(record.messageIdHex, controller.pendingAttachmentsList(record.messageIdHex)) {
-                        controller.pendingAttachmentsList(record.messageIdHex)
-                    }
-                val pendingAudio =
-                    remember(pendingAttachmentsForRecord) {
-                        pendingAttachmentsForRecord
-                            .withIndex()
-                            .filter { (_, p) -> p.mediaType.startsWith("audio/", ignoreCase = true) }
-                            .toList()
-                    }
-                val pendingVideo =
-                    remember(pendingAttachmentsForRecord) {
-                        pendingAttachmentsForRecord
-                            .withIndex()
-                            .filter { (_, p) -> p.mediaType.startsWith("video/", ignoreCase = true) }
-                            .toList()
-                    }
-                val pendingImage =
-                    remember(pendingAttachmentsForRecord) {
-                        pendingAttachmentsForRecord
-                            .withIndex()
-                            .filter { (_, p) -> p.mediaType.startsWith("image/", ignoreCase = true) }
-                            .toList()
-                    }
-                val pendingVisuals =
-                    remember(pendingImage, pendingVideo) {
-                        (pendingImage + pendingVideo).sortedBy { it.index }
-                    }
-                // Synthesize references for each pending visual so
-                // the existing single-bubble + grid bubble can render
-                // them. mine=true threads the bytes through the
-                // pendingAttachmentsList fallback in the auto-download
-                // path.
-                val pendingVisualRefs =
-                    remember(record.messageIdHex, pendingVisuals) {
-                        pendingVisuals.map { (index, pending) ->
-                            IndexedValue(
-                                index,
-                                MediaAttachmentReferenceFfi(
-                                    locators = emptyList(),
-                                    ciphertextSha256 = "",
-                                    plaintextSha256 = "",
-                                    nonceHex = "",
-                                    fileName = pending.fileName,
-                                    mediaType = pending.mediaType,
-                                    version = EncryptedMediaVersionFfi.V1,
-                                    sourceEpoch = 0uL,
-                                    dim = pending.dim,
-                                    thumbhash = pending.thumbhash,
-                                ),
-                            )
                         }
                     }
                 val footerOnPendingVisual =
