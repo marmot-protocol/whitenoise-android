@@ -38,19 +38,25 @@ class ComposerBarScreenshotTest {
 
     @Test
     fun composerBarIdleLight() {
-        render(darkTheme = false, draft = "")
+        render(darkTheme = false, amoled = false, draft = "")
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_idle_light.png")
     }
 
     @Test
     fun composerBarIdleDark() {
-        render(darkTheme = true, draft = "")
+        render(darkTheme = true, amoled = false, draft = "")
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_idle_dark.png")
     }
 
     @Test
+    fun composerBarIdleAmoled() {
+        render(darkTheme = true, amoled = true, draft = "")
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_idle_amoled.png")
+    }
+
+    @Test
     fun composerBarDraftLight() {
-        render(darkTheme = false, draft = "Draft message text")
+        render(darkTheme = false, amoled = false, draft = "Draft message text")
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_bar_draft_light.png")
     }
 
@@ -80,10 +86,11 @@ class ComposerBarScreenshotTest {
 
     private fun render(
         darkTheme: Boolean,
+        amoled: Boolean = false,
         draft: String,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
                     ComposerBar(
                         replyingTo = null,
