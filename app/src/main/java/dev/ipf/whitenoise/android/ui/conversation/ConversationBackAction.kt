@@ -39,10 +39,3 @@ internal fun composerPreImeBackAction(
         isKeyDown -> ComposerPreImeBackAction.DISMISS
         else -> ComposerPreImeBackAction.CONSUME
     }
-
-internal fun shouldClearComposerFocusAfterImeDismissal(
-    wasImeTargetOpen: Boolean,
-    imeTargetIsOpen: Boolean,
-    composerFocused: Boolean,
-    lifecycleResumed: Boolean,
-): Boolean = wasImeTargetOpen && !imeTargetIsOpen && composerFocused && lifecycleResumed
