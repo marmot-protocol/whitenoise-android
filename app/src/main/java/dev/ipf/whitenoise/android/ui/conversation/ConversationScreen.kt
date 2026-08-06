@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -1091,15 +1089,9 @@ internal fun ConversationScreen(
     // triggers a recomposition. getBottom() reads the inset's snapshot state
     // inside the derived block. See #374.
     val imeInsets = WindowInsets.ime
-
-    @OptIn(ExperimentalLayoutApi::class)
-    val imeTargetInsets = WindowInsets.imeAnimationTarget
     val density = LocalDensity.current
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
-    }
-    val imeTargetIsOpen by remember(imeTargetInsets, density) {
-        derivedStateOf { imeTargetInsets.getBottom(density) > 0 }
     }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
@@ -1120,23 +1112,6 @@ internal fun ConversationScreen(
     // composer's own focus requester.
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val resumeLifecycleOwner = LocalContext.current.lifecycleOwner()
-    var previousImeTargetOpen by remember(chat.id) { mutableStateOf(imeTargetIsOpen) }
-    LaunchedEffect(imeTargetIsOpen, composerFocused, resumeLifecycleOwner) {
-        val wasImeTargetOpen = previousImeTargetOpen
-        previousImeTargetOpen = imeTargetIsOpen
-        if (
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = wasImeTargetOpen,
-                imeTargetIsOpen = imeTargetIsOpen,
-                composerFocused = composerFocused,
-                lifecycleResumed = resumeLifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED,
-            )
-        ) {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-        }
-    }
     val scope = rememberCoroutineScope()
 
     fun revealSentMessage(targetIndex: Int? = null) {
@@ -2474,6 +2449,7 @@ internal fun ConversationScreen(
     // Keyed on controller so chat and same-group account/runtime switches both
     // rebind the observer; resolved through the existing Context.lifecycleOwner()
     // idiom (no new Local import).
+    val resumeLifecycleOwner = context.lifecycleOwner()
     val currentScrollAnchorProvider by rememberUpdatedState(newValue = { currentScrollAnchor() })
     val currentScrollAnchorResolver by
         rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })

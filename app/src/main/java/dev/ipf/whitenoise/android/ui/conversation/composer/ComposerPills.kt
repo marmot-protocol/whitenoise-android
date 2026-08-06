@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -36,8 +38,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -56,6 +60,7 @@ import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.SpanStyle
@@ -112,9 +117,41 @@ internal fun ComposerPill(
     onComposerFocusChanged: (Boolean) -> Unit = {},
     preImeBackEnabled: Boolean = false,
     onPreImeBack: () -> Unit = {},
+    overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
 ) {
     val context = LocalContext.current
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
+    val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
+    var composerFocused by remember { mutableStateOf(false) }
+    val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
+    // Gesture/predictive Back reaches the IME before the activity's ordinary
+    // BackHandler. While this field owns focus, register ahead of the IME so an
+    // explicit Back clears focus; IME-only geometry changes (including a
+    // keyboard-to-voice handoff) never invoke this callback.
+    DisposableEffect(preImeBackEnabled, composerFocused, backDispatcher, overlayBackRegistrar) {
+        val unregister =
+            if (preImeBackEnabled && composerFocused) {
+                val callback = OnBackInvokedCallback { latestOnPreImeBack() }
+                when {
+                    overlayBackRegistrar != null ->
+                        overlayBackRegistrar.register(OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+                    backDispatcher != null -> {
+                        backDispatcher.registerOnBackInvokedCallback(
+                            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                            callback,
+                        )
+                        val unregisterCallback: () -> Unit = {
+                            backDispatcher.unregisterOnBackInvokedCallback(callback)
+                        }
+                        unregisterCallback
+                    }
+                    else -> null
+                }
+            } else {
+                null
+            }
+        onDispose { unregister?.invoke() }
+    }
     val pasteImageReceiver =
         remember(context) {
             object : ReceiveContentListener {
@@ -261,7 +298,10 @@ internal fun ComposerPill(
                             // #589: track focus so the conversation screen's
                             // resume observer knows whether the keyboard was up
                             // when the app was backgrounded (Case B gate).
-                            .onFocusChanged { onComposerFocusChanged(it.isFocused) }
+                            .onFocusChanged {
+                                composerFocused = it.isFocused
+                                onComposerFocusChanged(it.isFocused)
+                            }
                             // #404: honor the Enter-key toggle for hardware
                             // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
                             // always inserts a line break as an escape hatch; in

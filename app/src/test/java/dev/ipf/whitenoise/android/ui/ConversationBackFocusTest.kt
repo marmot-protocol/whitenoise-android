@@ -4,10 +4,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.ConversationBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.conversationBackAction
-import dev.ipf.whitenoise.android.ui.conversation.shouldClearComposerFocusAfterImeDismissal
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationBackFocusTest {
@@ -109,42 +106,6 @@ class ConversationBackFocusTest {
                 ),
             )
         }
-    }
-
-    @Test
-    fun imeTargetClosingClearsFocusedComposerWhileConversationIsResumed() {
-        assertTrue(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = true,
-                imeTargetIsOpen = false,
-                composerFocused = true,
-                lifecycleResumed = true,
-            ),
-        )
-    }
-
-    @Test
-    fun imeTargetOpeningDoesNotClearNewComposerFocus() {
-        assertFalse(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = false,
-                imeTargetIsOpen = true,
-                composerFocused = true,
-                lifecycleResumed = true,
-            ),
-        )
-    }
-
-    @Test
-    fun backgroundImeDismissalPreservesFocusForResumeRestoration() {
-        assertFalse(
-            shouldClearComposerFocusAfterImeDismissal(
-                wasImeTargetOpen = true,
-                imeTargetIsOpen = false,
-                composerFocused = true,
-                lifecycleResumed = false,
-            ),
-        )
     }
 }
 
