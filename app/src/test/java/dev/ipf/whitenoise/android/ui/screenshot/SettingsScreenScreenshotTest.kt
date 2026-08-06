@@ -42,13 +42,13 @@ class SettingsScreenScreenshotTest {
                             ),
                         appUpdateInfo =
                             AppUpdateInfo(
-                                installedVersion = "2026.7.6",
+                                installedVersion = "2026.8.6",
                                 latestVersion = null,
                                 checkedAtMillis = null,
                                 dismissedVersion = null,
                                 releasesBehind = null,
                             ),
-                        versionName = "2026.7.6",
+                        versionName = "2026.8.6",
                         mdkShortSha = "abc1234",
                         staging = false,
                         onBackToChats = {},
