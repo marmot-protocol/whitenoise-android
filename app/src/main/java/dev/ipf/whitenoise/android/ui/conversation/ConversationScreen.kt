@@ -23,41 +23,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,14 +63,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -99,8 +81,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -116,7 +96,6 @@ import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
-import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
@@ -144,14 +123,11 @@ import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
-import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
-import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -161,11 +137,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -183,7 +155,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
@@ -193,11 +164,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
-import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
-import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -2434,492 +2402,187 @@ internal fun ConversationScreen(
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            Column {
-                if (selectionMode) {
-                    MessageSelectionBar(
-                        count = batchSelectionUi.actionItems.size,
-                        canCopy = batchSelectionUi.copyText.isNotBlank(),
-                        canForward = batchSelectionUi.forwardBodies.isNotEmpty(),
-                        onClose = { selectedMessages.clear() },
-                        onCopy = {
-                            if (batchSelectionUi.copyText.isNotBlank()) {
-                                clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
-                                selectedMessages.clear()
-                            }
-                        },
-                        onForward = {
-                            if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
-                        },
-                        onDelete = { showBatchDeleteConfirm = true },
-                    )
-                } else if (searchOpen) {
-                    ConversationSearchTopBar(
-                        query = searchQuery,
-                        onQueryChange = {
-                            searchJob?.cancel()
-                            searchJob = null
-                            highlightedMessageId = null
-                            searchQuery = it
-                            // Re-anchor the cursor to the new query's match set on
-                            // the next derivation; clearing the pin makes it land
-                            // on the first match again.
-                            searchPinnedMatchId = null
-                        },
-                        onClear = {
-                            searchJob?.cancel()
-                            searchJob = null
-                            highlightedMessageId = null
-                            searchQuery = ""
-                            searchPinnedMatchId = null
-                        },
-                        onClose = { closeSearch() },
-                        onSearchAction = { navigateToSearchMatch(forward = true) },
-                        focusRequester = searchFocusRequester,
-                    )
-                } else {
-                    TopAppBar(
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier =
-                                    Modifier
-                                        // Fill the title slot so the whole strip between
-                                        // the back arrow and the overflow menu opens
-                                        // details, not just the avatar/name. Those two
-                                        // live in their own slots and keep their taps.
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { showDetails = true }
-                                        .semantics { contentDescription = openDetailsDescription },
-                            ) {
-                                GroupAvatar(
-                                    appState = appState,
-                                    group = controller.group,
-                                    title = controller.title(groupTitleCopy),
-                                    // For a 1:1 DM the seed must match the peer-derived
-                                    // avatar so the initials fallback stays stable, just
-                                    // like the chat-list row (#837).
-                                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                                    size = 36.dp,
-                                    fallbackPictureUrl = controller.avatarAccount?.let(appState::avatarUrl),
-                                )
-                                Column {
-                                    Text(
-                                        controller.title(groupTitleCopy),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+            ConversationTopBar(
+                selectionMode = selectionMode,
+                selectedCount = batchSelectionUi.actionItems.size,
+                canCopySelection = batchSelectionUi.copyText.isNotBlank(),
+                canForwardSelection = batchSelectionUi.forwardBodies.isNotEmpty(),
+                onCloseSelection = { selectedMessages.clear() },
+                onCopySelection = {
+                    if (batchSelectionUi.copyText.isNotBlank()) {
+                        clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                        selectedMessages.clear()
+                    }
+                },
+                onForwardSelection = {
+                    if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                },
+                onDeleteSelection = { showBatchDeleteConfirm = true },
+                searchOpen = searchOpen,
+                searchQuery = searchQuery,
+                onSearchQueryChange = {
+                    searchJob?.cancel()
+                    searchJob = null
+                    highlightedMessageId = null
+                    searchQuery = it
+                    searchPinnedMatchId = null
+                },
+                onClearSearch = {
+                    searchJob?.cancel()
+                    searchJob = null
+                    highlightedMessageId = null
+                    searchQuery = ""
+                    searchPinnedMatchId = null
+                },
+                onCloseSearch = ::closeSearch,
+                onSearchAction = { navigateToSearchMatch(forward = true) },
+                searchFocusRequester = searchFocusRequester,
+                appState = appState,
+                controller = controller,
+                groupTitleCopy = groupTitleCopy,
+                openedAsDmHint = openedAsDmHint,
+                openDetailsDescription = openDetailsDescription,
+                onOpenDetails = { showDetails = true },
+                onBack = onBack,
+                menuOpen = menuOpen,
+                onMenuOpenChange = { menuOpen = it },
+                onOpenSearch = {
+                    menuOpen = false
+                    val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                    val anchorMessage =
+                        bookmark.anchor.messageId?.let { messageId ->
+                            renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
+                        }
+                    preSearchScrollAnchor =
+                        ConversationSearchScrollAnchor(
+                            bookmark = bookmark,
+                            match =
+                                anchorMessage?.let {
+                                    ConversationSearchMatch(
+                                        messageIdHex = it.record.messageIdHex,
+                                        timelineAt = it.projected?.timelineAt ?: it.record.recordedAt,
                                     )
-                                    // Subtitle line: members count (groups) and the
-                                    // disappearing-timer indicator inline on ONE row,
-                                    // not stacked. The one-time tooltip anchors to the
-                                    // whole line when the timer is on.
-                                    val membersSubtitle =
-                                        if (
-                                            shouldShowConversationMembersSubtitle(
-                                                membersLoaded = controller.membersLoaded,
-                                                openedAsDmHint = openedAsDmHint,
-                                                groupName = controller.group.name,
-                                                memberCount = controller.memberCount,
-                                            )
-                                        ) {
-                                            controller.subtitle(
-                                                justYou = stringResource(R.string.just_you),
-                                                oneMember = stringResource(R.string.one_member),
-                                                membersFormat = stringResource(R.string.members_count),
-                                            )
-                                        } else {
-                                            null
-                                        }
-                                    val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
-                                    val showTimer = disappearingSecs > 0L
-                                    if (membersSubtitle != null || showTimer) {
-                                        val labelStyle = MaterialTheme.typography.labelSmall
-                                        val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                        val subtitleRow: @Composable () -> Unit = {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            ) {
-                                                if (membersSubtitle != null) {
-                                                    Text(membersSubtitle, style = labelStyle, color = labelColor)
-                                                }
-                                                if (showTimer) {
-                                                    if (membersSubtitle != null) {
-                                                        Text("·", style = labelStyle, color = labelColor)
-                                                    }
-                                                    Icon(
-                                                        Icons.Default.Schedule,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(13.dp),
-                                                        tint = labelColor,
-                                                    )
-                                                    Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
-                                                }
-                                            }
-                                        }
-                                        if (showTimer) {
-                                            val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                            val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                            // Snapshot the one-time decision so marking the flag
-                                            // (which we do first, to persist before a quick exit
-                                            // can re-arm it) doesn't recompose this branch away and
-                                            // cancel the still-suspended show().
-                                            val showTooltipOnce =
-                                                remember(controller.group.groupIdHex) {
-                                                    !appState.disappearingTooltipShown
-                                                }
-                                            if (showTooltipOnce) {
-                                                LaunchedEffect(controller.group.groupIdHex) {
-                                                    appState.markDisappearingTooltipShown()
-                                                    timerTooltipState.show()
-                                                }
-                                            }
-                                            TooltipBox(
-                                                positionProvider =
-                                                    TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                                tooltip = { RichTooltip { Text(timerTooltipText) } },
-                                                state = timerTooltipState,
-                                                content = subtitleRow,
-                                            )
-                                        } else {
-                                            subtitleRow()
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
-                            }
-                            KeyboardPreservingDropdownMenu(
-                                expanded = menuOpen,
-                                onDismissRequest = { menuOpen = false },
-                                shape = RoundedCornerShape(20.dp),
-                                // Inset the panel from the right screen edge instead
-                                // of letting it sit flush against it.
-                                offset = DpOffset(x = (-8).dp, y = 0.dp),
-                                modifier = Modifier.widthIn(min = 232.dp),
-                            ) {
-                                // Iconless, roomier rows: each entry reads as a
-                                // full-width tappable line of body-large text rather
-                                // than a compact icon+label cell.
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.conversation_search_open),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    contentPadding = conversationMenuItemPadding,
-                                    onClick = {
-                                        menuOpen = false
-                                        // Snapshot the current scroll position before the
-                                        // search auto-scroll effect can move the list, so
-                                        // closing search can restore it (#292).
-                                        val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
-                                        val anchorMessage =
-                                            bookmark.anchor.messageId?.let { messageId ->
-                                                renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
-                                            }
-                                        preSearchScrollAnchor =
-                                            ConversationSearchScrollAnchor(
-                                                bookmark = bookmark,
-                                                match =
-                                                    anchorMessage?.let {
-                                                        ConversationSearchMatch(
-                                                            messageIdHex = it.record.messageIdHex,
-                                                            timelineAt =
-                                                                it.projected?.timelineAt
-                                                                    ?: it.record.recordedAt,
-                                                        )
-                                                    },
-                                            )
-                                        searchOpen = true
-                                    },
-                                )
-                                if (!controller.group.pendingConfirmation) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
-                                        contentPadding = conversationMenuItemPadding,
-                                        enabled = !controller.mutationInFlight,
-                                        onClick = {
-                                            menuOpen = false
-                                            appState.launchMutation {
-                                                controller.setArchived(!controller.group.archived)
-                                            }
-                                        },
-                                    )
-                                    if (controller.isSelfMember) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.leave),
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                )
-                                            },
-                                            contentPadding = conversationMenuItemPadding,
-                                            // Gate on membersLoaded: the sole-admin routing
-                                            // below reads the roster, and an empty (unloaded)
-                                            // roster would misroute to a plain leave.
-                                            enabled = !controller.mutationInFlight && controller.membersLoaded,
-                                            onClick = {
-                                                menuOpen = false
-                                                // A sole admin with other members can't
-                                                // leave until they transfer admin; route
-                                                // them to the transfer flow instead of
-                                                // the old leaveGroup() toast dead end.
-                                                appState.launchMutation {
-                                                    when (val leaveAction = controller.leaveAction()) {
-                                                        LeaveAction.SoleAdminMustTransfer ->
-                                                            showTransferAdminFirst = true
-                                                        LeaveAction.SoleMemberDeletesGroup,
-                                                        LeaveAction.Standard,
-                                                        -> pendingTopBarLeaveAction = leaveAction
-                                                    }
-                                                }
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                    )
-                }
-                // Read-aloud transport renders beneath whichever bar is
-                // active and survives selection, search, and navigation.
-                TtsTransportBar(appState)
-            }
+                                },
+                        )
+                    searchOpen = true
+                },
+                onToggleArchived = {
+                    menuOpen = false
+                    appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                },
+                onRequestLeave = {
+                    menuOpen = false
+                    appState.launchMutation {
+                        when (val leaveAction = controller.leaveAction()) {
+                            LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
+                            LeaveAction.SoleMemberDeletesGroup,
+                            LeaveAction.Standard,
+                            -> pendingTopBarLeaveAction = leaveAction
+                        }
+                    }
+                },
+            )
         },
         bottomBar = {
-            // Measure the real bottom chrome (composer with reply/edit banners and
-            // grown multi-line input, search nav bar, invite bar, or notice) and lift
-            // the global toast host by that amount, instead of assuming the resting
-            // single-line composer height (#122, #796). Nav/IME insets are subtracted
-            // because WhiteNoiseSnackbarHost pads for those itself.
-            val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { size ->
-                        if (bottomChromeHeightObserver.onMeasured(size.height)) {
-                            reanchorNewestAfterBottomInputChange(frameCount = 1)
-                        }
-                        val chromeBottom = chromeInsets.getBottom(density)
-                        snackbarBottomInset.value =
-                            with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
-                    },
-            ) {
-                when {
-                    // Selection owns the screen chrome; hide search navigation,
-                    // invite controls, and the composer until it exits.
-                    selectionMode -> Unit
-                    // While search is open the composer steps aside for the match
-                    // navigation bar pinned above the keyboard.
-                    searchOpen ->
-                        ConversationSearchNavBar(
-                            matchCount = effectiveSearchMatchIds.size,
-                            activeIndex = searchActiveIndex,
-                            hasQuery = searchQuery.isNotBlank(),
-                            onPrev = { navigateToSearchMatch(forward = false) },
-                            onNext = { navigateToSearchMatch(forward = true) },
+            ConversationBottomBar(
+                selectionMode = selectionMode,
+                searchOpen = searchOpen,
+                searchMatchCount = effectiveSearchMatchIds.size,
+                searchActiveIndex = searchActiveIndex,
+                hasSearchQuery = searchQuery.isNotBlank(),
+                onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
+                onNextSearchMatch = { navigateToSearchMatch(forward = true) },
+                hasError = controller.error != null,
+                composerGate = composerGate,
+                controller = controller,
+                appState = appState,
+                messageTextCopy = messageTextCopy,
+                onBack = onBack,
+                initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+                onDraftChange = { appState.setDraft(controller.group.groupIdHex, it) },
+                composerTextState = composerTextState,
+                composerAttachmentSheet = composerAttachmentSheet,
+                onAfterSend = { revealSentMessage() },
+                onPickFromGallery = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                onPickRecentMedia = { uri ->
+                    pendingMediaUris = (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                },
+                onCaptureFromCamera = {
+                    val granted =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        launchCameraCapture()
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                onPickDocument = { documentPickerLauncher.launch(arrayOf("*/*")) },
+                onShareLocation = {
+                    if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    ) {
+                        locationPickerOpen = true
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
                         )
-                    controller.error != null -> Unit
-                    // Membership-display gate (issues #545 and #623). During the
-                    // brief window before refreshMembers() confirms the roster we
-                    // must not flash a state we don't actually know: a left group
-                    // flashing the active composer (#545) OR a member's group —
-                    // especially an admin re-entering their own group — flashing the
-                    // "no longer a member" notice (#623, the inverse). The gate
-                    // paints the composer only for a (believed) member, the notice
-                    // only for a known not-member, and NOTHING while membership is
-                    // genuinely unknown (cold open with no seeding snapshot), where
-                    // it upgrades on the confirmed result. The controller's
-                    // Text handoff may proceed for a positively seeded current
-                    // member; destructive/admin mutations still require verified
-                    // membership through `canSendMessages`.
-                    else ->
-                        when (composerGate) {
-                            // Reserve the composer's resting height while membership
-                            // is still unknown (e.g. right after an account switch),
-                            // so the bottom inset is stable and the composer doesn't
-                            // pop in over the last message once it resolves. Matches
-                            // ComposerBar's resting height (the 44.dp pill plus its
-                            // Column's 10.dp vertical padding top and bottom). Kept
-                            // transparent so no surface colour flashes before the
-                            // composer or notice resolves.
-                            ComposerGate.PENDING ->
-                                Spacer(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .navigationBarsPadding()
-                                        .imePadding()
-                                        .height(64.dp),
-                                )
-                            ComposerGate.NOTICE -> RemovedMemberComposerNotice()
-                            ComposerGate.FROZEN -> FrozenGroupComposerNotice()
-                            ComposerGate.DISBANDED ->
-                                DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
-                            ComposerGate.INVITE ->
-                                InvitePreviewActionBar(
-                                    mutationInFlight = controller.mutationInFlight,
-                                    onJoin = { appState.launchMutation { controller.acceptInvite() } },
-                                    onDecline = {
-                                        appState.launchMutation {
-                                            if (controller.declineInvite()) onBack()
-                                        }
-                                    },
-                                )
-                            ComposerGate.COMPOSER -> {
-                                val groupIdHex = controller.group.groupIdHex
-                                val editingRecord =
-                                    controller.editingMessageId?.let { id ->
-                                        controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                                    }
-                                ComposerBar(
-                                    replyingTo = controller.replyingTo,
-                                    replyingToMedia =
-                                        controller.replyingTo
-                                            ?.let(controller::mediaReferencesFor)
-                                            .orEmpty(),
-                                    replyingToDisplay =
-                                        controller.replyingTo
-                                            ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                                    messageTextCopy = messageTextCopy,
-                                    onCancelReply = { controller.replyingTo = null },
-                                    onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                    initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                                    onDraftChange = { appState.setDraft(groupIdHex, it) },
-                                    draftKey = groupIdHex,
-                                    textState = composerTextState,
-                                    attachmentSheetState = composerAttachmentSheet,
-                                    editingMessageId = controller.editingMessageId,
-                                    editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                    onCancelEdit = { controller.editingMessageId = null },
-                                    onAfterSend = {
-                                        // Always pull the user down to see their just-sent
-                                        // bubble, even if they were reading older history.
-                                        // Matches standard chat-app behavior.
-                                        revealSentMessage()
-                                    },
-                                    onPickFromGallery = {
-                                        imagePickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                                        )
-                                    },
-                                    onPickRecentMedia = { uri ->
-                                        // A tap on the recent-media strip stages that item
-                                        // into the same shelf as the picker, so the preview
-                                        // sheet opens with it queued (multi-select + send
-                                        // live in the preview).
-                                        pendingMediaUris =
-                                            (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
-                                    },
-                                    onCaptureFromCamera = {
-                                        val granted =
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.CAMERA,
-                                            ) == PackageManager.PERMISSION_GRANTED
-                                        if (granted) {
-                                            launchCameraCapture()
-                                        } else {
-                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        }
-                                    },
-                                    onPickDocument = {
-                                        // `*/*` lets the system file picker surface every
-                                        // installed provider (Drive, Downloads, Files…)
-                                        // without restricting by MIME. Bytes upload as-is.
-                                        documentPickerLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    onShareLocation = {
-                                        // Permission is requested here, on the tap, never
-                                        // earlier. Fine and coarse together so the user's
-                                        // approximate-only choice still works.
-                                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
-                                        ) {
-                                            locationPickerOpen = true
-                                        } else {
-                                            locationPermissionLauncher.launch(
-                                                arrayOf(
-                                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                                ),
-                                            )
-                                        }
-                                    },
-                                    onShareUser = { shareUserPickerOpen = true },
-                                    onShareContact = { contactPickerLauncher.launch(Unit) },
-                                    onPasteImageUris = { uris ->
-                                        // Receive-content URI grants are scoped to the
-                                        // paste callback. Copy the bytes into app-owned
-                                        // cache before returning, then stage those local
-                                        // FileProvider URIs through the same shelf as the
-                                        // photo picker/camera path.
-                                        val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
-                                        val pasteCandidates = uris.distinct().take(openSlots)
-                                        val localUris =
-                                            pasteCandidates.mapNotNull { uri ->
-                                                materializeReceiveContentImageUri(context, uri)
-                                            }
-                                        if (localUris.size < pasteCandidates.size) {
-                                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-                                        }
-                                        if (localUris.isEmpty()) return@ComposerBar
-                                        pendingMediaUris =
-                                            (pendingMediaUris + localUris)
-                                                .distinct()
-                                                .take(MEDIA_PICKER_MAX_ITEMS)
-                                    },
-                                    voiceRecordingController = voiceRecordingController,
-                                    appState = appState,
-                                    mentionCandidates = mentionPicker.candidates,
-                                    mentionPickerEnabled = mentionPicker.enabled,
-                                    autoFocusOnEnter = justCreated,
-                                    autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
-                                    autoFocusConsumedState = composerAutoFocusConsumed,
-                                    enterKeyBehavior = appState.enterKeyBehavior,
-                                    // #589: hoisted focus plumbing — the requester lets the
-                                    // resume observer restore focus, and the callback keeps
-                                    // `composerFocused` tracking the live keyboard state.
-                                    composerFocus = composerFocus,
-                                    onComposerFocusChanged = { focused ->
-                                        if (focused && !composerFocused && !imeIsOpen) {
-                                            imeTransitionBookmark =
-                                                scrollCoordinator.bookmark(currentScrollAnchor())
-                                        } else if (!focused && !imeIsOpen) {
-                                            imeTransitionBookmark = null
-                                        }
-                                        composerFocused = focused
-                                    },
-                                    onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
-                                    onKeyboardRestoreFromCustomInput = {
-                                        suppressNextImeOpenReanchor.set(true)
-                                    },
-                                    onKeyboardRestoreFromCustomInputFailed = {
-                                        suppressNextImeOpenReanchor.set(false)
-                                    },
-                                    recentEmojis = recentEmojiRecentsOwner.recents,
-                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                )
-                            }
+                    }
+                },
+                onShareUser = { shareUserPickerOpen = true },
+                onShareContact = { contactPickerLauncher.launch(Unit) },
+                onPasteImageUris = { uris ->
+                    val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
+                    val pasteCandidates = uris.distinct().take(openSlots)
+                    val localUris =
+                        pasteCandidates.mapNotNull { uri ->
+                            materializeReceiveContentImageUri(context, uri)
                         }
-                }
-            }
+                    if (localUris.size < pasteCandidates.size) {
+                        appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                    }
+                    if (localUris.isNotEmpty()) {
+                        pendingMediaUris =
+                            (pendingMediaUris + localUris)
+                                .distinct()
+                                .take(MEDIA_PICKER_MAX_ITEMS)
+                    }
+                },
+                voiceRecordingController = voiceRecordingController,
+                mentionCandidates = mentionPicker.candidates,
+                mentionPickerEnabled = mentionPicker.enabled,
+                autoFocusOnEnter = justCreated,
+                autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
+                autoFocusConsumedState = composerAutoFocusConsumed,
+                composerFocus = composerFocus,
+                onComposerFocusChanged = { focused ->
+                    if (focused && !composerFocused && !imeIsOpen) {
+                        imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                    } else if (!focused && !imeIsOpen) {
+                        imeTransitionBookmark = null
+                    }
+                    composerFocused = focused
+                },
+                onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
+                onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
+                onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
+                recentEmojis = recentEmojiRecentsOwner.recents,
+                onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                onBottomChromeMeasured = { heightPx, chromeBottomPx ->
+                    if (bottomChromeHeightObserver.onMeasured(heightPx)) {
+                        reanchorNewestAfterBottomInputChange(frameCount = 1)
+                    }
+                    snackbarBottomInset.value =
+                        with(density) { (heightPx - chromeBottomPx).coerceAtLeast(0).toDp() }
+                },
+            )
         },
     ) { padding ->
         Box(
@@ -3011,245 +2674,81 @@ internal fun ConversationScreen(
                                     }
                                 },
                             ) { index, item ->
-                                Column(Modifier.fillMaxWidth()) {
-                                    // Rendered inside the slot, not as its own item, so
-                                    // the anchor index math stays intact.
-                                    val older = renderedTimeline.getOrNull(index - 1)
-                                    val daySeparatorLabel =
-                                        remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
-                                            if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
-                                                messageDayLabel(item.record.recordedAt, transcriptLocale)
-                                            } else {
-                                                null
-                                            }
+                                val messageId = item.record.messageIdHex
+                                TimelineRow(
+                                    item = item,
+                                    older = renderedTimeline.getOrNull(index - 1),
+                                    newer = renderedTimeline.getOrNull(index + 1),
+                                    transcriptLocale = transcriptLocale,
+                                    entryUnreadCount = entryUnreadCount,
+                                    unreadIncomingCount = unreadIncomingCount,
+                                    entryUnreadDividerRetired = entryUnreadDividerRetired,
+                                    entryFirstUnreadMessageId = entryFirstUnreadMessageId,
+                                    onMeasured = { id, height ->
+                                        if (timelineItemHeightsPx[id] != height) timelineItemHeightsPx[id] = height
+                                    },
+                                    appState = appState,
+                                    controller = controller,
+                                    composerTextState = composerTextState,
+                                    highlighted = messageId == highlightedMessageId,
+                                    selectionMode = selectionMode,
+                                    textSelectionMode = textSelectionMessageId == messageId,
+                                    onTextSelectionModeChange = { enabled ->
+                                        if (enabled) {
+                                            openActionMenuId = null
+                                            textSelectionMessageId = messageId
+                                            textSelectionBubbleBounds = null
+                                        } else if (textSelectionMessageId == messageId) {
+                                            clearTextSelection()
                                         }
-                                    if (daySeparatorLabel != null) {
-                                        DaySeparator(daySeparatorLabel)
-                                    }
-                                    if (
-                                        shouldShowConversationEntryUnreadDivider(
-                                            entryUnreadCount = entryUnreadCount,
-                                            liveUnreadCount = unreadIncomingCount,
-                                            dividerRetired = entryUnreadDividerRetired,
-                                            messageId = item.record.messageIdHex,
-                                            firstUnreadMessageId = entryFirstUnreadMessageId,
-                                        )
-                                    ) {
-                                        UnreadMessagesDivider(count = entryUnreadCount)
-                                    }
-                                    // Measured below the day/unread separators, so centered
-                                    // scroll targets get the bubble's own height, not a
-                                    // separator-inflated one.
-                                    Column(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .onSizeChanged { size ->
-                                                if (size.height > 0 && timelineItemHeightsPx[item.record.messageIdHex] != size.height) {
-                                                    timelineItemHeightsPx[item.record.messageIdHex] = size.height
-                                                }
-                                            },
-                                    ) {
-                                        // Synthetic `dbg:stream:` rows must never fall
-                                        // through to normal message rendering — not even in
-                                        // the window between the toggle flipping off and the
-                                        // republish that drops them. Draw the debug row only
-                                        // when enabled; otherwise suppress the row entirely.
-                                        if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                                            if (appState.streamingDebugEnabled) {
-                                                StreamDebugEventRow(record = item.record)
-                                            }
-                                            return@Column
+                                    },
+                                    onTextSelectionBoundsChange = { bounds ->
+                                        if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
+                                    },
+                                    batchSelectable = messageId in selectableMessages,
+                                    selected = selectedMessages.containsKey(messageId),
+                                    onToggleSelection = {
+                                        if (selectedMessages.containsKey(messageId)) {
+                                            selectedMessages.remove(messageId)
+                                        } else {
+                                            selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
                                         }
-                                        // One decision point for which row a record renders
-                                        // as. Group-system (kind 1210) rows are derived state
-                                        // facts, not chat: they render the centered one-line
-                                        // summary, never a raw-JSON bubble — and that summary
-                                        // stays the default even in developer mode, with the
-                                        // MLS dump reachable per-row behind a tap (#857). The
-                                        // debug-row path covers the other non-user-visible
-                                        // signaling kinds only when streaming debug is on, so
-                                        // the timeline is byte-identical to today when off.
-                                        when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
-                                            TimelineRowKind.GroupSystem -> {
-                                                GroupSystemRow(
-                                                    record = item.record,
-                                                    appState = appState,
-                                                    groupSystem = item.projected?.groupSystem,
-                                                    onDeleteForMe =
-                                                        if (controller.group.pendingConfirmation) {
-                                                            null
-                                                        } else {
-                                                            { controller.hideMessageForMe(item.record.messageIdHex) }
-                                                        },
-                                                )
-                                                return@Column
-                                            }
-                                            TimelineRowKind.AgentOperation -> {
-                                                // Standard bubbles own deletion and
-                                                // convergence tombstones. Use the
-                                                // dedicated chip only for live rows.
-                                                val projectedDeleted = item.projected?.deleted == true
-                                                val optimisticallyDeleted =
-                                                    MessageProjector.isDeleted(
-                                                        item.record.messageIdHex,
-                                                        controller.deletedMessageIds,
-                                                    )
-                                                val invalidated = item.projected?.invalidationStatus != null
-                                                if (
-                                                    shouldRenderDedicatedAgentOperationRow(
-                                                        projectedDeleted = projectedDeleted,
-                                                        optimisticallyDeleted = optimisticallyDeleted,
-                                                        invalidated = invalidated,
-                                                    )
-                                                ) {
-                                                    val operation =
-                                                        remember(item.record) {
-                                                            AgentOperationProjector.project(item.record)
-                                                        }
-                                                    if (operation != null) {
-                                                        AgentOperationTimelineRow(
-                                                            item = item,
-                                                            operation = operation,
-                                                            controller = controller,
-                                                            appState = appState,
-                                                            readOnly = controller.group.pendingConfirmation,
-                                                        )
-                                                        return@Column
-                                                    }
-                                                }
-                                            }
-                                            TimelineRowKind.DebugRow -> {
-                                                MessageDebugRow(
-                                                    style = MessageDebugClassifier.debugStyle(item.record),
-                                                    record = item.record,
-                                                )
-                                                return@Column
-                                            }
-                                            TimelineRowKind.Bubble -> Unit
+                                    },
+                                    rangeDragActive = dragAnchorTimelineId == item.id,
+                                    onDragSelectionStart = { pointerWindowY ->
+                                        openActionMenuId = null
+                                        clearTextSelection()
+                                        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                        dragAnchorTimelineId = item.id
+                                        dragPointerWindowY = pointerWindowY
+                                    },
+                                    onDragSelection = { pointerWindowY ->
+                                        dragPointerWindowY = pointerWindowY
+                                        updateMessageDragSelection(pointerWindowY)
+                                    },
+                                    onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
+                                    onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
+                                    quickReactionEmojis = quickReactionEmojis,
+                                    recentEmojis = recentEmojiRecentsOwner.recents,
+                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                                    isActionMenuOpen = openActionMenuId == messageId,
+                                    onActionMenuOpenChange = { open ->
+                                        if (open) clearTextSelection()
+                                        if (open) {
+                                            openActionMenuId = messageId
+                                        } else if (openActionMenuId == messageId) {
+                                            openActionMenuId = null
                                         }
-                                        val newer = renderedTimeline.getOrNull(index + 1)
-                                        val sameSenderAsOlderBubble =
-                                            older?.let { candidate ->
-                                                conversationBubbleRowsShareSenderRun(
-                                                    first = candidate,
-                                                    second = item,
-                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
-                                                    deletedMessageIds = controller.deletedMessageIds,
-                                                )
-                                            } == true
-                                        val sameSenderAsNewerBubble =
-                                            newer?.let { candidate ->
-                                                conversationBubbleRowsShareSenderRun(
-                                                    first = item,
-                                                    second = candidate,
-                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
-                                                    deletedMessageIds = controller.deletedMessageIds,
-                                                )
-                                            } == true
-                                        val senderDecoration =
-                                            GroupProjector.transcriptSenderDecoration(
-                                                isDm = controller.isDm,
-                                                mine = controller.isMessageMine(item.record),
-                                                sameSenderAsOlderBubble = sameSenderAsOlderBubble,
-                                                sameSenderAsNewerBubble = sameSenderAsNewerBubble,
-                                            )
-                                        val messageId = item.record.messageIdHex
-                                        val ownsActionMenu = openActionMenuId == messageId
-                                        DismissMessageActionMenuOnDispose(
-                                            messageId = messageId,
-                                            isOpen = ownsActionMenu,
-                                        ) {
-                                            if (openActionMenuId == messageId) {
-                                                openActionMenuId = null
-                                            }
-                                        }
-                                        MessageBubble(
-                                            item = item,
-                                            controller = controller,
-                                            appState = appState,
-                                            composerTextState = composerTextState,
-                                            highlighted = item.record.messageIdHex == highlightedMessageId,
-                                            selectionMode = selectionMode,
-                                            textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
-                                            onTextSelectionModeChange = { enabled ->
-                                                val messageId = item.record.messageIdHex
-                                                if (enabled) {
-                                                    openActionMenuId = null
-                                                    textSelectionMessageId = messageId
-                                                    textSelectionBubbleBounds = null
-                                                } else if (textSelectionMessageId == messageId) {
-                                                    clearTextSelection()
-                                                }
-                                            },
-                                            onTextSelectionBoundsChange = { bounds ->
-                                                if (textSelectionMessageId == item.record.messageIdHex) {
-                                                    textSelectionBubbleBounds = bounds
-                                                }
-                                            },
-                                            batchSelectable = item.record.messageIdHex in selectableMessages,
-                                            selected = selectedMessages.containsKey(item.record.messageIdHex),
-                                            onToggleSelection = {
-                                                val messageId = item.record.messageIdHex
-                                                if (selectedMessages.containsKey(messageId)) {
-                                                    selectedMessages.remove(messageId)
-                                                } else {
-                                                    selectableMessages[messageId]?.let {
-                                                        selectedMessages[messageId] = it
-                                                    }
-                                                }
-                                            },
-                                            rangeDragActive = dragAnchorTimelineId == item.id,
-                                            onDragSelectionStart = { pointerWindowY ->
-                                                openActionMenuId = null
-                                                clearTextSelection()
-                                                scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                                dragAnchorTimelineId = item.id
-                                                dragPointerWindowY = pointerWindowY
-                                            },
-                                            onDragSelection = { pointerWindowY ->
-                                                dragPointerWindowY = pointerWindowY
-                                                updateMessageDragSelection(pointerWindowY)
-                                            },
-                                            onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
-                                            onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
-                                            quickReactionEmojis = quickReactionEmojis,
-                                            recentEmojis = recentEmojiRecentsOwner.recents,
-                                            onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                            isActionMenuOpen = ownsActionMenu,
-                                            onActionMenuOpenChange = { open ->
-                                                if (open) clearTextSelection()
-                                                if (open) {
-                                                    openActionMenuId = messageId
-                                                } else if (openActionMenuId == messageId) {
-                                                    openActionMenuId = null
-                                                }
-                                            },
-                                            // Lambdas, not method references: the Compose
-                                            // compiler memoizes lambdas but allocates a fresh
-                                            // function reference per recomposition, which made
-                                            // every visible bubble recompose on any timeline
-                                            // change. See #110.
-                                            onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                            onQuickReactionsReset = { resetQuickReactionEmojis() },
-                                            onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                            composerGate = composerGate,
-                                            groupDisbanded = controller.group.disbanded,
-                                            inviteMutationInFlight = controller.mutationInFlight,
-                                            onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
-                                            onDeclineInvite = {
-                                                appState.launchMutation {
-                                                    if (controller.declineInvite()) onBack()
-                                                }
-                                            },
-                                            mentionCandidates = mentionPicker.candidates,
-                                            mentionPickerEnabled = mentionPicker.enabled,
-                                            showSenderName = senderDecoration.showName,
-                                            showSenderAvatar = senderDecoration.showAvatar,
-                                            collapseLongMessages = collapseLongMessages,
-                                            readOnly = controller.group.pendingConfirmation,
-                                        )
-                                    }
-                                }
+                                    },
+                                    onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                    onQuickReactionsReset = { resetQuickReactionEmojis() },
+                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                    composerGate = composerGate,
+                                    onBack = onBack,
+                                    mentionCandidates = mentionPicker.candidates,
+                                    mentionPickerEnabled = mentionPicker.enabled,
+                                    collapseLongMessages = collapseLongMessages,
+                                )
                             }
                             // Kept minimal (matches the top-spacer) so the last
                             // bubble sits a tight breathing-room above the

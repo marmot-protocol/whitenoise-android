@@ -16,14 +16,16 @@ class MessageMultiSelectCoverageTest {
 
     @Test
     fun conversationOwnsSelectionActionsAndHidesBottomChrome() {
-        val source = source("ConversationScreen.kt")
+        val screenSource = source("ConversationScreen.kt")
+        val topBarSource = source("ConversationTopBar.kt")
+        val bottomBarSource = source("ConversationBottomBar.kt")
 
-        assertTrue(source.contains("selectedMessages"))
-        assertTrue(source.contains("MessageSelectionBar("))
-        assertTrue(source.contains("batchCopyText(actionItems)"))
-        assertTrue(source.contains("batchForwardBodies(actionItems)"))
-        assertTrue(source.contains("selectionMode ->"))
-        assertTrue(source.contains("if (initialTimelineAnchored && !selectionMode)"))
+        assertTrue(screenSource.contains("selectedMessages"))
+        assertTrue(topBarSource.contains("MessageSelectionBar("))
+        assertTrue(screenSource.contains("batchCopyText(actionItems)"))
+        assertTrue(screenSource.contains("batchForwardBodies(actionItems)"))
+        assertTrue(bottomBarSource.contains("selectionMode ->"))
+        assertTrue(screenSource.contains("if (initialTimelineAnchored && !selectionMode)"))
     }
 
     @Test

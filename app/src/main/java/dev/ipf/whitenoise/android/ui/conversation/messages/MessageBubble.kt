@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,11 +28,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,20 +57,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
@@ -96,17 +85,14 @@ import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
-import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
-import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
-import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -116,12 +102,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
-import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVideoAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
@@ -132,11 +112,7 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionSummaryChip
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
-import dev.ipf.whitenoise.android.ui.conversation.share.ContactMessageBubble
-import dev.ipf.whitenoise.android.ui.conversation.share.LocationMessageBubble
-import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
-import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
@@ -145,10 +121,8 @@ import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 @Composable
@@ -943,7 +917,6 @@ internal fun MessageBubble(
                 val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
                 val bubbleMedia = rememberBubbleMedia(mediaReferences, pendingAttachmentsForRecord)
                 val imageAttachments = bubbleMedia.images
-                val audioAttachments = bubbleMedia.audio
                 val videoAttachments = bubbleMedia.videos
                 val fileAttachments = bubbleMedia.files
                 val visualAttachments = bubbleMedia.visuals
@@ -1116,215 +1089,6 @@ internal fun MessageBubble(
                             }
                         }
                     }
-                val mediaBlocks: @Composable ColumnScope.(attachedToCaption: Boolean) -> Unit = { attachedToCaption ->
-                    if (sharedLocation != null) {
-                        val shareContext = LocalContext.current
-                        LocationMessageBubble(
-                            location = sharedLocation,
-                            onOpen = {
-                                runCatching {
-                                    shareContext.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(
-                                                "https://maps.google.com/maps?q=" +
-                                                    "${formatCoordinate(sharedLocation.latitude)}," +
-                                                    formatCoordinate(sharedLocation.longitude),
-                                            ),
-                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                    if (sharedContact != null) {
-                        ContactMessageBubble(contact = sharedContact)
-                    }
-                    if (sharedUser != null) {
-                        UserMessageBubble(
-                            user = sharedUser,
-                            onOpen = { appState.presentProfile(sharedUser.npub) },
-                        )
-                    }
-                    if (!deleted && visualAttachments.isNotEmpty()) {
-                        if (visualAttachments.size == 1) {
-                            val entry = visualAttachments.first()
-                            Box {
-                                if (MediaReferenceSupport.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = mine,
-                                        controller = controller,
-                                        appState = appState,
-                                        onLongPress = onMediaLongPress,
-                                        attachedToCaption = attachedToCaption,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = mine,
-                                        onLongPress = onMediaLongPress,
-                                        attachedToCaption = attachedToCaption,
-                                    )
-                                }
-                                if (footerOnVisualMedia) {
-                                    MediaFooterOverlay(
-                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                        showStatus = mine,
-                                        status = item.status,
-                                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
-                                    )
-                                }
-                            }
-                        } else {
-                            MediaVisualGridBubble(
-                                item = item,
-                                attachments = visualAttachments,
-                                controller = controller,
-                                appState = appState,
-                                mine = mine,
-                                onLongPress = onMediaLongPress,
-                                attachedToCaption = attachedToCaption,
-                            )
-                        }
-                    }
-                    if (!deleted && audioAttachments.isNotEmpty()) {
-                        audioAttachments.forEach { entry ->
-                            MediaVoiceBubble(
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = entry.index,
-                                reference = entry.value,
-                                mine = mine,
-                                controller = controller,
-                                appState = appState,
-                                onLongPress = onMediaLongPress,
-                                attachedToCaption = attachedToCaption,
-                            )
-                        }
-                    }
-                    if (!deleted && fileAttachments.isNotEmpty()) {
-                        fileAttachments.forEach { entry ->
-                            // A vCard renders the contact card above; keep its file
-                            // pill too so the .vcf stays downloadable/openable until
-                            // the card gains its own save action (both app-generated
-                            // and inbound shares must remain reachable as files).
-                            MediaFileBubble(
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = entry.index,
-                                reference = entry.value,
-                                mine = mine,
-                                controller = controller,
-                                appState = appState,
-                                onLongPress = onMediaLongPress,
-                                attachedToCaption = attachedToCaption,
-                            )
-                        }
-                    }
-                    if (!deleted && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
-                        pendingAudio.forEach { (index, pending) ->
-                            MediaVoiceBubble(
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = index,
-                                reference =
-                                    remember(record.messageIdHex, index, pending) {
-                                        MediaAttachmentReferenceFfi(
-                                            locators = emptyList(),
-                                            ciphertextSha256 = "",
-                                            plaintextSha256 = "",
-                                            nonceHex = "",
-                                            fileName = pending.fileName,
-                                            mediaType = pending.mediaType,
-                                            version = EncryptedMediaVersionFfi.V1,
-                                            sourceEpoch = 0uL,
-                                            dim = null,
-                                            thumbhash = null,
-                                        )
-                                    },
-                                mine = true,
-                                controller = controller,
-                                appState = appState,
-                                onLongPress = onMediaLongPress,
-                                attachedToCaption = attachedToCaption,
-                            )
-                        }
-                    }
-                    if (!deleted && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
-                        val uploadFailed = item.status == MessageStatus.Failed
-                        val retryUpload: () -> Unit = {
-                            appState.launchMutation { controller.retryFailedSend(item) }
-                        }
-                        if (pendingVisualRefs.size == 1) {
-                            val entry = pendingVisualRefs.first()
-                            Box {
-                                if (MediaReferenceSupport.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = true,
-                                        controller = controller,
-                                        appState = appState,
-                                        onLongPress = onMediaLongPress,
-                                        uploading = !uploadFailed,
-                                        uploadFailed = uploadFailed,
-                                        onRetryUpload = if (uploadFailed) retryUpload else null,
-                                        attachedToCaption = attachedToCaption,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = true,
-                                        onLongPress = onMediaLongPress,
-                                        uploading = !uploadFailed,
-                                        attachedToCaption = attachedToCaption,
-                                    )
-                                }
-                                if (footerOnPendingVisual) {
-                                    MediaFooterOverlay(
-                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                        showStatus = true,
-                                        status = item.status,
-                                        showRetention = retentionIndicatorVisible(record.retentionSeconds),
-                                    )
-                                }
-                            }
-                        } else {
-                            MediaVisualGridBubble(
-                                item = item,
-                                attachments = pendingVisualRefs,
-                                controller = controller,
-                                appState = appState,
-                                mine = true,
-                                onLongPress = onMediaLongPress,
-                                uploading = !uploadFailed,
-                                attachedToCaption = attachedToCaption,
-                            )
-                        }
-                    }
-                    if (showPendingPlaceholder) {
-                        MediaPendingPlaceholder(
-                            pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
-                            failed = item.status == MessageStatus.Failed,
-                            attachedToCaption = attachedToCaption,
-                            onRetry =
-                                if (mine && item.status == MessageStatus.Failed) {
-                                    { appState.launchMutation { controller.retryFailedSend(item) } }
-                                } else {
-                                    null
-                                },
-                        )
-                    }
-                }
                 // Body text policy:
                 // - Pending and confirmed media render the user-authored
                 //   caption throughout the upload/reconciliation lifecycle.
@@ -1369,224 +1133,12 @@ internal fun MessageBubble(
                     } else {
                         null
                     }
-                val inlineFooter: @Composable () -> Unit = {
-                    MessageInlineFooter(
-                        timeText = rememberedMessageBubbleTime(record.recordedAt),
-                        color = timestampColor,
-                        showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
-                        status = item.status,
-                        showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
-                        editedLabel = editedLabel,
-                        onEditedClick =
-                            if (editState != null && !textSelectionMode) {
-                                { editHistoryOpen = true }
-                            } else {
-                                null
-                            },
-                    )
-                }
-                // Last-line geometry of the body so the footer can sit on
-                // that line when it fits, not merely when the widest line does.
-                var lastLineLayout by remember(record.messageIdHex, bodyTextToRender) {
-                    mutableStateOf<TextLayoutResult?>(null)
-                }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
                 val collapsible =
                     collapseLongMessages && !deleted && !persistedFailure && !textSelectionMode
-                val readMoreLabel = stringResource(R.string.message_read_more)
-                val readMoreStyle =
-                    SpanStyle(color = bubbleContentColor, fontWeight = FontWeight.Bold)
-                // The body/caption text + inline footer, plus the failed-send
-                // retry row. Hoisted into a lambda so it can render either inside
-                // the text-only bubble or inside the caption region of the shared
-                // media card. Without body text it falls through to the existing
-                // footer-only / retry handling.
-                val bodyFooterAndRetry: @Composable ColumnScope.() -> Unit = {
-                    if (bodyTextToRender != null) {
-                        // Markdown only when the tokens describe exactly
-                        // the text we're about to show: tombstone copy,
-                        // imeta-filename fallbacks, etc. all diverge from
-                        // record.plaintext and must stay plain. An empty
-                        // document (legacy record, parse failure) falls
-                        // through to the unchanged plain-text path.
-                        val markdownDocument = record.contentTokens
-                        val renderMarkdownBody =
-                            !deleted &&
-                                !persistedFailure &&
-                                markdownDocument.blocks.isNotEmpty() &&
-                                bodyTextToRender == record.plaintext
-                        // Markdown can't be cleanly truncated mid-document.
-                        // Probe one pixel past the collapsed height inside the
-                        // footer layout so overflow and the final visible row
-                        // height are both decided in the same measure pass.
-                        val lineHeightPx =
-                            with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
-                        val maxBodyHeightDp =
-                            with(density) { (lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT).toDp() }
-                        val messageBody: @Composable () -> Unit = {
-                            if (renderMarkdownBody) {
-                                Box {
-                                    // Mention names resolve through the profile
-                                    // cache; npub/nprofile taps stay in-app via
-                                    // the profile sheet (never an external nostr:
-                                    // intent). The "@" mention treatment is
-                                    // reserved for an account in the roster
-                                    // snapshot captured for this bubble (#1017),
-                                    // so later roster updates do not rewrite old
-                                    // rendered message semantics. If the roster
-                                    // has not loaded yet, leave membership unknown
-                                    // and keep pre-#1017 rendering until it does.
-                                    val mentionMemberSnapshot =
-                                        remember(record.messageIdHex, controller.membersLoaded) {
-                                            if (controller.membersLoaded) controller.members else null
-                                        }
-                                    val mentionMembershipResolver =
-                                        remember(appState, mentionMemberSnapshot) {
-                                            mentionMemberSnapshot?.let { members ->
-                                                { bech32: String -> appState.isRosterMember(bech32, members) }
-                                            }
-                                        }
-                                    MarkdownMessageBody(
-                                        markdownDocument,
-                                        mentionDisplayName =
-                                            remember(appState) {
-                                                { bech32: String -> appState.mentionDisplayName(bech32) }
-                                            },
-                                        isGroupMember = mentionMembershipResolver,
-                                        useDecorativeBackgrounds = !customBubbleColorActive,
-                                        onNostrProfileTap =
-                                            remember(appState) {
-                                                { bech32: String -> appState.presentNostrProfile(bech32) }
-                                            },
-                                        onLastTextLayout = { lastLineLayout = it },
-                                        onSelectableTextLayoutChanged =
-                                            if (textSelectionMode) selectableTextLayoutReporter else null,
-                                        onLinkTextLayoutChanged = markdownLinkLayoutReporter,
-                                        onCopyLink = ::copyMarkdownLink,
-                                    )
-                                }
-                            } else {
-                                Text(
-                                    bodyTextToRender,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = plainTextSelectionModifier,
-                                    maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
-                                    onTextLayout = {
-                                        lastLineLayout = it
-                                        plainTextLayoutTracker.layoutResult = it
-                                        reportPlainTextLayoutIfReady()
-                                    },
-                                )
-                            }
-                        }
-                        val selectableMessageBody: @Composable () -> Unit = {
-                            if (textSelectionMode) {
-                                CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                                    SelectionContainer(state = messageTextSelectionState) {
-                                        messageBody()
-                                    }
-                                }
-                            } else {
-                                messageBody()
-                            }
-                        }
-                        val readMoreFooter: @Composable () -> Unit = {
-                            Text(
-                                readMoreLabel,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = readMoreStyle.color,
-                                fontWeight = readMoreStyle.fontWeight,
-                                modifier =
-                                    Modifier.clickable(
-                                        onClickLabel = readMoreLabel,
-                                        role = Role.Button,
-                                    ) { expandedFullView = true },
-                            )
-                        }
-                        // Body text is always start-aligned inside the bubble,
-                        // regardless of which side the bubble sits on or how wide
-                        // a sibling (reply quote, media) makes the content column.
-                        // End-aligning own messages left a short reply drifting to
-                        // the right of a wide bubble (#439). The footer still places
-                        // itself at the block's trailing edge internally.
-                        val bodyModifier =
-                            messageBubbleBodyModifier(
-                                hasReplyPreview = replyPreview != null,
-                                hasMedia = hasMedia,
-                            )
-                        if (collapsible) {
-                            BubbleCollapsibleFooterLayout(
-                                maxBodyHeight = maxBodyHeightDp,
-                                readMore = readMoreFooter,
-                                footer = inlineFooter,
-                                modifier = bodyModifier,
-                                lastLineWidth =
-                                    lastLineLayout?.let { layout ->
-                                        if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
-                                    },
-                            ) {
-                                selectableMessageBody()
-                            }
-                        } else {
-                            BubbleFooterLayout(
-                                footer = inlineFooter,
-                                modifier = bodyModifier,
-                                lastLineWidth =
-                                    lastLineLayout?.let { layout ->
-                                        if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
-                                    },
-                            ) {
-                                selectableMessageBody()
-                            }
-                        }
-                    } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
-                        Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
-                            inlineFooter()
-                        }
-                    }
-                    invalidationWarning?.let { warning ->
-                        MessageBubbleInvalidationWarning(
-                            warning = warning,
-                            color = timestampColor,
-                            modifier = Modifier.align(Alignment.Start).padding(top = 2.dp),
-                        )
-                    }
-                    if (mine && item.status == MessageStatus.Failed) {
-                        Row(
-                            modifier = Modifier.align(Alignment.End),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(
-                                enabled = !textSelectionMode,
-                                onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
-                                modifier = Modifier.size(24.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.retry),
-                                    tint = timestampColor,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                            IconButton(
-                                enabled = !textSelectionMode,
-                                onClick = { controller.discardFailedSend(item) },
-                                modifier = Modifier.size(24.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.discard_failed_message),
-                                    tint = timestampColor,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    }
-                }
                 // The sender-name label (group chats only). Rendered above the
                 // shared media card when media is present, or as the first child
                 // of the text-only bubble otherwise.
@@ -1677,19 +1229,147 @@ internal fun MessageBubble(
                                 mentionedYouLabel = mentionedYouLabel,
                                 alignEnd = mine,
                                 contentModifier = textSelectionBoundsModifier,
-                                media = { mediaBlocks(true) },
+                                media = {
+                                    BubbleMediaBlocks(
+                                        item = item,
+                                        record = record,
+                                        controller = controller,
+                                        appState = appState,
+                                        bubbleMedia = bubbleMedia,
+                                        sharedLocation = sharedLocation,
+                                        sharedContact = sharedContact,
+                                        sharedUser = sharedUser,
+                                        deleted = deleted,
+                                        mine = mine,
+                                        footerOnVisualMedia = footerOnVisualMedia,
+                                        footerOnPendingVisual = footerOnPendingVisual,
+                                        showPendingPlaceholder = showPendingPlaceholder,
+                                        onMediaLongPress = onMediaLongPress,
+                                        attachedToCaption = true,
+                                    )
+                                },
                             ) {
-                                bodyFooterAndRetry()
+                                BubbleBodyFooterAndRetry(
+                                    item = item,
+                                    record = record,
+                                    controller = controller,
+                                    appState = appState,
+                                    bodyText = bodyTextToRender,
+                                    deleted = deleted,
+                                    persistedFailure = persistedFailure,
+                                    textSelectionMode = textSelectionMode,
+                                    customBubbleColorActive = customBubbleColorActive,
+                                    selectableTextLayoutReporter = selectableTextLayoutReporter,
+                                    markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    plainTextSelectionModifier = plainTextSelectionModifier,
+                                    onPlainTextLayout = {
+                                        plainTextLayoutTracker.layoutResult = it
+                                        reportPlainTextLayoutIfReady()
+                                    },
+                                    selectionWrapper = { content ->
+                                        if (textSelectionMode) {
+                                            CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
+                                                SelectionContainer(state = messageTextSelectionState) { content() }
+                                            }
+                                        } else {
+                                            content()
+                                        }
+                                    },
+                                    collapsible = collapsible,
+                                    replyPreviewPresent = replyPreview != null,
+                                    hasMedia = hasMedia,
+                                    bubbleContentColor = bubbleContentColor,
+                                    timestampColor = timestampColor,
+                                    showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
+                                    showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                                    editedLabel = editedLabel,
+                                    onEditedClick =
+                                        if (editState != null && !textSelectionMode) {
+                                            { editHistoryOpen = true }
+                                        } else {
+                                            null
+                                        },
+                                    footerOnVisualMedia = footerOnVisualMedia,
+                                    footerOnPendingVisual = footerOnPendingVisual,
+                                    invalidationWarning = invalidationWarning,
+                                    mine = mine,
+                                    onExpand = { expandedFullView = true },
+                                )
                             }
                         } else {
                             MediaSupplementEnvelope(
                                 alignEnd = mine,
-                                media = { mediaBlocks(false) },
+                                media = {
+                                    BubbleMediaBlocks(
+                                        item = item,
+                                        record = record,
+                                        controller = controller,
+                                        appState = appState,
+                                        bubbleMedia = bubbleMedia,
+                                        sharedLocation = sharedLocation,
+                                        sharedContact = sharedContact,
+                                        sharedUser = sharedUser,
+                                        deleted = deleted,
+                                        mine = mine,
+                                        footerOnVisualMedia = footerOnVisualMedia,
+                                        footerOnPendingVisual = footerOnPendingVisual,
+                                        showPendingPlaceholder = showPendingPlaceholder,
+                                        onMediaLongPress = onMediaLongPress,
+                                        attachedToCaption = false,
+                                    )
+                                },
                             ) {
                                 // No caption: the footer (time/status) for audio,
                                 // file, or multi-visual media still needs a home —
                                 // and so does the failed-send retry row.
-                                bodyFooterAndRetry()
+                                BubbleBodyFooterAndRetry(
+                                    item = item,
+                                    record = record,
+                                    controller = controller,
+                                    appState = appState,
+                                    bodyText = bodyTextToRender,
+                                    deleted = deleted,
+                                    persistedFailure = persistedFailure,
+                                    textSelectionMode = textSelectionMode,
+                                    customBubbleColorActive = customBubbleColorActive,
+                                    selectableTextLayoutReporter = selectableTextLayoutReporter,
+                                    markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                                    onCopyMarkdownLink = ::copyMarkdownLink,
+                                    plainTextSelectionModifier = plainTextSelectionModifier,
+                                    onPlainTextLayout = {
+                                        plainTextLayoutTracker.layoutResult = it
+                                        reportPlainTextLayoutIfReady()
+                                    },
+                                    selectionWrapper = { content ->
+                                        if (textSelectionMode) {
+                                            CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
+                                                SelectionContainer(state = messageTextSelectionState) { content() }
+                                            }
+                                        } else {
+                                            content()
+                                        }
+                                    },
+                                    collapsible = collapsible,
+                                    replyPreviewPresent = replyPreview != null,
+                                    hasMedia = hasMedia,
+                                    bubbleContentColor = bubbleContentColor,
+                                    timestampColor = timestampColor,
+                                    showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
+                                    showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                                    editedLabel = editedLabel,
+                                    onEditedClick =
+                                        if (editState != null && !textSelectionMode) {
+                                            { editHistoryOpen = true }
+                                        } else {
+                                            null
+                                        },
+                                    footerOnVisualMedia = footerOnVisualMedia,
+                                    footerOnPendingVisual = footerOnPendingVisual,
+                                    invalidationWarning = invalidationWarning,
+                                    mine = mine,
+                                    onExpand = { expandedFullView = true },
+                                )
                             }
                         }
                     }
@@ -1717,7 +1397,53 @@ internal fun MessageBubble(
                     ) {
                         senderNameLabel(true)
                         replyPreviewCard(true)
-                        bodyFooterAndRetry()
+                        BubbleBodyFooterAndRetry(
+                            item = item,
+                            record = record,
+                            controller = controller,
+                            appState = appState,
+                            bodyText = bodyTextToRender,
+                            deleted = deleted,
+                            persistedFailure = persistedFailure,
+                            textSelectionMode = textSelectionMode,
+                            customBubbleColorActive = customBubbleColorActive,
+                            selectableTextLayoutReporter = selectableTextLayoutReporter,
+                            markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                            onCopyMarkdownLink = ::copyMarkdownLink,
+                            plainTextSelectionModifier = plainTextSelectionModifier,
+                            onPlainTextLayout = {
+                                plainTextLayoutTracker.layoutResult = it
+                                reportPlainTextLayoutIfReady()
+                            },
+                            selectionWrapper = { content ->
+                                if (textSelectionMode) {
+                                    CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
+                                        SelectionContainer(state = messageTextSelectionState) { content() }
+                                    }
+                                } else {
+                                    content()
+                                }
+                            },
+                            collapsible = collapsible,
+                            replyPreviewPresent = replyPreview != null,
+                            hasMedia = hasMedia,
+                            bubbleContentColor = bubbleContentColor,
+                            timestampColor = timestampColor,
+                            showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
+                            showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
+                            editedLabel = editedLabel,
+                            onEditedClick =
+                                if (editState != null && !textSelectionMode) {
+                                    { editHistoryOpen = true }
+                                } else {
+                                    null
+                                },
+                            footerOnVisualMedia = footerOnVisualMedia,
+                            footerOnPendingVisual = footerOnPendingVisual,
+                            invalidationWarning = invalidationWarning,
+                            mine = mine,
+                            onExpand = { expandedFullView = true },
+                        )
                     }
                 }
                 MessageActionMenu(
@@ -2040,7 +1766,7 @@ internal fun MessageBubble(
 
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
-private const val MESSAGE_COLLAPSE_LINE_LIMIT = 18
+internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 18
 
 private val MessageBubbleOppositeGutter = 48.dp
 private val MessageBubbleSenderAvatarSlotWidth = 40.dp
