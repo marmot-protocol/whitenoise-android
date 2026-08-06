@@ -175,8 +175,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttac
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
-import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
-import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
@@ -246,6 +244,8 @@ private data class ConversationSearchScrollAnchor(
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
+
+private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 
 // Foreground catch-up normally materializes almost immediately. Keep the
 // background-arrival listener bounded so a later, genuinely foreground
@@ -1095,17 +1095,17 @@ internal fun ConversationScreen(
     }
     // #589: composer focus is hoisted here so the resume lifecycle observer
     // below can drive it. `composerFocus` is the requester wired into the
-    // composer's BasicTextField; `composerFocused` mirrors the live focus
-    // edge reported by `onFocusChanged`; `wasComposerFocusedOnPause` snapshots
-    // that edge on ON_PAUSE so resume can restore the exact keyboard state the
-    // user left with (Case B). Keyed on chat.id so a conversation switch
-    // doesn't carry the previous chat's keyboard state across.
+    // composer's BasicTextField, `composerFocused` mirrors the live focus edge
+    // reported by `onFocusChanged`. Keyed on chat.id so a conversation switch
+    // doesn't carry the previous chat's keyboard state across — the ON_PAUSE
+    // snapshot that decides restore-vs-clear lives in
+    // ConversationComposerLifecycleEffect instead, scoped to the observer it
+    // installed rather than to chat.id.
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
     var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
     var pauseScrollBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
-    var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
     // #589: used by the resume observer to clear focus and drop the keyboard
     // when the composer was NOT focused on pause (Case B), without poking the
@@ -2430,19 +2430,18 @@ internal fun ConversationScreen(
     // #589: app-switch resume handling. Two bugs surfaced when returning to a
     // chat after backgrounding the app:
     //
-    //   Case A (keyboard was OPEN on leave): the bottom scroll anchor was
-    //   computed against the pre-resume viewport before the keyboard inset
-    //   re-applied, so the latest bubble landed clipped behind the keyboard.
-    //   The existing imeIsOpen chase above does NOT re-fire here because
-    //   imeIsOpen never transitions (it was already true), so we add a
-    //   resume-triggered re-anchor that waits for the IME inset to settle and
-    //   then re-snaps to the newest row — reusing the 24-frame chase idiom.
+    //   Case A (keyboard was OPEN on leave): restoring the pause-time viewport
+    //   bookmark before the keyboard inset re-applied could clip the tail or
+    //   shift a reader's mid-history position. The existing imeIsOpen chase
+    //   above does NOT re-fire here because imeIsOpen never transitions (it was
+    //   already true), so resume waits for the inset to settle before restoring
+    //   that bookmark — reusing the 24-frame chase idiom.
     //
     //   Case B (keyboard was CLOSED on leave): Android/Compose restores the
     //   BasicTextField focus and IME visibility on its own, popping a keyboard
     //   the user never asked for. We snapshot the composer focus on ON_PAUSE
     //   and, on ON_RESUME, gate restoration through the pure
-    //   [shouldRestoreComposerFocusOnResume] predicate: restore focus only if
+    //   `shouldRestoreComposerFocusOnResume` predicate: restore focus only if
     //   it was held on pause (or an edit/reply session is active); otherwise
     //   actively clear focus and hide the keyboard so it does not pop.
     //
@@ -2455,73 +2454,57 @@ internal fun ConversationScreen(
         rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })
     val currentInitialTimelineAnchored by rememberUpdatedState(newValue = initialTimelineAnchored)
     val currentImeIsOpen by rememberUpdatedState(newValue = imeIsOpen)
-    DisposableEffect(controller, resumeLifecycleOwner) {
-        if (resumeLifecycleOwner == null) {
-            onDispose { }
-        } else {
-            val observer =
-                LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_PAUSE -> {
-                            resumeScrollRestoreCoordinator.cancel()
-                            wasComposerFocusedOnPause = composerFocused
-                            pauseScrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider())
-                        }
-                        Lifecycle.Event.ON_RESUME -> {
-                            val restoreFocus =
-                                shouldRestoreComposerFocusOnResume(
-                                    wasComposerFocusedOnPause = wasComposerFocusedOnPause,
-                                    hasActiveEditOrReplySession =
-                                        controller.editingMessageId != null ||
-                                            controller.replyingTo != null,
-                                )
-                            val scrollSnapshot = pauseScrollBookmark
-                            pauseScrollBookmark = null
-                            resumeScrollRestoreCoordinator.launchResumeWork(scope) {
-                                if (restoreFocus) {
-                                    runCatching { composerFocus.requestFocus() }
-                                    keyboardController?.show()
-                                } else if (shouldClearFocusOnResume(
-                                        restoringComposerFocus = restoreFocus,
-                                        searchOpen = searchOpen,
-                                    )
-                                ) {
-                                    focusManager.clearFocus(force = true)
-                                    keyboardController?.hide()
-                                }
-                                if (currentInitialTimelineAnchored && scrollSnapshot != null) {
-                                    var lastInset = -1
-                                    var stableFrames = 0
-                                    var settleFrame = 0
-                                    while (settleFrame < 24 && stableFrames < 2) {
-                                        withFrameNanos { }
-                                        val current = imeInsets.getBottom(density)
-                                        if (current == lastInset) {
-                                            stableFrames++
-                                        } else {
-                                            stableFrames = 0
-                                            lastInset = current
-                                        }
-                                        settleFrame++
-                                    }
-                                    scrollCoordinator.restoreViewport(
-                                        snapshot = scrollSnapshot,
-                                        resolveAnchorIndex = currentScrollAnchorResolver,
-                                        resolveTailIndex = { currentTailIndex },
-                                    )
-                                }
-                            }
-                        }
-                        else -> Unit
+    ConversationComposerLifecycleEffect(
+        observerKey = controller,
+        lifecycleOwner = resumeLifecycleOwner,
+        composerFocused = composerFocused,
+        searchOpen = searchOpen,
+        hasActiveEditOrReplySession =
+            controller.editingMessageId != null ||
+                controller.replyingTo != null,
+        onPause = {
+            resumeScrollRestoreCoordinator.cancel()
+            pauseScrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider())
+        },
+        onResume = { restoreFocus, clearFocus ->
+            val scrollSnapshot = pauseScrollBookmark
+            pauseScrollBookmark = null
+            resumeScrollRestoreCoordinator.launchResumeWork(scope) {
+                when {
+                    restoreFocus -> {
+                        runCatching { composerFocus.requestFocus() }
+                        keyboardController?.show()
+                    }
+                    clearFocus -> {
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
                     }
                 }
-            resumeLifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                resumeScrollRestoreCoordinator.cancel()
-                resumeLifecycleOwner.lifecycle.removeObserver(observer)
+                if (currentInitialTimelineAnchored && scrollSnapshot != null) {
+                    var lastInset = -1
+                    var stableFrames = 0
+                    var settleFrame = 0
+                    while (settleFrame < RESUME_IME_SETTLE_MAX_FRAMES && stableFrames < 2) {
+                        withFrameNanos { }
+                        val current = imeInsets.getBottom(density)
+                        if (current == lastInset) {
+                            stableFrames++
+                        } else {
+                            stableFrames = 0
+                            lastInset = current
+                        }
+                        settleFrame++
+                    }
+                    scrollCoordinator.restoreViewport(
+                        snapshot = scrollSnapshot,
+                        resolveAnchorIndex = currentScrollAnchorResolver,
+                        resolveTailIndex = { currentTailIndex },
+                    )
+                }
             }
-        }
-    }
+        },
+        onObserverDisposed = resumeScrollRestoreCoordinator::cancel,
+    )
     LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
             val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
