@@ -1162,6 +1162,7 @@
     <string name="sign_in_error_setup_unexpected_state">Unerwarteter Kontozustand, die Anmeldung wurde gestoppt. Es wurde nichts geändert.</string>
     <string name="sign_in_error_setup_recovery_declined">Wiederherstellung abgebrochen. Es wurde nichts geändert.</string>
     <string name="sign_in_error_setup_recovery_failed">Die Wiederherstellung wurde nicht abgeschlossen. Tippe auf Anmelden, um es erneut zu versuchen.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Unerwarteter Kontozustand nach der Wiederherstellung, die Anmeldung wurde gestoppt. Ein Teil der Wiederherstellung wurde möglicherweise schon angewendet.</string>
     <string name="sign_in_recovery_title">Dieses Konto wiederherstellen?</string>
     <string name="sign_in_recovery_message">Die Kontoeinrichtung wurde nicht abgeschlossen, und dieses Gerät kann nicht belegen, dass kein Schlüsselpaket dafür veröffentlicht wurde. Die Wiederherstellung entfernt die unvollständige Einrichtung und meldet dich erneut an. Falls ein Schlüsselpaket veröffentlicht wurde, kann es verwaist auf Relays zurückbleiben.</string>
     <string name="sign_in_recovery_confirm">Wiederherstellen</string>

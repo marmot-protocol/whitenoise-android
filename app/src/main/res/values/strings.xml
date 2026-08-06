@@ -1216,6 +1216,7 @@
     <string name="sign_in_error_setup_unexpected_state">Unexpected account state, so sign-in stopped. Nothing was changed.</string>
     <string name="sign_in_error_setup_recovery_declined">Recovery cancelled. Nothing was changed.</string>
     <string name="sign_in_error_setup_recovery_failed">Recovery didn\'t complete. Tap sign in to try again.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Unexpected account state after recovery, so sign-in stopped. Part of the recovery may already have been applied.</string>
     <string name="sign_in_recovery_title">Recover this account?</string>
     <string name="sign_in_recovery_message">Account setup didn\'t finish, and this device can\'t prove that no key package was published for it. Recovering clears the unfinished setup and signs in again. If a key package was published, it may be left orphaned on relays.</string>
     <string name="sign_in_recovery_confirm">Recover</string>

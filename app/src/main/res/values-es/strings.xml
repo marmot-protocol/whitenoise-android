@@ -1164,6 +1164,7 @@
     <string name="sign_in_error_setup_unexpected_state">Estado de cuenta inesperado, así que se detuvo el inicio de sesión. No se cambió nada.</string>
     <string name="sign_in_error_setup_recovery_declined">Recuperación cancelada. No se cambió nada.</string>
     <string name="sign_in_error_setup_recovery_failed">La recuperación no se completó. Toca iniciar sesión para intentarlo de nuevo.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Estado de cuenta inesperado tras la recuperación, así que se detuvo el inicio de sesión. Puede que parte de la recuperación ya se haya aplicado.</string>
     <string name="sign_in_recovery_title">¿Recuperar esta cuenta?</string>
     <string name="sign_in_recovery_message">La configuración de la cuenta no terminó y este dispositivo no puede demostrar que no se publicó ningún paquete de llaves para ella. La recuperación elimina la configuración incompleta y vuelve a iniciar sesión. Si se publicó un paquete de llaves, puede quedar huérfano en los relés.</string>
     <string name="sign_in_recovery_confirm">Recuperar</string>

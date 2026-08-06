@@ -1164,6 +1164,7 @@
     <string name="sign_in_error_setup_unexpected_state">Stato dell’account inatteso, quindi l’accesso è stato interrotto. Non è stato modificato nulla.</string>
     <string name="sign_in_error_setup_recovery_declined">Recupero annullato. Non è stato modificato nulla.</string>
     <string name="sign_in_error_setup_recovery_failed">Il recupero non è andato a buon fine. Tocca Accedi per riprovare.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Stato dell’account inatteso dopo il recupero, quindi l’accesso è stato interrotto. Parte del recupero potrebbe essere già stata applicata.</string>
     <string name="sign_in_recovery_title">Recuperare questo account?</string>
     <string name="sign_in_recovery_message">La configurazione dell’account non è stata completata e questo dispositivo non può dimostrare che non sia stato pubblicato alcun pacchetto chiavi per esso. Il recupero rimuove la configurazione incompleta e ti fa accedere di nuovo. Se un pacchetto chiavi è stato pubblicato, può restare orfano sui relay.</string>
     <string name="sign_in_recovery_confirm">Recupera</string>

@@ -84,16 +84,57 @@ class SignInStepMappingTest {
     fun anAcknowledgedRecoveryNeverAsksForConsentAgain() {
         assertEquals(
             SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed),
-            recoveryStepFor(IdentityImportOutcome.SetupRecoveryRequired, nsec),
+            recoveryStepFor(IdentityImportOutcome.SetupRecoveryRequired),
+        )
+    }
+
+    @Test
+    fun aSignInAfterAFailedRecoveryForTheSameKeyReportsItInsteadOfRePrompting() {
+        assertEquals(
+            SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed),
+            signInStepFor(IdentityImportOutcome.SetupRecoveryRequired, nsec, recoveryConsentedFor = nsec),
+        )
+    }
+
+    @Test
+    fun anotherKeyStillGetsItsOwnConsentPrompt() {
+        val otherNsec = "nsec1" + "p".repeat(58)
+
+        assertEquals(
+            SignInStep.AskRecoveryConsent,
+            signInStepFor(IdentityImportOutcome.SetupRecoveryRequired, otherNsec, recoveryConsentedFor = nsec),
+        )
+    }
+
+    @Test
+    fun aFailedRecoveryReadsAsRecoveryFailureNotAsABadKey() {
+        assertEquals(
+            SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed),
+            recoveryStepFor(IdentityImportOutcome.Failed),
+        )
+    }
+
+    @Test
+    fun anUnexpectedStateAfterRecoveryDoesNotReuseTheUntouchedAccountMessage() {
+        val afterRecovery = recoveryStepFor(IdentityImportOutcome.SetupResetNotApplicable)
+
+        assertEquals(SignInStep.InlineError(R.string.sign_in_error_setup_recovery_unexpected_state), afterRecovery)
+        assertNotEquals(
+            signInStepFor(IdentityImportOutcome.SetupResetNotApplicable, nsec),
+            afterRecovery,
         )
     }
 
     @Test
     fun recoveryKeepsTheOtherStatesAsTheyAre() {
-        assertEquals(SignInStep.SignedIn, recoveryStepFor(IdentityImportOutcome.Success, nsec))
+        assertEquals(SignInStep.SignedIn, recoveryStepFor(IdentityImportOutcome.Success))
         assertEquals(
             SignInStep.InlineError(R.string.sign_in_error_setup_retry),
-            recoveryStepFor(IdentityImportOutcome.SetupRetryRequired, nsec),
+            recoveryStepFor(IdentityImportOutcome.SetupRetryRequired),
+        )
+        assertEquals(
+            SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry),
+            recoveryStepFor(IdentityImportOutcome.SetupKeyPackageRecoveryAvailable),
         )
     }
 

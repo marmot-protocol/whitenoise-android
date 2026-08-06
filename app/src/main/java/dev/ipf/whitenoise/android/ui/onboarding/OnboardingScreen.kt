@@ -78,6 +78,10 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
+    // The key an acknowledged recovery already ran for. Holding the value the
+    // field still holds adds no exposure, and it stops a failed recovery from
+    // steering the user through the consent prompt again on every retry.
+    var recoveryConsentedFor by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -132,7 +136,7 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             }
         },
         onImportIdentity = { value ->
-            runStep { signInStepFor(appState.importIdentity(value), value) }
+            runStep { signInStepFor(appState.importIdentity(value), value, recoveryConsentedFor) }
         },
         recoveryConsentVisible = recoveryConsentVisible,
         // The engine needs the same nsec again, so the already-entered value is
@@ -141,7 +145,8 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
         onRecoveryConsentConfirm = {
             recoveryConsentVisible = false
             val value = identity.trim()
-            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value), value) }
+            recoveryConsentedFor = value
+            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
         },
         // Declining reaches no engine call at all: only the prompt closes, and
         // the entered key and sign-in button stay exactly as they were.
@@ -196,14 +201,25 @@ internal sealed interface SignInStep {
  * Each account-setup state gets its own message. The two resumable states point
  * at the sign-in button the user already has rather than retrying on their
  * behalf — an automatic retry on this path can loop.
+ *
+ * [recoveryConsentedFor] is the key an acknowledged recovery already ran for.
+ * Asking again for the same key would only walk the user back through the
+ * orphaned-KeyPackage acknowledgement the last round already spent, so the
+ * repeat reads as a recovery that didn't complete.
  */
 internal fun signInStepFor(
     outcome: IdentityImportOutcome,
     identity: String,
+    recoveryConsentedFor: String? = null,
 ): SignInStep =
     when (outcome) {
         IdentityImportOutcome.Success -> SignInStep.SignedIn
-        IdentityImportOutcome.SetupRecoveryRequired -> SignInStep.AskRecoveryConsent
+        IdentityImportOutcome.SetupRecoveryRequired ->
+            if (identity == recoveryConsentedFor) {
+                SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
+            } else {
+                SignInStep.AskRecoveryConsent
+            }
         IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
         IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
             SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
@@ -213,17 +229,24 @@ internal fun signInStepFor(
     }
 
 /**
- * The acknowledged recovery attempt already carried the consent, so a second
- * consent prompt would only loop — a recovery that still reports the same state
- * reads as a plain retryable failure instead.
+ * Outcomes of the acknowledged recovery attempt. The consent was already
+ * carried, so nothing here can ask for it again, and no message may claim the
+ * account is untouched: the engine's recovery may have applied part of its work
+ * before reporting any of these states.
  */
-internal fun recoveryStepFor(
-    outcome: IdentityImportOutcome,
-    identity: String,
-): SignInStep =
-    when (val step = signInStepFor(outcome, identity)) {
-        SignInStep.AskRecoveryConsent -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
-        else -> step
+internal fun recoveryStepFor(outcome: IdentityImportOutcome): SignInStep =
+    when (outcome) {
+        IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
+        IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
+        IdentityImportOutcome.SetupResetNotApplicable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_recovery_unexpected_state)
+        // The key was well-formed enough for the engine to report a setup state a
+        // moment ago, so a bare failure here is the recovery failing, not a bad key.
+        IdentityImportOutcome.SetupRecoveryRequired,
+        IdentityImportOutcome.Failed,
+        -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
     }
 
 @Composable

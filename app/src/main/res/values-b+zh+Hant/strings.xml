@@ -1142,6 +1142,7 @@
     <string name="sign_in_error_setup_unexpected_state">帳號狀態異常，登入已停止。未做任何變更。</string>
     <string name="sign_in_error_setup_recovery_declined">已取消復原。未做任何變更。</string>
     <string name="sign_in_error_setup_recovery_failed">復原未完成。請點按登入重試。</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">復原後帳號狀態異常，登入已停止。部分復原可能已生效。</string>
     <string name="sign_in_recovery_title">要復原此帳號嗎？</string>
     <string name="sign_in_recovery_message">帳號設定未完成，且本裝置無法證明未曾為其發布過金鑰套件。復原會清除未完成的設定並重新登入。若曾發布過金鑰套件，它可能會遺留在中繼站上無人認領。</string>
     <string name="sign_in_recovery_confirm">復原</string>

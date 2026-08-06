@@ -1142,6 +1142,7 @@
     <string name="sign_in_error_setup_unexpected_state">账号状态异常，登录已停止。未做任何更改。</string>
     <string name="sign_in_error_setup_recovery_declined">已取消恢复。未做任何更改。</string>
     <string name="sign_in_error_setup_recovery_failed">恢复未完成。请点按登录重试。</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">恢复后账号状态异常，登录已停止。部分恢复可能已生效。</string>
     <string name="sign_in_recovery_title">要恢复此账号吗？</string>
     <string name="sign_in_recovery_message">账号设置未完成，且本设备无法证明未曾为其发布过密钥包。恢复会清除未完成的设置并重新登录。如果曾发布过密钥包，它可能会遗留在中继上无人认领。</string>
     <string name="sign_in_recovery_confirm">恢复</string>

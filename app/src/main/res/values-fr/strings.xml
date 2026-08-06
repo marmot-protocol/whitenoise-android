@@ -1164,6 +1164,7 @@
     <string name="sign_in_error_setup_unexpected_state">État de compte inattendu, la connexion a été interrompue. Rien n’a été modifié.</string>
     <string name="sign_in_error_setup_recovery_declined">Récupération annulée. Rien n’a été modifié.</string>
     <string name="sign_in_error_setup_recovery_failed">La récupération n’a pas abouti. Touchez Se connecter pour réessayer.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">État de compte inattendu après la récupération, la connexion a été interrompue. Une partie de la récupération a peut-être déjà été appliquée.</string>
     <string name="sign_in_recovery_title">Récupérer ce compte ?</string>
     <string name="sign_in_recovery_message">La configuration du compte n’est pas allée au bout, et cet appareil ne peut pas prouver qu’aucun paquet de clés n’a été publié pour lui. La récupération supprime la configuration incomplète et vous reconnecte. Si un paquet de clés a été publié, il peut rester orphelin sur les relais.</string>
     <string name="sign_in_recovery_confirm">Récupérer</string>

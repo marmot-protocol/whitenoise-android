@@ -1162,6 +1162,7 @@
     <string name="sign_in_error_setup_unexpected_state">Beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Hiçbir şey değiştirilmedi.</string>
     <string name="sign_in_error_setup_recovery_declined">Kurtarma iptal edildi. Hiçbir şey değiştirilmedi.</string>
     <string name="sign_in_error_setup_recovery_failed">Kurtarma tamamlanmadı. Yeniden denemek için Giriş Yap\'a dokunun.</string>
+    <string name="sign_in_error_setup_recovery_unexpected_state">Kurtarmadan sonra beklenmeyen hesap durumu, bu yüzden giriş durduruldu. Kurtarmanın bir kısmı zaten uygulanmış olabilir.</string>
     <string name="sign_in_recovery_title">Bu hesap kurtarılsın mı?</string>
     <string name="sign_in_recovery_message">Hesap kurulumu tamamlanmadı ve bu cihaz, hesap için hiçbir anahtar paketinin yayımlanmadığını kanıtlayamıyor. Kurtarma, tamamlanmamış kurulumu siler ve yeniden giriş yapar. Bir anahtar paketi yayımlanmışsa rölelerde sahipsiz kalabilir.</string>
     <string name="sign_in_recovery_confirm">Kurtar</string>
