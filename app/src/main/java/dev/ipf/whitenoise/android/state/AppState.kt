@@ -1222,6 +1222,7 @@ class WhiteNoiseAppState private constructor(
     private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
     private val profileDisplayNameReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
+    private val identityLoginCalls: IdentityLoginCalls?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1234,6 +1235,7 @@ class WhiteNoiseAppState private constructor(
             profileReader = null,
             profileDisplayNameReader = null,
             profileRefreshRequest = null,
+            identityLoginCalls = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1248,6 +1250,7 @@ class WhiteNoiseAppState private constructor(
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
+        identityLoginCalls: IdentityLoginCalls? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1256,6 +1259,7 @@ class WhiteNoiseAppState private constructor(
         profileReader = profileReader,
         profileDisplayNameReader = profileDisplayNameReader,
         profileRefreshRequest = profileRefreshRequest,
+        identityLoginCalls = identityLoginCalls,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -3015,7 +3019,7 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
+            val summary = engineLogin(trimmed)
             activateImportedIdentity(summary)
             IdentityImportOutcome.Success
         } catch (error: Throwable) {
@@ -3039,21 +3043,38 @@ class WhiteNoiseAppState private constructor(
         val trimmed = identity.trim()
         if (!permitsDirectIdentityImport(trimmed)) return IdentityImportOutcome.Failed
         return try {
-            val summary =
-                marmotIo {
-                    loginRecoveringIncompleteSetup(
-                        trimmed,
-                        MarmotClient.bootstrapRelays,
-                        MarmotClient.bootstrapRelays,
-                        acknowledgePossibleKeyPackageOrphan = true,
-                    )
-                }
+            val summary = engineRecoveringLogin(trimmed)
             activateImportedIdentity(summary)
             IdentityImportOutcome.Success
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             logRedactedIdentityFailure("identity setup recovery", error)
             identityImportOutcome(error)
+        }
+    }
+
+    private suspend fun engineLogin(nsec: String): AccountSummaryFfi {
+        val relays = MarmotClient.bootstrapRelays
+        val injected = identityLoginCalls
+        if (injected != null) return injected.login(nsec, relays, relays)
+        return marmotIo { login(nsec, relays, relays) }
+    }
+
+    // The acknowledgement is a constant, never derived from state: the only
+    // caller is the consent prompt's confirm action.
+    private suspend fun engineRecoveringLogin(nsec: String): AccountSummaryFfi {
+        val relays = MarmotClient.bootstrapRelays
+        val injected = identityLoginCalls
+        if (injected != null) {
+            return injected.loginRecoveringIncompleteSetup(
+                nsec,
+                relays,
+                relays,
+                acknowledgePossibleKeyPackageOrphan = true,
+            )
+        }
+        return marmotIo {
+            loginRecoveringIncompleteSetup(nsec, relays, relays, acknowledgePossibleKeyPackageOrphan = true)
         }
     }
 
@@ -7263,6 +7284,27 @@ internal sealed interface IdentityImportOutcome {
      * acknowledgement.
      */
     data object SetupRecoveryRequired : IdentityImportOutcome
+}
+
+/**
+ * The two engine login entry points behind a direct nsec sign-in. Injectable so
+ * a test can count them: which binding a sign-in reaches is the consent
+ * guarantee, and a source-text guard cannot see a bypass routed through some
+ * other wrapper.
+ */
+internal interface IdentityLoginCalls {
+    suspend fun login(
+        nsec: String,
+        relays: List<String>,
+        keyPackageRelays: List<String>,
+    ): AccountSummaryFfi
+
+    suspend fun loginRecoveringIncompleteSetup(
+        nsec: String,
+        relays: List<String>,
+        keyPackageRelays: List<String>,
+        acknowledgePossibleKeyPackageOrphan: Boolean,
+    ): AccountSummaryFfi
 }
 
 internal fun identityImportOutcome(error: Throwable): IdentityImportOutcome =

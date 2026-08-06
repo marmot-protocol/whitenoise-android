@@ -41,19 +41,6 @@ class AccountSetupRecoveryTest {
     }
 
     @Test
-    fun recoveryPassesTheAcknowledgementAndTheSameRelaysAsLogin() {
-        val body = appStateSource().functionBody("recoverIncompleteIdentitySetup")
-
-        assertTrue(body.contains("loginRecoveringIncompleteSetup("))
-        assertTrue(body.contains("acknowledgePossibleKeyPackageOrphan = true"))
-        assertEquals(
-            "recovery must reuse the relay pair the plain login call supplies",
-            2,
-            Regex("MarmotClient.bootstrapRelays").findAll(body).count(),
-        )
-    }
-
-    @Test
     fun recoverySuccessActivatesTheAccountExactlyLikeAnOrdinaryImport() {
         val source = appStateSource()
 
@@ -67,15 +54,6 @@ class AccountSetupRecoveryTest {
             "phase = AppPhase.Ready",
             "warmProfile(summary.accountIdHex)",
         ).forEach { assertTrue("activation must keep $it", activation.contains(it)) }
-    }
-
-    @Test
-    fun ordinaryImportNeverReachesTheRecoveryApi() {
-        val body = appStateSource().functionBody("importIdentity")
-
-        assertTrue(body.contains("login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)"))
-        assertFalse(body.contains("loginRecoveringIncompleteSetup"))
-        assertFalse(body.contains("acknowledgePossibleKeyPackageOrphan"))
     }
 
     @Test

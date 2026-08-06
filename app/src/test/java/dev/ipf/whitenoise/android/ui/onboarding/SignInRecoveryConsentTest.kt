@@ -2,12 +2,20 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.content.Context
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.state.RecordingIdentityLoginCalls
+import dev.ipf.whitenoise.android.state.RecoveryCall
+import dev.ipf.whitenoise.android.state.signInTestAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -15,51 +23,54 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+/**
+ * The consent gate, driven through the real onboarding surface against a
+ * counting stand-in for the engine's two login bindings. Which binding a tap
+ * reaches is the whole guarantee — the recovering variant rotates key material
+ * the engine can't prove was never published — so it is counted here rather
+ * than read out of the source text, where a bypass routed through any other
+ * wrapper would be invisible.
+ */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "en")
 class SignInRecoveryConsentTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private var confirms = 0
-    private var dismissals = 0
-    private var identity = "nsec1" + "q".repeat(58)
+    private val app = ApplicationProvider.getApplicationContext<Context>()
+    private val nsec = "nsec1" + "q".repeat(58)
+    private val otherNsec = "nsec1" + "p".repeat(58)
 
-    private fun string(res: Int): String =
-        ApplicationProvider
-            .getApplicationContext<Context>()
-            .getString(res)
+    private fun string(res: Int): String = app.getString(res)
 
-    private fun setContent(recoveryConsentVisible: Boolean) {
+    private fun recoveryRequiredEngine(recoveryFails: () -> Throwable = { MarmotKitException.Runtime("no") }) =
+        RecordingIdentityLoginCalls(
+            loginFails = { MarmotKitException.AccountSetupRecoveryRequired() },
+            recoveryFails = recoveryFails,
+        )
+
+    private fun openSignIn(engine: RecordingIdentityLoginCalls) {
+        val appState = signInTestAppState(app, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                SignInContent(
-                    identity = identity,
-                    busy = false,
-                    errorRes = null,
-                    onIdentityChange = { identity = it },
-                    onErrorChange = {},
-                    onBack = {},
-                    onSignIn = {},
-                    recoveryConsentVisible = recoveryConsentVisible,
-                    onRecoveryConsentConfirm = { confirms += 1 },
-                    onRecoveryConsentDismiss = { dismissals += 1 },
-                )
+                OnboardingScreen(appState = appState)
             }
         }
+        composeRule.onNodeWithText(string(R.string.onboarding_login)).performClick()
+    }
+
+    private fun signIn(key: String) {
+        composeRule.onNodeWithText(string(R.string.nostr_nsec)).performTextInput(key)
+        composeRule.onNodeWithText(string(R.string.sign_in)).performClick()
+        composeRule.waitForIdle()
     }
 
     @Test
-    fun ordinarySignInShowsNoConsentPrompt() {
-        setContent(recoveryConsentVisible = false)
+    fun theSignInAttemptItselfNeverRecovers() {
+        val engine = recoveryRequiredEngine()
+        openSignIn(engine)
 
-        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).assertDoesNotExist()
-    }
-
-    @Test
-    fun promptStatesTheOrphanedKeyPackageRiskBeforeAnyRecovery() {
-        setContent(recoveryConsentVisible = true)
+        signIn(nsec)
 
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertExists()
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_message)).assertExists()
@@ -67,28 +78,107 @@ class SignInRecoveryConsentTest {
             "the prompt must name the orphaned-KeyPackage risk",
             string(R.string.sign_in_recovery_message).contains("orphaned"),
         )
-        assertEquals("showing the prompt must not recover on its own", 0, confirms)
+        assertEquals("the prompt alone must reach no recovery", emptyList<RecoveryCall>(), engine.recoveries)
+        assertEquals(1, engine.logins.size)
     }
 
     @Test
-    fun confirmingAcknowledgesExactlyOnce() {
-        setContent(recoveryConsentVisible = true)
+    fun confirmingRecoversTheSameKeyExactlyOnceWithTheAcknowledgement() {
+        val engine = recoveryRequiredEngine()
+        openSignIn(engine)
+        signIn(nsec)
 
         composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
+        composeRule.waitForIdle()
 
-        assertEquals(1, confirms)
-        assertEquals(0, dismissals)
+        val ordinaryLogin = engine.logins.single()
+        assertEquals(
+            listOf(
+                RecoveryCall(
+                    nsec = nsec,
+                    relays = ordinaryLogin.relays,
+                    keyPackageRelays = ordinaryLogin.keyPackageRelays,
+                    acknowledged = true,
+                ),
+            ),
+            engine.recoveries,
+        )
+        assertEquals(MarmotClient.bootstrapRelays, ordinaryLogin.relays)
     }
 
     @Test
-    fun cancellingRecoversNothingAndLeavesTheEnteredKeyIntact() {
-        val entered = identity
-        setContent(recoveryConsentVisible = true)
+    fun decliningRecoversNothingAndSaysSo() {
+        val engine = recoveryRequiredEngine()
+        openSignIn(engine)
+        signIn(nsec)
 
         composeRule.onNodeWithText(string(R.string.cancel)).performClick()
+        composeRule.waitForIdle()
 
-        assertEquals("cancelling must reach no engine call", 0, confirms)
-        assertEquals(1, dismissals)
-        assertEquals(entered, identity)
+        assertEquals("declining must reach no engine call", emptyList<RecoveryCall>(), engine.recoveries)
+        composeRule.onNodeWithText(string(R.string.sign_in_error_setup_recovery_declined)).assertExists()
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun anOrdinarySignInFailureNeverAsksForConsentOrRecovers() {
+        val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("no") })
+        openSignIn(engine)
+
+        signIn(nsec)
+
+        assertEquals(emptyList<RecoveryCall>(), engine.recoveries)
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.identity_entry_error_import_failed)).assertExists()
+    }
+
+    @Test
+    fun aFailedRecoveryReportsItselfWithoutReArmingTheConsentPrompt() {
+        val engine = recoveryRequiredEngine(recoveryFails = { MarmotKitException.AccountSetupRecoveryRequired() })
+        openSignIn(engine)
+        signIn(nsec)
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(string(R.string.sign_in_error_setup_recovery_failed)).assertExists()
+        composeRule.onNodeWithText(string(R.string.sign_in)).performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("the second round must not re-prompt", 1, engine.recoveries.size)
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.sign_in_error_setup_recovery_failed)).assertExists()
+    }
+
+    @Test
+    fun noPostRecoveryMessageClaimsTheAccountWasLeftUntouched() {
+        // "Nothing was changed" is provable from a plain sign-in only: after the
+        // recovering login has run, the engine may already have applied part of it.
+        val untouched = "Nothing was changed"
+
+        assertTrue(string(R.string.sign_in_error_setup_unexpected_state).contains(untouched))
+        listOf(
+            R.string.sign_in_error_setup_recovery_unexpected_state,
+            R.string.sign_in_error_setup_recovery_failed,
+        ).forEach { res ->
+            assertFalse("post-recovery copy must not promise an untouched account", string(res).contains(untouched))
+        }
+    }
+
+    @Test
+    fun aDifferentKeyStillGetsItsOwnConsentPrompt() {
+        val engine = recoveryRequiredEngine(recoveryFails = { MarmotKitException.AccountSetupRecoveryRequired() })
+        openSignIn(engine)
+        signIn(nsec)
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription(string(R.string.clear)).performClick()
+        signIn(otherNsec)
+
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_title)).assertExists()
+        composeRule.onNodeWithText(string(R.string.sign_in_recovery_confirm)).performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf(nsec, otherNsec), engine.recoveries.map { it.nsec })
     }
 }
