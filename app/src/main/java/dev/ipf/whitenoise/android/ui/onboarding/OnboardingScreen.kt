@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
+import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.delay
@@ -76,11 +77,36 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
+    var recoveryConsentVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
     // Signer availability can't change while onboarding is on screen, so read it
     // once (the query hits the PackageManager).
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
+
+    fun applyStep(step: SignInStep) {
+        when (step) {
+            SignInStep.SignedIn -> clearSensitiveClipboard(context)
+            SignInStep.AskRecoveryConsent -> recoveryConsentVisible = true
+            is SignInStep.InlineError -> importErrorRes = step.messageRes
+        }
+    }
+
+    // Shared by the sign-in attempt and the acknowledged recovery: the busy
+    // state flips before the coroutine starts, so the button reads as busy from
+    // the tap onward.
+    fun runStep(step: suspend () -> SignInStep) {
+        inFlightAction = OnboardingAction.Importing
+        importErrorRes = null
+        scope.launch {
+            try {
+                applyStep(step())
+            } finally {
+                inFlightAction = OnboardingAction.Idle
+            }
+        }
+    }
 
     OnboardingContent(
         identity = identity,
@@ -103,19 +129,22 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             }
         },
         onImportIdentity = { value ->
-            inFlightAction = OnboardingAction.Importing
-            importErrorRes = null
-            scope.launch {
-                try {
-                    if (appState.importIdentity(value)) {
-                        clearSensitiveClipboard(context)
-                    } else {
-                        importErrorRes = importIdentityErrorRes(value)
-                    }
-                } finally {
-                    inFlightAction = OnboardingAction.Idle
-                }
-            }
+            runStep { signInStepFor(appState.importIdentity(value), value) }
+        },
+        recoveryConsentVisible = recoveryConsentVisible,
+        // The engine needs the same nsec again, so the already-entered value is
+        // reused from the field rather than stashed anywhere new — it leaves
+        // memory with the rest of the onboarding state.
+        onRecoveryConsentConfirm = {
+            recoveryConsentVisible = false
+            val value = identity.trim()
+            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value), value) }
+        },
+        // Declining reaches no engine call at all: only the prompt closes, and
+        // the entered key and sign-in button stay exactly as they were.
+        onRecoveryConsentDismiss = {
+            recoveryConsentVisible = false
+            importErrorRes = R.string.sign_in_error_setup_recovery_declined
         },
         loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
         amberSignInStage = appState.amberSignInStage,
@@ -149,6 +178,51 @@ internal fun importIdentityErrorRes(identity: String): Int =
         IdentityEntryInput.Kind.EncryptedSecretKey -> R.string.identity_entry_error_import_failed
     }
 
+/** What the sign-in surface should do once the engine has answered. */
+internal sealed interface SignInStep {
+    data object SignedIn : SignInStep
+
+    data class InlineError(
+        val messageRes: Int,
+    ) : SignInStep
+
+    data object AskRecoveryConsent : SignInStep
+}
+
+/**
+ * Each account-setup state gets its own message. The two resumable states point
+ * at the sign-in button the user already has rather than retrying on their
+ * behalf — an automatic retry on this path can loop.
+ */
+internal fun signInStepFor(
+    outcome: IdentityImportOutcome,
+    identity: String,
+): SignInStep =
+    when (outcome) {
+        IdentityImportOutcome.Success -> SignInStep.SignedIn
+        IdentityImportOutcome.SetupRecoveryRequired -> SignInStep.AskRecoveryConsent
+        IdentityImportOutcome.SetupRetryRequired -> SignInStep.InlineError(R.string.sign_in_error_setup_retry)
+        IdentityImportOutcome.SetupKeyPackageRecoveryAvailable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
+        IdentityImportOutcome.SetupResetNotApplicable ->
+            SignInStep.InlineError(R.string.sign_in_error_setup_unexpected_state)
+        IdentityImportOutcome.Failed -> SignInStep.InlineError(importIdentityErrorRes(identity))
+    }
+
+/**
+ * The acknowledged recovery attempt already carried the consent, so a second
+ * consent prompt would only loop — a recovery that still reports the same state
+ * reads as a plain retryable failure instead.
+ */
+internal fun recoveryStepFor(
+    outcome: IdentityImportOutcome,
+    identity: String,
+): SignInStep =
+    when (val step = signInStepFor(outcome, identity)) {
+        SignInStep.AskRecoveryConsent -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)
+        else -> step
+    }
+
 @Composable
 fun OnboardingContent(
     identity: String,
@@ -163,6 +237,9 @@ fun OnboardingContent(
     amberSignInStage: Int? = null,
     amberSignerAvailable: Boolean = false,
     onLoginWithAmber: () -> Unit = {},
+    recoveryConsentVisible: Boolean = false,
+    onRecoveryConsentConfirm: () -> Unit = {},
+    onRecoveryConsentDismiss: () -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber
@@ -178,6 +255,9 @@ fun OnboardingContent(
             onErrorChange = onImportErrorChange,
             onBack = { signingIn = false },
             onSignIn = { onImportIdentity(identity.trim()) },
+            recoveryConsentVisible = recoveryConsentVisible,
+            onRecoveryConsentConfirm = onRecoveryConsentConfirm,
+            onRecoveryConsentDismiss = onRecoveryConsentDismiss,
         )
         return
     }

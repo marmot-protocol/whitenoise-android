@@ -67,6 +67,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -82,6 +83,9 @@ internal fun SignInContent(
     onErrorChange: (Int?) -> Unit,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
+    recoveryConsentVisible: Boolean = false,
+    onRecoveryConsentConfirm: () -> Unit = {},
+    onRecoveryConsentDismiss: () -> Unit = {},
 ) {
     WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
@@ -208,6 +212,19 @@ internal fun SignInContent(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+
+    // Recovery rotates signing material the engine can't prove was never
+    // published, so it is never started from the sign-in attempt itself — the
+    // user has to affirm the orphaned-KeyPackage risk first.
+    if (recoveryConsentVisible) {
+        ConfirmDialog(
+            title = stringResource(R.string.sign_in_recovery_title),
+            message = stringResource(R.string.sign_in_recovery_message),
+            confirmLabel = stringResource(R.string.sign_in_recovery_confirm),
+            onConfirm = onRecoveryConsentConfirm,
+            onDismiss = onRecoveryConsentDismiss,
+        )
     }
 }
 

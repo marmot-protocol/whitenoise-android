@@ -1159,6 +1159,14 @@
     <string name="onboarding_slogan_uncensorable">Incensurável</string>
     <string name="onboarding_slogan_secure_messaging">Mensagens Seguras</string>
     <string name="sign_in_error_public_key">Essa é uma chave pública. Insira sua chave secreta (nsec) para entrar.</string>
+    <string name="sign_in_error_setup_retry">A configuração da conta não foi concluída. Toque em entrar novamente para retomá-la.</string>
+    <string name="sign_in_error_setup_key_package_retry">A configuração da conta ainda está sendo concluída. Toque em entrar novamente para finalizá-la.</string>
+    <string name="sign_in_error_setup_unexpected_state">Estado de conta inesperado, então a entrada foi interrompida. Nada foi alterado.</string>
+    <string name="sign_in_error_setup_recovery_declined">Recuperação cancelada. Nada foi alterado.</string>
+    <string name="sign_in_error_setup_recovery_failed">A recuperação não foi concluída. Toque em entrar para tentar de novo.</string>
+    <string name="sign_in_recovery_title">Recuperar esta conta?</string>
+    <string name="sign_in_recovery_message">A configuração da conta não foi concluída e este dispositivo não pode provar que nenhum pacote de chaves foi publicado para ela. A recuperação remove a configuração incompleta e entra novamente. Se um pacote de chaves foi publicado, ele pode ficar órfão nos relays.</string>
+    <string name="sign_in_recovery_confirm">Recuperar</string>
     <string name="group_add_members_after_create">Você pode adicionar membros depois de criar o grupo.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Você é o único administrador. %1$s torna-se admin e você sai do grupo.</string>
     <string name="app_updates">Atualizações do app</string>

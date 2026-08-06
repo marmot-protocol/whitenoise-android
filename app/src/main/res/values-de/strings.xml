@@ -1157,6 +1157,14 @@
     <string name="onboarding_slogan_uncensorable">Unzensierbar</string>
     <string name="onboarding_slogan_secure_messaging">Sichere Nachrichten</string>
     <string name="sign_in_error_public_key">Das ist ein öffentlicher Schlüssel. Gib deinen geheimen Schlüssel (nsec) ein, um dich anzumelden.</string>
+    <string name="sign_in_error_setup_retry">Die Kontoeinrichtung wurde nicht abgeschlossen. Tippe erneut auf Anmelden, um sie fortzusetzen.</string>
+    <string name="sign_in_error_setup_key_package_retry">Die Kontoeinrichtung wird noch abgeschlossen. Tippe erneut auf Anmelden, um sie zu beenden.</string>
+    <string name="sign_in_error_setup_unexpected_state">Unerwarteter Kontozustand, die Anmeldung wurde gestoppt. Es wurde nichts geändert.</string>
+    <string name="sign_in_error_setup_recovery_declined">Wiederherstellung abgebrochen. Es wurde nichts geändert.</string>
+    <string name="sign_in_error_setup_recovery_failed">Die Wiederherstellung wurde nicht abgeschlossen. Tippe auf Anmelden, um es erneut zu versuchen.</string>
+    <string name="sign_in_recovery_title">Dieses Konto wiederherstellen?</string>
+    <string name="sign_in_recovery_message">Die Kontoeinrichtung wurde nicht abgeschlossen, und dieses Gerät kann nicht belegen, dass kein Schlüsselpaket dafür veröffentlicht wurde. Die Wiederherstellung entfernt die unvollständige Einrichtung und meldet dich erneut an. Falls ein Schlüsselpaket veröffentlicht wurde, kann es verwaist auf Relays zurückbleiben.</string>
+    <string name="sign_in_recovery_confirm">Wiederherstellen</string>
     <string name="group_add_members_after_create">Mitglieder kannst du nach dem Erstellen der Gruppe hinzufügen.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">Du bist der einzige Admin. %1$s wird Admin und du verlässt die Gruppe.</string>
     <string name="app_updates">App-Updates</string>

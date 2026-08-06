@@ -1211,6 +1211,14 @@
     <string name="onboarding_slogan_uncensorable">Uncensorable</string>
     <string name="onboarding_slogan_secure_messaging">Secure Messaging</string>
     <string name="sign_in_error_public_key">That\'s a public key. Enter your secret key (nsec) to sign in.</string>
+    <string name="sign_in_error_setup_retry">Account setup didn\'t finish. Tap sign in again to resume it.</string>
+    <string name="sign_in_error_setup_key_package_retry">Account setup is still finishing. Tap sign in again to complete it.</string>
+    <string name="sign_in_error_setup_unexpected_state">Unexpected account state, so sign-in stopped. Nothing was changed.</string>
+    <string name="sign_in_error_setup_recovery_declined">Recovery cancelled. Nothing was changed.</string>
+    <string name="sign_in_error_setup_recovery_failed">Recovery didn\'t complete. Tap sign in to try again.</string>
+    <string name="sign_in_recovery_title">Recover this account?</string>
+    <string name="sign_in_recovery_message">Account setup didn\'t finish, and this device can\'t prove that no key package was published for it. Recovering clears the unfinished setup and signs in again. If a key package was published, it may be left orphaned on relays.</string>
+    <string name="sign_in_recovery_confirm">Recover</string>
     <string name="group_add_members_after_create">You can add members after creating the group.</string>
     <string name="confirm_sole_admin_transfer_then_leave_message">You\'re the only admin. %1$s becomes admin and you leave the group.</string>
     <string name="app_updates">App updates</string>
