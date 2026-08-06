@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
+import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
@@ -80,6 +81,7 @@ class MainActivity : FragmentActivity() {
             val state = remember { appState }
             val systemDarkTheme = isSystemInDarkTheme()
             val darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme)
+            val bubbleTheme = BubbleTheme.resolve(state.themeMode, systemDarkTheme)
             // The in-app theme can override the system theme (e.g. AMOLED while
             // the system is light), so the pre-Compose fallback and system-bar
             // icons must follow the resolved app theme. Left on the edge-to-edge
@@ -96,6 +98,7 @@ class MainActivity : FragmentActivity() {
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
+                accentColorArgb = state.actionColorArgb(bubbleTheme),
                 fontScale = state.fontScale.factor,
                 appFont = state.appFont,
             ) {

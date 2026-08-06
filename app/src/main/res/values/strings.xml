@@ -1255,10 +1255,10 @@
     <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
-    <string name="action_color">Action color</string>
-    <string name="action_color_subtitle">Choose an identity color for New message, Send, and unread indicators. Light, dark, and AMOLED colors are stored separately.</string>
-    <string name="action_color_no_active_account">Choose an active account before setting its action color.</string>
-    <string name="action_color_swatch_content_description">Action color %1$s</string>
+    <string name="action_color">App accent color</string>
+    <string name="action_color_subtitle">Choose this account’s accent color for buttons, selections, and unread indicators. Light, dark, and AMOLED colors are stored separately.</string>
+    <string name="action_color_no_active_account">Choose an active account before setting its app accent color.</string>
+    <string name="action_color_swatch_content_description">App accent color %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Choose defaults for the current theme. Light, dark, and AMOLED colors are stored separately.</string>
     <string name="chat_bubble_colors_chat_subtitle">Override bubble colors only for this conversation. Reset to inherit the Appearance defaults.</string>
     <string name="bubble_color_preview">Preview</string>

@@ -1203,10 +1203,10 @@
     <string name="notification_channel_app_updates_description">Alertas de versiones de Zapstore</string>
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
-    <string name="action_color">Color de acción</string>
-    <string name="action_color_subtitle">Elige un color de identidad para Nuevo mensaje, Enviar y los indicadores de no leídos. Los colores claros, oscuros y AMOLED se guardan por separado.</string>
-    <string name="action_color_no_active_account">Selecciona una cuenta activa antes de configurar su color de acción.</string>
-    <string name="action_color_swatch_content_description">Color de acción %1$s</string>
+    <string name="action_color">Color de acento de la app</string>
+    <string name="action_color_subtitle">Elige el color de acento de esta cuenta para botones, selecciones e indicadores de no leídos. Los colores claros, oscuros y AMOLED se guardan por separado.</string>
+    <string name="action_color_no_active_account">Selecciona una cuenta activa antes de configurar su color de acento.</string>
+    <string name="action_color_swatch_content_description">Color de acento de la app %1$s</string>
     <string name="chat_bubble_colors_global_subtitle">Elige los valores predeterminados del tema actual. Los colores claro, oscuro y AMOLED se guardan por separado.</string>
     <string name="chat_bubble_colors_chat_subtitle">Cambia los colores de las burbujas solo para esta conversación. Restablece para heredar los valores de Apariencia.</string>
     <string name="bubble_color_preview">Vista previa</string>
