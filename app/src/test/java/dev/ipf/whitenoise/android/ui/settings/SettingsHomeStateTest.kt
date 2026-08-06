@@ -38,6 +38,7 @@ class SettingsHomeStateTest {
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
                 SettingsHomeRow.DevicePrivacy,
+                SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,
             ),
             state.preferenceRows,

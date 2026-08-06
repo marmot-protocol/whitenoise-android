@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Tune
@@ -111,6 +112,7 @@ internal enum class SettingsHomeRow {
     Notifications,
     TextToSpeech,
     DevicePrivacy,
+    AiAgents,
     Help,
 }
 
@@ -151,6 +153,7 @@ internal fun settingsHomeState(
                 SettingsHomeRow.Notifications,
                 SettingsHomeRow.TextToSpeech,
                 SettingsHomeRow.DevicePrivacy,
+                SettingsHomeRow.AiAgents,
                 SettingsHomeRow.Help,
             ),
         showAccountHeader = hasActiveAccount,
@@ -224,6 +227,7 @@ internal fun SettingsScreen(
                 appState = appState,
                 onBack = { onDetailChange(null) },
             )
+        SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
@@ -514,6 +518,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                 SettingsHomeRow.Notifications -> SettingsDetail.Notifications
                 SettingsHomeRow.TextToSpeech -> SettingsDetail.TextToSpeech
                 SettingsHomeRow.DevicePrivacy -> SettingsDetail.DevicePrivacy
+                SettingsHomeRow.AiAgents -> SettingsDetail.AiAgents
                 SettingsHomeRow.Help -> SettingsDetail.Help
             }
         item {
@@ -530,6 +535,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_title)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy)
+                        SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents)
                         SettingsHomeRow.Help -> stringResource(R.string.help)
                     },
                 subtitle =
@@ -544,6 +550,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.Notifications -> stringResource(R.string.notifications_settings_subtitle)
                         SettingsHomeRow.TextToSpeech -> stringResource(R.string.tts_settings_subtitle)
                         SettingsHomeRow.DevicePrivacy -> stringResource(R.string.device_privacy_settings_subtitle)
+                        SettingsHomeRow.AiAgents -> stringResource(R.string.ai_agents_settings_subtitle)
                         SettingsHomeRow.Help -> stringResource(R.string.help_settings_subtitle)
                     },
                 icon =
@@ -558,6 +565,7 @@ private fun SettingsGroupScope.settingsHomeRows(
                         SettingsHomeRow.Notifications -> Icons.Filled.Notifications
                         SettingsHomeRow.TextToSpeech -> Icons.Filled.RecordVoiceOver
                         SettingsHomeRow.DevicePrivacy -> Icons.Filled.Shield
+                        SettingsHomeRow.AiAgents -> Icons.Filled.SmartToy
                         SettingsHomeRow.Help -> Icons.Filled.Help
                     },
             ) { onOpenDetail(detail) }

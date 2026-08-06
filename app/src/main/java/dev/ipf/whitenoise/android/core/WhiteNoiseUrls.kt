@@ -8,4 +8,7 @@ internal object WhiteNoiseUrls {
     const val BUG_REPORT = "https://github.com/marmot-protocol/whitenoise-android/issues/new/choose"
 
     const val PRIVACY_POLICY = "https://www.whitenoise.chat/privacy"
+
+    const val AGENT_CONNECTOR_DOCS =
+        "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
 }
