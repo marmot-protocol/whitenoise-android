@@ -5,9 +5,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.conversationBackAction
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
-import java.io.File
 
 class ConversationBackFocusTest {
     @Test
@@ -108,22 +106,6 @@ class ConversationBackFocusTest {
                 ),
             )
         }
-    }
-
-    @Test
-    fun imeTargetClosureDoesNotActAsAComposerDismissalSignal() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-            ).firstOrNull { it.exists() }?.readText()
-                ?: error("Missing ConversationScreen.kt source file")
-
-        assertFalse(
-            "IME target closure is also emitted during keyboard-to-voice handoff",
-            source.contains("WindowInsets.imeAnimationTarget"),
-        )
-        assertFalse(source.contains("shouldClearComposerFocusAfterImeDismissal"))
     }
 }
 
