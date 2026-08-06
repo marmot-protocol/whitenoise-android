@@ -188,13 +188,16 @@ class TtsController internal constructor(
     }
 
     /**
-     * Resolves a deferred edge navigation once its history request settled. A
-     * terminal chunk that parked while the page was in flight completes now,
-     * unless [retainCursor] keeps the window for a retry.
+     * Resolves a deferred edge navigation once its history request settled,
+     * applying [settlement] to whatever cursor the queue is holding.
      */
     @Synchronized
-    internal fun settleEdgeRequest(retainCursor: Boolean) {
-        queue.settleEdgeRequest(retainCursor)
+    internal fun settleEdgeRequest(settlement: TtsEdgeSettlement) {
+        val wasSpeaking = state.value is TtsState.Speaking
+        queue.settleEdgeRequest(settlement)
+        // A settle that parks the session has nothing left to speak, so focus
+        // goes back exactly as it does for a user-driven pause.
+        if (wasSpeaking && state.value is TtsState.Paused) audioFocus.release()
     }
 
     /** Message ids of the queued window in playback order, empty ids included. */

@@ -167,10 +167,10 @@ class TtsHistorySession internal constructor(
         // completion or an interior move into a bogus page request.
         when (skip(true)) {
             TtsNavigationOutcome.AtOlderEdge ->
-                startEdgeLoad(convo, TtsHistoryDirection.Older, targetSentence, skip)
+                startEdgeLoad(convo, TtsHistoryDirection.Older, targetSentence)
 
             TtsNavigationOutcome.AtNewerEdge ->
-                startEdgeLoad(convo, TtsHistoryDirection.Newer, targetSentence, skip)
+                startEdgeLoad(convo, TtsHistoryDirection.Newer, targetSentence)
 
             else -> _edgeState.value = null
         }
@@ -180,7 +180,6 @@ class TtsHistorySession internal constructor(
         convo: SessionConversation,
         direction: TtsHistoryDirection,
         targetSentence: TtsWindowSentenceTarget,
-        fallbackSkip: (Boolean) -> TtsNavigationOutcome,
     ) {
         generation += 1
         val startedGeneration = generation
@@ -211,42 +210,44 @@ class TtsHistorySession internal constructor(
                         TtsHistoryEdgeWalk.Result.Failed
                     }
                 if (startedGeneration != generation || conversation != convo) return@launch
-                // Every branch settles the queue's edge deferral: a final chunk
-                // that finished mid-request parked instead of ending playback,
-                // and only these outcomes can say how it resolves.
+                // Every reachable branch settles the queue's edge deferral: a
+                // final chunk that finished mid-request parked instead of ending
+                // playback, and only these outcomes can say how it resolves.
                 when (result) {
-                    is TtsHistoryEdgeWalk.Result.Found -> {
-                        // Found is only reachable through a resolved pager.
-                        pager?.let { applyProjection(it, direction, targetSentence, result) }
-                        // An extension that landed already repositioned the
-                        // parked terminal, one that was refused has nothing
-                        // left to play.
-                        controller.settleEdgeRequest(retainCursor = false)
-                        _edgeState.value = null
-                    }
+                    is TtsHistoryEdgeWalk.Result.Found ->
+                        try {
+                            // Found is only reachable through a resolved pager.
+                            pager?.let { applyProjection(it, direction, targetSentence, result) }
+                        } finally {
+                            // An extension that landed already repositioned the
+                            // parked terminal, one that was refused has nothing
+                            // left to play. A throw must not strand either.
+                            controller.settleEdgeRequest(TtsEdgeSettlement.Resolved)
+                            _edgeState.value = null
+                        }
 
                     TtsHistoryEdgeWalk.Result.EndOfHistory -> {
                         _edgeState.value = null
-                        // A genuine end keeps the pre-paging semantics: next
-                        // completes the session naturally, previous restarts.
-                        // Settling only afterwards lets the restart claim the
-                        // parked terminal before completion could.
-                        fallbackSkip(false)
-                        controller.settleEdgeRequest(retainCursor = false)
+                        // Replaying the navigation call here instead would read
+                        // a cursor the parked terminal has already moved.
+                        controller.settleEdgeRequest(direction.endOfHistorySettlement())
                     }
 
                     TtsHistoryEdgeWalk.Result.Failed -> {
                         // Retry-by-re-tap needs the window and cursor intact.
-                        controller.settleEdgeRequest(retainCursor = true)
+                        controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
                         _edgeState.value = TtsHistoryEdgeState.Failed(direction)
                     }
 
-                    TtsHistoryEdgeWalk.Result.PageBound,
-                    TtsHistoryEdgeWalk.Result.Stale,
-                    -> {
-                        controller.settleEdgeRequest(retainCursor = false)
+                    TtsHistoryEdgeWalk.Result.PageBound -> {
+                        controller.settleEdgeRequest(TtsEdgeSettlement.Resolved)
                         _edgeState.value = null
                     }
+
+                    // Unreachable: a stale walk means the generation already
+                    // advanced, which the guard above returned on. Settling
+                    // here would clobber whichever request re-armed since.
+                    TtsHistoryEdgeWalk.Result.Stale -> Unit
                 }
             }
     }
@@ -290,6 +291,16 @@ class TtsHistorySession internal constructor(
         _edgeState.value = null
     }
 }
+
+/**
+ * A genuine end of history keeps the pre-paging semantics of the tap that armed
+ * the request: newer completes the session, older restarts the window.
+ */
+private fun TtsHistoryDirection.endOfHistorySettlement(): TtsEdgeSettlement =
+    when (this) {
+        TtsHistoryDirection.Older -> TtsEdgeSettlement.RestartedWindow
+        TtsHistoryDirection.Newer -> TtsEdgeSettlement.CompletedSession
+    }
 
 /**
  * One bounded hunt for the nearest speakable record beyond a window edge:

@@ -74,6 +74,26 @@ enum class TtsNavigationOutcome {
     Inactive,
 }
 
+/**
+ * How the outcome of a deferred edge request resolves the cursor it left
+ * behind. The tap's meaning was fixed when it armed the deferral, so the
+ * outcome only names the verdict — the queue applies it under its own lock,
+ * where the cursor it has to reason about cannot drift underneath it.
+ */
+internal enum class TtsEdgeSettlement {
+    /** The request repositioned playback itself, or had nothing to add. */
+    Resolved,
+
+    /** Retryable failure: the window and cursor stay put for a re-tap. */
+    Retained,
+
+    /** Older history really ended: the window replays from its first sentence. */
+    RestartedWindow,
+
+    /** Newer history really ended: the session ends, like an undeferred tail tap. */
+    CompletedSession,
+}
+
 /** Which sentence of the target message a window replacement lands on. */
 internal enum class TtsWindowSentenceTarget {
     First,
@@ -215,12 +235,16 @@ internal class TtsPlaybackQueue(
 
     fun pause() {
         val speaking = _state.value as? TtsState.Speaking ?: return
+        pauseAt(speaking.chunkIndex)
+    }
+
+    private fun pauseAt(chunkIndex: Int) {
         stopEngine()
         generation += 1
         // Resume re-reads the rate per utterance anyway, a leaked flag would
         // only force a needless engine restart at the first boundary.
         refreshAtNextBoundary = false
-        currentIndex = speaking.chunkIndex
+        currentIndex = chunkIndex
         pendingResumeAnnouncement = null
         messageIndexAtPause = messageIndexForChunk(currentIndex)
         publishPaused(currentIndex)
@@ -404,19 +428,26 @@ internal class TtsPlaybackQueue(
     private fun messageIndexOf(id: String): Int? = messages.indexOfFirst { it.messageIdHex == id }.takeIf { it >= 0 }
 
     /**
-     * Resolves the edge request armed by a deferred navigation. A terminal
-     * chunk that parked while the request was in flight completes here, because
-     * nothing repositioned playback — except under [retainCursor], where a
-     * failed request keeps its window and cursor so a re-tap can page again.
-     * Callers that did reposition (a window replacement, a fallback skip) have
-     * already advanced the generation, which makes this call inert.
+     * Applies the verdict of the edge request armed by a deferred navigation.
+     * A caller that already repositioned playback advanced the generation,
+     * which makes this call inert.
+     *
+     * The end-of-history verdicts act whether or not a terminal chunk parked:
+     * the tap has to mean the same thing either way, and only this side knows
+     * where the cursor ended up. [TtsEdgeSettlement.Retained] instead pauses a
+     * parked terminal — it was already spoken, so keeping the session Speaking
+     * would hold audio focus in silence with nothing left to play.
      */
-    fun settleEdgeRequest(retainCursor: Boolean) {
+    fun settleEdgeRequest(settlement: TtsEdgeSettlement) {
+        if (edgeRequestGeneration != generation) return
         val parked = parkedTerminalGeneration == generation
-        if (edgeRequestGeneration == generation) edgeRequestGeneration = null
-        if (parked && !retainCursor) {
-            parkedTerminalGeneration = null
-            finishPlayback()
+        edgeRequestGeneration = null
+        parkedTerminalGeneration = null
+        when (settlement) {
+            TtsEdgeSettlement.RestartedWindow -> moveTo(0, announcementForTarget(0))
+            TtsEdgeSettlement.CompletedSession -> completeThroughNavigation()
+            TtsEdgeSettlement.Retained -> if (parked) pauseAt(currentIndex)
+            TtsEdgeSettlement.Resolved -> if (parked) finishPlayback()
         }
     }
 
@@ -517,11 +548,11 @@ internal class TtsPlaybackQueue(
 
     private fun completeThroughNavigation() {
         stopEngine()
-        generation += 1
         finishPlayback()
     }
 
     private fun finishPlayback() {
+        generation += 1
         val completedCount = chunks.size
         val completedMessages = messages.size
         val lastPreview = messages.lastOrNull()?.preview.orEmpty()

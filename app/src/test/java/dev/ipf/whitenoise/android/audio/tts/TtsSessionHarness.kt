@@ -53,34 +53,69 @@ internal class SessionHarness(
         pager.loaded += record(id)
     }
 
-    fun speakConversation(vararg ids: String) {
-        check(controller.speak(ids.map(::entry), Locale.US)) { "speak must start" }
+    fun speakConversation(vararg ids: String) = speakEntries(ids.map(::entry))
+
+    fun speakEntries(entries: List<TtsSpeakableEntry>) {
+        check(controller.speak(entries, Locale.US)) { "speak must start" }
         session.onConversationSessionStarted("account", "group")
     }
 
-    fun entry(id: String): TtsSpeakableEntry =
+    /**
+     * Generation of every spoken utterance, in order. Each restart, requeue, or
+     * completion advances it, so this is what tells "played straight through"
+     * apart from "replayed something".
+     */
+    fun spokenGenerations(): List<Long> = engine.spoken.map { utteranceGeneration(it.utteranceId) }
+
+    /** Text of every spoken utterance, in order. */
+    fun spokenTexts(): List<String> = engine.spoken.map(FakeSessionEngine.Spoken::text)
+
+    fun entry(
+        id: String,
+        sentences: Int = 1,
+    ): TtsSpeakableEntry =
         TtsSpeakableEntry(
             senderKey = "s-$id",
             senderDisplayName = "N$id",
-            text = "Text $id.",
+            text = speakableText(id, sentences),
             messageIdHex = id,
             timelineAt = timelinePosition(id),
         )
 
-    fun record(id: String): AppMessageRecordFfi {
-        pager.speakableTextById[id] = "Text $id."
-        return rawRecord(id)
+    fun record(
+        id: String,
+        sentences: Int = 1,
+    ): AppMessageRecordFfi {
+        pager.speakableTextById[id] = speakableText(id, sentences)
+        return rawRecord(id, speakableText(id, sentences))
     }
 
-    fun unspeakableRecord(id: String): AppMessageRecordFfi = rawRecord(id)
+    fun unspeakableRecord(id: String): AppMessageRecordFfi = rawRecord(id, speakableText(id, sentences = 1))
 
-    private fun rawRecord(id: String): AppMessageRecordFfi =
+    private fun speakableText(
+        id: String,
+        sentences: Int,
+    ): String =
+        buildString {
+            append("Text $id.")
+            for (sentence in 2..sentences) append(" More $id $sentence.")
+        }
+
+    private fun utteranceGeneration(utteranceId: String): Long {
+        val stamped = utteranceId.removePrefix("whitenoise.tts.")
+        return stamped.substringBefore('.').toLong()
+    }
+
+    private fun rawRecord(
+        id: String,
+        plaintext: String,
+    ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
             direction = "received",
             groupIdHex = "group",
             sender = "s-$id",
-            plaintext = "Text $id.",
+            plaintext = plaintext,
             contentTokens =
                 MarkdownDocumentFfi(
                     truncated = false,
