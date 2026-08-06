@@ -187,6 +187,16 @@ class TtsController internal constructor(
         return queue.skipPreviousSentence(deferAtEdge)
     }
 
+    /**
+     * Resolves a deferred edge navigation once its history request settled. A
+     * terminal chunk that parked while the page was in flight completes now,
+     * unless [retainCursor] keeps the window for a retry.
+     */
+    @Synchronized
+    internal fun settleEdgeRequest(retainCursor: Boolean) {
+        queue.settleEdgeRequest(retainCursor)
+    }
+
     /** Message ids of the queued window in playback order, empty ids included. */
     @Synchronized
     internal fun queuedMessageIds(): List<String> = queue.queuedMessagesSnapshot().map(TtsQueuedMessage::messageIdHex)

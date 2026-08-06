@@ -211,10 +211,17 @@ class TtsHistorySession internal constructor(
                         TtsHistoryEdgeWalk.Result.Failed
                     }
                 if (startedGeneration != generation || conversation != convo) return@launch
+                // Every branch settles the queue's edge deferral: a final chunk
+                // that finished mid-request parked instead of ending playback,
+                // and only these outcomes can say how it resolves.
                 when (result) {
                     is TtsHistoryEdgeWalk.Result.Found -> {
                         // Found is only reachable through a resolved pager.
                         pager?.let { applyProjection(it, direction, targetSentence, result) }
+                        // An extension that landed already repositioned the
+                        // parked terminal, one that was refused has nothing
+                        // left to play.
+                        controller.settleEdgeRequest(retainCursor = false)
                         _edgeState.value = null
                     }
 
@@ -222,15 +229,24 @@ class TtsHistorySession internal constructor(
                         _edgeState.value = null
                         // A genuine end keeps the pre-paging semantics: next
                         // completes the session naturally, previous restarts.
+                        // Settling only afterwards lets the restart claim the
+                        // parked terminal before completion could.
                         fallbackSkip(false)
+                        controller.settleEdgeRequest(retainCursor = false)
                     }
 
-                    TtsHistoryEdgeWalk.Result.Failed ->
+                    TtsHistoryEdgeWalk.Result.Failed -> {
+                        // Retry-by-re-tap needs the window and cursor intact.
+                        controller.settleEdgeRequest(retainCursor = true)
                         _edgeState.value = TtsHistoryEdgeState.Failed(direction)
+                    }
 
                     TtsHistoryEdgeWalk.Result.PageBound,
                     TtsHistoryEdgeWalk.Result.Stale,
-                    -> _edgeState.value = null
+                    -> {
+                        controller.settleEdgeRequest(retainCursor = false)
+                        _edgeState.value = null
+                    }
                 }
             }
     }

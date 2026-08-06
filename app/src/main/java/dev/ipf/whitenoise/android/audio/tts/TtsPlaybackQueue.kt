@@ -104,6 +104,14 @@ internal class TtsPlaybackQueue(
     private var pendingResumeAnnouncement: SenderAnnouncement? = null
     private var messageIndexAtPause: Int? = null
 
+    // Generation of a deferred edge navigation the caller has not resolved
+    // yet, and the generation whose final chunk finished while that request
+    // was still in flight. Both are stamped rather than cleared: every reset
+    // path advances the generation, so a late resolve is inert for the same
+    // reason a stale utterance callback is.
+    private var edgeRequestGeneration: Long? = null
+    private var parkedTerminalGeneration: Long? = null
+
     /** How a repositioned target treats its message's sender announcement. */
     private enum class SenderAnnouncement {
         // The target crossed into another message: announce its sender once.
@@ -165,6 +173,13 @@ internal class TtsPlaybackQueue(
         if (newMessages.isEmpty()) return false
         val appended = appendMessages(newMessages)
         if (current is TtsState.Speaking) {
+            // A parked terminal chunk has already been spoken, so progress has
+            // to move onto the appended run instead of waiting on a callback
+            // that will never come again.
+            if (parkedTerminalGeneration == generation) {
+                parkedTerminalGeneration = null
+                currentIndex = appended.first().index
+            }
             publishSpeaking(currentIndex)
             for (chunk in appended) {
                 val utteranceId = utteranceId(generation, chunk.index)
@@ -267,7 +282,7 @@ internal class TtsPlaybackQueue(
         if (!isNavigable()) return TtsNavigationOutcome.Inactive
         val nextMessage = messageIndexForChunk(currentIndex) + 1
         return when {
-            nextMessage >= messages.size && deferAtEdge -> TtsNavigationOutcome.AtNewerEdge
+            nextMessage >= messages.size && deferAtEdge -> deferToEdge(TtsNavigationOutcome.AtNewerEdge)
             nextMessage >= messages.size -> {
                 completeThroughNavigation()
                 TtsNavigationOutcome.Completed
@@ -284,7 +299,7 @@ internal class TtsPlaybackQueue(
         if (!isNavigable()) return TtsNavigationOutcome.Inactive
         val currentMessage = messageIndexForChunk(currentIndex)
         return if (currentMessage == 0 && deferAtEdge) {
-            TtsNavigationOutcome.AtOlderEdge
+            deferToEdge(TtsNavigationOutcome.AtOlderEdge)
         } else {
             val target = firstChunkIndexOfMessage((currentMessage - 1).coerceAtLeast(0))
             moveTo(target, announcementForTarget(target))
@@ -296,7 +311,7 @@ internal class TtsPlaybackQueue(
         if (!isNavigable()) return TtsNavigationOutcome.Inactive
         val target = firstChunkIndexAfterSentenceContaining(currentIndex)
         return when {
-            target >= chunks.size && deferAtEdge -> TtsNavigationOutcome.AtNewerEdge
+            target >= chunks.size && deferAtEdge -> deferToEdge(TtsNavigationOutcome.AtNewerEdge)
             target >= chunks.size -> {
                 completeThroughNavigation()
                 TtsNavigationOutcome.Completed
@@ -314,7 +329,7 @@ internal class TtsPlaybackQueue(
         // Only the very first chunk is a genuine boundary crossing — anywhere
         // later in the first sentence, "previous" restarts that sentence.
         return if (currentIndex == 0 && deferAtEdge) {
-            TtsNavigationOutcome.AtOlderEdge
+            deferToEdge(TtsNavigationOutcome.AtOlderEdge)
         } else {
             val currentSentenceStart = firstChunkIndexOfSentenceContaining(currentIndex)
             val target =
@@ -388,20 +403,44 @@ internal class TtsPlaybackQueue(
 
     private fun messageIndexOf(id: String): Int? = messages.indexOfFirst { it.messageIdHex == id }.takeIf { it >= 0 }
 
+    /**
+     * Resolves the edge request armed by a deferred navigation. A terminal
+     * chunk that parked while the request was in flight completes here, because
+     * nothing repositioned playback — except under [retainCursor], where a
+     * failed request keeps its window and cursor so a re-tap can page again.
+     * Callers that did reposition (a window replacement, a fallback skip) have
+     * already advanced the generation, which makes this call inert.
+     */
+    fun settleEdgeRequest(retainCursor: Boolean) {
+        val parked = parkedTerminalGeneration == generation
+        if (edgeRequestGeneration == generation) edgeRequestGeneration = null
+        if (parked && !retainCursor) {
+            parkedTerminalGeneration = null
+            finishPlayback()
+        }
+    }
+
     fun onDone(utteranceId: String?) {
         val completedIndex = parseCurrentGenerationIndex(utteranceId) ?: return
         if (_state.value !is TtsState.Speaking || completedIndex != currentIndex) return
         val next = completedIndex + 1
-        if (next >= chunks.size) {
-            finishPlayback()
-        } else {
-            currentIndex = next
-            announceSenderForCurrentMessage = false
-            publishSpeaking(currentIndex)
-            if (refreshAtNextBoundary) {
-                refreshAtNextBoundary = false
-                requeueFrom(next, SenderAnnouncement.Natural)
-            }
+        when {
+            next < chunks.size -> advanceToChunk(next)
+            // An edge request is still hunting for history past this chunk, so
+            // the terminal parks: publishing Idle here would tear the session
+            // down (and drop audio focus) moments before the page extends it.
+            edgeRequestGeneration == generation -> parkedTerminalGeneration = generation
+            else -> finishPlayback()
+        }
+    }
+
+    private fun advanceToChunk(next: Int) {
+        currentIndex = next
+        announceSenderForCurrentMessage = false
+        publishSpeaking(currentIndex)
+        if (refreshAtNextBoundary) {
+            refreshAtNextBoundary = false
+            requeueFrom(next, SenderAnnouncement.Natural)
         }
     }
 
@@ -433,6 +472,12 @@ internal class TtsPlaybackQueue(
     }
 
     private fun isNavigable(): Boolean = _state.value is TtsState.Speaking || _state.value is TtsState.Paused
+
+    /** Arms the edge deferral for the request the caller is about to start. */
+    private fun deferToEdge(outcome: TtsNavigationOutcome): TtsNavigationOutcome {
+        edgeRequestGeneration = generation
+        return outcome
+    }
 
     private fun announcementForTarget(target: Int): SenderAnnouncement =
         if (messageIndexForChunk(target) != messageIndexForChunk(currentIndex)) {
