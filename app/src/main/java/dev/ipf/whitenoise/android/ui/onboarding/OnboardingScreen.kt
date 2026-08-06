@@ -95,8 +95,11 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
 
     // Shared by the sign-in attempt and the acknowledged recovery: the busy
     // state flips before the coroutine starts, so the button reads as busy from
-    // the tap onward.
+    // the tap onward. The idle guard is what makes a second tap in the frame
+    // before that flip renders — the consent dialog is still attached — reach
+    // no second engine call.
     fun runStep(step: suspend () -> SignInStep) {
+        if (inFlightAction != OnboardingAction.Idle) return
         inFlightAction = OnboardingAction.Importing
         importErrorRes = null
         scope.launch {

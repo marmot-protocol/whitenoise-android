@@ -216,8 +216,10 @@ internal fun SignInContent(
 
     // Recovery rotates signing material the engine can't prove was never
     // published, so it is never started from the sign-in attempt itself — the
-    // user has to affirm the orphaned-KeyPackage risk first.
-    if (recoveryConsentVisible) {
+    // user has to affirm the orphaned-KeyPackage risk first. The busy read drops
+    // the prompt as soon as a confirmed recovery is in flight, so the confirm
+    // button can't be tapped a second time behind it.
+    if (recoveryConsentVisible && !busy) {
         ConfirmDialog(
             title = stringResource(R.string.sign_in_recovery_title),
             message = stringResource(R.string.sign_in_recovery_message),
