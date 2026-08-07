@@ -1,0 +1,40 @@
+name: PR screenshots
+
+# This privileged event only reads GitHub API metadata and committed images.
+# It deliberately never checks out or executes pull-request code, so fork PRs
+# can receive an updated description without exposing a write token to them.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: pr-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  update-description:
+    name: Update visual changes in PR description
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted workflow scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Test screenshot renderer
+        run: node --test .github/scripts/update-pr-screenshots.test.js
+
+      - name: Update PR screenshots
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
+        with:
+          script: |
+            const updater = require('./.github/scripts/update-pr-screenshots.js')
+            await updater.run({ github, context, core })

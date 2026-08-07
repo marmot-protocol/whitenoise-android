@@ -34,6 +34,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Test PR screenshot renderer
+        run: node --test .github/scripts/update-pr-screenshots.test.js
+
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
