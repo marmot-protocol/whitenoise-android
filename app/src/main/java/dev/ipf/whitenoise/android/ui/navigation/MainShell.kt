@@ -185,7 +185,7 @@ internal fun MainShell(
     appState: WhiteNoiseAppState,
     inboundNotificationTarget: NotificationTarget? = null,
     inboundNotificationRequestId: Long = 0L,
-    onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
@@ -300,6 +300,7 @@ internal fun MainShell(
         chatsController.materializedGroupsRevision,
         notificationInviteAuthoritativelyUnavailable,
     ) {
+        val routingRequestId = inboundNotificationRequestId
         val target =
             inboundNotificationTarget ?: run {
                 // The pending target was cancelled or replaced mid-route (e.g. a
@@ -365,7 +366,7 @@ internal fun MainShell(
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
             selectedChat = chatItem
             routingNotification = false
-            onNotificationTargetHandled(target)
+            onNotificationTargetHandled(target, routingRequestId)
         }
 
         fun fallBackToChatList() {
@@ -457,20 +458,20 @@ internal fun MainShell(
                     }
                     ?: run {
                         routingNotification = false
-                        onNotificationTargetHandled(target)
+                        onNotificationTargetHandled(target, routingRequestId)
                     }
             }
             NotificationNavStep.MissingAccount -> {
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
-                onNotificationTargetHandled(target)
+                onNotificationTargetHandled(target, routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
-                onNotificationTargetHandled(target)
+                onNotificationTargetHandled(target, routingRequestId)
             }
         }
     }

@@ -24,6 +24,19 @@ data class NotificationTarget(
     val kind: NotificationTargetKind,
 )
 
+/**
+ * True when [handledTarget] and [handledRequestId] still match the activity's
+ * pending inbound notification — i.e. it is safe to clear that target on
+ * consume. An equal target with a stale request id (same-target retap) must not
+ * match.
+ */
+internal fun inboundNotificationHandledMatchesCurrent(
+    inboundTarget: NotificationTarget?,
+    inboundRequestId: Long,
+    handledTarget: NotificationTarget,
+    handledRequestId: Long,
+): Boolean = inboundTarget == handledTarget && inboundRequestId == handledRequestId
+
 /** One step of the tap-to-navigate state machine (see [resolveNotificationNav]). */
 sealed interface NotificationNavStep {
     /** Active account differs from the target's — switch first, then re-evaluate. */

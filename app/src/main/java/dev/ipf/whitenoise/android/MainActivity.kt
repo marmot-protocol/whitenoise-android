@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.parseShareRequest
@@ -123,8 +124,20 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun handleNotificationTarget(handled: NotificationTarget) {
-        if (inboundNotificationTarget == handled) inboundNotificationTarget = null
+    private fun handleNotificationTarget(
+        handledTarget: NotificationTarget,
+        handledRequestId: Long,
+    ) {
+        if (
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = inboundNotificationTarget,
+                inboundRequestId = inboundNotificationRequestId,
+                handledTarget = handledTarget,
+                handledRequestId = handledRequestId,
+            )
+        ) {
+            inboundNotificationTarget = null
+        }
     }
 
     // NIP-55 (Amber) approval prompts route through this launcher. Registered

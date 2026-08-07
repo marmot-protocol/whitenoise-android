@@ -47,7 +47,7 @@ fun WhiteNoiseApp(
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     inboundNotificationRequestId: Long = 0L,
-    onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,

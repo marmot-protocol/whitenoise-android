@@ -74,6 +74,32 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun inboundNotificationHandledMatchesCurrent_equalTargetStaleRequestId_doesNotMatch() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        assertFalse(
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = target,
+                inboundRequestId = 2L,
+                handledTarget = target,
+                handledRequestId = 1L,
+            ),
+        )
+    }
+
+    @Test
+    fun inboundNotificationHandledMatchesCurrent_matchingTargetAndRequestId_matches() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        assertTrue(
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = target,
+                inboundRequestId = 2L,
+                handledTarget = target,
+                handledRequestId = 2L,
+            ),
+        )
+    }
+
+    @Test
     fun routeInboundIntent_repeatedSameNotificationTargetAdvancesRequestId() {
         val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
         val first =
