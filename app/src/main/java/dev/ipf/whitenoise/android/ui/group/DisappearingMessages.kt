@@ -53,6 +53,9 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowInsetsControllerCompat
 import dev.ipf.whitenoise.android.R
 
+internal const val DISAPPEARING_CUSTOM_VALUE_PICKER_TAG = "disappearing_custom_value_picker"
+internal const val DISAPPEARING_CUSTOM_UNIT_PICKER_TAG = "disappearing_custom_unit_picker"
+
 // Full-screen retention picker: an explanatory line, a radio list of preset
 // windows + Custom, and a Save action. The selection is STAGED — nothing
 // changes until Save, so the caller's [onPick] (which routes through the group
@@ -210,6 +213,8 @@ private fun DisappearingCustomDialog(
     initialSecs: Long,
     onDismiss: () -> Unit,
     onConfirm: (Long) -> Unit,
+    hostInDialog: Boolean = true,
+    onPickerCreated: ((NumberPicker) -> Unit)? = null,
 ) {
     val units = disappearingCustomUnits
     val initialState = remember(initialSecs) { disappearingCustomPickerStateForSeconds(initialSecs) }
@@ -222,10 +227,7 @@ private fun DisappearingCustomDialog(
     // The selected (center) number is rendered bright by the theme; only the
     // scrolling neighbours expose a public color setter.
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    val content: @Composable () -> Unit = {
         Surface(
             modifier = Modifier.width(300.dp),
             shape = RoundedCornerShape(28.dp),
@@ -248,10 +250,12 @@ private fun DisappearingCustomDialog(
                 ) {
                     AndroidView(
                         factory = { ctx ->
-                            NumberPicker(ctx).apply {
-                                minValue = 1
-                                setOnValueChangedListener { _, _, n -> value = n }
-                            }
+                            NumberPicker(ctx)
+                                .apply {
+                                    tag = DISAPPEARING_CUSTOM_VALUE_PICKER_TAG
+                                    minValue = 1
+                                    setOnValueChangedListener { _, _, n -> value = n }
+                                }.also { onPickerCreated?.invoke(it) }
                         },
                         update = { picker ->
                             picker.textColor = unselectedColor
@@ -262,14 +266,16 @@ private fun DisappearingCustomDialog(
                     Spacer(Modifier.width(12.dp))
                     AndroidView(
                         factory = { ctx ->
-                            NumberPicker(ctx).apply {
-                                minValue = 0
-                                wrapSelectorWheel = false
-                                setOnValueChangedListener { _, _, n ->
-                                    unitIndex = n
-                                    value = clampDisappearingCustomValue(value, n)
-                                }
-                            }
+                            NumberPicker(ctx)
+                                .apply {
+                                    tag = DISAPPEARING_CUSTOM_UNIT_PICKER_TAG
+                                    minValue = 0
+                                    wrapSelectorWheel = false
+                                    setOnValueChangedListener { _, _, n ->
+                                        unitIndex = n
+                                        value = clampDisappearingCustomValue(value, n)
+                                    }
+                                }.also { onPickerCreated?.invoke(it) }
                         },
                         update = { picker ->
                             picker.textColor = unselectedColor
@@ -298,4 +304,30 @@ private fun DisappearingCustomDialog(
             }
         }
     }
+    if (hostInDialog) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            content()
+        }
+    } else {
+        content()
+    }
+}
+
+@Composable
+internal fun disappearingCustomDialogTestHost(
+    initialSecs: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit,
+    onPickerCreated: (NumberPicker) -> Unit,
+) {
+    DisappearingCustomDialog(
+        initialSecs = initialSecs,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        hostInDialog = false,
+        onPickerCreated = onPickerCreated,
+    )
 }

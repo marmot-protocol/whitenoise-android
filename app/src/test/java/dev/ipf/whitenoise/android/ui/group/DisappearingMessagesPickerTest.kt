@@ -1,10 +1,14 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import android.widget.NumberPicker
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
@@ -13,10 +17,12 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -28,6 +34,7 @@ class DisappearingMessagesPickerTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private val nativePickers = mutableMapOf<Any?, NumberPicker>()
 
     @Test
     fun presetListShowsThreeMonthsAboveFourWeeks() {
@@ -54,8 +61,7 @@ class DisappearingMessagesPickerTest {
         var picked: Long? = null
         render(currentSecs = 604_800L, onPick = { picked = it })
 
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_custom)).performClick()
-        composeRule.waitForIdle()
+        openCustomDialog()
         composeRule.runOnUiThread {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
@@ -69,7 +75,7 @@ class DisappearingMessagesPickerTest {
         var picked: Long? = null
         render(currentSecs = 2_592_000L, onPick = { picked = it })
 
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_custom)).performClick()
+        openCustomDialog()
         composeRule.waitForIdle()
         composeRule.runOnUiThread {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
@@ -96,7 +102,10 @@ class DisappearingMessagesPickerTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(context.getString(R.string.save)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_custom)).assertIsDisplayed()
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.disappearing_custom))
+            .filterToOne(hasClickAction())
+            .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.disappearing_off)).assertIsDisplayed()
     }
@@ -140,6 +149,99 @@ class DisappearingMessagesPickerTest {
         }
         composeRule.onNodeWithText("10 years").assertIsDisplayed()
     }
+
+    @Test
+    fun nativeCustomPickersClampSubmitAndCancelLongDurations() {
+        var confirmed: Long? = null
+        var dismissed = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                disappearingCustomDialogTestHost(
+                    initialSecs = 60L,
+                    onDismiss = { dismissed = true },
+                    onConfirm = { confirmed = it },
+                    onPickerCreated = { picker -> nativePickers[picker.tag] = picker },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, monthUnitIndex())
+        setNativePicker(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG, 12)
+        clickCustomSet()
+        composeRule.runOnIdle { assertEquals(31_104_000L, confirmed) }
+
+        composeRule.runOnIdle { confirmed = null }
+        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, yearUnitIndex())
+        assertEquals(10, nativePickerValue(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG))
+        clickCustomSet()
+        composeRule.runOnIdle { assertEquals(315_360_000L, confirmed) }
+
+        composeRule.runOnIdle { confirmed = null }
+        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, monthUnitIndex())
+        setNativePicker(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG, 12)
+        clickCustomCancel()
+        composeRule.runOnIdle {
+            assertTrue(dismissed)
+            assertNull(confirmed)
+        }
+    }
+
+    private fun openCustomDialog() {
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.disappearing_custom))
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun clickCustomSet() {
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.disappearing_set))
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun clickCustomCancel() {
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.cancel))
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun setNativePicker(
+        tag: String,
+        newValue: Int,
+    ) {
+        composeRule.runOnUiThread {
+            val picker = checkNotNull(nativePickers[tag])
+            val oldValue = picker.value
+            picker.value = newValue
+            checkNotNull(shadowOf(picker).onValueChangeListener)
+                .onValueChange(picker, oldValue, newValue)
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun nativePickerValue(tag: String): Int {
+        var value: Int? = null
+        composeRule.runOnUiThread {
+            value = checkNotNull(nativePickers[tag]).value
+        }
+        return checkNotNull(value)
+    }
+
+    private fun monthUnitIndex(): Int =
+        disappearingCustomUnits.indexOfFirst {
+            it.seconds == DISAPPEARING_SECONDS_PER_MONTH
+        }
+
+    private fun yearUnitIndex(): Int =
+        disappearingCustomUnits.indexOfFirst {
+            it.seconds == DISAPPEARING_SECONDS_PER_YEAR
+        }
 
     private fun render(
         currentSecs: Long,
