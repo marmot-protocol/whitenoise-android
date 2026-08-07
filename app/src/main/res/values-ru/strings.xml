@@ -1115,7 +1115,7 @@
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_7_days">7 дней</string>
     <string name="disappearing_30_days">30 дней</string>
-    <string name="disappearing_90_days">90 дней</string>
+    <string name="disappearing_90_days">3 месяца</string>
     <string name="disappearing_custom">Своё время</string>
     <string name="disappearing_days_format">%1$d дн.</string>
     <string name="disappearing_hours_format">%1$d ч.</string>
@@ -1124,6 +1124,26 @@
     <string name="disappearing_unit_hours">Часы</string>
     <string name="disappearing_unit_days">Дни</string>
     <string name="disappearing_unit_weeks">Недели</string>
+    <string name="disappearing_unit_months">Месяцы</string>
+    <string name="disappearing_unit_years">Годы</string>
+    <plurals name="disappearing_weeks_count">
+        <item quantity="one">%d неделя</item>
+        <item quantity="few">%d недели</item>
+        <item quantity="many">%d недель</item>
+        <item quantity="other">%d недели</item>
+    </plurals>
+    <plurals name="disappearing_months_count">
+        <item quantity="one">%d месяц</item>
+        <item quantity="few">%d месяца</item>
+        <item quantity="many">%d месяцев</item>
+        <item quantity="other">%d месяца</item>
+    </plurals>
+    <plurals name="disappearing_years_count">
+        <item quantity="one">%d год</item>
+        <item quantity="few">%d года</item>
+        <item quantity="many">%d лет</item>
+        <item quantity="other">%d года</item>
+    </plurals>
     <string name="disappearing_custom_amount_label">Количество</string>
     <string name="disappearing_row_hint_admin">Нажмите, чтобы задать срок жизни новых сообщений</string>
     <string name="disappearing_row_hint_readonly">Изменить это могут только администраторы</string>

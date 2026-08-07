@@ -1069,7 +1069,7 @@
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_7_days">7 gün</string>
     <string name="disappearing_30_days">30 gün</string>
-    <string name="disappearing_90_days">90 gün</string>
+    <string name="disappearing_90_days">3 ay</string>
     <string name="disappearing_custom">Özel süre</string>
     <string name="disappearing_days_format">%1$d gün</string>
     <string name="disappearing_hours_format">%1$d saat</string>
@@ -1078,6 +1078,20 @@
     <string name="disappearing_unit_hours">Saat</string>
     <string name="disappearing_unit_days">Gün</string>
     <string name="disappearing_unit_weeks">Hafta</string>
+    <string name="disappearing_unit_months">Ay</string>
+    <string name="disappearing_unit_years">Yıl</string>
+    <plurals name="disappearing_weeks_count">
+        <item quantity="one">%d hafta</item>
+        <item quantity="other">%d hafta</item>
+    </plurals>
+    <plurals name="disappearing_months_count">
+        <item quantity="one">%d ay</item>
+        <item quantity="other">%d ay</item>
+    </plurals>
+    <plurals name="disappearing_years_count">
+        <item quantity="one">%d yıl</item>
+        <item quantity="other">%d yıl</item>
+    </plurals>
     <string name="disappearing_custom_amount_label">Miktar</string>
     <string name="disappearing_row_hint_admin">Yeni mesajların ne kadar kalacağını ayarlamak için dokunun</string>
     <string name="disappearing_row_hint_readonly">Bunu yalnızca yöneticiler değiştirebilir</string>
