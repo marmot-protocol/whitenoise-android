@@ -108,9 +108,7 @@ class MainActivity : FragmentActivity() {
                     },
                     inboundNotificationTarget = inboundNotificationTarget,
                     inboundNotificationRequestId = inboundNotificationRequestId,
-                    onNotificationTargetHandled = { handled ->
-                        if (inboundNotificationTarget == handled) inboundNotificationTarget = null
-                    },
+                    onNotificationTargetHandled = ::handleNotificationTarget,
                     inboundShareRequest = inboundShareRequest,
                     onShareRequestHandled = { handled ->
                         if (inboundShareRequest == handled) inboundShareRequest = null
@@ -123,6 +121,10 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
+    }
+
+    private fun handleNotificationTarget(handled: NotificationTarget) {
+        if (inboundNotificationTarget == handled) inboundNotificationTarget = null
     }
 
     // NIP-55 (Amber) approval prompts route through this launcher. Registered
