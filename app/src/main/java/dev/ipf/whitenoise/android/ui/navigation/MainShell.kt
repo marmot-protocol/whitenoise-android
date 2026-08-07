@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -240,6 +241,13 @@ internal fun MainShell(
     ) {
         mutableStateOf(false)
     }
+    var notificationInviteAuthoritativeProbeAttempts by remember(
+        inboundNotificationTarget?.accountRef,
+        inboundNotificationTarget?.groupIdHex,
+        inboundNotificationTarget?.kind,
+    ) {
+        mutableIntStateOf(0)
+    }
     var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
@@ -299,7 +307,13 @@ internal fun MainShell(
                 routingNotification = false
                 return@LaunchedEffect
             }
-        if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
+        if (appState.accounts.isEmpty()) {
+            // Accounts are not loaded yet; release any routing overlay so we do
+            // not stick on NotificationLoading. Do not touch chat-list await
+            // semantics — the effect re-runs when accounts arrive.
+            routingNotification = false
+            return@LaunchedEffect
+        }
         val chatListReady =
             chatsController.boundAccountRef == target.accountRef &&
                 !chatsController.isLoading
@@ -389,6 +403,10 @@ internal fun MainShell(
                 var authoritativeItem: ChatListItem? = null
                 when (
                     retryInviteAuthoritativeLoad(
+                        probeAttempts = notificationInviteAuthoritativeProbeAttempts,
+                        onProbeAttempt = {
+                            notificationInviteAuthoritativeProbeAttempts = it
+                        },
                         load = {
                             runCatchingCancellable {
                                 appState.loadCreatedChatListItem(target.groupIdHex)

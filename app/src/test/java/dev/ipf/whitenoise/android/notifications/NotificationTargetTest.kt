@@ -778,9 +778,9 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun inviteAuthoritativeLoadClassification_distinguishesMissingFromTransientFailure() {
+    fun inviteAuthoritativeLoadClassification_treatsUnknownGroupAsTransientDuringProbe() {
         assertEquals(
-            NotificationInviteAuthoritativeOutcome.Unavailable,
+            NotificationInviteAuthoritativeOutcome.Inconclusive,
             classifyInviteAuthoritativeLoad(
                 Result.failure(MarmotKitException.UnknownGroup("group-1")),
             ),
@@ -915,9 +915,9 @@ class NotificationTargetTest {
 
     @Test
     fun inviteAuthoritativeProbeRetry_allowsBoundedInconclusiveAttempts() {
-        assertTrue(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 0))
-        assertTrue(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 2))
-        assertFalse(inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes = 3))
+        assertTrue(inviteAuthoritativeProbeShouldRetry(probeAttempts = 0))
+        assertTrue(inviteAuthoritativeProbeShouldRetry(probeAttempts = 2))
+        assertFalse(inviteAuthoritativeProbeShouldRetry(probeAttempts = 3))
     }
 
     @Test
@@ -982,6 +982,90 @@ class NotificationTargetTest {
             )
             assertEquals(3, calls)
             assertEquals(listOf(250L, 500L), delays)
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_unknownGroupThenSuccess_retriesAndOpens() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.UnknownGroup("group-1")),
+                        Result.success(true),
+                    ),
+                )
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.OpenConversation,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(listOf(250L), delays)
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_exhaustedUnknownGroupRemainsInconclusive() =
+        runTest {
+            var calls = 0
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    load = {
+                        calls += 1
+                        Result.failure(MarmotKitException.UnknownGroup("group-1"))
+                    },
+                    sleep = {},
+                ),
+            )
+            assertEquals(3, calls)
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_persistedBudgetSurvivesCancellationDuringBackoff() =
+        runTest {
+            var persistedAttempts = 0
+            var loadCalls = 0
+            val transientFailure = Result.failure<Boolean>(MarmotKitException.Runtime("busy"))
+            var cancelled = false
+
+            try {
+                retryInviteAuthoritativeLoad(
+                    probeAttempts = persistedAttempts,
+                    onProbeAttempt = { persistedAttempts = it },
+                    load = {
+                        loadCalls += 1
+                        transientFailure
+                    },
+                    sleep = { throw kotlinx.coroutines.CancellationException("effect restarted") },
+                )
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                cancelled = true
+            }
+
+            assertTrue(cancelled)
+            assertEquals(1, persistedAttempts)
+            assertEquals(1, loadCalls)
+
+            loadCalls = 0
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    probeAttempts = persistedAttempts,
+                    onProbeAttempt = { persistedAttempts = it },
+                    load = {
+                        loadCalls += 1
+                        transientFailure
+                    },
+                    sleep = {},
+                ),
+            )
+            assertEquals(2, loadCalls)
+            assertEquals(3, persistedAttempts)
         }
 
     // ---- helpers ------------------------------------------------------------

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Intent
 import android.net.Uri
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -137,10 +136,7 @@ internal fun classifyInviteAuthoritativeLoad(result: Result<Boolean>): Notificat
             NotificationInviteAuthoritativeOutcome.Unavailable
         }
     }
-    return when (result.exceptionOrNull()) {
-        is MarmotKitException.UnknownGroup -> NotificationInviteAuthoritativeOutcome.Unavailable
-        else -> NotificationInviteAuthoritativeOutcome.Inconclusive
-    }
+    return NotificationInviteAuthoritativeOutcome.Inconclusive
 }
 
 /** Whether an authoritative group read still represents an openable invite target. */
@@ -153,48 +149,52 @@ internal fun inviteAuthoritativeGroupAvailable(
         else -> pendingConfirmation || selfMembership == SelfMembershipFfi.MEMBER
     }
 
-/** Max inconclusive authoritative invite probes before releasing the route (#1767). */
-internal const val NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES = 3
+/** Max authoritative invite probe attempts before releasing the route (#1767). */
+internal const val NOTIFICATION_INVITE_AUTHORITATIVE_MAX_PROBE_ATTEMPTS = 3
 
 internal const val NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_INITIAL_BACKOFF_MILLIS = 250L
 
 internal const val NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_MAX_BACKOFF_MILLIS = 2_000L
 
 internal fun inviteAuthoritativeProbeShouldRetry(
-    inconclusiveOutcomes: Int,
-    maxInconclusiveOutcomes: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES,
-): Boolean = inconclusiveOutcomes < maxInconclusiveOutcomes
+    probeAttempts: Int,
+    maxProbeAttempts: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_PROBE_ATTEMPTS,
+): Boolean = probeAttempts < maxProbeAttempts
 
 internal fun inviteAuthoritativeProbeBackoffMillis(
-    inconclusiveOutcomes: Int,
+    probeAttempts: Int,
     initialMillis: Long = NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_INITIAL_BACKOFF_MILLIS,
     maxMillis: Long = NOTIFICATION_INVITE_AUTHORITATIVE_PROBE_MAX_BACKOFF_MILLIS,
 ): Long {
     var delayMillis = initialMillis
-    repeat((inconclusiveOutcomes - 1).coerceAtLeast(0)) {
+    repeat((probeAttempts - 1).coerceAtLeast(0)) {
         delayMillis = nextRetryBackoffMillis(delayMillis, maxMillis)
     }
     return delayMillis
 }
 
 internal suspend fun retryInviteAuthoritativeLoad(
-    maxInconclusiveOutcomes: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_INCONCLUSIVE_OUTCOMES,
+    probeAttempts: Int = 0,
+    maxProbeAttempts: Int = NOTIFICATION_INVITE_AUTHORITATIVE_MAX_PROBE_ATTEMPTS,
+    onProbeAttempt: (Int) -> Unit = {},
     load: suspend () -> Result<Boolean>,
     sleep: suspend (Long) -> Unit = { delay(it) },
 ): NotificationInviteAuthoritativeOutcome {
-    var inconclusiveOutcomes = 0
-    while (true) {
-        when (val outcome = classifyInviteAuthoritativeLoad(load())) {
-            NotificationInviteAuthoritativeOutcome.Inconclusive -> {
-                inconclusiveOutcomes += 1
-                if (!inviteAuthoritativeProbeShouldRetry(inconclusiveOutcomes, maxInconclusiveOutcomes)) {
-                    return outcome
-                }
-                sleep(inviteAuthoritativeProbeBackoffMillis(inconclusiveOutcomes))
-            }
-            else -> return outcome
+    var attempts = probeAttempts
+    while (inviteAuthoritativeProbeShouldRetry(attempts, maxProbeAttempts)) {
+        attempts += 1
+        // Commit the budget before entering the cancellable load so an effect
+        // restart cannot silently restore this attempt.
+        onProbeAttempt(attempts)
+        val outcome = classifyInviteAuthoritativeLoad(load())
+        if (outcome != NotificationInviteAuthoritativeOutcome.Inconclusive ||
+            !inviteAuthoritativeProbeShouldRetry(attempts, maxProbeAttempts)
+        ) {
+            return outcome
         }
+        sleep(inviteAuthoritativeProbeBackoffMillis(attempts))
     }
+    return NotificationInviteAuthoritativeOutcome.Inconclusive
 }
 
 /** The activity's pending inbound-intent routing: a tapped-notification target,
