@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,9 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.notifications.NotificationInviteAuthoritativeOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
+import dev.ipf.whitenoise.android.notifications.inviteAuthoritativeGroupAvailable
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
+import dev.ipf.whitenoise.android.notifications.retryInviteAuthoritativeLoad
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.resolveShareDirectGroupId
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
@@ -33,6 +38,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
@@ -157,12 +163,29 @@ internal fun ProfileGroupForegroundCoordinator(
 internal fun nextNotificationConversationOpenContext(current: ConversationOpenContext): ConversationOpenContext =
     ConversationOpenContext(notificationOpenRequestId = current.notificationOpenRequestId + 1L)
 
+internal enum class MainShellContentRoute {
+    Conversation,
+    NotificationLoading,
+    Main,
+}
+
+internal fun resolveMainShellContentRoute(
+    conversationOpen: Boolean,
+    routingNotification: Boolean,
+): MainShellContentRoute =
+    when {
+        routingNotification -> MainShellContentRoute.NotificationLoading
+        conversationOpen -> MainShellContentRoute.Conversation
+        else -> MainShellContentRoute.Main
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MainShell(
     appState: WhiteNoiseAppState,
     inboundNotificationTarget: NotificationTarget? = null,
-    onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundNotificationRequestId: Long = 0L,
+    onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
     inboundAppUpdateTap: Int = 0,
@@ -212,6 +235,22 @@ internal fun MainShell(
     // state over the multi-step route so the chat list never paints as an
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
+    var notificationInviteAuthoritativelyUnavailable by remember(
+        inboundNotificationRequestId,
+        inboundNotificationTarget?.accountRef,
+        inboundNotificationTarget?.groupIdHex,
+        inboundNotificationTarget?.kind,
+    ) {
+        mutableStateOf(false)
+    }
+    var notificationInviteAuthoritativeProbeAttempts by remember(
+        inboundNotificationRequestId,
+        inboundNotificationTarget?.accountRef,
+        inboundNotificationTarget?.groupIdHex,
+        inboundNotificationTarget?.kind,
+    ) {
+        mutableIntStateOf(0)
+    }
     var sharePickerRequest by remember { mutableStateOf<ShareRequest?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
@@ -250,6 +289,7 @@ internal fun MainShell(
     // as account/chat-list state changes.
     LaunchedEffect(
         inboundNotificationTarget,
+        inboundNotificationRequestId,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -257,7 +297,10 @@ internal fun MainShell(
         chatsController.boundAccountRef,
         chatsController.isLoading,
         chatsController.items,
+        chatsController.materializedGroupsRevision,
+        notificationInviteAuthoritativelyUnavailable,
     ) {
+        val routingRequestId = inboundNotificationRequestId
         val target =
             inboundNotificationTarget ?: run {
                 // The pending target was cancelled or replaced mid-route (e.g. a
@@ -269,13 +312,38 @@ internal fun MainShell(
                 routingNotification = false
                 return@LaunchedEffect
             }
-        if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
+        if (appState.accounts.isEmpty()) {
+            // Accounts are not loaded yet; release any routing overlay so we do
+            // not stick on NotificationLoading. Do not touch chat-list await
+            // semantics — the effect re-runs when accounts arrive.
+            routingNotification = false
+            return@LaunchedEffect
+        }
         val chatListReady =
             chatsController.boundAccountRef == target.accountRef &&
                 !chatsController.isLoading
         // Archived conversations still exist — include them so an archived
         // group isn't treated as a missing conversation.
         val allChats = chatsController.items + chatsController.archivedItems
+
+        fun notificationChatItem(groupIdHex: String): ChatListItem? =
+            allChats.firstOrNull { it.group.groupIdHex == groupIdHex }
+                ?: chatsController.chatItemForGroup(groupIdHex)
+
+        val inviteRowMaterialized = chatsController.containsGroup(target.groupIdHex)
+        val inviteListItem =
+            if (target.kind == NotificationTargetKind.INVITE) {
+                notificationChatItem(target.groupIdHex)
+            } else {
+                null
+            }
+        val inviteRowMembershipOpenable =
+            inviteListItem?.let { item ->
+                inviteAuthoritativeGroupAvailable(
+                    pendingConfirmation = item.group.pendingConfirmation,
+                    selfMembership = item.group.selfMembership,
+                )
+            } ?: true
         val step =
             resolveNotificationNav(
                 target = target,
@@ -283,7 +351,23 @@ internal fun MainShell(
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
                 availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
+                inviteRowMaterialized = inviteRowMaterialized,
+                inviteRowMembershipOpenable = inviteRowMembershipOpenable,
+                inviteAuthoritativelyUnavailable = notificationInviteAuthoritativelyUnavailable,
             )
+
+        fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+            selectedChatOpenContext =
+                nextNotificationConversationOpenContext(selectedChatOpenContext)
+            selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
+            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            selectedChat = chatItem
+            routingNotification = false
+            onNotificationTargetHandled(target, routingRequestId)
+        }
 
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
@@ -319,14 +403,43 @@ internal fun MainShell(
                 appState.launchMutation { appState.setActiveAccount(step.accountRef) }
             }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
+            NotificationNavStep.AwaitInviteRow -> {
+                routingNotification = true
+                var authoritativeItem: ChatListItem? = null
+                when (
+                    retryInviteAuthoritativeLoad(
+                        probeAttempts = notificationInviteAuthoritativeProbeAttempts,
+                        onProbeAttempt = {
+                            notificationInviteAuthoritativeProbeAttempts = it
+                        },
+                        load = {
+                            runCatchingCancellable {
+                                appState.loadCreatedChatListItem(target.groupIdHex)
+                            }.onSuccess { authoritativeItem = it }
+                                .map {
+                                    inviteAuthoritativeGroupAvailable(
+                                        pendingConfirmation = it.group.pendingConfirmation,
+                                        selfMembership = it.group.selfMembership,
+                                    )
+                                }
+                        },
+                    )
+                ) {
+                    NotificationInviteAuthoritativeOutcome.OpenConversation ->
+                        commitNotificationConversationOpen(requireNotNull(authoritativeItem))
+                    NotificationInviteAuthoritativeOutcome.Unavailable ->
+                        notificationInviteAuthoritativelyUnavailable = true
+                    NotificationInviteAuthoritativeOutcome.Inconclusive -> {
+                        // Release the overlay without consuming the target. A live
+                        // row update can still re-run this route; only a proven
+                        // unavailable invite may be consumed with an error.
+                        routingNotification = false
+                    }
+                }
+            }
             is NotificationNavStep.OpenConversation -> {
-                // Ensure we're on the Chats section so back-from-conversation
-                // lands on the chat list, not whatever section was open.
-                sectionName = MainSection.Chats.name
-                settingsDetailName = null
-                allChats
-                    .firstOrNull { it.group.groupIdHex == step.groupIdHex }
-                    ?.let {
+                notificationChatItem(step.groupIdHex)
+                    ?.let { item ->
                         // Opening from a message notification explicitly reads
                         // up to the notified message. Persist that cursor outside
                         // the conversation composition so a quick back press
@@ -341,34 +454,24 @@ internal fun MainShell(
                                 )
                             }
                         }
-                        // A notification's latest message id is a read-through
-                        // cursor, not a search target. Advance the request so the
-                        // first-unread anchor also re-runs for an already-mounted chat.
-                        selectedChatOpenContext =
-                            nextNotificationConversationOpenContext(selectedChatOpenContext)
-                        // Notification routing is never a just-created open, so
-                        // clear any stale justCreated flag carried over from a
-                        // prior New Chat / Create Group flow before showing the
-                        // target conversation (issue #321 guard).
-                        selectedChatJustCreated = false
-                        selectedChatOpenedAsDmHint = false
-                        chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                        selectedChat = it
+                        commitNotificationConversationOpen(item)
                     }
-                routingNotification = false
-                onNotificationTargetHandled(target)
+                    ?: run {
+                        routingNotification = false
+                        onNotificationTargetHandled(target, routingRequestId)
+                    }
             }
             NotificationNavStep.MissingAccount -> {
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
-                onNotificationTargetHandled(target)
+                onNotificationTargetHandled(target, routingRequestId)
             }
             NotificationNavStep.MissingConversation -> {
                 routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
-                onNotificationTargetHandled(target)
+                onNotificationTargetHandled(target, routingRequestId)
             }
         }
     }
@@ -631,12 +734,18 @@ internal fun MainShell(
         onClosePicker = { chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap) },
     ) {
         val openChat = selectedChat
-        when {
-            openChat != null -> {
-                val scrollKey = conversationScrollKey(appState.activeAccountRef, openChat.group.groupIdHex)
+        when (
+            resolveMainShellContentRoute(
+                conversationOpen = openChat != null,
+                routingNotification = routingNotification,
+            )
+        ) {
+            MainShellContentRoute.Conversation -> {
+                val chat = requireNotNull(openChat)
+                val scrollKey = conversationScrollKey(appState.activeAccountRef, chat.group.groupIdHex)
                 ConversationScreen(
                     appState = appState,
-                    chat = openChat,
+                    chat = chat,
                     controller = requireNotNull(conversationController),
                     focusMessageId = selectedChatOpenContext.focusMessageId,
                     notificationOpenRequestId = selectedChatOpenContext.notificationOpenRequestId,
@@ -663,13 +772,13 @@ internal fun MainShell(
                     },
                 )
             }
-            routingNotification -> {
+            MainShellContentRoute.NotificationLoading -> {
                 // A notification tap on a non-active account resolves in steps
                 // (switch account → await its chat list → open conversation). Keep
                 // one loading surface over that whole route.
                 LoadingScreen()
             }
-            else ->
+            MainShellContentRoute.Main ->
                 when (section) {
                     MainSection.Chats -> {
                         WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)

@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.notifications
 import androidx.work.BackoffPolicy
 import androidx.work.ListenableWorker
 import androidx.work.workDataOf
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -37,6 +40,7 @@ class NotificationTargetTest {
             )
         assertEquals(target, routed.notificationTarget)
         assertNull(routed.profilePayload)
+        assertEquals(1L, routed.notificationRequestId)
     }
 
     @Test
@@ -64,9 +68,59 @@ class NotificationTargetTest {
     @Test
     fun routeInboundIntent_datalessIntentPreservesPendingNotificationTarget() {
         val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
-        val pending = InboundIntentRouting(target, null, null)
+        val pending = InboundIntentRouting(target, null, null, notificationRequestId = 2L)
         val routed = routeInboundIntent(parsedTarget = null, shareRequest = null, dataString = null, current = pending)
         assertEquals(pending, routed)
+    }
+
+    @Test
+    fun inboundNotificationHandledMatchesCurrent_equalTargetStaleRequestId_doesNotMatch() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        assertFalse(
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = target,
+                inboundRequestId = 2L,
+                handledTarget = target,
+                handledRequestId = 1L,
+            ),
+        )
+    }
+
+    @Test
+    fun inboundNotificationHandledMatchesCurrent_matchingTargetAndRequestId_matches() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        assertTrue(
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = target,
+                inboundRequestId = 2L,
+                handledTarget = target,
+                handledRequestId = 2L,
+            ),
+        )
+    }
+
+    @Test
+    fun routeInboundIntent_repeatedSameNotificationTargetAdvancesRequestId() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        val first =
+            routeInboundIntent(
+                parsedTarget = target,
+                shareRequest = null,
+                dataString = null,
+                current = noPending,
+            )
+        assertEquals(target, first.notificationTarget)
+        assertEquals(1L, first.notificationRequestId)
+
+        val second =
+            routeInboundIntent(
+                parsedTarget = target,
+                shareRequest = null,
+                dataString = null,
+                current = first,
+            )
+        assertEquals(target, second.notificationTarget)
+        assertEquals(2L, second.notificationRequestId)
     }
 
     // ---- fromUpdate ---------------------------------------------------------
@@ -728,6 +782,342 @@ class NotificationTargetTest {
             )
         assertEquals(NotificationNavStep.MissingConversation, step)
     }
+
+    @Test
+    fun nav_readyButInviteAbsent_awaitsInviteRow() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-other"),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = false,
+            )
+        assertEquals(NotificationNavStep.AwaitInviteRow, step)
+    }
+
+    @Test
+    fun nav_inviteAbsentAfterReady_materializesLater() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        assertEquals(
+            NotificationNavStep.AwaitInviteRow,
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = emptySet(),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = false,
+            ),
+        )
+        assertEquals(
+            NotificationNavStep.OpenConversation("group-1", null),
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteAuthoritativelyUnavailable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeLoadClassification_treatsUnknownGroupAsTransientDuringProbe() {
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Inconclusive,
+            classifyInviteAuthoritativeLoad(
+                Result.failure(MarmotKitException.UnknownGroup("group-1")),
+            ),
+        )
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Inconclusive,
+            classifyInviteAuthoritativeLoad(
+                Result.failure(MarmotKitException.Runtime("sqlite busy")),
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeGroupAvailability_distinguishesAcceptedFromDeclinedInvite() {
+        assertTrue(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.MEMBER,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.LEFT,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = false,
+                selfMembership = SelfMembershipFfi.REMOVED,
+            ),
+        )
+        assertTrue(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.MEMBER,
+            ),
+        )
+    }
+
+    @Test
+    fun inviteAuthoritativeLoadClassification_distinguishesAvailableFromUnavailableGroup() {
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.OpenConversation,
+            classifyInviteAuthoritativeLoad(Result.success(true)),
+        )
+        assertEquals(
+            NotificationInviteAuthoritativeOutcome.Unavailable,
+            classifyInviteAuthoritativeLoad(Result.success(false)),
+        )
+    }
+
+    @Test
+    fun nav_inviteAuthoritativelyUnavailable_isMissingConversation() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = emptySet(),
+                inviteRowMaterialized = false,
+                inviteAuthoritativelyUnavailable = true,
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun nav_inviteAuthoritativelyUnavailable_dominatesStalePresentRow() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        val step =
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteRowMembershipOpenable = true,
+                inviteAuthoritativelyUnavailable = true,
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun inviteAuthoritativeGroupAvailability_terminalMembershipDominatesStalePendingConfirmation() {
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.LEFT,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.REMOVED,
+            ),
+        )
+    }
+
+    @Test
+    fun nav_invitePresentRow_terminalMembership_isMissingConversation_notOpen() {
+        val inviteTarget = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.INVITE)
+        assertEquals(
+            NotificationNavStep.MissingConversation,
+            resolveNotificationNav(
+                inviteTarget,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+                inviteRowMaterialized = true,
+                inviteRowMembershipOpenable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun nav_messageAbsentGroup_unchangedWhenInviteMembershipFlagFalse() {
+        val step =
+            resolveNotificationNav(
+                target,
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-other"),
+                inviteRowMembershipOpenable = false,
+            )
+        assertEquals(NotificationNavStep.MissingConversation, step)
+    }
+
+    @Test
+    fun inviteAuthoritativeProbeRetry_allowsBoundedInconclusiveAttempts() {
+        assertTrue(inviteAuthoritativeProbeShouldRetry(probeAttempts = 0))
+        assertTrue(inviteAuthoritativeProbeShouldRetry(probeAttempts = 2))
+        assertFalse(inviteAuthoritativeProbeShouldRetry(probeAttempts = 3))
+    }
+
+    @Test
+    fun inviteAuthoritativeProbe_transientFailureThenSuccess_retriesAndOpens() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.Runtime("busy")),
+                        Result.success(true),
+                    ),
+                )
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.OpenConversation,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(listOf(250L), delays)
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_transientFailureThenAuthoritativeAbsence_retriesAndStops() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.Runtime("busy")),
+                        Result.success(false),
+                    ),
+                )
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Unavailable,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = {},
+                ),
+            )
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_exhaustedTransientFailuresRemainInconclusive() =
+        runTest {
+            var calls = 0
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    load = {
+                        calls += 1
+                        Result.failure(MarmotKitException.Runtime("busy"))
+                    },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(3, calls)
+            assertEquals(listOf(250L, 500L), delays)
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_unknownGroupThenSuccess_retriesAndOpens() =
+        runTest {
+            val results =
+                ArrayDeque(
+                    listOf(
+                        Result.failure<Boolean>(MarmotKitException.UnknownGroup("group-1")),
+                        Result.success(true),
+                    ),
+                )
+            val delays = mutableListOf<Long>()
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.OpenConversation,
+                retryInviteAuthoritativeLoad(
+                    load = { results.removeFirst() },
+                    sleep = delays::add,
+                ),
+            )
+            assertEquals(listOf(250L), delays)
+            assertTrue(results.isEmpty())
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_exhaustedUnknownGroupRemainsInconclusive() =
+        runTest {
+            var calls = 0
+
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    load = {
+                        calls += 1
+                        Result.failure(MarmotKitException.UnknownGroup("group-1"))
+                    },
+                    sleep = {},
+                ),
+            )
+            assertEquals(3, calls)
+        }
+
+    @Test
+    fun inviteAuthoritativeProbe_persistedBudgetSurvivesCancellationDuringBackoff() =
+        runTest {
+            var persistedAttempts = 0
+            var loadCalls = 0
+            val transientFailure = Result.failure<Boolean>(MarmotKitException.Runtime("busy"))
+            var cancelled = false
+
+            try {
+                retryInviteAuthoritativeLoad(
+                    probeAttempts = persistedAttempts,
+                    onProbeAttempt = { persistedAttempts = it },
+                    load = {
+                        loadCalls += 1
+                        transientFailure
+                    },
+                    sleep = { throw kotlinx.coroutines.CancellationException("effect restarted") },
+                )
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                cancelled = true
+            }
+
+            assertTrue(cancelled)
+            assertEquals(1, persistedAttempts)
+            assertEquals(1, loadCalls)
+
+            loadCalls = 0
+            assertEquals(
+                NotificationInviteAuthoritativeOutcome.Inconclusive,
+                retryInviteAuthoritativeLoad(
+                    probeAttempts = persistedAttempts,
+                    onProbeAttempt = { persistedAttempts = it },
+                    load = {
+                        loadCalls += 1
+                        transientFailure
+                    },
+                    sleep = {},
+                ),
+            )
+            assertEquals(2, loadCalls)
+            assertEquals(3, persistedAttempts)
+        }
 
     // ---- helpers ------------------------------------------------------------
 
