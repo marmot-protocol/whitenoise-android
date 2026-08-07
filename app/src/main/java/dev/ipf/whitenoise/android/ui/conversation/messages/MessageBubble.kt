@@ -548,6 +548,21 @@ internal fun MessageBubble(
                 )
             }
         }
+    // TTS must use genuine user-authored text, never displayBody's synthetic
+    // filename, media placeholder, reaction summary, or tombstone copy. Keep
+    // this payload aligned with projectTtsSpeakableEntry, which applies the
+    // same projection to every subsequent record in Speak from here.
+    val speakableText: String? =
+        remember(record, editState, deleted, invalidated) {
+            if (deleted || invalidated) {
+                null
+            } else {
+                MessageProjector.copyableText(
+                    record,
+                    editedText = editState?.latestText?.takeIf { record.kind == 9uL },
+                )
+            }
+        }
     val reserveSenderAvatarSlot =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             isDm = controller.isDm,
@@ -1833,10 +1848,11 @@ internal fun MessageBubble(
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
-                    // Keep the action discoverable for copyable text and hide it
-                    // when no engine exists. If URL omission leaves no speech,
-                    // the action reports that it could not read the message.
-                    canSpeak = displayedBody.isNotBlank() && appState.ttsHasUsableEngine,
+                    // URL-only text may still project to no audible speech; in
+                    // that case the action reports that it could not read the
+                    // message. Synthetic attachment/display text never reaches
+                    // this gate.
+                    canSpeak = speakableText != null && appState.ttsHasUsableEngine,
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,

@@ -11,6 +11,18 @@ import java.time.Instant
 
 class FreshSweepCoverageTest {
     @Test
+    fun speakActionNeverUsesSyntheticDisplayText() {
+        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val projection = source.section("val speakableText: String? =", "val reserveSenderAvatarSlot")
+        val menu = source.section("MessageActionMenu(", "quickReactionEmojis =")
+
+        assertTrue("speech must use the edit-aware user-authored projection", "MessageProjector.copyableText(" in projection)
+        assertTrue("deleted messages must not be speakable", "if (deleted || invalidated)" in projection)
+        assertTrue("the menu gate must use the projected payload", "canSpeak = speakableText != null" in menu)
+        assertFalse("display fallbacks must not enable speech", "canSpeak = displayedBody.isNotBlank()" in menu)
+    }
+
+    @Test
     fun conversationSelectionDerivationsAreRememberedByTheirRealInputs() {
         val source = source("ui/conversation/ConversationScreen.kt")
         val block = source.substring(source.indexOf("val renderedTimeline ="), source.indexOf("LaunchedEffect(", source.indexOf("val renderedTimeline =")))
