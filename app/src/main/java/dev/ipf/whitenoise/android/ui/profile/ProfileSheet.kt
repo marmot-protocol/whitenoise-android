@@ -109,7 +109,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
-import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
+import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.inviteShareIntent
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -234,24 +234,6 @@ internal fun profileSharedGroupVisible(
     memberCount: Int,
     groupName: String,
 ): Boolean = memberCount > 2 || (memberCount == 2 && groupName.isNotBlank())
-
-internal fun profileConversationChoiceEligible(
-    memberIds: List<String>,
-    targetAccountIdHex: String,
-    activeAccountIdHex: String?,
-    pendingConfirmation: Boolean,
-): Boolean {
-    // An unaccepted invite is not a conversation the account can open or send
-    // into, so it must not be offered as one.
-    if (pendingConfirmation) return false
-    val active = activeAccountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-    val target = targetAccountIdHex.trim().lowercase().takeIf { it.isNotEmpty() }
-    return if (active == null || target == null) {
-        false
-    } else {
-        memberIds.mapTo(HashSet()) { it.trim().lowercase() } == setOf(active, target)
-    }
-}
 
 @Composable
 @Suppress("FunctionNaming")
@@ -398,33 +380,6 @@ internal fun ProfileSheet(
                 .orEmpty()
                 .filter { profileSharedGroupVisible(it.memberCount, it.group.name) }
         }
-    // Keyed on the active account too: the eligibility filter is scoped to it, and
-    // equal projections across a switch would otherwise reuse the old account's list.
-    val conversationChoices =
-        remember(hex, activeAccountHex, appState.chatListItems, appState.archivedChatListItems) {
-            hex
-                ?.let { target ->
-                    appState
-                        .sharedGroupsWith(target)
-                        .filter { item ->
-                            val memberIds =
-                                item.memberSnapshot
-                                    ?.members
-                                    ?.map { it.memberIdHex }
-                                    .orEmpty()
-                            profileConversationChoiceEligible(
-                                memberIds = memberIds,
-                                targetAccountIdHex = target,
-                                activeAccountIdHex = activeAccountHex,
-                                pendingConfirmation = item.group.pendingConfirmation,
-                            )
-                        }
-                }.orEmpty()
-                .sortedWith(
-                    compareByDescending<ChatListItem> { it.latestAt ?: 0uL }
-                        .thenBy { it.group.groupIdHex },
-                )
-        }
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.
@@ -432,7 +387,6 @@ internal fun ProfileSheet(
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
-    var showConversationChooser by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     // UI guard covers both profile actions, including "Start new group". The
     // state-layer addable-groups helper still rejects self as a defensive check
@@ -523,11 +477,12 @@ internal fun ProfileSheet(
             try {
                 when (
                     val result =
-                        attemptStartProfileChat(
+                        attemptOpenOrStartProfileChat(
                             npub = npub,
                             progressHex = progressHex,
                             recipientName = displayTitle,
                             retryGroupIdHex = retryGroupIdHex,
+                            resolveDirectChat = { appState.resolveExistingDirectChat(npub) },
                             createGroup = appState::createProfileChatGroup,
                             loadCreatedChatListItem = appState::loadCreatedChatListItem,
                             displayName = appState::displayName,
@@ -535,32 +490,13 @@ internal fun ProfileSheet(
                             abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
-                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, true)
+                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, result.newlyCreated)
                     is StartChatAttemptResult.Failed -> startChatError = result.error
                 }
             } finally {
                 creatingChat = false
             }
         }
-    }
-
-    if (showConversationChooser) {
-        ProfileConversationChooserSheet(
-            appState = appState,
-            recipientName = displayTitle,
-            targetAccountIdHex = hex,
-            choices = conversationChoices,
-            onOpen = { choice ->
-                showConversationChooser = false
-                onOpenGroup(choice, false)
-            },
-            onStartNew = {
-                showConversationChooser = false
-                openOrCreateProfileChat()
-            },
-            onDismiss = { showConversationChooser = false },
-        )
-        return
     }
 
     ModalBottomSheet(
@@ -681,13 +617,7 @@ internal fun ProfileSheet(
                     // commit + Nostr publish finish regardless; we keep the sheet up
                     // with a spinner until the conversation is ready, then navigate
                     // straight in — no dismiss-into-a-blank-gap.
-                    onClick = {
-                        if (conversationChoices.isNotEmpty()) {
-                            showConversationChooser = true
-                        } else {
-                            openOrCreateProfileChat()
-                        }
-                    },
+                    onClick = { openOrCreateProfileChat() },
                 )
                 QuickActionButton(
                     icon = Icons.Default.Call,
@@ -984,87 +914,6 @@ internal const val PROFILE_BANNER_LOADING_TAG = "profile-banner-loading"
 internal const val PROFILE_FOLLOW_ACTION_TAG = "profile-follow-action"
 internal const val PROFILE_MESSAGE_ACTION_TAG = "profile-message-action"
 internal const val PROFILE_QUICK_ACTIONS_TAG = "profile-quick-actions"
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Suppress("FunctionNaming", "LongMethod")
-internal fun ProfileConversationChooserSheet(
-    appState: WhiteNoiseAppState,
-    recipientName: String,
-    targetAccountIdHex: String?,
-    choices: List<ChatListItem>,
-    onOpen: (ChatListItem) -> Unit,
-    onStartNew: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val titleCopy = rememberGroupTitleCopy()
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = Dimens.spaceLg),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-            ) {
-                Text(
-                    stringResource(R.string.profile_conversations_with, recipientName),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    stringResource(R.string.profile_choose_conversation),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp)) {
-                items(choices, key = { it.group.groupIdHex }) { choice ->
-                    val named = choice.group.name.isNotBlank()
-                    val title =
-                        if (named) {
-                            chatListItemDisplayTitle(choice, appState, titleCopy)
-                        } else {
-                            stringResource(R.string.profile_conversation)
-                        }
-                    ListItem(
-                        modifier = Modifier.clickable(role = Role.Button) { onOpen(choice) },
-                        leadingContent = {
-                            GroupAvatar(
-                                appState = appState,
-                                group = choice.group,
-                                title = if (named) title else recipientName,
-                                seed = if (named) choice.group.groupIdHex else targetAccountIdHex.orEmpty(),
-                                size = 44.dp,
-                                fallbackPictureUrl =
-                                    if (named || targetAccountIdHex == null) {
-                                        null
-                                    } else {
-                                        appState.avatarUrl(targetAccountIdHex)
-                                    },
-                            )
-                        },
-                        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
-                            if (choice.group.archived) Text(stringResource(R.string.archived))
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                }
-            }
-            // Outside the capped list so a full roster cannot scroll it away.
-            SettingsActionRow(
-                icon = Icons.Default.Edit,
-                title = stringResource(R.string.profile_start_new_conversation),
-                onClick = onStartNew,
-            )
-        }
-    }
-}
 
 @Composable
 private fun ContactPrivateDetailsDialog(

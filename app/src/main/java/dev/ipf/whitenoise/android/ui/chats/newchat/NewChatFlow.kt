@@ -58,9 +58,7 @@ import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
-import dev.ipf.whitenoise.android.ui.profile.ProfileConversationChooserSheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
-import dev.ipf.whitenoise.android.ui.profile.profileConversationChoiceEligible
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -84,7 +82,6 @@ internal data class StartChatErrorUiState(
     val invitation: Boolean = false,
     val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
     val retryGroupIdHex: String? = null,
-    val forceCreate: Boolean = false,
 )
 
 internal sealed interface StartChatAttemptResult {
@@ -328,7 +325,6 @@ private fun NewMessageScreen(
     var showMyQr by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
-    var conversationTarget by remember { mutableStateOf<RecipientSearch.Candidate?>(null) }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val showMyQrLabel = stringResource(R.string.show_my_qr_code)
@@ -376,7 +372,6 @@ private fun NewMessageScreen(
         recipientName: String? = null,
         retryGroupIdHex: String? = null,
         existingDmGroupIdHex: String? = null,
-        forceCreate: Boolean = false,
     ) {
         if (creatingHex != null) return
         startChatError = null
@@ -392,18 +387,14 @@ private fun NewMessageScreen(
                             recipientName = recipientName,
                             retryGroupIdHex = retryGroupIdHex,
                             resolveDirectChat = {
-                                if (forceCreate) {
-                                    NewMessageDirectChatResolution(item = null, createRequired = true)
-                                } else {
-                                    resolveNewMessageDirectChat(
-                                        npub = npub,
-                                        existingDmGroupIdHex = existingDmGroupIdHex,
-                                        provenanceDirectChat = appState::resolveProvenanceDirectChat,
-                                        existingDirectChat = { target ->
-                                            appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
-                                        },
-                                    )
-                                }
+                                resolveNewMessageDirectChat(
+                                    npub = npub,
+                                    existingDmGroupIdHex = existingDmGroupIdHex,
+                                    provenanceDirectChat = appState::resolveProvenanceDirectChat,
+                                    existingDirectChat = { target ->
+                                        appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
+                                    },
+                                )
                             },
                             createGroup = appState::createProfileChatGroup,
                             loadCreatedChatListItem = appState::loadCreatedChatListItem,
@@ -414,8 +405,7 @@ private fun NewMessageScreen(
                 ) {
                     is StartChatAttemptResult.Open ->
                         onOpenConversation(result.item, result.newlyCreated)
-                    is StartChatAttemptResult.Failed ->
-                        startChatError = result.error.copy(forceCreate = forceCreate)
+                    is StartChatAttemptResult.Failed -> startChatError = result.error
                 }
             } finally {
                 creatingHex = null
@@ -423,32 +413,13 @@ private fun NewMessageScreen(
         }
     }
 
-    fun chooseOrStartConversation(candidate: RecipientSearch.Candidate) {
-        val choices =
-            appState
-                .sharedGroupsWith(candidate.accountIdHex)
-                .filter { item ->
-                    profileConversationChoiceEligible(
-                        memberIds =
-                            item.memberSnapshot
-                                ?.members
-                                ?.map { it.memberIdHex }
-                                .orEmpty(),
-                        targetAccountIdHex = candidate.accountIdHex,
-                        activeAccountIdHex = activeHex,
-                        pendingConfirmation = item.group.pendingConfirmation,
-                    )
-                }
-        if (choices.isEmpty()) {
-            openOrCreateChat(
-                npub = candidate.npub,
-                hexForProgress = candidate.accountIdHex,
-                recipientName = candidate.displayName,
-                existingDmGroupIdHex = candidate.existingDmGroupIdHex,
-            )
-        } else {
-            conversationTarget = candidate
-        }
+    fun startOrOpenConversation(candidate: RecipientSearch.Candidate) {
+        openOrCreateChat(
+            npub = candidate.npub,
+            hexForProgress = candidate.accountIdHex,
+            recipientName = candidate.displayName,
+            existingDmGroupIdHex = candidate.existingDmGroupIdHex,
+        )
     }
 
     Scaffold(
@@ -518,7 +489,6 @@ private fun NewMessageScreen(
                                     hexForProgress = error.progressHex,
                                     recipientName = error.recipientName,
                                     retryGroupIdHex = error.retryGroupIdHex,
-                                    forceCreate = error.forceCreate,
                                 )
                             },
                             onInvite = {
@@ -545,7 +515,7 @@ private fun NewMessageScreen(
                             avatarUrl = appState.avatarUrl(resolvedHex),
                             enabled = creatingHex == null,
                             onClick = {
-                                chooseOrStartConversation(
+                                startOrOpenConversation(
                                     RecipientSearch.Candidate(
                                         accountIdHex = resolvedHex,
                                         npub = appState.npub(resolvedHex),
@@ -610,7 +580,7 @@ private fun NewMessageScreen(
                                 if (candidate.source == null && candidate.searchProfile != null) {
                                     appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
                                 } else {
-                                    chooseOrStartConversation(candidate)
+                                    startOrOpenConversation(candidate)
                                 }
                             },
                             onLongClick = {
@@ -662,48 +632,6 @@ private fun NewMessageScreen(
                         appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
                 }
             },
-        )
-    }
-    conversationTarget?.let { target ->
-        val choices =
-            remember(target.accountIdHex, activeHex, appState.chatListItems, appState.archivedChatListItems) {
-                appState
-                    .sharedGroupsWith(target.accountIdHex)
-                    .filter { item ->
-                        profileConversationChoiceEligible(
-                            memberIds =
-                                item.memberSnapshot
-                                    ?.members
-                                    ?.map { it.memberIdHex }
-                                    .orEmpty(),
-                            targetAccountIdHex = target.accountIdHex,
-                            activeAccountIdHex = activeHex,
-                            pendingConfirmation = item.group.pendingConfirmation,
-                        )
-                    }.sortedWith(
-                        compareByDescending<ChatListItem> { it.latestAt ?: 0uL }
-                            .thenBy { it.group.groupIdHex },
-                    )
-            }
-        ProfileConversationChooserSheet(
-            appState = appState,
-            recipientName = target.displayName,
-            targetAccountIdHex = target.accountIdHex,
-            choices = choices,
-            onOpen = { choice ->
-                conversationTarget = null
-                onOpenConversation(choice, false)
-            },
-            onStartNew = {
-                conversationTarget = null
-                openOrCreateChat(
-                    npub = target.npub,
-                    hexForProgress = target.accountIdHex,
-                    recipientName = target.displayName,
-                    forceCreate = true,
-                )
-            },
-            onDismiss = { conversationTarget = null },
         )
     }
     if (showMyQr && activeHex != null && myQrContent != null) {

@@ -150,10 +150,6 @@
     <string name="profile_unfollow">Takibi bırak</string>
     <string name="profile_follow_failed">Takip durumu güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="profile_nip05_verified">Doğrulanmış Nostr adresi</string>
-    <string name="profile_conversations_with">%1$s ile konuşmalar</string>
-    <string name="profile_choose_conversation">Devam etmek için bir konuşma seçin veya yeni bir konuşma başlatın.</string>
-    <string name="profile_conversation">Konuşma</string>
-    <string name="profile_start_new_conversation">Yeni konuşma başlat</string>
     <string name="profile_start_new_group_with">%1$s ile yeni grup başlat</string>
     <string name="contact_create_group_with">%1$s ile grup oluştur</string>
     <string name="contact_add_to_group">Gruba ekle</string>

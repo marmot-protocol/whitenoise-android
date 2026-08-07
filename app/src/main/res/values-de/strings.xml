@@ -150,10 +150,6 @@
     <string name="profile_unfollow">Nicht mehr folgen</string>
     <string name="profile_follow_failed">Der Folgestatus konnte nicht aktualisiert werden. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="profile_nip05_verified">Verifizierte Nostr-Adresse</string>
-    <string name="profile_conversations_with">Unterhaltungen mit %1$s</string>
-    <string name="profile_choose_conversation">Wähle eine Unterhaltung aus oder beginne eine neue.</string>
-    <string name="profile_conversation">Unterhaltung</string>
-    <string name="profile_start_new_conversation">Neue Unterhaltung beginnen</string>
     <string name="profile_start_new_group_with">Neue Gruppe mit %1$s starten</string>
     <string name="contact_create_group_with">Gruppe mit %1$s erstellen</string>
     <string name="contact_add_to_group">Zu Gruppe hinzufügen</string>

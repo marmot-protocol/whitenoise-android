@@ -198,10 +198,6 @@
     <string name="profile_unfollow">Unfollow</string>
     <string name="profile_follow_failed">Couldn’t update this follow. Check your connection and try again.</string>
     <string name="profile_nip05_verified">Verified Nostr address</string>
-    <string name="profile_conversations_with">Conversations with %1$s</string>
-    <string name="profile_choose_conversation">Choose a conversation to continue, or start a new one.</string>
-    <string name="profile_conversation">Conversation</string>
-    <string name="profile_start_new_conversation">Start new conversation</string>
     <string name="profile_start_new_group_with">Start new group with %1$s</string>
     <string name="contact_create_group_with">Create group with %1$s</string>
     <string name="contact_add_to_group">Add to group</string>

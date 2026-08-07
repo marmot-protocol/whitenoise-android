@@ -144,10 +144,6 @@
     <string name="profile_unfollow">取消关注</string>
     <string name="profile_follow_failed">无法更新关注状态。请检查网络连接后重试。</string>
     <string name="profile_nip05_verified">已验证的 Nostr 地址</string>
-    <string name="profile_conversations_with">与 %1$s 的对话</string>
-    <string name="profile_choose_conversation">选择一个对话继续，或开始新对话。</string>
-    <string name="profile_conversation">对话</string>
-    <string name="profile_start_new_conversation">开始新对话</string>
     <string name="profile_start_new_group_with">与 %1$s 开始新群组</string>
     <string name="contact_create_group_with">与 %1$s 创建群组</string>
     <string name="contact_add_to_group">添加到群组</string>

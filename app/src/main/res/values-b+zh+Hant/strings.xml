@@ -144,10 +144,6 @@
     <string name="profile_unfollow">取消追蹤</string>
     <string name="profile_follow_failed">無法更新追蹤狀態。請檢查網路連線後再試一次。</string>
     <string name="profile_nip05_verified">已驗證的 Nostr 位址</string>
-    <string name="profile_conversations_with">與 %1$s 的對話</string>
-    <string name="profile_choose_conversation">選擇一個對話繼續，或開始新對話。</string>
-    <string name="profile_conversation">對話</string>
-    <string name="profile_start_new_conversation">開始新對話</string>
     <string name="profile_start_new_group_with">與 %1$s 開始新群組</string>
     <string name="contact_create_group_with">與 %1$s 建立群組</string>
     <string name="contact_add_to_group">新增至群組</string>

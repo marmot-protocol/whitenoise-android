@@ -82,6 +82,7 @@ import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
 import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
+import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
 import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
 import kotlinx.coroutines.CancellationException
@@ -3546,14 +3547,22 @@ class ChatsController private constructor(
      * "open existing DM" and "don't create a duplicate DM" agree on what counts
      * as an existing one.
      */
-    fun existingDirectChat(reference: String): ChatListItem? {
-        val normalizedReference = reference.trim().takeIf { it.isNotEmpty() } ?: return null
+    fun existingDirectChat(reference: String): ChatListItem? = existingDirectChatCandidates(reference).firstOrNull()
+
+    /**
+     * Every current implicit DM with [reference], best first per
+     * [directChatPreferenceOrder]. Ordering matters because duplicates are
+     * reachable — both sides can each have created a DM — and the tap that opens
+     * one must land on the same conversation every time.
+     */
+    private fun existingDirectChatCandidates(reference: String): List<ChatListItem> {
+        val normalizedReference = reference.trim().takeIf { it.isNotEmpty() } ?: return emptyList()
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         return chatRows
             .asSequence()
             .filter { !it.pendingConfirmation }
-            .firstNotNullOfOrNull { row ->
-                val members = memberCacheByGroup[row.groupIdHex] ?: return@firstNotNullOfOrNull null
+            .mapNotNull { row ->
+                val members = memberCacheByGroup[row.groupIdHex] ?: return@mapNotNull null
                 val match =
                     GroupProjector.isImplicitDmWith(
                         members = members,
@@ -3563,7 +3572,8 @@ class ChatsController private constructor(
                         equivalentTarget = { other -> appState.npub(other).equals(normalizedReference, ignoreCase = true) },
                     )
                 if (match) projectChatRow(row) else null
-            }
+            }.sortedWith(directChatPreferenceOrder)
+            .toList()
     }
 
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
@@ -3607,8 +3617,13 @@ class ChatsController private constructor(
         val epoch = bindEpoch
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         // The cache is only a priority hint: every candidate is still
-        // revalidated through authoritative group details before opening.
-        val cachedMatchId = existingDirectChat(targetReference)?.id
+        // revalidated through authoritative group details before opening. It is
+        // a ranked hint rather than a single row so duplicate DMs resolve to the
+        // preferred one instead of whichever the snapshot listed first.
+        val cachedRankById =
+            existingDirectChatCandidates(targetReference)
+                .withIndex()
+                .associate { (rank, item) -> item.id.lowercase() to rank }
         val candidateGroupIds =
             chatRows
                 .asSequence()
@@ -3618,7 +3633,7 @@ class ChatsController private constructor(
                 .map { it.id }
                 .filterNot { it.equals(excludingGroupIdHex, ignoreCase = true) }
                 .distinctBy { it.lowercase() }
-                .sortedBy { if (it.equals(cachedMatchId, ignoreCase = true)) 0 else 1 }
+                .sortedBy { cachedRankById[it.lowercase()] ?: Int.MAX_VALUE }
                 .toList()
         return resolveExistingDirectChatCandidates(candidateGroupIds) { groupIdHex ->
             resolveDirectChatGroup(

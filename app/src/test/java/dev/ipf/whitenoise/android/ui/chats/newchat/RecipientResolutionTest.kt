@@ -605,6 +605,106 @@ class RecipientResolutionTest {
         }
 }
 
+/**
+ * Which conversation a tap on a person lands in. There is no chooser — a DM is
+ * always exactly one conversation — so resolution has to be right on its own.
+ */
+class DirectChatTargetResolutionTest {
+    @Test
+    fun unacceptedInviteIsNeverOpenedAsTheDirectChat() =
+        runTest {
+            val alice = "a".repeat(64)
+            val bob = "b".repeat(64)
+            val roster = listOf(member(alice, local = true), member(bob))
+            val invite =
+                dmChatItem("dm-invite", alice, roster, pendingConfirmation = true)
+
+            val resolution =
+                existingDirectChatFromProvenance(
+                    provenanceGroupIdHex = invite.id,
+                    targetReference = bob,
+                    activeAccountIdHex = alice,
+                    equivalentTarget = { other -> other.equals(bob, ignoreCase = true) },
+                    chatItemForGroup = { id -> invite.takeIf { it.id.equals(id, ignoreCase = true) } },
+                    authoritativeGroupDetails = { appliedDetails(invite, roster) },
+                )
+
+            // The roster is the right two people, so only the unaccepted state
+            // keeps it shut. Opening it would drop the user into a group they
+            // have not joined and cannot send into.
+            assertNull(resolution.item)
+        }
+
+    @Test
+    fun duplicateDirectChatsPreferTheActiveOneThenRecencyThenGroupId() {
+        val alice = "a".repeat(64)
+        val bob = "b".repeat(64)
+        val roster = listOf(member(alice, local = true), member(bob))
+
+        fun dm(
+            groupId: String,
+            archived: Boolean,
+            activitySortAt: ULong,
+        ) = dmChatItem(
+            groupId = groupId,
+            activeHex = alice,
+            members = roster,
+            archived = archived,
+            activitySortAt = activitySortAt,
+        )
+
+        val busiestArchived = dm("dm-archived-busy", archived = true, activitySortAt = 900uL)
+        val quietActive = dm("dm-active-quiet", archived = false, activitySortAt = 10uL)
+        val busyActiveB = dm("dm-active-b", archived = false, activitySortAt = 500uL)
+        val busyActiveA = dm("dm-active-a", archived = false, activitySortAt = 500uL)
+
+        val ordered =
+            listOf(busiestArchived, quietActive, busyActiveB, busyActiveA)
+                .sortedWith(directChatPreferenceOrder)
+                .map { it.id }
+
+        // Archived loses to every active DM even when it is the busiest, ties on
+        // activity break by group id, and the result never depends on input order.
+        assertEquals(
+            listOf("dm-active-a", "dm-active-b", "dm-active-quiet", "dm-archived-busy"),
+            ordered,
+        )
+        assertEquals(
+            ordered,
+            listOf(busyActiveA, busiestArchived, busyActiveB, quietActive)
+                .sortedWith(directChatPreferenceOrder)
+                .map { it.id },
+        )
+    }
+
+    @Test
+    fun candidateSearchOpensTheFirstRankedDuplicateRatherThanAnyMatch() =
+        runTest {
+            val alice = "a".repeat(64)
+            val bob = "b".repeat(64)
+            val roster = listOf(member(alice, local = true), member(bob))
+            val archivedDuplicate =
+                dmChatItem("dm-archived", alice, roster, archived = true, activitySortAt = 900uL)
+            val preferred =
+                dmChatItem("dm-active", alice, roster, activitySortAt = 10uL)
+            val ranked =
+                listOf(archivedDuplicate, preferred)
+                    .sortedWith(directChatPreferenceOrder)
+                    .map { it.id }
+            val scanned = mutableListOf<String>()
+
+            val resolution =
+                resolveExistingDirectChatCandidates(ranked) { groupId ->
+                    scanned += groupId
+                    val item = if (groupId == "dm-active") preferred else archivedDuplicate
+                    NewMessageDirectChatResolution(item = item, createRequired = false)
+                }
+
+            assertEquals(listOf("dm-active"), scanned)
+            assertEquals("dm-active", resolution.item?.id)
+        }
+}
+
 private suspend fun resolveFromProvenance(
     provenanceGroupIdHex: String?,
     targetReference: String,
@@ -642,10 +742,22 @@ internal fun dmChatItem(
     conversationKind: ChatConversationKindFfi = ChatConversationKindFfi.DIRECT,
     latestSender: String? = null,
     welcomer: String? = null,
+    archived: Boolean = false,
+    activitySortAt: ULong = 1uL,
+    pendingConfirmation: Boolean = false,
 ): ChatListItem =
     chatListItemFromProjection(
-        row = dmChatRow(groupId, groupName, conversationKind, latestSender),
-        group = dmChatGroup(groupId, groupName, welcomer),
+        row =
+            dmChatRow(
+                groupId,
+                groupName,
+                conversationKind,
+                latestSender,
+                archived,
+                activitySortAt,
+                pendingConfirmation,
+            ),
+        group = dmChatGroup(groupId, groupName, welcomer, archived, pendingConfirmation),
         activeAccountIdHex = activeHex,
         members = members,
     )
@@ -655,13 +767,16 @@ private fun dmChatRow(
     groupName: String,
     conversationKind: ChatConversationKindFfi,
     latestSender: String?,
+    archived: Boolean = false,
+    activitySortAt: ULong = 1uL,
+    pendingConfirmation: Boolean = false,
 ) = ChatListRowFfi(
     selfMembership = SelfMembershipFfi.MEMBER,
     unreadMentionCount = 0uL,
     unreadMention = false,
     groupIdHex = groupId,
-    archived = false,
-    pendingConfirmation = false,
+    archived = archived,
+    pendingConfirmation = pendingConfirmation,
     title = groupName,
     groupName = groupName,
     avatarUrl = null,
@@ -674,7 +789,7 @@ private fun dmChatRow(
     lastReadMessageIdHex = null,
     lastReadTimelineAt = null,
     conversationCreatedAt = 1uL,
-    activitySortAt = 1uL,
+    activitySortAt = activitySortAt,
     updatedAt = 1uL,
     conversationKind = conversationKind,
     muted = false,
@@ -707,6 +822,8 @@ private fun dmChatGroup(
     groupId: String,
     groupName: String,
     welcomer: String?,
+    archived: Boolean = false,
+    pendingConfirmation: Boolean = false,
 ) = AppGroupRecordFfi(
     selfMembership = SelfMembershipFfi.MEMBER,
     groupIdHex = groupId,
@@ -723,8 +840,8 @@ private fun dmChatGroup(
     avatarThumbhash = null,
     imageHashHex = null,
     encryptedMedia = encryptedMedia(),
-    archived = false,
-    pendingConfirmation = false,
+    archived = archived,
+    pendingConfirmation = pendingConfirmation,
     unrecoverable = false,
     welcomerAccountIdHex = welcomer,
     viaWelcomeMessageIdHex = null,

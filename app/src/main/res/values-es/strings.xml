@@ -150,10 +150,6 @@
     <string name="profile_unfollow">Dejar de seguir</string>
     <string name="profile_follow_failed">No se pudo actualizar el seguimiento. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="profile_nip05_verified">Dirección de Nostr verificada</string>
-    <string name="profile_conversations_with">Conversaciones con %1$s</string>
-    <string name="profile_choose_conversation">Elige una conversación para continuar o inicia una nueva.</string>
-    <string name="profile_conversation">Conversación</string>
-    <string name="profile_start_new_conversation">Iniciar una conversación nueva</string>
     <string name="profile_start_new_group_with">Iniciar nuevo grupo con %1$s</string>
     <string name="contact_create_group_with">Crear grupo con %1$s</string>
     <string name="contact_add_to_group">Añadir a un grupo</string>

@@ -84,22 +84,6 @@ class ProfileParityTest {
     }
 
     @Test
-    fun conversationChoiceRequiresTheExactTwoPersonRoster() {
-        val me = "a".repeat(64)
-        val target = "b".repeat(64)
-        assertTrue(eligible(listOf(me, target), target, me))
-        assertFalse(eligible(listOf(me, target, "c".repeat(64)), target, me))
-        assertFalse(eligible(listOf(me, "c".repeat(64)), target, me))
-    }
-
-    @Test
-    fun conversationChoiceSkipsAnUnacceptedInvite() {
-        val me = "a".repeat(64)
-        val target = "b".repeat(64)
-        assertFalse(eligible(listOf(me, target), target, me, pendingConfirmation = true))
-    }
-
-    @Test
     fun selectedDiscoveryCandidateKeepsEphemeralNameAndAvatar() {
         val remoteAvatar = "https://example.com/jack.png"
         val candidate =
@@ -142,17 +126,4 @@ class ProfileParityTest {
         assertEquals("npub1abcde…vwxyz", selectedMemberDisplayName(frozen, liveDisplayName = "  "))
         assertEquals("Camille", selectedMemberDisplayName(frozen, liveDisplayName = "Camille"))
     }
-
-    private fun eligible(
-        memberIds: List<String>,
-        target: String,
-        active: String,
-        pendingConfirmation: Boolean = false,
-    ): Boolean =
-        profileConversationChoiceEligible(
-            memberIds = memberIds,
-            targetAccountIdHex = target,
-            activeAccountIdHex = active,
-            pendingConfirmation = pendingConfirmation,
-        )
 }

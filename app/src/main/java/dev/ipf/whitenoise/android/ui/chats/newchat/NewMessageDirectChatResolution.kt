@@ -31,6 +31,17 @@ internal suspend fun resolveNewMessageDirectChat(
 }
 
 /**
+ * Fixed preference among several DMs with the same person — both sides can each
+ * have created one, so duplicates are reachable. Active outranks archived, then
+ * most recent activity, then group id, so the pick never depends on the order
+ * the engine happened to hand rows over in.
+ */
+internal val directChatPreferenceOrder: Comparator<ChatListItem> =
+    compareBy<ChatListItem> { it.group.archived }
+        .thenByDescending { it.latestAt ?: 0uL }
+        .thenBy { it.group.groupIdHex }
+
+/**
  * Scans current direct-chat candidates for the target. A stale/non-match
  * only rejects that group; any unavailable authoritative read fails closed if
  * no other candidate can be opened.

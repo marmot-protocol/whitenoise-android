@@ -162,10 +162,6 @@
     <string name="profile_unfollow">Отписаться</string>
     <string name="profile_follow_failed">Не удалось обновить подписку. Проверьте подключение и повторите попытку.</string>
     <string name="profile_nip05_verified">Подтверждённый адрес Nostr</string>
-    <string name="profile_conversations_with">Разговоры с %1$s</string>
-    <string name="profile_choose_conversation">Выберите разговор для продолжения или начните новый.</string>
-    <string name="profile_conversation">Разговор</string>
-    <string name="profile_start_new_conversation">Начать новый разговор</string>
     <string name="profile_start_new_group_with">Начать новую группу с %1$s</string>
     <string name="contact_create_group_with">Создать группу с %1$s</string>
     <string name="contact_add_to_group">Добавить в группу</string>
