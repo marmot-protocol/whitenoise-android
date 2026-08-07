@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android
 
+import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
 import dev.ipf.whitenoise.android.ui.common.relativeTimeRefreshDelayMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -107,8 +108,34 @@ class FreshSweepCoverageTest {
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
         assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
-        assertTrue(accept.contains("runBestEffortPostCommitSteps("))
         assertTrue(invite.indexOf("try {") < invite.indexOf("val adminTargets"))
+    }
+
+    @Test
+    fun acceptInviteAcknowledgesSuccessBeforeLifecycleScopedWarmup() {
+        val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
+        val accept = body.indexOf("acceptGroupInvite")
+        val localUpdate = body.indexOf("applyLocalGroupUpdate")
+        val dismiss = body.indexOf("dismissConversationNotifications")
+        val clearSelfLeft = body.indexOf("clearSelfLeft()")
+        val toast = body.indexOf("toast_invite_accepted")
+        val warmupLaunch = body.indexOf("inviteStreamScope.launch")
+        val postCommit = body.indexOf("runBestEffortPostCommitSteps(")
+        val members = body.indexOf("\"members\" to { refreshMembers() }")
+        val timeline = body.indexOf("refreshCurrentTimeline(account)")
+        val watcher = body.indexOf("watchAgentTextStream(account, streamId)")
+        val readState = body.indexOf("\"read-state\" to { initializeReadState(account) }")
+
+        assertTrue("accept must precede the local group snapshot", accept in 0 until localUpdate)
+        assertTrue("local snapshot must precede notification dismissal", localUpdate < dismiss)
+        assertTrue("notification dismissal must precede clearing the self-left latch", dismiss < clearSelfLeft)
+        assertTrue("self-left latch must clear before durable success is shown", clearSelfLeft < toast)
+        assertTrue("success must precede the post-accept warm-up launch", toast < warmupLaunch)
+        assertTrue("warm-up must run from the controller lifecycle scope", warmupLaunch < postCommit)
+        assertTrue("member refresh must remain background work", postCommit < members)
+        assertTrue("timeline refresh must remain background work", postCommit < timeline)
+        assertTrue("stream watchers must start from background work", postCommit < watcher)
+        assertTrue("read-state initialization must remain background work", postCommit < readState)
     }
 
     @Test
