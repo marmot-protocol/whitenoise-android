@@ -224,14 +224,14 @@ private fun BubbleColorPreview(
         )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         PreviewBubble(
-            text = stringResource(R.string.bubble_preview_other),
-            mine = false,
-            presentation = resolveBubblePresentationArgb(false, amoled, false, otherOverrideArgb, tokens),
-        )
-        PreviewBubble(
             text = stringResource(R.string.bubble_preview_mine),
             mine = true,
             presentation = resolveBubblePresentationArgb(false, amoled, true, mineOverrideArgb, tokens),
+        )
+        PreviewBubble(
+            text = stringResource(R.string.bubble_preview_other),
+            mine = false,
+            presentation = resolveBubblePresentationArgb(false, amoled, false, otherOverrideArgb, tokens),
         )
     }
 }
