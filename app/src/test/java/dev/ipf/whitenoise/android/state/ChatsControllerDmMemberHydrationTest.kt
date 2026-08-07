@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.ui.chats.chatListItemAvatarAccount
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.junit.After
@@ -155,6 +156,197 @@ class ChatsControllerDmMemberHydrationTest {
 
         awaitCondition { attempts >= 2 }
         awaitCondition { controller.items.single().otherMemberAccount == PEER }
+    }
+
+    @Test
+    fun establishedDmKeepsPeerPresentationWithoutExposingStaleMembership() {
+        var attempts = 0
+        var releaseRefresh = false
+        val controller =
+            bindDmController(retryDelayMillis = { 60_000L }) { _, _ ->
+                attempts += 1
+                if (attempts == 1) {
+                    return@bindDmController listOf(member(ME, local = true), member(PEER, local = false))
+                }
+                while (coroutineContext.isActive && !releaseRefresh) {
+                    delay(10)
+                }
+                listOf(member(ME, local = true))
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        assertEquals(DM_GROUP, controller.existingDirectChat(PEER)?.id)
+
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "updated"),
+            )
+        }
+        awaitCondition { attempts >= 2 }
+        val refreshing = controller.items.single()
+        assertNull(refreshing.memberSnapshot)
+        assertNull(refreshing.otherMemberAccount)
+        assertEquals(PEER, refreshing.presentationOtherMemberAccount)
+        assertEquals(2, refreshing.presentationMemberCount)
+        assertEquals(
+            PEER,
+            chatListItemAvatarAccount(refreshing),
+        )
+        assertNull(controller.existingDirectChat(PEER))
+
+        releaseRefresh = true
+        drainMainLooperFor(100)
+
+        assertEquals(2, attempts)
+        val transientSelfOnly = controller.items.single()
+        assertNull(transientSelfOnly.memberSnapshot)
+        assertEquals(PEER, transientSelfOnly.presentationOtherMemberAccount)
+        assertNull(controller.existingDirectChat(PEER))
+    }
+
+    @Test
+    fun persistentSelfOnlyDirectRosterBecomesAuthoritativeAfterOneGraceRetry() {
+        var attempts = 0
+        val controller =
+            bindDmController(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                retryDelayMillis = { 0L },
+            ) { _, _ ->
+                attempts += 1
+                if (attempts == 1) {
+                    listOf(member(ME, local = true), member(PEER, local = false))
+                } else {
+                    listOf(member(ME, local = true))
+                }
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "updated"),
+            )
+        }
+
+        awaitCondition { attempts >= 3 }
+        awaitCondition {
+            controller.items.single().let { item ->
+                item.memberSnapshot?.memberCount == 1 && item.presentationActiveAccountIsSoleMember
+            }
+        }
+
+        val selfOnly = controller.items.single()
+        assertEquals(3, attempts)
+        assertEquals(
+            "Just you",
+            GroupProjector.displayTitle(
+                group = selfOnly.group,
+                otherMemberAccount = selfOnly.presentationOtherMemberAccount,
+                memberCount = selfOnly.presentationMemberCount,
+                memberTitle = { it },
+                copy = GroupTitleCopy.Default,
+                conversationKind = selfOnly.projection?.conversationKind,
+                soleSelfMember = selfOnly.presentationActiveAccountIsSoleMember,
+            ),
+        )
+        assertNull(controller.existingDirectChat(PEER))
+    }
+
+    @Test
+    fun authoritativeSelfOnlyDmKeepsJustYouPresentationDuringNextRefresh() {
+        var attempts = 0
+        var releaseSecondRefresh = false
+        val controller =
+            bindDmController(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                retryDelayMillis = { 0L },
+            ) { _, _ ->
+                attempts += 1
+                when {
+                    attempts == 1 -> listOf(member(ME, local = true), member(PEER, local = false))
+                    attempts <= 3 -> listOf(member(ME, local = true))
+                    else -> {
+                        while (coroutineContext.isActive && !releaseSecondRefresh) {
+                            delay(10)
+                        }
+                        listOf(member(ME, local = true))
+                    }
+                }
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "first update"),
+            )
+        }
+        awaitCondition { attempts >= 3 }
+        awaitCondition {
+            controller.items
+                .single()
+                .memberSnapshot
+                ?.memberCount == 1
+        }
+
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "second update"),
+            )
+        }
+        awaitCondition { attempts >= 4 }
+
+        val refreshing = controller.items.single()
+        assertNull(refreshing.memberSnapshot)
+        assertTrue(refreshing.presentationActiveAccountIsSoleMember)
+        assertEquals(
+            "Just you",
+            GroupProjector.displayTitle(
+                group = refreshing.group,
+                otherMemberAccount = refreshing.presentationOtherMemberAccount,
+                memberCount = refreshing.presentationMemberCount,
+                memberTitle = { it },
+                copy = GroupTitleCopy.Default,
+                conversationKind = refreshing.projection?.conversationKind,
+                soleSelfMember = refreshing.presentationActiveAccountIsSoleMember,
+            ),
+        )
+        releaseSecondRefresh = true
+    }
+
+    @Test
+    fun failedRefreshDoesNotConsumeSelfOnlyDirectGraceRetry() {
+        var attempts = 0
+        var releaseFourthAttempt = false
+        val controller =
+            bindDmController(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                retryDelayMillis = { 0L },
+            ) { _, _ ->
+                attempts += 1
+                when (attempts) {
+                    1 -> listOf(member(ME, local = true), member(PEER, local = false))
+                    2 -> error("transient roster read failure")
+                    3 -> listOf(member(ME, local = true))
+                    else -> {
+                        while (coroutineContext.isActive && !releaseFourthAttempt) {
+                            delay(10)
+                        }
+                        listOf(member(ME, local = true), member(PEER, local = false))
+                    }
+                }
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "updated"),
+            )
+        }
+        awaitCondition { attempts >= 4 }
+
+        val awaitingGraceRetry = controller.items.single()
+        assertNull(awaitingGraceRetry.memberSnapshot)
+        assertEquals(PEER, awaitingGraceRetry.presentationOtherMemberAccount)
+        releaseFourthAttempt = true
     }
 
     @Test

@@ -8,6 +8,7 @@ data class GroupTitleCopy(
     val inviteFromFormat: String,
     val groupOfPeopleFormat: String,
     val unknownTitle: String,
+    val soleMemberTitle: String = "Just you",
 ) {
     fun inviteFrom(name: String): String = String.format(inviteFromFormat, name)
 
@@ -37,6 +38,8 @@ object GroupProjector {
         memberCount: Int,
         memberTitle: (String) -> String,
         copy: GroupTitleCopy = GroupTitleCopy.Default,
+        conversationKind: ChatConversationKindFfi? = null,
+        soleSelfMember: Boolean = false,
     ): String =
         displayTitle(
             name = group.name,
@@ -46,6 +49,8 @@ object GroupProjector {
             memberCount = memberCount,
             memberTitle = memberTitle,
             copy = copy,
+            conversationKind = conversationKind,
+            soleSelfMember = soleSelfMember,
         )
 
     /**
@@ -53,8 +58,9 @@ object GroupProjector {
      * [AppGroupRecordFfi] (e.g. the notification pipeline, which only has the
      * group id + members) resolve exactly the same title the chat list shows:
      * the group name when set, an invite line when pending, "Group of N people"
-     * for larger unnamed groups, the other member for a pair, else an Unknown
-     * fallback — never the group id hex, which is opaque to users.
+     * for larger unnamed groups, the other member for a pair, "Just you" for a
+     * hydrated direct conversation whose peer has left, else an Unknown fallback —
+     * never the group id hex, which is opaque to users.
      *
      * The group name is peer-supplied, so it is routed through
      * [ProfileSanitizer.displayName] (strip bidi overrides / zero-width and
@@ -70,12 +76,17 @@ object GroupProjector {
         memberCount: Int,
         memberTitle: (String) -> String,
         copy: GroupTitleCopy = GroupTitleCopy.Default,
+        conversationKind: ChatConversationKindFfi? = null,
+        soleSelfMember: Boolean = false,
     ): String {
         ProfileSanitizer.displayName(name)?.let { return it }
         pendingInviteAccount?.takeIf { it.isNotBlank() }?.let { return copy.inviteFrom(memberTitle(it)) }
         if (memberCount > 2) return copy.groupOfPeople(memberCount)
         if (memberCount == 2) {
             otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return memberTitle(it) }
+        }
+        if (conversationKind == ChatConversationKindFfi.DIRECT && memberCount == 1 && soleSelfMember) {
+            return copy.soleMemberTitle
         }
         // An unresolved roster (e.g. a DM whose peer snapshot is still empty)
         // must not leak the opaque group id hex as a title.

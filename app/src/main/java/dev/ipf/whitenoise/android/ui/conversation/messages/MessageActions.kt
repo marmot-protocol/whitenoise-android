@@ -378,8 +378,8 @@ internal fun MessageActionMenu(
 internal fun forwardTargetAvatarAccount(item: ChatListItem): String? =
     GroupProjector.avatarAccount(
         group = item.group,
-        otherMemberAccount = item.otherMemberAccount,
-        memberCount = item.memberCount,
+        otherMemberAccount = item.presentationOtherMemberAccount,
+        memberCount = item.presentationMemberCount,
     )
 
 internal fun forwardTargetMembersPreview(

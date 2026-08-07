@@ -117,9 +117,20 @@ import kotlin.coroutines.resume
 data class ChatListItem(
     val group: AppGroupRecordFfi,
     val latest: AppMessageRecordFfi?,
+    /** Counterparty resolved only from the current authoritative roster. */
     val otherMemberAccount: String?,
+    /** Headcount resolved only from the current authoritative roster. */
     val memberCount: Int,
+    /** Current authoritative roster; never populated from stale presentation state. */
     val memberSnapshot: GroupMemberSnapshot?,
+    /**
+     * Last-known values retained only for title/avatar continuity while a newer
+     * roster is loading. Membership-sensitive consumers must use the fields
+     * above instead.
+     */
+    val presentationOtherMemberAccount: String? = otherMemberAccount,
+    val presentationMemberCount: Int = memberCount,
+    val presentationActiveAccountIsSoleMember: Boolean = false,
     val projection: ChatListRowFfi? = null,
     /**
      * Markdown AST for the last-message preview line, parsed off-main by
@@ -279,8 +290,8 @@ data class ChatListItem(
     /** Zero-based display position inside the pinned block, engine-normalized. */
     fun pinnedPosition(): UInt? = projection?.pinnedPosition
 
-    /** Projected conversation kind first, name/headcount heuristic as fallback. */
-    fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, memberCount, group.name)
+    /** Projected conversation kind first, presentation headcount heuristic as fallback. */
+    fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, presentationMemberCount, group.name)
 
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -310,6 +321,22 @@ data class ChatListItem(
         }
     }
 }
+
+internal data class ChatListMemberPresentation(
+    val otherMemberAccount: String?,
+    val memberCount: Int,
+    val activeAccountIsSoleMember: Boolean,
+)
+
+private fun chatListMemberPresentation(
+    members: List<AppGroupMemberRecordFfi>,
+    activeAccountIdHex: String?,
+): ChatListMemberPresentation =
+    ChatListMemberPresentation(
+        otherMemberAccount = GroupProjector.otherMemberAccount(members, activeAccountIdHex),
+        memberCount = GroupProjector.uniqueMemberCount(members),
+        activeAccountIsSoleMember = GroupProjector.isSelfSoleMember(members, activeAccountIdHex),
+    )
 
 internal fun sortChatListItems(
     items: List<ChatListItem>,
@@ -388,27 +415,21 @@ private fun chatListItemRecencyTie(
  */
 internal fun chatListItemSortKey(item: ChatListItem): String =
     item.sanitizedNamedTitle?.lowercase()
-        ?: (item.otherMemberAccount ?: "~${item.memberCount}").lowercase()
+        ?: (item.presentationOtherMemberAccount ?: "~${item.presentationMemberCount}").lowercase()
 
 /**
- * Build a `ChatListItem` from the FFI projection. The optional [members]
- * snapshot lets the caller hand in the group's member roster fetched
- * separately (the chat-list FFI doesn't include members on each row).
- * When present, the snapshot drives the `otherMemberAccount` /
- * `memberCount` fields that `GroupProjector.displayTitle` reads and stays on
- * the item as [ChatListItem.memberSnapshot] for local shared-group
- * intersections — that's how an unnamed group resolves to "Group of N people"
- * or the other member's display name instead of leaking the group hex into the
- * UI.
- * Without it, those fields fall back to null/0 and the local projection
- * shows a short group hex until [ChatsController]'s async members fetch
- * fills the cache.
+ * Build a `ChatListItem` from the FFI projection. [members] is the current
+ * authoritative roster used for membership-sensitive fields. The optional
+ * [presentationMembers] supplies only last-known, display-shaped values while
+ * a newer authoritative roster is loading; it never populates
+ * [ChatListItem.memberSnapshot] or exposes a stale roster to callers.
  */
 internal fun chatListItemFromProjection(
     row: ChatListRowFfi,
     group: AppGroupRecordFfi? = null,
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
+    presentationMembers: ChatListMemberPresentation? = null,
     previewTokens: MarkdownDocumentFfi? = null,
     resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     removed: Boolean = false,
@@ -430,9 +451,7 @@ internal fun chatListItemFromProjection(
                 ),
             previousSelfMembership = baseGroup.selfMembership,
         )
-    val otherMember =
-        members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
-    val memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0
+    val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
     return ChatListItem(
         group = displayGroup,
         latest =
@@ -463,9 +482,13 @@ internal fun chatListItemFromProjection(
                     receivedAt = preview.timelineAt,
                 )
             },
-        otherMemberAccount = otherMember,
-        memberCount = memberCount,
+        otherMemberAccount =
+            members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
+        memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
         memberSnapshot = members?.let(::GroupMemberSnapshot),
+        presentationOtherMemberAccount = presentation?.otherMemberAccount,
+        presentationMemberCount = presentation?.memberCount ?: 0,
+        presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
         projection = row,
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
@@ -2368,14 +2391,16 @@ internal data class AuthoritativeChatListMembers(
  * An empty roster can be a transient catch-up result and must stay uncached so
  * the chat list retries instead of pinning an Unknown DM title. Once self-
  * removal is independently known, an empty roster is terminal and cacheable.
- * A joined direct conversation containing only self is likewise unresolved:
- * caching it would permanently pin the title to Unknown before its peer lands.
+ * A joined direct conversation containing only self is likewise unresolved for
+ * one grace retry: this absorbs transient hydration gaps without preserving a
+ * departed peer forever.
  */
 internal fun memberSnapshotReadyToCache(
     members: List<AppGroupMemberRecordFfi>,
     knownSelfRemoval: Boolean = false,
     directConversation: Boolean = false,
     activeAccountIdHex: String? = null,
+    selfOnlyDirectGraceElapsed: Boolean = false,
 ): Boolean {
     if (knownSelfRemoval) return true
     val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() }
@@ -2383,9 +2408,16 @@ internal fun memberSnapshotReadyToCache(
         !directConversation ||
             active == null ||
             members.none { GroupProjector.isActiveAccountMember(it, active) } ||
-            members.any { !GroupProjector.isActiveAccountMember(it, active) }
+            members.any { !GroupProjector.isActiveAccountMember(it, active) } ||
+            selfOnlyDirectGraceElapsed
     return members.isNotEmpty() && directRosterReady
 }
+
+private fun isSelfOnlyDirectRoster(
+    members: List<AppGroupMemberRecordFfi>,
+    directConversation: Boolean,
+    activeAccountIdHex: String?,
+): Boolean = directConversation && GroupProjector.isSelfSoleMember(members, activeAccountIdHex)
 
 internal fun memberSnapshotRetryDelayMillis(backoffTier: Int): Long {
     var delayMs = MEMBER_FETCH_INITIAL_RETRY_DELAY_MS
@@ -2929,6 +2961,13 @@ class ChatsController private constructor(
     // `recompute()` per group; re-fetched on bind.
     private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
 
+    // A live group-record update invalidates the authoritative roster, but its
+    // last rendered values remain useful for title/avatar continuity while a
+    // replacement loads. Keep only the display-shaped values separate from the
+    // authoritative cache so business rules cannot consume a stale roster.
+    // Cleared on each bind and as soon as a complete replacement arrives.
+    private var presentationMembersByGroup: Map<String, ChatListMemberPresentation> = emptyMap()
+
     // Groups the active account is known to have been removed/left from, keyed
     // by group id hex. Set on a confirmed self-leave or when a loaded roster
     // omits self; lets [ChatListItem.removedFromGroup] treat a genuinely-empty
@@ -2950,6 +2989,11 @@ class ChatsController private constructor(
     // become permanent after a finite retry budget.
     private val memberFetchRetryBackoffTierByGroup = mutableMapOf<String, Int>()
     private val memberFetchRetryJobsByGroup = mutableMapOf<String, Job>()
+
+    // A self-only direct roster gets one dedicated confirmation read before it
+    // becomes authoritative. Keep this separate from the general backoff tier:
+    // an earlier error or empty read must not consume the self-only grace retry.
+    private val selfOnlyDirectGraceRetryGroups = mutableSetOf<String>()
 
     // Widening member snapshots to every group makes the chat-list projection
     // much more useful, but the app should not start one roster FFI call per
@@ -3237,16 +3281,24 @@ class ChatsController private constructor(
 
     private fun invalidateMemberCacheForGroup(groupIdHex: String) {
         val hasRetryScheduled = memberFetchRetryJobsByGroup[groupIdHex]?.isActive == true
-        if (!memberCacheByGroup.containsKey(groupIdHex) &&
-            groupIdHex !in inFlightMemberFetches &&
-            !hasRetryScheduled
-        ) {
-            return
-        }
+        val hasSnapshot =
+            memberCacheByGroup.containsKey(groupIdHex) ||
+                presentationMembersByGroup.containsKey(groupIdHex)
+        val hasPendingFetch = groupIdHex in inFlightMemberFetches || hasRetryScheduled
+        if (!hasSnapshot && !hasPendingFetch) return
         cancelMemberSnapshotRetry(groupIdHex)
-        memberCacheByGroup = memberCacheByGroup - groupIdHex
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
+        memberCacheByGroup[groupIdHex]?.let { members ->
+            val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+            presentationMembersByGroup =
+                presentationMembersByGroup +
+                (groupIdHex to chatListMemberPresentation(members, activeAccountIdHex))
+            memberCacheByGroup = memberCacheByGroup - groupIdHex
+        }
         memberCacheEpoch += 1L
     }
+
+    private fun memberSnapshotNeedsFetch(groupIdHex: String): Boolean = !memberCacheByGroup.containsKey(groupIdHex)
 
     // Marmot's `set_group_archived` writes local state + saves but emits no
     // ProjectionUpdated event, so the chat-list snapshot stays stale until the
@@ -3360,6 +3412,10 @@ class ChatsController private constructor(
         if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
         if (members != null) {
             memberCacheEpoch += 1L
+            presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
+            cancelMemberSnapshotRetry(record.groupIdHex)
+            memberFetchRetryBackoffTierByGroup.remove(record.groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(record.groupIdHex)
             members
                 .map { it.memberIdHex }
                 .filter { it.isNotBlank() }
@@ -3420,6 +3476,7 @@ class ChatsController private constructor(
                 group = groupRecordsById[row.groupIdHex],
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
+                presentationMembers = presentationMembersByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                 resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
@@ -3441,6 +3498,7 @@ class ChatsController private constructor(
             group = groupRecordsById[row.groupIdHex],
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
+            presentationMembers = presentationMembersByGroup[row.groupIdHex],
             previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
             resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
@@ -3712,6 +3770,8 @@ class ChatsController private constructor(
         }
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
+        presentationMembersByGroup = presentationMembersByGroup.filterKeys { it in liveGroupIds }
+        selfOnlyDirectGraceRetryGroups.retainAll(liveGroupIds)
         memberFetchRetryJobsByGroup.keys
             .filterNot { it in liveGroupIds }
             .toList()
@@ -3741,6 +3801,8 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
+            presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
         }
@@ -4345,7 +4407,7 @@ class ChatsController private constructor(
                 ?: ProfileSanitizer.imageUrl(item.projection?.avatarUrl)
         AvatarImageLoader.preWarm(conversationAvatar)
         GroupProjector
-            .avatarAccount(item.group, item.otherMemberAccount, item.memberCount)
+            .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
             ?.let(appState::preWarmProfileAvatar)
         item.latest?.sender?.let(appState::preWarmProfileAvatar)
     }
@@ -4437,12 +4499,14 @@ class ChatsController private constructor(
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()
         memberCacheByGroup = emptyMap()
+        presentationMembersByGroup = emptyMap()
         memberSnapshotsRevision += 1L
         removedGroupIds = emptySet()
         inFlightMemberFetches.clear()
         memberFetchRetryJobsByGroup.values.forEach(Job::cancel)
         memberFetchRetryJobsByGroup.clear()
         memberFetchRetryBackoffTierByGroup.clear()
+        selfOnlyDirectGraceRetryGroups.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
         mediaPreviewFallbackByMessageId = emptyMap()
@@ -4527,7 +4591,7 @@ class ChatsController private constructor(
                 .asSequence()
                 .distinct()
                 .filter { it in liveGroupIds }
-                .filterNot { memberCacheByGroup.containsKey(it) }
+                .filter { memberSnapshotNeedsFetch(it) }
                 .filterNot { it in inFlightMemberFetches }
                 .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
                 .toList()
@@ -4563,7 +4627,10 @@ class ChatsController private constructor(
                     // a no-op but obscures the invariant.
                     if (isActiveBindEpoch(epoch)) {
                         inFlightMemberFetches.remove(groupIdHex)
-                        if (cacheEpoch != memberCacheEpoch && !memberCacheByGroup.containsKey(groupIdHex)) {
+                        if (
+                            cacheEpoch != memberCacheEpoch &&
+                            memberSnapshotNeedsFetch(groupIdHex)
+                        ) {
                             // The chat list can be hidden behind an open
                             // conversation while the system-share picker is
                             // visible. Retry the invalidated targeted fetch
@@ -4604,14 +4671,22 @@ class ChatsController private constructor(
                     memberCount = memberCount,
                     name = groupName,
                 )
+        val selfOnlyDirectRoster =
+            isSelfOnlyDirectRoster(
+                members = members,
+                directConversation = directConversationCandidate,
+                activeAccountIdHex = activeAccountIdHex,
+            )
         if (
             !memberSnapshotReadyToCache(
                 members = members,
                 knownSelfRemoval = knownSelfRemoval,
                 directConversation = directConversationCandidate,
                 activeAccountIdHex = activeAccountIdHex,
+                selfOnlyDirectGraceElapsed = groupIdHex in selfOnlyDirectGraceRetryGroups,
             )
         ) {
+            if (selfOnlyDirectRoster) selfOnlyDirectGraceRetryGroups.add(groupIdHex)
             scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
@@ -4620,8 +4695,10 @@ class ChatsController private constructor(
             .filter { it.isNotBlank() }
             .forEach(appState::requestProfile)
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+        presentationMembersByGroup = presentationMembersByGroup - groupIdHex
         cancelMemberSnapshotRetry(groupIdHex)
         memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
         memberSnapshotsRevision += 1L
         // A loaded roster that omits self is known removal evidence (admin
         // eviction / self-leave the engine has already applied). Marking it
@@ -4648,7 +4725,7 @@ class ChatsController private constructor(
         val backoffTier = memberFetchRetryBackoffTierByGroup.getOrDefault(groupIdHex, 0)
         val shouldRetry =
             isActiveBindEpoch(epoch) &&
-                !memberCacheByGroup.containsKey(groupIdHex) &&
+                memberSnapshotNeedsFetch(groupIdHex) &&
                 chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
         if (!shouldRetry) return
         memberFetchRetryBackoffTierByGroup[groupIdHex] =
@@ -4664,7 +4741,7 @@ class ChatsController private constructor(
                     try {
                         delay(memberSnapshotRetryDelay(backoffTier))
                         isActiveBindEpoch(epoch) &&
-                            !memberCacheByGroup.containsKey(groupIdHex) &&
+                            memberSnapshotNeedsFetch(groupIdHex) &&
                             chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
                     } finally {
                         if (memberFetchRetryJobsByGroup[groupIdHex] === currentJob) {
@@ -5327,6 +5404,8 @@ class ConversationController(
             memberCount = memberCount,
             memberTitle = { appState.chatMemberTitle(it) },
             copy = copy,
+            conversationKind = latestChatListRow?.conversationKind,
+            soleSelfMember = GroupProjector.isSelfSoleMember(members, me),
         )
     }
 
