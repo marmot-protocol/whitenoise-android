@@ -1758,6 +1758,14 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileMetadata by mutableStateOf<UserProfileMetadataFfi?>(null)
         private set
 
+    /**
+     * Whether the presented profile was opened from user search. Tracked
+     * separately from [pendingProfileMetadata], which is also the fallback for
+     * profile data generally and so cannot identify the entry point.
+     */
+    var pendingProfileFromDiscovery by mutableStateOf(false)
+        private set
+
     var relationshipRevision by mutableStateOf(0L)
         private set
 
@@ -6240,12 +6248,14 @@ class WhiteNoiseAppState private constructor(
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
         pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
         pendingProfileNpub = link.npub
         return true
     }
 
     fun presentProfile(npub: String) {
         pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
         pendingProfileNpub = npub
     }
 
@@ -6254,6 +6264,7 @@ class WhiteNoiseAppState private constructor(
         profile: UserProfileMetadataFfi?,
     ) {
         pendingProfileMetadata = profile
+        pendingProfileFromDiscovery = true
         pendingProfileNpub = npub
     }
 
@@ -6343,6 +6354,7 @@ class WhiteNoiseAppState private constructor(
     fun clearPresentedProfile() {
         pendingProfileNpub = null
         pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
     }
 
     /**
