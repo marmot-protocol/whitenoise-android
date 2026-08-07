@@ -5173,6 +5173,10 @@ class ConversationController(
 
     private val memberRosterRefreshGeneration = GroupRosterRefreshGeneration()
 
+    // Invalidated when a timeline page or live subscription batch lands so an
+    // in-flight full-page refresh cannot clobber newer state (#1849).
+    private val timelineWindowGeneration = GroupRosterRefreshGeneration()
+
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
     // state (lives only as long as this controller, never persisted —
     // AGENTS.md); it mirrors ChatsController.removedGroupIds for the chat-list
@@ -8538,26 +8542,45 @@ class ConversationController(
             }
         }
 
-    private suspend fun refreshCurrentTimeline(account: String): List<String> {
+    private suspend fun refreshCurrentTimeline(
+        account: String,
+        pageLoader: (suspend () -> TimelinePageFfi)? = null,
+    ): List<String> {
+        val refreshGeneration = timelineWindowGeneration.begin()
         val page =
-            appState.marmotIo {
-                timelineMessages(
-                    account,
-                    TimelineMessageQueryFfi(
-                        groupIdHex = group.groupIdHex,
-                        search = null,
-                        before = null,
-                        beforeMessageId = null,
-                        after = null,
-                        afterMessageId = null,
-                        limit = ConversationTimelinePageLimit,
-                    ),
-                )
-            }
+            pageLoader?.invoke()
+                ?: appState.marmotIo {
+                    timelineMessages(
+                        account,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = group.groupIdHex,
+                            search = null,
+                            before = null,
+                            beforeMessageId = null,
+                            after = null,
+                            afterMessageId = null,
+                            limit = ConversationTimelinePageLimit,
+                        ),
+                    )
+                }
+        if (!timelineWindowGeneration.isCurrent(refreshGeneration)) {
+            return emptyList()
+        }
         hasLoadedOlderPages = false
         protectedTimelineMessageIds.clear()
         return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
     }
+
+    internal suspend fun testRefreshCurrentTimeline(
+        account: String,
+        pageLoader: suspend () -> TimelinePageFfi,
+    ): List<String> = refreshCurrentTimeline(account, pageLoader)
+
+    internal fun testApplyLiveTimelineChangesAndRegisterStreams(changes: List<TimelineMessageChangeFfi>) {
+        applyTimelineChanges(changes).forEach(activeStreamIds::add)
+    }
+
+    internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw
@@ -8607,6 +8630,7 @@ class ConversationController(
         replaceWindow: Boolean,
         updatePagination: Boolean,
     ): List<String> {
+        timelineWindowGeneration.invalidate()
         val pageMessages = page.messages
         if (replaceWindow) {
             timelineRecords.clear()
@@ -8709,6 +8733,7 @@ class ConversationController(
     }
 
     private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
+        timelineWindowGeneration.invalidate()
         val displayedProjectedStreamItemIds =
             timelineItemsById.keys.filterTo(mutableSetOf()) { it.startsWith("stream:") }
         val removedIds =
