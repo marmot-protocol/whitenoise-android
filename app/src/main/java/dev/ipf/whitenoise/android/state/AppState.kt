@@ -6257,8 +6257,11 @@ class WhiteNoiseAppState private constructor(
         pendingProfileNpub = npub
     }
 
-    suspend fun isFollowingProfile(userRef: String): Boolean {
-        val account = activeAccountRef ?: return false
+    // Null means the relationship is unreadable, not "not following" — the write
+    // side throws without an active account, so a false here would enable a
+    // Follow the user cannot perform.
+    suspend fun isFollowingProfile(userRef: String): Boolean? {
+        val account = activeAccountRef ?: return null
         return marmotIo { isFollowing(account, userRef) }
     }
 

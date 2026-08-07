@@ -197,7 +197,7 @@ internal fun runProfileSheetAdminMutation(
  */
 internal suspend fun loadProfileFollowing(
     previous: Boolean?,
-    load: suspend () -> Boolean,
+    load: suspend () -> Boolean?,
 ): Boolean? =
     runCatching { load() }
         .fold(
@@ -393,8 +393,10 @@ internal fun ProfileSheet(
                 .orEmpty()
                 .filter { profileSharedGroupVisible(it.memberCount, it.group.name) }
         }
+    // Keyed on the active account too: the eligibility filter is scoped to it, and
+    // equal projections across a switch would otherwise reuse the old account's list.
     val conversationChoices =
-        remember(hex, appState.chatListItems, appState.archivedChatListItems) {
+        remember(hex, activeAccountHex, appState.chatListItems, appState.archivedChatListItems) {
             hex
                 ?.let { target ->
                     appState

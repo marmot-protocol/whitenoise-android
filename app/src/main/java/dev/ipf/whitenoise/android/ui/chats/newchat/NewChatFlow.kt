@@ -666,7 +666,7 @@ private fun NewMessageScreen(
     }
     conversationTarget?.let { target ->
         val choices =
-            remember(target.accountIdHex, appState.chatListItems, appState.archivedChatListItems) {
+            remember(target.accountIdHex, activeHex, appState.chatListItems, appState.archivedChatListItems) {
                 appState
                     .sharedGroupsWith(target.accountIdHex)
                     .filter { item ->

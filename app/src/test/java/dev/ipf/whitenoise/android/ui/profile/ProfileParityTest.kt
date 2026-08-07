@@ -30,6 +30,19 @@ class ProfileParityTest {
         }
 
     @Test
+    fun noActiveAccountStaysUnknownRatherThanAssertingNotFollowing() =
+        runTest {
+            // The read returns null without an active account, matching the write
+            // side, which throws — a false would enable a follow that must fail.
+            assertNull(loadProfileFollowing(previous = null) { null })
+            assertNull(loadProfileFollowing(previous = true) { null })
+            val row = profileFollowRowState(following = null, loading = false, busy = false, creatingChat = false)
+            assertFalse(row.enabled)
+            assertFalse(row.inProgress)
+            assertFalse(row.showsUnfollow)
+        }
+
+    @Test
     fun unknownFollowStatusDisablesTheRowWithoutSpinningOrPromisingAFollow() =
         runTest {
             val unknown = loadProfileFollowing(previous = null) { error("binding unavailable") }
