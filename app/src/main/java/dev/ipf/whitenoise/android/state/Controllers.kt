@@ -5846,12 +5846,13 @@ class ConversationController(
      * Cancel controller-owned scopes that outlive a single [start] call. The
      * conversation screen calls this once when it disposes the controller.
      *
-     * [inviteStreamScope]'s only launcher is [acceptInvite], invoked from a
-     * separate mutation scope that can fire after [start]'s loops have ended
-     * while the invite screen is still composed. Cancelling it in [start]'s
-     * teardown left a dead scope, so the accepted invite's agent-stream watchers
-     * never launched yet were marked active in [activeStreamIds] and never
-     * retried — the streaming previews stayed stuck (#279).
+     * [inviteStreamScope] launches post-accept warm-up and agent-stream watchers
+     * from [acceptInvite], invoked from a separate mutation scope that can fire
+     * after [start]'s loops have ended while the invite screen is still composed.
+     * Cancelling it in [start]'s teardown left a dead scope, so the accepted
+     * invite's agent-stream watchers never launched yet were marked active in
+     * [activeStreamIds] and never retried — the streaming previews stayed stuck
+     * (#279).
      */
     fun onCleared() {
         controllerCleared = true
@@ -7593,28 +7594,30 @@ class ConversationController(
             // local self-left latch before refreshMembers() so applyGroupDetails
             // is allowed to add self back to the roster (issue #787).
             selfMembership.clearSelfLeft()
-            runBestEffortPostCommitSteps(
-                steps =
-                    listOf(
-                        "members" to { refreshMembers() },
-                        "timeline" to {
-                            refreshCurrentTimeline(account).forEach { streamId ->
-                                if (activeStreamIds.add(streamId)) {
-                                    inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
-                                }
-                            }
-                        },
-                        "read-state" to { initializeReadState(account) },
-                    ),
-                onFailure = { step, throwable ->
-                    Log.w(
-                        "DMConversation",
-                        "post-accept $step refresh failed for ${group.groupIdHex.take(8)}",
-                        throwable,
-                    )
-                },
-            )
             if (notify) appState.present(R.string.toast_invite_accepted)
+            inviteStreamScope.launch {
+                runBestEffortPostCommitSteps(
+                    steps =
+                        listOf(
+                            "members" to { refreshMembers() },
+                            "timeline" to {
+                                refreshCurrentTimeline(account).forEach { streamId ->
+                                    if (activeStreamIds.add(streamId)) {
+                                        inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+                                    }
+                                }
+                            },
+                            "read-state" to { initializeReadState(account) },
+                        ),
+                    onFailure = { step, throwable ->
+                        Log.w(
+                            "DMConversation",
+                            "post-accept $step refresh failed for ${group.groupIdHex.take(8)}",
+                            throwable,
+                        )
+                    },
+                )
+            }
             true
         }
 
