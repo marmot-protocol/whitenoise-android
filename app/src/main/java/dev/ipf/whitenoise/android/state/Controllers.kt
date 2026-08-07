@@ -598,13 +598,6 @@ internal fun mergeMarkReadChatListRow(
     )
 }
 
-/**
- * Field-wise reducer for live chat-list subscription rows. Subscription rows
- * are ordered full projections, so all non-read fields are authoritative — in
- * particular, a deletion may move [ChatListRowFfi.lastMessage] backwards or to
- * null. Only the read-dependent fields can be stale when a synchronous
- * [markTimelineMessageRead] return races a previously queued subscription row.
- */
 private fun subscriptionReadWatermarkCoversLastMessage(row: ChatListRowFfi): Boolean {
     val last = row.lastMessage
     val readAt = row.lastReadTimelineAt
@@ -645,6 +638,13 @@ private fun reconcileTrustedSubscriptionChatListRow(incoming: ChatListRowFfi): C
         incoming
     }
 
+/**
+ * Field-wise reducer for live chat-list subscription rows. Subscription rows
+ * are ordered full projections, so all non-read fields are authoritative — in
+ * particular, a deletion may move [ChatListRowFfi.lastMessage] backwards or to
+ * null. Only the read-dependent fields can be stale when a synchronous
+ * [markTimelineMessageRead] return races a previously queued subscription row.
+ */
 internal fun reduceSubscriptionChatListRow(
     current: ChatListRowFfi,
     incoming: ChatListRowFfi,
