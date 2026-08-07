@@ -14,6 +14,82 @@ import org.junit.Test
 
 class ProfileParityTest {
     @Test
+    fun sparseCachedProfileFallsBackToDiscoveryMetadataFieldByField() {
+        val cached =
+            UserProfileMetadataFfi(
+                name = "cached-name",
+                displayName = "  ",
+                about = "Cached about",
+                picture = "http://unsafe.example/cached.png",
+                banner = null,
+                nip05 = "not-an-identifier",
+                lud16 = null,
+            )
+        val discovered =
+            UserProfileMetadataFfi(
+                name = "discovered-name",
+                displayName = "Discovered Name",
+                about = "Discovered about",
+                picture = "https://example.com/discovered.png",
+                banner = "https://example.com/banner.png",
+                nip05 = "person@example.com",
+                lud16 = "person@example.com",
+            )
+
+        val resolved =
+            resolveProfileSheetMetadata(
+                cached = cached,
+                discovered = discovered,
+                cachedAvatarUrl = null,
+            )
+
+        assertEquals("Discovered Name", resolved.displayName)
+        assertEquals("Cached about", resolved.about)
+        assertEquals("https://example.com/discovered.png", resolved.pictureUrl)
+        assertEquals("https://example.com/banner.png", resolved.bannerUrl)
+        assertEquals("person@example.com", resolved.nip05)
+        assertEquals("person@example.com", resolved.lightningAddress)
+    }
+
+    @Test
+    fun completeCachedProfileRemainsAuthoritativeOverDiscoveryMetadata() {
+        val cached =
+            UserProfileMetadataFfi(
+                name = "cached-name",
+                displayName = "Cached Name",
+                about = "Cached about",
+                picture = "https://example.com/cached.png",
+                banner = "https://example.com/cached-banner.png",
+                nip05 = "cached@example.com",
+                lud16 = "cached@example.com",
+            )
+        val discovered =
+            UserProfileMetadataFfi(
+                name = "discovered-name",
+                displayName = "Discovered Name",
+                about = "Discovered about",
+                picture = "https://example.com/discovered.png",
+                banner = "https://example.com/discovered-banner.png",
+                nip05 = "discovered@example.com",
+                lud16 = "discovered@example.com",
+            )
+
+        val resolved =
+            resolveProfileSheetMetadata(
+                cached = cached,
+                discovered = discovered,
+                cachedAvatarUrl = "https://example.com/presentation.png",
+            )
+
+        assertEquals("Cached Name", resolved.displayName)
+        assertEquals("Cached about", resolved.about)
+        assertEquals("https://example.com/presentation.png", resolved.pictureUrl)
+        assertEquals("https://example.com/cached-banner.png", resolved.bannerUrl)
+        assertEquals("cached@example.com", resolved.nip05)
+        assertEquals("cached@example.com", resolved.lightningAddress)
+    }
+
+    @Test
     fun followLoadFailureKeepsPreviousStateAndCancellationPropagates() =
         runTest {
             assertEquals(true, loadProfileFollowing(previous = true) { error("binding unavailable") })

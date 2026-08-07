@@ -84,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -225,6 +226,55 @@ internal fun profileFollowRowState(
         showsUnfollow = following == true,
     )
 
+internal data class ProfileSheetMetadata(
+    val displayName: String?,
+    val pictureUrl: String?,
+    val bannerUrl: String?,
+    val about: String?,
+    val nip05: String?,
+    val lightningAddress: String?,
+)
+
+/**
+ * Keeps locally materialized fields authoritative without letting a sparse or
+ * invalid cached record hide richer metadata carried by a discovery result.
+ */
+internal fun resolveProfileSheetMetadata(
+    cached: UserProfileMetadataFfi?,
+    discovered: UserProfileMetadataFfi?,
+    cachedAvatarUrl: String?,
+): ProfileSheetMetadata {
+    fun displayName(raw: String?): String? = ProfileSanitizer.displayName(raw)
+
+    fun imageUrl(raw: String?): String? = ProfileSanitizer.imageUrl(raw)
+
+    fun nip05(raw: String?): String? =
+        raw
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableNip05(it) }
+
+    fun lightningAddress(raw: String?): String? =
+        raw
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableLud16(it) }
+
+    val mergedDisplayName = displayName(cached?.displayName) ?: displayName(discovered?.displayName)
+    val mergedName = displayName(cached?.name) ?: displayName(discovered?.name)
+    return ProfileSheetMetadata(
+        displayName = mergedDisplayName ?: mergedName,
+        pictureUrl =
+            imageUrl(cachedAvatarUrl)
+                ?: imageUrl(cached?.picture)
+                ?: imageUrl(discovered?.picture),
+        bannerUrl = imageUrl(cached?.banner) ?: imageUrl(discovered?.banner),
+        about = ProfileSanitizer.about(cached?.about) ?: ProfileSanitizer.about(discovered?.about),
+        nip05 = nip05(cached?.nip05) ?: nip05(discovered?.nip05),
+        lightningAddress =
+            lightningAddress(cached?.lud16)
+                ?: lightningAddress(discovered?.lud16),
+    )
+}
+
 @Composable
 @Suppress("FunctionNaming")
 internal fun ProfileSheetAdminActionRows(
@@ -318,32 +368,31 @@ internal fun ProfileSheet(
         if (resolved != null) appState.refreshProfile(resolved)
     }
 
-    val profile = hex?.let { appState.userProfile(it) } ?: appState.pendingProfileMetadata
-    val profileName =
-        ProfileSanitizer.displayName(profile?.displayName)
-            ?: ProfileSanitizer.displayName(profile?.name)
-    val title = profileName ?: hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
+    val cachedProfile = hex?.let { appState.userProfile(it) }
+    val profile =
+        resolveProfileSheetMetadata(
+            cached = cachedProfile,
+            discovered = appState.pendingProfileMetadata,
+            cachedAvatarUrl = hex?.let { appState.avatarUrl(it) },
+        )
+    val title = profile.displayName ?: hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
-    val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
-    val bannerUrl = ProfileSanitizer.imageUrl(profile?.banner)
+    val pictureUrl = profile.pictureUrl
+    val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
-    val about = ProfileSanitizer.about(profile?.about)
-    val nip05 =
-        profile
-            ?.nip05
-            ?.trim()
-            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
+    val about = profile.about
+    val nip05 = profile.nip05
     var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }
     LaunchedEffect(nip05) {
         nip05ResolvedHex = nip05?.let { Nip05Resolver.resolve(it) }
     }
     val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, hex)
-    val lightningAddress = profile?.lud16?.trim()?.takeIf { ProfileFieldValidation.isAcceptableLud16(it) }
+    val lightningAddress = profile.lightningAddress
     val activeAccountHex = appState.activeAccount?.accountIdHex
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
