@@ -1123,7 +1123,7 @@
     <string name="disappearing_1_day">1 day</string>
     <string name="disappearing_7_days">7 days</string>
     <string name="disappearing_30_days">30 days</string>
-    <string name="disappearing_90_days">90 days</string>
+    <string name="disappearing_90_days">3 months</string>
     <string name="disappearing_custom">Custom time</string>
     <string name="disappearing_days_format">%1$d days</string>
     <string name="disappearing_hours_format">%1$d hours</string>
@@ -1132,6 +1132,20 @@
     <string name="disappearing_unit_hours">Hours</string>
     <string name="disappearing_unit_days">Days</string>
     <string name="disappearing_unit_weeks">Weeks</string>
+    <string name="disappearing_unit_months">Months</string>
+    <string name="disappearing_unit_years">Years</string>
+    <plurals name="disappearing_weeks_count">
+        <item quantity="one">%d week</item>
+        <item quantity="other">%d weeks</item>
+    </plurals>
+    <plurals name="disappearing_months_count">
+        <item quantity="one">%d month</item>
+        <item quantity="other">%d months</item>
+    </plurals>
+    <plurals name="disappearing_years_count">
+        <item quantity="one">%d year</item>
+        <item quantity="other">%d years</item>
+    </plurals>
     <string name="disappearing_custom_amount_label">Amount</string>
     <string name="disappearing_row_hint_admin">Tap to set how long new messages last</string>
     <string name="disappearing_row_hint_readonly">Only admins can change this</string>

@@ -1049,7 +1049,7 @@
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_7_days">7 天</string>
     <string name="disappearing_30_days">30 天</string>
-    <string name="disappearing_90_days">90 天</string>
+    <string name="disappearing_90_days">3 个月</string>
     <string name="disappearing_custom">自定义时间</string>
     <string name="disappearing_days_format">%1$d 天</string>
     <string name="disappearing_hours_format">%1$d 小时</string>
@@ -1058,6 +1058,17 @@
     <string name="disappearing_unit_hours">小时</string>
     <string name="disappearing_unit_days">天</string>
     <string name="disappearing_unit_weeks">周</string>
+    <string name="disappearing_unit_months">月</string>
+    <string name="disappearing_unit_years">年</string>
+    <plurals name="disappearing_weeks_count">
+        <item quantity="other">%d 周</item>
+    </plurals>
+    <plurals name="disappearing_months_count">
+        <item quantity="other">%d 个月</item>
+    </plurals>
+    <plurals name="disappearing_years_count">
+        <item quantity="other">%d 年</item>
+    </plurals>
     <string name="disappearing_custom_amount_label">数量</string>
     <string name="disappearing_row_hint_admin">点按设置新消息的留存时间</string>
     <string name="disappearing_row_hint_readonly">只有管理员可以更改</string>

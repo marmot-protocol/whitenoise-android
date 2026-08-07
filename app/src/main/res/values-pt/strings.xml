@@ -1071,7 +1071,7 @@
     <string name="disappearing_1_day">1 dia</string>
     <string name="disappearing_7_days">7 dias</string>
     <string name="disappearing_30_days">30 dias</string>
-    <string name="disappearing_90_days">90 dias</string>
+    <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tempo personalizado</string>
     <string name="disappearing_days_format">%1$d dias</string>
     <string name="disappearing_hours_format">%1$d horas</string>
@@ -1080,6 +1080,20 @@
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Dias</string>
     <string name="disappearing_unit_weeks">Semanas</string>
+    <string name="disappearing_unit_months">Meses</string>
+    <string name="disappearing_unit_years">Anos</string>
+    <plurals name="disappearing_weeks_count">
+        <item quantity="one">%d semana</item>
+        <item quantity="other">%d semanas</item>
+    </plurals>
+    <plurals name="disappearing_months_count">
+        <item quantity="one">%d mês</item>
+        <item quantity="other">%d meses</item>
+    </plurals>
+    <plurals name="disappearing_years_count">
+        <item quantity="one">%d ano</item>
+        <item quantity="other">%d anos</item>
+    </plurals>
     <string name="disappearing_custom_amount_label">Quantidade</string>
     <string name="disappearing_row_hint_admin">Toque para definir a duração das novas mensagens</string>
     <string name="disappearing_row_hint_readonly">Apenas administradores podem alterar isto</string>
