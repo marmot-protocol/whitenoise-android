@@ -703,6 +703,40 @@ class DirectChatTargetResolutionTest {
             assertEquals(listOf("dm-active"), scanned)
             assertEquals("dm-active", resolution.item?.id)
         }
+
+    @Test
+    fun authoritativeCandidateRankingDoesNotPutCachedArchivedMatchBeforeUncachedActiveMatch() =
+        runTest {
+            val alice = "a".repeat(64)
+            val bob = "b".repeat(64)
+            val roster = listOf(member(alice, local = true), member(bob))
+            val cachedArchivedMatch =
+                dmChatItem("dm-archived", alice, roster, archived = true, activitySortAt = 900uL)
+            val uncachedActiveMatch =
+                dmChatItem("dm-active", alice, null, archived = false, activitySortAt = 10uL)
+            val unrelatedActive =
+                dmChatItem("dm-unrelated", alice, null, archived = false, activitySortAt = 500uL)
+            val ranked =
+                rankedDirectChatCandidates(
+                    listOf(cachedArchivedMatch, uncachedActiveMatch, unrelatedActive),
+                ).map { it.id }
+            val scanned = mutableListOf<String>()
+
+            val resolution =
+                resolveExistingDirectChatCandidates(ranked) { groupId ->
+                    scanned += groupId
+                    when (groupId) {
+                        uncachedActiveMatch.id ->
+                            NewMessageDirectChatResolution(item = uncachedActiveMatch, createRequired = false)
+                        cachedArchivedMatch.id ->
+                            NewMessageDirectChatResolution(item = cachedArchivedMatch, createRequired = false)
+                        else -> NewMessageDirectChatResolution(item = null, createRequired = true)
+                    }
+                }
+
+            assertEquals(listOf("dm-unrelated", "dm-active"), scanned)
+            assertEquals(uncachedActiveMatch.id, resolution.item?.id)
+        }
 }
 
 private suspend fun resolveFromProvenance(

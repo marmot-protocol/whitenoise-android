@@ -84,6 +84,7 @@ import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
+import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
 import dev.ipf.whitenoise.android.ui.chats.newchat.resolveExistingDirectChatCandidates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -3616,25 +3617,16 @@ class ChatsController private constructor(
         val bindAccount = account
         val epoch = bindEpoch
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-        // The cache is only a priority hint: every candidate is still
-        // revalidated through authoritative group details before opening. It is
-        // a ranked hint rather than a single row so duplicate DMs resolve to the
-        // preferred one instead of whichever the snapshot listed first.
-        val cachedRankById =
-            existingDirectChatCandidates(targetReference)
-                .withIndex()
-                .associate { (rank, item) -> item.id.lowercase() to rank }
         val candidateGroupIds =
-            chatRows
-                .asSequence()
-                .filterNot { it.pendingConfirmation }
-                .map(::projectChatRow)
-                .filter(ChatListItem::isDm)
-                .map { it.id }
-                .filterNot { it.equals(excludingGroupIdHex, ignoreCase = true) }
-                .distinctBy { it.lowercase() }
-                .sortedBy { cachedRankById[it.lowercase()] ?: Int.MAX_VALUE }
-                .toList()
+            rankedDirectChatCandidates(
+                candidates =
+                    chatRows
+                        .asSequence()
+                        .filterNot { it.pendingConfirmation }
+                        .map(::projectChatRow)
+                        .asIterable(),
+                excludingGroupIdHex = excludingGroupIdHex,
+            ).map(ChatListItem::id)
         return resolveExistingDirectChatCandidates(candidateGroupIds) { groupIdHex ->
             resolveDirectChatGroup(
                 account = account,

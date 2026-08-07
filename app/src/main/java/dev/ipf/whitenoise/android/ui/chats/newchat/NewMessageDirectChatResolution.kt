@@ -42,6 +42,23 @@ internal val directChatPreferenceOrder: Comparator<ChatListItem> =
         .thenBy { it.group.groupIdHex }
 
 /**
+ * Ranks every current DM before authoritative target validation. Membership
+ * cache availability must not affect this order: an uncached active duplicate
+ * still outranks a cached archived one.
+ */
+internal fun rankedDirectChatCandidates(
+    candidates: Iterable<ChatListItem>,
+    excludingGroupIdHex: String? = null,
+): List<ChatListItem> =
+    candidates
+        .asSequence()
+        .filter(ChatListItem::isDm)
+        .filterNot { it.id.equals(excludingGroupIdHex, ignoreCase = true) }
+        .distinctBy { it.id.lowercase() }
+        .sortedWith(directChatPreferenceOrder)
+        .toList()
+
+/**
  * Scans current direct-chat candidates for the target. A stale/non-match
  * only rejects that group; any unavailable authoritative read fails closed if
  * no other candidate can be opened.
