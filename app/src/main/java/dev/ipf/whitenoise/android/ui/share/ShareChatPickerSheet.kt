@@ -401,12 +401,14 @@ private fun shareTargetPresentation(
     val projectedTitle =
         item.sanitizedNamedTitle ?: GroupProjector.displayTitle(
             group = item.group,
-            otherMemberAccount = item.otherMemberAccount,
-            memberCount = item.memberCount,
+            otherMemberAccount = item.presentationOtherMemberAccount,
+            memberCount = item.presentationMemberCount,
             memberTitle = { accountIdHex ->
                 accountAliases[accountIdHex]?.displayName ?: IdentityFormatter.short(accountIdHex)
             },
             copy = groupTitleCopy,
+            conversationKind = item.projection?.conversationKind,
+            soleSelfMember = item.presentationActiveAccountIsSoleMember,
         )
     val title =
         when {
@@ -417,7 +419,7 @@ private fun shareTargetPresentation(
     val searchableTitle =
         title.takeIf {
             item.sanitizedNamedTitle != null ||
-                title == groupTitleCopy.groupOfPeople(item.memberCount) ||
+                title == groupTitleCopy.groupOfPeople(item.presentationMemberCount) ||
                 accountAliases.values.any { aliases -> title in aliases.human }
         }
     val humanSearchValues =
@@ -440,9 +442,9 @@ private fun shareTargetAccountIds(
     activeAccountIdHex: String?,
 ): List<String> =
     buildList {
-        item.otherMemberAccount?.let(::add)
+        item.presentationOtherMemberAccount?.let(::add)
         val directTarget =
-            item.otherMemberAccount != null ||
+            item.presentationOtherMemberAccount != null ||
                 item.projection?.conversationKind == ChatConversationKindFfi.DIRECT
         if (directTarget) {
             item.memberSnapshot
