@@ -462,6 +462,42 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun directConversationWithOnlySelfShowsExplicitSoleMemberTitle() {
+        val selfOnly = listOf(member(memberId = "alice", account = "alice", local = true))
+
+        assertEquals(
+            "Just you",
+            GroupProjector.displayTitle(
+                group = group(name = ""),
+                otherMemberAccount = null,
+                memberCount = 1,
+                memberTitle = { account: String -> account },
+                copy = GroupTitleCopy.Default,
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                soleSelfMember = GroupProjector.isSelfSoleMember(selfOnly, activeAccountIdHex = "alice"),
+            ),
+        )
+    }
+
+    @Test
+    fun directConversationWithOnlyFormerPeerDoesNotShowSoleMemberTitle() {
+        val peerOnly = listOf(member(memberId = "bob", account = "bob", local = false))
+
+        assertEquals(
+            "Unknown",
+            GroupProjector.displayTitle(
+                group = group(name = ""),
+                otherMemberAccount = "bob",
+                memberCount = 1,
+                memberTitle = { account: String -> account },
+                copy = GroupTitleCopy.Default,
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                soleSelfMember = GroupProjector.isSelfSoleMember(peerOnly, activeAccountIdHex = "alice"),
+            ),
+        )
+    }
+
+    @Test
     fun namedChatTitleUsesGroupName() {
         val named = group(name = "Product")
 

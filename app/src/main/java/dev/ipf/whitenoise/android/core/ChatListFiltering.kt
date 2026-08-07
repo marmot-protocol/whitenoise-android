@@ -168,9 +168,11 @@ internal fun chatListItemDisplayTitle(
     item.sanitizedNamedTitle?.let { return it }
     return GroupProjector.displayTitle(
         group = item.group,
-        otherMemberAccount = item.otherMemberAccount,
-        memberCount = item.memberCount,
+        otherMemberAccount = item.presentationOtherMemberAccount,
+        memberCount = item.presentationMemberCount,
         memberTitle = { appState.chatMemberTitle(it) },
         copy = copy,
+        conversationKind = item.projection?.conversationKind,
+        soleSelfMember = item.activeAccountIsSoleMember,
     )
 }

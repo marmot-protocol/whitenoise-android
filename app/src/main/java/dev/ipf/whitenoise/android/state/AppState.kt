@@ -6815,6 +6815,7 @@ class WhiteNoiseAppState private constructor(
             inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
             groupOfPeopleFormat = appContext.getString(R.string.group_title_people_count),
             unknownTitle = appContext.getString(R.string.unknown),
+            soleMemberTitle = appContext.getString(R.string.just_you),
         )
 
     private suspend fun postNotificationUpdate(

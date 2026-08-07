@@ -309,6 +309,28 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun memberSnapshotReadyToCache_givesFirstSelfOnlyDirectRosterOneGraceRetry() {
+        val selfOnly = listOf(chatMember("alice", account = "alice", local = true))
+
+        assertFalse(
+            memberSnapshotReadyToCache(
+                members = selfOnly,
+                directConversation = true,
+                activeAccountIdHex = "alice",
+                selfOnlyDirectGraceElapsed = false,
+            ),
+        )
+        assertTrue(
+            memberSnapshotReadyToCache(
+                members = selfOnly,
+                directConversation = true,
+                activeAccountIdHex = "alice",
+                selfOnlyDirectGraceElapsed = true,
+            ),
+        )
+    }
+
+    @Test
     fun memberSnapshotReadyToCache_acceptsNonEmptyRosterWithoutSelfForRemovalDetection() {
         assertTrue(
             memberSnapshotReadyToCache(
