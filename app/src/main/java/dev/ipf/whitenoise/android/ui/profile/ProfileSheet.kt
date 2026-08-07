@@ -235,6 +235,21 @@ internal data class ProfileSheetMetadata(
     val lightningAddress: String?,
 )
 
+private inline fun firstSanitizedProfileField(
+    vararg candidates: String?,
+    sanitize: (String?) -> String?,
+): String? = candidates.firstNotNullOfOrNull(sanitize)
+
+private fun sanitizedProfileNip05(raw: String?): String? =
+    raw
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableNip05(it) }
+
+private fun sanitizedProfileLightningAddress(raw: String?): String? =
+    raw
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableLud16(it) }
+
 /**
  * Keeps locally materialized fields authoritative without letting a sparse or
  * invalid cached record hide richer metadata carried by a discovery result.
@@ -243,37 +258,48 @@ internal fun resolveProfileSheetMetadata(
     cached: UserProfileMetadataFfi?,
     discovered: UserProfileMetadataFfi?,
     cachedAvatarUrl: String?,
-): ProfileSheetMetadata {
-    fun displayName(raw: String?): String? = ProfileSanitizer.displayName(raw)
-
-    fun imageUrl(raw: String?): String? = ProfileSanitizer.imageUrl(raw)
-
-    fun nip05(raw: String?): String? =
-        raw
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableNip05(it) }
-
-    fun lightningAddress(raw: String?): String? =
-        raw
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableLud16(it) }
-
-    val mergedDisplayName = displayName(cached?.displayName) ?: displayName(discovered?.displayName)
-    val mergedName = displayName(cached?.name) ?: displayName(discovered?.name)
-    return ProfileSheetMetadata(
-        displayName = mergedDisplayName ?: mergedName,
+): ProfileSheetMetadata =
+    ProfileSheetMetadata(
+        displayName =
+            firstSanitizedProfileField(
+                cached?.displayName,
+                discovered?.displayName,
+                cached?.name,
+                discovered?.name,
+                sanitize = ProfileSanitizer::displayName,
+            ),
         pictureUrl =
-            imageUrl(cachedAvatarUrl)
-                ?: imageUrl(cached?.picture)
-                ?: imageUrl(discovered?.picture),
-        bannerUrl = imageUrl(cached?.banner) ?: imageUrl(discovered?.banner),
-        about = ProfileSanitizer.about(cached?.about) ?: ProfileSanitizer.about(discovered?.about),
-        nip05 = nip05(cached?.nip05) ?: nip05(discovered?.nip05),
+            firstSanitizedProfileField(
+                cachedAvatarUrl,
+                cached?.picture,
+                discovered?.picture,
+                sanitize = ProfileSanitizer::imageUrl,
+            ),
+        bannerUrl =
+            firstSanitizedProfileField(
+                cached?.banner,
+                discovered?.banner,
+                sanitize = ProfileSanitizer::imageUrl,
+            ),
+        about =
+            firstSanitizedProfileField(
+                cached?.about,
+                discovered?.about,
+                sanitize = ProfileSanitizer::about,
+            ),
+        nip05 =
+            firstSanitizedProfileField(
+                cached?.nip05,
+                discovered?.nip05,
+                sanitize = ::sanitizedProfileNip05,
+            ),
         lightningAddress =
-            lightningAddress(cached?.lud16)
-                ?: lightningAddress(discovered?.lud16),
+            firstSanitizedProfileField(
+                cached?.lud16,
+                discovered?.lud16,
+                sanitize = ::sanitizedProfileLightningAddress,
+            ),
     )
-}
 
 @Composable
 @Suppress("FunctionNaming")
