@@ -47,6 +47,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
@@ -347,12 +348,21 @@ private fun NewMessageScreen(
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
     val resolution = rememberRecipientResolution(query, appState)
+    val userSearch by rememberRecipientUserSearchState(query, appState)
+    val discovered = userSearch.candidates
+    val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, activeHex) {
-            if (query.isNotBlank() && !isPlainNameQuery(query)) {
+        remember(query, candidates, discovered, followedIds, activeHex) {
+            if (identifierQuery) {
                 emptyList()
             } else {
-                RecipientSearch.browse(query, candidates, activeHex)
+                RecipientSearch.mergeAndBrowse(
+                    query = query,
+                    known = candidates,
+                    discovered = discovered,
+                    activeAccountIdHex = activeHex,
+                    followedAccountIds = followedIds,
+                )
             }
         }
 
@@ -401,6 +411,15 @@ private fun NewMessageScreen(
                 creatingHex = null
             }
         }
+    }
+
+    fun startOrOpenConversation(candidate: RecipientSearch.Candidate) {
+        openOrCreateChat(
+            npub = candidate.npub,
+            hexForProgress = candidate.accountIdHex,
+            recipientName = candidate.displayName,
+            existingDmGroupIdHex = candidate.existingDmGroupIdHex,
+        )
     }
 
     Scaffold(
@@ -496,13 +515,12 @@ private fun NewMessageScreen(
                             avatarUrl = appState.avatarUrl(resolvedHex),
                             enabled = creatingHex == null,
                             onClick = {
-                                openOrCreateChat(
-                                    npub = appState.npub(resolvedHex),
-                                    hexForProgress = resolvedHex,
-                                    recipientName =
-                                        appState
-                                            .displayName(resolvedHex)
-                                            .takeIf { resolution.state == RecipientPreviewState.Loaded },
+                                startOrOpenConversation(
+                                    RecipientSearch.Candidate(
+                                        accountIdHex = resolvedHex,
+                                        npub = appState.npub(resolvedHex),
+                                        displayName = appState.displayName(resolvedHex),
+                                    ),
                                 )
                             },
                             onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
@@ -521,35 +539,57 @@ private fun NewMessageScreen(
                     // centered hero, paste, or scan affordance here (all redundant).
                     if (query.isNotBlank()) {
                         item {
-                            Text(
-                                stringResource(R.string.no_matches),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                            )
+                            if (!identifierQuery && userSearch.isSearching) {
+                                UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
+                            } else {
+                                Text(
+                                    stringResource(
+                                        when {
+                                            userSearch.failed -> R.string.user_search_failed
+                                            userSearch.isIncomplete -> R.string.user_search_incomplete
+                                            else -> R.string.no_matches
+                                        },
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                                )
+                            }
                         }
                     }
                 } else {
                     item { SectionHeader(stringResource(R.string.contacts)) }
                     items(matches, key = { it.accountIdHex }) { candidate ->
                         ContactRow(
-                            title = appState.displayName(candidate.accountIdHex),
-                            subtitle = IdentityFormatter.short(candidate.npub),
+                            title = candidate.displayName,
+                            subtitle =
+                                when {
+                                    candidate.isFollowing -> stringResource(R.string.user_search_following)
+                                    candidate.searchProfile != null -> stringResource(R.string.user_search_network)
+                                    else -> IdentityFormatter.short(candidate.npub)
+                                },
                             avatarSeed = candidate.accountIdHex,
-                            avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                            avatarUrl =
+                                appState.avatarUrl(candidate.accountIdHex)
+                                    ?: ProfileSanitizer.imageUrl(candidate.searchProfile?.picture),
                             enabled = creatingHex == null,
                             onClick = {
-                                openOrCreateChat(
-                                    npub = candidate.npub,
-                                    hexForProgress = candidate.accountIdHex,
-                                    recipientName = appState.displayName(candidate.accountIdHex),
-                                    existingDmGroupIdHex = candidate.existingDmGroupIdHex,
-                                )
+                                if (candidate.source == null && candidate.searchProfile != null) {
+                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+                                } else {
+                                    startOrOpenConversation(candidate)
+                                }
                             },
-                            onLongClick = { appState.presentProfile(candidate.npub) },
+                            onLongClick = {
+                                if (candidate.searchProfile != null) {
+                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+                                } else {
+                                    appState.presentProfile(candidate.npub)
+                                }
+                            },
                             trailing =
                                 if (creatingHex == candidate.accountIdHex) {
                                     { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
@@ -557,6 +597,15 @@ private fun NewMessageScreen(
                                     null
                                 },
                         )
+                    }
+                    if (userSearch.isSearching) {
+                        item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
+                    } else if (userSearch.failed || userSearch.isIncomplete) {
+                        item {
+                            UserSearchStatusRow(
+                                if (userSearch.failed) R.string.user_search_failed else R.string.user_search_incomplete,
+                            )
+                        }
                     }
                 }
             }

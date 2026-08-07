@@ -1,14 +1,21 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.profile
 
 import android.content.Intent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,19 +35,22 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -57,7 +67,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -72,10 +84,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -83,6 +97,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
@@ -92,13 +107,13 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
-import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
+import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.inviteShareIntent
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -106,7 +121,6 @@ import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
@@ -175,6 +189,118 @@ internal fun runProfileSheetAdminMutation(
     return true
 }
 
+/**
+ * Null means the follow status is unknown — an initial read failure must not be
+ * reported as "not following", or the sheet offers the opposite mutation.
+ */
+internal suspend fun loadProfileFollowing(
+    previous: Boolean?,
+    load: suspend () -> Boolean?,
+): Boolean? =
+    runCatching { load() }
+        .fold(
+            onSuccess = { it },
+            onFailure = { error ->
+                rethrowIfCancellation(error)
+                previous
+            },
+        )
+
+internal data class ProfileFollowRowState(
+    val enabled: Boolean,
+    val inProgress: Boolean,
+    val showsUnfollow: Boolean,
+)
+
+internal fun profileFollowRowState(
+    following: Boolean?,
+    loading: Boolean,
+    busy: Boolean,
+    creatingChat: Boolean,
+): ProfileFollowRowState =
+    ProfileFollowRowState(
+        enabled = following != null && !loading && !busy && !creatingChat,
+        // Unknown-after-failure is a settled state, not a pending one — spinning
+        // on it would be indistinguishable from a read that never returns.
+        inProgress = loading || busy,
+        showsUnfollow = following == true,
+    )
+
+internal data class ProfileSheetMetadata(
+    val displayName: String?,
+    val pictureUrl: String?,
+    val bannerUrl: String?,
+    val about: String?,
+    val nip05: String?,
+    val lightningAddress: String?,
+)
+
+private inline fun firstSanitizedProfileField(
+    vararg candidates: String?,
+    sanitize: (String?) -> String?,
+): String? = candidates.firstNotNullOfOrNull(sanitize)
+
+private fun sanitizedProfileNip05(raw: String?): String? =
+    raw
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableNip05(it) }
+
+private fun sanitizedProfileLightningAddress(raw: String?): String? =
+    raw
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && ProfileFieldValidation.isAcceptableLud16(it) }
+
+/**
+ * Keeps locally materialized fields authoritative without letting a sparse or
+ * invalid cached record hide richer metadata carried by a discovery result.
+ */
+internal fun resolveProfileSheetMetadata(
+    cached: UserProfileMetadataFfi?,
+    discovered: UserProfileMetadataFfi?,
+    cachedAvatarUrl: String?,
+): ProfileSheetMetadata =
+    ProfileSheetMetadata(
+        displayName =
+            firstSanitizedProfileField(
+                cached?.displayName,
+                discovered?.displayName,
+                cached?.name,
+                discovered?.name,
+                sanitize = ProfileSanitizer::displayName,
+            ),
+        pictureUrl =
+            firstSanitizedProfileField(
+                cachedAvatarUrl,
+                cached?.picture,
+                discovered?.picture,
+                sanitize = ProfileSanitizer::imageUrl,
+            ),
+        bannerUrl =
+            firstSanitizedProfileField(
+                cached?.banner,
+                discovered?.banner,
+                sanitize = ProfileSanitizer::imageUrl,
+            ),
+        about =
+            firstSanitizedProfileField(
+                cached?.about,
+                discovered?.about,
+                sanitize = ProfileSanitizer::about,
+            ),
+        nip05 =
+            firstSanitizedProfileField(
+                cached?.nip05,
+                discovered?.nip05,
+                sanitize = ::sanitizedProfileNip05,
+            ),
+        lightningAddress =
+            firstSanitizedProfileField(
+                cached?.lud16,
+                discovered?.lud16,
+                sanitize = ::sanitizedProfileLightningAddress,
+            ),
+    )
+
 @Composable
 @Suppress("FunctionNaming")
 internal fun ProfileSheetAdminActionRows(
@@ -230,8 +356,8 @@ internal fun ProfileSheet(
     npub: String,
     // (chat, justCreated): justCreated is true only on the path that just
     // created a brand-new DM with this person (issue #321), so the conversation
-    // opens with the composer focused + keyboard up. Opening an existing DM or
-    // a shared group passes false.
+    // opens with the composer focused + keyboard up. Opening an existing DM
+    // passes false.
     onOpenGroup: (ChatListItem, Boolean) -> Unit,
     onStartGroup: (RecipientSearch.Candidate) -> Unit,
     onDismiss: () -> Unit,
@@ -250,7 +376,7 @@ internal fun ProfileSheet(
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
-    // avatar, shared groups — would move that target mid-animation and read as
+    // avatar — would move that target mid-animation and read as
     // a stutter on open (#1432). This is the same pure FFI decode (no storage
     // read) the message bubble already runs on its per-message render path, so
     // it is cheap enough for composition; the suspend resolver below still
@@ -259,7 +385,6 @@ internal fun ProfileSheet(
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contentScrollState = rememberScrollState()
-    val groupTitleCopy = rememberGroupTitleCopy()
     val compactMemberSheet = adminController != null
 
     LaunchedEffect(npub) {
@@ -269,50 +394,32 @@ internal fun ProfileSheet(
         if (resolved != null) appState.refreshProfile(resolved)
     }
 
-    val profile = hex?.let { appState.userProfile(it) }
-    val title = hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
+    val cachedProfile = hex?.let { appState.userProfile(it) }
+    val profile =
+        resolveProfileSheetMetadata(
+            cached = cachedProfile,
+            discovered = appState.pendingProfileMetadata,
+            cachedAvatarUrl = hex?.let { appState.avatarUrl(it) },
+        )
+    val title = profile.displayName ?: hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
-    val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val pictureUrl = profile.pictureUrl
+    val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
-    val about = ProfileSanitizer.about(profile?.about)
-    val nip05 =
-        profile
-            ?.nip05
-            ?.trim()
-            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
-    // The named, multi-member groups this account shares with the active user.
-    // The whole derivation — the O(groups) `sharedGroupsWith` projection/scan
-    // and the filter + list allocation — is memoized, keyed on `hex` and the
-    // controller's observable chat-list projection (`appState.chatListItems`),
-    // so it runs only when the underlying group set / membership / names
-    // actually change and is skipped on unrelated recompositions (e.g. the
-    // profile name/avatar resolving). Reading `chatListItems` as a key also
-    // subscribes the sheet so the list still refreshes when the groups change
-    // while it's open. This mirrors the keyed-remember memoization used by the
-    // sibling sheets in this file (TransferAdminSheet, ReactionDetailsSheet,
-    // ForwardSheet).
-    val sharedGroups =
-        remember(hex, appState.chatListItems) {
-            // Only named, multi-member groups belong in this list: the 1:1 DM is
-            // reached via the Message button, and an unnamed group would just
-            // read as "Group of N people".
-            hex
-                ?.let { appState.sharedGroupsWith(it) }
-                .orEmpty()
-                .filter { it.memberCount > 2 && it.group.name.isNotBlank() }
-        }
-    // The existing 1:1 DM with this person, if any — the confirmed two-member
-    // group with them. Drives the Message button: open it when present,
-    // otherwise start a new DM.
-    val directMessageGroup =
-        remember(npub, appState.chatListItems) {
-            appState.existingDirectChat(npub)
-        }
+    val about = profile.about
+    val nip05 = profile.nip05
+    var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }
+    LaunchedEffect(nip05) {
+        nip05ResolvedHex = nip05?.let { Nip05Resolver.resolve(it) }
+    }
+    val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, hex)
+    val lightningAddress = profile.lightningAddress
+    val activeAccountHex = appState.activeAccount?.accountIdHex
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.
@@ -321,11 +428,37 @@ internal fun ProfileSheet(
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
-    val activeAccountHex = appState.activeAccount?.accountIdHex
     // UI guard covers both profile actions, including "Start new group". The
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    // Keyed by account as well as profile: the failure path deliberately keeps the
+    // previous value, which would otherwise carry one account's relationship into
+    // the next and offer the wrong follow/unfollow.
+    var following by remember(npub, appState.activeAccountRef) { mutableStateOf<Boolean?>(null) }
+    var followLoading by remember(npub, appState.activeAccountRef) { mutableStateOf(false) }
+    var followBusy by remember(npub, appState.activeAccountRef) { mutableStateOf(false) }
+    LaunchedEffect(hex, appState.activeAccountRef, appState.relationshipRevision) {
+        val target = hex?.takeUnless { targetIsSelf }
+        if (target == null) {
+            following = null
+            followLoading = false
+            return@LaunchedEffect
+        }
+        followLoading = true
+        try {
+            following = loadProfileFollowing(following) { appState.isFollowingProfile(target) }
+        } finally {
+            followLoading = false
+        }
+    }
+    val followRow =
+        profileFollowRowState(
+            following = following,
+            loading = followLoading,
+            busy = followBusy,
+            creatingChat = creatingChat,
+        )
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
     val addableGroups =
@@ -384,11 +517,12 @@ internal fun ProfileSheet(
             try {
                 when (
                     val result =
-                        attemptStartProfileChat(
+                        attemptOpenOrStartProfileChat(
                             npub = npub,
                             progressHex = progressHex,
                             recipientName = displayTitle,
                             retryGroupIdHex = retryGroupIdHex,
+                            resolveDirectChat = { appState.resolveExistingDirectChat(npub) },
                             createGroup = appState::createProfileChatGroup,
                             loadCreatedChatListItem = appState::loadCreatedChatListItem,
                             displayName = appState::displayName,
@@ -396,7 +530,7 @@ internal fun ProfileSheet(
                             abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
                         )
                 ) {
-                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, true)
+                    is StartChatAttemptResult.Open -> onOpenGroup(result.item, result.newlyCreated)
                     is StartChatAttemptResult.Failed -> startChatError = result.error
                 }
             } finally {
@@ -419,33 +553,29 @@ internal fun ProfileSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .clickable(
-                            enabled = avatarImageAvailable,
-                            onClickLabel = stringResource(R.string.profile_view_picture),
-                            role = Role.Button,
-                        ) { fullPictureOpen = true },
-            ) {
-                Avatar(
-                    title = displayTitle,
-                    seed = hex ?: npub,
-                    size = 96.dp,
-                    pictureUrl = pictureUrl,
-                )
-            }
+            ProfileSheetHeaderImages(
+                bannerUrl = bannerUrl,
+                title = displayTitle,
+                seed = hex ?: npub,
+                pictureUrl = pictureUrl,
+                avatarClickable = avatarImageAvailable,
+                onAvatarClick = { fullPictureOpen = true },
+            )
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(displayTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                if (contactNickname != null && title != displayTitle) {
+                    Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (nip05 != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
+                        if (nip05Verified) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = stringResource(R.string.profile_nip05_verified),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                         Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -482,10 +612,43 @@ internal fun ProfileSheet(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
+            Row(
+                modifier = Modifier.testTag(PROFILE_QUICK_ACTIONS_TAG),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+            ) {
+                if (hex != null && !targetIsSelf) {
+                    QuickActionButton(
+                        icon = if (followRow.showsUnfollow) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
+                        label =
+                            stringResource(
+                                if (followRow.showsUnfollow) R.string.profile_unfollow else R.string.profile_follow,
+                            ),
+                        modifier = Modifier.testTag(PROFILE_FOLLOW_ACTION_TAG),
+                        enabled = followRow.enabled,
+                        inProgress = followRow.inProgress,
+                        onClick = {
+                            if (followBusy) return@QuickActionButton
+                            val desired = following != true
+                            followBusy = true
+                            appState.launchMutation {
+                                try {
+                                    runCatching { appState.setProfileFollowing(hex!!, desired) }
+                                        .onSuccess { following = desired }
+                                        .onFailure { error ->
+                                            rethrowIfCancellation(error)
+                                            appState.present(R.string.profile_follow_failed)
+                                        }
+                                } finally {
+                                    followBusy = false
+                                }
+                            }
+                        },
+                    )
+                }
                 QuickActionButton(
                     icon = Icons.AutoMirrored.Filled.Chat,
                     label = stringResource(R.string.message),
+                    modifier = Modifier.testTag(PROFILE_MESSAGE_ACTION_TAG),
                     enabled = hex != null && !creatingChat,
                     inProgress = creatingChat,
                     // Opens the existing 1:1 DM, or starts a new one with this
@@ -494,14 +657,7 @@ internal fun ProfileSheet(
                     // commit + Nostr publish finish regardless; we keep the sheet up
                     // with a spinner until the conversation is ready, then navigate
                     // straight in — no dismiss-into-a-blank-gap.
-                    onClick = {
-                        val existing = directMessageGroup
-                        if (existing != null) {
-                            onOpenGroup(existing, false)
-                        } else {
-                            openOrCreateProfileChat()
-                        }
-                    },
+                    onClick = { openOrCreateProfileChat() },
                 )
                 QuickActionButton(
                     icon = Icons.Default.Call,
@@ -553,22 +709,12 @@ internal fun ProfileSheet(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    SectionCard(title = stringResource(R.string.profile_shared_groups)) {
-                        if (sharedGroups.isEmpty()) {
-                            Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            sharedGroups.forEachIndexed { index, group ->
-                                ProfileSharedGroupRow(
-                                    item = group,
-                                    appState = appState,
-                                    titleCopy = groupTitleCopy,
-                                    onOpen = { onOpenGroup(group, false) },
-                                )
-                                if (index != sharedGroups.lastIndex) {
-                                    AppDivider()
-                                }
-                            }
-                        }
+                    if (lightningAddress != null) {
+                        CopyableValueRow(
+                            label = stringResource(R.string.lightning),
+                            value = lightningAddress,
+                            clipboard = clipboard,
+                        )
                     }
                 }
             }
@@ -648,6 +794,144 @@ internal fun ProfileSheet(
         )
     }
 }
+
+/**
+ * The sheet header mirrors the own-profile header: the ringed avatar straddles
+ * the banner's bottom edge instead of sitting in its own row below it.
+ *
+ * A profile with no banner — and one whose banner load fails, which
+ * [ProfileBannerLoadState] reports the same way — keeps the plain, unoverlapped
+ * avatar. Reserving the overlap for a banner that will never render would leave
+ * a hole, and inventing a placeholder banner would make every bannerless profile
+ * taller than it is today.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun ProfileSheetHeaderImages(
+    bannerUrl: String?,
+    title: String,
+    seed: String,
+    pictureUrl: String?,
+    avatarClickable: Boolean,
+    onAvatarClick: () -> Unit,
+) {
+    val banner = bannerUrl?.let { rememberProfileBannerLoadState(it) }
+    val viewPictureLabel = stringResource(R.string.profile_view_picture)
+    val avatar: @Composable () -> Unit = {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            modifier =
+                Modifier
+                    .clip(CircleShape)
+                    .clickable(
+                        enabled = avatarClickable,
+                        onClickLabel = viewPictureLabel,
+                        role = Role.Button,
+                        onClick = onAvatarClick,
+                    ),
+        ) {
+            Box(Modifier.padding(PROFILE_AVATAR_RING)) {
+                Avatar(title = title, seed = seed, size = PROFILE_AVATAR_SIZE, pictureUrl = pictureUrl)
+            }
+        }
+    }
+    if (banner?.visible != true) {
+        avatar()
+        return
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(bottom = PROFILE_AVATAR_OVERLAP),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        ProfileBannerImage(banner)
+        // The offset overflows the banner; the bottom padding above reserves it.
+        Box(Modifier.offset(y = PROFILE_AVATAR_OVERLAP)) { avatar() }
+    }
+}
+
+private val PROFILE_AVATAR_SIZE = 96.dp
+private val PROFILE_AVATAR_RING = 4.dp
+
+/** Half the ringed avatar, so it sits centred on the banner's bottom edge. */
+private val PROFILE_AVATAR_OVERLAP = 52.dp
+
+/**
+ * [AvatarImageLoader.load] answers null both while it is working and when the
+ * fetch failed, so completion has to be tracked separately: a banner that will
+ * never arrive is dropped instead of spinning forever.
+ */
+internal data class ProfileBannerLoadState(
+    val image: ImageBitmap?,
+    val settled: Boolean,
+) {
+    /** False once a load has failed, so callers collapse as if there were no banner. */
+    val visible: Boolean get() = image != null || !settled
+}
+
+@Composable
+internal fun rememberProfileBannerLoadState(
+    bannerUrl: String,
+    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
+    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+): ProfileBannerLoadState {
+    var image by remember(bannerUrl) { mutableStateOf(peek(bannerUrl)) }
+    var settled by remember(bannerUrl) { mutableStateOf(image != null) }
+    LaunchedEffect(bannerUrl) {
+        if (image == null) {
+            image = load(bannerUrl)
+            settled = true
+        }
+    }
+    return ProfileBannerLoadState(image = image, settled = settled)
+}
+
+@Composable
+@Suppress("FunctionNaming")
+internal fun ProfileBannerImage(
+    bannerUrl: String,
+    peek: (String) -> ImageBitmap? = AvatarImageLoader::peek,
+    load: suspend (String) -> ImageBitmap? = AvatarImageLoader::load,
+) {
+    ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, peek, load))
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+@Suppress("FunctionNaming")
+internal fun ProfileBannerImage(state: ProfileBannerLoadState) {
+    val bitmap = state.image
+    if (!state.visible) return
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLg)
+                .aspectRatio(2f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .testTag(PROFILE_BANNER_TAG),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            LoadingIndicator(modifier = Modifier.size(20.dp).testTag(PROFILE_BANNER_LOADING_TAG))
+        }
+    }
+}
+
+internal const val PROFILE_BANNER_TAG = "profile-banner"
+internal const val PROFILE_BANNER_LOADING_TAG = "profile-banner-loading"
+internal const val PROFILE_FOLLOW_ACTION_TAG = "profile-follow-action"
+internal const val PROFILE_MESSAGE_ACTION_TAG = "profile-message-action"
+internal const val PROFILE_QUICK_ACTIONS_TAG = "profile-quick-actions"
 
 @Composable
 private fun ContactPrivateDetailsDialog(
@@ -974,40 +1258,4 @@ private fun ProfileSheetAdminActions(
             destructive = true,
         )
     }
-}
-
-@Composable
-private fun ProfileSharedGroupRow(
-    item: ChatListItem,
-    appState: WhiteNoiseAppState,
-    titleCopy: GroupTitleCopy,
-    onOpen: () -> Unit,
-) {
-    val title = chatListItemDisplayTitle(item, appState, titleCopy)
-    val subtitle =
-        when {
-            item.group.archived -> stringResource(R.string.archived)
-            item.memberCount == 1 -> stringResource(R.string.one_member)
-            item.memberCount > 1 -> stringResource(R.string.members_count, item.memberCount)
-            else -> stringResource(R.string.members)
-        }
-    ListItem(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                .clickable(role = Role.Button, onClick = onOpen),
-        leadingContent = {
-            GroupAvatar(
-                appState = appState,
-                group = item.group,
-                title = title,
-                seed = item.group.groupIdHex,
-                size = 40.dp,
-            )
-        },
-        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
 }

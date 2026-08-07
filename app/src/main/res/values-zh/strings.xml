@@ -138,8 +138,10 @@
     <string name="invite_preview_with_inviter">%1$s 邀请你加入此群组。</string>
     <string name="profile">个人资料</string>
     <string name="profile_no_bio">还没有简介。</string>
-    <string name="profile_shared_groups">共同群组</string>
-    <string name="profile_no_shared_groups">还没有共同群组。</string>
+    <string name="profile_follow">关注</string>
+    <string name="profile_unfollow">取消关注</string>
+    <string name="profile_follow_failed">无法更新关注状态。请检查网络连接后重试。</string>
+    <string name="profile_nip05_verified">已验证的 Nostr 地址</string>
     <string name="profile_start_new_group_with">与 %1$s 开始新群组</string>
     <string name="contact_create_group_with">与 %1$s 创建群组</string>
     <string name="contact_add_to_group">添加到群组</string>
@@ -1104,7 +1106,12 @@
     <string name="next">下一步</string>
     <string name="no_matches">无匹配结果</string>
     <string name="new_message">新消息</string>
-    <string name="search_people_hint">姓名或 npub</string>
+    <string name="search_people_hint">姓名、Nostr 地址或 npub</string>
+    <string name="user_search_searching">正在搜索网络…</string>
+    <string name="user_search_incomplete">部分网络结果可能缺失。</string>
+    <string name="user_search_failed">无法搜索网络。请检查网络连接后重试。</string>
+    <string name="user_search_following">已关注</string>
+    <string name="user_search_network">来自网络</string>
     <string name="paste_npub">粘贴 npub</string>
     <string name="start_chat">开始聊天</string>
     <string name="name_this_group">为群组命名</string>

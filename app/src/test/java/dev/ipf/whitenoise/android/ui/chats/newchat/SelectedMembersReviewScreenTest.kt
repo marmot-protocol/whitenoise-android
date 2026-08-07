@@ -49,7 +49,7 @@ class SelectedMembersReviewScreenTest {
         }
 
         composeRule
-            .onNodeWithText(members.joinToString { member -> state.displayName(member.accountIdHex) })
+            .onNodeWithText(members.joinToString { member -> member.displayName })
             .assertIsDisplayed()
         composeRule
             .onNodeWithText(context.resources.getQuantityString(R.plurals.selected_members_count, 2, 2))
@@ -60,6 +60,24 @@ class SelectedMembersReviewScreenTest {
 
         assertEquals(1, opens)
         assertEquals(2, members.size)
+    }
+
+    @Test
+    fun summaryNameSwitchesOffTheFrozenPlaceholderWhenTheProfileResolves() {
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMemberSummary(
+                    members = listOf(frozenPlaceholderMember),
+                    appState = state,
+                    onClick = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(frozenPlaceholderMember.displayName).assertIsDisplayed()
+        state.setContactNickname(frozenPlaceholderMember.accountIdHex, "Camille Example")
+        composeRule.onNodeWithText("Camille Example").assertIsDisplayed()
     }
 
     @Test
@@ -109,7 +127,7 @@ class SelectedMembersReviewScreenTest {
         members.forEach { member ->
             composeRule
                 .onNodeWithContentDescription(
-                    context.getString(R.string.remove_member_named, state.displayName(member.accountIdHex)),
+                    context.getString(R.string.remove_member_named, member.displayName),
                 ).performClick()
         }
         assertEquals(members, removed)
@@ -141,7 +159,7 @@ class SelectedMembersReviewScreenTest {
         composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsNotEnabled().performClick()
         composeRule
             .onNodeWithContentDescription(
-                context.getString(R.string.remove_member_named, state.displayName(members.first().accountIdHex)),
+                context.getString(R.string.remove_member_named, members.first().displayName),
             ).assertIsNotEnabled()
             .performClick()
 
@@ -174,6 +192,10 @@ class SelectedMembersReviewScreenTest {
                 RecipientSearch.Candidate("a".repeat(64), "Alexandria Example", "npub1alexandria"),
                 RecipientSearch.Candidate("b".repeat(64), "Benjamin Example", "npub1benjamin"),
             )
+
+        // What the picker captures for a pasted npub whose profile hasn't loaded.
+        val frozenPlaceholderMember =
+            RecipientSearch.Candidate("c".repeat(64), "npub1camil…example", "npub1camilleexample")
 
         object EmptyDraftPersistence : DraftPersistence {
             override fun read(): Map<String, String> = emptyMap()

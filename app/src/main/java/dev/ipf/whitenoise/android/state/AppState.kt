@@ -1754,6 +1754,21 @@ class WhiteNoiseAppState private constructor(
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
+    /** Ephemeral metadata carried by a live user-directory result. */
+    var pendingProfileMetadata by mutableStateOf<UserProfileMetadataFfi?>(null)
+        private set
+
+    /**
+     * Whether the presented profile was opened from user search. Tracked
+     * separately from [pendingProfileMetadata], which is also the fallback for
+     * profile data generally and so cannot identify the entry point.
+     */
+    var pendingProfileFromDiscovery by mutableStateOf(false)
+        private set
+
+    var relationshipRevision by mutableStateOf(0L)
+        private set
+
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
         private set
 
@@ -6232,12 +6247,44 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
         pendingProfileNpub = link.npub
         return true
     }
 
     fun presentProfile(npub: String) {
+        pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
         pendingProfileNpub = npub
+    }
+
+    fun presentDiscoveredProfile(
+        npub: String,
+        profile: UserProfileMetadataFfi?,
+    ) {
+        pendingProfileMetadata = profile
+        pendingProfileFromDiscovery = true
+        pendingProfileNpub = npub
+    }
+
+    // Null means the relationship is unreadable, not "not following" — the write
+    // side throws without an active account, so a false here would enable a
+    // Follow the user cannot perform.
+    suspend fun isFollowingProfile(userRef: String): Boolean? {
+        val account = activeAccountRef ?: return null
+        return marmotIo { isFollowing(account, userRef) }
+    }
+
+    suspend fun setProfileFollowing(
+        userRef: String,
+        following: Boolean,
+    ) {
+        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
+        marmotIo {
+            if (following) followUser(account, userRef) else unfollowUser(account, userRef)
+        }
+        relationshipRevision += 1L
     }
 
     /**
@@ -6306,6 +6353,8 @@ class WhiteNoiseAppState private constructor(
 
     fun clearPresentedProfile() {
         pendingProfileNpub = null
+        pendingProfileMetadata = null
+        pendingProfileFromDiscovery = false
     }
 
     /**
