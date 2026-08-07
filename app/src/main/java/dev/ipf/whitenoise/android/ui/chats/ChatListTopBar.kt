@@ -65,6 +65,8 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chat-list-filter-chip-all"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
+private val CHAT_LIST_AVATAR_CONNECTIVITY_SPACING = 12.dp
+
 internal fun chatListFilterChipTag(folderId: String): String = "chat-list-filter-chip-$folderId"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,6 +119,7 @@ internal fun ChatListTopBar(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(CHAT_LIST_AVATAR_CONNECTIVITY_SPACING),
                     ) {
                         Box(modifier = Modifier.testTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)) {
                             OtherAccountAvatarsRow(

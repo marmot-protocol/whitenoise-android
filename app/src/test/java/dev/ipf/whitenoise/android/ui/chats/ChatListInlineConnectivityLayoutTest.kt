@@ -102,32 +102,42 @@ class ChatListInlineConnectivityLayoutTest {
     }
 
     @Test
-    fun connectingIndicatorFollowsEveryAccountAvatar() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                ChatListTopBarConnectivityHarness(
-                    connectivityState = ConnectivityBannerState.Connecting,
-                    appState = remember { testAppState(accountCount = 3) },
-                )
-            }
-        }
-        composeRule.waitForIdle()
+    fun connectingIndicatorKeepsMinimumGapAfterSingleAccountAvatar() {
+        renderConnectingTopBar(accountCount = 1)
+
+        val activeAccountAvatar =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.open_settings))
+                .fetchSemanticsNode()
+                .boundsInRoot
+
+        assertMinimumAvatarConnectivityGap(activeAccountAvatar.right)
+    }
+
+    @Test
+    fun connectingIndicatorKeepsMinimumGapWithOneOtherAccount() {
+        renderConnectingTopBar(accountCount = 2)
 
         val otherAccountAvatars =
             composeRule
                 .onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        val connecting =
+
+        assertMinimumAvatarConnectivityGap(otherAccountAvatars.right)
+    }
+
+    @Test
+    fun connectingIndicatorKeepsMinimumGapAfterEveryAccountAvatar() {
+        renderConnectingTopBar(accountCount = 3)
+
+        val otherAccountAvatars =
             composeRule
-                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
+                .onNodeWithTag(CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot
 
-        assertTrue(
-            "connecting must render after the complete avatar cluster",
-            otherAccountAvatars.right <= connecting.left + POSITION_TOLERANCE,
-        )
+        assertMinimumAvatarConnectivityGap(otherAccountAvatars.right)
     }
 
     @Test
@@ -161,7 +171,12 @@ class ChatListInlineConnectivityLayoutTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsDisplayed()
+        val connectivityBounds =
+            composeRule
+                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
         val overflowBounds =
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.switch_account))
@@ -176,6 +191,8 @@ class ChatListInlineConnectivityLayoutTest {
                 .boundsInRoot
 
         assertTrue("account overflow must not overlap search", overflowBounds.right <= searchBounds.left)
+        assertMinimumAvatarConnectivityGap(overflowBounds.right)
+        assertTrue("connectivity must not overlap search", connectivityBounds.right <= searchBounds.left)
     }
 
     @Test
@@ -201,6 +218,33 @@ class ChatListInlineConnectivityLayoutTest {
                 .fetchSemanticsNode()
                 .boundsInRoot
         assertTrue(offlineBounds.top >= topBarBounds.bottom - POSITION_TOLERANCE)
+    }
+
+    private fun renderConnectingTopBar(accountCount: Int) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListTopBarConnectivityHarness(
+                    connectivityState = ConnectivityBannerState.Connecting,
+                    appState = remember { testAppState(accountCount) },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun assertMinimumAvatarConnectivityGap(avatarRight: Float) {
+        val connectingLeft =
+            composeRule
+                .onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .left
+        val minimumGap = with(composeRule.density) { 12.dp.toPx() }
+
+        assertTrue(
+            "avatar cluster must keep at least 12.dp before connectivity status",
+            connectingLeft - avatarRight >= minimumGap - POSITION_TOLERANCE,
+        )
     }
 
     private fun contentAnchorTop(): Float =
