@@ -40,6 +40,7 @@ class NotificationTargetTest {
             )
         assertEquals(target, routed.notificationTarget)
         assertNull(routed.profilePayload)
+        assertEquals(1L, routed.notificationRequestId)
     }
 
     @Test
@@ -67,9 +68,33 @@ class NotificationTargetTest {
     @Test
     fun routeInboundIntent_datalessIntentPreservesPendingNotificationTarget() {
         val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
-        val pending = InboundIntentRouting(target, null, null)
+        val pending = InboundIntentRouting(target, null, null, notificationRequestId = 2L)
         val routed = routeInboundIntent(parsedTarget = null, shareRequest = null, dataString = null, current = pending)
         assertEquals(pending, routed)
+    }
+
+    @Test
+    fun routeInboundIntent_repeatedSameNotificationTargetAdvancesRequestId() {
+        val target = NotificationTarget("acct-a", "g1", "m1", NotificationTargetKind.MESSAGE)
+        val first =
+            routeInboundIntent(
+                parsedTarget = target,
+                shareRequest = null,
+                dataString = null,
+                current = noPending,
+            )
+        assertEquals(target, first.notificationTarget)
+        assertEquals(1L, first.notificationRequestId)
+
+        val second =
+            routeInboundIntent(
+                parsedTarget = target,
+                shareRequest = null,
+                dataString = null,
+                current = first,
+            )
+        assertEquals(target, second.notificationTarget)
+        assertEquals(2L, second.notificationRequestId)
     }
 
     // ---- fromUpdate ---------------------------------------------------------

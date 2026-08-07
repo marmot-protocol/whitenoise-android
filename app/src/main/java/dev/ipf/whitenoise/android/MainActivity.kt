@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
+    private var inboundNotificationRequestId by mutableStateOf(0L)
     private var inboundShareRequest by mutableStateOf<ShareRequest?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
@@ -106,6 +107,7 @@ class MainActivity : FragmentActivity() {
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
                     },
                     inboundNotificationTarget = inboundNotificationTarget,
+                    inboundNotificationRequestId = inboundNotificationRequestId,
                     onNotificationTargetHandled = { handled ->
                         if (inboundNotificationTarget == handled) inboundNotificationTarget = null
                     },
@@ -167,9 +169,16 @@ class MainActivity : FragmentActivity() {
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
                 dataString = intent?.dataString,
-                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload, inboundShareRequest),
+                current =
+                    InboundIntentRouting(
+                        notificationTarget = inboundNotificationTarget,
+                        profilePayload = inboundProfilePayload,
+                        shareRequest = inboundShareRequest,
+                        notificationRequestId = inboundNotificationRequestId,
+                    ),
             )
         inboundNotificationTarget = routing.notificationTarget
+        inboundNotificationRequestId = routing.notificationRequestId
         inboundProfilePayload = routing.profilePayload
         inboundShareRequest = routing.shareRequest
         if (parsedTarget != null || parsedShare != null) {

@@ -204,6 +204,8 @@ data class InboundIntentRouting(
     val notificationTarget: NotificationTarget?,
     val profilePayload: String?,
     val shareRequest: ShareRequest? = null,
+    /** Advances for every parsed notification tap so equal targets remain distinct UI requests. */
+    val notificationRequestId: Long = 0L,
 )
 
 /**
@@ -223,9 +225,25 @@ fun routeInboundIntent(
     current: InboundIntentRouting,
 ): InboundIntentRouting =
     when {
-        parsedTarget != null -> InboundIntentRouting(parsedTarget, null, null)
-        shareRequest != null -> InboundIntentRouting(null, null, shareRequest)
-        dataString != null -> InboundIntentRouting(null, dataString, null)
+        parsedTarget != null ->
+            current.copy(
+                notificationTarget = parsedTarget,
+                profilePayload = null,
+                shareRequest = null,
+                notificationRequestId = current.notificationRequestId + 1L,
+            )
+        shareRequest != null ->
+            current.copy(
+                notificationTarget = null,
+                profilePayload = null,
+                shareRequest = shareRequest,
+            )
+        dataString != null ->
+            current.copy(
+                notificationTarget = null,
+                profilePayload = dataString,
+                shareRequest = null,
+            )
         else -> current
     }
 

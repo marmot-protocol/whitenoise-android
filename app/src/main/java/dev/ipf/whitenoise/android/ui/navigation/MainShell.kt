@@ -184,6 +184,7 @@ internal fun resolveMainShellContentRoute(
 internal fun MainShell(
     appState: WhiteNoiseAppState,
     inboundNotificationTarget: NotificationTarget? = null,
+    inboundNotificationRequestId: Long = 0L,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
@@ -235,6 +236,7 @@ internal fun MainShell(
     // intermediate stop between the account switch and the opened conversation.
     var routingNotification by remember { mutableStateOf(false) }
     var notificationInviteAuthoritativelyUnavailable by remember(
+        inboundNotificationRequestId,
         inboundNotificationTarget?.accountRef,
         inboundNotificationTarget?.groupIdHex,
         inboundNotificationTarget?.kind,
@@ -242,6 +244,7 @@ internal fun MainShell(
         mutableStateOf(false)
     }
     var notificationInviteAuthoritativeProbeAttempts by remember(
+        inboundNotificationRequestId,
         inboundNotificationTarget?.accountRef,
         inboundNotificationTarget?.groupIdHex,
         inboundNotificationTarget?.kind,
@@ -286,6 +289,7 @@ internal fun MainShell(
     // as account/chat-list state changes.
     LaunchedEffect(
         inboundNotificationTarget,
+        inboundNotificationRequestId,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
