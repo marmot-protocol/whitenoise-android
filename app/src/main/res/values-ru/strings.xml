@@ -156,8 +156,6 @@
     <string name="invite_preview_with_inviter">%1$s пригласил(а) вас в эту группу.</string>
     <string name="profile">Профиль</string>
     <string name="profile_no_bio">Биографии пока нет.</string>
-    <string name="profile_shared_groups">Общие группы</string>
-    <string name="profile_no_shared_groups">Пока нет общих групп.</string>
     <string name="profile_follow">Подписаться</string>
     <string name="profile_unfollow">Отписаться</string>
     <string name="profile_follow_failed">Не удалось обновить подписку. Проверьте подключение и повторите попытку.</string>

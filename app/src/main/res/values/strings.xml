@@ -192,8 +192,6 @@
     <string name="invite_preview_with_inviter">%1$s invited you to this group.</string>
     <string name="profile">Profile</string>
     <string name="profile_no_bio">No bio yet.</string>
-    <string name="profile_shared_groups">Shared groups</string>
-    <string name="profile_no_shared_groups">No shared groups yet.</string>
     <string name="profile_follow">Follow</string>
     <string name="profile_unfollow">Unfollow</string>
     <string name="profile_follow_failed">Couldn’t update this follow. Check your connection and try again.</string>

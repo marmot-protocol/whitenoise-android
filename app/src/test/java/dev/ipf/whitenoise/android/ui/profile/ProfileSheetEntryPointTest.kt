@@ -9,18 +9,15 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,10 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Entry-point-dependent chrome on the profile sheet: the shared-groups section
- * and the follow quick action.
- */
+/** Entry-point-dependent chrome on the profile sheet. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -40,23 +34,6 @@ class ProfileSheetEntryPointTest {
     val composeRule = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
-
-    @Test
-    fun userSearchProfileDropsTheSharedGroupsSection() {
-        val appState = renderProfile { it.presentDiscoveredProfile(TARGET_NPROFILE, null) }
-
-        composeRule.onNodeWithText(app.getString(R.string.profile_shared_groups)).assertDoesNotExist()
-        composeRule.onNodeWithText(app.getString(R.string.profile_no_shared_groups)).assertDoesNotExist()
-        composeRule.runOnIdle { assertTrue(appState.pendingProfileFromDiscovery) }
-    }
-
-    @Test
-    fun everyOtherEntryPointKeepsTheSharedGroupsSection() {
-        val appState = renderProfile { it.presentProfile(TARGET_NPROFILE) }
-
-        composeRule.onNodeWithText(app.getString(R.string.profile_shared_groups)).assertExists()
-        composeRule.runOnIdle { assertTrue(!appState.pendingProfileFromDiscovery) }
-    }
 
     @Test
     fun unknownFollowStateLeavesTheQuickActionDisabled() {

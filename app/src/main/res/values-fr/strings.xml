@@ -144,8 +144,6 @@
     <string name="invite_preview_with_inviter">%1$s vous a invité dans ce groupe.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Aucune bio pour le moment.</string>
-    <string name="profile_shared_groups">Groupes partagés</string>
-    <string name="profile_no_shared_groups">Aucun groupe partagé pour le moment.</string>
     <string name="profile_follow">Suivre</string>
     <string name="profile_unfollow">Ne plus suivre</string>
     <string name="profile_follow_failed">Impossible de mettre à jour l’abonnement. Vérifiez votre connexion et réessayez.</string>

@@ -77,13 +77,6 @@ class ProfileParityTest {
     }
 
     @Test
-    fun namedTwoPersonGroupIsVisibleButUnnamedDmIsNot() {
-        assertTrue(profileSharedGroupVisible(memberCount = 2, groupName = "Project"))
-        assertFalse(profileSharedGroupVisible(memberCount = 2, groupName = ""))
-        assertTrue(profileSharedGroupVisible(memberCount = 3, groupName = ""))
-    }
-
-    @Test
     fun selectedDiscoveryCandidateKeepsEphemeralNameAndAvatar() {
         val remoteAvatar = "https://example.com/jack.png"
         val candidate =

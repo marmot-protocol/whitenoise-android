@@ -144,8 +144,6 @@
     <string name="invite_preview_with_inviter">%1$s sizi bu gruba davet etti.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Henüz biyografi yok.</string>
-    <string name="profile_shared_groups">Ortak gruplar</string>
-    <string name="profile_no_shared_groups">Henüz ortak grup yok.</string>
     <string name="profile_follow">Takip et</string>
     <string name="profile_unfollow">Takibi bırak</string>
     <string name="profile_follow_failed">Takip durumu güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>

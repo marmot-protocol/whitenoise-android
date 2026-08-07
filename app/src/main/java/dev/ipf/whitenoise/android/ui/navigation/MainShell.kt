@@ -155,9 +155,6 @@ internal fun ProfileGroupForegroundCoordinator(
             },
             onDismiss = onDismissProfile,
             adminController = conversationController,
-            // A stranger found in user search nearly never shares a group, so the
-            // section is dead weight on that entry point only.
-            showSharedGroups = !appState.pendingProfileFromDiscovery,
             securePolicy = profileSecurePolicy,
         )
     }

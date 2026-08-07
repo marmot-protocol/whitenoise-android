@@ -138,8 +138,6 @@
     <string name="invite_preview_with_inviter">%1$s 邀請你加入此群組。</string>
     <string name="profile">個人檔案</string>
     <string name="profile_no_bio">尚無簡介。</string>
-    <string name="profile_shared_groups">共同群組</string>
-    <string name="profile_no_shared_groups">尚無共同群組。</string>
     <string name="profile_follow">追蹤</string>
     <string name="profile_unfollow">取消追蹤</string>
     <string name="profile_follow_failed">無法更新追蹤狀態。請檢查網路連線後再試一次。</string>

@@ -144,8 +144,6 @@
     <string name="invite_preview_with_inviter">%1$s ti ha invitato a questo gruppo.</string>
     <string name="profile">Profilo</string>
     <string name="profile_no_bio">Ancora nessuna bio.</string>
-    <string name="profile_shared_groups">Gruppi condivisi</string>
-    <string name="profile_no_shared_groups">Ancora nessun gruppo condiviso.</string>
     <string name="profile_follow">Segui</string>
     <string name="profile_unfollow">Non seguire più</string>
     <string name="profile_follow_failed">Impossibile aggiornare lo stato. Controlla la connessione e riprova.</string>

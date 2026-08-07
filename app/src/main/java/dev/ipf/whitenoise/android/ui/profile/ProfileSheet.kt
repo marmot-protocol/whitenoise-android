@@ -45,8 +45,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -89,7 +87,6 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.ProfileFieldValidation
@@ -116,7 +113,6 @@ import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -124,7 +120,6 @@ import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
@@ -230,11 +225,6 @@ internal fun profileFollowRowState(
         showsUnfollow = following == true,
     )
 
-internal fun profileSharedGroupVisible(
-    memberCount: Int,
-    groupName: String,
-): Boolean = memberCount > 2 || (memberCount == 2 && groupName.isNotBlank())
-
 @Composable
 @Suppress("FunctionNaming")
 internal fun ProfileSheetAdminActionRows(
@@ -290,8 +280,8 @@ internal fun ProfileSheet(
     npub: String,
     // (chat, justCreated): justCreated is true only on the path that just
     // created a brand-new DM with this person (issue #321), so the conversation
-    // opens with the composer focused + keyboard up. Opening an existing DM or
-    // a shared group passes false.
+    // opens with the composer focused + keyboard up. Opening an existing DM
+    // passes false.
     onOpenGroup: (ChatListItem, Boolean) -> Unit,
     onStartGroup: (RecipientSearch.Candidate) -> Unit,
     onDismiss: () -> Unit,
@@ -303,9 +293,6 @@ internal fun ProfileSheet(
     // Null for every other entry point (mentions, QR, reaction list, shell
     // members-list row), which keeps those sheets byte-identical to before.
     adminController: ConversationController? = null,
-    // False only for the user-search entry point, where a shared-groups list is
-    // noise: a stranger found in the directory nearly never shares a group.
-    showSharedGroups: Boolean = true,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -313,7 +300,7 @@ internal fun ProfileSheet(
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
-    // avatar, shared groups — would move that target mid-animation and read as
+    // avatar — would move that target mid-animation and read as
     // a stutter on open (#1432). This is the same pure FFI decode (no storage
     // read) the message bubble already runs on its per-message render path, so
     // it is cheap enough for composition; the suspend resolver below still
@@ -322,7 +309,6 @@ internal fun ProfileSheet(
     var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val contentScrollState = rememberScrollState()
-    val groupTitleCopy = rememberGroupTitleCopy()
     val compactMemberSheet = adminController != null
 
     LaunchedEffect(npub) {
@@ -359,27 +345,6 @@ internal fun ProfileSheet(
     val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, hex)
     val lightningAddress = profile?.lud16?.trim()?.takeIf { ProfileFieldValidation.isAcceptableLud16(it) }
     val activeAccountHex = appState.activeAccount?.accountIdHex
-    // The named, multi-member groups this account shares with the active user.
-    // The whole derivation — the O(groups) `sharedGroupsWith` projection/scan
-    // and the filter + list allocation — is memoized, keyed on `hex` and the
-    // controller's observable chat-list projection (`appState.chatListItems`),
-    // so it runs only when the underlying group set / membership / names
-    // actually change and is skipped on unrelated recompositions (e.g. the
-    // profile name/avatar resolving). Reading `chatListItems` as a key also
-    // subscribes the sheet so the list still refreshes when the groups change
-    // while it's open. This mirrors the keyed-remember memoization used by the
-    // sibling sheets in this file (TransferAdminSheet, ReactionDetailsSheet,
-    // ForwardSheet).
-    val sharedGroups =
-        remember(hex, appState.chatListItems, appState.archivedChatListItems) {
-            // Only named, multi-member groups belong in this list: the 1:1 DM is
-            // reached via the Message button, and an unnamed group would just
-            // read as "Group of N people".
-            hex
-                ?.let { appState.sharedGroupsWith(it) }
-                .orEmpty()
-                .filter { profileSharedGroupVisible(it.memberCount, it.group.name) }
-        }
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.
@@ -675,28 +640,6 @@ internal fun ProfileSheet(
                             value = lightningAddress,
                             clipboard = clipboard,
                         )
-                    }
-                    if (showSharedGroups) {
-                        SectionCard(title = stringResource(R.string.profile_shared_groups)) {
-                            if (sharedGroups.isEmpty()) {
-                                Text(
-                                    stringResource(R.string.profile_no_shared_groups),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                sharedGroups.forEachIndexed { index, group ->
-                                    ProfileSharedGroupRow(
-                                        item = group,
-                                        appState = appState,
-                                        titleCopy = groupTitleCopy,
-                                        onOpen = { onOpenGroup(group, false) },
-                                    )
-                                    if (index != sharedGroups.lastIndex) {
-                                        AppDivider()
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -1240,40 +1183,4 @@ private fun ProfileSheetAdminActions(
             destructive = true,
         )
     }
-}
-
-@Composable
-private fun ProfileSharedGroupRow(
-    item: ChatListItem,
-    appState: WhiteNoiseAppState,
-    titleCopy: GroupTitleCopy,
-    onOpen: () -> Unit,
-) {
-    val title = chatListItemDisplayTitle(item, appState, titleCopy)
-    val subtitle =
-        when {
-            item.group.archived -> stringResource(R.string.archived)
-            item.memberCount == 1 -> stringResource(R.string.one_member)
-            item.memberCount > 1 -> stringResource(R.string.members_count, item.memberCount)
-            else -> stringResource(R.string.members)
-        }
-    ListItem(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                .clickable(role = Role.Button, onClick = onOpen),
-        leadingContent = {
-            GroupAvatar(
-                appState = appState,
-                group = item.group,
-                title = title,
-                seed = item.group.groupIdHex,
-                size = 40.dp,
-            )
-        },
-        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
 }
