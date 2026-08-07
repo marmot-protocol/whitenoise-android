@@ -144,8 +144,10 @@
     <string name="invite_preview_with_inviter">%1$s hat dich in diese Gruppe eingeladen.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Noch keine Bio.</string>
-    <string name="profile_shared_groups">Gemeinsame Gruppen</string>
-    <string name="profile_no_shared_groups">Noch keine gemeinsamen Gruppen.</string>
+    <string name="profile_follow">Folgen</string>
+    <string name="profile_unfollow">Nicht mehr folgen</string>
+    <string name="profile_follow_failed">Der Folgestatus konnte nicht aktualisiert werden. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="profile_nip05_verified">Verifizierte Nostr-Adresse</string>
     <string name="profile_start_new_group_with">Neue Gruppe mit %1$s starten</string>
     <string name="contact_create_group_with">Gruppe mit %1$s erstellen</string>
     <string name="contact_add_to_group">Zu Gruppe hinzufügen</string>
@@ -1127,7 +1129,12 @@
     <string name="next">Weiter</string>
     <string name="no_matches">Keine Treffer</string>
     <string name="new_message">Neue Nachricht</string>
-    <string name="search_people_hint">Name oder npub</string>
+    <string name="search_people_hint">Name, Nostr-Adresse oder npub</string>
+    <string name="user_search_searching">Netzwerk wird durchsucht…</string>
+    <string name="user_search_incomplete">Einige Netzwerkergebnisse fehlen möglicherweise.</string>
+    <string name="user_search_failed">Das Netzwerk konnte nicht durchsucht werden. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="user_search_following">Du folgst</string>
+    <string name="user_search_network">Aus dem Netzwerk</string>
     <string name="paste_npub">npub einfügen</string>
     <string name="start_chat">Chat starten</string>
     <string name="name_this_group">Gruppe benennen</string>

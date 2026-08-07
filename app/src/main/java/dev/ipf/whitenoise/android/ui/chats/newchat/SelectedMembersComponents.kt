@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -51,6 +52,35 @@ import dev.ipf.whitenoise.android.ui.theme.Radii
 
 private const val SUMMARY_AVATAR_OVERLAP_DP = 20
 private const val SUMMARY_AVATAR_COUNT = 3
+
+/**
+ * Selection holds a frozen [RecipientSearch.Candidate], so the name it captured
+ * can be a short-npub placeholder taken before the profile resolved. Prefer the
+ * live lookup and keep the captured/ephemeral name only as a fallback.
+ */
+internal fun selectedMemberDisplayName(
+    member: RecipientSearch.Candidate,
+    liveDisplayName: String?,
+): String =
+    liveDisplayName?.takeIf { it.isNotBlank() }
+        ?: ProfileSanitizer.displayName(member.searchProfile?.displayName)
+        ?: ProfileSanitizer.displayName(member.searchProfile?.name)
+        ?: member.displayName
+
+internal fun selectedMemberDisplayName(
+    member: RecipientSearch.Candidate,
+    appState: WhiteNoiseAppState,
+): String {
+    val live = appState.contactDisplayNameCachedOrNull(member.accountIdHex)
+    // Same in-composition prefetch appState.displayName() would have done.
+    if (live == null) appState.requestProfile(member.accountIdHex)
+    return selectedMemberDisplayName(member, live)
+}
+
+internal fun selectedMemberAvatarUrl(
+    member: RecipientSearch.Candidate,
+    localAvatarUrl: String?,
+): String? = localAvatarUrl ?: ProfileSanitizer.imageUrl(member.searchProfile?.picture)
 
 @Composable
 @Suppress("FunctionNaming")
@@ -90,10 +120,10 @@ internal fun SelectedMemberSummary(
                 members.take(SUMMARY_AVATAR_COUNT).forEachIndexed { index, member ->
                     Box(modifier = Modifier.padding(start = (index * SUMMARY_AVATAR_OVERLAP_DP).dp)) {
                         Avatar(
-                            title = appState.displayName(member.accountIdHex),
+                            title = selectedMemberDisplayName(member, appState),
                             seed = member.accountIdHex,
                             size = 32.dp,
-                            pictureUrl = appState.avatarUrl(member.accountIdHex),
+                            pictureUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                         )
                     }
                 }
@@ -105,7 +135,7 @@ internal fun SelectedMemberSummary(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    members.joinToString { member -> appState.displayName(member.accountIdHex) },
+                    members.joinToString { member -> selectedMemberDisplayName(member, appState) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -187,11 +217,12 @@ internal fun SelectedMembersReviewScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->
+                val memberName = selectedMemberDisplayName(member, appState)
                 ContactRow(
-                    title = appState.displayName(member.accountIdHex),
+                    title = memberName,
                     subtitle = IdentityFormatter.short(member.npub),
                     avatarSeed = member.accountIdHex,
-                    avatarUrl = appState.avatarUrl(member.accountIdHex),
+                    avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                     trailing = {
                         FilledTonalIconButton(
                             onClick = { onRemove(member) },
@@ -200,11 +231,7 @@ internal fun SelectedMembersReviewScreen(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription =
-                                    stringResource(
-                                        R.string.remove_member_named,
-                                        appState.displayName(member.accountIdHex),
-                                    ),
+                                contentDescription = stringResource(R.string.remove_member_named, memberName),
                             )
                         }
                     },

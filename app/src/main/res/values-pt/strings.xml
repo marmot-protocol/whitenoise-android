@@ -144,8 +144,10 @@
     <string name="invite_preview_with_inviter">%1$s convidou você para este grupo.</string>
     <string name="profile">Perfil</string>
     <string name="profile_no_bio">Ainda sem bio.</string>
-    <string name="profile_shared_groups">Grupos compartilhados</string>
-    <string name="profile_no_shared_groups">Ainda não há grupos compartilhados.</string>
+    <string name="profile_follow">Seguir</string>
+    <string name="profile_unfollow">Deixar de seguir</string>
+    <string name="profile_follow_failed">Não foi possível atualizar o seguimento. Verifique sua conexão e tente novamente.</string>
+    <string name="profile_nip05_verified">Endereço Nostr verificado</string>
     <string name="profile_start_new_group_with">Iniciar novo grupo com %1$s</string>
     <string name="contact_create_group_with">Criar grupo com %1$s</string>
     <string name="contact_add_to_group">Adicionar a um grupo</string>
@@ -1129,7 +1131,12 @@
     <string name="next">Avançar</string>
     <string name="no_matches">Sem resultados</string>
     <string name="new_message">Nova mensagem</string>
-    <string name="search_people_hint">Nome ou npub</string>
+    <string name="search_people_hint">Nome, endereço Nostr ou npub</string>
+    <string name="user_search_searching">Pesquisando na rede…</string>
+    <string name="user_search_incomplete">Alguns resultados da rede podem estar ausentes.</string>
+    <string name="user_search_failed">Não foi possível pesquisar na rede. Verifique sua conexão e tente novamente.</string>
+    <string name="user_search_following">Seguindo</string>
+    <string name="user_search_network">Da rede</string>
     <string name="paste_npub">Colar npub</string>
     <string name="start_chat">Iniciar conversa</string>
     <string name="name_this_group">Dê um nome ao grupo</string>

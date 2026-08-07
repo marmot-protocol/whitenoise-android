@@ -156,8 +156,10 @@
     <string name="invite_preview_with_inviter">%1$s пригласил(а) вас в эту группу.</string>
     <string name="profile">Профиль</string>
     <string name="profile_no_bio">Биографии пока нет.</string>
-    <string name="profile_shared_groups">Общие группы</string>
-    <string name="profile_no_shared_groups">Пока нет общих групп.</string>
+    <string name="profile_follow">Подписаться</string>
+    <string name="profile_unfollow">Отписаться</string>
+    <string name="profile_follow_failed">Не удалось обновить подписку. Проверьте подключение и повторите попытку.</string>
+    <string name="profile_nip05_verified">Подтверждённый адрес Nostr</string>
     <string name="profile_start_new_group_with">Начать новую группу с %1$s</string>
     <string name="contact_create_group_with">Создать группу с %1$s</string>
     <string name="contact_add_to_group">Добавить в группу</string>
@@ -1179,7 +1181,12 @@
     <string name="next">Далее</string>
     <string name="no_matches">Совпадений нет</string>
     <string name="new_message">Новое сообщение</string>
-    <string name="search_people_hint">Имя или npub</string>
+    <string name="search_people_hint">Имя, адрес Nostr или npub</string>
+    <string name="user_search_searching">Поиск в сети…</string>
+    <string name="user_search_incomplete">Некоторые результаты сети могут отсутствовать.</string>
+    <string name="user_search_failed">Не удалось выполнить поиск в сети. Проверьте подключение и повторите попытку.</string>
+    <string name="user_search_following">Вы подписаны</string>
+    <string name="user_search_network">Из сети</string>
     <string name="paste_npub">Вставить npub</string>
     <string name="start_chat">Начать чат</string>
     <string name="name_this_group">Назовите группу</string>
