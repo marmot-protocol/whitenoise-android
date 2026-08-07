@@ -4,15 +4,21 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
@@ -42,19 +48,7 @@ class AiAgentsScreenTest {
         val npub = TEST_NPUB
         val expectedHermesPrompt = app.getString(R.string.agent_connector_hermes_prompt, npub)
 
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface {
-                    AiAgentsContent(
-                        npub = npub,
-                        snackbarHostState = SnackbarHostState(),
-                        onCopyPrompt = {},
-                        onOpenConnectorDocs = {},
-                        onBack = {},
-                    )
-                }
-            }
-        }
+        renderContent(npub)
 
         composeRule
             .onNodeWithTag(agentConnectorToggleTag("hermes"))
@@ -74,6 +68,70 @@ class AiAgentsScreenTest {
             val prompt = app.getString(connector.promptRes, TEST_NPUB)
             assertTrue(prompt.contains(TEST_NPUB))
             assertFalse(prompt.contains("<USER_NPUB>"))
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h780dp-mdpi")
+    fun connectorSubtitlesAreFullyVisibleAtCompactWidth() {
+        renderContent()
+
+        agentConnectors.forEach { connector ->
+            val subtitle = app.getString(connector.subtitleRes)
+            composeRule
+                .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+                .performScrollToNode(hasText(subtitle))
+            val layoutResults = mutableListOf<TextLayoutResult>()
+            composeRule
+                .onNodeWithText(subtitle, useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                    action(layoutResults)
+                }
+
+            val layout = layoutResults.single()
+            assertFalse(
+                "Connector subtitle is ellipsized: $subtitle",
+                (0 until layout.lineCount).any(layout::isLineEllipsized),
+            )
+        }
+    }
+
+    @Test
+    fun connectorDocsExposeTextAndButtonActionWithoutOverridingDescription() {
+        val docsTitle = app.getString(R.string.ai_agents_connector_docs_title)
+        val docsSubtitle = app.getString(R.string.ai_agents_connector_docs_subtitle)
+        renderContent()
+
+        composeRule
+            .onNodeWithTag(AI_AGENTS_CONTENT_TAG)
+            .performScrollToNode(hasTestTag(AI_AGENTS_CONNECTOR_DOCS_TAG))
+        val docsNode = composeRule.onNodeWithTag(AI_AGENTS_CONNECTOR_DOCS_TAG).fetchSemanticsNode()
+
+        assertFalse(docsNode.config.contains(SemanticsProperties.ContentDescription))
+        assertEquals(Role.Button, docsNode.config[SemanticsProperties.Role])
+        assertEquals(docsTitle, docsNode.config[SemanticsActions.OnClick].label)
+        assertEquals(
+            listOf(docsTitle, docsSubtitle),
+            docsNode.config[SemanticsProperties.Text].map { it.text },
+        )
+    }
+
+    @Test
+    fun iconButtonsExposeEachContentDescriptionOnce() {
+        renderContent()
+
+        val expectedDescriptions =
+            mapOf(
+                AI_AGENTS_BACK_TAG to app.getString(R.string.back),
+                agentConnectorToggleTag("hermes") to
+                    app.getString(R.string.agent_connector_show_prompt_cd, "Hermes"),
+                agentConnectorCopyTag("hermes") to
+                    app.getString(R.string.agent_connector_copy_prompt_cd, "Hermes"),
+            )
+
+        expectedDescriptions.forEach { (tag, description) ->
+            val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode()
+            assertEquals(listOf(description), node.config[SemanticsProperties.ContentDescription])
         }
     }
 
@@ -156,6 +214,22 @@ class AiAgentsScreenTest {
 
         composeRule.onNodeWithTag(AI_AGENTS_BACK_TAG).performClick()
         composeRule.runOnIdle { assertEquals(1, backCount) }
+    }
+
+    private fun renderContent(npub: String? = TEST_NPUB) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    AiAgentsContent(
+                        npub = npub,
+                        snackbarHostState = SnackbarHostState(),
+                        onCopyPrompt = {},
+                        onOpenConnectorDocs = {},
+                        onBack = {},
+                    )
+                }
+            }
+        }
     }
 
     private fun appStateWithNpub(npub: String): WhiteNoiseAppState {

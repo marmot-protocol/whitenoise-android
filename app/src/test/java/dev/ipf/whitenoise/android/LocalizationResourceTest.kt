@@ -268,6 +268,46 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun agentConnectorProductNamesAreIdenticalAcrossAllLocales() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+        val expectedNames =
+            mapOf(
+                "agent_connector_hermes_name" to "Hermes",
+                "agent_connector_openclaw_name" to "OpenClaw",
+                "agent_connector_opencode_name" to "OpenCode",
+            )
+
+        val resourceFiles =
+            buildList {
+                add(File(resDir, "values/strings.xml"))
+                resDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isDirectory && it.name.startsWith("values-") }
+                    .map { File(it, "strings.xml") }
+                    .filter { it.exists() }
+                    .forEach { add(it) }
+            }
+
+        val offenders =
+            resourceFiles.flatMap { file ->
+                val strings = stringValues(file)
+                expectedNames.mapNotNull { (key, expected) ->
+                    val actual = strings[key]
+                    if (actual == expected) null else "${file.path}: $key=\"$actual\""
+                }
+            }
+
+        assertTrue(
+            "Agent connector product names must remain untranslated. Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
     fun relayListLabelsDescribeUserVisibleBehavior() {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
@@ -556,6 +596,9 @@ class LocalizationResourceTest {
                 // Brand/protocol names kept identical across every locale.
                 "donate_method_bitcoin",
                 "donate_method_lightning",
+                "agent_connector_hermes_name",
+                "agent_connector_openclaw_name",
+                "agent_connector_opencode_name",
                 "edit_history_original",
                 "edit_history_version_label",
                 "generic_message",

@@ -1313,13 +1313,13 @@
     <string name="agent_connector_copy_prompt_cd">Copiar indicación de configuración de %1$s</string>
     <string name="agent_connector_show_prompt_cd">Mostrar indicación de configuración de %1$s</string>
     <string name="agent_connector_hide_prompt_cd">Ocultar indicación de configuración de %1$s</string>
-    <string name="agent_connector_hermes_name">Agente Hermes</string>
+    <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Agente de terminal de Nous Research</string>
     <string name="agent_connector_hermes_prompt">Conecta esta instalación de Hermes a White Noise (Marmot). Sigue la guía oficial del conector Hermes en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — instala y configura el conector como se describe allí, sin interacción, con mi npub en la lista de permitidos: %1$s. Cuando termines, verifica que el conector esté en ejecución y responde SOLO con la npub de tu agente — nada más.</string>
-    <string name="agent_connector_openclaw_name">Asistente OpenClaw</string>
+    <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Asistente de IA personal autoalojado</string>
     <string name="agent_connector_openclaw_prompt">Conecta esta instancia de OpenClaw a White Noise (Marmot). Sigue la guía oficial del conector OpenClaw en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — instala y configura el conector como se describe allí, sin interacción, con mi npub en la lista de permitidos: %1$s. Cuando termines, verifica que el conector esté en ejecución y responde SOLO con la npub de tu agente — nada más.</string>
-    <string name="agent_connector_opencode_name">Agente OpenCode</string>
+    <string name="agent_connector_opencode_name">OpenCode</string>
     <string name="agent_connector_opencode_subtitle">Agente de código de código abierto</string>
     <string name="agent_connector_opencode_prompt">Conecta este harness de OpenCode a White Noise (Marmot). Sigue la guía oficial del conector OpenCode en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — instala y configura el conector como se describe allí, sin interacción, con mi npub en la lista de permitidos: %1$s. Cuando termines, verifica que el conector esté en ejecución y responde SOLO con la npub de tu agente — nada más.</string>
     <string name="account_and_keys">Cuenta y claves</string>

@@ -1288,13 +1288,13 @@
     <string name="agent_connector_copy_prompt_cd">複製 %1$s 設定提示</string>
     <string name="agent_connector_show_prompt_cd">顯示 %1$s 設定提示</string>
     <string name="agent_connector_hide_prompt_cd">隱藏 %1$s 設定提示</string>
-    <string name="agent_connector_hermes_name">Hermes 代理</string>
+    <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的終端代理</string>
     <string name="agent_connector_hermes_prompt">將此 Hermes 安裝連接到 White Noise（Marmot）。請遵循官方 Hermes 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
-    <string name="agent_connector_openclaw_name">OpenClaw 助手</string>
+    <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">自架個人 AI 助手</string>
     <string name="agent_connector_openclaw_prompt">將此 OpenClaw 執行個體連接到 White Noise（Marmot）。請遵循官方 OpenClaw 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
-    <string name="agent_connector_opencode_name">OpenCode 代理</string>
+    <string name="agent_connector_opencode_name">OpenCode</string>
     <string name="agent_connector_opencode_subtitle">開源程式設計代理</string>
     <string name="agent_connector_opencode_prompt">將此 OpenCode harness 連接到 White Noise（Marmot）。請遵循官方 OpenCode 連接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 依其中的說明以非互動方式安裝並設定連接器，並將我的 npub 加入允許清單：%1$s。完成後，請確認連接器正在執行，並僅回覆你的代理 npub——不要其他內容。</string>
     <string name="account_and_keys">帳號與金鑰</string>

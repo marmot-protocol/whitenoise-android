@@ -1311,13 +1311,13 @@
     <string name="agent_connector_copy_prompt_cd">%1$s kurulum istemini kopyala</string>
     <string name="agent_connector_show_prompt_cd">%1$s kurulum istemini göster</string>
     <string name="agent_connector_hide_prompt_cd">%1$s kurulum istemini gizle</string>
-    <string name="agent_connector_hermes_name">Hermes ajanı</string>
+    <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research terminal ajanı</string>
     <string name="agent_connector_hermes_prompt">Bu Hermes kurulumunu White Noise (Marmot) ile bağlayın. https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki resmi Hermes bağlayıcı kılavuzunu izleyin — bağlayıcıyı orada açıklandığı gibi etkileşimsiz kurun ve yapılandırın; npub\'um izin listesinde olsun: %1$s. İşiniz bittiğinde bağlayıcının çalıştığını doğrulayın ve YALNIZCA ajan npub\'unuzla yanıt verin — başka bir şey yok.</string>
-    <string name="agent_connector_openclaw_name">OpenClaw asistanı</string>
+    <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Kendi sunucunuzda kişisel yapay zeka asistanı</string>
     <string name="agent_connector_openclaw_prompt">Bu OpenClaw örneğini White Noise (Marmot) ile bağlayın. https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki resmi OpenClaw bağlayıcı kılavuzunu izleyin — bağlayıcıyı orada açıklandığı gibi etkileşimsiz kurun ve yapılandırın; npub\'um izin listesinde olsun: %1$s. İşiniz bittiğinde bağlayıcının çalıştığını doğrulayın ve YALNIZCA ajan npub\'unuzla yanıt verin — başka bir şey yok.</string>
-    <string name="agent_connector_opencode_name">OpenCode ajanı</string>
+    <string name="agent_connector_opencode_name">OpenCode</string>
     <string name="agent_connector_opencode_subtitle">Açık kaynak kodlama ajanı</string>
     <string name="agent_connector_opencode_prompt">Bu OpenCode harness\'ini White Noise (Marmot) ile bağlayın. https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki resmi OpenCode bağlayıcı kılavuzunu izleyin — bağlayıcıyı orada açıklandığı gibi etkileşimsiz kurun ve yapılandırın; npub\'um izin listesinde olsun: %1$s. İşiniz bittiğinde bağlayıcının çalıştığını doğrulayın ve YALNIZCA ajan npub\'unuzla yanıt verin — başka bir şey yok.</string>
     <string name="account_and_keys">Hesap ve anahtarlar</string>

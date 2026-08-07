@@ -39,12 +39,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
@@ -119,10 +119,7 @@ internal fun AiAgentsContent(
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
-                        modifier =
-                            Modifier
-                                .testTag(AI_AGENTS_BACK_TAG)
-                                .semantics { contentDescription = backLabel },
+                        modifier = Modifier.testTag(AI_AGENTS_BACK_TAG),
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -200,8 +197,11 @@ internal fun AiAgentsContent(
                             Modifier
                                 .fillMaxWidth()
                                 .testTag(AI_AGENTS_CONNECTOR_DOCS_TAG)
-                                .clickable(onClick = onOpenConnectorDocs)
-                                .semantics { contentDescription = connectorDocsTitle },
+                                .clickable(
+                                    onClickLabel = connectorDocsTitle,
+                                    role = Role.Button,
+                                    onClick = onOpenConnectorDocs,
+                                ),
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text(stringResource(R.string.ai_agents_connector_docs_title)) },
                         supportingContent = {
@@ -272,8 +272,6 @@ private fun AgentConnectorRow(
                 Text(
                     stringResource(connector.subtitleRes),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             },
             trailingContent = {
@@ -283,8 +281,7 @@ private fun AgentConnectorRow(
                         enabled = actionsEnabled,
                         modifier =
                             Modifier
-                                .testTag(agentConnectorToggleTag(connector.id))
-                                .semantics { contentDescription = if (expanded) hideCd else showCd },
+                                .testTag(agentConnectorToggleTag(connector.id)),
                     ) {
                         Icon(
                             imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -296,8 +293,7 @@ private fun AgentConnectorRow(
                         enabled = actionsEnabled,
                         modifier =
                             Modifier
-                                .testTag(agentConnectorCopyTag(connector.id))
-                                .semantics { contentDescription = copyCd },
+                                .testTag(agentConnectorCopyTag(connector.id)),
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = copyCd)
                     }
