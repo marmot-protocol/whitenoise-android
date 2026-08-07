@@ -1833,10 +1833,17 @@ internal fun MessageBubble(
                     // card rather than the text renderer. Partial selection is only
                     // available when this bubble has selectable rendered text.
                     canCopyText = displayedBody.isNotBlank(),
-                    // Keep the action discoverable for copyable text and hide it
-                    // when no engine exists. If URL omission leaves no speech,
-                    // the action reports that it could not read the message.
-                    canSpeak = displayedBody.isNotBlank() && appState.ttsHasUsableEngine,
+                    // Speak aloud uses the same edit-aware user-authored text as TTS
+                    // projection, not the display fallback (filenames, placeholders,
+                    // reactions, system copy).
+                    canSpeak =
+                        messageBubbleCanSpeak(
+                            record = record,
+                            editedText = editState?.latestText,
+                            deleted = deleted,
+                            invalidated = invalidated,
+                            ttsHasUsableEngine = appState.ttsHasUsableEngine,
+                        ),
                     canSelectText = !bodyTextToRender.isNullOrBlank(),
                     canSave = mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
                     quickReactionEmojis = quickReactionEmojis,
