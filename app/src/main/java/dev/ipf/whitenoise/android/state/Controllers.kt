@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.os.SystemClock
 import android.util.Log
 import android.view.Choreographer
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -33,6 +34,7 @@ import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
@@ -1953,8 +1955,21 @@ internal fun presentSendFailure(
         "DMSend",
         "send failed type=${throwable.javaClass.simpleName} detail=${throwable.message}",
     )
-    appState.present(R.string.toast_send_failed)
+    appState.present(sendFailureMessageRes(throwable))
 }
+
+/**
+ * The engine refuses a send outright when a group's outbound queue is full: the
+ * message was never accepted, and the backlog clears on the group's own schedule
+ * rather than on any timer this app could pick. That earns its own wording, since
+ * the generic failure invites a retry the engine has already ruled out.
+ */
+@StringRes
+internal fun sendFailureMessageRes(throwable: Throwable): Int =
+    when (throwable) {
+        is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
+        else -> R.string.toast_send_failed
+    }
 
 internal fun logUnreadCountDivergence(
     tag: String,

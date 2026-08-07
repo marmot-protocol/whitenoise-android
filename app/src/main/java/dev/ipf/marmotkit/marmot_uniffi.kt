@@ -18445,6 +18445,27 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = ""
     }
     
+    /**
+     * The group's outbound retention queue is full
+     * (`MAX_QUEUED_OUTBOUND_INTENTS_PER_GROUP`), so this message was **not**
+     * accepted and nothing was queued for it. The app layer has already
+     * retracted the optimistic local row; this variant is typed rather than
+     * the untyped [`MarmotKitError::Runtime`] bucket so the host can say the
+     * group is stuck instead of reporting an opaque failure. Unlike
+     * [`MarmotKitError::StorageBusy`] it is not worth an automatic retry:
+     * whatever the group is waiting on — a stalled publication, unsettled
+     * convergence input, or an inactive transport — clears on its own schedule,
+     * not on a timer this call could pick. Prompt the user to resend once the
+     * group is sending again.
+     */
+    class GroupSendQueueFull(
+        
+        val `groupIdHex`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "groupIdHex=${ `groupIdHex` }"
+    }
+    
     class Runtime(
         
         val `details`: kotlin.String
@@ -18569,7 +18590,10 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 )
             39 -> MarmotKitException.ExternalSignerMismatch()
             40 -> MarmotKitException.ExternalSignerRejected()
-            41 -> MarmotKitException.Runtime(
+            41 -> MarmotKitException.GroupSendQueueFull(
+                FfiConverterString.read(buf),
+                )
+            42 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -18769,6 +18793,11 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             is MarmotKitException.ExternalSignerRejected -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
+            )
+            is MarmotKitException.GroupSendQueueFull -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
             )
             is MarmotKitException.Runtime -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -18972,8 +19001,13 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 buf.putInt(40)
                 Unit
             }
-            is MarmotKitException.Runtime -> {
+            is MarmotKitException.GroupSendQueueFull -> {
                 buf.putInt(41)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                Unit
+            }
+            is MarmotKitException.Runtime -> {
+                buf.putInt(42)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
