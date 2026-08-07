@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.ui.chats.chatListItemAvatarAccount
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.junit.After
@@ -189,11 +190,7 @@ class ChatsControllerDmMemberHydrationTest {
         assertEquals(2, refreshing.presentationMemberCount)
         assertEquals(
             PEER,
-            GroupProjector.avatarAccount(
-                refreshing.group,
-                refreshing.presentationOtherMemberAccount,
-                refreshing.presentationMemberCount,
-            ),
+            chatListItemAvatarAccount(refreshing),
         )
         assertNull(controller.existingDirectChat(PEER))
 
@@ -233,7 +230,7 @@ class ChatsControllerDmMemberHydrationTest {
         awaitCondition { attempts >= 3 }
         awaitCondition {
             controller.items.single().let { item ->
-                item.memberSnapshot?.memberCount == 1 && item.activeAccountIsSoleMember
+                item.memberSnapshot?.memberCount == 1 && item.presentationActiveAccountIsSoleMember
             }
         }
 
@@ -248,10 +245,108 @@ class ChatsControllerDmMemberHydrationTest {
                 memberTitle = { it },
                 copy = GroupTitleCopy.Default,
                 conversationKind = selfOnly.projection?.conversationKind,
-                soleSelfMember = selfOnly.activeAccountIsSoleMember,
+                soleSelfMember = selfOnly.presentationActiveAccountIsSoleMember,
             ),
         )
         assertNull(controller.existingDirectChat(PEER))
+    }
+
+    @Test
+    fun authoritativeSelfOnlyDmKeepsJustYouPresentationDuringNextRefresh() {
+        var attempts = 0
+        var releaseSecondRefresh = false
+        val controller =
+            bindDmController(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                retryDelayMillis = { 0L },
+            ) { _, _ ->
+                attempts += 1
+                when {
+                    attempts == 1 -> listOf(member(ME, local = true), member(PEER, local = false))
+                    attempts <= 3 -> listOf(member(ME, local = true))
+                    else -> {
+                        while (coroutineContext.isActive && !releaseSecondRefresh) {
+                            delay(10)
+                        }
+                        listOf(member(ME, local = true))
+                    }
+                }
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "first update"),
+            )
+        }
+        awaitCondition { attempts >= 3 }
+        awaitCondition {
+            controller.items
+                .single()
+                .memberSnapshot
+                ?.memberCount == 1
+        }
+
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "second update"),
+            )
+        }
+        awaitCondition { attempts >= 4 }
+
+        val refreshing = controller.items.single()
+        assertNull(refreshing.memberSnapshot)
+        assertTrue(refreshing.presentationActiveAccountIsSoleMember)
+        assertEquals(
+            "Just you",
+            GroupProjector.displayTitle(
+                group = refreshing.group,
+                otherMemberAccount = refreshing.presentationOtherMemberAccount,
+                memberCount = refreshing.presentationMemberCount,
+                memberTitle = { it },
+                copy = GroupTitleCopy.Default,
+                conversationKind = refreshing.projection?.conversationKind,
+                soleSelfMember = refreshing.presentationActiveAccountIsSoleMember,
+            ),
+        )
+        releaseSecondRefresh = true
+    }
+
+    @Test
+    fun failedRefreshDoesNotConsumeSelfOnlyDirectGraceRetry() {
+        var attempts = 0
+        var releaseFourthAttempt = false
+        val controller =
+            bindDmController(
+                conversationKind = ChatConversationKindFfi.DIRECT,
+                retryDelayMillis = { 0L },
+            ) { _, _ ->
+                attempts += 1
+                when (attempts) {
+                    1 -> listOf(member(ME, local = true), member(PEER, local = false))
+                    2 -> error("transient roster read failure")
+                    3 -> listOf(member(ME, local = true))
+                    else -> {
+                        while (coroutineContext.isActive && !releaseFourthAttempt) {
+                            delay(10)
+                        }
+                        listOf(member(ME, local = true), member(PEER, local = false))
+                    }
+                }
+            }
+
+        awaitCondition { controller.items.singleOrNull()?.otherMemberAccount == PEER }
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(
+                unnamedDmGroup(SelfMembershipFfi.MEMBER).copy(description = "updated"),
+            )
+        }
+        awaitCondition { attempts >= 4 }
+
+        val awaitingGraceRetry = controller.items.single()
+        assertNull(awaitingGraceRetry.memberSnapshot)
+        assertEquals(PEER, awaitingGraceRetry.presentationOtherMemberAccount)
+        releaseFourthAttempt = true
     }
 
     @Test

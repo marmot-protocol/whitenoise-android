@@ -130,7 +130,7 @@ data class ChatListItem(
      */
     val presentationOtherMemberAccount: String? = otherMemberAccount,
     val presentationMemberCount: Int = memberCount,
-    val activeAccountIsSoleMember: Boolean = false,
+    val presentationActiveAccountIsSoleMember: Boolean = false,
     val projection: ChatListRowFfi? = null,
     /**
      * Markdown AST for the last-message preview line, parsed off-main by
@@ -325,6 +325,7 @@ data class ChatListItem(
 internal data class ChatListMemberPresentation(
     val otherMemberAccount: String?,
     val memberCount: Int,
+    val activeAccountIsSoleMember: Boolean,
 )
 
 private fun chatListMemberPresentation(
@@ -334,6 +335,7 @@ private fun chatListMemberPresentation(
     ChatListMemberPresentation(
         otherMemberAccount = GroupProjector.otherMemberAccount(members, activeAccountIdHex),
         memberCount = GroupProjector.uniqueMemberCount(members),
+        activeAccountIsSoleMember = GroupProjector.isSelfSoleMember(members, activeAccountIdHex),
     )
 
 internal fun sortChatListItems(
@@ -486,8 +488,7 @@ internal fun chatListItemFromProjection(
         memberSnapshot = members?.let(::GroupMemberSnapshot),
         presentationOtherMemberAccount = presentation?.otherMemberAccount,
         presentationMemberCount = presentation?.memberCount ?: 0,
-        activeAccountIsSoleMember =
-            members?.let { GroupProjector.isSelfSoleMember(it, activeAccountIdHex) } == true,
+        presentationActiveAccountIsSoleMember = presentation?.activeAccountIsSoleMember == true,
         projection = row,
         previewTokens = previewTokens,
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
@@ -2412,6 +2413,12 @@ internal fun memberSnapshotReadyToCache(
     return members.isNotEmpty() && directRosterReady
 }
 
+private fun isSelfOnlyDirectRoster(
+    members: List<AppGroupMemberRecordFfi>,
+    directConversation: Boolean,
+    activeAccountIdHex: String?,
+): Boolean = directConversation && GroupProjector.isSelfSoleMember(members, activeAccountIdHex)
+
 internal fun memberSnapshotRetryDelayMillis(backoffTier: Int): Long {
     var delayMs = MEMBER_FETCH_INITIAL_RETRY_DELAY_MS
     repeat(backoffTier.coerceIn(0, MEMBER_FETCH_MAX_BACKOFF_TIER)) {
@@ -2983,6 +2990,11 @@ class ChatsController private constructor(
     private val memberFetchRetryBackoffTierByGroup = mutableMapOf<String, Int>()
     private val memberFetchRetryJobsByGroup = mutableMapOf<String, Job>()
 
+    // A self-only direct roster gets one dedicated confirmation read before it
+    // becomes authoritative. Keep this separate from the general backoff tier:
+    // an earlier error or empty read must not consume the self-only grace retry.
+    private val selfOnlyDirectGraceRetryGroups = mutableSetOf<String>()
+
     // Widening member snapshots to every group makes the chat-list projection
     // much more useful, but the app should not start one roster FFI call per
     // group on large accounts. Keep at most one fetch in flight per group while
@@ -3275,6 +3287,7 @@ class ChatsController private constructor(
         val hasPendingFetch = groupIdHex in inFlightMemberFetches || hasRetryScheduled
         if (!hasSnapshot && !hasPendingFetch) return
         cancelMemberSnapshotRetry(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
         memberCacheByGroup[groupIdHex]?.let { members ->
             val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
             presentationMembersByGroup =
@@ -3402,6 +3415,7 @@ class ChatsController private constructor(
             presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
             cancelMemberSnapshotRetry(record.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(record.groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(record.groupIdHex)
             members
                 .map { it.memberIdHex }
                 .filter { it.isNotBlank() }
@@ -3757,6 +3771,7 @@ class ChatsController private constructor(
         optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
         val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
         presentationMembersByGroup = presentationMembersByGroup.filterKeys { it in liveGroupIds }
+        selfOnlyDirectGraceRetryGroups.retainAll(liveGroupIds)
         memberFetchRetryJobsByGroup.keys
             .filterNot { it in liveGroupIds }
             .toList()
@@ -3786,6 +3801,7 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
+            selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
             presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
             noteMaterializedGroupMembershipChanged()
             scheduleRecompute()
@@ -4490,6 +4506,7 @@ class ChatsController private constructor(
         memberFetchRetryJobsByGroup.values.forEach(Job::cancel)
         memberFetchRetryJobsByGroup.clear()
         memberFetchRetryBackoffTierByGroup.clear()
+        selfOnlyDirectGraceRetryGroups.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
         mediaPreviewFallbackByMessageId = emptyMap()
@@ -4654,17 +4671,22 @@ class ChatsController private constructor(
                     memberCount = memberCount,
                     name = groupName,
                 )
+        val selfOnlyDirectRoster =
+            isSelfOnlyDirectRoster(
+                members = members,
+                directConversation = directConversationCandidate,
+                activeAccountIdHex = activeAccountIdHex,
+            )
         if (
             !memberSnapshotReadyToCache(
                 members = members,
                 knownSelfRemoval = knownSelfRemoval,
                 directConversation = directConversationCandidate,
                 activeAccountIdHex = activeAccountIdHex,
-                selfOnlyDirectGraceElapsed =
-                    memberFetchRetryBackoffTierByGroup.getOrDefault(groupIdHex, 0) >=
-                        MEMBER_FETCH_SELF_ONLY_DIRECT_GRACE_RETRIES,
+                selfOnlyDirectGraceElapsed = groupIdHex in selfOnlyDirectGraceRetryGroups,
             )
         ) {
+            if (selfOnlyDirectRoster) selfOnlyDirectGraceRetryGroups.add(groupIdHex)
             scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
@@ -4676,6 +4698,7 @@ class ChatsController private constructor(
         presentationMembersByGroup = presentationMembersByGroup - groupIdHex
         cancelMemberSnapshotRetry(groupIdHex)
         memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
+        selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
         memberSnapshotsRevision += 1L
         // A loaded roster that omits self is known removal evidence (admin
         // eviction / self-leave the engine has already applied). Marking it
@@ -5034,7 +5057,6 @@ private const val MEMBER_FETCH_FANOUT = 4
 private const val MEMBER_FETCH_INITIAL_RETRY_DELAY_MS = 250L
 private const val MEMBER_FETCH_MAX_RETRY_DELAY_MS = 300_000L
 private const val MEMBER_FETCH_MAX_BACKOFF_TIER = 11
-private const val MEMBER_FETCH_SELF_ONLY_DIRECT_GRACE_RETRIES = 1
 private const val PREVIEW_PARSE_FANOUT = 4
 private const val MEDIA_KIND_RESOLVE_FANOUT = 4
 

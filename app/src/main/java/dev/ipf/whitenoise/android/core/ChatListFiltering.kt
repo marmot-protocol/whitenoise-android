@@ -173,6 +173,6 @@ internal fun chatListItemDisplayTitle(
         memberTitle = { appState.chatMemberTitle(it) },
         copy = copy,
         conversationKind = item.projection?.conversationKind,
-        soleSelfMember = item.activeAccountIsSoleMember,
+        soleSelfMember = item.presentationActiveAccountIsSoleMember,
     )
 }

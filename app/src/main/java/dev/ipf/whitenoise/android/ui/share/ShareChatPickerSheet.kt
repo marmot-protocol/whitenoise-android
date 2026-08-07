@@ -408,7 +408,7 @@ private fun shareTargetPresentation(
             },
             copy = groupTitleCopy,
             conversationKind = item.projection?.conversationKind,
-            soleSelfMember = item.activeAccountIsSoleMember,
+            soleSelfMember = item.presentationActiveAccountIsSoleMember,
         )
     val title =
         when {

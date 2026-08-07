@@ -78,6 +78,13 @@ internal fun Modifier.chatListSelectionRow(
         .semantics { this.selected = selected }
         .chatListSelectionRowClickable(onClick)
 
+internal fun chatListItemAvatarAccount(item: ChatListItem): String? =
+    GroupProjector.avatarAccount(
+        group = item.group,
+        otherMemberAccount = item.presentationOtherMemberAccount,
+        memberCount = item.presentationMemberCount,
+    )
+
 /**
  * A stationary long press opens the single-chat actions surface. Continuing
  * the hold into a vertical drag enters anchored range selection; while
@@ -197,12 +204,7 @@ internal fun ChatRow(
     // activity. A title/preview-only hit (bodyMatch null) keeps the chat's
     // last-message time.
     val timestampAt = bodyMatch?.timelineAt ?: item.latestAt ?: 0uL
-    val avatarAccount =
-        GroupProjector.avatarAccount(
-            group = item.group,
-            otherMemberAccount = item.otherMemberAccount,
-            memberCount = item.memberCount,
-        )
+    val avatarAccount = chatListItemAvatarAccount(item)
     val openableDmAvatarAccount =
         avatarAccount
             ?.takeIf { item.isDm() }
