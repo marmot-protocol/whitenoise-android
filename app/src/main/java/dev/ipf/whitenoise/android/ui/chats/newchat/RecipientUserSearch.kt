@@ -159,8 +159,10 @@ internal fun rememberRecipientUserSearchState(
             return@produceState
         }
 
-        delay(USER_SEARCH_DEBOUNCE_MILLIS)
+        // Pending before the debounce elapses, not after — otherwise a query with
+        // no local matches reads as a completed empty search for 300 ms.
         value = RecipientUserSearchState(isSearching = true)
+        delay(USER_SEARCH_DEBOUNCE_MILLIS)
         try {
             val followedIds =
                 loadRecipientSearchFollowIds {

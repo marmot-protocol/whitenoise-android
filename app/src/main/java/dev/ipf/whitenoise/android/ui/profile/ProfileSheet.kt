@@ -926,7 +926,7 @@ internal fun ProfileConversationChooserSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 360.dp)) {
                 items(choices, key = { it.group.groupIdHex }) { choice ->
                     val named = choice.group.name.isNotBlank()
                     val title =
@@ -959,14 +959,13 @@ internal fun ProfileConversationChooserSheet(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                 }
-                item {
-                    SettingsActionRow(
-                        icon = Icons.Default.Edit,
-                        title = stringResource(R.string.profile_start_new_conversation),
-                        onClick = onStartNew,
-                    )
-                }
             }
+            // Outside the capped list so a full roster cannot scroll it away.
+            SettingsActionRow(
+                icon = Icons.Default.Edit,
+                title = stringResource(R.string.profile_start_new_conversation),
+                onClick = onStartNew,
+            )
         }
     }
 }
