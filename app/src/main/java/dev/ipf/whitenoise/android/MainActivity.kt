@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.parseShareRequest
@@ -46,6 +47,7 @@ import dev.ipf.whitenoise.android.updates.AppUpdateNavigation
 class MainActivity : FragmentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
+    private var inboundNotificationRequestId by mutableStateOf(0L)
     private var inboundShareRequest by mutableStateOf<ShareRequest?>(null)
     private var inboundAppUpdateTap by mutableStateOf(0)
     private var appUnlockPromptActive = false
@@ -109,9 +111,8 @@ class MainActivity : FragmentActivity() {
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
                     },
                     inboundNotificationTarget = inboundNotificationTarget,
-                    onNotificationTargetHandled = { handled ->
-                        if (inboundNotificationTarget == handled) inboundNotificationTarget = null
-                    },
+                    inboundNotificationRequestId = inboundNotificationRequestId,
+                    onNotificationTargetHandled = ::handleNotificationTarget,
                     inboundShareRequest = inboundShareRequest,
                     onShareRequestHandled = { handled ->
                         if (inboundShareRequest == handled) inboundShareRequest = null
@@ -123,6 +124,22 @@ class MainActivity : FragmentActivity() {
                     onRequestAppUnlock = ::requestAppUnlock,
                 )
             }
+        }
+    }
+
+    private fun handleNotificationTarget(
+        handledTarget: NotificationTarget,
+        handledRequestId: Long,
+    ) {
+        if (
+            inboundNotificationHandledMatchesCurrent(
+                inboundTarget = inboundNotificationTarget,
+                inboundRequestId = inboundNotificationRequestId,
+                handledTarget = handledTarget,
+                handledRequestId = handledRequestId,
+            )
+        ) {
+            inboundNotificationTarget = null
         }
     }
 
@@ -170,9 +187,16 @@ class MainActivity : FragmentActivity() {
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
                 dataString = intent?.dataString,
-                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload, inboundShareRequest),
+                current =
+                    InboundIntentRouting(
+                        notificationTarget = inboundNotificationTarget,
+                        profilePayload = inboundProfilePayload,
+                        shareRequest = inboundShareRequest,
+                        notificationRequestId = inboundNotificationRequestId,
+                    ),
             )
         inboundNotificationTarget = routing.notificationTarget
+        inboundNotificationRequestId = routing.notificationRequestId
         inboundProfilePayload = routing.profilePayload
         inboundShareRequest = routing.shareRequest
         if (parsedTarget != null || parsedShare != null) {
