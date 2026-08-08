@@ -598,6 +598,46 @@ internal fun mergeMarkReadChatListRow(
     )
 }
 
+private fun subscriptionReadWatermarkCoversLastMessage(row: ChatListRowFfi): Boolean {
+    val last = row.lastMessage
+    val readAt = row.lastReadTimelineAt
+    val readId = row.lastReadMessageIdHex
+    return last != null &&
+        readAt != null &&
+        readId != null &&
+        compareTimelineAtMessageIdHex(
+            readAt,
+            readId,
+            last.timelineAt,
+            last.messageIdHex,
+        ) >= 0
+}
+
+private fun subscriptionHasReadDerivedUnread(row: ChatListRowFfi): Boolean =
+    when {
+        row.unreadCount > 0uL -> true
+        row.hasUnread -> true
+        row.firstUnreadMessageIdHex != null -> true
+        row.unreadMentionCount > 0uL -> true
+        else -> row.unreadMention
+    }
+
+private fun reconcileTrustedSubscriptionChatListRow(incoming: ChatListRowFfi): ChatListRowFfi =
+    if (
+        subscriptionReadWatermarkCoversLastMessage(incoming) &&
+        subscriptionHasReadDerivedUnread(incoming)
+    ) {
+        incoming.copy(
+            unreadCount = 0uL,
+            hasUnread = false,
+            firstUnreadMessageIdHex = null,
+            unreadMentionCount = 0uL,
+            unreadMention = false,
+        )
+    } else {
+        incoming
+    }
+
 /**
  * Field-wise reducer for live chat-list subscription rows. Subscription rows
  * are ordered full projections, so all non-read fields are authoritative — in
@@ -620,7 +660,7 @@ internal fun reduceSubscriptionChatListRow(
             current.lastReadMessageIdHex,
         )
     val incomingReadTrusted = incomingReadComplete && (!currentReadComplete || incomingReadCompare!! >= 0)
-    if (incomingReadTrusted) return incoming
+    if (incomingReadTrusted) return reconcileTrustedSubscriptionChatListRow(incoming)
 
     val newLastMessage = incoming.lastMessage
     val currentLastMessage = current.lastMessage
