@@ -366,7 +366,7 @@ class ChatListHeadReorderAnimationTest {
                 assertEquals("a crossing-row tap opened a chat at iteration $iteration", iteration, openedIds.size)
             }
 
-            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
             composeRule.runOnIdle { }
             composeRule.onNodeWithTag(chatListHeadReorderRowTag(targetHead)).performTouchInput {
                 down(center)

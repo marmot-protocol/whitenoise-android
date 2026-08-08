@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import android.os.SystemClock
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -10,8 +11,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Keyed chat-row motion for head reorders and folder membership changes.
@@ -86,17 +89,26 @@ internal fun ChatListActiveHeadScrollEffect(
                     launch {
                         activeCorrections += 1
                         liveProgressCallback(true)
-                        val minimumInputGate = launch { delay(CHAT_LIST_HEAD_INPUT_GATE_MILLIS) }
+                        val gateStartedAtMs = SystemClock.uptimeMillis()
                         try {
                             listState.animateScrollToItem(0)
                         } finally {
-                            // Placement uses Compose's spring animation and can
-                            // outlive the scroll correction by a few frames.
-                            // Keep row actions off until that crossing window is
-                            // over; the LazyColumn itself remains scrollable.
-                            minimumInputGate.join()
-                            activeCorrections -= 1
-                            if (activeCorrections == 0) liveProgressCallback(false)
+                            try {
+                                // Placement uses Compose's spring animation and
+                                // can outlive the scroll correction by a few
+                                // frames. Preserve the minimum gate even when a
+                                // newer scroll mutation cancels this animation.
+                                withContext(NonCancellable) {
+                                    val elapsedMs = SystemClock.uptimeMillis() - gateStartedAtMs
+                                    val remainingMs = CHAT_LIST_HEAD_INPUT_GATE_MILLIS - elapsedMs
+                                    if (remainingMs > 0L) delay(remainingMs)
+                                }
+                            } finally {
+                                // Cleanup itself must never suspend: otherwise a
+                                // cancellation can strand all row actions off.
+                                activeCorrections -= 1
+                                if (activeCorrections == 0) liveProgressCallback(false)
+                            }
                         }
                     }
                 }
@@ -108,4 +120,4 @@ internal fun ChatListActiveHeadScrollEffect(
 }
 
 private const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
-private const val CHAT_LIST_HEAD_INPUT_GATE_MILLIS = 500L
+internal const val CHAT_LIST_HEAD_INPUT_GATE_MILLIS = 500L

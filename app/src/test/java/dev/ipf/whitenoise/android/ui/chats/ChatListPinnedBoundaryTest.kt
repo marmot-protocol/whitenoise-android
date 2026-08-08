@@ -43,6 +43,7 @@ class ChatListPinnedBoundaryTest {
         assertEquals(1, pinnedBoundaryIndex(listOf(true, false), showArchived = false))
         assertNull(pinnedBoundaryIndex(listOf(false, false), showArchived = false))
         assertNull(pinnedBoundaryIndex(listOf(true, true), showArchived = false))
+        assertNull(pinnedBoundaryIndex(listOf(true, false, true), showArchived = false))
         assertNull(pinnedBoundaryIndex(emptyList(), showArchived = false))
         assertNull(pinnedBoundaryIndex(listOf(true, false), showArchived = true))
     }

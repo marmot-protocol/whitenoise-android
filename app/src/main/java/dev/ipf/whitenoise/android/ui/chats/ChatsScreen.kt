@@ -938,11 +938,14 @@ internal fun ChatsScreen(
                         ) {
                             visibleItems.forEachIndexed { targetIndex, item ->
                                 if (targetIndex == pinnedBoundary) {
-                                    this.item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
+                                    this.item(
+                                        key = CHAT_LIST_PINNED_BOUNDARY_KEY,
+                                        contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
+                                    ) {
                                         ChatListPinnedBoundary()
                                     }
                                 }
-                                this.item(key = item.id) {
+                                this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
                                     // Body-match snippet + tap-to-message focus are
                                     // for rows that matched ONLY on an older message
                                     // body. A row that also matches its title or
@@ -1296,6 +1299,10 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
+
+private const val CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE = "pinned-boundary"
+
+private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
 
 // Debounce before the chat-list message-body search fires its per-chat FFI
 // queries (issue #290). Sits inside the existing 250–300 ms chat-list input

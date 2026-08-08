@@ -2707,8 +2707,8 @@ private data class RemovedChatRowSnapshot(
     val optimisticState: OptimisticChatListPreviewState?,
 )
 
-private data class OptimisticArchiveIntent(
-    val generation: Long,
+private class OptimisticArchiveIntent(
+    val bindEpoch: Long,
     val archived: Boolean,
 )
 
@@ -3014,7 +3014,6 @@ class ChatsController private constructor(
     private var nextActivitySequence = 0uL
     private val optimisticChatListPreviewByGroup = mutableMapOf<String, OptimisticChatListPreviewState>()
     private val optimisticArchiveByGroup = mutableMapOf<String, OptimisticArchiveIntent>()
-    private var nextArchiveGeneration = 0L
 
     // Whether the chat list is on screen. While a conversation is foregrounded
     // the subscription stays warm (updates keep folding into the maps above),
@@ -4077,35 +4076,42 @@ class ChatsController private constructor(
      * whole selection leaves the current folder in one frame. The authoritative
      * chat/group maps remain untouched until Marmot confirms each mutation.
      */
+    @Suppress("ReturnCount") // Guard returns avoid starting or reporting an empty archive batch.
     suspend fun setArchived(
         groupIds: Collection<String>,
         archived: Boolean,
         notify: Boolean = true,
     ): Int {
         val account = accountRef ?: return 0
-        val intents = beginOptimisticArchive(groupIds, archived)
+        val epoch = bindEpoch
+        val intents = beginOptimisticArchive(groupIds, archived, epoch)
         if (intents.isEmpty()) return 0
 
         var succeeded = 0
         try {
             intents.forEach { (groupIdHex, intent) ->
-                val updated =
+                val applied =
                     runCatchingCancellable {
                         appState.withGroupCommitLock(account, groupIdHex) {
-                            groupArchivedUpdater(account, groupIdHex, archived)
+                            val updated = groupArchivedUpdater(account, groupIdHex, archived)
+                            if (isActiveBindEpoch(epoch)) {
+                                applyLocalGroupUpdate(updated)
+                                true
+                            } else {
+                                false
+                            }
                         }
-                    }.onFailure {
-                        appState.present(
-                            R.string.toast_couldnt_update_chat,
-                            AppText.Plain(it.message ?: it.javaClass.simpleName),
-                            copyable = true,
-                        )
-                    }.getOrNull()
+                    }.onFailure { error ->
+                        if (isActiveBindEpoch(epoch)) {
+                            appState.present(
+                                R.string.toast_couldnt_update_chat,
+                                AppText.Plain(error.message ?: error.javaClass.simpleName),
+                                copyable = true,
+                            )
+                        }
+                    }.getOrDefault(false)
 
-                if (updated != null) {
-                    applyLocalGroupUpdate(updated)
-                    succeeded += 1
-                }
+                if (applied) succeeded += 1
                 finishOptimisticArchive(groupIdHex, intent)
             }
         } finally {
@@ -4113,7 +4119,7 @@ class ChatsController private constructor(
             // strand presentation overlays for commits that never started.
             intents.forEach { (groupIdHex, intent) -> finishOptimisticArchive(groupIdHex, intent) }
         }
-        if (notify && succeeded > 0) {
+        if (notify && succeeded > 0 && isActiveBindEpoch(epoch)) {
             appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }
         return succeeded
@@ -4122,6 +4128,7 @@ class ChatsController private constructor(
     private fun beginOptimisticArchive(
         groupIds: Collection<String>,
         archived: Boolean,
+        epoch: Long,
     ): List<Pair<String, OptimisticArchiveIntent>> {
         val intents =
             groupIds
@@ -4135,7 +4142,7 @@ class ChatsController private constructor(
                     if (currentArchived == archived) return@mapNotNull null
                     val intent =
                         OptimisticArchiveIntent(
-                            generation = ++nextArchiveGeneration,
+                            bindEpoch = epoch,
                             archived = archived,
                         )
                     optimisticArchiveByGroup[rowKey] = intent
@@ -4150,7 +4157,7 @@ class ChatsController private constructor(
         intent: OptimisticArchiveIntent,
     ) {
         val rowKey = chatRowKey(groupIdHex)
-        if (optimisticArchiveByGroup[rowKey] == intent) {
+        if (isActiveBindEpoch(intent.bindEpoch) && optimisticArchiveByGroup[rowKey] === intent) {
             optimisticArchiveByGroup.remove(rowKey)
             recompute()
         }
@@ -4660,7 +4667,6 @@ class ChatsController private constructor(
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()
         optimisticArchiveByGroup.clear()
-        nextArchiveGeneration = 0L
         memberCacheByGroup = emptyMap()
         presentationMembersByGroup = emptyMap()
         memberSnapshotsRevision += 1L

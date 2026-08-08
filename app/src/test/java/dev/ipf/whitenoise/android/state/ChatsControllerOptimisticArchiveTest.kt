@@ -64,6 +64,80 @@ class ChatsControllerOptimisticArchiveTest {
             controller.onCleared()
         }
 
+    @Test
+    @Suppress("LongMethod") // One lifecycle race must retain both suspended mutations in a single scenario.
+    fun staleArchiveCompletionCannotCrossABindResetOrClearTheNewIntent() =
+        runBlocking {
+            val releaseOldCommit = CompletableDeferred<Unit>()
+            val releaseNewCommit = CompletableDeferred<Unit>()
+            var updateCount = 0
+            val controller =
+                ChatsController(
+                    appState = testAppState(),
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                        when (++updateCount) {
+                            1 -> {
+                                releaseOldCommit.await()
+                                group(groupIdHex, name = "old account result").copy(archived = archived)
+                            }
+                            else -> {
+                                releaseNewCommit.await()
+                                group(groupIdHex, name = "new account").copy(archived = archived)
+                            }
+                        }
+                    },
+                )
+            seed(controller, GROUP_A)
+
+            val oldArchive =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(listOf(GROUP_A), archived = true, notify = false)
+                }
+            assertEquals(GROUP_A, controller.archivedItems.single().id)
+
+            // A real bind reset clears every projection and advances bindEpoch.
+            // Restore only the injected test account reference so this isolated
+            // controller can seed the next account snapshot without opening
+            // Marmot's live subscriptions.
+            controller.bind(null)
+            restoreTestAccountReference(controller)
+            seed(controller, GROUP_A)
+            controller.applyLocalGroupUpdate(group(GROUP_A, name = "new account"))
+
+            val newArchive =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setArchived(listOf(GROUP_A), archived = true, notify = false)
+                }
+            assertEquals(
+                "new account",
+                controller.archivedItems
+                    .single()
+                    .group.name,
+            )
+
+            releaseOldCommit.complete(Unit)
+            assertEquals(0, oldArchive.await())
+            assertEquals(GROUP_A, controller.archivedItems.single().id)
+            assertEquals(
+                "new account",
+                controller.archivedItems
+                    .single()
+                    .group.name,
+            )
+
+            releaseNewCommit.complete(Unit)
+            assertEquals(1, newArchive.await())
+            assertEquals(
+                "new account",
+                controller.archivedItems
+                    .single()
+                    .group.name,
+            )
+            controller.onCleared()
+        }
+
     private fun seed(
         controller: ChatsController,
         vararg groupIds: String,
@@ -129,50 +203,59 @@ class ChatsControllerOptimisticArchiveTest {
             disbandRequest = null,
         )
 
-    private fun group(groupIdHex: String) =
-        AppGroupRecordFfi(
-            selfMembership = SelfMembershipFfi.MEMBER,
-            groupIdHex = groupIdHex,
-            protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
-            profilePresent = false,
-            endpoint = "endpoint-$groupIdHex",
-            name = "",
-            description = "",
-            admins = emptyList(),
-            relays = emptyList(),
-            nostrGroupIdHex = "nostr-$groupIdHex",
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.primal.net",
-                            ),
+    private fun group(
+        groupIdHex: String,
+        name: String = "",
+    ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        groupIdHex = groupIdHex,
+        protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+        profilePresent = false,
+        endpoint = "endpoint-$groupIdHex",
+        name = name,
+        description = "",
+        admins = emptyList(),
+        relays = emptyList(),
+        nostrGroupIdHex = "nostr-$groupIdHex",
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia =
+            AppGroupEncryptedMediaComponentFfi(
+                componentId = 0x8008u,
+                component = "marmot.group.encrypted-media.v1",
+                required = true,
+                version = EncryptedMediaVersionFfi.V1,
+                mediaFormat = "encrypted-media-v1",
+                allowedLocatorKinds = listOf("blossom-v1"),
+                defaultBlobEndpoints =
+                    listOf(
+                        AppBlobEndpointFfi(
+                            locatorKind = "blossom-v1",
+                            baseUrl = "https://blossom.primal.net",
                         ),
-                ),
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-            disappearingMessageSecs = 0uL,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbanded = false,
-            disbandRequest = null,
-        )
+                    ),
+            ),
+        archived = false,
+        pendingConfirmation = false,
+        unrecoverable = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = false,
+        disbandRequest = null,
+    )
+
+    private fun restoreTestAccountReference(controller: ChatsController) {
+        ChatsController::class.java.getDeclaredField("accountRef").apply {
+            isAccessible = true
+            set(controller, ACCOUNT_REF)
+        }
+    }
 
     private class InMemoryDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
