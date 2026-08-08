@@ -4,9 +4,11 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 /**
- * Bounded process-local record of posted invite cards whose sender identity was
- * incomplete. Invite notifications have a unique notification key, so they can
- * be refreshed safely without overwriting a newer accumulating message card.
+ * Bounded process-local record of posted invite cards whose sender name was
+ * incomplete. Invite cards use a plain notification style that does not render
+ * sender avatars, so only the displayed name participates in refresh state.
+ * Invites have a unique notification key and can therefore be refreshed safely
+ * without overwriting a newer accumulating message card.
  */
 internal class GroupInviteNotificationIdentityRefreshStore(
     private val maxEntries: Int = 64,
@@ -14,15 +16,12 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     internal data class RefreshCandidate(
         val update: NotificationUpdateFfi,
         val resolvedName: String?,
-        val resolvedAvatarUrl: String?,
     )
 
     private data class Entry(
         val update: NotificationUpdateFfi,
         val displayedName: String?,
-        val displayedAvatarUrl: String?,
         val desiredName: String?,
-        val desiredAvatarUrl: String?,
     )
 
     private val lock = Any()
@@ -32,7 +31,6 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     fun rememberPosted(
         update: NotificationUpdateFfi,
         displayedName: String?,
-        displayedAvatarUrl: String?,
     ) {
         if (
             update.trigger != NotificationTriggerFfi.GROUP_INVITE ||
@@ -47,9 +45,7 @@ internal class GroupInviteNotificationIdentityRefreshStore(
                 Entry(
                     update = update,
                     displayedName = displayedName,
-                    displayedAvatarUrl = displayedAvatarUrl,
                     desiredName = displayedName,
-                    desiredAvatarUrl = displayedAvatarUrl,
                 )
             while (entriesByNotificationKey.size > maxEntries) {
                 val evictedKey = entriesByNotificationKey.keys.first()
@@ -62,9 +58,8 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     fun refreshCandidates(
         senderAccountIdHex: String,
         resolvedName: String?,
-        resolvedAvatarUrl: String?,
     ): List<RefreshCandidate> {
-        if (senderAccountIdHex.isBlank() || (resolvedName == null && resolvedAvatarUrl == null)) return emptyList()
+        if (senderAccountIdHex.isBlank() || resolvedName == null) return emptyList()
         return synchronized(lock) {
             val candidates = mutableListOf<RefreshCandidate>()
             entriesByNotificationKey.entries.forEach { (notificationKey, entry) ->
@@ -75,8 +70,7 @@ internal class GroupInviteNotificationIdentityRefreshStore(
                 }
                 val updatedEntry =
                     entry.copy(
-                        desiredName = resolvedName ?: entry.desiredName,
-                        desiredAvatarUrl = resolvedAvatarUrl ?: entry.desiredAvatarUrl,
+                        desiredName = resolvedName,
                     )
                 entriesByNotificationKey[notificationKey] = updatedEntry
                 claimIfPending(notificationKey, updatedEntry)?.let(candidates::add)
@@ -85,18 +79,18 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         }
     }
 
-    fun markRefreshed(
+    fun completeRefresh(
         update: NotificationUpdateFfi,
         displayedName: String?,
-        displayedAvatarUrl: String?,
+        contentRedacted: Boolean,
     ): RefreshCandidate? =
         synchronized(lock) {
             refreshesInFlight.remove(update.notificationKey)
             val current = entriesByNotificationKey[update.notificationKey] ?: return@synchronized null
+            if (contentRedacted) return@synchronized null
             val refreshedEntry =
                 current.copy(
-                    displayedName = displayedName ?: current.displayedName,
-                    displayedAvatarUrl = displayedAvatarUrl ?: current.displayedAvatarUrl,
+                    displayedName = displayedName,
                 )
             entriesByNotificationKey[update.notificationKey] = refreshedEntry
             claimIfPending(update.notificationKey, refreshedEntry)
@@ -142,10 +136,7 @@ internal class GroupInviteNotificationIdentityRefreshStore(
     ): RefreshCandidate? {
         if (
             notificationKey in refreshesInFlight ||
-            (
-                entry.desiredName == entry.displayedName &&
-                    entry.desiredAvatarUrl == entry.displayedAvatarUrl
-            )
+            entry.desiredName == entry.displayedName
         ) {
             return null
         }
@@ -153,7 +144,6 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         return RefreshCandidate(
             update = entry.update,
             resolvedName = entry.desiredName,
-            resolvedAvatarUrl = entry.desiredAvatarUrl,
         )
     }
 }
