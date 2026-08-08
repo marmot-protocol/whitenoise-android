@@ -70,13 +70,15 @@ class ChatsControllerOptimisticArchiveTest {
         runBlocking {
             val releaseOldCommit = CompletableDeferred<Unit>()
             val releaseNewCommit = CompletableDeferred<Unit>()
+            val updateAccountRefs = mutableListOf<String>()
             var updateCount = 0
             val controller =
                 ChatsController(
                     appState = testAppState(),
                     initialAccountRef = ACCOUNT_REF,
                     memberSnapshotLoader = { _, _ -> emptyList() },
-                    groupArchivedUpdater = { _, groupIdHex, archived ->
+                    groupArchivedUpdater = { accountRef, groupIdHex, archived ->
+                        updateAccountRefs += accountRef
                         when (++updateCount) {
                             1 -> {
                                 releaseOldCommit.await()
@@ -102,7 +104,7 @@ class ChatsControllerOptimisticArchiveTest {
             // controller can seed the next account snapshot without opening
             // Marmot's live subscriptions.
             controller.bind(null)
-            restoreTestAccountReference(controller)
+            restoreTestAccountReference(controller, NEW_ACCOUNT_REF)
             seed(controller, GROUP_A)
             controller.applyLocalGroupUpdate(group(GROUP_A, name = "new account"))
 
@@ -110,6 +112,7 @@ class ChatsControllerOptimisticArchiveTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.setArchived(listOf(GROUP_A), archived = true, notify = false)
                 }
+            assertEquals(listOf(ACCOUNT_REF, NEW_ACCOUNT_REF), updateAccountRefs)
             assertEquals(
                 "new account",
                 controller.archivedItems
@@ -129,6 +132,7 @@ class ChatsControllerOptimisticArchiveTest {
 
             releaseNewCommit.complete(Unit)
             assertEquals(1, newArchive.await())
+            assertEquals(listOf(ACCOUNT_REF, NEW_ACCOUNT_REF), updateAccountRefs)
             assertEquals(
                 "new account",
                 controller.archivedItems
@@ -250,10 +254,13 @@ class ChatsControllerOptimisticArchiveTest {
         disbandRequest = null,
     )
 
-    private fun restoreTestAccountReference(controller: ChatsController) {
+    private fun restoreTestAccountReference(
+        controller: ChatsController,
+        accountRef: String,
+    ) {
         ChatsController::class.java.getDeclaredField("accountRef").apply {
             isAccessible = true
-            set(controller, ACCOUNT_REF)
+            set(controller, accountRef)
         }
     }
 
@@ -268,6 +275,7 @@ class ChatsControllerOptimisticArchiveTest {
 
     private companion object {
         const val ACCOUNT_REF = "account"
+        const val NEW_ACCOUNT_REF = "new-account"
         const val GROUP_A = "group-a"
         const val GROUP_B = "group-b"
     }
