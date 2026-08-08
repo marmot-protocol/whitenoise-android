@@ -248,6 +248,15 @@ just release-fast
 
 Same as `just release` but reuses the checked-in Marmot bindings and native libraries.
 
+### Reproducible unsigned release APK (#1261)
+
+To verify that two isolated builds of the same commit produce identical **unsigned**
+production Zapstore `arm64-v8a` release APK bytes (no signing secrets, no
+`google-services.json`), see [docs/reproducible-apk-builds.md](docs/reproducible-apk-builds.md)
+and run `./scripts/repro-verify.sh`. Tag/manual CI runs publish matching
+artifacts plus the recorded toolchain from
+[`.github/workflows/android-repro-verify.yml`](.github/workflows/android-repro-verify.yml).
+
 ## Device Testing
 
 For local device checks, prefer:
