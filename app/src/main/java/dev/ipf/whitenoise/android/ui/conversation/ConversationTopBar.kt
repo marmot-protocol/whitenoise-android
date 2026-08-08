@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -45,6 +46,8 @@ import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +75,7 @@ internal fun ConversationTopBar(
     onOpenSearch: () -> Unit,
     onToggleArchived: () -> Unit,
     onRequestLeave: () -> Unit,
+    performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
     Column {
         if (selectionMode) {
@@ -99,7 +103,12 @@ internal fun ConversationTopBar(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable(onClick = onOpenDetails)
-                                .semantics { contentDescription = openDetailsDescription },
+                                .performanceTestTag(
+                                    PerformanceTestTags.OPEN_GROUP_DETAILS,
+                                    enabled = performanceSelectorsEnabled,
+                                ).semantics {
+                                    contentDescription = openDetailsDescription
+                                },
                     ) {
                         GroupAvatar(
                             appState = appState,

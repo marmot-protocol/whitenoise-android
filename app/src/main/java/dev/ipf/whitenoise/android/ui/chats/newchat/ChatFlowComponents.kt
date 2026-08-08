@@ -40,8 +40,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -119,7 +117,6 @@ internal fun ContactRow(
     onLongClick: (() -> Unit)? = null,
     onSubtitleClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
-    rowContentDescription: String? = null,
 ) {
     val copyLabel = stringResource(R.string.copy)
     Row(
@@ -137,12 +134,6 @@ internal fun ContactRow(
                         )
                     } else {
                         it
-                    }
-                }.let { rowModifier ->
-                    if (rowContentDescription != null) {
-                        rowModifier.semantics { contentDescription = rowContentDescription }
-                    } else {
-                        rowModifier
                     }
                 }.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
         verticalAlignment = Alignment.CenterVertically,

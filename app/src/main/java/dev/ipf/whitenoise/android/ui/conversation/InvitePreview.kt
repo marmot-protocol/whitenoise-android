@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 @Composable
@@ -92,7 +92,7 @@ internal fun InvitePreviewActionBar(
             }
             Button(
                 onClick = onJoin,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).performanceTestTag(PerformanceTestTags.JOIN_INVITE),
                 enabled = !mutationInFlight,
             ) {
                 if (mutationInFlight) {
@@ -104,11 +104,7 @@ internal fun InvitePreviewActionBar(
                 } else {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription =
-                            performanceTestContentDescription(
-                                null,
-                                PerformanceTestTags.JOIN_INVITE,
-                            ),
+                        contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
                 }

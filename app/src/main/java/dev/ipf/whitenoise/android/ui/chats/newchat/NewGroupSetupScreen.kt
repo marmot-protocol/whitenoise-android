@@ -74,7 +74,7 @@ import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
@@ -330,6 +330,7 @@ internal fun NewGroupSetupScreen(
         floatingActionButton = {
             Surface(
                 onClick = { create(retryLoadGroupIdHex = retryGroupIdHex) },
+                modifier = Modifier.performanceTestTag(PerformanceTestTags.CREATE_GROUP),
                 enabled = setupUi.submitEnabled,
                 shape = FloatingActionButtonDefaults.extendedFabShape,
                 color =
@@ -355,11 +356,7 @@ internal fun NewGroupSetupScreen(
                     } else {
                         Icon(
                             Icons.Default.Check,
-                            contentDescription =
-                                performanceTestContentDescription(
-                                    null,
-                                    PerformanceTestTags.CREATE_GROUP,
-                                ),
+                            contentDescription = null,
                         )
                     }
                     Spacer(Modifier.size(Dimens.spaceSm))

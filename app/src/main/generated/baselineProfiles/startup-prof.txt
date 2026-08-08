@@ -28447,7 +28447,7 @@ SPLdev/ipf/whitenoise/android/ui/settings/ChatFoldersScreenKt;->chatFolderDispla
 Ldev/ipf/whitenoise/android/ui/settings/ChatFoldersScreenKt$WhenMappings;
 SPLdev/ipf/whitenoise/android/ui/settings/ChatFoldersScreenKt$WhenMappings;-><clinit>()V
 Ldev/ipf/whitenoise/android/ui/testing/PerformanceTestTagsKt;
-SPLdev/ipf/whitenoise/android/ui/testing/PerformanceTestTagsKt;->performanceTestContentDescription(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+SPLdev/ipf/whitenoise/android/ui/testing/PerformanceTestTagsKt;->performanceTestTag(Landroidx/compose/ui/Modifier;Ljava/lang/String;Z)Landroidx/compose/ui/Modifier;
 Ldev/ipf/whitenoise/android/ui/theme/AmoledSurfaceKt;
 SPLdev/ipf/whitenoise/android/ui/theme/AmoledSurfaceKt;-><clinit>()V
 SPLdev/ipf/whitenoise/android/ui/theme/AmoledSurfaceKt;->amoledSurfaceBorderStroke-kHDZbjc(FLandroidx/compose/runtime/Composer;II)Landroidx/compose/foundation/BorderStroke;

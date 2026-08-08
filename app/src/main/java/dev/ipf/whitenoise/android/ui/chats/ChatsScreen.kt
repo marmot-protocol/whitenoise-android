@@ -108,7 +108,7 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
@@ -867,16 +867,13 @@ internal fun ChatsScreen(
                 val actionColors = accountActionColors(appState)
                 FloatingActionButton(
                     onClick = { showNewChatFlow = true },
+                    modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_MESSAGE),
                     containerColor = actionColors.container,
                     contentColor = actionColors.content,
                 ) {
                     Icon(
                         Icons.Default.Edit,
-                        contentDescription =
-                            performanceTestContentDescription(
-                                stringResource(R.string.new_message),
-                                PerformanceTestTags.NEW_MESSAGE,
-                            ),
+                        contentDescription = stringResource(R.string.new_message),
                     )
                 }
             }

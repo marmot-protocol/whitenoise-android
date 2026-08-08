@@ -147,7 +147,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -1333,6 +1333,12 @@ internal fun GroupDetailsScreen(
                                     },
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
+                                modifier =
+                                    if (index == 0) {
+                                        Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
+                                    } else {
+                                        Modifier
+                                    },
                                 onSubtitleClick =
                                     if (isSelfRow || memberNpub.isBlank()) {
                                         null
@@ -1340,12 +1346,6 @@ internal fun GroupDetailsScreen(
                                         { clipboard.setText(AnnotatedString(memberNpub)) }
                                     },
                                 onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
-                                rowContentDescription =
-                                    if (index == 0) {
-                                        performanceTestContentDescription(null, PerformanceTestTags.MEMBER_LIST)
-                                    } else {
-                                        null
-                                    },
                                 trailing = {
                                     GroupMemberMutationStatus(
                                         isAdmin = controller.isAdmin(member),

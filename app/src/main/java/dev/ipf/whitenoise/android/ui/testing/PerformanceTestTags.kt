@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.testing
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import dev.ipf.whitenoise.android.BuildConfig
 
 /** Stable cross-process selectors for release-like Macrobenchmark journeys. */
@@ -13,8 +15,8 @@ internal object PerformanceTestTags {
     const val JOIN_INVITE = "performance.join_invite"
 }
 
-/** Exposes a stable selector only in release-like performance APKs. */
-internal fun performanceTestContentDescription(
-    defaultDescription: String?,
+/** Exposes a stable selector without changing accessibility descriptions. */
+internal fun Modifier.performanceTestTag(
     tag: String,
-): String? = if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) tag else defaultDescription
+    enabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
+): Modifier = if (enabled) testTag(tag) else this
