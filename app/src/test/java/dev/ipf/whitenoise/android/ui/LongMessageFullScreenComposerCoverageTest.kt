@@ -70,20 +70,21 @@ class LongMessageFullScreenComposerCoverageTest {
 
     @Test
     fun conversationPassesMainComposerGateAndMentionPickerToExpandedReader() {
-        val body = conversationScreenSource().readText()
+        val screenBody = conversationSource("ConversationScreen.kt").readText()
+        val bottomBarBody = conversationSource("ConversationBottomBar.kt").readText()
 
         assertTrue(
             "ConversationScreen must compute one ComposerGate result and pass it both to the main bottom bar and expanded reader",
-            "val composerGate =" in body &&
-                "when (composerGate)" in body &&
-                "composerGate = composerGate" in body,
+            "val composerGate =" in screenBody &&
+                "when (composerGate)" in bottomBarBody &&
+                Regex("composerGate = composerGate").findAll(screenBody).count() >= 2,
         )
         assertTrue(
             "mention candidate setup should be shared so the main composer and expanded-reader composer cannot drift",
-            "val mentionPicker =" in body &&
-                "rememberConversationMentionPickerState(" in body &&
-                "mentionCandidates = mentionPicker.candidates" in body &&
-                "mentionPickerEnabled = mentionPicker.enabled" in body,
+            "val mentionPicker =" in screenBody &&
+                "rememberConversationMentionPickerState(" in screenBody &&
+                Regex("mentionCandidates = mentionPicker.candidates").findAll(screenBody).count() >= 2 &&
+                Regex("mentionPickerEnabled = mentionPicker.enabled").findAll(screenBody).count() >= 2,
         )
     }
 
@@ -101,10 +102,10 @@ class LongMessageFullScreenComposerCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing MessageBubble.kt source file")
 
-    private fun conversationScreenSource(): File =
+    private fun conversationSource(fileName: String): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/$fileName"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/$fileName"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing ConversationScreen.kt source file")
+            ?: error("Missing $fileName source file")
 }

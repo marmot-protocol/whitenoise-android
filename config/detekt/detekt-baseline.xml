@@ -444,9 +444,6 @@
     <ID>LongMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>LongMethod:ConversationRows.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun GroupSystemRow</ID>
     <ID>LongMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
-    <ID>LongMethod:ConversationScreen.kt:fun sendPickedMedia</ID>
-    <ID>LongMethod:ConversationScreen.kt:fun sendStagedAttachments</ID>
-    <ID>LongMethod:ConversationScreen.kt:suspend fun readPickedDocuments: DocumentReadOutcome</ID>
     <ID>LongMethod:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$@Test fun documentEncodesTimelineMetadataInChronologicalOrder</ID>
     <ID>LongMethod:DevicePrivacyScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DevicePrivacyScreen</ID>
     <ID>LongMethod:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
@@ -1561,7 +1558,6 @@
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
     <ID>ReturnCount:ConversationNotificationSettings.kt:internal fun openConversationNotificationSettings</ID>
-    <ID>ReturnCount:ConversationScreen.kt:fun readImageAttachment: ImageAttachmentReadOutcome</ID>
     <ID>ReturnCount:DisappearingMessageSweep.kt:DisappearingMessageSweep$fun isLocallyExpired: Boolean</ID>
     <ID>ReturnCount:DisappearingMessageSweep.kt:DisappearingMessageSweep$fun isSendTimeExpiryDeferredForBackgroundScan: Boolean</ID>
     <ID>ReturnCount:DisappearingMessageSweep.kt:DisappearingMessageSweep$internal fun resolveLocalExpirySeconds: ULong?</ID>

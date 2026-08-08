@@ -7,19 +7,37 @@ internal fun String.functionBody(functionName: String): String {
             ?.range
             ?.first
             ?: error("Missing function $functionName")
-    val braceStart = indexOf('{', start)
-    require(braceStart >= 0) { "Missing body for $functionName" }
-    return kotlinBlockFrom(braceStart, "function $functionName")
+    val parametersStart = indexOf('(', start)
+    require(parametersStart >= 0) { "Missing parameters for $functionName" }
+    val parameters =
+        kotlinBlockFrom(
+            openDelimiter = parametersStart,
+            description = "parameters for $functionName",
+            opening = '(',
+            closing = ')',
+        )
+    val parametersEnd = parametersStart + parameters.length
+    return kotlinBlockFrom(
+        openDelimiter = parametersEnd,
+        description = "function $functionName",
+        searchForOpening = true,
+    )
 }
 
 internal fun String.kotlinBlockFrom(
-    openBrace: Int,
+    openDelimiter: Int,
     description: String,
+    opening: Char = '{',
+    closing: Char = '}',
+    searchForOpening: Boolean = false,
 ): String {
-    require(getOrNull(openBrace) == '{') { "Missing opening brace for $description" }
+    require(searchForOpening || getOrNull(openDelimiter) == opening) {
+        "Missing opening delimiter for $description"
+    }
 
     var depth = 0
-    var index = openBrace
+    var index = openDelimiter
+    var blockStart = if (searchForOpening) -1 else openDelimiter
     var inLineComment = false
     var blockCommentDepth = 0
     var inString = false
@@ -97,14 +115,15 @@ internal fun String.kotlinBlockFrom(
                         inChar = true
                         index += 1
                     }
-                    current == '{' -> {
+                    current == opening -> {
+                        if (depth == 0) blockStart = index
                         depth += 1
                         index += 1
                     }
-                    current == '}' -> {
+                    current == closing && depth > 0 -> {
                         depth -= 1
                         index += 1
-                        if (depth == 0) return substring(openBrace, index)
+                        if (depth == 0) return substring(blockStart, index)
                     }
                     else -> index += 1
                 }
@@ -112,5 +131,6 @@ internal fun String.kotlinBlockFrom(
         }
     }
 
-    error("Unterminated block for $description")
+    require(blockStart >= 0) { "Missing opening delimiter for $description" }
+    error("Unterminated delimiters for $description")
 }
