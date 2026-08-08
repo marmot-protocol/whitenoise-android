@@ -5,13 +5,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -60,7 +63,7 @@ class ImageEditorResourceOwnershipTest {
             }
         }
 
-    @Test
+    @Test(timeout = 10_000L)
     fun previewAndSaveNativeWorkAreSerializedPerEditorSession() =
         runBlocking {
             val mutex = Mutex()
@@ -107,5 +110,35 @@ class ImageEditorResourceOwnershipTest {
             jobs.awaitAll()
 
             assertTrue("native render workers must not overlap", maximumActive.get() == 1)
+        }
+
+    @Test(timeout = 10_000L)
+    fun cancelledOwnerReleasesSourceOnlyAfterNativeWorkUnlocks() =
+        runBlocking {
+            val mutex = Mutex(locked = true)
+            var cleaned = false
+            val ownerStarted = CompletableDeferred<Unit>()
+            val owner =
+                launch {
+                    try {
+                        ownerStarted.complete(Unit)
+                        awaitCancellation()
+                    } finally {
+                        releaseSerializedOwnedResource(
+                            mutex = mutex,
+                            resource = Any(),
+                            cleanup = { cleaned = true },
+                        )
+                    }
+                }
+
+            ownerStarted.await()
+            owner.cancel()
+            assertNull("cleanup must wait for native work", withTimeoutOrNull(100L) { owner.join() })
+            assertFalse(cleaned)
+
+            mutex.unlock()
+            owner.join()
+            assertTrue("cancelled owner must still release its resource", cleaned)
         }
 }

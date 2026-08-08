@@ -887,7 +887,7 @@
     <string name="image_editor_draw">Dessiner</string>
     <string name="image_editor_rotate_left">Pivoter à gauche</string>
     <string name="image_editor_rotate_right">Pivoter à droite</string>
-    <string name="image_editor_undo">Annuler</string>
+    <string name="image_editor_undo">Annuler la dernière action</string>
     <string name="image_editor_redo">Rétablir</string>
     <string name="image_editor_reset">Réinitialiser les modifications</string>
 

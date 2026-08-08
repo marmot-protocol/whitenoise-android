@@ -26,9 +26,12 @@ class ImageEditabilityTest {
     @Test
     fun avifUsesSendUnchangedBecauseFrameDetectionIsNotSafe() {
         val result = imageEditability("image/avif", isAnimated = false)
+        val mixedCase = imageEditability("IMAGE/AVIF", isAnimated = false)
 
         assertFalse(result.canEdit)
         assertTrue(result.isUnsupportedImage)
+        assertFalse(mixedCase.canEdit)
+        assertTrue(mixedCase.isUnsupportedImage)
     }
 
     @Test
