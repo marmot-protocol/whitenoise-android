@@ -889,20 +889,113 @@ internal fun profileAddableGroupItems(
     items: Iterable<ChatListItem>,
     targetAccountIdHex: String,
     activeAccountIdHex: String?,
-): List<ChatListItem> {
-    val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
-    val target = targetAccountIdHex.trim().takeIf { it.isNotEmpty() } ?: return emptyList()
-    if (active.equals(target, ignoreCase = true)) return emptyList()
-    return items
+): List<ChatListItem> =
+    profileAddableGroupsState(
+        items = items,
+        targetAccountIdHex = targetAccountIdHex,
+        activeAccountIdHex = activeAccountIdHex,
+    ).groups
+
+internal enum class ProfileGroupPickerLoadState {
+    READY,
+    LOADING,
+    FAILED,
+}
+
+internal data class ProfileGroupPickerState(
+    val groups: List<ChatListItem>,
+    val pendingGroupIds: Set<String>,
+    val loadState: ProfileGroupPickerLoadState,
+) {
+    companion object {
+        fun empty(): ProfileGroupPickerState =
+            ProfileGroupPickerState(
+                groups = emptyList(),
+                pendingGroupIds = emptySet(),
+                loadState = ProfileGroupPickerLoadState.READY,
+            )
+    }
+}
+
+internal fun profileAddableGroupsState(
+    items: Iterable<ChatListItem>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+    failedGroupIds: Set<String> = emptySet(),
+): ProfileGroupPickerState {
+    val (active, target) =
+        profileGroupPickerAccounts(activeAccountIdHex, targetAccountIdHex)
+            ?: return ProfileGroupPickerState.empty()
+    return profileGroupPickerState(
+        candidates = profileManagedGroupCandidates(items, active),
+        failedGroupIds = failedGroupIds,
+    ) { _, snapshot ->
+        snapshot.containsAccount(active) && !snapshot.containsAccount(target)
+    }
+}
+
+internal fun profilePromotableGroupsState(
+    items: Iterable<ChatListItem>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+    failedGroupIds: Set<String> = emptySet(),
+): ProfileGroupPickerState {
+    val (active, target) =
+        profileGroupPickerAccounts(activeAccountIdHex, targetAccountIdHex)
+            ?: return ProfileGroupPickerState.empty()
+    return profileGroupPickerState(
+        candidates = profileManagedGroupCandidates(items, active),
+        failedGroupIds = failedGroupIds,
+    ) { item, snapshot ->
+        snapshot.containsAccount(active) &&
+            snapshot.containsAccount(target) &&
+            !GroupProjector.isAdminRef(item.group, target)
+    }
+}
+
+private fun profileGroupPickerAccounts(
+    activeAccountIdHex: String?,
+    targetAccountIdHex: String,
+): Pair<String, String>? {
+    val active = activeAccountIdHex?.trim().orEmpty()
+    val target = targetAccountIdHex.trim()
+    return if (active.isEmpty() || target.isEmpty() || active.equals(target, ignoreCase = true)) {
+        null
+    } else {
+        active to target
+    }
+}
+
+private fun profileManagedGroupCandidates(
+    items: Iterable<ChatListItem>,
+    activeAccountIdHex: String,
+): List<ChatListItem> =
+    items
         .filter { item ->
-            val snapshot = item.memberSnapshot ?: return@filter false
             !item.group.pendingConfirmation &&
-                !item.removedFromGroup(active) &&
+                !item.removedFromGroup(activeAccountIdHex) &&
                 !item.isDm() &&
-                GroupProjector.isAdminRef(item.group, active) &&
-                snapshot.containsAccount(active) &&
-                !snapshot.containsAccount(target)
+                GroupProjector.isAdminRef(item.group, activeAccountIdHex)
         }.distinctBy { it.group.groupIdHex.lowercase() }
+
+private fun profileGroupPickerState(
+    candidates: List<ChatListItem>,
+    failedGroupIds: Set<String>,
+    eligible: (ChatListItem, GroupMemberSnapshot) -> Boolean,
+): ProfileGroupPickerState {
+    val groups = candidates.filter { item -> item.memberSnapshot?.let { eligible(item, it) } == true }
+    val pendingGroupIds =
+        candidates
+            .filter { it.memberSnapshot == null }
+            .mapTo(linkedSetOf()) { it.group.groupIdHex }
+    val normalizedFailures = failedGroupIds.mapTo(mutableSetOf()) { it.lowercase() }
+    val loadState =
+        when {
+            pendingGroupIds.any { it.lowercase() in normalizedFailures } -> ProfileGroupPickerLoadState.FAILED
+            pendingGroupIds.isNotEmpty() -> ProfileGroupPickerLoadState.LOADING
+            else -> ProfileGroupPickerLoadState.READY
+        }
+    return ProfileGroupPickerState(groups, pendingGroupIds, loadState)
 }
 
 /**
@@ -3057,6 +3150,7 @@ class ChatsController private constructor(
     // become permanent after a finite retry budget.
     private val memberFetchRetryBackoffTierByGroup = mutableMapOf<String, Int>()
     private val memberFetchRetryJobsByGroup = mutableMapOf<String, Job>()
+    private val failedMemberFetches = mutableSetOf<String>()
 
     // A self-only direct roster gets one dedicated confirmation read before it
     // becomes authoritative. Keep this separate from the general backoff tier:
@@ -3355,6 +3449,7 @@ class ChatsController private constructor(
         val hasPendingFetch = groupIdHex in inFlightMemberFetches || hasRetryScheduled
         if (!hasSnapshot && !hasPendingFetch) return
         cancelMemberSnapshotRetry(groupIdHex)
+        failedMemberFetches.remove(groupIdHex)
         selfOnlyDirectGraceRetryGroups.remove(groupIdHex)
         memberCacheByGroup[groupIdHex]?.let { members ->
             val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
@@ -3483,6 +3578,7 @@ class ChatsController private constructor(
             presentationMembersByGroup = presentationMembersByGroup - record.groupIdHex
             cancelMemberSnapshotRetry(record.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(record.groupIdHex)
+            failedMemberFetches.remove(record.groupIdHex)
             selfOnlyDirectGraceRetryGroups.remove(record.groupIdHex)
             members
                 .map { it.memberIdHex }
@@ -3608,11 +3704,28 @@ class ChatsController private constructor(
     fun profileAddableGroups(
         targetAccountIdHex: String,
         activeAccountIdHex: String?,
-    ): List<ChatListItem> =
-        profileAddableGroupItems(
-            currentProjectedItems(activeAccountIdHex),
-            targetAccountIdHex,
-            activeAccountIdHex,
+    ): List<ChatListItem> = profileAddableGroupsState(targetAccountIdHex, activeAccountIdHex).groups
+
+    internal fun profileAddableGroupsState(
+        targetAccountIdHex: String,
+        activeAccountIdHex: String?,
+    ): ProfileGroupPickerState =
+        profileAddableGroupsState(
+            items = currentProjectedItems(activeAccountIdHex),
+            targetAccountIdHex = targetAccountIdHex,
+            activeAccountIdHex = activeAccountIdHex,
+            failedGroupIds = failedMemberFetches,
+        )
+
+    internal fun profilePromotableGroupsState(
+        targetAccountIdHex: String,
+        activeAccountIdHex: String?,
+    ): ProfileGroupPickerState =
+        profilePromotableGroupsState(
+            items = currentProjectedItems(activeAccountIdHex),
+            targetAccountIdHex = targetAccountIdHex,
+            activeAccountIdHex = activeAccountIdHex,
+            failedGroupIds = failedMemberFetches,
         )
 
     /**
@@ -3866,6 +3979,7 @@ class ChatsController private constructor(
             .toList()
             .forEach(::cancelMemberSnapshotRetry)
         memberFetchRetryBackoffTierByGroup.keys.retainAll(liveGroupIds)
+        failedMemberFetches.retainAll(liveGroupIds)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
             noteMaterializedGroupMembershipChanged()
         }
@@ -3890,6 +4004,7 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup.remove(rowKey)
             cancelMemberSnapshotRetry(removedRow.groupIdHex)
             memberFetchRetryBackoffTierByGroup.remove(removedRow.groupIdHex)
+            failedMemberFetches.remove(removedRow.groupIdHex)
             selfOnlyDirectGraceRetryGroups.remove(removedRow.groupIdHex)
             presentationMembersByGroup = presentationMembersByGroup - removedRow.groupIdHex
             noteMaterializedGroupMembershipChanged()
@@ -4675,6 +4790,7 @@ class ChatsController private constructor(
         memberFetchRetryJobsByGroup.values.forEach(Job::cancel)
         memberFetchRetryJobsByGroup.clear()
         memberFetchRetryBackoffTierByGroup.clear()
+        failedMemberFetches.clear()
         selfOnlyDirectGraceRetryGroups.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -4750,6 +4866,13 @@ class ChatsController private constructor(
         schedulePendingMemberFetches(groupIds)
     }
 
+    internal fun retryMemberSnapshots(groupIds: Iterable<String>) {
+        val targets = groupIds.distinct().toList()
+        targets.forEach(::cancelMemberSnapshotRetry)
+        if (failedMemberFetches.removeAll(targets.toSet())) memberSnapshotsRevision += 1L
+        schedulePendingMemberFetches(targets)
+    }
+
     private fun schedulePendingMemberFetches(groupIds: Iterable<String> = chatRows.map { it.groupIdHex }) {
         val account = accountRef ?: return
         val epoch = bindEpoch
@@ -4765,6 +4888,7 @@ class ChatsController private constructor(
                 .filterNot { memberFetchRetryJobsByGroup[it]?.isActive == true }
                 .toList()
         if (pending.isEmpty()) return
+        if (failedMemberFetches.removeAll(pending.toSet())) memberSnapshotsRevision += 1L
         inFlightMemberFetches.addAll(pending)
         pending.forEach { groupIdHex ->
             recomputeScope.launch {
@@ -4787,6 +4911,7 @@ class ChatsController private constructor(
                             (throwable.message ?: throwable.javaClass.simpleName)
                     }
                     if (isActiveBindEpoch(epoch)) {
+                        markMemberSnapshotFetchFailed(groupIdHex)
                         scheduleMemberSnapshotRetry(groupIdHex, epoch)
                     }
                 } finally {
@@ -4856,6 +4981,7 @@ class ChatsController private constructor(
             )
         ) {
             if (selfOnlyDirectRoster) selfOnlyDirectGraceRetryGroups.add(groupIdHex)
+            markMemberSnapshotFetchFailed(groupIdHex)
             scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
@@ -4864,6 +4990,7 @@ class ChatsController private constructor(
             .filter { it.isNotBlank() }
             .forEach(appState::requestProfile)
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+        failedMemberFetches.remove(groupIdHex)
         presentationMembersByGroup = presentationMembersByGroup - groupIdHex
         cancelMemberSnapshotRetry(groupIdHex)
         memberFetchRetryBackoffTierByGroup.remove(groupIdHex)
@@ -4881,6 +5008,10 @@ class ChatsController private constructor(
         // Coalesce: a burst of member-fetch completions on account open/switch
         // would otherwise drive N un-debounced full recomputes. Defer into one.
         scheduleRecompute()
+    }
+
+    private fun markMemberSnapshotFetchFailed(groupIdHex: String) {
+        if (failedMemberFetches.add(groupIdHex)) memberSnapshotsRevision += 1L
     }
 
     private fun scheduleMemberSnapshotRetry(

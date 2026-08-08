@@ -158,6 +158,11 @@
     <string name="profile_add_to_groups_confirm_message">%1$s 将被添加到 %2$s。所有成员都能看到此操作。</string>
     <string name="profile_add_to_groups_confirm_label">添加到群组</string>
     <string name="profile_no_addable_groups">没有可将此人添加到其中的群组。</string>
+    <string name="profile_addable_groups_loading">正在检查可用群组…</string>
+    <string name="profile_addable_groups_failed">无法检查部分群组。</string>
+    <string name="profile_make_admin_title">将 %1$s 设为管理员</string>
+    <string name="profile_make_admin_description">选择一个你是管理员且 %1$s 已是成员的群组。</string>
+    <string name="profile_no_promotable_groups">没有可将此人设为管理员的群组。</string>
     <string name="profile_view_picture">查看头像</string>
     <string name="profile_name_from_profile">名称（来自个人资料）：%1$s</string>
     <string name="profile_nickname_and_notes">昵称和备注</string>

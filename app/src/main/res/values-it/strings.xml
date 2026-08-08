@@ -164,6 +164,11 @@
     <string name="profile_add_to_groups_confirm_message">%1$s verrà aggiunto a %2$s. Questo sarà visibile a tutti i membri.</string>
     <string name="profile_add_to_groups_confirm_label">Aggiungi ai gruppi</string>
     <string name="profile_no_addable_groups">Non ci sono gruppi a cui puoi aggiungere questa persona.</string>
+    <string name="profile_addable_groups_loading">Verifica dei gruppi disponibili…</string>
+    <string name="profile_addable_groups_failed">Non è stato possibile verificare alcuni gruppi.</string>
+    <string name="profile_make_admin_title">Rendi %1$s amministratore</string>
+    <string name="profile_make_admin_description">Scegli un gruppo di cui sei amministratore e di cui %1$s è già membro.</string>
+    <string name="profile_no_promotable_groups">Non ci sono gruppi in cui puoi rendere questa persona amministratore.</string>
     <string name="profile_view_picture">Visualizza immagine del profilo</string>
     <string name="profile_name_from_profile">Nome (dal profilo): %1$s</string>
     <string name="profile_nickname_and_notes">Soprannome e note</string>

@@ -116,6 +116,7 @@ import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -350,10 +351,16 @@ internal fun GroupDetailsScreen(
                 ?.let { directDetailsSharedGroups(it, controller.group.groupIdHex) }
                 .orEmpty()
         }
-    val dmAddableGroups =
-        remember(dmPeerAccountIdHex, appState.chatListItems) {
-            dmPeerAccountIdHex?.let(appState::profileAddableGroups).orEmpty()
+    val groupPickerRevision = appState.profileGroupPickerRevision
+    val dmAddableGroupsState =
+        remember(dmPeerAccountIdHex, appState.chatListItems, groupPickerRevision) {
+            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
         }
+    LaunchedEffect(showAddContactToGroups, dmAddableGroupsState.pendingGroupIds) {
+        if (showAddContactToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
+            appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
+        }
+    }
     val dmPeerCandidate =
         remember(dmPeerAccountIdHex, dmPeerNpub, conversationTitle) {
             if (dmPeerAccountIdHex != null && dmPeerNpub != null) {
@@ -1479,10 +1486,16 @@ internal fun GroupDetailsScreen(
         ProfileAddToGroupsSheet(
             appState = appState,
             targetName = conversationTitle,
-            groups = dmAddableGroups,
+            state = dmAddableGroupsState,
             busy = addingContactToGroups,
             onDismiss = {
                 if (!addingContactToGroups) showAddContactToGroups = false
+            },
+            onRetry = {
+                appState.requestProfileGroupMembers(
+                    dmAddableGroupsState.pendingGroupIds,
+                    retry = true,
+                )
             },
             onAdd = { selected ->
                 if (addingContactToGroups) return@ProfileAddToGroupsSheet
