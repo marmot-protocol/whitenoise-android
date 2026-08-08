@@ -1378,6 +1378,7 @@ class WhiteNoiseAppState private constructor(
     private val conversationVibrationChannelMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
@@ -4004,6 +4005,7 @@ class WhiteNoiseAppState private constructor(
         if (!appLockCredentialAvailable) {
             appLockScreenVisible = false
             appUnlockError = null
+            resumePendingInviteNotificationIdentityRefreshes()
         }
     }
 
@@ -4022,6 +4024,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLockScreenVisible = false
             appUnlockError = null
+            resumePendingInviteNotificationIdentityRefreshes()
         }
     }
 
@@ -4044,6 +4047,7 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        resumePendingInviteNotificationIdentityRefreshes()
         dismissVisibleConversationNotifications()
     }
 
@@ -4104,6 +4108,7 @@ class WhiteNoiseAppState private constructor(
                 requestAppUnlock()
             } else {
                 appLockScreenVisible = false
+                resumePendingInviteNotificationIdentityRefreshes()
             }
         }
     }
@@ -6976,33 +6981,47 @@ class WhiteNoiseAppState private constructor(
             // after all app-state lookups; if enrichment was skipped while locked,
             // keep the post redacted even if the app has since unlocked.
             val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
-            localNotificationPresenter.show(
-                update,
-                if (redactNotificationContent) null else conversationTitle,
-                if (redactNotificationContent) null else senderNameOverride,
-                if (redactNotificationContent) null else previewTextOverride,
-                if (redactNotificationContent) null else reactedToPreviewOverride,
-                if (redactNotificationContent) ReplyMediaKind.None else mediaKind,
-                recipientAccountSubtext =
-                    if (redactNotificationContent) {
-                        null
-                    } else {
-                        LocalNotificationFormatter.recipientAccountSubtext(
-                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
-                            recipientLabel = notificationRecipientName(update.accountRef),
-                        )
+            val posted =
+                localNotificationPresenter.show(
+                    update,
+                    if (redactNotificationContent) null else conversationTitle,
+                    if (redactNotificationContent) null else senderNameOverride,
+                    if (redactNotificationContent) null else previewTextOverride,
+                    if (redactNotificationContent) null else reactedToPreviewOverride,
+                    if (redactNotificationContent) ReplyMediaKind.None else mediaKind,
+                    recipientAccountSubtext =
+                        if (redactNotificationContent) {
+                            null
+                        } else {
+                            LocalNotificationFormatter.recipientAccountSubtext(
+                                signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
+                                recipientLabel = notificationRecipientName(update.accountRef),
+                            )
+                        },
+                    redactContent = redactNotificationContent,
+                    directShareEligible = !redactNotificationContent && update.accountRef == activeAccountRef,
+                    conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
+                    senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
+                    shortNpub = ::shortNpub,
+                    isPostStillAllowed = {
+                        !networkNotificationRecoverySuppressed &&
+                            notificationPostEpoch.isCurrent(postEpoch) &&
+                            shouldPostNotification(update, engineMuted)
                     },
-                redactContent = redactNotificationContent,
-                directShareEligible = !redactNotificationContent && update.accountRef == activeAccountRef,
-                conversationAvatarUrl = if (redactNotificationContent) null else conversationAvatarUrl,
-                senderAvatarUrl = if (redactNotificationContent) null else senderAvatarUrl,
-                shortNpub = ::shortNpub,
-                isPostStillAllowed = {
-                    !networkNotificationRecoverySuppressed &&
-                        notificationPostEpoch.isCurrent(postEpoch) &&
-                        shouldPostNotification(update, engineMuted)
-                },
-            )
+                )
+            if (posted && !redactNotificationContent && update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+                val displayedName = senderNameOverride ?: notificationDisplayNameHint(update.sender.displayName)
+                inviteNotificationIdentityRefreshStore.rememberPosted(
+                    update = update,
+                    displayedName = displayedName,
+                    displayedAvatarUrl = senderAvatarUrl,
+                )
+                synchronized(profilePresentationLock) {
+                    profilePresentations[update.sender.accountIdHex]
+                }?.let { presentation ->
+                    scheduleInviteNotificationIdentityRefresh(update.sender.accountIdHex, presentation)
+                }
+            }
         }
         // Coalesce the unread refresh across a burst instead of paying the
         // chat-list + per-group roster cost once per update. The scheduler
@@ -7073,6 +7092,122 @@ class WhiteNoiseAppState private constructor(
             preWarm = { preWarmNotificationAvatars(update, engineMuted) },
             post = { avatars -> postNotificationUpdate(update, avatars, postEpoch, engineMuted) },
         )
+    }
+
+    private fun scheduleInviteNotificationIdentityRefresh(
+        senderAccountIdHex: String,
+        presentation: ProfilePresentation,
+    ) {
+        val candidates =
+            inviteNotificationIdentityRefreshStore.refreshCandidates(
+                senderAccountIdHex = senderAccountIdHex,
+                resolvedName = presentation.displayName,
+                resolvedAvatarUrl = presentation.avatarUrl,
+            )
+        candidates.forEach(::launchInviteNotificationIdentityRefresh)
+    }
+
+    private fun resumePendingInviteNotificationIdentityRefreshes() {
+        inviteNotificationIdentityRefreshStore
+            .claimPendingRefreshes()
+            .forEach(::launchInviteNotificationIdentityRefresh)
+    }
+
+    private fun launchInviteNotificationIdentityRefresh(initialCandidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate) {
+        val update = initialCandidate.update
+        profileScope.launch {
+            var candidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = initialCandidate
+            while (candidate != null) {
+                val currentCandidate = candidate
+                var followUp: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = null
+                candidate = null
+                inviteNotificationIdentityRefreshStore.runClaimedRefresh(update.notificationKey) {
+                    if (appLockScreenVisible) {
+                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
+                        // Unlock can race between the visibility check and the
+                        // release above. Re-check after releasing so either this
+                        // coroutine or the unlock hook reclaims the deferred work.
+                        if (!appLockScreenVisible) {
+                            resumePendingInviteNotificationIdentityRefreshes()
+                        }
+                        return@runClaimedRefresh
+                    }
+                    if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
+                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
+                        return@runClaimedRefresh
+                    }
+                    val presentation =
+                        ProfilePresentation(
+                            displayName = currentCandidate.resolvedName,
+                            avatarUrl = currentCandidate.resolvedAvatarUrl,
+                        )
+                    val (posted, displayedPresentation) = refreshActiveInviteNotificationIdentity(update, presentation)
+                    if (posted) {
+                        followUp =
+                            inviteNotificationIdentityRefreshStore.markRefreshed(
+                                update = update,
+                                displayedName = displayedPresentation.displayName,
+                                displayedAvatarUrl = displayedPresentation.avatarUrl,
+                            )
+                    } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
+                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
+                    } else {
+                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
+                    }
+                }
+                candidate = followUp
+            }
+        }
+    }
+
+    private suspend fun refreshActiveInviteNotificationIdentity(
+        update: NotificationUpdateFfi,
+        presentation: ProfilePresentation,
+    ): Pair<Boolean, ProfilePresentation> {
+        val skipEnrichmentForLock = appLockScreenVisible
+        val resolvedName =
+            if (skipEnrichmentForLock) {
+                null
+            } else {
+                notificationSenderName(update)
+                    ?: presentation.displayName
+                    ?: notificationDisplayNameHint(update.sender.displayName)
+            }
+        val resolvedAvatarUrl =
+            if (skipEnrichmentForLock) {
+                null
+            } else {
+                bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
+                    ?: presentation.avatarUrl
+            }
+        // A lock can arrive during either suspending lookup above. Re-check after
+        // enrichment so the silent update cannot reveal identity behind the lock.
+        val redactContent = skipEnrichmentForLock || appLockScreenVisible
+        val displayedPresentation =
+            if (redactContent) ProfilePresentation(null, null) else ProfilePresentation(resolvedName, resolvedAvatarUrl)
+        val posted =
+            localNotificationPresenter.show(
+                update = update,
+                senderNameOverride = displayedPresentation.displayName,
+                recipientAccountSubtext =
+                    if (redactContent) {
+                        null
+                    } else {
+                        LocalNotificationFormatter.recipientAccountSubtext(
+                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
+                            recipientLabel = notificationRecipientName(update.accountRef),
+                        )
+                    },
+                redactContent = redactContent,
+                directShareEligible = !redactContent && update.accountRef == activeAccountRef,
+                silentUpdate = true,
+                shortNpub = ::shortNpub,
+                isPostStillAllowed = {
+                    !networkNotificationRecoverySuppressed &&
+                        localNotificationPresenter.isGroupInviteNotificationActive(update)
+                },
+            )
+        return posted to displayedPresentation
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
@@ -7213,6 +7348,7 @@ class WhiteNoiseAppState private constructor(
         if (changed) {
             profileRevision += 1
             bumpProfileAccountRevision(accountIdHex)
+            scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
         }
     }
 
