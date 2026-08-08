@@ -65,6 +65,29 @@ class ImageEditorRendererTest {
     }
 
     @Test
+    fun cropExcludedStrokeStaysOutsideTheOutputAfterRotation() {
+        val source = bitmap(100, 100, Color.BLUE)
+        val transformed =
+            ImageEditState(
+                strokes =
+                    listOf(
+                        EditorStroke.bounded(
+                            points = listOf(NormalizedPoint(0.5f, 0.5f)),
+                            colorArgb = Color.RED,
+                            widthFraction = 0.1f,
+                            eraser = false,
+                        ),
+                    ),
+            ).withCrop(NormalizedRect(0f, 0f, 0.4f, 0.4f)).rotateRight()
+
+        val rendered = ImageEditorRenderer.render(source, transformed)
+        assertNotNull(rendered)
+        val output = track(requireNotNull(rendered))
+
+        assertEquals(Color.BLUE, output.getPixel(0, output.height - 1))
+    }
+
+    @Test
     fun eraserRemovesOnlyMarkupAndRevealsTheSource() {
         val source = bitmap(100, 100, Color.BLUE)
         val diagonal = listOf(NormalizedPoint(0f, 0f), NormalizedPoint(1f, 1f))

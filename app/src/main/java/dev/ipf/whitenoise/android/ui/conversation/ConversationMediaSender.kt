@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -50,10 +51,12 @@ private class ConversationAttachmentReader(
         val quality = appState.mediaQuality
         // Animated images cannot survive JPEG recompression. Preserve their
         // original bytes at every quality setting rather than flattening them.
-        val animatedSource = MediaPipeline.isAnimatedImageSource(context.contentResolver, uri)
+        // An indeterminate provider/header probe also fails closed.
+        val animationStatus = MediaPipeline.imageAnimationStatus(context.contentResolver, uri)
+        val requiresOriginalBytes = animationStatus != ImageAnimationStatus.STATIC
         val original =
-            if (quality.preservesOriginalImageBytes || animatedSource) {
-                readOriginalImageAttachment(uri, remainingBytes, animatedSource)
+            if (quality.preservesOriginalImageBytes || requiresOriginalBytes) {
+                readOriginalImageAttachment(uri, remainingBytes, requiresOriginalBytes)
             } else {
                 null
             }
@@ -63,7 +66,7 @@ private class ConversationAttachmentReader(
     private fun readOriginalImageAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
-        animatedSource: Boolean,
+        requiresOriginalBytes: Boolean,
     ): ImageAttachmentReadOutcome? {
         val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         return when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
@@ -81,7 +84,7 @@ private class ConversationAttachmentReader(
                 ImageAttachmentReadOutcome(null, overflowed = true)
             MediaPipeline.OriginalImageReadResult.Failed,
             MediaPipeline.OriginalImageReadResult.Unsupported,
-            -> if (animatedSource) ImageAttachmentReadOutcome(null) else null
+            -> if (requiresOriginalBytes) ImageAttachmentReadOutcome(null) else null
         }
     }
 

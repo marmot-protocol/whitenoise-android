@@ -96,6 +96,15 @@ internal fun ownedEditorFileForUri(
     }
 }
 
+internal fun ownedEditorFileNamesForUris(
+    cacheRoot: File,
+    expectedAuthority: String,
+    uris: List<Uri>,
+): Set<String> =
+    uris
+        .mapNotNull { uri -> ownedEditorFileForUri(cacheRoot, expectedAuthority, uri)?.name }
+        .toSet()
+
 private fun isSafeEditorFilename(name: String): Boolean {
     val reserved = name.isBlank() || name == "." || name == ".."
     val containsSeparator = name.contains('/') || name.contains('\\')
@@ -121,14 +130,24 @@ internal fun sweepStaleImageEditorFiles(
     cacheRoot: File,
     maxAgeMillis: Long = IMAGE_EDITOR_ORPHAN_MAX_AGE_MS,
     nowMillis: Long = System.currentTimeMillis(),
+    protectedFileNames: Set<String> = emptySet(),
 ) {
     val directory = File(cacheRoot, MediaCacheDirs.IMAGE_EDITOR)
     val cutoff = nowMillis - maxAgeMillis.coerceAtLeast(0L)
     directory.listFiles().orEmpty().forEach { entry ->
         val partial = entry.name.endsWith(".tmp")
-        val stale = entry.lastModified() < cutoff
+        val stale = entry.name !in protectedFileNames && entry.lastModified() < cutoff
         if (entry.isFile && (partial || stale)) runCatching { entry.delete() }
     }
+}
+
+internal fun sweepIncompleteImageEditorFiles(cacheRoot: File) {
+    val directory = File(cacheRoot, MediaCacheDirs.IMAGE_EDITOR)
+    directory
+        .listFiles()
+        .orEmpty()
+        .filter { entry -> entry.isFile && entry.name.endsWith(".tmp") }
+        .forEach { entry -> runCatching { entry.delete() } }
 }
 
 private fun restrictToOwner(file: File) {

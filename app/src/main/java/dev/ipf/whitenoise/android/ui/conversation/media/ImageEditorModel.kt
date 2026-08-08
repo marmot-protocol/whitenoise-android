@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.net.Uri
+import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 internal const val IMAGE_EDITOR_MAX_STROKES = 128
 internal const val IMAGE_EDITOR_MAX_POINTS_PER_STROKE = 2_048
 internal const val IMAGE_EDITOR_MAX_HISTORY = 64
+internal const val IMAGE_EDITOR_MAX_RETAINED_POINTS = IMAGE_EDITOR_MAX_STROKES * IMAGE_EDITOR_MAX_POINTS_PER_STROKE * 2
 private const val MIN_CROP_SIZE = 0.05f
 private const val STROKE_SIMPLIFY_DISTANCE = 0.0025f
 private const val MIN_STROKE_WIDTH = 0.002f
@@ -154,7 +156,10 @@ internal data class ImageEditState(
             strokes =
                 strokes.map { stroke ->
                     stroke.copy(
-                        points = stroke.points.map { point -> NormalizedPoint(1f - point.y, point.x).normalized() },
+                        points =
+                            stroke.points.map { point ->
+                                NormalizedPoint(1f - point.y, point.x).normalized(clamp = false)
+                            },
                     )
                 },
         )
@@ -246,7 +251,7 @@ internal data class ImageEditHistory(
         } else {
             ImageEditHistory(
                 current = next,
-                undoStates = (undoStates + current).takeLast(IMAGE_EDITOR_MAX_HISTORY),
+                undoStates = retainHistoryWithinPointBudget(undoStates + current, next),
                 redoStates = emptyList(),
             )
         }
@@ -272,6 +277,24 @@ internal data class ImageEditHistory(
     fun reset(): ImageEditHistory = commit(ImageEditState())
 }
 
+private fun retainHistoryWithinPointBudget(
+    states: List<ImageEditState>,
+    current: ImageEditState,
+): List<ImageEditState> {
+    val limited = states.takeLast(IMAGE_EDITOR_MAX_HISTORY)
+    var retainedStart = limited.size
+    var retainedPoints = current.pointCount()
+    while (retainedStart > 0) {
+        val candidatePoints = limited[retainedStart - 1].pointCount()
+        if (candidatePoints > IMAGE_EDITOR_MAX_RETAINED_POINTS - retainedPoints) break
+        retainedPoints += candidatePoints
+        retainedStart -= 1
+    }
+    return limited.subList(retainedStart, limited.size).toList()
+}
+
+private fun ImageEditState.pointCount(): Int = strokes.sumOf { it.points.size }
+
 internal data class ImageEditability(
     val canEdit: Boolean,
     val isUnsupportedImage: Boolean,
@@ -279,10 +302,12 @@ internal data class ImageEditability(
 
 internal fun imageEditability(
     mime: String,
-    isAnimated: Boolean,
+    animationStatus: ImageAnimationStatus,
 ): ImageEditability {
     val isImage = mime.startsWith("image/", ignoreCase = true)
-    val unsupported = isImage && (isAnimated || mime.equals("image/avif", ignoreCase = true))
+    val unsupported =
+        isImage &&
+            (animationStatus != ImageAnimationStatus.STATIC || mime.equals("image/avif", ignoreCase = true))
     return ImageEditability(
         canEdit = isImage && !unsupported,
         isUnsupportedImage = unsupported,

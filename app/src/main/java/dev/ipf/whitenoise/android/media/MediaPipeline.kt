@@ -15,6 +15,12 @@ import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
+internal enum class ImageAnimationStatus {
+    STATIC,
+    ANIMATED,
+    INDETERMINATE,
+}
+
 /**
  * Local prep for outgoing image attachments. Two layers:
  *
@@ -136,6 +142,10 @@ object MediaPipeline {
 
     /** Header bytes read to sniff an animated source — GIF sig + WebP ANIM chunk sit near the start. */
     private const val ANIMATED_SNIFF_MAX_BYTES: Int = 4096
+    private const val WEBP_ANIMATION_FLAG: Int = 0x02
+    private const val WEBP_FIRST_CHUNK_OFFSET: Int = 12
+    private const val WEBP_CHUNK_TYPE_BYTES: Int = 4
+    private const val WEBP_FIRST_CHUNK_PAYLOAD_OFFSET: Int = 20
 
     /** Header bytes needed to recognize JPEG/PNG/WebP/GIF signatures. */
     private const val IMAGE_SIGNATURE_SNIFF_MAX_BYTES: Int = 12
@@ -278,16 +288,14 @@ object MediaPipeline {
     }
 
     /**
-     * Sniff the source header to decide whether [uri] is an animated image (GIF
-     * or animated WebP). Callers use this to keep animations off the static JPEG
-     * recompress path at any quality — a flatten would silently drop the motion.
-     * The GIF signature and the WebP `VP8X`/`ANIM` chunks live in the first few
-     * bytes, so a bounded header read is enough.
+     * Sniff the source header to decide whether [uri] is animated. An
+     * indeterminate provider read or bounded prefix must fail closed rather than
+     * flattening a possibly animated source.
      */
-    fun isAnimatedImageSource(
+    internal fun imageAnimationStatus(
         contentResolver: ContentResolver,
         uri: Uri,
-    ): Boolean {
+    ): ImageAnimationStatus {
         val header =
             try {
                 contentResolver.openInputStream(uri)?.use { stream ->
@@ -306,9 +314,41 @@ object MediaPipeline {
                 null
             } catch (_: RuntimeException) {
                 null
-            } ?: return false
-        return isGif(header) || hasWebpAnimChunk(header)
+            } ?: return ImageAnimationStatus.INDETERMINATE
+        return imageAnimationStatus(header)
     }
+
+    private fun imageAnimationStatus(header: ByteArray): ImageAnimationStatus =
+        when {
+            isGif(header) -> ImageAnimationStatus.ANIMATED
+            isJpeg(header) || isPng(header) -> ImageAnimationStatus.STATIC
+            !isWebp(header) || header.size < WEBP_FIRST_CHUNK_PAYLOAD_OFFSET ->
+                ImageAnimationStatus.INDETERMINATE
+            else -> webpAnimationStatus(header)
+        }
+
+    private fun webpAnimationStatus(header: ByteArray): ImageAnimationStatus =
+        when (ascii(header, WEBP_FIRST_CHUNK_OFFSET, WEBP_CHUNK_TYPE_BYTES)) {
+            "VP8X" ->
+                if (
+                    header.size > WEBP_FIRST_CHUNK_PAYLOAD_OFFSET &&
+                    u8(header, WEBP_FIRST_CHUNK_PAYLOAD_OFFSET) and WEBP_ANIMATION_FLAG != 0
+                ) {
+                    ImageAnimationStatus.ANIMATED
+                } else if (header.size > WEBP_FIRST_CHUNK_PAYLOAD_OFFSET) {
+                    ImageAnimationStatus.STATIC
+                } else {
+                    ImageAnimationStatus.INDETERMINATE
+                }
+            "VP8 ", "VP8L" -> ImageAnimationStatus.STATIC
+            "ANIM" -> ImageAnimationStatus.ANIMATED
+            else ->
+                if (hasWebpAnimChunk(header)) {
+                    ImageAnimationStatus.ANIMATED
+                } else {
+                    ImageAnimationStatus.INDETERMINATE
+                }
+        }
 
     /**
      * True when a decoded static thumbnail cache hit can be trusted before the

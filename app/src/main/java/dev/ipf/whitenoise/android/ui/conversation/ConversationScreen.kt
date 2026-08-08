@@ -154,7 +154,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.isOnlyMediaUriReferenceAt
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.ownedEditorFileNamesForUris
 import dev.ipf.whitenoise.android.ui.conversation.media.replaceMediaUriIfCurrent
+import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleImageEditorFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
@@ -1125,6 +1127,20 @@ internal fun ConversationScreen(
     }
     var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    LaunchedEffect(chat.id, pendingMediaUris) {
+        withContext(Dispatchers.IO) {
+            val liveEditorFiles =
+                ownedEditorFileNamesForUris(
+                    cacheRoot = context.cacheDir,
+                    expectedAuthority = "${context.packageName}.fileprovider",
+                    uris = pendingMediaUris,
+                )
+            sweepStaleImageEditorFiles(
+                cacheRoot = context.cacheDir,
+                protectedFileNames = liveEditorFiles,
+            )
+        }
     }
     LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaUris.size, pendingDocumentUris.size) {
         val capped =

@@ -95,6 +95,47 @@ class ImageEditorStorageTest {
     }
 
     @Test
+    fun startupPartialSweepLeavesCompletedDraftsForStateRestoration() {
+        val directory = File(root, MediaCacheDirs.IMAGE_EDITOR).apply { mkdirs() }
+        val partial = File(directory, "render.tmp").apply { writeBytes(byteArrayOf(1)) }
+        val completed = File(directory, "restored.png").apply { writeBytes(byteArrayOf(1)) }
+
+        sweepIncompleteImageEditorFiles(root)
+
+        assertFalse(partial.exists())
+        assertTrue(completed.exists())
+    }
+
+    @Test
+    fun restoredEditorUriProtectsCompletedDraftFromOrphanSweep() {
+        val directory = File(root, MediaCacheDirs.IMAGE_EDITOR).apply { mkdirs() }
+        val now = 10_000L
+        val restored =
+            File(directory, "restored.png").apply {
+                writeBytes(byteArrayOf(1))
+                setLastModified(1_000L)
+            }
+        val orphan =
+            File(directory, "orphan.png").apply {
+                writeBytes(byteArrayOf(1))
+                setLastModified(1_000L)
+            }
+        val authority = "dev.ipf.test.fileprovider"
+        val restoredUri = Uri.parse("content://$authority/image_editor/${restored.name}")
+
+        val protectedNames = ownedEditorFileNamesForUris(root, authority, listOf(restoredUri))
+        sweepStaleImageEditorFiles(
+            root,
+            maxAgeMillis = 5_000L,
+            nowMillis = now,
+            protectedFileNames = protectedNames,
+        )
+
+        assertTrue(restored.exists())
+        assertFalse(orphan.exists())
+    }
+
+    @Test
     fun conversationRecreationCleanupKeepsCompletedEditedRevisions() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         clearMediaTempFiles(context)

@@ -103,6 +103,24 @@ class ImageEditorModelTest {
     }
 
     @Test
+    fun populatedTransformHistoryStaysWithinAggregatePointBudget() {
+        val points = List(1_024) { index -> NormalizedPoint(index / 1_023f, 0.5f) }
+        val stroke = EditorStroke(points, 0xff000000.toInt(), 0.01f, eraser = false)
+        val populated = ImageEditState(strokes = List(16) { stroke })
+        var history = ImageEditHistory(current = populated)
+
+        repeat(IMAGE_EDITOR_MAX_HISTORY) {
+            history = history.commit(history.current.rotateRight())
+        }
+
+        val retainedPoints =
+            (history.undoStates + history.current + history.redoStates)
+                .sumOf { state -> state.strokes.sumOf { it.points.size } }
+        val budget = IMAGE_EDITOR_MAX_STROKES * IMAGE_EDITOR_MAX_POINTS_PER_STROKE * 2
+        assertTrue("retained $retainedPoints points, budget is $budget", retainedPoints <= budget)
+    }
+
+    @Test
     fun longDrawingGestureStaysBoundedAndKeepsItsLatestPoint() {
         var points = emptyList<NormalizedPoint>()
         val inputCount = IMAGE_EDITOR_MAX_POINTS_PER_STROKE * 3

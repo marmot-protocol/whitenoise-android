@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -116,12 +117,15 @@ private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android
                         val editability =
                             imageEditability(
                                 mime = effectiveMime,
-                                isAnimated =
-                                    isImage &&
-                                        MediaPipeline.isAnimatedImageSource(
+                                animationStatus =
+                                    if (isImage) {
+                                        MediaPipeline.imageAnimationStatus(
                                             context.contentResolver,
                                             item.uri,
-                                        ),
+                                        )
+                                    } else {
+                                        ImageAnimationStatus.STATIC
+                                    },
                             )
                         item.uri to
                             LocalPreviewMetadata(
