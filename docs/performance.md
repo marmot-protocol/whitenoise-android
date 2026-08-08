@@ -154,5 +154,5 @@ the benchmark JSON artifact, and link the relevant traces.
 
 | Journey | No compilation median | Baseline Profile median | Delta |
 | --- | ---: | ---: | ---: |
-| Cold startup → chat list | _ms_ | _ms_ | _%_ |
+| Cold startup → initial display | _ms_ | _ms_ | _%_ |
 | Open group → members visible | _ms_ | _ms_ | _%_ |

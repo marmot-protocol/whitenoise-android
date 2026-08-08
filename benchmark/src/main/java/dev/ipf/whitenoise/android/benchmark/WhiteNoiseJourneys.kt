@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -50,9 +52,11 @@ internal class WhiteNoiseJourneys {
         waitForTag(PerformanceTags.NEW_GROUP).click()
         waitForTag(PerformanceTags.CONTACT_PICKER_NEXT).click()
         waitForTag(PerformanceTags.CREATE_GROUP)
-        waitForEditableText().text = groupName
-        device.pressBack()
-        waitForTag(PerformanceTags.CREATE_GROUP).click()
+        waitForEditableText().click()
+        waitForFocusedEditableText().text = groupName
+        waitForEditableText(groupName)
+        dismissInputMethodIfVisible()
+        waitForEnabledTag(PerformanceTags.CREATE_GROUP).click()
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS, NETWORK_STATE_TIMEOUT_MS)
         return groupName
     }
@@ -90,6 +94,18 @@ internal class WhiteNoiseJourneys {
                 "Confirm the dev app is authenticated and the fixture is in the expected state."
         }
 
+    private fun waitForEnabledTag(
+        tag: String,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+    ): UiObject2 =
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = timeoutMs) {
+                matchesPerformanceTag(tag) && isEnabled && isClickable
+            },
+        ) {
+            "Timed out waiting for enabled test tag '$tag'."
+        }
+
     private fun waitForText(
         text: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
@@ -98,14 +114,47 @@ internal class WhiteNoiseJourneys {
             "Timed out waiting for fixture row '$text'."
         }
 
-    private fun waitForEditableText(): UiObject2 =
+    private fun waitForEditableText(expectedText: String? = null): UiObject2 =
         checkNotNull(
             device.onElementOrNull(timeoutMs = DEFAULT_TIMEOUT_MS) {
-                className?.toString() == EDIT_TEXT_CLASS && isEnabled
+                className?.toString() == EDIT_TEXT_CLASS &&
+                    isEnabled &&
+                    (expectedText == null || textAsString() == expectedText)
             },
         ) {
-            "Timed out waiting for the group-name text field."
+            if (expectedText == null) {
+                "Timed out waiting for the group-name text field."
+            } else {
+                "Timed out waiting for the group-name field to contain the entered text."
+            }
         }
+
+    private fun waitForFocusedEditableText(): UiObject2 =
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = DEFAULT_TIMEOUT_MS) {
+                className?.toString() == EDIT_TEXT_CLASS && isEnabled && isFocused
+            },
+        ) {
+            "Timed out waiting for the group-name text field to receive focus."
+        }
+
+    private fun dismissInputMethodIfVisible() {
+        if (!isInputMethodVisible()) return
+        check(device.pressBack()) { "Failed to dismiss the input method." }
+
+        val deadline = SystemClock.uptimeMillis() + DEFAULT_TIMEOUT_MS
+        while (isInputMethodVisible() && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(INPUT_METHOD_POLL_INTERVAL_MS)
+        }
+        check(!isInputMethodVisible()) { "Timed out waiting for the input method to close." }
+    }
+
+    private fun isInputMethodVisible(): Boolean =
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
+            .windows
+            .any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
 
     private fun AccessibilityNodeInfo.matchesPerformanceTag(tag: String): Boolean =
         contentDescription?.toString() == tag ||
@@ -117,5 +166,6 @@ internal class WhiteNoiseJourneys {
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
+        const val INPUT_METHOD_POLL_INTERVAL_MS = 100L
     }
 }

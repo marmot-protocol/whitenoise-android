@@ -108,6 +108,9 @@ for apk in "$dev_app_apk" "$app_apk" "$test_apk"; do
 done
 
 result_file="$(mktemp)"
+run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+device_output="/sdcard/Android/media/$test_package/$run_id"
+local_output="benchmark/build/outputs/manual/$run_id"
 cleanup() {
   local status=$?
   trap - EXIT
@@ -128,6 +131,11 @@ adb_cmd uninstall "$test_package" >/dev/null 2>&1 || true
 adb_cmd install -r -d -t "$app_apk"
 adb_cmd install -r -d -t "$test_apk"
 
+# Isolate this run from stale device output. Supplying the directory explicitly
+# also makes every pulled report and trace attributable to this invocation.
+adb_cmd shell rm -rf "$device_output"
+adb_cmd shell mkdir -p "$device_output"
+
 default_benchmark_classes="dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupNoCompilation,\
 dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupBaselineProfile,\
 dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupMembersNoCompilation,\
@@ -138,6 +146,7 @@ adb_cmd shell am instrument -w -r \
   -e class "$benchmark_classes" \
   -e groupName "$group_name" \
   -e androidx.benchmark.output.enable true \
+  -e additionalTestOutputDir "$device_output" \
   "$runner" | tee "$result_file"
 
 if rg -q "FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed" "$result_file"; then
@@ -145,11 +154,42 @@ if rg -q "FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process cra
   exit 1
 fi
 
-device_output="/sdcard/Android/media/$test_package"
-local_output="benchmark/build/outputs/manual/$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$local_output"
-if adb_cmd shell test -d "$device_output"; then
-  adb_cmd pull "$device_output" "$local_output"
+if ! rg -q '^INSTRUMENTATION_CODE: -1\r?$' "$result_file" ||
+  ! rg -q 'OK \([1-9][0-9]* tests?\)' "$result_file"; then
+  echo "Instrumentation did not report successful test completion." >&2
+  exit 1
 fi
 
-echo "Benchmark artifacts: $local_output"
+mkdir -p "$local_output"
+if ! adb_cmd shell test -d "$device_output"; then
+  echo "Benchmark output directory was not created: $device_output" >&2
+  exit 1
+fi
+adb_cmd pull "$device_output/." "$local_output"
+
+benchmark_report_count=0
+while IFS= read -r report; do
+  if ! jq -e '.benchmarks | type == "array" and length > 0' "$report" >/dev/null; then
+    echo "Benchmark report is missing measurement data: $report" >&2
+    exit 1
+  fi
+  ((benchmark_report_count += 1))
+done < <(find "$local_output" -type f -name '*-benchmarkData.json' -print)
+
+benchmark_trace_count=0
+while IFS= read -r trace; do
+  ((benchmark_trace_count += 1))
+done < <(find "$local_output" -type f \( -name '*.perfetto-trace' -o -name '*.trace' \) -print)
+
+if ((benchmark_report_count == 0)); then
+  echo "No fresh benchmark JSON report was pulled from $device_output." >&2
+  exit 1
+fi
+if ((benchmark_trace_count == 0)); then
+  echo "No fresh benchmark trace was pulled from $device_output." >&2
+  exit 1
+fi
+
+adb_cmd shell rm -rf "$device_output"
+
+echo "Benchmark artifacts: $local_output ($benchmark_report_count JSON, $benchmark_trace_count traces)"
