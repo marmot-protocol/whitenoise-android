@@ -370,6 +370,7 @@ internal fun FlowQuickActionRow(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconContentDescription: String? = null,
     enabled: Boolean = true,
 ) {
     Row(
@@ -390,7 +391,7 @@ internal fun FlowQuickActionRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = iconContentDescription, tint = MaterialTheme.colorScheme.primary)
         }
         Text(title, style = MaterialTheme.typography.bodyLarge)
     }

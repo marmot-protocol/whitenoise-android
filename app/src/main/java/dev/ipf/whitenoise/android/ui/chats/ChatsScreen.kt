@@ -107,6 +107,8 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.delay
@@ -868,7 +870,14 @@ internal fun ChatsScreen(
                     containerColor = actionColors.container,
                     contentColor = actionColors.content,
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.new_message))
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription =
+                            performanceTestContentDescription(
+                                stringResource(R.string.new_message),
+                                PerformanceTestTags.NEW_MESSAGE,
+                            ),
+                    )
                 }
             }
         },

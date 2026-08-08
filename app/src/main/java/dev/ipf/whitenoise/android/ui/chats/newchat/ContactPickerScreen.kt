@@ -45,6 +45,8 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
@@ -191,7 +193,14 @@ internal fun ContactPickerScreen(
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
-                    Icon(confirmIcon, contentDescription = confirmLabel)
+                    Icon(
+                        confirmIcon,
+                        contentDescription =
+                            performanceTestContentDescription(
+                                confirmLabel,
+                                PerformanceTestTags.CONTACT_PICKER_NEXT,
+                            ),
+                    )
                 }
             }
         },

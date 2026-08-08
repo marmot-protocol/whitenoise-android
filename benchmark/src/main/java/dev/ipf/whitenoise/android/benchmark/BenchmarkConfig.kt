@@ -1,0 +1,32 @@
+package dev.ipf.whitenoise.android.benchmark
+
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assume.assumeTrue
+
+internal object BenchmarkConfig {
+    const val TARGET_PACKAGE = "dev.ipf.whitenoise.android.dev"
+
+    private val arguments
+        get() = InstrumentationRegistry.getArguments()
+
+    val groupName: String?
+        get() = arguments.getString("groupName")?.trim()?.takeIf(String::isNotEmpty)
+
+    val inviteName: String?
+        get() = arguments.getString("inviteName")?.trim()?.takeIf(String::isNotEmpty)
+
+    val createdGroupPrefix: String?
+        get() = arguments.getString("createdGroupPrefix")?.trim()?.takeIf(String::isNotEmpty)
+
+    fun requireFixture(
+        value: String?,
+        argumentName: String,
+    ): String {
+        assumeTrue(
+            "Pass -Pandroid.testInstrumentationRunnerArguments.$argumentName=<value> " +
+                "after preparing the authenticated dev fixture.",
+            value != null,
+        )
+        return checkNotNull(value)
+    }
+}

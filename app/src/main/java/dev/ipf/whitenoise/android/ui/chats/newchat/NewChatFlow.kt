@@ -64,6 +64,8 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 internal enum class NewGroupCreateStage {
@@ -471,6 +473,11 @@ private fun NewMessageScreen(
                             icon = Icons.Default.Group,
                             title = stringResource(R.string.new_group),
                             onClick = onNewGroup,
+                            iconContentDescription =
+                                performanceTestContentDescription(
+                                    null,
+                                    PerformanceTestTags.NEW_GROUP,
+                                ),
                         )
                     }
                     item {

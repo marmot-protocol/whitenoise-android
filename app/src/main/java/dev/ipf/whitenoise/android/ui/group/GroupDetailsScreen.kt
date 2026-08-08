@@ -146,6 +146,8 @@ import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -1208,7 +1210,10 @@ internal fun GroupDetailsScreen(
                         )
                     } else {
                         Row(
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -1226,7 +1231,11 @@ internal fun GroupDetailsScreen(
                             ) {
                                 Icon(
                                     if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
-                                    contentDescription = stringResource(R.string.search_members),
+                                    contentDescription =
+                                        performanceTestContentDescription(
+                                            stringResource(R.string.search_members),
+                                            PerformanceTestTags.MEMBER_LIST,
+                                        ),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }

@@ -52,6 +52,23 @@ jobs:
       - name: Compile (Kotlin)
         run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin --no-daemon --stacktrace
 
+      # Release-mode Compose compiler output identifies unstable classes and
+      # restartable/skippable composables using the same optimizations users
+      # receive. Keep it opt-in locally; publish it on every CI build.
+      - name: Compose compiler metrics and stability reports
+        run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-daemon --stacktrace
+
+      - name: Upload Compose compiler reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compose-compiler-reports
+          path: |
+            app/build/compose-metrics/
+            app/build/compose-reports/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Unit tests
         run: ./gradlew :app:testDevZapstoreDebugUnitTest :app:testDevPlayDebugUnitTest --no-daemon --stacktrace
 
@@ -66,7 +83,7 @@ jobs:
         run: ./gradlew :app:verifyRoborazziDevZapstoreDebug :app:verifyRoborazziDevPlayDebug --no-daemon --stacktrace
 
       - name: ktlint
-        run: ./gradlew :app:ktlintCheck --no-daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck --no-daemon --stacktrace
 
       - name: detekt
         run: ./gradlew :app:detekt --no-daemon --stacktrace
