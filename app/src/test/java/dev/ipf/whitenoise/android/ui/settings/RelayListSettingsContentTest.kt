@@ -43,13 +43,14 @@ class RelayListSettingsContentTest {
     private val app = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun configuredRelayAppearsOnceWithCompleteStatus() {
+    fun availableRelayAppearsOnceWithPublicationNeutralStatus() {
         val relay = "wss://post.example.com"
 
         render(relayLists(nip65 = listOf(relay), inbox = listOf("wss://inbox.example.com")))
 
         composeRule.onAllNodesWithText(relay).assertCountEquals(1)
         assertEquals("My relays", app.getString(R.string.account_relay_lists))
+        assertEquals("Both relay lists are available.", app.getString(R.string.all_relay_lists_published))
         composeRule.onNodeWithText(app.getString(R.string.all_relay_lists_published)).assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.relay_posting_help)).assertIsDisplayed()
     }
@@ -65,8 +66,10 @@ class RelayListSettingsContentTest {
 
         render(lists)
 
+        val unavailableStatus = app.getString(R.string.missing_relay_lists, app.getString(R.string.inbox))
+        assertEquals("Unavailable relay lists: ${app.getString(R.string.inbox)}", unavailableStatus)
         composeRule
-            .onNodeWithText(app.getString(R.string.missing_relay_lists, app.getString(R.string.inbox)))
+            .onNodeWithText(unavailableStatus)
             .assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.inbox)).performClick()
         composeRule.onNodeWithText(app.getString(R.string.relay_inbox_help)).assertIsDisplayed()

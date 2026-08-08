@@ -471,8 +471,8 @@
     <string name="key_package">Pacote de chaves</string>
     <string name="published_relay_lists">Listas de retransmissão publicadas</string>
     <string name="no_relay_projection">O status dos relays ainda não está disponível.</string>
-    <string name="all_relay_lists_published">As duas listas de relays estão configuradas.</string>
-    <string name="missing_relay_lists">Nenhum relay configurado para: %1$s</string>
+    <string name="all_relay_lists_published">As duas listas de relays estão disponíveis.</string>
+    <string name="missing_relay_lists">Listas de relays indisponíveis: %1$s</string>
     <string name="not_published">Não publicado</string>
     <string name="publishing">Publicação</string>
     <string name="key_package_publishing_help">Republica o pacote de chaves atual na lista de relays desta conta, ou alterna para um novo. Pacotes antigos permanecem nos relays até serem excluídos.</string>

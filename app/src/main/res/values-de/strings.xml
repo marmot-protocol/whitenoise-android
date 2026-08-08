@@ -471,8 +471,8 @@
     <string name="key_package">Schlüsselpaket</string>
     <string name="published_relay_lists">Veröffentlichte Relay-Listen</string>
     <string name="no_relay_projection">Der Relay-Status ist noch nicht verfügbar.</string>
-    <string name="all_relay_lists_published">Beide Relay-Listen sind konfiguriert.</string>
-    <string name="missing_relay_lists">Keine Relays für %1$s konfiguriert</string>
+    <string name="all_relay_lists_published">Beide Relay-Listen sind verfügbar.</string>
+    <string name="missing_relay_lists">Nicht verfügbare Relay-Listen: %1$s</string>
     <string name="not_published">Nicht veröffentlicht</string>
     <string name="publishing">Veröffentlichung</string>
     <string name="key_package_publishing_help">Veröffentlicht das aktuelle Schlüsselpaket erneut auf der Relay-Liste dieses Kontos oder rotiert zu einem neuen. Alte Pakete bleiben auf Relays, bis sie gelöscht werden.</string>

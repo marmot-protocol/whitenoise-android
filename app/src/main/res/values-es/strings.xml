@@ -471,8 +471,8 @@
     <string name="key_package">Paquete de claves</string>
     <string name="published_relay_lists">Listas de retransmisión publicadas</string>
     <string name="no_relay_projection">El estado de los relés aún no está disponible.</string>
-    <string name="all_relay_lists_published">Ambas listas de relés están configuradas.</string>
-    <string name="missing_relay_lists">No hay relés configurados para: %1$s</string>
+    <string name="all_relay_lists_published">Ambas listas de relés están disponibles.</string>
+    <string name="missing_relay_lists">Listas de relés no disponibles: %1$s</string>
     <string name="not_published">No publicado</string>
     <string name="publishing">Publicación</string>
     <string name="key_package_publishing_help">Vuelve a publicar el paquete de claves actual en la lista de relés de esta cuenta, o rota a uno nuevo. Los paquetes antiguos permanecen en los relés hasta que se eliminen.</string>

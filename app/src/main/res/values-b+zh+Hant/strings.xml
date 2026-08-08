@@ -462,8 +462,8 @@
     <string name="key_package">金鑰套件</string>
     <string name="published_relay_lists">已發布的中繼列表</string>
     <string name="no_relay_projection">中繼狀態暫時無法使用。</string>
-    <string name="all_relay_lists_published">兩個中繼列表都已設定。</string>
-    <string name="missing_relay_lists">尚未設定中繼：%1$s</string>
+    <string name="all_relay_lists_published">兩個中繼列表皆可用。</string>
+    <string name="missing_relay_lists">無法使用的中繼列表：%1$s</string>
     <string name="not_published">未發表</string>
     <string name="publishing">出版</string>
     <string name="key_package_publishing_help">將目前金鑰包重新發布到此帳戶的中繼清單，或輪換為新的金鑰包。舊包會保留在中繼上，直到被刪除。</string>

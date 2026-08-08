@@ -708,8 +708,8 @@
     <string name="key_package">Key Package</string>
     <string name="published_relay_lists">Published Relay Lists</string>
     <string name="no_relay_projection">Relay status isn\'t available yet.</string>
-    <string name="all_relay_lists_published">Both relay lists are configured.</string>
-    <string name="missing_relay_lists">No relays configured for: %1$s</string>
+    <string name="all_relay_lists_published">Both relay lists are available.</string>
+    <string name="missing_relay_lists">Unavailable relay lists: %1$s</string>
     <string name="not_published">Not published</string>
     <string name="publishing">Publishing</string>
     <string name="key_package_publishing_help">Republish the current key package to this account\'s relay list, or rotate to a fresh one. Old packages stay on relays until deleted.</string>

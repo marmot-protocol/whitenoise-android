@@ -462,8 +462,8 @@
     <string name="key_package">密钥包</string>
     <string name="published_relay_lists">已发布的中继列表</string>
     <string name="no_relay_projection">中继状态暂不可用。</string>
-    <string name="all_relay_lists_published">两个中继列表均已配置。</string>
-    <string name="missing_relay_lists">未配置中继：%1$s</string>
+    <string name="all_relay_lists_published">两个中继列表均可用。</string>
+    <string name="missing_relay_lists">不可用的中继列表：%1$s</string>
     <string name="not_published">未发表</string>
     <string name="publishing">出版</string>
     <string name="key_package_publishing_help">将当前密钥包重新发布到此账户的中继列表，或轮换为新的密钥包。旧包会保留在中继上，直到被删除。</string>
