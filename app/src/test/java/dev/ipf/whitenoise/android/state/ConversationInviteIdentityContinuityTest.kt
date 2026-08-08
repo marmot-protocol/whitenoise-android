@@ -43,6 +43,19 @@ class ConversationInviteIdentityContinuityTest {
         assertEquals(2, resolvedRoster.memberCount)
     }
 
+    @Test
+    fun selfOnlyRosterKeepsAcceptedInvitePeerUntilPeerArrives() {
+        val selfOnlyRoster =
+            conversationIdentityProjection(
+                members = listOf(member(SELF, local = true)),
+                activeAccountIdHex = SELF,
+                acceptedInvitePeerAccount = INVITER,
+            )
+
+        assertEquals(INVITER, selfOnlyRoster.otherMemberAccount)
+        assertEquals(2, selfOnlyRoster.memberCount)
+    }
+
     private fun member(
         memberIdHex: String,
         local: Boolean = false,

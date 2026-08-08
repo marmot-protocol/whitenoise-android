@@ -7084,14 +7084,25 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         presentation: ProfilePresentation,
     ): Pair<Boolean, ProfilePresentation> {
-        val redactContent = appLockScreenVisible
+        val skipEnrichmentForLock = appLockScreenVisible
         val resolvedName =
-            notificationSenderName(update)
-                ?: presentation.displayName
-                ?: notificationDisplayNameHint(update.sender.displayName)
+            if (skipEnrichmentForLock) {
+                null
+            } else {
+                notificationSenderName(update)
+                    ?: presentation.displayName
+                    ?: notificationDisplayNameHint(update.sender.displayName)
+            }
         val resolvedAvatarUrl =
-            bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
-                ?: presentation.avatarUrl
+            if (skipEnrichmentForLock) {
+                null
+            } else {
+                bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
+                    ?: presentation.avatarUrl
+            }
+        // A lock can arrive during either suspending lookup above. Re-check after
+        // enrichment so the silent update cannot reveal identity behind the lock.
+        val redactContent = skipEnrichmentForLock || appLockScreenVisible
         val displayedPresentation =
             if (redactContent) ProfilePresentation(null, null) else ProfilePresentation(resolvedName, resolvedAvatarUrl)
         val posted =

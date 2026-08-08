@@ -5268,7 +5268,12 @@ internal fun conversationIdentityProjection(
     acceptedInvitePeerAccount: String?,
 ): ConversationIdentityProjection {
     val memberCount = GroupProjector.uniqueMemberCount(members)
-    val rosterPeer = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
+    val rosterPeer =
+        members
+            .firstOrNull { member ->
+                member.memberIdHex.isNotBlank() &&
+                    !GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+            }?.memberIdHex
     val continuityPeer = acceptedInvitePeerAccount?.takeIf(String::isNotBlank)
     return ConversationIdentityProjection(
         otherMemberAccount = rosterPeer ?: continuityPeer,
@@ -10084,7 +10089,14 @@ class ConversationController(
         // otherwise the full roster (self included) would restore the member
         // count and re-enable the composer right after a leave (issue #787).
         members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
-        acceptedInvitePeerAccount = null
+        if (
+            members.any { member ->
+                member.memberIdHex.isNotBlank() &&
+                    !GroupProjector.isActiveAccountMember(member, conversationAccountIdHex)
+            }
+        ) {
+            acceptedInvitePeerAccount = null
+        }
         membersLoaded = true
         membersVerified = true
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
