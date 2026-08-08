@@ -62,6 +62,77 @@ class ProfileAddableGroupsTest {
     }
 
     @Test
+    fun unresolvedAdminGroupsSurfaceAsLoadingInsteadOfTerminalEmpty() {
+        val state =
+            profileAddableGroupsState(
+                items = listOf(item("pending-roster", name = "Friends", admins = listOf("self"), members = null)),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertTrue(state.groups.isEmpty())
+        assertEquals(setOf("pending-roster"), state.pendingGroupIds)
+        assertEquals(ProfileGroupPickerLoadState.LOADING, state.loadState)
+    }
+
+    @Test
+    fun failedUnresolvedRosterOffersRetryWithoutHidingKnownGroups() {
+        val state =
+            profileAddableGroupsState(
+                items =
+                    listOf(
+                        item("ready", name = "Ready", admins = listOf("self"), members = listOf("self")),
+                        item("failed", name = "Failed", admins = listOf("self"), members = null),
+                    ),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+                failedGroupIds = setOf("FAILED"),
+            )
+
+        assertEquals(listOf("ready"), state.groups.map { it.group.groupIdHex })
+        assertEquals(setOf("failed"), state.pendingGroupIds)
+        assertEquals(ProfileGroupPickerLoadState.FAILED, state.loadState)
+    }
+
+    @Test
+    fun promotableGroupsRequireSharedMembershipAndNonAdminTarget() {
+        val state =
+            profilePromotableGroupsState(
+                items =
+                    listOf(
+                        item("eligible", name = "Friends", admins = listOf("self"), members = listOf("self", "target")),
+                        item("target-absent", name = "Other", admins = listOf("self"), members = listOf("self")),
+                        item(
+                            "already-admin",
+                            name = "Admins",
+                            admins = listOf("self", "target"),
+                            members = listOf("self", "target"),
+                        ),
+                        item("not-admin", name = "No access", admins = emptyList(), members = listOf("self", "target")),
+                    ),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertEquals(listOf("eligible"), state.groups.map { it.group.groupIdHex })
+        assertEquals(ProfileGroupPickerLoadState.READY, state.loadState)
+    }
+
+    @Test
+    fun unresolvedManagedGroupKeepsGeneralAdminPathLoading() {
+        val state =
+            profilePromotableGroupsState(
+                items = listOf(item("pending-roster", name = "Friends", admins = listOf("self"), members = null)),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertTrue(state.groups.isEmpty())
+        assertEquals(setOf("pending-roster"), state.pendingGroupIds)
+        assertEquals(ProfileGroupPickerLoadState.LOADING, state.loadState)
+    }
+
+    @Test
     fun inviteToastCoversSuccessPartialAndFailureCounts() {
         assertInviteToast(
             outcome = ProfileGroupInviteOutcome(attempted = 1, failures = 0),
@@ -116,14 +187,14 @@ class ProfileAddableGroupsTest {
         groupId: String,
         name: String,
         admins: List<String>,
-        members: List<String>,
+        members: List<String>?,
         pending: Boolean = false,
     ) = ChatListItem(
         group = group(groupId, name, admins, pending),
         latest = null,
         otherMemberAccount = null,
-        memberCount = members.size,
-        memberSnapshot = GroupMemberSnapshot(members.map { member(it) }),
+        memberCount = members?.size ?: 0,
+        memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
     )
 
     private fun group(
