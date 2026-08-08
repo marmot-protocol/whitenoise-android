@@ -42,8 +42,50 @@ esac
   -Pandroid.injected.build.abi="$device_abi" \
   --no-daemon
 
-app_apk="app/build/intermediates/apk/devZapstore/benchmarkRelease/app-dev-zapstore-$device_abi-benchmarkRelease.apk"
-test_apk="benchmark/build/intermediates/apk/devZapstore/benchmarkRelease/benchmark-dev-zapstore-benchmarkRelease.apk"
+resolve_apk() {
+  local module_dir="$1"
+  local application_id="$2"
+  local variant_name="devZapstoreBenchmarkRelease"
+  local apk_root metadata output_file candidate
+
+  # AGP writes regular assembly outputs under outputs/apk. Device-targeted
+  # builds created with android.injected.build.abi may instead use
+  # intermediates/apk, so resolve the artifact from AGP's metadata in either
+  # location rather than depending on a generated filename or directory shape.
+  for apk_root in "$module_dir/build/outputs/apk" "$module_dir/build/intermediates/apk"; do
+    [[ -d "$apk_root" ]] || continue
+    while IFS= read -r metadata; do
+      if [[ "$(jq -r '.applicationId' "$metadata")" != "$application_id" ]] ||
+        [[ "$(jq -r '.variantName' "$metadata")" != "$variant_name" ]]; then
+        continue
+      fi
+
+      output_file="$(
+        jq -er --arg abi "$device_abi" '
+          .elements
+          | map(
+              select(
+                ([.filters[]? | select(.filterType == "ABI") | .value]) as $abis
+                | ($abis | length == 0) or ($abis | index($abi) != null)
+              )
+            )
+          | if length == 1 then .[0].outputFile else empty end
+        ' "$metadata"
+      )" || continue
+      candidate="$(dirname "$metadata")/$output_file"
+      if [[ -f "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done < <(find "$apk_root" -type f -name output-metadata.json -print | sort)
+  done
+
+  echo "Could not resolve $application_id ($variant_name) from AGP output metadata." >&2
+  return 1
+}
+
+app_apk="$(resolve_apk app "$target_package")"
+test_apk="$(resolve_apk benchmark "$test_package")"
 
 for apk in "$app_apk" "$test_apk"; do
   if [[ ! -f "$apk" ]]; then
