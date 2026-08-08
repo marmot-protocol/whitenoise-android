@@ -915,6 +915,30 @@
     <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
     <string name="media_attachment_add_more">Добавить ещё</string>
     <string name="media_attachment_remove">Удалить вложение</string>
+    <string name="image_editor_edit">Редактировать фото</string>
+    <string name="image_editor_title">Редактировать фото</string>
+    <string name="image_editor_crop">Обрезать</string>
+    <string name="image_editor_draw">Рисовать</string>
+    <string name="image_editor_rotate_left">Повернуть влево</string>
+    <string name="image_editor_rotate_right">Повернуть вправо</string>
+    <string name="image_editor_undo">Отменить</string>
+    <string name="image_editor_redo">Повторить</string>
+    <string name="image_editor_reset">Сбросить изменения</string>
+
+    <string name="image_editor_eraser">Ластик</string>
+    <string name="image_editor_width">Толщина линии</string>
+    <string name="image_editor_aspect_free">Свободно</string>
+
+    <string name="image_editor_color_red">Красное перо</string>
+    <string name="image_editor_color_yellow">Жёлтое перо</string>
+    <string name="image_editor_color_green">Зелёное перо</string>
+    <string name="image_editor_color_blue">Синее перо</string>
+    <string name="image_editor_color_white">Белое перо</string>
+    <string name="image_editor_unsupported">Это вложение нельзя редактировать. Оно будет отправлено без изменений.</string>
+    <string name="image_editor_decode_failed">Не удалось открыть это фото для редактирования.</string>
+    <string name="image_editor_save_failed">Не удалось сохранить отредактированное фото.</string>
+    <string name="image_editor_crop_hint">Перетащите угол для обрезки</string>
+    <string name="image_editor_draw_hint">Рисуйте на фото</string>
     <string name="voice_message_record">Удерживайте для записи</string>
     <string name="voice_message_recording">Запись…</string>
     <string name="voice_message_release_to_send">Отпустите для отправки · потяните для отмены</string>

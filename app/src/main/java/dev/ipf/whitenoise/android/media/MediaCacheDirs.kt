@@ -13,4 +13,5 @@ object MediaCacheDirs {
     const val VIDEO = "video_attachments"
     const val SHARED = "shared_media"
     const val COMPOSER_PASTE = "composer_paste"
+    const val IMAGE_EDITOR = "image_editor"
 }

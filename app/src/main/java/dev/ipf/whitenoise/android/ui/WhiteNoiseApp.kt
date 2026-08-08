@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
+import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleImageEditorFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingScreen
@@ -80,6 +81,7 @@ fun WhiteNoiseApp(
         // any external reader has long since finished with are deleted.
         withContext(Dispatchers.IO) {
             sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
+            sweepStaleImageEditorFiles(context.cacheDir)
         }
     }
     LaunchedEffect(

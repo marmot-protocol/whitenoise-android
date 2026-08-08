@@ -304,6 +304,8 @@ object MediaPipeline {
                 null
             } catch (_: SecurityException) {
                 null
+            } catch (_: RuntimeException) {
+                null
             } ?: return false
         return isGif(header) || hasWebpAnimChunk(header)
     }
@@ -422,6 +424,11 @@ object MediaPipeline {
         } catch (_: java.io.IOException) {
             null
         } catch (_: SecurityException) {
+            null
+        } catch (_: RuntimeException) {
+            // ContentProvider implementations can surface stale/invalid URI
+            // failures as IllegalArgumentException, NPE, or decoder-specific
+            // runtime exceptions. Treat them as an unavailable preview.
             null
         } catch (_: OutOfMemoryError) {
             null

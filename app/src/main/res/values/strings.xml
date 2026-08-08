@@ -1100,6 +1100,32 @@
     <string name="relative_time_yesterday">Yesterday</string>
     <string name="media_attachment_add_more">Add more</string>
     <string name="media_attachment_remove">Remove attachment</string>
+    <string name="image_editor_edit">Edit photo</string>
+    <string name="image_editor_title">Edit photo</string>
+    <string name="image_editor_crop">Crop</string>
+    <string name="image_editor_draw">Draw</string>
+    <string name="image_editor_rotate_left">Rotate left</string>
+    <string name="image_editor_rotate_right">Rotate right</string>
+    <string name="image_editor_undo">Undo</string>
+    <string name="image_editor_redo">Redo</string>
+    <string name="image_editor_reset">Reset edits</string>
+
+    <string name="image_editor_eraser">Eraser</string>
+    <string name="image_editor_width">Stroke width</string>
+    <string name="image_editor_aspect_free">Free</string>
+    <string name="image_editor_aspect_square" translatable="false">1:1</string>
+    <string name="image_editor_aspect_four_three" translatable="false">4:3</string>
+    <string name="image_editor_aspect_sixteen_nine" translatable="false">16:9</string>
+    <string name="image_editor_color_red">Red pen</string>
+    <string name="image_editor_color_yellow">Yellow pen</string>
+    <string name="image_editor_color_green">Green pen</string>
+    <string name="image_editor_color_blue">Blue pen</string>
+    <string name="image_editor_color_white">White pen</string>
+    <string name="image_editor_unsupported">This attachment can’t be edited. It will be sent unchanged.</string>
+    <string name="image_editor_decode_failed">Couldn’t open this photo for editing.</string>
+    <string name="image_editor_save_failed">Couldn’t save the edited photo.</string>
+    <string name="image_editor_crop_hint">Drag a corner to crop</string>
+    <string name="image_editor_draw_hint">Draw on the photo</string>
     <string name="voice_message_record">Hold to record voice message</string>
     <string name="voice_message_recording">Recording…</string>
     <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>

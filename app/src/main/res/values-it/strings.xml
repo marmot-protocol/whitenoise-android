@@ -881,6 +881,30 @@
     <string name="group_system_you_avatar_changed">Hai cambiato l\'immagine del gruppo</string>
     <string name="media_attachment_add_more">Aggiungi altro</string>
     <string name="media_attachment_remove">Rimuovi allegato</string>
+    <string name="image_editor_edit">Modifica foto</string>
+    <string name="image_editor_title">Modifica foto</string>
+    <string name="image_editor_crop">Ritaglia</string>
+    <string name="image_editor_draw">Disegna</string>
+    <string name="image_editor_rotate_left">Ruota a sinistra</string>
+    <string name="image_editor_rotate_right">Ruota a destra</string>
+    <string name="image_editor_undo">Annulla</string>
+    <string name="image_editor_redo">Ripeti</string>
+    <string name="image_editor_reset">Reimposta modifiche</string>
+
+    <string name="image_editor_eraser">Gomma</string>
+    <string name="image_editor_width">Spessore tratto</string>
+    <string name="image_editor_aspect_free">Libero</string>
+
+    <string name="image_editor_color_red">Penna rossa</string>
+    <string name="image_editor_color_yellow">Penna gialla</string>
+    <string name="image_editor_color_green">Penna verde</string>
+    <string name="image_editor_color_blue">Penna blu</string>
+    <string name="image_editor_color_white">Penna bianca</string>
+    <string name="image_editor_unsupported">Questo allegato non può essere modificato. Verrà inviato senza modifiche.</string>
+    <string name="image_editor_decode_failed">Impossibile aprire questa foto per modificarla.</string>
+    <string name="image_editor_save_failed">Impossibile salvare la foto modificata.</string>
+    <string name="image_editor_crop_hint">Trascina un angolo per ritagliare</string>
+    <string name="image_editor_draw_hint">Disegna sulla foto</string>
     <string name="voice_message_record">Tieni premuto per registrare</string>
     <string name="voice_message_recording">Registrazione…</string>
     <string name="voice_message_release_to_send">Rilascia per inviare · trascina per annullare</string>

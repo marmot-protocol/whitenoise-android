@@ -881,6 +881,30 @@
     <string name="group_system_you_avatar_changed">Você alterou a imagem do grupo</string>
     <string name="media_attachment_add_more">Adicionar mais</string>
     <string name="media_attachment_remove">Remover anexo</string>
+    <string name="image_editor_edit">Editar foto</string>
+    <string name="image_editor_title">Editar foto</string>
+    <string name="image_editor_crop">Recortar</string>
+    <string name="image_editor_draw">Desenhar</string>
+    <string name="image_editor_rotate_left">Rodar à esquerda</string>
+    <string name="image_editor_rotate_right">Rodar à direita</string>
+    <string name="image_editor_undo">Desfazer</string>
+    <string name="image_editor_redo">Refazer</string>
+    <string name="image_editor_reset">Repor edições</string>
+
+    <string name="image_editor_eraser">Borracha</string>
+    <string name="image_editor_width">Espessura do traço</string>
+    <string name="image_editor_aspect_free">Livre</string>
+
+    <string name="image_editor_color_red">Caneta vermelha</string>
+    <string name="image_editor_color_yellow">Caneta amarela</string>
+    <string name="image_editor_color_green">Caneta verde</string>
+    <string name="image_editor_color_blue">Caneta azul</string>
+    <string name="image_editor_color_white">Caneta branca</string>
+    <string name="image_editor_unsupported">Este anexo não pode ser editado. Será enviado sem alterações.</string>
+    <string name="image_editor_decode_failed">Não foi possível abrir esta foto para edição.</string>
+    <string name="image_editor_save_failed">Não foi possível guardar a foto editada.</string>
+    <string name="image_editor_crop_hint">Arraste um canto para recortar</string>
+    <string name="image_editor_draw_hint">Desenhe na foto</string>
     <string name="voice_message_record">Segure para gravar</string>
     <string name="voice_message_recording">A gravar…</string>
     <string name="voice_message_release_to_send">Solte para enviar · deslize para cancelar</string>

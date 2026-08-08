@@ -864,6 +864,30 @@
     <string name="group_system_you_avatar_changed">你更换了群组头像</string>
     <string name="media_attachment_add_more">添加更多</string>
     <string name="media_attachment_remove">移除附件</string>
+    <string name="image_editor_edit">编辑照片</string>
+    <string name="image_editor_title">编辑照片</string>
+    <string name="image_editor_crop">裁剪</string>
+    <string name="image_editor_draw">绘制</string>
+    <string name="image_editor_rotate_left">向左旋转</string>
+    <string name="image_editor_rotate_right">向右旋转</string>
+    <string name="image_editor_undo">撤销</string>
+    <string name="image_editor_redo">重做</string>
+    <string name="image_editor_reset">重置编辑</string>
+
+    <string name="image_editor_eraser">橡皮擦</string>
+    <string name="image_editor_width">线条粗细</string>
+    <string name="image_editor_aspect_free">自由</string>
+
+    <string name="image_editor_color_red">红色画笔</string>
+    <string name="image_editor_color_yellow">黄色画笔</string>
+    <string name="image_editor_color_green">绿色画笔</string>
+    <string name="image_editor_color_blue">蓝色画笔</string>
+    <string name="image_editor_color_white">白色画笔</string>
+    <string name="image_editor_unsupported">无法编辑此附件。它将保持原样发送。</string>
+    <string name="image_editor_decode_failed">无法打开此照片进行编辑。</string>
+    <string name="image_editor_save_failed">无法保存编辑后的照片。</string>
+    <string name="image_editor_crop_hint">拖动角点进行裁剪</string>
+    <string name="image_editor_draw_hint">在照片上绘制</string>
     <string name="voice_message_record">按住录制</string>
     <string name="voice_message_recording">正在录制…</string>
     <string name="voice_message_release_to_send">松开发送 · 滑动取消</string>
