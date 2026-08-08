@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.testing
 
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.BuildConfig
 
 /** Stable cross-process selectors for release-like Macrobenchmark journeys. */
@@ -21,14 +18,3 @@ internal fun performanceTestContentDescription(
     defaultDescription: String?,
     tag: String,
 ): String? = if (BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) tag else defaultDescription
-
-/** Adds a stable cross-process selector without changing production semantics. */
-internal fun Modifier.performanceTestTag(
-    tag: String,
-    enabled: Boolean = true,
-): Modifier =
-    if (enabled && BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) {
-        semantics { contentDescription = tag }
-    } else {
-        this
-    }
