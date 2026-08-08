@@ -14,7 +14,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -35,16 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
-import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -94,26 +89,25 @@ internal fun RelaysScreen(
                 SettingsGroup(title = stringResource(R.string.account_relay_lists), icon = Icons.Filled.Hub) {
                     item {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            RelayListEditor(
-                                appState = appState,
+                            RelayListSettingsContent(
                                 lists = lists,
                                 selectedKind = selectedKind,
                                 onSelectKind = { selectedKind = it },
                                 pendingUrl = pendingUrl,
                                 onPendingUrlChange = { pendingUrl = it },
                                 saving = saving,
-                                onSavingChange = { saving = it },
-                                onListsChange = { lists = it },
+                                canEdit = appState.activeAccountRef != null,
+                                onUpdateRelays = { kind, relays ->
+                                    saving = true
+                                    appState.launchMutation {
+                                        try {
+                                            lists = appState.setAccountRelays(kind, relays) ?: appState.accountRelayLists()
+                                        } finally {
+                                            saving = false
+                                        }
+                                    }
+                                },
                             )
-                        }
-                    }
-                }
-            }
-            item {
-                SettingsGroup(title = stringResource(R.string.published_relay_lists), icon = Icons.Filled.Public) {
-                    item {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            PublishedRelayLists(lists)
                         }
                     }
                 }
@@ -124,17 +118,18 @@ internal fun RelaysScreen(
 
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
-private fun RelayListEditor(
-    appState: WhiteNoiseAppState,
+internal fun RelayListSettingsContent(
     lists: AccountRelayListsFfi?,
     selectedKind: RelayListKind,
     onSelectKind: (RelayListKind) -> Unit,
     pendingUrl: String,
     onPendingUrlChange: (String) -> Unit,
     saving: Boolean,
-    onSavingChange: (Boolean) -> Unit,
-    onListsChange: (AccountRelayListsFfi?) -> Unit,
+    canEdit: Boolean,
+    onUpdateRelays: (RelayListKind, List<String>) -> Unit,
 ) {
+    RelayListStatus(lists)
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         relayListKinds.forEach { option ->
             FilterChip(
@@ -145,6 +140,12 @@ private fun RelayListEditor(
         }
     }
 
+    Text(
+        text = stringResource(selectedKind.helpRes),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
     val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
     if (currentRelays.isEmpty()) {
         Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,16 +154,7 @@ private fun RelayListEditor(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
             IconButton(
-                onClick = {
-                    onSavingChange(true)
-                    appState.launchMutation {
-                        try {
-                            onListsChange(appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists())
-                        } finally {
-                            onSavingChange(false)
-                        }
-                    }
-                },
+                onClick = { onUpdateRelays(selectedKind, currentRelays - relay) },
                 enabled = !saving && currentRelays.size > 1,
             ) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
@@ -187,21 +179,14 @@ private fun RelayListEditor(
         IconButton(
             onClick = {
                 val trimmed = pendingUrl.trim()
-                onSavingChange(true)
-                appState.launchMutation {
-                    try {
-                        onListsChange(appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists())
-                        onPendingUrlChange("")
-                    } finally {
-                        onSavingChange(false)
-                    }
-                }
+                onUpdateRelays(selectedKind, currentRelays + trimmed)
+                onPendingUrlChange("")
             },
             modifier = Modifier.size(48.dp),
             enabled =
                 pendingUrl.trim().let {
                     !saving &&
-                        appState.activeAccountRef != null &&
+                        canEdit &&
                         isAcceptableRelayUrl(it) &&
                         !currentRelays.contains(it)
                 },
@@ -224,6 +209,13 @@ internal val RelayListKind.labelRes: Int
             RelayListKind.Inbox -> R.string.inbox
         }
 
+internal val RelayListKind.helpRes: Int
+    get() =
+        when (this) {
+            RelayListKind.Nip65 -> R.string.relay_posting_help
+            RelayListKind.Inbox -> R.string.relay_inbox_help
+        }
+
 private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
     when (kind) {
         RelayListKind.Nip65 -> nip65.relays
@@ -231,18 +223,25 @@ private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
     }
 
 @Composable
-private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
+private fun RelayListStatus(lists: AccountRelayListsFfi?) {
     if (lists == null) {
-        Text(stringResource(R.string.no_relay_projection), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = stringResource(R.string.no_relay_projection),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         return
     }
-    RelayListRow(stringResource(R.string.nip_65), lists.nip65)
-    RelayListRow(stringResource(R.string.inbox), lists.inbox)
     if (lists.complete) {
-        Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = stringResource(R.string.all_relay_lists_published),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     } else {
         Text(
-            stringResource(R.string.missing_relay_lists, missingRelayListLabels(lists.missing)),
+            text = stringResource(R.string.missing_relay_lists, missingRelayListLabels(lists.missing)),
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.error,
         )
     }
@@ -263,23 +262,3 @@ internal val MissingRelayListKindFfi.labelRes: Int
             MissingRelayListKindFfi.NIP65 -> R.string.nip_65
             MissingRelayListKindFfi.INBOX -> R.string.inbox
         }
-
-@Composable
-private fun RelayListRow(
-    title: String,
-    list: RelayListFfi,
-) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text("${list.relays.size}", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (list.relays.isEmpty()) {
-            Text(stringResource(R.string.not_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            list.relays.forEach { relay ->
-                Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
