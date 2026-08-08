@@ -68,15 +68,19 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingIndicatorIcon
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 
 @OptIn(ExperimentalFoundationApi::class)
-internal fun Modifier.chatListSelectionRowClickable(onClick: () -> Unit): Modifier = combinedClickable(onClick = onClick, onLongClick = {})
+internal fun Modifier.chatListSelectionRowClickable(
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+): Modifier = combinedClickable(enabled = enabled, onClick = onClick, onLongClick = {})
 
 internal fun Modifier.chatListSelectionRow(
     selected: Boolean,
+    interactionsEnabled: Boolean = true,
     onClick: () -> Unit,
 ): Modifier =
     fillMaxWidth()
         .semantics { this.selected = selected }
-        .chatListSelectionRowClickable(onClick)
+        .chatListSelectionRowClickable(interactionsEnabled, onClick)
 
 internal fun chatListItemAvatarAccount(item: ChatListItem): String? =
     GroupProjector.avatarAccount(
@@ -95,6 +99,7 @@ internal fun ChatListRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
     isMuted: Boolean,
+    interactionsEnabled: Boolean = true,
     selectionMode: Boolean,
     selected: Boolean,
     onOpen: () -> Unit,
@@ -135,6 +140,7 @@ internal fun ChatListRow(
         onOpenProfile = onOpenProfile,
         bodyMatch = bodyMatch,
         isMuted = isMuted,
+        interactionsEnabled = interactionsEnabled,
     )
 }
 
@@ -172,6 +178,7 @@ internal fun ChatRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     isMuted: Boolean = false,
+    interactionsEnabled: Boolean = true,
     // Message-body search hit for this row (issue #290): when present, a
     // second supporting line shows the matched message with the needle
     // highlighted, so the user can see why the chat appeared in the results.
@@ -213,31 +220,39 @@ internal fun ChatRow(
             selectionMode && !rangeDragActive ->
                 Modifier.chatListSelectionRow(
                     selected = selected,
+                    interactionsEnabled = interactionsEnabled,
                     onClick = onClick,
                 )
             onLongClick != null ->
                 Modifier
-                    .clickable(onClick = onClick)
-                    .longPressOrVerticalDrag(
-                        onLongPressStart = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    .clickable(enabled = interactionsEnabled, onClick = onClick)
+                    .then(
+                        if (interactionsEnabled) {
+                            Modifier
+                                .longPressOrVerticalDrag(
+                                    onLongPressStart = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onLongPressRelease = { onLongClick() },
+                                    onDragStart = { position ->
+                                        pointerWindowY(position)?.let { onDragSelectionStart?.invoke(it) }
+                                    },
+                                    onDrag = { position ->
+                                        pointerWindowY(position)?.let { onDragSelection?.invoke(it) } == true
+                                    },
+                                    onDragEnd = { onDragSelectionEnd?.invoke() },
+                                    onGestureCancel = { onDragSelectionCancel?.invoke() },
+                                ).semantics {
+                                    onLongClick(label = actionsLabel) {
+                                        onLongClick()
+                                        true
+                                    }
+                                }.onGloballyPositioned { rowCoordinates[0] = it }
+                        } else {
+                            Modifier
                         },
-                        onLongPressRelease = { onLongClick() },
-                        onDragStart = { position ->
-                            pointerWindowY(position)?.let { onDragSelectionStart?.invoke(it) }
-                        },
-                        onDrag = { position ->
-                            pointerWindowY(position)?.let { onDragSelection?.invoke(it) } == true
-                        },
-                        onDragEnd = { onDragSelectionEnd?.invoke() },
-                        onGestureCancel = { onDragSelectionCancel?.invoke() },
-                    ).semantics {
-                        onLongClick(label = actionsLabel) {
-                            onLongClick()
-                            true
-                        }
-                    }.onGloballyPositioned { rowCoordinates[0] = it }
-            else -> Modifier.clickable(onClick = onClick)
+                    )
+            else -> Modifier.clickable(enabled = interactionsEnabled, onClick = onClick)
         }
     val pinned = item.pinned()
     val evicted = chatListItemEvicted(item)
@@ -257,7 +272,7 @@ internal fun ChatRow(
                         if (!selectionMode && openableDmAvatarAccount != null) {
                             Modifier
                                 .clip(CircleShape)
-                                .clickable(role = Role.Button) {
+                                .clickable(enabled = interactionsEnabled, role = Role.Button) {
                                     onOpenProfile(appState.npub(openableDmAvatarAccount))
                                 }
                         } else {
