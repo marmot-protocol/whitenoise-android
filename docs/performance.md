@@ -47,11 +47,11 @@ ANDROID_SERIAL=<device-serial> \
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
-The script builds the release-like APKs, replaces the dev app in place, invokes
-only the startup and group-open before/after methods, and pulls JSON plus
-Perfetto output into `benchmark/build/outputs/manual/`. It uninstalls only the
-self-instrumenting benchmark package after the run; the authenticated dev app
-and its data remain installed.
+The script builds the normal dev and release-like APKs, replaces the dev app in
+place, invokes only the startup and group-open before/after methods, and pulls
+JSON plus Perfetto output into `benchmark/build/outputs/manual/`. Its exit trap
+restores the normal dev debug APK and uninstalls the self-instrumenting benchmark
+package even when a benchmark fails; the authenticated app data remains intact.
 
 For a focused rerun, set AndroidJUnitRunner's comma-separated class filter via
 `BENCHMARK_CLASS_FILTER`; the script still uses the same state-preserving path.
@@ -100,7 +100,9 @@ the script for a local stateful fixture.
 ## Generate and package the Baseline Profile
 
 Generate startup, chat-list, group-open, and member-roster rules on the prepared
-device:
+device. Only launch-to-chat-list rules enter the Startup Profile; the broader
+group and roster journey remains in the Baseline Profile so it cannot crowd
+startup code out of the primary DEX:
 
 ```bash
 ./gradlew :app:generateBaselineProfile \

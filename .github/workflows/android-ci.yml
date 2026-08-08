@@ -50,7 +50,7 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --no-daemon --stacktrace
 
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users

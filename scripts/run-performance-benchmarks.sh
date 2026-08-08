@@ -37,6 +37,7 @@ case "$device_abi" in
 esac
 
 ./gradlew \
+  :app:assembleDevZapstoreDebug \
   :app:assembleDevZapstoreBenchmarkRelease \
   :benchmark:assembleDevZapstoreBenchmarkRelease \
   -Pandroid.injected.build.abi="$device_abi" \
@@ -45,7 +46,7 @@ esac
 resolve_apk() {
   local module_dir="$1"
   local application_id="$2"
-  local variant_name="devZapstoreBenchmarkRelease"
+  local variant_name="$3"
   local apk_root metadata output_file candidate
 
   # AGP writes regular assembly outputs under outputs/apk. Device-targeted
@@ -84,10 +85,11 @@ resolve_apk() {
   return 1
 }
 
-app_apk="$(resolve_apk app "$target_package")"
-test_apk="$(resolve_apk benchmark "$test_package")"
+dev_app_apk="$(resolve_apk app "$target_package" devZapstoreDebug)"
+app_apk="$(resolve_apk app "$target_package" devZapstoreBenchmarkRelease)"
+test_apk="$(resolve_apk benchmark "$test_package" devZapstoreBenchmarkRelease)"
 
-for apk in "$app_apk" "$test_apk"; do
+for apk in "$dev_app_apk" "$app_apk" "$test_apk"; do
   if [[ ! -f "$apk" ]]; then
     echo "Expected APK was not built: $apk" >&2
     exit 1
@@ -96,14 +98,21 @@ done
 
 result_file="$(mktemp)"
 cleanup() {
+  local status=$?
+  trap - EXIT
   adb_cmd uninstall "$test_package" >/dev/null 2>&1 || true
+  if ! adb_cmd install -r -d -t "$dev_app_apk"; then
+    echo "Failed to restore the normal dev app: $dev_app_apk" >&2
+    if ((status == 0)); then status=1; fi
+  fi
   rm -f "$result_file"
+  exit "$status"
 }
 trap cleanup EXIT
 
 # Replacing the target APK with the same application ID and debug certificate
-# preserves its authenticated data. Only the self-instrumenting test package is
-# uninstalled, so stale trace output cannot contaminate this run.
+# preserves its authenticated data. The exit trap restores the normal dev debug
+# APK and uninstalls the self-instrumenting package even when the run fails.
 adb_cmd uninstall "$test_package" >/dev/null 2>&1 || true
 adb_cmd install -r -d -t "$app_apk"
 adb_cmd install -r -d -t "$test_apk"
