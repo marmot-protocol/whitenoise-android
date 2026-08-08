@@ -78,8 +78,8 @@ internal class GroupInviteNotificationIdentityRefreshStore(
             val current = entriesByNotificationKey[update.notificationKey] ?: return
             entriesByNotificationKey[update.notificationKey] =
                 current.copy(
-                    displayedName = displayedName,
-                    displayedAvatarUrl = displayedAvatarUrl,
+                    displayedName = displayedName ?: current.displayedName,
+                    displayedAvatarUrl = displayedAvatarUrl ?: current.displayedAvatarUrl,
                 )
         }
     }

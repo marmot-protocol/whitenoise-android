@@ -101,6 +101,50 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         }
 
     @Test
+    fun normallyCompletedRefreshUsesItsTerminalRelease() =
+        runTest {
+            val store = GroupInviteNotificationIdentityRefreshStore()
+            val invite = update("alice-invite", "Alice")
+            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            assertRefreshCandidate(store, invite)
+
+            store.runClaimedRefresh(invite.notificationKey) {
+                store.release(invite.notificationKey)
+            }
+
+            assertRefreshCandidate(store, invite)
+        }
+
+    @Test
+    fun nameOnlyRefreshPreservesExistingAvatar() {
+        val store = GroupInviteNotificationIdentityRefreshStore()
+        val invite = update("alice-invite", "Alice")
+        val avatarUrl = "https://example.com/alice.png"
+        store.rememberPosted(invite, displayedName = "npub1alice", displayedAvatarUrl = avatarUrl)
+        assertRefreshCandidate(store, invite)
+
+        store.markRefreshed(invite, displayedName = "Alice", displayedAvatarUrl = null)
+
+        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = avatarUrl).isEmpty())
+    }
+
+    @Test
+    fun avatarOnlyRefreshPreservesExistingName() {
+        val store = GroupInviteNotificationIdentityRefreshStore()
+        val invite = update("alice-invite", "Alice")
+        val avatarUrl = "https://example.com/alice.png"
+        store.rememberPosted(invite, displayedName = "Alice", displayedAvatarUrl = null)
+        assertEquals(
+            listOf(invite),
+            store.refreshCandidates("Alice", resolvedName = null, resolvedAvatarUrl = avatarUrl),
+        )
+
+        store.markRefreshed(invite, displayedName = null, displayedAvatarUrl = avatarUrl)
+
+        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = avatarUrl).isEmpty())
+    }
+
+    @Test
     fun nonInviteUpdatesAreNeverTracked() {
         val store = GroupInviteNotificationIdentityRefreshStore()
         store.rememberPosted(
