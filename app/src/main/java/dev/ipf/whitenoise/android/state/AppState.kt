@@ -3812,12 +3812,12 @@ class WhiteNoiseAppState private constructor(
         val candidates = relays.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (candidates.any { !isAcceptableRelayUrl(it) }) {
             present(R.string.toast_relay_update_failed, R.string.error_remove_invalid_relay_urls_first, copyable = true)
-            return accountRelayLists()
+            return null
         }
         val next = normalizeRelayUrls(candidates)
         if (next.isEmpty()) {
             present(R.string.toast_relay_list_empty)
-            return accountRelayLists()
+            return null
         }
         when (relayUrlsResolveTimeCheckResult(next)) {
             RelayResolveTimeCheckResult.Passed -> Unit
@@ -3827,7 +3827,7 @@ class WhiteNoiseAppState private constructor(
                     R.string.error_remove_invalid_relay_urls_first,
                     copyable = true,
                 )
-                return accountRelayLists()
+                return null
             }
             RelayResolveTimeCheckResult.Unavailable -> {
                 present(
@@ -3835,7 +3835,7 @@ class WhiteNoiseAppState private constructor(
                     AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
                     copyable = true,
                 )
-                return accountRelayLists()
+                return null
             }
         }
         return runCatchingCancellable {

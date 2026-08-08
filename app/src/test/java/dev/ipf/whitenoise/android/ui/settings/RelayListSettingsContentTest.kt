@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,24 +82,59 @@ class RelayListSettingsContentTest {
             .assertIsNotEnabled()
     }
 
+    @Test
+    fun failedPublicationKeepsPendingRelayUrl() {
+        val pendingUrl = "wss://new.example.com"
+        var updateRequested = false
+
+        render(
+            lists = relayLists(nip65 = listOf("wss://post.example.com"), inbox = emptyList()),
+            pendingUrl = pendingUrl,
+            onUpdateRelays = { _, _, _ -> updateRequested = true },
+        )
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).performClick()
+
+        assertTrue(updateRequested)
+        composeRule.onNodeWithText(pendingUrl).assertIsDisplayed()
+    }
+
+    @Test
+    fun successfulPublicationClearsPendingRelayUrl() {
+        val pendingUrl = "wss://new.example.com"
+
+        render(
+            lists = relayLists(nip65 = listOf("wss://post.example.com"), inbox = emptyList()),
+            pendingUrl = pendingUrl,
+            onUpdateRelays = { _, _, onSuccess -> onSuccess() },
+        )
+
+        composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).performClick()
+
+        composeRule.onAllNodesWithText(pendingUrl).assertCountEquals(0)
+    }
+
     private fun render(
         lists: AccountRelayListsFfi,
         canEdit: Boolean = true,
+        pendingUrl: String = "",
+        onUpdateRelays: (RelayListKind, List<String>, () -> Unit) -> Unit = { _, _, _ -> },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
                     Column(Modifier.padding(16.dp)) {
                         var selectedKind by remember { mutableStateOf(RelayListKind.Nip65) }
+                        var currentPendingUrl by remember { mutableStateOf(pendingUrl) }
                         RelayListSettingsContent(
                             lists = lists,
                             selectedKind = selectedKind,
                             onSelectKind = { selectedKind = it },
-                            pendingUrl = "",
-                            onPendingUrlChange = {},
+                            pendingUrl = currentPendingUrl,
+                            onPendingUrlChange = { currentPendingUrl = it },
                             saving = false,
                             canEdit = canEdit,
-                            onUpdateRelays = { _, _ -> },
+                            onUpdateRelays = onUpdateRelays,
                         )
                     }
                 }

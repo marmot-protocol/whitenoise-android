@@ -71,7 +71,7 @@ class RelayListSettingsScreenshotTest {
                             onPendingUrlChange = {},
                             saving = false,
                             canEdit = true,
-                            onUpdateRelays = { _, _ -> },
+                            onUpdateRelays = { _, _, _ -> },
                         )
                     }
                 }

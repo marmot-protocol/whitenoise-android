@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("FunctionNaming", "LongMethod") // Keep the relay edit transaction next to the screen state it updates.
 internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
@@ -84,7 +85,10 @@ internal fun RelaysScreen(
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             item {
                 SettingsGroup(title = stringResource(R.string.account_relay_lists), icon = Icons.Filled.Hub) {
                     item {
@@ -97,11 +101,16 @@ internal fun RelaysScreen(
                                 onPendingUrlChange = { pendingUrl = it },
                                 saving = saving,
                                 canEdit = appState.activeAccountRef != null,
-                                onUpdateRelays = { kind, relays ->
+                                onUpdateRelays = { kind, relays, onSuccess ->
+                                    val accountAtStart = appState.activeAccountRef
                                     saving = true
                                     appState.launchMutation {
                                         try {
-                                            lists = appState.setAccountRelays(kind, relays) ?: appState.accountRelayLists()
+                                            val updated = appState.setAccountRelays(kind, relays)
+                                            if (updated != null && appState.activeAccountRef == accountAtStart) {
+                                                lists = updated
+                                                onSuccess()
+                                            }
                                         } finally {
                                             saving = false
                                         }
@@ -126,7 +135,7 @@ internal fun RelayListSettingsContent(
     onPendingUrlChange: (String) -> Unit,
     saving: Boolean,
     canEdit: Boolean,
-    onUpdateRelays: (RelayListKind, List<String>) -> Unit,
+    onUpdateRelays: (RelayListKind, List<String>, onSuccess: () -> Unit) -> Unit,
 ) {
     RelayListStatus(lists)
 
@@ -154,7 +163,7 @@ internal fun RelayListSettingsContent(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
             IconButton(
-                onClick = { onUpdateRelays(selectedKind, currentRelays - relay) },
+                onClick = { onUpdateRelays(selectedKind, currentRelays - relay) {} },
                 enabled = canEdit && !saving && currentRelays.size > 1,
             ) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
@@ -179,8 +188,9 @@ internal fun RelayListSettingsContent(
         IconButton(
             onClick = {
                 val trimmed = pendingUrl.trim()
-                onUpdateRelays(selectedKind, currentRelays + trimmed)
-                onPendingUrlChange("")
+                onUpdateRelays(selectedKind, currentRelays + trimmed) {
+                    onPendingUrlChange("")
+                }
             },
             modifier = Modifier.size(48.dp),
             enabled =
@@ -223,6 +233,7 @@ private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
     }
 
 @Composable
+@Suppress("FunctionNaming")
 private fun RelayListStatus(lists: AccountRelayListsFfi?) {
     if (lists == null) {
         Text(
