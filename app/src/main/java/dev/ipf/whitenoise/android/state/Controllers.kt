@@ -1232,17 +1232,29 @@ data class ReactionParticipant(
     val reactedAt: ULong,
 )
 
+/** Shared membership gate for optimistic work that the engine later validates. */
+private fun canAcceptSeededMemberMutation(
+    accountRef: String?,
+    membersVerified: Boolean,
+    isSelfMember: Boolean,
+    seededSelfMember: Boolean,
+    selfLeft: Boolean,
+    unrecoverable: Boolean,
+    disbanding: Boolean,
+    disbanded: Boolean,
+): Boolean =
+    accountRef != null &&
+        !unrecoverable &&
+        !disbanding &&
+        !disbanded &&
+        (
+            (membersVerified && isSelfMember) ||
+                (!membersVerified && seededSelfMember && !selfLeft)
+        )
+
 /**
- * Whether a text [send] can commit an optimistic record. Pulled out as a pure
- * predicate so the UI's "clear the input" decision is driven by the *same*
- * answer the controller uses to decide whether to insert the optimistic bubble
- * — the two must never disagree, otherwise the input clears while the message
- * is silently dropped (issue #264).
- *
- * A verified current member can send normally. During the `refreshMembers()`
- * window, a positive membership seed can also accept the text so the visible
- * composer does not reject the handoff solely because verification is still in
- * flight. Frozen, disbanding, disbanded, and non-member groups stay blocked.
+ * Whether a text [ConversationController.send] can commit an optimistic record.
+ * This must stay aligned with the UI's input-clearing decision (issue #264).
  */
 internal fun canAcceptTextSend(
     accountRef: String?,
@@ -1255,15 +1267,43 @@ internal fun canAcceptTextSend(
     disbanding: Boolean,
     disbanded: Boolean,
 ): Boolean =
-    accountRef != null &&
-        trimmed.isNotEmpty() &&
-        !unrecoverable &&
-        !disbanding &&
-        !disbanded &&
-        (
-            (membersVerified && isSelfMember) ||
-                (!membersVerified && seededSelfMember && !selfLeft)
+    trimmed.isNotEmpty() &&
+        canAcceptSeededMemberMutation(
+            accountRef = accountRef,
+            membersVerified = membersVerified,
+            isSelfMember = isSelfMember,
+            seededSelfMember = seededSelfMember,
+            selfLeft = selfLeft,
+            unrecoverable = unrecoverable,
+            disbanding = disbanding,
+            disbanded = disbanded,
         )
+
+/**
+ * Reactions use the same seed-safe membership window as text sends. The
+ * authoritative engine still validates the mutation and rolls back the
+ * optimistic reaction if the cached membership has become stale.
+ */
+internal fun canAcceptReaction(
+    accountRef: String?,
+    membersVerified: Boolean,
+    isSelfMember: Boolean,
+    seededSelfMember: Boolean,
+    selfLeft: Boolean,
+    unrecoverable: Boolean,
+    disbanding: Boolean,
+    disbanded: Boolean,
+): Boolean =
+    canAcceptSeededMemberMutation(
+        accountRef = accountRef,
+        membersVerified = membersVerified,
+        isSelfMember = isSelfMember,
+        seededSelfMember = seededSelfMember,
+        selfLeft = selfLeft,
+        unrecoverable = unrecoverable,
+        disbanding = disbanding,
+        disbanded = disbanded,
+    )
 
 /**
  * How many times a text/reply send retries the FFI publish before surfacing a
@@ -5914,13 +5954,6 @@ class ConversationController(
             coroutineScope {
                 conversationScope = this
                 try {
-                    // Converge workers in the background so the first timeline
-                    // snapshot is not gated on a global, all-accounts relay
-                    // round-trip (#441). Lifecycle-bound to this conversation:
-                    // cancelled when start() is cancelled (user leaves). The live
-                    // group-state + timeline subscriptions below still fold in
-                    // peer commits as they arrive.
-                    launch { appState.catchUpAccounts() }
                     // Local NIP-40 enforcement (#333) + secure delete (#334): on open
                     // and then at the next loaded row's expiry boundary, securely wipe
                     // plaintext past the retention window via the engine and re-publish
@@ -7168,13 +7201,37 @@ class ConversationController(
         }
     }
 
+    private fun reactionAccountIfAccepted(): String? {
+        val accountRef = conversationAccountRef
+        if (
+            !canAcceptReaction(
+                accountRef = accountRef,
+                membersVerified = membersVerified,
+                isSelfMember = isSelfMember,
+                seededSelfMember = seededSelfMember,
+                selfLeft = selfMembership.selfLeft,
+                unrecoverable = group.unrecoverable,
+                disbanding = group.disbanding,
+                disbanded = group.disbanded,
+            )
+        ) {
+            appState.present(R.string.toast_reaction_failed)
+            return null
+        }
+        return accountRef
+    }
+
     suspend fun toggleReaction(
         emoji: String,
         message: AppMessageRecordFfi,
     ) {
-        val account = conversationAccountRef ?: return
-        if (!canSendMessages) return
-        val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
+        val account = reactionAccountIfAccepted() ?: return
+        val target =
+            message.messageIdHex.takeIf { it.isNotBlank() }
+                ?: run {
+                    appState.present(R.string.toast_reaction_failed)
+                    return
+                }
         val alreadyMine = reactions[target]?.any { it.emoji == emoji && it.mine } == true
         val optimisticId = UUID.randomUUID().toString()
         optimisticReactionChanges[optimisticId] =
