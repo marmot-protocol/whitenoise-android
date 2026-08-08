@@ -2757,11 +2757,84 @@ internal suspend fun runBestEffortPostCommitSteps(
     }
 }
 
-private data class OptimisticReactionChange(
+internal data class OptimisticReactionChange(
     val targetMessageId: String,
     val emoji: String,
     val add: Boolean,
 )
+
+/**
+ * Apply a reaction overlay before waiting for the engine, and roll it back only
+ * when the authoritative mutation fails. This small orchestration boundary is
+ * deliberately independent of the FFI so the blocked-worker window can be
+ * exercised as behavior rather than inferred from source ordering.
+ */
+internal suspend fun runOptimisticReactionMutation(
+    applyOptimistic: () -> Unit,
+    commit: suspend () -> Boolean,
+    rollback: () -> Unit,
+): Result<Boolean> {
+    applyOptimistic()
+    return try {
+        Result.success(commit())
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (throwable: Throwable) {
+        rollback()
+        Result.failure(throwable)
+    }
+}
+
+internal fun confirmedOptimisticReactionKeys(
+    activeAccountIdHex: String?,
+    optimisticChanges: Map<String, OptimisticReactionChange>,
+    confirmedSendersByTarget: Map<String, Map<String, Set<String>>>,
+): Set<String> {
+    val mine = activeAccountIdHex?.lowercase() ?: return emptySet()
+    return optimisticChanges
+        .filterValues { change ->
+            val senders = confirmedSendersByTarget[change.targetMessageId]?.get(change.emoji).orEmpty()
+            senders.any { it.equals(mine, ignoreCase = true) } == change.add
+        }.keys
+}
+
+internal fun reactionTalliesForSenders(
+    activeAccountIdHex: String?,
+    confirmedSendersByEmoji: Map<String, Set<String>>,
+    optimisticChanges: Collection<OptimisticReactionChange>,
+): List<ReactionTally> {
+    val mine = activeAccountIdHex?.lowercase()
+    val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
+    confirmedSendersByEmoji.forEach { (emoji, senders) ->
+        sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.addAll(senders.map(String::lowercase))
+    }
+    if (mine != null) {
+        optimisticChanges.forEach { change ->
+            val senders = sendersByEmoji.getOrPut(change.emoji) { linkedSetOf() }
+            if (change.add) {
+                senders.add(mine)
+            } else {
+                senders.remove(mine)
+            }
+        }
+    }
+    return sendersByEmoji
+        .mapNotNull { (emoji, senders) ->
+            if (senders.isEmpty()) {
+                null
+            } else {
+                ReactionTally(
+                    emoji = emoji,
+                    count = senders.size,
+                    mine = mine != null && senders.contains(mine),
+                )
+            }
+        }.sortedWith(
+            compareByDescending<ReactionTally> { it.count }
+                .thenByDescending { it.mine }
+                .thenBy { it.emoji },
+        )
+}
 
 /**
  * One named attachment queued for upload as part of an album. The bytes are
@@ -5954,6 +6027,11 @@ class ConversationController(
             coroutineScope {
                 conversationScope = this
                 try {
+                    // Global relay catch-up is owned by the chat-list/foreground
+                    // lifecycle. The timeline and group handles below subscribe to
+                    // local projections, so opening them does not need another
+                    // account-worker sync; reactions render their optimistic overlay
+                    // before any authoritative commit waits for that worker.
                     // Local NIP-40 enforcement (#333) + secure delete (#334): on open
                     // and then at the next loaded row's expiry boundary, securely wipe
                     // plaintext past the retention window via the engine and re-publish
@@ -7221,6 +7299,50 @@ class ConversationController(
         return accountRef
     }
 
+    private suspend fun commitReactionMutation(
+        account: String,
+        target: String,
+        emoji: String,
+        alreadyMine: Boolean,
+    ): Boolean {
+        appState.withGroupCommitLock(account, group.groupIdHex) {
+            if (alreadyMine) {
+                retractOwnReaction(account, target, emoji)
+            } else {
+                appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
+            }
+        }
+        return !alreadyMine
+    }
+
+    private suspend fun retractOwnReaction(
+        account: String,
+        target: String,
+        emoji: String,
+    ) {
+        // Retract just the tapped emoji by deleting its own reaction event; the
+        // FFI target-only unreact would drop the wrong emoji when the user holds
+        // more than one reaction on the same message.
+        val me = conversationAccountIdHex ?: error("no active account to retract reaction")
+        val ownReactions =
+            timelineRecords[target]
+                ?.reactions
+                ?.userReactions
+                .orEmpty()
+                .filter { it.sender.equals(me, ignoreCase = true) }
+        val reactionEventId =
+            ownReactions
+                .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
+                ?.reactionMessageIdHex
+        when {
+            reactionEventId != null ->
+                appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
+            ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
+                appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+            else -> error("no reaction event to retract for $emoji")
+        }
+    }
+
     suspend fun toggleReaction(
         emoji: String,
         message: AppMessageRecordFfi,
@@ -7234,59 +7356,32 @@ class ConversationController(
                 }
         val alreadyMine = reactions[target]?.any { it.emoji == emoji && it.mine } == true
         val optimisticId = UUID.randomUUID().toString()
-        optimisticReactionChanges[optimisticId] =
+        val optimisticChange =
             OptimisticReactionChange(
                 targetMessageId = target,
                 emoji = emoji,
                 add = !alreadyMine,
             )
-        recomputeReactions()
-        var reactionCommitted = false
-        try {
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                if (alreadyMine) {
-                    // Retract just the tapped emoji by deleting its own reaction
-                    // event; the FFI unreact is target-only and clears the latest
-                    // reaction, so it would drop the wrong emoji when a user holds
-                    // more than one on the same message.
-                    // activeAccountRef can be set while the account row hasn't loaded
-                    // into `accounts` yet; surface that distinctly from an ambiguous
-                    // reaction so the failure reason isn't misleading.
-                    val me =
-                        conversationAccountIdHex
-                            ?: error("no active account to retract reaction")
-                    val ownReactions =
-                        timelineRecords[target]
-                            ?.reactions
-                            ?.userReactions
-                            .orEmpty()
-                            .filter { it.sender.equals(me, ignoreCase = true) }
-                    val reactionEventId =
-                        ownReactions
-                            .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
-                            ?.reactionMessageIdHex
-                    when {
-                        reactionEventId != null ->
-                            appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
-                        // Target-only unreact is safe only when this is the single
-                        // reaction to clear; with several it could drop another emoji.
-                        ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
-                            appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-                        // No event id yet (optimistic/unsynced) and ambiguous — fail so
-                        // the optimistic toggle reverts instead of retracting the wrong one.
-                        else -> error("no reaction event to retract for $emoji")
-                    }
-                } else {
-                    appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
-                    reactionCommitted = true
-                }
-            }
-        } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
-            optimisticReactionChanges.remove(optimisticId)
-            recomputeReactions()
-            appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+        val mutation =
+            runOptimisticReactionMutation(
+                applyOptimistic = {
+                    optimisticReactionChanges[optimisticId] = optimisticChange
+                    recomputeReactions()
+                },
+                commit = { commitReactionMutation(account, target, emoji, alreadyMine) },
+                rollback = {
+                    optimisticReactionChanges.remove(optimisticId)
+                    recomputeReactions()
+                },
+            )
+        mutation.onFailure { throwable ->
+            appState.present(
+                R.string.toast_reaction_failed,
+                AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
+                copyable = true,
+            )
         }
+        val reactionCommitted = mutation.getOrDefault(false)
         if (reactionCommitted) {
             // Reacting is unambiguous evidence the user saw this message, so
             // advance the read marker through it. Keep this best-effort and
@@ -9420,14 +9515,11 @@ class ConversationController(
     }
 
     private fun pruneConfirmedOptimisticReactions() {
-        val mine = conversationAccountIdHex?.lowercase() ?: return
-        val base = baseReactionSenders()
-        optimisticReactionChanges.entries
-            .filter { (_, change) ->
-                val senders = base[change.targetMessageId]?.get(change.emoji).orEmpty()
-                senders.contains(mine) == change.add
-            }.map { it.key }
-            .forEach(optimisticReactionChanges::remove)
+        confirmedOptimisticReactionKeys(
+            activeAccountIdHex = conversationAccountIdHex,
+            optimisticChanges = optimisticReactionChanges,
+            confirmedSendersByTarget = baseReactionSenders(),
+        ).forEach(optimisticReactionChanges::remove)
     }
 
     private fun upsertProjectedRecord(
@@ -10075,41 +10167,15 @@ class ConversationController(
     }
 
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
-        // Lowercased sender sets for the same casing-drift reason as
-        // recomputeReactions(). See #143.
-        val mine = conversationAccountIdHex?.lowercase()
-        val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
-        timelineRecords[targetMessageId]?.reactions?.byEmoji?.forEach { summary ->
-            sendersByEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders.map { it.lowercase() })
+        val confirmed = linkedMapOf<String, MutableSet<String>>()
+        timelineRecords[targetMessageId]?.reactions?.byEmoji.orEmpty().forEach { summary ->
+            confirmed.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
         }
-        if (mine != null) {
-            optimisticReactionChanges.values
-                .filter { it.targetMessageId == targetMessageId }
-                .forEach { change ->
-                    val senders = sendersByEmoji.getOrPut(change.emoji) { linkedSetOf() }
-                    if (change.add) {
-                        senders.add(mine)
-                    } else {
-                        senders.remove(mine)
-                    }
-                }
-        }
-        return sendersByEmoji
-            .mapNotNull { (emoji, senders) ->
-                if (senders.isEmpty()) {
-                    null
-                } else {
-                    ReactionTally(
-                        emoji = emoji,
-                        count = senders.size,
-                        mine = mine != null && senders.contains(mine),
-                    )
-                }
-            }.sortedWith(
-                compareByDescending<ReactionTally> { it.count }
-                    .thenByDescending { it.mine }
-                    .thenBy { it.emoji },
-            )
+        return reactionTalliesForSenders(
+            activeAccountIdHex = conversationAccountIdHex,
+            confirmedSendersByEmoji = confirmed,
+            optimisticChanges = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId },
+        )
     }
 
     fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {

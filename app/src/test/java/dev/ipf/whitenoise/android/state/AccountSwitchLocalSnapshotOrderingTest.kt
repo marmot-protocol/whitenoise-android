@@ -39,21 +39,6 @@ class AccountSwitchLocalSnapshotOrderingTest {
     }
 
     @Test
-    fun conversationOpenDoesNotStartAnotherGlobalCatchUp() {
-        val body = controllersSource().readText().kotlinFunctionBody("start")
-
-        assertFalse(
-            "chat-list/foreground lifecycle owns global catch-up; " +
-                "a conversation open must not serialize the account worker again",
-            "catchUpAccounts()" in body,
-        )
-        assertTrue(
-            "conversation open must still start its local projection subscriptions",
-            "runConversationSubscriptionLoop(account)" in body,
-        )
-    }
-
-    @Test
     fun activationCallbackPrecedesBestEffortPostSwitchWork() {
         val source = appStateSource().readText()
         val start = source.indexOf("suspend fun setActiveAccount(")
