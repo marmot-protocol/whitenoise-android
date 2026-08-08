@@ -42,6 +42,7 @@ class ConversationTopBarSemanticsTest {
     fun performanceSelectorIsClickableWithoutReplacingAccessibilityDescription() {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
+        val searchFocusRequester = FocusRequester()
         var openDetailsCalls = 0
 
         composeRule.setContent {
@@ -62,7 +63,7 @@ class ConversationTopBarSemanticsTest {
                         onClearSearch = {},
                         onCloseSearch = {},
                         onSearchAction = {},
-                        searchFocusRequester = FocusRequester(),
+                        searchFocusRequester = searchFocusRequester,
                         appState = appState,
                         controller = controller,
                         groupTitleCopy = GroupTitleCopy.Default,
