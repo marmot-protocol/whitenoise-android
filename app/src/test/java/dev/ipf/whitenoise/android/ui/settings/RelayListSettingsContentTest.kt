@@ -10,7 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -67,7 +69,21 @@ class RelayListSettingsContentTest {
         composeRule.onNodeWithText(app.getString(R.string.relay_inbox_help)).assertIsDisplayed()
     }
 
-    private fun render(lists: AccountRelayListsFfi) {
+    @Test
+    fun relayRemovalIsDisabledWhenEditingIsUnavailable() {
+        val lists = relayLists(nip65 = listOf("wss://one.example.com", "wss://two.example.com"), inbox = emptyList())
+
+        render(lists, canEdit = false)
+
+        composeRule
+            .onAllNodesWithContentDescription(app.getString(R.string.remove_relay))[0]
+            .assertIsNotEnabled()
+    }
+
+    private fun render(
+        lists: AccountRelayListsFfi,
+        canEdit: Boolean = true,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
@@ -80,7 +96,7 @@ class RelayListSettingsContentTest {
                             pendingUrl = "",
                             onPendingUrlChange = {},
                             saving = false,
-                            canEdit = true,
+                            canEdit = canEdit,
                             onUpdateRelays = { _, _ -> },
                         )
                     }

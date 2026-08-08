@@ -453,7 +453,7 @@
     <string name="copy">复制</string>
     <string name="account_relay_lists">我的中继</string>
     <string name="no_relays">未配置中继器</string>
-    <string name="remove_relay">移除中继器？</string>
+    <string name="remove_relay">移除中继器</string>
     <string name="add_relay">添加中继器</string>
     <string name="nip_65">我发布到哪里</string>
     <string name="inbox">我在哪里接收</string>

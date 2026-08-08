@@ -484,7 +484,7 @@
     <string name="copy">Копировать</string>
     <string name="account_relay_lists">Мои реле</string>
     <string name="no_relays">Реле не настроены</string>
-    <string name="remove_relay">Удалить Реле?</string>
+    <string name="remove_relay">Удалить реле</string>
     <string name="add_relay">Добавить Реле</string>
     <string name="nip_65">Куда я публикую</string>
     <string name="inbox">Откуда я получаю</string>

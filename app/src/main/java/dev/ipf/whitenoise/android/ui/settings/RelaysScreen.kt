@@ -155,7 +155,7 @@ internal fun RelayListSettingsContent(
             Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
             IconButton(
                 onClick = { onUpdateRelays(selectedKind, currentRelays - relay) },
-                enabled = !saving && currentRelays.size > 1,
+                enabled = canEdit && !saving && currentRelays.size > 1,
             ) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
             }

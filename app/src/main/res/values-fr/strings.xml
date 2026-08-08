@@ -462,8 +462,8 @@
     <string name="copy">Copier</string>
     <string name="account_relay_lists">Mes relais</string>
     <string name="no_relays">Aucun relais configuré</string>
-    <string name="remove_relay">Supprimer le Relais ?</string>
-    <string name="add_relay">Ajouter un Relais</string>
+    <string name="remove_relay">Supprimer le relais</string>
+    <string name="add_relay">Ajouter un relais</string>
     <string name="nip_65">Où je publie</string>
     <string name="inbox">Où je reçois</string>
     <string name="relay_posting_help">Les autres récupèrent votre clé sur ces relais pour vous ajouter à des groupes.</string>

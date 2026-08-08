@@ -462,7 +462,7 @@
     <string name="copy">Kopyala</string>
     <string name="account_relay_lists">Aktarma sunucularım</string>
     <string name="no_relays">Yapılandırılmış röle yok</string>
-    <string name="remove_relay">Röle Kaldırılsın mı?</string>
+    <string name="remove_relay">Röleyi kaldır</string>
     <string name="add_relay">Röle Ekle</string>
     <string name="nip_65">Nerede paylaşırım</string>
     <string name="inbox">Nerede alırım</string>
