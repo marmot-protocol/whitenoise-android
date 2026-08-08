@@ -23,42 +23,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -79,14 +63,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -100,8 +81,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -117,7 +96,6 @@ import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
-import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
@@ -126,15 +104,12 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
-import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
@@ -148,14 +123,11 @@ import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
-import dev.ipf.whitenoise.android.ui.chats.ConversationSearchNavBar
-import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -165,11 +137,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -181,35 +149,23 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
-import dev.ipf.whitenoise.android.ui.conversation.media.documentPickTreatAsImage
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
-import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
-import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
-import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
-import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
-import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
-import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
-import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
-import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
-import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
-import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -251,20 +207,6 @@ private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 // background-arrival listener bounded so a later, genuinely foreground
 // message does not unexpectedly start an otherwise idle auto-reader.
 private const val TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS = 10_000L
-
-// Per-file ceiling for a document attachment. Matches the retained-uploads
-// LRU cap so a single oversize pick can't OOM the picker pass before the
-// retained store gets a chance to evict. Anything larger is dropped with a
-// toast — the user can re-pick a smaller file or split the upload.
-private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
-
-// Total bytes cap across one album send. Bound to the retained-uploads LRU
-// cap (NOT independently doubled): exceeding that cap on insert would cause
-// `ByteSizeLruCache` to evict the just-inserted RetainedMediaUpload during
-// its own `put()` pass, breaking retry. Keep the picker ceiling honest with
-// the actual heap budget rather than letting the user pick more than the
-// controller can ever hold.
-private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -1128,6 +1070,13 @@ internal fun ConversationScreen(
     }
 
     val context = LocalContext.current
+    val mediaSender =
+        rememberConversationMediaSender(
+            appState = appState,
+            controller = controller,
+            context = context,
+            onRevealSent = { revealSentMessage() },
+        )
     val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
@@ -1317,29 +1266,6 @@ internal fun ConversationScreen(
         }
     }
 
-    fun sendSharedContact(contact: SharedContact) {
-        appState.launchMutation {
-            val vcardBytes =
-                withContext(Dispatchers.IO) {
-                    buildVCard(contact).toByteArray(Charsets.UTF_8)
-                }
-            // The vCard rides the existing media pipeline as a text/vcard
-            // attachment (portable — any client can save it), and the caption
-            // carries the human-readable name/phone so a peer with no contact
-            // renderer still reads it, and our own bubble draws a card from it.
-            val attachment =
-                PendingAttachment(
-                    plaintextBytes = vcardBytes,
-                    mediaType = VCARD_MIME_TYPE,
-                    fileName = contactVCardFileName(contact),
-                )
-            val caption = formatContactShareText(contact).ifBlank { null }
-            val seeded = controller.queueAttachments(listOf(attachment), caption) ?: return@launchMutation
-            revealSentMessage()
-            controller.uploadQueued(seeded)
-        }
-    }
-
     // Voice-message recording surface — owned per ConversationScreen so a
     // backgrounded recording is dropped on dispose. The recorder writes
     // into a per-session temp dir; the file is consumed by `sendVoiceMessage`
@@ -1355,83 +1281,6 @@ internal fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
-
-    fun sendVoiceAttachment(
-        file: java.io.File,
-        durationMs: Long,
-    ) {
-        appState.launchMutation {
-            val bytes =
-                withContext(Dispatchers.IO) {
-                    runCatching { file.readBytes() }.getOrNull()
-                }
-            withContext(Dispatchers.IO) { runCatching { file.delete() } }
-            if (bytes == null || bytes.isEmpty()) return@launchMutation
-            val attachment =
-                PendingAttachment(
-                    plaintextBytes = bytes,
-                    mediaType = dev.ipf.whitenoise.android.audio.VoiceRecorder.MIME_TYPE,
-                    fileName = "voice-${durationMs}ms.${dev.ipf.whitenoise.android.audio.VoiceRecorder.FILE_EXTENSION}",
-                )
-            val seeded = controller.queueAttachments(listOf(attachment), null) ?: return@launchMutation
-            revealSentMessage()
-            controller.uploadQueued(seeded)
-        }
-    }
-
-    fun readImageAttachment(
-        uri: android.net.Uri,
-        remainingBytes: Long,
-    ): ImageAttachmentReadOutcome {
-        val quality = appState.mediaQuality
-        // Animated images (GIF, animated WebP) can't survive the static JPEG
-        // recompress path — it flattens them to a single frame. Preserve them at
-        // any quality; the quality knob only governs static-image downscaling.
-        val animatedSource = MediaPipeline.isAnimatedImageSource(context.contentResolver, uri)
-        if (quality.preservesOriginalImageBytes || animatedSource) {
-            val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
-                is MediaPipeline.OriginalImageReadResult.Success ->
-                    return ImageAttachmentReadOutcome(
-                        PendingAttachment(
-                            plaintextBytes = original.image.bytes,
-                            mediaType = original.image.mediaType,
-                            fileName = original.image.fileName,
-                            dim = original.image.dim,
-                            thumbhash = original.image.thumbhash,
-                        ),
-                    )
-                MediaPipeline.OriginalImageReadResult.TooLarge -> return ImageAttachmentReadOutcome(null, overflowed = true)
-                MediaPipeline.OriginalImageReadResult.Failed,
-                MediaPipeline.OriginalImageReadResult.Unsupported,
-                // Never flatten an animation to JPEG — fail the attachment instead
-                // of silently dropping the animation. Static sources still fall
-                // back to the JPEG re-encode so unsupported containers strip metadata.
-                -> if (animatedSource) return ImageAttachmentReadOutcome(null) else Unit
-            }
-        }
-        val jpeg =
-            MediaPipeline.readDownscaledJpeg(
-                context.contentResolver,
-                uri,
-                maxEdgePx = quality.imageMaxEdgePx,
-                quality = quality.imageJpegQuality,
-            ) ?: return ImageAttachmentReadOutcome(null)
-        if (jpeg.bytes.size.toLong() > remainingBytes) {
-            return ImageAttachmentReadOutcome(null, overflowed = true)
-        }
-        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-        return ImageAttachmentReadOutcome(
-            PendingAttachment(
-                plaintextBytes = jpeg.bytes,
-                mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                fileName = fileName,
-                dim = "${jpeg.width}x${jpeg.height}",
-                thumbhash = jpeg.thumbhash,
-            ),
-        )
-    }
 
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
@@ -1454,7 +1303,7 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> sendVoiceAttachment(file, durationMs) },
+                onRecordingComplete = { file, durationMs -> mediaSender.sendVoiceAttachment(file, durationMs) },
                 onError = { throwable ->
                     if (throwable is IllegalStateException && throwable.message == "voice recording too short") {
                         appState.present(voiceTooShortMsg)
@@ -1529,399 +1378,6 @@ internal fun ConversationScreen(
             }
         onDispose {
             unregister()
-        }
-    }
-
-    // Decode/compress each URI off the main thread, then hand the album to
-    // the controller as a single `sendAttachments(list, caption)` call. One
-    // kind:9 carries N imeta tags; the caption is shared across the whole
-    // album. If any source fails to decode the rest still send (best
-    // effort), but if NONE decode we bail without surfacing an empty send.
-    fun sendPickedMedia(
-        uris: List<android.net.Uri>,
-        caption: String,
-    ) {
-        if (uris.isEmpty()) return
-        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
-        appState.launchMutation {
-            val result =
-                withContext(Dispatchers.Default) {
-                    val out = mutableListOf<PendingAttachment>()
-                    var consumed = 0L
-                    var overflowed = false
-                    for (uri in uris) {
-                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                        if (remaining <= 0L) {
-                            overflowed = true
-                            break
-                        }
-                        val mime = safeGetType(context.contentResolver, uri)
-                        val attachment =
-                            if (mime.startsWith("video/", ignoreCase = true)) {
-                                when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
-                                    is MediaPipeline.VideoReadResult.Success ->
-                                        PendingAttachment(
-                                            plaintextBytes = r.video.bytes,
-                                            mediaType = r.video.mediaType,
-                                            fileName = r.video.fileName,
-                                            dim = "${r.video.width}x${r.video.height}",
-                                            thumbhash = r.video.thumbhash,
-                                        )
-                                    MediaPipeline.VideoReadResult.TooLarge -> {
-                                        overflowed = true
-                                        continue
-                                    }
-                                    MediaPipeline.VideoReadResult.Failed -> continue
-                                }
-                            } else {
-                                val image = readImageAttachment(uri, remaining)
-                                if (image.overflowed) {
-                                    overflowed = true
-                                    continue
-                                }
-                                image.attachment ?: continue
-                            }
-                        consumed += attachment.plaintextBytes.size.toLong()
-                        out += attachment
-                    }
-                    out to overflowed
-                }
-            val attachments = result.first
-            val albumOverflowed = result.second
-            if (attachments.size < uris.size) {
-                val anyVideoPicked =
-                    uris.any {
-                        safeGetType(context.contentResolver, it)
-                            .startsWith("video/", ignoreCase = true)
-                    }
-                appState.present(
-                    when {
-                        albumOverflowed -> R.string.media_album_too_large
-                        anyVideoPicked -> R.string.toast_couldnt_process_video
-                        else -> R.string.toast_couldnt_decode_image
-                    },
-                    // Decode/process failures are diagnostic; the album size
-                    // cap is a fixed validation limit (#796).
-                    copyable = !albumOverflowed,
-                )
-                if (attachments.isEmpty()) return@launchMutation
-            }
-            controller.sendAttachments(attachments, trimmedCaption)
-        }
-    }
-
-    // Read picked document URIs into attachments. Non-image documents are kept
-    // as raw bytes; image/* picks from Files use the same media-quality and
-    // metadata-stripping path as visual image picks before joining the document
-    // send path. MIME comes from the content resolver; filename from
-    // `OpenableColumns.DISPLAY_NAME`.
-    //
-    // Two-layer size guard:
-    //   1. Per-attachment ceiling: skip any single pick that already declares
-    //      a `OpenableColumns.SIZE` greater than [MEDIA_ATTACHMENT_MAX_BYTES],
-    //      OR overruns the cap during a bounded streaming read (no fully-
-    //      buffered `readBytes()` so a 500 MB pick can't OOM the JVM heap
-    //      before the retained-uploads LRU has anything to evict).
-    //   2. Album-total ceiling: stop accumulating once the cumulative payload
-    //      crosses [MEDIA_ALBUM_MAX_TOTAL_BYTES]; remaining picks are dropped.
-    //
-    // Any reject surfaces a single user-visible toast; the rest of the album
-    // continues. If NOTHING survives the gates we bail without an empty send.
-    // Decoded outcome of the document read pass, surfaced so the unified
-    // sendStagedAttachments path can blend its results with the image decode.
-    data class DocumentReadOutcome(
-        val attachments: List<PendingAttachment>,
-        val rejected: Boolean,
-        val albumOverflowed: Boolean,
-        val totalBytes: Long,
-    )
-
-    suspend fun readPickedDocuments(
-        uris: List<android.net.Uri>,
-        bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
-    ): DocumentReadOutcome =
-        withContext(Dispatchers.IO) {
-            val accepted = mutableListOf<PendingAttachment>()
-            var albumBytes = 0L
-            var rejected = false
-            var albumOverflowed = false
-            for (uri in uris) {
-                val reportedMime = safeGetType(context.contentResolver, uri)
-                val resolvedMime =
-                    reportedMime.takeIf { it.isNotBlank() }
-                        ?: "application/octet-stream"
-                val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
-                if (remainingAlbumBudget <= 0L) {
-                    albumOverflowed = true
-                    break
-                }
-                val sniffedImageMime =
-                    if (reportedMime.isBlank() || reportedMime.equals("application/octet-stream", ignoreCase = true)) {
-                        MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
-                    } else {
-                        null
-                    }
-                if (documentPickTreatAsImage(reportedMime, sniffedImageMime)) {
-                    val image = readImageAttachment(uri, remainingAlbumBudget)
-                    if (image.overflowed) {
-                        albumOverflowed = true
-                        continue
-                    }
-                    val attachment = image.attachment
-                    if (attachment == null) {
-                        rejected = true
-                        continue
-                    }
-                    if (attachment.plaintextBytes.isEmpty()) continue
-                    val nextAlbumBytes = albumBytes + attachment.plaintextBytes.size.toLong()
-                    if (nextAlbumBytes > bytesBudget) {
-                        albumOverflowed = true
-                        continue
-                    }
-                    albumBytes = nextAlbumBytes
-                    accepted += attachment
-                    continue
-                }
-                val declaredSize = queryContentSize(context.contentResolver, uri)
-                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-                    rejected = true
-                    continue
-                }
-                val perFileCap =
-                    minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
-                        .coerceAtMost(Int.MAX_VALUE.toLong())
-                        .toInt()
-                val bytes =
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            MediaPipeline.readBoundedBytes(stream, perFileCap)
-                        }
-                    }.getOrNull()
-                if (bytes == null) {
-                    rejected = true
-                    continue
-                }
-                if (bytes.isEmpty()) continue
-                if (albumBytes + bytes.size > bytesBudget) {
-                    albumOverflowed = true
-                    continue
-                }
-                albumBytes += bytes.size
-                val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                accepted +=
-                    PendingAttachment(
-                        plaintextBytes = bytes,
-                        mediaType = resolvedMime,
-                        fileName = name,
-                        dim = null,
-                    )
-            }
-            DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
-        }
-
-    data class VisualReadOutcome(
-        val attachments: List<PendingAttachment>,
-        val albumOverflowed: Boolean,
-    )
-
-    suspend fun readPickedImages(uris: List<android.net.Uri>): VisualReadOutcome =
-        withContext(Dispatchers.Default) {
-            val out = mutableListOf<PendingAttachment>()
-            var consumed = 0L
-            var overflowed = false
-            for (uri in uris) {
-                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                if (remaining <= 0L) {
-                    overflowed = true
-                    break
-                }
-                val mime = safeGetType(context.contentResolver, uri)
-                val attachment =
-                    if (mime.startsWith("video/", ignoreCase = true)) {
-                        // Thread the remaining album budget into the video read so a
-                        // multi-video pick can't accumulate hundreds of MB in heap
-                        // before the cap downstream would reject the tail.
-                        when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
-                            is MediaPipeline.VideoReadResult.Success ->
-                                PendingAttachment(
-                                    plaintextBytes = r.video.bytes,
-                                    mediaType = r.video.mediaType,
-                                    fileName = r.video.fileName,
-                                    dim = "${r.video.width}x${r.video.height}",
-                                    thumbhash = r.video.thumbhash,
-                                )
-                            MediaPipeline.VideoReadResult.TooLarge -> {
-                                overflowed = true
-                                continue
-                            }
-                            MediaPipeline.VideoReadResult.Failed -> continue
-                        }
-                    } else {
-                        val image = readImageAttachment(uri, remaining)
-                        if (image.overflowed) {
-                            overflowed = true
-                            continue
-                        }
-                        image.attachment ?: continue
-                    }
-                consumed += attachment.plaintextBytes.size.toLong()
-                out += attachment
-            }
-            VisualReadOutcome(out, overflowed)
-        }
-
-    // Single-path send used by the unified staging shelf: decodes images
-    // (downscale + JPEG) and documents (raw bytes with cap) in parallel,
-    // concatenates the attachments, and ships them as one kind-9 album.
-    fun sendStagedAttachments(
-        imageUris: List<android.net.Uri>,
-        documentUris: List<android.net.Uri>,
-        caption: String,
-        onAccepted: () -> Unit = {},
-        onRejected: () -> Unit = {},
-        onAfterSend: () -> Unit = {},
-    ) {
-        if (imageUris.isEmpty() && documentUris.isEmpty()) {
-            onRejected()
-            return
-        }
-        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
-        appState.launchMutation {
-            // Enforce the album byte cap on images first so a multi-large-photo
-            // pick can't push the cumulative payload past
-            // MEDIA_ALBUM_MAX_TOTAL_BYTES and evict the retained-uploads LRU
-            // mid-flight (which would break retry). Drop the tail and surface
-            // a single oversize toast.
-            val rawImages = readPickedImages(imageUris)
-            var imageBytes = 0L
-            val acceptedImages = mutableListOf<PendingAttachment>()
-            var imageAlbumOverflowed = rawImages.albumOverflowed
-            for (attachment in rawImages.attachments) {
-                val next = imageBytes + attachment.plaintextBytes.size
-                if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
-                    imageAlbumOverflowed = true
-                    continue
-                }
-                imageBytes = next
-                acceptedImages += attachment
-            }
-            val docBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - imageBytes).coerceAtLeast(0L)
-            val docOutcome =
-                if (documentUris.isEmpty()) {
-                    DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
-                } else {
-                    readPickedDocuments(documentUris, docBudget)
-                }
-            val merged = acceptedImages + docOutcome.attachments
-            val pickHasVideo =
-                imageUris.any {
-                    safeGetType(context.contentResolver, it)
-                        .startsWith("video/", ignoreCase = true)
-                }
-            val visualFailureToast =
-                if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image
-            if (merged.isEmpty()) {
-                // Only surface the visual-decode toast when there were visual
-                // picks to begin with — a document-only send that failed every
-                // file should fall through to the document toasts below
-                // rather than misreporting as an image decode error. And if
-                // the album overflowed the byte budget, surface that
-                // explicitly instead of "couldn't process".
-                if (imageUris.isNotEmpty()) {
-                    val toast =
-                        if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
-                    appState.present(toast, copyable = !imageAlbumOverflowed)
-                    onRejected()
-                    return@launchMutation
-                }
-            }
-            if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
-                appState.present(visualFailureToast, copyable = true)
-            }
-            if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
-                appState.present(R.string.media_album_too_large)
-            } else if (docOutcome.rejected) {
-                appState.present(R.string.media_file_too_large)
-            }
-            if (merged.isEmpty()) {
-                onRejected()
-                return@launchMutation
-            }
-            // Two-phase ship: SEED every send synchronously (so all the
-            // optimistic bubbles appear in the same recomposition pass and
-            // the user sees the queue light up at once), THEN run the
-            // FFI upload+publish for each in pick order (so the post-
-            // confirm timeline keeps the order the user picked).
-            //
-            // Image attachments ride one kind-9 album (the masonry layout
-            // wants multiple tiles in one message). Non-image attachments
-            // ship as their own kind-9 each, because each carries distinct
-            // filename/MIME metadata that doesn't benefit from grid
-            // composition. Caption sticks with images when present;
-            // otherwise it attaches to the first file send.
-            // Backfill thumbhash for any image-typed doc-picker attachments that
-            // lack one. image/* document picks usually arrive here already
-            // processed by the image privacy pipeline; this keeps the renderer
-            // defensive for legacy/raw sources while staying off-main so the
-            // staging-shelf dismiss animation doesn't stutter on multi-image
-            // picks.
-            val readyDocAttachments =
-                if (docOutcome.attachments.isEmpty()) {
-                    emptyList()
-                } else {
-                    withContext(Dispatchers.Default) {
-                        docOutcome.attachments.map { attachment ->
-                            if (!attachment.mediaType.startsWith("image/", ignoreCase = true) ||
-                                attachment.thumbhash != null
-                            ) {
-                                attachment
-                            } else {
-                                val bitmap =
-                                    MediaPipeline.decodeSampledBitmap(
-                                        attachment.plaintextBytes,
-                                        MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                                    )
-                                val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
-                                bitmap?.recycle()
-                                attachment.copy(thumbhash = hash)
-                            }
-                        }
-                    }
-                }
-            // The image picker's multi-select UI groups its picks as one
-            // batch, so they ride one kind-9 album — preserves the masonry
-            // grouping the user opted into. Doc-picker items, by contrast,
-            // are picked one-by-one in order, so each ships as its own
-            // kind-9 in pick position regardless of MIME. Image MIMEs from
-            // the doc picker still render as image bubbles (single-image
-            // variant of the album shape) — same surface, different framing.
-            val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
-            if (acceptedImages.isNotEmpty()) {
-                controller.queueAttachments(acceptedImages, trimmedCaption)?.let(seeded::add)
-            }
-            val captionConsumedByAlbum = acceptedImages.isNotEmpty()
-            readyDocAttachments.forEachIndexed { index, attachment ->
-                val perItemCaption =
-                    if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
-                controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
-            }
-            if (seeded.isEmpty()) {
-                onRejected()
-                return@launchMutation
-            }
-            // Pull the user down to the just-seeded bubbles before the
-            // upload loop suspends — same UX as text-send. Firing after
-            // queueAttachments (the optimistic seed) and before
-            // uploadQueued (the FFI publish) means the scroll lands in the
-            // same frame the bubble appears, instead of waiting on the
-            // relay round-trip.
-            onAccepted()
-            onAfterSend()
-            // Run uploads sequentially so the kind-9 publishes go out in
-            // pick order. The optimistic bubbles are already on screen.
-            for (slot in seeded) {
-                controller.uploadQueued(slot)
-            }
         }
     }
 
@@ -2946,492 +2402,187 @@ internal fun ConversationScreen(
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            Column {
-                if (selectionMode) {
-                    MessageSelectionBar(
-                        count = batchSelectionUi.actionItems.size,
-                        canCopy = batchSelectionUi.copyText.isNotBlank(),
-                        canForward = batchSelectionUi.forwardBodies.isNotEmpty(),
-                        onClose = { selectedMessages.clear() },
-                        onCopy = {
-                            if (batchSelectionUi.copyText.isNotBlank()) {
-                                clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
-                                selectedMessages.clear()
-                            }
-                        },
-                        onForward = {
-                            if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
-                        },
-                        onDelete = { showBatchDeleteConfirm = true },
-                    )
-                } else if (searchOpen) {
-                    ConversationSearchTopBar(
-                        query = searchQuery,
-                        onQueryChange = {
-                            searchJob?.cancel()
-                            searchJob = null
-                            highlightedMessageId = null
-                            searchQuery = it
-                            // Re-anchor the cursor to the new query's match set on
-                            // the next derivation; clearing the pin makes it land
-                            // on the first match again.
-                            searchPinnedMatchId = null
-                        },
-                        onClear = {
-                            searchJob?.cancel()
-                            searchJob = null
-                            highlightedMessageId = null
-                            searchQuery = ""
-                            searchPinnedMatchId = null
-                        },
-                        onClose = { closeSearch() },
-                        onSearchAction = { navigateToSearchMatch(forward = true) },
-                        focusRequester = searchFocusRequester,
-                    )
-                } else {
-                    TopAppBar(
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier =
-                                    Modifier
-                                        // Fill the title slot so the whole strip between
-                                        // the back arrow and the overflow menu opens
-                                        // details, not just the avatar/name. Those two
-                                        // live in their own slots and keep their taps.
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { showDetails = true }
-                                        .semantics { contentDescription = openDetailsDescription },
-                            ) {
-                                GroupAvatar(
-                                    appState = appState,
-                                    group = controller.group,
-                                    title = controller.title(groupTitleCopy),
-                                    // For a 1:1 DM the seed must match the peer-derived
-                                    // avatar so the initials fallback stays stable, just
-                                    // like the chat-list row (#837).
-                                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                                    size = 36.dp,
-                                    fallbackPictureUrl = controller.avatarAccount?.let(appState::avatarUrl),
-                                )
-                                Column {
-                                    Text(
-                                        controller.title(groupTitleCopy),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+            ConversationTopBar(
+                selectionMode = selectionMode,
+                selectedCount = batchSelectionUi.actionItems.size,
+                canCopySelection = batchSelectionUi.copyText.isNotBlank(),
+                canForwardSelection = batchSelectionUi.forwardBodies.isNotEmpty(),
+                onCloseSelection = { selectedMessages.clear() },
+                onCopySelection = {
+                    if (batchSelectionUi.copyText.isNotBlank()) {
+                        clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                        selectedMessages.clear()
+                    }
+                },
+                onForwardSelection = {
+                    if (batchSelectionUi.forwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                },
+                onDeleteSelection = { showBatchDeleteConfirm = true },
+                searchOpen = searchOpen,
+                searchQuery = searchQuery,
+                onSearchQueryChange = {
+                    searchJob?.cancel()
+                    searchJob = null
+                    highlightedMessageId = null
+                    searchQuery = it
+                    searchPinnedMatchId = null
+                },
+                onClearSearch = {
+                    searchJob?.cancel()
+                    searchJob = null
+                    highlightedMessageId = null
+                    searchQuery = ""
+                    searchPinnedMatchId = null
+                },
+                onCloseSearch = ::closeSearch,
+                onSearchAction = { navigateToSearchMatch(forward = true) },
+                searchFocusRequester = searchFocusRequester,
+                appState = appState,
+                controller = controller,
+                groupTitleCopy = groupTitleCopy,
+                openedAsDmHint = openedAsDmHint,
+                openDetailsDescription = openDetailsDescription,
+                onOpenDetails = { showDetails = true },
+                onBack = onBack,
+                menuOpen = menuOpen,
+                onMenuOpenChange = { menuOpen = it },
+                onOpenSearch = {
+                    menuOpen = false
+                    val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                    val anchorMessage =
+                        bookmark.anchor.messageId?.let { messageId ->
+                            renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
+                        }
+                    preSearchScrollAnchor =
+                        ConversationSearchScrollAnchor(
+                            bookmark = bookmark,
+                            match =
+                                anchorMessage?.let {
+                                    ConversationSearchMatch(
+                                        messageIdHex = it.record.messageIdHex,
+                                        timelineAt = it.projected?.timelineAt ?: it.record.recordedAt,
                                     )
-                                    // Subtitle line: members count (groups) and the
-                                    // disappearing-timer indicator inline on ONE row,
-                                    // not stacked. The one-time tooltip anchors to the
-                                    // whole line when the timer is on.
-                                    val membersSubtitle =
-                                        if (
-                                            shouldShowConversationMembersSubtitle(
-                                                membersLoaded = controller.membersLoaded,
-                                                openedAsDmHint = openedAsDmHint,
-                                                groupName = controller.group.name,
-                                                memberCount = controller.memberCount,
-                                            )
-                                        ) {
-                                            controller.subtitle(
-                                                justYou = stringResource(R.string.just_you),
-                                                oneMember = stringResource(R.string.one_member),
-                                                membersFormat = stringResource(R.string.members_count),
-                                            )
-                                        } else {
-                                            null
-                                        }
-                                    val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
-                                    val showTimer = disappearingSecs > 0L
-                                    if (membersSubtitle != null || showTimer) {
-                                        val labelStyle = MaterialTheme.typography.labelSmall
-                                        val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                        val subtitleRow: @Composable () -> Unit = {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            ) {
-                                                if (membersSubtitle != null) {
-                                                    Text(membersSubtitle, style = labelStyle, color = labelColor)
-                                                }
-                                                if (showTimer) {
-                                                    if (membersSubtitle != null) {
-                                                        Text("·", style = labelStyle, color = labelColor)
-                                                    }
-                                                    Icon(
-                                                        Icons.Default.Schedule,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(13.dp),
-                                                        tint = labelColor,
-                                                    )
-                                                    Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
-                                                }
-                                            }
-                                        }
-                                        if (showTimer) {
-                                            val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                            val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                            // Snapshot the one-time decision so marking the flag
-                                            // (which we do first, to persist before a quick exit
-                                            // can re-arm it) doesn't recompose this branch away and
-                                            // cancel the still-suspended show().
-                                            val showTooltipOnce =
-                                                remember(controller.group.groupIdHex) {
-                                                    !appState.disappearingTooltipShown
-                                                }
-                                            if (showTooltipOnce) {
-                                                LaunchedEffect(controller.group.groupIdHex) {
-                                                    appState.markDisappearingTooltipShown()
-                                                    timerTooltipState.show()
-                                                }
-                                            }
-                                            TooltipBox(
-                                                positionProvider =
-                                                    TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                                tooltip = { RichTooltip { Text(timerTooltipText) } },
-                                                state = timerTooltipState,
-                                                content = subtitleRow,
-                                            )
-                                        } else {
-                                            subtitleRow()
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
-                            }
-                            KeyboardPreservingDropdownMenu(
-                                expanded = menuOpen,
-                                onDismissRequest = { menuOpen = false },
-                                shape = RoundedCornerShape(20.dp),
-                                // Inset the panel from the right screen edge instead
-                                // of letting it sit flush against it.
-                                offset = DpOffset(x = (-8).dp, y = 0.dp),
-                                modifier = Modifier.widthIn(min = 232.dp),
-                            ) {
-                                // Iconless, roomier rows: each entry reads as a
-                                // full-width tappable line of body-large text rather
-                                // than a compact icon+label cell.
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.conversation_search_open),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    },
-                                    contentPadding = conversationMenuItemPadding,
-                                    onClick = {
-                                        menuOpen = false
-                                        // Snapshot the current scroll position before the
-                                        // search auto-scroll effect can move the list, so
-                                        // closing search can restore it (#292).
-                                        val bookmark = scrollCoordinator.bookmark(currentScrollAnchor())
-                                        val anchorMessage =
-                                            bookmark.anchor.messageId?.let { messageId ->
-                                                renderedTimeline.firstOrNull { it.record.messageIdHex == messageId }
-                                            }
-                                        preSearchScrollAnchor =
-                                            ConversationSearchScrollAnchor(
-                                                bookmark = bookmark,
-                                                match =
-                                                    anchorMessage?.let {
-                                                        ConversationSearchMatch(
-                                                            messageIdHex = it.record.messageIdHex,
-                                                            timelineAt =
-                                                                it.projected?.timelineAt
-                                                                    ?: it.record.recordedAt,
-                                                        )
-                                                    },
-                                            )
-                                        searchOpen = true
-                                    },
-                                )
-                                if (!controller.group.pendingConfirmation) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
-                                        contentPadding = conversationMenuItemPadding,
-                                        enabled = !controller.mutationInFlight,
-                                        onClick = {
-                                            menuOpen = false
-                                            appState.launchMutation {
-                                                controller.setArchived(!controller.group.archived)
-                                            }
-                                        },
-                                    )
-                                    if (controller.isSelfMember) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.leave),
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                )
-                                            },
-                                            contentPadding = conversationMenuItemPadding,
-                                            // Gate on membersLoaded: the sole-admin routing
-                                            // below reads the roster, and an empty (unloaded)
-                                            // roster would misroute to a plain leave.
-                                            enabled = !controller.mutationInFlight && controller.membersLoaded,
-                                            onClick = {
-                                                menuOpen = false
-                                                // A sole admin with other members can't
-                                                // leave until they transfer admin; route
-                                                // them to the transfer flow instead of
-                                                // the old leaveGroup() toast dead end.
-                                                appState.launchMutation {
-                                                    when (val leaveAction = controller.leaveAction()) {
-                                                        LeaveAction.SoleAdminMustTransfer ->
-                                                            showTransferAdminFirst = true
-                                                        LeaveAction.SoleMemberDeletesGroup,
-                                                        LeaveAction.Standard,
-                                                        -> pendingTopBarLeaveAction = leaveAction
-                                                    }
-                                                }
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                    )
-                }
-                // Read-aloud transport renders beneath whichever bar is
-                // active and survives selection, search, and navigation.
-                TtsTransportBar(appState)
-            }
+                                },
+                        )
+                    searchOpen = true
+                },
+                onToggleArchived = {
+                    menuOpen = false
+                    appState.launchMutation { controller.setArchived(!controller.group.archived) }
+                },
+                onRequestLeave = {
+                    menuOpen = false
+                    appState.launchMutation {
+                        when (val leaveAction = controller.leaveAction()) {
+                            LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
+                            LeaveAction.SoleMemberDeletesGroup,
+                            LeaveAction.Standard,
+                            -> pendingTopBarLeaveAction = leaveAction
+                        }
+                    }
+                },
+            )
         },
         bottomBar = {
-            // Measure the real bottom chrome (composer with reply/edit banners and
-            // grown multi-line input, search nav bar, invite bar, or notice) and lift
-            // the global toast host by that amount, instead of assuming the resting
-            // single-line composer height (#122, #796). Nav/IME insets are subtracted
-            // because WhiteNoiseSnackbarHost pads for those itself.
-            val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { size ->
-                        if (bottomChromeHeightObserver.onMeasured(size.height)) {
-                            reanchorNewestAfterBottomInputChange(frameCount = 1)
-                        }
-                        val chromeBottom = chromeInsets.getBottom(density)
-                        snackbarBottomInset.value =
-                            with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
-                    },
-            ) {
-                when {
-                    // Selection owns the screen chrome; hide search navigation,
-                    // invite controls, and the composer until it exits.
-                    selectionMode -> Unit
-                    // While search is open the composer steps aside for the match
-                    // navigation bar pinned above the keyboard.
-                    searchOpen ->
-                        ConversationSearchNavBar(
-                            matchCount = effectiveSearchMatchIds.size,
-                            activeIndex = searchActiveIndex,
-                            hasQuery = searchQuery.isNotBlank(),
-                            onPrev = { navigateToSearchMatch(forward = false) },
-                            onNext = { navigateToSearchMatch(forward = true) },
+            ConversationBottomBar(
+                selectionMode = selectionMode,
+                searchOpen = searchOpen,
+                searchMatchCount = effectiveSearchMatchIds.size,
+                searchActiveIndex = searchActiveIndex,
+                hasSearchQuery = searchQuery.isNotBlank(),
+                onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
+                onNextSearchMatch = { navigateToSearchMatch(forward = true) },
+                hasError = controller.error != null,
+                composerGate = composerGate,
+                controller = controller,
+                appState = appState,
+                messageTextCopy = messageTextCopy,
+                onBack = onBack,
+                initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+                onDraftChange = { appState.setDraft(controller.group.groupIdHex, it) },
+                composerTextState = composerTextState,
+                composerAttachmentSheet = composerAttachmentSheet,
+                onAfterSend = { revealSentMessage() },
+                onPickFromGallery = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                onPickRecentMedia = { uri ->
+                    pendingMediaUris = (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                },
+                onCaptureFromCamera = {
+                    val granted =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        launchCameraCapture()
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                onPickDocument = { documentPickerLauncher.launch(arrayOf("*/*")) },
+                onShareLocation = {
+                    if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    ) {
+                        locationPickerOpen = true
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
                         )
-                    controller.error != null -> Unit
-                    // Membership-display gate (issues #545 and #623). During the
-                    // brief window before refreshMembers() confirms the roster we
-                    // must not flash a state we don't actually know: a left group
-                    // flashing the active composer (#545) OR a member's group —
-                    // especially an admin re-entering their own group — flashing the
-                    // "no longer a member" notice (#623, the inverse). The gate
-                    // paints the composer only for a (believed) member, the notice
-                    // only for a known not-member, and NOTHING while membership is
-                    // genuinely unknown (cold open with no seeding snapshot), where
-                    // it upgrades on the confirmed result. The controller's
-                    // Text handoff may proceed for a positively seeded current
-                    // member; destructive/admin mutations still require verified
-                    // membership through `canSendMessages`.
-                    else ->
-                        when (composerGate) {
-                            // Reserve the composer's resting height while membership
-                            // is still unknown (e.g. right after an account switch),
-                            // so the bottom inset is stable and the composer doesn't
-                            // pop in over the last message once it resolves. Matches
-                            // ComposerBar's resting height (the 44.dp pill plus its
-                            // Column's 10.dp vertical padding top and bottom). Kept
-                            // transparent so no surface colour flashes before the
-                            // composer or notice resolves.
-                            ComposerGate.PENDING ->
-                                Spacer(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .navigationBarsPadding()
-                                        .imePadding()
-                                        .height(64.dp),
-                                )
-                            ComposerGate.NOTICE -> RemovedMemberComposerNotice()
-                            ComposerGate.FROZEN -> FrozenGroupComposerNotice()
-                            ComposerGate.DISBANDED ->
-                                DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
-                            ComposerGate.INVITE ->
-                                InvitePreviewActionBar(
-                                    mutationInFlight = controller.mutationInFlight,
-                                    onJoin = { appState.launchMutation { controller.acceptInvite() } },
-                                    onDecline = {
-                                        appState.launchMutation {
-                                            if (controller.declineInvite()) onBack()
-                                        }
-                                    },
-                                )
-                            ComposerGate.COMPOSER -> {
-                                val groupIdHex = controller.group.groupIdHex
-                                val editingRecord =
-                                    controller.editingMessageId?.let { id ->
-                                        controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                                    }
-                                ComposerBar(
-                                    replyingTo = controller.replyingTo,
-                                    replyingToMedia =
-                                        controller.replyingTo
-                                            ?.let(controller::mediaReferencesFor)
-                                            .orEmpty(),
-                                    replyingToDisplay =
-                                        controller.replyingTo
-                                            ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                                    messageTextCopy = messageTextCopy,
-                                    onCancelReply = { controller.replyingTo = null },
-                                    onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                    initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                                    onDraftChange = { appState.setDraft(groupIdHex, it) },
-                                    draftKey = groupIdHex,
-                                    textState = composerTextState,
-                                    attachmentSheetState = composerAttachmentSheet,
-                                    editingMessageId = controller.editingMessageId,
-                                    editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                    onCancelEdit = { controller.editingMessageId = null },
-                                    onAfterSend = {
-                                        // Always pull the user down to see their just-sent
-                                        // bubble, even if they were reading older history.
-                                        // Matches standard chat-app behavior.
-                                        revealSentMessage()
-                                    },
-                                    onPickFromGallery = {
-                                        imagePickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                                        )
-                                    },
-                                    onPickRecentMedia = { uri ->
-                                        // A tap on the recent-media strip stages that item
-                                        // into the same shelf as the picker, so the preview
-                                        // sheet opens with it queued (multi-select + send
-                                        // live in the preview).
-                                        pendingMediaUris =
-                                            (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
-                                    },
-                                    onCaptureFromCamera = {
-                                        val granted =
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.CAMERA,
-                                            ) == PackageManager.PERMISSION_GRANTED
-                                        if (granted) {
-                                            launchCameraCapture()
-                                        } else {
-                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        }
-                                    },
-                                    onPickDocument = {
-                                        // `*/*` lets the system file picker surface every
-                                        // installed provider (Drive, Downloads, Files…)
-                                        // without restricting by MIME. Bytes upload as-is.
-                                        documentPickerLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    onShareLocation = {
-                                        // Permission is requested here, on the tap, never
-                                        // earlier. Fine and coarse together so the user's
-                                        // approximate-only choice still works.
-                                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
-                                        ) {
-                                            locationPickerOpen = true
-                                        } else {
-                                            locationPermissionLauncher.launch(
-                                                arrayOf(
-                                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                                ),
-                                            )
-                                        }
-                                    },
-                                    onShareUser = { shareUserPickerOpen = true },
-                                    onShareContact = { contactPickerLauncher.launch(Unit) },
-                                    onPasteImageUris = { uris ->
-                                        // Receive-content URI grants are scoped to the
-                                        // paste callback. Copy the bytes into app-owned
-                                        // cache before returning, then stage those local
-                                        // FileProvider URIs through the same shelf as the
-                                        // photo picker/camera path.
-                                        val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
-                                        val pasteCandidates = uris.distinct().take(openSlots)
-                                        val localUris =
-                                            pasteCandidates.mapNotNull { uri ->
-                                                materializeReceiveContentImageUri(context, uri)
-                                            }
-                                        if (localUris.size < pasteCandidates.size) {
-                                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-                                        }
-                                        if (localUris.isEmpty()) return@ComposerBar
-                                        pendingMediaUris =
-                                            (pendingMediaUris + localUris)
-                                                .distinct()
-                                                .take(MEDIA_PICKER_MAX_ITEMS)
-                                    },
-                                    voiceRecordingController = voiceRecordingController,
-                                    appState = appState,
-                                    mentionCandidates = mentionPicker.candidates,
-                                    mentionPickerEnabled = mentionPicker.enabled,
-                                    autoFocusOnEnter = justCreated,
-                                    autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
-                                    autoFocusConsumedState = composerAutoFocusConsumed,
-                                    enterKeyBehavior = appState.enterKeyBehavior,
-                                    // #589: hoisted focus plumbing — the requester lets the
-                                    // resume observer restore focus, and the callback keeps
-                                    // `composerFocused` tracking the live keyboard state.
-                                    composerFocus = composerFocus,
-                                    onComposerFocusChanged = { focused ->
-                                        if (focused && !composerFocused && !imeIsOpen) {
-                                            imeTransitionBookmark =
-                                                scrollCoordinator.bookmark(currentScrollAnchor())
-                                        } else if (!focused && !imeIsOpen) {
-                                            imeTransitionBookmark = null
-                                        }
-                                        composerFocused = focused
-                                    },
-                                    onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
-                                    onKeyboardRestoreFromCustomInput = {
-                                        suppressNextImeOpenReanchor.set(true)
-                                    },
-                                    onKeyboardRestoreFromCustomInputFailed = {
-                                        suppressNextImeOpenReanchor.set(false)
-                                    },
-                                    recentEmojis = recentEmojiRecentsOwner.recents,
-                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                )
-                            }
+                    }
+                },
+                onShareUser = { shareUserPickerOpen = true },
+                onShareContact = { contactPickerLauncher.launch(Unit) },
+                onPasteImageUris = { uris ->
+                    val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
+                    val pasteCandidates = uris.distinct().take(openSlots)
+                    val localUris =
+                        pasteCandidates.mapNotNull { uri ->
+                            materializeReceiveContentImageUri(context, uri)
                         }
-                }
-            }
+                    if (localUris.size < pasteCandidates.size) {
+                        appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                    }
+                    if (localUris.isNotEmpty()) {
+                        pendingMediaUris =
+                            (pendingMediaUris + localUris)
+                                .distinct()
+                                .take(MEDIA_PICKER_MAX_ITEMS)
+                    }
+                },
+                voiceRecordingController = voiceRecordingController,
+                mentionCandidates = mentionPicker.candidates,
+                mentionPickerEnabled = mentionPicker.enabled,
+                autoFocusOnEnter = justCreated,
+                autoFocusOnDraftRestore = shouldFocusComposerOnDraftRestore(restoredDraftSnapshot),
+                autoFocusConsumedState = composerAutoFocusConsumed,
+                composerFocus = composerFocus,
+                onComposerFocusChanged = { focused ->
+                    if (focused && !composerFocused && !imeIsOpen) {
+                        imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                    } else if (!focused && !imeIsOpen) {
+                        imeTransitionBookmark = null
+                    }
+                    composerFocused = focused
+                },
+                onBottomInputChanged = { reanchorNewestAfterBottomInputChange() },
+                onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
+                onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
+                recentEmojis = recentEmojiRecentsOwner.recents,
+                onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                onBottomChromeMeasured = { heightPx, chromeBottomPx ->
+                    if (bottomChromeHeightObserver.onMeasured(heightPx)) {
+                        reanchorNewestAfterBottomInputChange(frameCount = 1)
+                    }
+                    snackbarBottomInset.value =
+                        with(density) { (heightPx - chromeBottomPx).coerceAtLeast(0).toDp() }
+                },
+            )
         },
     ) { padding ->
         Box(
@@ -3523,245 +2674,81 @@ internal fun ConversationScreen(
                                     }
                                 },
                             ) { index, item ->
-                                Column(Modifier.fillMaxWidth()) {
-                                    // Rendered inside the slot, not as its own item, so
-                                    // the anchor index math stays intact.
-                                    val older = renderedTimeline.getOrNull(index - 1)
-                                    val daySeparatorLabel =
-                                        remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
-                                            if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
-                                                messageDayLabel(item.record.recordedAt, transcriptLocale)
-                                            } else {
-                                                null
-                                            }
+                                val messageId = item.record.messageIdHex
+                                TimelineRow(
+                                    item = item,
+                                    older = renderedTimeline.getOrNull(index - 1),
+                                    newer = renderedTimeline.getOrNull(index + 1),
+                                    transcriptLocale = transcriptLocale,
+                                    entryUnreadCount = entryUnreadCount,
+                                    unreadIncomingCount = unreadIncomingCount,
+                                    entryUnreadDividerRetired = entryUnreadDividerRetired,
+                                    entryFirstUnreadMessageId = entryFirstUnreadMessageId,
+                                    onMeasured = { id, height ->
+                                        if (timelineItemHeightsPx[id] != height) timelineItemHeightsPx[id] = height
+                                    },
+                                    appState = appState,
+                                    controller = controller,
+                                    composerTextState = composerTextState,
+                                    highlighted = messageId == highlightedMessageId,
+                                    selectionMode = selectionMode,
+                                    textSelectionMode = textSelectionMessageId == messageId,
+                                    onTextSelectionModeChange = { enabled ->
+                                        if (enabled) {
+                                            openActionMenuId = null
+                                            textSelectionMessageId = messageId
+                                            textSelectionBubbleBounds = null
+                                        } else if (textSelectionMessageId == messageId) {
+                                            clearTextSelection()
                                         }
-                                    if (daySeparatorLabel != null) {
-                                        DaySeparator(daySeparatorLabel)
-                                    }
-                                    if (
-                                        shouldShowConversationEntryUnreadDivider(
-                                            entryUnreadCount = entryUnreadCount,
-                                            liveUnreadCount = unreadIncomingCount,
-                                            dividerRetired = entryUnreadDividerRetired,
-                                            messageId = item.record.messageIdHex,
-                                            firstUnreadMessageId = entryFirstUnreadMessageId,
-                                        )
-                                    ) {
-                                        UnreadMessagesDivider(count = entryUnreadCount)
-                                    }
-                                    // Measured below the day/unread separators, so centered
-                                    // scroll targets get the bubble's own height, not a
-                                    // separator-inflated one.
-                                    Column(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .onSizeChanged { size ->
-                                                if (size.height > 0 && timelineItemHeightsPx[item.record.messageIdHex] != size.height) {
-                                                    timelineItemHeightsPx[item.record.messageIdHex] = size.height
-                                                }
-                                            },
-                                    ) {
-                                        // Synthetic `dbg:stream:` rows must never fall
-                                        // through to normal message rendering — not even in
-                                        // the window between the toggle flipping off and the
-                                        // republish that drops them. Draw the debug row only
-                                        // when enabled; otherwise suppress the row entirely.
-                                        if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                                            if (appState.streamingDebugEnabled) {
-                                                StreamDebugEventRow(record = item.record)
-                                            }
-                                            return@Column
+                                    },
+                                    onTextSelectionBoundsChange = { bounds ->
+                                        if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
+                                    },
+                                    batchSelectable = messageId in selectableMessages,
+                                    selected = selectedMessages.containsKey(messageId),
+                                    onToggleSelection = {
+                                        if (selectedMessages.containsKey(messageId)) {
+                                            selectedMessages.remove(messageId)
+                                        } else {
+                                            selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
                                         }
-                                        // One decision point for which row a record renders
-                                        // as. Group-system (kind 1210) rows are derived state
-                                        // facts, not chat: they render the centered one-line
-                                        // summary, never a raw-JSON bubble — and that summary
-                                        // stays the default even in developer mode, with the
-                                        // MLS dump reachable per-row behind a tap (#857). The
-                                        // debug-row path covers the other non-user-visible
-                                        // signaling kinds only when streaming debug is on, so
-                                        // the timeline is byte-identical to today when off.
-                                        when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
-                                            TimelineRowKind.GroupSystem -> {
-                                                GroupSystemRow(
-                                                    record = item.record,
-                                                    appState = appState,
-                                                    groupSystem = item.projected?.groupSystem,
-                                                    onDeleteForMe =
-                                                        if (controller.group.pendingConfirmation) {
-                                                            null
-                                                        } else {
-                                                            { controller.hideMessageForMe(item.record.messageIdHex) }
-                                                        },
-                                                )
-                                                return@Column
-                                            }
-                                            TimelineRowKind.AgentOperation -> {
-                                                // Standard bubbles own deletion and
-                                                // convergence tombstones. Use the
-                                                // dedicated chip only for live rows.
-                                                val projectedDeleted = item.projected?.deleted == true
-                                                val optimisticallyDeleted =
-                                                    MessageProjector.isDeleted(
-                                                        item.record.messageIdHex,
-                                                        controller.deletedMessageIds,
-                                                    )
-                                                val invalidated = item.projected?.invalidationStatus != null
-                                                if (
-                                                    shouldRenderDedicatedAgentOperationRow(
-                                                        projectedDeleted = projectedDeleted,
-                                                        optimisticallyDeleted = optimisticallyDeleted,
-                                                        invalidated = invalidated,
-                                                    )
-                                                ) {
-                                                    val operation =
-                                                        remember(item.record) {
-                                                            AgentOperationProjector.project(item.record)
-                                                        }
-                                                    if (operation != null) {
-                                                        AgentOperationTimelineRow(
-                                                            item = item,
-                                                            operation = operation,
-                                                            controller = controller,
-                                                            appState = appState,
-                                                            readOnly = controller.group.pendingConfirmation,
-                                                        )
-                                                        return@Column
-                                                    }
-                                                }
-                                            }
-                                            TimelineRowKind.DebugRow -> {
-                                                MessageDebugRow(
-                                                    style = MessageDebugClassifier.debugStyle(item.record),
-                                                    record = item.record,
-                                                )
-                                                return@Column
-                                            }
-                                            TimelineRowKind.Bubble -> Unit
+                                    },
+                                    rangeDragActive = dragAnchorTimelineId == item.id,
+                                    onDragSelectionStart = { pointerWindowY ->
+                                        openActionMenuId = null
+                                        clearTextSelection()
+                                        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                        dragAnchorTimelineId = item.id
+                                        dragPointerWindowY = pointerWindowY
+                                    },
+                                    onDragSelection = { pointerWindowY ->
+                                        dragPointerWindowY = pointerWindowY
+                                        updateMessageDragSelection(pointerWindowY)
+                                    },
+                                    onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
+                                    onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
+                                    quickReactionEmojis = quickReactionEmojis,
+                                    recentEmojis = recentEmojiRecentsOwner.recents,
+                                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                                    isActionMenuOpen = openActionMenuId == messageId,
+                                    onActionMenuOpenChange = { open ->
+                                        if (open) clearTextSelection()
+                                        if (open) {
+                                            openActionMenuId = messageId
+                                        } else if (openActionMenuId == messageId) {
+                                            openActionMenuId = null
                                         }
-                                        val newer = renderedTimeline.getOrNull(index + 1)
-                                        val sameSenderAsOlderBubble =
-                                            older?.let { candidate ->
-                                                conversationBubbleRowsShareSenderRun(
-                                                    first = candidate,
-                                                    second = item,
-                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
-                                                    deletedMessageIds = controller.deletedMessageIds,
-                                                )
-                                            } == true
-                                        val sameSenderAsNewerBubble =
-                                            newer?.let { candidate ->
-                                                conversationBubbleRowsShareSenderRun(
-                                                    first = item,
-                                                    second = candidate,
-                                                    streamingDebugEnabled = appState.streamingDebugEnabled,
-                                                    deletedMessageIds = controller.deletedMessageIds,
-                                                )
-                                            } == true
-                                        val senderDecoration =
-                                            GroupProjector.transcriptSenderDecoration(
-                                                isDm = controller.isDm,
-                                                mine = controller.isMessageMine(item.record),
-                                                sameSenderAsOlderBubble = sameSenderAsOlderBubble,
-                                                sameSenderAsNewerBubble = sameSenderAsNewerBubble,
-                                            )
-                                        val messageId = item.record.messageIdHex
-                                        val ownsActionMenu = openActionMenuId == messageId
-                                        DismissMessageActionMenuOnDispose(
-                                            messageId = messageId,
-                                            isOpen = ownsActionMenu,
-                                        ) {
-                                            if (openActionMenuId == messageId) {
-                                                openActionMenuId = null
-                                            }
-                                        }
-                                        MessageBubble(
-                                            item = item,
-                                            controller = controller,
-                                            appState = appState,
-                                            composerTextState = composerTextState,
-                                            highlighted = item.record.messageIdHex == highlightedMessageId,
-                                            selectionMode = selectionMode,
-                                            textSelectionMode = textSelectionMessageId == item.record.messageIdHex,
-                                            onTextSelectionModeChange = { enabled ->
-                                                val messageId = item.record.messageIdHex
-                                                if (enabled) {
-                                                    openActionMenuId = null
-                                                    textSelectionMessageId = messageId
-                                                    textSelectionBubbleBounds = null
-                                                } else if (textSelectionMessageId == messageId) {
-                                                    clearTextSelection()
-                                                }
-                                            },
-                                            onTextSelectionBoundsChange = { bounds ->
-                                                if (textSelectionMessageId == item.record.messageIdHex) {
-                                                    textSelectionBubbleBounds = bounds
-                                                }
-                                            },
-                                            batchSelectable = item.record.messageIdHex in selectableMessages,
-                                            selected = selectedMessages.containsKey(item.record.messageIdHex),
-                                            onToggleSelection = {
-                                                val messageId = item.record.messageIdHex
-                                                if (selectedMessages.containsKey(messageId)) {
-                                                    selectedMessages.remove(messageId)
-                                                } else {
-                                                    selectableMessages[messageId]?.let {
-                                                        selectedMessages[messageId] = it
-                                                    }
-                                                }
-                                            },
-                                            rangeDragActive = dragAnchorTimelineId == item.id,
-                                            onDragSelectionStart = { pointerWindowY ->
-                                                openActionMenuId = null
-                                                clearTextSelection()
-                                                scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                                dragAnchorTimelineId = item.id
-                                                dragPointerWindowY = pointerWindowY
-                                            },
-                                            onDragSelection = { pointerWindowY ->
-                                                dragPointerWindowY = pointerWindowY
-                                                updateMessageDragSelection(pointerWindowY)
-                                            },
-                                            onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
-                                            onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
-                                            quickReactionEmojis = quickReactionEmojis,
-                                            recentEmojis = recentEmojiRecentsOwner.recents,
-                                            onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                            isActionMenuOpen = ownsActionMenu,
-                                            onActionMenuOpenChange = { open ->
-                                                if (open) clearTextSelection()
-                                                if (open) {
-                                                    openActionMenuId = messageId
-                                                } else if (openActionMenuId == messageId) {
-                                                    openActionMenuId = null
-                                                }
-                                            },
-                                            // Lambdas, not method references: the Compose
-                                            // compiler memoizes lambdas but allocates a fresh
-                                            // function reference per recomposition, which made
-                                            // every visible bubble recompose on any timeline
-                                            // change. See #110.
-                                            onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                            onQuickReactionsReset = { resetQuickReactionEmojis() },
-                                            onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                            composerGate = composerGate,
-                                            groupDisbanded = controller.group.disbanded,
-                                            inviteMutationInFlight = controller.mutationInFlight,
-                                            onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
-                                            onDeclineInvite = {
-                                                appState.launchMutation {
-                                                    if (controller.declineInvite()) onBack()
-                                                }
-                                            },
-                                            mentionCandidates = mentionPicker.candidates,
-                                            mentionPickerEnabled = mentionPicker.enabled,
-                                            showSenderName = senderDecoration.showName,
-                                            showSenderAvatar = senderDecoration.showAvatar,
-                                            collapseLongMessages = collapseLongMessages,
-                                            readOnly = controller.group.pendingConfirmation,
-                                        )
-                                    }
-                                }
+                                    },
+                                    onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                    onQuickReactionsReset = { resetQuickReactionEmojis() },
+                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                    composerGate = composerGate,
+                                    onBack = onBack,
+                                    mentionCandidates = mentionPicker.candidates,
+                                    mentionPickerEnabled = mentionPicker.enabled,
+                                    collapseLongMessages = collapseLongMessages,
+                                )
                             }
                             // Kept minimal (matches the top-spacer) so the last
                             // bubble sits a tight breathing-room above the
@@ -3968,7 +2955,7 @@ internal fun ConversationScreen(
             onDismiss = { pendingContactShare = null },
             onSend = { selected ->
                 pendingContactShare = null
-                sendSharedContact(selected)
+                mediaSender.sendSharedContact(selected)
             },
         )
     }
@@ -4028,7 +3015,7 @@ internal fun ConversationScreen(
                 pendingDocumentUris = emptyList()
             },
             onSend = { caption, onResult ->
-                sendStagedAttachments(
+                mediaSender.sendStagedAttachments(
                     imageUris,
                     documentUris,
                     caption,
