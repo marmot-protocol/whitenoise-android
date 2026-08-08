@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -382,6 +381,13 @@ internal fun ChatsScreen(
         }
     val visibleChatIds = remember(visibleItems) { visibleItems.map { it.id }.toSet() }
     val orderedVisibleChatIds = remember(visibleItems) { visibleItems.map { it.id } }
+    val pinnedBoundary =
+        remember(visibleItems, showArchived) {
+            pinnedBoundaryIndex(
+                pinnedStates = visibleItems.map(ChatListItem::pinned),
+                showArchived = showArchived,
+            )
+        }
 
     fun openGroupFromVisibleList(
         item: ChatListItem,
@@ -451,10 +457,12 @@ internal fun ChatsScreen(
         if (items.isEmpty()) return
         clearSelection()
         appState.launchMutation {
-            var succeeded = 0
-            items.forEach { item ->
-                if (controller.setArchived(item.group.groupIdHex, archive, notify = false)) succeeded++
-            }
+            val succeeded =
+                controller.setArchived(
+                    groupIds = items.map { it.group.groupIdHex },
+                    archived = archive,
+                    notify = false,
+                )
             if (succeeded > 0) {
                 val pluralRes =
                     if (archive) {
@@ -527,6 +535,7 @@ internal fun ChatsScreen(
             query = trimmedQuery,
         )
     val chatListState = key(showArchived) { rememberLazyListState() }
+    var headReorderInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
     val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
@@ -667,6 +676,7 @@ internal fun ChatsScreen(
         activeHeadId = activeHeadId,
         datasetKey = chatListDatasetKey,
         isActiveList = !showArchived,
+        onHeadReorderInProgressChange = { headReorderInProgress = it },
     )
     val archivedUnreadCount =
         remember(controller.archivedItems) {
@@ -926,68 +936,76 @@ internal fun ChatsScreen(
                                     },
                             state = chatListState,
                         ) {
-                            itemsIndexed(visibleItems, key = { _, item -> item.id }) { targetIndex, item ->
-                                // Body-match snippet + tap-to-message focus are
-                                // for rows that matched ONLY on an older message
-                                // body. A row that also matches its title or
-                                // current preview keeps the normal single-line
-                                // layout and a normal conversation open, so drop
-                                // its body match here (issue #290 contract). The
-                                // title/preview test mirrors the synchronous
-                                // match in applyChatListSearchAndFilter so the
-                                // classification can't drift from the filter.
-                                val rawBodyMatch = bodyMatches[item.id]
-                                val bodyMatch =
-                                    remember(
-                                        item,
-                                        appState,
-                                        groupTitleCopy,
-                                        ciSearchNeedle,
-                                        profileRev,
-                                        rawBodyMatch,
-                                    ) {
-                                        rawBodyMatch?.takeUnless {
-                                            ChatListMessageSearch.titleOrPreviewMatches(
-                                                displayTitle =
-                                                    chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                                                previewText = item.projectedPreviewText(),
-                                                ciNeedle = ciSearchNeedle,
-                                                description = item.group.description,
-                                            )
-                                        }
+                            visibleItems.forEachIndexed { targetIndex, item ->
+                                if (targetIndex == pinnedBoundary) {
+                                    this.item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
+                                        ChatListPinnedBoundary()
                                     }
-                                Box(modifier = chatListRowMotion(targetIndex)) {
-                                    ChatListRow(
-                                        item = item,
-                                        appState = appState,
-                                        isMuted =
-                                            item.engineMuted() || isLocallyMuted(item.group.groupIdHex),
-                                        selectionMode = selectionMode,
-                                        selected = item.id in selectedChatIds,
-                                        bodyMatch = bodyMatch,
-                                        onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
-                                        onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
-                                        onOpenActions = {
-                                            actionSheetChatId = item.id
-                                        },
-                                        onDragSelectionStart = { pointerWindowY ->
-                                            actionSheetChatId = null
-                                            dragAnchorChatId = item.id
-                                            dragPointerWindowY = pointerWindowY
-                                        },
-                                        onDragSelection = { pointerWindowY ->
-                                            dragPointerWindowY = pointerWindowY
-                                            updateChatDragSelection(pointerWindowY)
-                                        },
-                                        onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
-                                        onDragSelectionCancel = { finishChatDrag(clearSelection = true) },
-                                        rangeDragActive = dragAnchorChatId == item.id,
-                                        onToggleSelection = {
-                                            val updated = toggleChatListSelection(selectedChatIds, item.id)
-                                            selectedChatIds.clear()
-                                            selectedChatIds.addAll(updated)
-                                        },
-                                    )
+                                }
+                                this.item(key = item.id) {
+                                    // Body-match snippet + tap-to-message focus are
+                                    // for rows that matched ONLY on an older message
+                                    // body. A row that also matches its title or
+                                    // current preview keeps the normal single-line
+                                    // layout and a normal conversation open, so drop
+                                    // its body match here (issue #290 contract). The
+                                    // title/preview test mirrors the synchronous
+                                    // match in applyChatListSearchAndFilter so the
+                                    // classification can't drift from the filter.
+                                    val rawBodyMatch = bodyMatches[item.id]
+                                    val bodyMatch =
+                                        remember(
+                                            item,
+                                            appState,
+                                            groupTitleCopy,
+                                            ciSearchNeedle,
+                                            profileRev,
+                                            rawBodyMatch,
+                                        ) {
+                                            rawBodyMatch?.takeUnless {
+                                                ChatListMessageSearch.titleOrPreviewMatches(
+                                                    displayTitle =
+                                                        chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                                                    previewText = item.projectedPreviewText(),
+                                                    ciNeedle = ciSearchNeedle,
+                                                    description = item.group.description,
+                                                )
+                                            }
+                                        }
+                                    Box(modifier = chatListRowMotion(targetIndex)) {
+                                        ChatListRow(
+                                            item = item,
+                                            appState = appState,
+                                            isMuted =
+                                                item.engineMuted() || isLocallyMuted(item.group.groupIdHex),
+                                            interactionsEnabled = !headReorderInProgress,
+                                            selectionMode = selectionMode,
+                                            selected = item.id in selectedChatIds,
+                                            bodyMatch = bodyMatch,
+                                            onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                                            onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                                            onOpenActions = {
+                                                actionSheetChatId = item.id
+                                            },
+                                            onDragSelectionStart = { pointerWindowY ->
+                                                actionSheetChatId = null
+                                                dragAnchorChatId = item.id
+                                                dragPointerWindowY = pointerWindowY
+                                            },
+                                            onDragSelection = { pointerWindowY ->
+                                                dragPointerWindowY = pointerWindowY
+                                                updateChatDragSelection(pointerWindowY)
+                                            },
+                                            onDragSelectionEnd = { finishChatDrag(clearSelection = false) },
+                                            onDragSelectionCancel = { finishChatDrag(clearSelection = true) },
+                                            rangeDragActive = dragAnchorChatId == item.id,
+                                            onToggleSelection = {
+                                                val updated = toggleChatListSelection(selectedChatIds, item.id)
+                                                selectedChatIds.clear()
+                                                selectedChatIds.addAll(updated)
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }

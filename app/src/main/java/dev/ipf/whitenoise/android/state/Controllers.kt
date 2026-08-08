@@ -2707,10 +2707,16 @@ private data class RemovedChatRowSnapshot(
     val optimisticState: OptimisticChatListPreviewState?,
 )
 
+private data class OptimisticArchiveIntent(
+    val generation: Long,
+    val archived: Boolean,
+)
+
 class ChatsController private constructor(
     private val appState: WhiteNoiseAppState,
     private val memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
     private val memberSnapshotRetryDelay: (Int) -> Long,
+    private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
     initialAccountRef: String?,
 ) {
     constructor(appState: WhiteNoiseAppState) :
@@ -2720,6 +2726,9 @@ class ChatsController private constructor(
                 appState.marmotIo { groupMembers(accountRef, groupIdHex) }
             },
             memberSnapshotRetryDelay = ::memberSnapshotRetryDelayMillis,
+            groupArchivedUpdater = { accountRef, groupIdHex, archived ->
+                appState.marmotIo { setGroupArchived(accountRef, groupIdHex, archived) }
+            },
             initialAccountRef = null,
         )
 
@@ -2728,7 +2737,23 @@ class ChatsController private constructor(
         initialAccountRef: String,
         memberSnapshotRetryDelay: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
         memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
-    ) : this(appState, memberSnapshotLoader, memberSnapshotRetryDelay, initialAccountRef)
+    ) : this(
+        appState,
+        memberSnapshotLoader,
+        memberSnapshotRetryDelay,
+        { accountRef, groupIdHex, archived ->
+            appState.marmotIo { setGroupArchived(accountRef, groupIdHex, archived) }
+        },
+        initialAccountRef,
+    )
+
+    internal constructor(
+        appState: WhiteNoiseAppState,
+        initialAccountRef: String,
+        memberSnapshotRetryDelay: (Int) -> Long = ::memberSnapshotRetryDelayMillis,
+        memberSnapshotLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+        groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi,
+    ) : this(appState, memberSnapshotLoader, memberSnapshotRetryDelay, groupArchivedUpdater, initialAccountRef)
 
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
@@ -2988,6 +3013,8 @@ class ChatsController private constructor(
     private val activitySequenceByGroup = mutableMapOf<String, ULong>()
     private var nextActivitySequence = 0uL
     private val optimisticChatListPreviewByGroup = mutableMapOf<String, OptimisticChatListPreviewState>()
+    private val optimisticArchiveByGroup = mutableMapOf<String, OptimisticArchiveIntent>()
+    private var nextArchiveGeneration = 0L
 
     // Whether the chat list is on screen. While a conversation is foregrounded
     // the subscription stays warm (updates keep folding into the maps above),
@@ -3512,10 +3539,11 @@ class ChatsController private constructor(
     // by-id resolution for navigation — see freshly created/updated groups
     // instead of the stale `items` snapshot.
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
-        chatRows.map { row ->
+        chatRows.map { authoritativeRow ->
+            val row = optimisticArchiveRow(authoritativeRow)
             chatListItemFromProjection(
                 row = row,
-                group = groupRecordsById[row.groupIdHex],
+                group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
                 presentationMembers = presentationMembersByGroup[row.groupIdHex],
@@ -3532,12 +3560,13 @@ class ChatsController private constructor(
     }
 
     private fun projectChatRow(
-        row: ChatListRowFfi,
+        authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-    ): ChatListItem =
-        chatListItemFromProjection(
+    ): ChatListItem {
+        val row = optimisticArchiveRow(authoritativeRow)
+        return chatListItemFromProjection(
             row = row,
-            group = groupRecordsById[row.groupIdHex],
+            group = optimisticArchiveGroup(row.groupIdHex, groupRecordsById[row.groupIdHex]),
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
             presentationMembers = presentationMembersByGroup[row.groupIdHex],
@@ -3546,6 +3575,20 @@ class ChatsController private constructor(
             removed = row.groupIdHex in removedGroupIds,
             activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
         )
+    }
+
+    private fun optimisticArchiveRow(row: ChatListRowFfi): ChatListRowFfi =
+        optimisticArchiveByGroup[chatRowKey(row.groupIdHex)]
+            ?.let { intent -> row.copy(archived = intent.archived) }
+            ?: row
+
+    private fun optimisticArchiveGroup(
+        groupIdHex: String,
+        group: AppGroupRecordFfi?,
+    ): AppGroupRecordFfi? =
+        optimisticArchiveByGroup[chatRowKey(groupIdHex)]
+            ?.let { intent -> group?.copy(archived = intent.archived) }
+            ?: group
 
     fun sharedGroupsWith(
         accountIdHex: String,
@@ -4026,20 +4069,91 @@ class ChatsController private constructor(
         groupIdHex: String,
         archived: Boolean,
         notify: Boolean = true,
-    ): Boolean {
-        val account = accountRef ?: return false
-        return runCatchingCancellable {
-            appState.withGroupCommitLock(account, groupIdHex) {
-                val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
-                appState.applyLocalGroupUpdate(updated)
+    ): Boolean = setArchived(listOf(groupIdHex), archived, notify) > 0
+
+    /**
+     * Bulk archive/unarchive counterpart. Every eligible row receives its
+     * presentation-only intent before the first engine call starts, so the
+     * whole selection leaves the current folder in one frame. The authoritative
+     * chat/group maps remain untouched until Marmot confirms each mutation.
+     */
+    suspend fun setArchived(
+        groupIds: Collection<String>,
+        archived: Boolean,
+        notify: Boolean = true,
+    ): Int {
+        val account = accountRef ?: return 0
+        val intents = beginOptimisticArchive(groupIds, archived)
+        if (intents.isEmpty()) return 0
+
+        var succeeded = 0
+        try {
+            intents.forEach { (groupIdHex, intent) ->
+                val updated =
+                    runCatchingCancellable {
+                        appState.withGroupCommitLock(account, groupIdHex) {
+                            groupArchivedUpdater(account, groupIdHex, archived)
+                        }
+                    }.onFailure {
+                        appState.present(
+                            R.string.toast_couldnt_update_chat,
+                            AppText.Plain(it.message ?: it.javaClass.simpleName),
+                            copyable = true,
+                        )
+                    }.getOrNull()
+
+                if (updated != null) {
+                    applyLocalGroupUpdate(updated)
+                    succeeded += 1
+                }
+                finishOptimisticArchive(groupIdHex, intent)
             }
-            if (notify) {
-                appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
-            }
-            true
-        }.onFailure {
-            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
-        }.getOrDefault(false)
+        } finally {
+            // Cancellation (for example an account/runtime switch) must not
+            // strand presentation overlays for commits that never started.
+            intents.forEach { (groupIdHex, intent) -> finishOptimisticArchive(groupIdHex, intent) }
+        }
+        if (notify && succeeded > 0) {
+            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+        }
+        return succeeded
+    }
+
+    private fun beginOptimisticArchive(
+        groupIds: Collection<String>,
+        archived: Boolean,
+    ): List<Pair<String, OptimisticArchiveIntent>> {
+        val intents =
+            groupIds
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .distinctBy { it.lowercase() }
+                .mapNotNull { groupIdHex ->
+                    val rowKey = chatRowKey(groupIdHex)
+                    val currentRow = chatRowsByGroup[rowKey] ?: return@mapNotNull null
+                    val currentArchived = optimisticArchiveByGroup[rowKey]?.archived ?: currentRow.archived
+                    if (currentArchived == archived) return@mapNotNull null
+                    val intent =
+                        OptimisticArchiveIntent(
+                            generation = ++nextArchiveGeneration,
+                            archived = archived,
+                        )
+                    optimisticArchiveByGroup[rowKey] = intent
+                    groupIdHex to intent
+                }
+        if (intents.isNotEmpty()) recompute()
+        return intents
+    }
+
+    private fun finishOptimisticArchive(
+        groupIdHex: String,
+        intent: OptimisticArchiveIntent,
+    ) {
+        val rowKey = chatRowKey(groupIdHex)
+        if (optimisticArchiveByGroup[rowKey] == intent) {
+            optimisticArchiveByGroup.remove(rowKey)
+            recompute()
+        }
     }
 
     /**
@@ -4545,6 +4659,8 @@ class ChatsController private constructor(
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()
+        optimisticArchiveByGroup.clear()
+        nextArchiveGeneration = 0L
         memberCacheByGroup = emptyMap()
         presentationMembersByGroup = emptyMap()
         memberSnapshotsRevision += 1L
