@@ -17,9 +17,11 @@ internal fun String.functionBody(functionName: String): String {
             closing = ')',
         )
     val parametersEnd = parametersStart + parameters.length
-    val braceStart = indexOf('{', parametersEnd)
-    require(braceStart >= 0) { "Missing body for $functionName" }
-    return kotlinBlockFrom(braceStart, "function $functionName")
+    return kotlinBlockFrom(
+        openDelimiter = parametersEnd,
+        description = "function $functionName",
+        searchForOpening = true,
+    )
 }
 
 internal fun String.kotlinBlockFrom(
@@ -27,11 +29,15 @@ internal fun String.kotlinBlockFrom(
     description: String,
     opening: Char = '{',
     closing: Char = '}',
+    searchForOpening: Boolean = false,
 ): String {
-    require(getOrNull(openDelimiter) == opening) { "Missing opening delimiter for $description" }
+    require(searchForOpening || getOrNull(openDelimiter) == opening) {
+        "Missing opening delimiter for $description"
+    }
 
     var depth = 0
     var index = openDelimiter
+    var blockStart = if (searchForOpening) -1 else openDelimiter
     var inLineComment = false
     var blockCommentDepth = 0
     var inString = false
@@ -110,13 +116,14 @@ internal fun String.kotlinBlockFrom(
                         index += 1
                     }
                     current == opening -> {
+                        if (depth == 0) blockStart = index
                         depth += 1
                         index += 1
                     }
-                    current == closing -> {
+                    current == closing && depth > 0 -> {
                         depth -= 1
                         index += 1
-                        if (depth == 0) return substring(openDelimiter, index)
+                        if (depth == 0) return substring(blockStart, index)
                     }
                     else -> index += 1
                 }
@@ -124,5 +131,6 @@ internal fun String.kotlinBlockFrom(
         }
     }
 
+    require(blockStart >= 0) { "Missing opening delimiter for $description" }
     error("Unterminated delimiters for $description")
 }
