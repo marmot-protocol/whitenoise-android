@@ -232,6 +232,40 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
+    fun activeInviteIdentityRefreshUpdatesInPlaceWithoutAlertingAgain() {
+        presenter.ensureChannels()
+        val invite = update(isMention = false, trigger = NotificationTriggerFfi.GROUP_INVITE)
+
+        runBlocking {
+            presenter.show(
+                invite,
+                senderNameOverride = "npub1alice",
+                shortNpub = { "npub1alice" },
+            )
+        }
+        assertTrue(presenter.isGroupInviteNotificationActive(invite))
+
+        runBlocking {
+            presenter.show(
+                invite,
+                senderNameOverride = "Alice",
+                silentUpdate = true,
+                shortNpub = { "npub1alice" },
+            )
+        }
+
+        val active = manager.activeNotifications.single()
+        assertEquals(invite.notificationKey, active.tag)
+        assertTrue(active.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertTrue(
+            active.notification.extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                .toString()
+                .contains("Alice"),
+        )
+    }
+
+    @Test
     fun futurePrimaryMessagesUseTheSelectedVersionedVibrationChannel() {
         presenter.ensureChannels()
         // The presenter already exists: changing the preference must reroute it
@@ -854,10 +888,11 @@ class LocalNotificationPresenterConversationTest {
         reactionEmoji: String? = null,
         trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
         accountRef: String = "account-a",
+        trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
     ) = NotificationUpdateFfi(
         notificationKey = "key",
         conversationKey = "conversation",
-        trigger = NotificationTriggerFfi.NEW_MESSAGE,
+        trigger = trigger,
         trafficClass = trafficClass,
         accountRef = accountRef,
         accountIdHex = accountRef,
