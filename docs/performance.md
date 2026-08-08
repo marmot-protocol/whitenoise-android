@@ -16,6 +16,13 @@ The structure follows the Android team's
 [Now in Android benchmark module](https://github.com/android/nowinandroid/tree/main/benchmarks)
 and [Macrobenchmark sample](https://github.com/android/performance-samples/tree/main/MacrobenchmarkSample).
 
+## Host prerequisites
+
+Install the Android SDK (including Platform Tools for `adb`), `jq`, and ripgrep
+(`rg`). The Baseline Profile verifier also needs either `apkanalyzer` from the
+Android SDK Command-Line Tools or `unzip` as a fallback. The scripts check these
+commands up front and report the missing dependency.
+
 ## Prepare a physical-device fixture
 
 Use a dedicated API 34+ device with animations disabled and a stable power and
@@ -121,7 +128,7 @@ Build a release-like APK and verify both compiled profile assets:
 ```bash
 ./gradlew :app:assembleDevZapstoreBenchmarkRelease
 bash scripts/verify-baseline-profile.sh \
-  app/build/outputs/apk/dev/zapstore/benchmarkRelease/app-dev-zapstore-benchmarkRelease-universal.apk
+  app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk
 ```
 
 The verifier uses `apkanalyzer` when available and falls back to the ZIP table.

@@ -6,9 +6,20 @@ target_package="dev.ipf.whitenoise.android.dev"
 test_package="dev.ipf.whitenoise.android.benchmark"
 runner="$test_package/androidx.test.runner.AndroidJUnitRunner"
 
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required host command: $1" >&2
+    exit 1
+  fi
+}
+
+require_command jq
+require_command rg
+
 if [[ -n "${ANDROID_HOME:-}" && -x "$ANDROID_HOME/platform-tools/adb" ]]; then
   adb_bin="$ANDROID_HOME/platform-tools/adb"
 else
+  require_command adb
   adb_bin="$(command -v adb)"
 fi
 

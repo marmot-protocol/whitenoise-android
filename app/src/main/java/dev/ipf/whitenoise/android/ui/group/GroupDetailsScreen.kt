@@ -147,7 +147,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
-import dev.ipf.whitenoise.android.ui.testing.performanceTestContentDescription
+import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
@@ -1231,11 +1231,7 @@ internal fun GroupDetailsScreen(
                             ) {
                                 Icon(
                                     if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
-                                    contentDescription =
-                                        performanceTestContentDescription(
-                                            stringResource(R.string.search_members),
-                                            PerformanceTestTags.MEMBER_LIST,
-                                        ),
+                                    contentDescription = stringResource(R.string.search_members),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -1321,13 +1317,14 @@ internal fun GroupDetailsScreen(
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu
                         // exposed (#444/#635 scope rules).
-                        GroupMemberIdentityRows(visibleMembers) { _, member ->
+                        GroupMemberIdentityRows(visibleMembers) { index, member ->
                             val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
                             val rowMutationPending =
                                 controller.isMemberMutationPending(member.memberIdHex) ||
                                     activeMutation?.target == member.memberIdHex
                             val memberNpub = appState.npubForDisplay(member.memberIdHex)
                             ContactRow(
+                                modifier = Modifier.performanceTestTag(PerformanceTestTags.MEMBER_LIST, index == 0),
                                 title = controller.memberDisplayName(member),
                                 subtitle =
                                     if (isSelfRow) {
