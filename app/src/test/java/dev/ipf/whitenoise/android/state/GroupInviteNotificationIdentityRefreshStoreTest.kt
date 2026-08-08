@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,10 +57,48 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         val invite = update("alice-invite", "Alice")
         store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
 
-        assertEquals(listOf(invite), store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null))
+        assertRefreshCandidate(store, invite)
         store.release(invite.notificationKey)
-        assertEquals(listOf(invite), store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null))
+        assertRefreshCandidate(store, invite)
     }
+
+    @Test
+    fun thrownRefreshReleasesClaimForRetry() =
+        runTest {
+            val store = GroupInviteNotificationIdentityRefreshStore()
+            val invite = update("alice-invite", "Alice")
+            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            assertRefreshCandidate(store, invite)
+
+            val failure =
+                runCatching {
+                    store.runClaimedRefresh(invite.notificationKey) {
+                        error("lookup failed")
+                    }
+                }
+
+            assertTrue(failure.exceptionOrNull() is IllegalStateException)
+            assertRefreshCandidate(store, invite)
+        }
+
+    @Test
+    fun cancelledRefreshReleasesClaimForRetry() =
+        runTest {
+            val store = GroupInviteNotificationIdentityRefreshStore()
+            val invite = update("alice-invite", "Alice")
+            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            assertRefreshCandidate(store, invite)
+
+            val failure =
+                runCatching {
+                    store.runClaimedRefresh(invite.notificationKey) {
+                        throw CancellationException("refresh cancelled")
+                    }
+                }
+
+            assertTrue(failure.exceptionOrNull() is CancellationException)
+            assertRefreshCandidate(store, invite)
+        }
 
     @Test
     fun nonInviteUpdatesAreNeverTracked() {
@@ -70,6 +110,16 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         )
 
         assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null).isEmpty())
+    }
+
+    private fun assertRefreshCandidate(
+        store: GroupInviteNotificationIdentityRefreshStore,
+        invite: NotificationUpdateFfi,
+    ) {
+        assertEquals(
+            listOf(invite),
+            store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null),
+        )
     }
 
     private fun update(

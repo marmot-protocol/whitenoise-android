@@ -90,6 +90,20 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         }
     }
 
+    suspend fun <T> runClaimedRefresh(
+        notificationKey: String,
+        block: suspend () -> T,
+    ): T {
+        var completedNormally = false
+        try {
+            val result = block()
+            completedNormally = true
+            return result
+        } finally {
+            if (!completedNormally) release(notificationKey)
+        }
+    }
+
     fun forget(notificationKey: String) {
         synchronized(lock) {
             entriesByNotificationKey.remove(notificationKey)

@@ -7060,21 +7060,23 @@ class WhiteNoiseAppState private constructor(
             )
         candidates.forEach { update ->
             profileScope.launch {
-                if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
-                    inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
-                    return@launch
-                }
-                val (posted, displayedPresentation) = refreshActiveInviteNotificationIdentity(update, presentation)
-                if (posted) {
-                    inviteNotificationIdentityRefreshStore.markRefreshed(
-                        update = update,
-                        displayedName = displayedPresentation.displayName,
-                        displayedAvatarUrl = displayedPresentation.avatarUrl,
-                    )
-                } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
-                    inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
-                } else {
-                    inviteNotificationIdentityRefreshStore.release(update.notificationKey)
+                inviteNotificationIdentityRefreshStore.runClaimedRefresh(update.notificationKey) {
+                    if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
+                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
+                        return@runClaimedRefresh
+                    }
+                    val (posted, displayedPresentation) = refreshActiveInviteNotificationIdentity(update, presentation)
+                    if (posted) {
+                        inviteNotificationIdentityRefreshStore.markRefreshed(
+                            update = update,
+                            displayedName = displayedPresentation.displayName,
+                            displayedAvatarUrl = displayedPresentation.avatarUrl,
+                        )
+                    } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
+                        inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
+                    } else {
+                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
+                    }
                 }
             }
         }
