@@ -72,7 +72,7 @@ class ProfileAddableGroupsTest {
 
         assertTrue(state.groups.isEmpty())
         assertEquals(setOf("pending-roster"), state.pendingGroupIds)
-        assertEquals(ProfileAddableGroupsLoadState.LOADING, state.loadState)
+        assertEquals(ProfileGroupPickerLoadState.LOADING, state.loadState)
     }
 
     @Test
@@ -91,7 +91,45 @@ class ProfileAddableGroupsTest {
 
         assertEquals(listOf("ready"), state.groups.map { it.group.groupIdHex })
         assertEquals(setOf("failed"), state.pendingGroupIds)
-        assertEquals(ProfileAddableGroupsLoadState.FAILED, state.loadState)
+        assertEquals(ProfileGroupPickerLoadState.FAILED, state.loadState)
+    }
+
+    @Test
+    fun promotableGroupsRequireSharedMembershipAndNonAdminTarget() {
+        val state =
+            profilePromotableGroupsState(
+                items =
+                    listOf(
+                        item("eligible", name = "Friends", admins = listOf("self"), members = listOf("self", "target")),
+                        item("target-absent", name = "Other", admins = listOf("self"), members = listOf("self")),
+                        item(
+                            "already-admin",
+                            name = "Admins",
+                            admins = listOf("self", "target"),
+                            members = listOf("self", "target"),
+                        ),
+                        item("not-admin", name = "No access", admins = emptyList(), members = listOf("self", "target")),
+                    ),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertEquals(listOf("eligible"), state.groups.map { it.group.groupIdHex })
+        assertEquals(ProfileGroupPickerLoadState.READY, state.loadState)
+    }
+
+    @Test
+    fun unresolvedManagedGroupKeepsGeneralAdminPathLoading() {
+        val state =
+            profilePromotableGroupsState(
+                items = listOf(item("pending-roster", name = "Friends", admins = listOf("self"), members = null)),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertTrue(state.groups.isEmpty())
+        assertEquals(setOf("pending-roster"), state.pendingGroupIds)
+        assertEquals(ProfileGroupPickerLoadState.LOADING, state.loadState)
     }
 
     @Test

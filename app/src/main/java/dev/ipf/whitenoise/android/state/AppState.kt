@@ -2601,14 +2601,18 @@ class WhiteNoiseAppState private constructor(
     fun profileAddableGroups(accountIdHex: String): List<ChatListItem> =
         chatsController?.profileAddableGroups(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 
-    internal val profileAddableGroupsRevision: Long
+    internal val profileGroupPickerRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
-    internal fun profileAddableGroupsState(accountIdHex: String): ProfileAddableGroupsState =
+    internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
-            ?: ProfileAddableGroupsState.empty()
+            ?: ProfileGroupPickerState.empty()
 
-    internal fun requestProfileAddableGroupMembers(
+    internal fun profilePromotableGroupsState(accountIdHex: String): ProfileGroupPickerState =
+        chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex)
+            ?: ProfileGroupPickerState.empty()
+
+    internal fun requestProfileGroupMembers(
         groupIds: Iterable<String>,
         retry: Boolean = false,
     ) {
@@ -2617,6 +2621,26 @@ class WhiteNoiseAppState private constructor(
         } else {
             chatsController?.requestMemberSnapshots(groupIds)
         }
+    }
+
+    suspend fun promoteProfileInGroup(
+        targetRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val target = targetRef.trim()
+        val groupId = groupIdHex.trim()
+        val account = activeAccountRef
+        if (target.isEmpty() || groupId.isEmpty() || account == null) return false
+        return runCatchingCancellable {
+            withGroupCommitLock(account, groupId) {
+                val result = marmotIo { promoteAdminDetailed(account, groupId, target) }
+                chatsController?.applyProfileGroupDetails(account, result.details)
+            }
+            present(R.string.toast_admin_added)
+            true
+        }.onFailure { error ->
+            present(R.string.toast_couldnt_update_admin, AppText.Plain(error.readableMessage()), copyable = true)
+        }.getOrDefault(false)
     }
 
     /**

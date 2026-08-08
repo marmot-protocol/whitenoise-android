@@ -160,6 +160,9 @@
     <string name="profile_no_addable_groups">沒有可將此人新增到其中的群組。</string>
     <string name="profile_addable_groups_loading">正在檢查可用群組…</string>
     <string name="profile_addable_groups_failed">無法檢查部分群組。</string>
+    <string name="profile_make_admin_title">將 %1$s 設為管理員</string>
+    <string name="profile_make_admin_description">選擇一個你是管理員且 %1$s 已是成員的群組。</string>
+    <string name="profile_no_promotable_groups">沒有可將此人設為管理員的群組。</string>
     <string name="profile_view_picture">查看頭像</string>
     <string name="profile_name_from_profile">名稱（來自個人檔案）：%1$s</string>
     <string name="profile_nickname_and_notes">暱稱與備註</string>

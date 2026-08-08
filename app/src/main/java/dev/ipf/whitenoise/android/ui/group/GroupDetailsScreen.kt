@@ -116,7 +116,7 @@ import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
-import dev.ipf.whitenoise.android.state.ProfileAddableGroupsState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -351,14 +351,14 @@ internal fun GroupDetailsScreen(
                 ?.let { directDetailsSharedGroups(it, controller.group.groupIdHex) }
                 .orEmpty()
         }
-    val addableGroupsRevision = appState.profileAddableGroupsRevision
+    val groupPickerRevision = appState.profileGroupPickerRevision
     val dmAddableGroupsState =
-        remember(dmPeerAccountIdHex, appState.chatListItems, addableGroupsRevision) {
-            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState) ?: ProfileAddableGroupsState.empty()
+        remember(dmPeerAccountIdHex, appState.chatListItems, groupPickerRevision) {
+            dmPeerAccountIdHex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
         }
     LaunchedEffect(showAddContactToGroups, dmAddableGroupsState.pendingGroupIds) {
         if (showAddContactToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
-            appState.requestProfileAddableGroupMembers(dmAddableGroupsState.pendingGroupIds)
+            appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
         }
     }
     val dmPeerCandidate =
@@ -1492,7 +1492,7 @@ internal fun GroupDetailsScreen(
                 if (!addingContactToGroups) showAddContactToGroups = false
             },
             onRetry = {
-                appState.requestProfileAddableGroupMembers(
+                appState.requestProfileGroupMembers(
                     dmAddableGroupsState.pendingGroupIds,
                     retry = true,
                 )

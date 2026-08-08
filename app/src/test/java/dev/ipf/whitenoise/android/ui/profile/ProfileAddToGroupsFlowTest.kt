@@ -12,14 +12,21 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.ProfileAddableGroupsLoadState
-import dev.ipf.whitenoise.android.state.ProfileAddableGroupsState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -73,10 +80,10 @@ class ProfileAddToGroupsFlowTest {
                     appState = appState,
                     targetName = "Alice",
                     state =
-                        ProfileAddableGroupsState(
+                        ProfileGroupPickerState(
                             groups = emptyList(),
                             pendingGroupIds = setOf("pending"),
-                            loadState = ProfileAddableGroupsLoadState.LOADING,
+                            loadState = ProfileGroupPickerLoadState.LOADING,
                         ),
                     busy = false,
                     onClose = {},
@@ -100,10 +107,10 @@ class ProfileAddToGroupsFlowTest {
                     appState = appState,
                     targetName = "Alice",
                     state =
-                        ProfileAddableGroupsState(
+                        ProfileGroupPickerState(
                             groups = emptyList(),
                             pendingGroupIds = setOf("failed"),
-                            loadState = ProfileAddableGroupsLoadState.FAILED,
+                            loadState = ProfileGroupPickerLoadState.FAILED,
                         ),
                     busy = false,
                     onClose = {},
@@ -115,7 +122,36 @@ class ProfileAddToGroupsFlowTest {
 
         composeRule.onNodeWithText(app.getString(R.string.profile_addable_groups_failed)).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.retry)).performClick()
-        composeRule.runOnIdle { org.junit.Assert.assertEquals(1, retryCount) }
+        composeRule.runOnIdle { assertEquals(1, retryCount) }
+    }
+
+    @Test
+    fun makeAdminPickerReturnsTheSelectedSharedGroup() {
+        val appState = testAppState()
+        val group = groupItem("friends", "Friends")
+        var promotedGroupId: String? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileMakeAdminContent(
+                    appState = appState,
+                    targetName = "Alice",
+                    state =
+                        ProfileGroupPickerState(
+                            groups = listOf(group),
+                            pendingGroupIds = emptySet(),
+                            loadState = ProfileGroupPickerLoadState.READY,
+                        ),
+                    busy = false,
+                    onClose = {},
+                    onRetry = {},
+                    onPromote = { promotedGroupId = it.group.groupIdHex },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Friends").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.make_admin)).performClick()
+        composeRule.runOnIdle { assertEquals("friends", promotedGroupId) }
     }
 
     private fun renderProfile() {
@@ -157,6 +193,60 @@ class ProfileAddToGroupsFlowTest {
             signedOut = false,
             running = true,
         )
+
+    private fun groupItem(
+        groupIdHex: String,
+        name: String,
+    ) = ChatListItem(
+        group =
+            AppGroupRecordFfi(
+                selfMembership = SelfMembershipFfi.MEMBER,
+                groupIdHex = groupIdHex,
+                protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+                profilePresent = false,
+                endpoint = "endpoint",
+                name = name,
+                description = "",
+                admins = listOf(ACTIVE_ACCOUNT_HEX),
+                relays = listOf("wss://relay.example"),
+                nostrGroupIdHex = "nostr-$groupIdHex",
+                avatarUrl = null,
+                avatarDim = null,
+                avatarThumbhash = null,
+                imageHashHex = null,
+                encryptedMedia =
+                    AppGroupEncryptedMediaComponentFfi(
+                        componentId = 0x8008u,
+                        component = "marmot.group.encrypted-media.v1",
+                        required = true,
+                        version = EncryptedMediaVersionFfi.V1,
+                        mediaFormat = "encrypted-media-v1",
+                        allowedLocatorKinds = listOf("blossom-v1"),
+                        defaultBlobEndpoints =
+                            listOf(
+                                AppBlobEndpointFfi(
+                                    locatorKind = "blossom-v1",
+                                    baseUrl = "https://blossom.primal.net",
+                                ),
+                            ),
+                    ),
+                archived = false,
+                pendingConfirmation = false,
+                unrecoverable = false,
+                welcomerAccountIdHex = null,
+                viaWelcomeMessageIdHex = null,
+                disappearingMessageSecs = 0uL,
+                leaveRequestPending = false,
+                leaveRequestedAtMs = null,
+                disbanding = false,
+                disbanded = false,
+                disbandRequest = null,
+            ),
+        latest = null,
+        otherMemberAccount = null,
+        memberCount = 2,
+        memberSnapshot = null,
+    )
 
     private fun latestComponentDialog(): ComponentDialog {
         val dialog = ShadowDialog.getLatestDialog()

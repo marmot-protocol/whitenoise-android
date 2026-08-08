@@ -896,23 +896,23 @@ internal fun profileAddableGroupItems(
         activeAccountIdHex = activeAccountIdHex,
     ).groups
 
-internal enum class ProfileAddableGroupsLoadState {
+internal enum class ProfileGroupPickerLoadState {
     READY,
     LOADING,
     FAILED,
 }
 
-internal data class ProfileAddableGroupsState(
+internal data class ProfileGroupPickerState(
     val groups: List<ChatListItem>,
     val pendingGroupIds: Set<String>,
-    val loadState: ProfileAddableGroupsLoadState,
+    val loadState: ProfileGroupPickerLoadState,
 ) {
     companion object {
-        fun empty(): ProfileAddableGroupsState =
-            ProfileAddableGroupsState(
+        fun empty(): ProfileGroupPickerState =
+            ProfileGroupPickerState(
                 groups = emptyList(),
                 pendingGroupIds = emptySet(),
-                loadState = ProfileAddableGroupsLoadState.READY,
+                loadState = ProfileGroupPickerLoadState.READY,
             )
     }
 }
@@ -922,25 +922,68 @@ internal fun profileAddableGroupsState(
     targetAccountIdHex: String,
     activeAccountIdHex: String?,
     failedGroupIds: Set<String> = emptySet(),
-): ProfileAddableGroupsState {
+): ProfileGroupPickerState {
+    val (active, target) =
+        profileGroupPickerAccounts(activeAccountIdHex, targetAccountIdHex)
+            ?: return ProfileGroupPickerState.empty()
+    return profileGroupPickerState(
+        candidates = profileManagedGroupCandidates(items, active),
+        failedGroupIds = failedGroupIds,
+    ) { _, snapshot ->
+        snapshot.containsAccount(active) && !snapshot.containsAccount(target)
+    }
+}
+
+internal fun profilePromotableGroupsState(
+    items: Iterable<ChatListItem>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+    failedGroupIds: Set<String> = emptySet(),
+): ProfileGroupPickerState {
+    val (active, target) =
+        profileGroupPickerAccounts(activeAccountIdHex, targetAccountIdHex)
+            ?: return ProfileGroupPickerState.empty()
+    return profileGroupPickerState(
+        candidates = profileManagedGroupCandidates(items, active),
+        failedGroupIds = failedGroupIds,
+    ) { item, snapshot ->
+        snapshot.containsAccount(active) &&
+            snapshot.containsAccount(target) &&
+            !GroupProjector.isAdminRef(item.group, target)
+    }
+}
+
+private fun profileGroupPickerAccounts(
+    activeAccountIdHex: String?,
+    targetAccountIdHex: String,
+): Pair<String, String>? {
     val active = activeAccountIdHex?.trim().orEmpty()
     val target = targetAccountIdHex.trim()
-    if (active.isEmpty() || target.isEmpty() || active.equals(target, ignoreCase = true)) {
-        return ProfileAddableGroupsState.empty()
+    return if (active.isEmpty() || target.isEmpty() || active.equals(target, ignoreCase = true)) {
+        null
+    } else {
+        active to target
     }
-    val candidates =
-        items
-            .filter { item ->
-                !item.group.pendingConfirmation &&
-                    !item.removedFromGroup(active) &&
-                    !item.isDm() &&
-                    GroupProjector.isAdminRef(item.group, active)
-            }.distinctBy { it.group.groupIdHex.lowercase() }
-    val groups =
-        candidates.filter { item ->
-            val snapshot = item.memberSnapshot ?: return@filter false
-            snapshot.containsAccount(active) && !snapshot.containsAccount(target)
-        }
+}
+
+private fun profileManagedGroupCandidates(
+    items: Iterable<ChatListItem>,
+    activeAccountIdHex: String,
+): List<ChatListItem> =
+    items
+        .filter { item ->
+            !item.group.pendingConfirmation &&
+                !item.removedFromGroup(activeAccountIdHex) &&
+                !item.isDm() &&
+                GroupProjector.isAdminRef(item.group, activeAccountIdHex)
+        }.distinctBy { it.group.groupIdHex.lowercase() }
+
+private fun profileGroupPickerState(
+    candidates: List<ChatListItem>,
+    failedGroupIds: Set<String>,
+    eligible: (ChatListItem, GroupMemberSnapshot) -> Boolean,
+): ProfileGroupPickerState {
+    val groups = candidates.filter { item -> item.memberSnapshot?.let { eligible(item, it) } == true }
     val pendingGroupIds =
         candidates
             .filter { it.memberSnapshot == null }
@@ -948,11 +991,11 @@ internal fun profileAddableGroupsState(
     val normalizedFailures = failedGroupIds.mapTo(mutableSetOf()) { it.lowercase() }
     val loadState =
         when {
-            pendingGroupIds.any { it.lowercase() in normalizedFailures } -> ProfileAddableGroupsLoadState.FAILED
-            pendingGroupIds.isNotEmpty() -> ProfileAddableGroupsLoadState.LOADING
-            else -> ProfileAddableGroupsLoadState.READY
+            pendingGroupIds.any { it.lowercase() in normalizedFailures } -> ProfileGroupPickerLoadState.FAILED
+            pendingGroupIds.isNotEmpty() -> ProfileGroupPickerLoadState.LOADING
+            else -> ProfileGroupPickerLoadState.READY
         }
-    return ProfileAddableGroupsState(groups, pendingGroupIds, loadState)
+    return ProfileGroupPickerState(groups, pendingGroupIds, loadState)
 }
 
 /**
@@ -3624,8 +3667,19 @@ class ChatsController private constructor(
     internal fun profileAddableGroupsState(
         targetAccountIdHex: String,
         activeAccountIdHex: String?,
-    ): ProfileAddableGroupsState =
+    ): ProfileGroupPickerState =
         profileAddableGroupsState(
+            items = currentProjectedItems(activeAccountIdHex),
+            targetAccountIdHex = targetAccountIdHex,
+            activeAccountIdHex = activeAccountIdHex,
+            failedGroupIds = failedMemberFetches,
+        )
+
+    internal fun profilePromotableGroupsState(
+        targetAccountIdHex: String,
+        activeAccountIdHex: String?,
+    ): ProfileGroupPickerState =
+        profilePromotableGroupsState(
             items = currentProjectedItems(activeAccountIdHex),
             targetAccountIdHex = targetAccountIdHex,
             activeAccountIdHex = activeAccountIdHex,

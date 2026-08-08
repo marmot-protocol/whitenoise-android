@@ -104,8 +104,8 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.ProfileAddableGroupsLoadState
-import dev.ipf.whitenoise.android.state.ProfileAddableGroupsState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -359,6 +359,12 @@ internal fun ProfileSheetAdminActionRows(
     }
 }
 
+private enum class ProfileSheetPage {
+    PROFILE,
+    ADD_TO_GROUPS,
+    MAKE_ADMIN,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileSheet(
@@ -435,9 +441,10 @@ internal fun ProfileSheet(
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
-    var showAddToGroups by remember(npub) { mutableStateOf(false) }
+    var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
+    var promotingAdmin by remember(npub) { mutableStateOf(false) }
     // UI guard covers both profile actions, including "Start new group". The
     // state-layer addable-groups helper still rejects self as a defensive check
     // for the add-to-existing-groups path.
@@ -471,14 +478,24 @@ internal fun ProfileSheet(
         )
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
     val inviteMessage = stringResource(R.string.invite_message)
-    val addableGroupsRevision = appState.profileAddableGroupsRevision
+    val groupPickerRevision = appState.profileGroupPickerRevision
     val addableGroupsState =
-        remember(hex, appState.chatListItems, addableGroupsRevision) {
-            hex?.let(appState::profileAddableGroupsState) ?: ProfileAddableGroupsState.empty()
+        remember(hex, appState.chatListItems, groupPickerRevision) {
+            hex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
         }
-    LaunchedEffect(showAddToGroups, addableGroupsState.pendingGroupIds) {
-        if (showAddToGroups && addableGroupsState.pendingGroupIds.isNotEmpty()) {
-            appState.requestProfileAddableGroupMembers(addableGroupsState.pendingGroupIds)
+    val promotableGroupsState =
+        remember(hex, appState.chatListItems, groupPickerRevision) {
+            hex?.let(appState::profilePromotableGroupsState) ?: ProfileGroupPickerState.empty()
+        }
+    LaunchedEffect(page, addableGroupsState.pendingGroupIds, promotableGroupsState.pendingGroupIds) {
+        val pendingGroupIds =
+            when (page) {
+                ProfileSheetPage.ADD_TO_GROUPS -> addableGroupsState.pendingGroupIds
+                ProfileSheetPage.MAKE_ADMIN -> promotableGroupsState.pendingGroupIds
+                ProfileSheetPage.PROFILE -> emptySet()
+            }
+        if (pendingGroupIds.isNotEmpty()) {
+            appState.requestProfileGroupMembers(pendingGroupIds)
         }
     }
     if (showContactEditorDialog && hex != null && !targetIsSelf) {
@@ -538,9 +555,23 @@ internal fun ProfileSheet(
                         targetRef = targetHex,
                         targetGroupIds = selected.map { it.group.groupIdHex },
                     )
-                if (allAdded) showAddToGroups = false
+                if (allAdded) page = ProfileSheetPage.PROFILE
             } finally {
                 addingToGroups = false
+            }
+        }
+    }
+
+    fun makeProfileAdmin(group: ChatListItem) {
+        val targetHex = hex ?: return
+        if (promotingAdmin) return
+        promotingAdmin = true
+        appState.launchMutation {
+            try {
+                val promoted = appState.promoteProfileInGroup(targetHex, group.group.groupIdHex)
+                if (promoted) page = ProfileSheetPage.PROFILE
+            } finally {
+                promotingAdmin = false
             }
         }
     }
@@ -765,8 +796,22 @@ internal fun ProfileSheet(
                         icon = Icons.Default.Add,
                         title = stringResource(R.string.profile_add_to_another_group),
                         enabled = !creatingChat,
-                        onClick = { showAddToGroups = true },
+                        onClick = { page = ProfileSheetPage.ADD_TO_GROUPS },
                     )
+                    if (
+                        adminController == null &&
+                        (
+                            promotableGroupsState.groups.isNotEmpty() ||
+                                promotableGroupsState.loadState != ProfileGroupPickerLoadState.READY
+                        )
+                    ) {
+                        SettingsActionRow(
+                            icon = Icons.Default.Shield,
+                            title = stringResource(R.string.make_admin),
+                            enabled = !creatingChat,
+                            onClick = { page = ProfileSheetPage.MAKE_ADMIN },
+                        )
+                    }
                 }
             }
             // Group-admin moderation actions (issue #635). Only rendered when the
@@ -790,21 +835,21 @@ internal fun ProfileSheet(
         // Back while the picker is visible is intercepted within this host.
         // Scrim/swipe dismiss the whole flow instead of recreating the profile
         // as a second modal window (#1868).
-        onDismissRequest = { if (!creatingChat && !addingToGroups) onDismiss() },
+        onDismissRequest = { if (!creatingChat && !addingToGroups && !promotingAdmin) onDismiss() },
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
         properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         // Register against the modal dialog's dispatcher, not the activity's;
         // otherwise the dialog consumes Back before this nested route sees it.
-        BackHandler(enabled = showAddToGroups) {
-            if (!addingToGroups) showAddToGroups = false
+        BackHandler(enabled = page != ProfileSheetPage.PROFILE) {
+            if (!addingToGroups && !promotingAdmin) page = ProfileSheetPage.PROFILE
         }
         AnimatedContent(
-            targetState = showAddToGroups && hex != null,
+            targetState = if (hex == null) ProfileSheetPage.PROFILE else page,
             transitionSpec = {
                 val transition =
-                    if (targetState) {
+                    if (targetState != ProfileSheetPage.PROFILE) {
                         (slideInHorizontally { it / 4 } + fadeIn()) togetherWith
                             (slideOutHorizontally { -it / 4 } + fadeOut())
                     } else {
@@ -813,26 +858,41 @@ internal fun ProfileSheet(
                     }
                 transition.using(SizeTransform(clip = false))
             },
-            label = "profile-add-to-groups",
+            label = "profile-group-picker",
             modifier = Modifier.fillMaxWidth().testTag(PROFILE_SHEET_HOST_TAG),
-        ) { showPicker ->
-            if (showPicker) {
-                ProfileAddToGroupsContent(
-                    appState = appState,
-                    targetName = displayTitle,
-                    state = addableGroupsState,
-                    busy = addingToGroups,
-                    onClose = { if (!addingToGroups) showAddToGroups = false },
-                    onRetry = {
-                        appState.requestProfileAddableGroupMembers(
-                            addableGroupsState.pendingGroupIds,
-                            retry = true,
-                        )
-                    },
-                    onAdd = ::addProfileToGroups,
-                )
-            } else {
-                profileContent()
+        ) { targetPage ->
+            when (targetPage) {
+                ProfileSheetPage.ADD_TO_GROUPS ->
+                    ProfileAddToGroupsContent(
+                        appState = appState,
+                        targetName = displayTitle,
+                        state = addableGroupsState,
+                        busy = addingToGroups,
+                        onClose = { if (!addingToGroups) page = ProfileSheetPage.PROFILE },
+                        onRetry = {
+                            appState.requestProfileGroupMembers(
+                                addableGroupsState.pendingGroupIds,
+                                retry = true,
+                            )
+                        },
+                        onAdd = ::addProfileToGroups,
+                    )
+                ProfileSheetPage.MAKE_ADMIN ->
+                    ProfileMakeAdminContent(
+                        appState = appState,
+                        targetName = displayTitle,
+                        state = promotableGroupsState,
+                        busy = promotingAdmin,
+                        onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                        onRetry = {
+                            appState.requestProfileGroupMembers(
+                                promotableGroupsState.pendingGroupIds,
+                                retry = true,
+                            )
+                        },
+                        onPromote = ::makeProfileAdmin,
+                    )
+                ProfileSheetPage.PROFILE -> profileContent()
             }
         }
     }
@@ -988,6 +1048,7 @@ internal const val PROFILE_QUICK_ACTIONS_TAG = "profile-quick-actions"
 internal const val PROFILE_SHEET_HOST_TAG = "profile-sheet-host"
 internal const val PROFILE_SHEET_CONTENT_TAG = "profile-sheet-content"
 internal const val PROFILE_ADD_TO_GROUPS_CONTENT_TAG = "profile-add-to-groups-content"
+internal const val PROFILE_MAKE_ADMIN_CONTENT_TAG = "profile-make-admin-content"
 
 @Composable
 private fun ContactPrivateDetailsDialog(
@@ -1057,7 +1118,7 @@ private fun ContactPrivateDetailsDialog(
 internal fun ProfileAddToGroupsSheet(
     appState: WhiteNoiseAppState,
     targetName: String,
-    state: ProfileAddableGroupsState,
+    state: ProfileGroupPickerState,
     busy: Boolean,
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
@@ -1086,7 +1147,7 @@ internal fun ProfileAddToGroupsSheet(
 internal fun ProfileAddToGroupsContent(
     appState: WhiteNoiseAppState,
     targetName: String,
-    state: ProfileAddableGroupsState,
+    state: ProfileGroupPickerState,
     busy: Boolean,
     onClose: () -> Unit,
     onRetry: () -> Unit,
@@ -1134,7 +1195,7 @@ internal fun ProfileAddToGroupsContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
-        if (groups.isEmpty() && state.loadState == ProfileAddableGroupsLoadState.READY) {
+        if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
             Text(
                 stringResource(R.string.profile_no_addable_groups),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1148,10 +1209,10 @@ internal fun ProfileAddToGroupsContent(
                 Text(stringResource(R.string.close))
             }
         } else if (groups.isEmpty()) {
-            ProfileAddToGroupsPendingState(state.loadState, onRetry)
+            ProfileGroupPickerPendingState(state.loadState, onRetry)
         } else {
-            if (state.loadState != ProfileAddableGroupsLoadState.READY) {
-                ProfileAddToGroupsPendingState(state.loadState, onRetry)
+            if (state.loadState != ProfileGroupPickerLoadState.READY) {
+                ProfileGroupPickerPendingState(state.loadState, onRetry)
             }
             FlowSearchField(
                 value = query,
@@ -1232,9 +1293,130 @@ internal fun ProfileAddToGroupsContent(
 }
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
+internal fun ProfileMakeAdminContent(
+    appState: WhiteNoiseAppState,
+    targetName: String,
+    state: ProfileGroupPickerState,
+    busy: Boolean,
+    onClose: () -> Unit,
+    onRetry: () -> Unit,
+    onPromote: (ChatListItem) -> Unit,
+) {
+    val groups = state.groups
+    val groupTitleCopy = rememberGroupTitleCopy()
+    var selectedGroupId by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    val titledGroups =
+        remember(groups, groupTitleCopy) {
+            groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    val filteredGroups =
+        remember(titledGroups, query) {
+            val needle = query.trim()
+            if (needle.isEmpty()) {
+                titledGroups
+            } else {
+                titledGroups.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
+            }
+        }
+    LaunchedEffect(groups) {
+        if (groups.none { it.group.groupIdHex == selectedGroupId }) selectedGroupId = null
+    }
+    val selectedGroup = groups.firstOrNull { it.group.groupIdHex == selectedGroupId }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .testTag(PROFILE_MAKE_ADMIN_CONTENT_TAG),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            stringResource(R.string.profile_make_admin_title, targetName),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+        )
+        Text(
+            stringResource(R.string.profile_make_admin_description, targetName),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+        )
+        if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+            Text(
+                stringResource(R.string.profile_no_promotable_groups),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+            )
+            TextButton(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+            ) {
+                Text(stringResource(R.string.close))
+            }
+        } else if (groups.isEmpty()) {
+            ProfileGroupPickerPendingState(state.loadState, onRetry)
+        } else {
+            if (state.loadState != ProfileGroupPickerLoadState.READY) {
+                ProfileGroupPickerPendingState(state.loadState, onRetry)
+            }
+            FlowSearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = stringResource(R.string.forward_search_chats),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                if (filteredGroups.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                }
+                items(
+                    filteredGroups,
+                    key = { (item, _) -> item.group.groupIdHex },
+                ) { (item, title) ->
+                    val selected = item.group.groupIdHex == selectedGroupId
+                    ContactRow(
+                        title = title,
+                        subtitle = stringResource(R.string.members_count, item.memberCount),
+                        avatarSeed = item.group.groupIdHex,
+                        avatarUrl = item.group.avatarUrl,
+                        avatarImage = rememberEncryptedGroupAvatar(appState, item.group),
+                        enabled = !busy,
+                        onClick = { selectedGroupId = item.group.groupIdHex },
+                        trailing = { SelectionIndicator(selected = selected) },
+                    )
+                }
+            }
+            Button(
+                onClick = { selectedGroup?.let(onPromote) },
+                enabled = selectedGroup != null && !busy,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Shield, contentDescription = null)
+                }
+                Spacer(Modifier.width(Dimens.spaceSm))
+                Text(stringResource(R.string.make_admin))
+            }
+        }
+    }
+}
+
+@Composable
 @Suppress("FunctionNaming")
-private fun ProfileAddToGroupsPendingState(
-    loadState: ProfileAddableGroupsLoadState,
+private fun ProfileGroupPickerPendingState(
+    loadState: ProfileGroupPickerLoadState,
     onRetry: () -> Unit,
 ) {
     Row(
@@ -1242,12 +1424,12 @@ private fun ProfileAddToGroupsPendingState(
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (loadState == ProfileAddableGroupsLoadState.LOADING) {
+        if (loadState == ProfileGroupPickerLoadState.LOADING) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
         }
         Text(
             stringResource(
-                if (loadState == ProfileAddableGroupsLoadState.FAILED) {
+                if (loadState == ProfileGroupPickerLoadState.FAILED) {
                     R.string.profile_addable_groups_failed
                 } else {
                     R.string.profile_addable_groups_loading
@@ -1257,7 +1439,7 @@ private fun ProfileAddToGroupsPendingState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        if (loadState == ProfileAddableGroupsLoadState.FAILED) {
+        if (loadState == ProfileGroupPickerLoadState.FAILED) {
             TextButton(onClick = onRetry) {
                 Text(stringResource(R.string.retry))
             }

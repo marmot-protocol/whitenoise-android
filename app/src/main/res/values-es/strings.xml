@@ -166,6 +166,9 @@
     <string name="profile_no_addable_groups">No hay grupos a los que puedas añadir a esta persona.</string>
     <string name="profile_addable_groups_loading">Comprobando los grupos disponibles…</string>
     <string name="profile_addable_groups_failed">No se han podido comprobar algunos grupos.</string>
+    <string name="profile_make_admin_title">Convertir a %1$s en administrador</string>
+    <string name="profile_make_admin_description">Elige un grupo en el que seas administrador y %1$s ya sea miembro.</string>
+    <string name="profile_no_promotable_groups">No hay grupos en los que puedas convertir a esta persona en administrador.</string>
     <string name="profile_view_picture">Ver foto de perfil</string>
     <string name="profile_name_from_profile">Nombre (del perfil): %1$s</string>
     <string name="profile_nickname_and_notes">Apodo y notas</string>

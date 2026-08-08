@@ -166,6 +166,9 @@
     <string name="profile_no_addable_groups">Bu kişiyi ekleyebileceğiniz bir grup yok.</string>
     <string name="profile_addable_groups_loading">Kullanılabilir gruplar kontrol ediliyor…</string>
     <string name="profile_addable_groups_failed">Bazı gruplar kontrol edilemedi.</string>
+    <string name="profile_make_admin_title">%1$s kullanıcısını yönetici yap</string>
+    <string name="profile_make_admin_description">Yöneticisi olduğunuz ve %1$s kullanıcısının zaten üye olduğu bir grup seçin.</string>
+    <string name="profile_no_promotable_groups">Bu kişiyi yönetici yapabileceğiniz bir grup yok.</string>
     <string name="profile_view_picture">Profil resmini görüntüle</string>
     <string name="profile_name_from_profile">Ad (profilden): %1$s</string>
     <string name="profile_nickname_and_notes">Takma ad ve notlar</string>
