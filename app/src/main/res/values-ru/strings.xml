@@ -178,6 +178,8 @@
     <string name="profile_add_to_groups_confirm_message">%1$s будет добавлен в %2$s. Это будет видно всем участникам.</string>
     <string name="profile_add_to_groups_confirm_label">Добавить в группы</string>
     <string name="profile_no_addable_groups">Нет групп, в которые можно добавить этого человека.</string>
+    <string name="profile_addable_groups_loading">Проверяем доступные группы…</string>
+    <string name="profile_addable_groups_failed">Не удалось проверить некоторые группы.</string>
     <string name="profile_view_picture">Посмотреть фото профиля</string>
     <string name="profile_name_from_profile">Имя (из профиля): %1$s</string>
     <string name="profile_nickname_and_notes">Псевдоним и заметки</string>

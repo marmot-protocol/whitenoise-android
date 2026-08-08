@@ -2601,6 +2601,24 @@ class WhiteNoiseAppState private constructor(
     fun profileAddableGroups(accountIdHex: String): List<ChatListItem> =
         chatsController?.profileAddableGroups(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 
+    internal val profileAddableGroupsRevision: Long
+        get() = chatsController?.memberSnapshotsRevision ?: 0L
+
+    internal fun profileAddableGroupsState(accountIdHex: String): ProfileAddableGroupsState =
+        chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
+            ?: ProfileAddableGroupsState.empty()
+
+    internal fun requestProfileAddableGroupMembers(
+        groupIds: Iterable<String>,
+        retry: Boolean = false,
+    ) {
+        if (retry) {
+            chatsController?.retryMemberSnapshots(groupIds)
+        } else {
+            chatsController?.requestMemberSnapshots(groupIds)
+        }
+    }
+
     /**
      * Add one viewed profile to one or more selected groups. The profile sheet
      * does the eligibility filtering (admin-only, not already a member); this

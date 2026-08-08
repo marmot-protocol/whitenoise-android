@@ -164,6 +164,8 @@
     <string name="profile_add_to_groups_confirm_message">%1$s wird zu %2$s hinzugefügt. Das ist für alle Mitglieder sichtbar.</string>
     <string name="profile_add_to_groups_confirm_label">Zu Gruppen hinzufügen</string>
     <string name="profile_no_addable_groups">Es gibt keine Gruppen, zu denen du diese Person hinzufügen kannst.</string>
+    <string name="profile_addable_groups_loading">Verfügbare Gruppen werden geprüft…</string>
+    <string name="profile_addable_groups_failed">Einige Gruppen konnten nicht geprüft werden.</string>
     <string name="profile_view_picture">Profilbild ansehen</string>
     <string name="profile_name_from_profile">Name (aus Profil): %1$s</string>
     <string name="profile_nickname_and_notes">Spitzname &amp; Notizen</string>

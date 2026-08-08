@@ -62,6 +62,39 @@ class ProfileAddableGroupsTest {
     }
 
     @Test
+    fun unresolvedAdminGroupsSurfaceAsLoadingInsteadOfTerminalEmpty() {
+        val state =
+            profileAddableGroupsState(
+                items = listOf(item("pending-roster", name = "Friends", admins = listOf("self"), members = null)),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+            )
+
+        assertTrue(state.groups.isEmpty())
+        assertEquals(setOf("pending-roster"), state.pendingGroupIds)
+        assertEquals(ProfileAddableGroupsLoadState.LOADING, state.loadState)
+    }
+
+    @Test
+    fun failedUnresolvedRosterOffersRetryWithoutHidingKnownGroups() {
+        val state =
+            profileAddableGroupsState(
+                items =
+                    listOf(
+                        item("ready", name = "Ready", admins = listOf("self"), members = listOf("self")),
+                        item("failed", name = "Failed", admins = listOf("self"), members = null),
+                    ),
+                targetAccountIdHex = "target",
+                activeAccountIdHex = "self",
+                failedGroupIds = setOf("FAILED"),
+            )
+
+        assertEquals(listOf("ready"), state.groups.map { it.group.groupIdHex })
+        assertEquals(setOf("failed"), state.pendingGroupIds)
+        assertEquals(ProfileAddableGroupsLoadState.FAILED, state.loadState)
+    }
+
+    @Test
     fun inviteToastCoversSuccessPartialAndFailureCounts() {
         assertInviteToast(
             outcome = ProfileGroupInviteOutcome(attempted = 1, failures = 0),
@@ -116,14 +149,14 @@ class ProfileAddableGroupsTest {
         groupId: String,
         name: String,
         admins: List<String>,
-        members: List<String>,
+        members: List<String>?,
         pending: Boolean = false,
     ) = ChatListItem(
         group = group(groupId, name, admins, pending),
         latest = null,
         otherMemberAccount = null,
-        memberCount = members.size,
-        memberSnapshot = GroupMemberSnapshot(members.map { member(it) }),
+        memberCount = members?.size ?: 0,
+        memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
     )
 
     private fun group(

@@ -212,6 +212,8 @@
     <string name="profile_add_to_groups_confirm_message">%1$s will be added to %2$s. This is visible to all members.</string>
     <string name="profile_add_to_groups_confirm_label">Add to groups</string>
     <string name="profile_no_addable_groups">There are no groups you can add this person to.</string>
+    <string name="profile_addable_groups_loading">Checking available groups…</string>
+    <string name="profile_addable_groups_failed">Some groups couldn’t be checked.</string>
     <string name="profile_view_picture">View profile picture</string>
     <string name="profile_name_from_profile">Name (from profile): %1$s</string>
     <string name="profile_nickname_and_notes">Nickname &amp; notes</string>
