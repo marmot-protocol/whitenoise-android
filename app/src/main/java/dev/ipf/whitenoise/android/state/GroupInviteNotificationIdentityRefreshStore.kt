@@ -11,10 +11,18 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 internal class GroupInviteNotificationIdentityRefreshStore(
     private val maxEntries: Int = 64,
 ) {
+    internal data class RefreshCandidate(
+        val update: NotificationUpdateFfi,
+        val resolvedName: String?,
+        val resolvedAvatarUrl: String?,
+    )
+
     private data class Entry(
         val update: NotificationUpdateFfi,
         val displayedName: String?,
         val displayedAvatarUrl: String?,
+        val desiredName: String?,
+        val desiredAvatarUrl: String?,
     )
 
     private val lock = Any()
@@ -36,7 +44,13 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         synchronized(lock) {
             entriesByNotificationKey.remove(update.notificationKey)
             entriesByNotificationKey[update.notificationKey] =
-                Entry(update, displayedName, displayedAvatarUrl)
+                Entry(
+                    update = update,
+                    displayedName = displayedName,
+                    displayedAvatarUrl = displayedAvatarUrl,
+                    desiredName = displayedName,
+                    desiredAvatarUrl = displayedAvatarUrl,
+                )
             while (entriesByNotificationKey.size > maxEntries) {
                 val evictedKey = entriesByNotificationKey.keys.first()
                 entriesByNotificationKey.remove(evictedKey)
@@ -49,21 +63,24 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         senderAccountIdHex: String,
         resolvedName: String?,
         resolvedAvatarUrl: String?,
-    ): List<NotificationUpdateFfi> {
+    ): List<RefreshCandidate> {
         if (senderAccountIdHex.isBlank() || (resolvedName == null && resolvedAvatarUrl == null)) return emptyList()
         return synchronized(lock) {
-            val candidates =
-                entriesByNotificationKey.values
-                    .filter { entry ->
-                        entry.update.notificationKey !in refreshesInFlight &&
-                            entry.update.sender.accountIdHex
-                                .equals(senderAccountIdHex, ignoreCase = true) &&
-                            (
-                                resolvedName?.let { it != entry.displayedName } == true ||
-                                    resolvedAvatarUrl?.let { it != entry.displayedAvatarUrl } == true
-                            )
-                    }.map(Entry::update)
-            refreshesInFlight += candidates.map(NotificationUpdateFfi::notificationKey)
+            val candidates = mutableListOf<RefreshCandidate>()
+            entriesByNotificationKey.entries.forEach { (notificationKey, entry) ->
+                if (!entry.update.sender.accountIdHex
+                        .equals(senderAccountIdHex, ignoreCase = true)
+                ) {
+                    return@forEach
+                }
+                val updatedEntry =
+                    entry.copy(
+                        desiredName = resolvedName ?: entry.desiredName,
+                        desiredAvatarUrl = resolvedAvatarUrl ?: entry.desiredAvatarUrl,
+                    )
+                entriesByNotificationKey[notificationKey] = updatedEntry
+                claimIfPending(notificationKey, updatedEntry)?.let(candidates::add)
+            }
             candidates
         }
     }
@@ -72,17 +89,25 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         update: NotificationUpdateFfi,
         displayedName: String?,
         displayedAvatarUrl: String?,
-    ) {
+    ): RefreshCandidate? =
         synchronized(lock) {
             refreshesInFlight.remove(update.notificationKey)
-            val current = entriesByNotificationKey[update.notificationKey] ?: return
-            entriesByNotificationKey[update.notificationKey] =
+            val current = entriesByNotificationKey[update.notificationKey] ?: return@synchronized null
+            val refreshedEntry =
                 current.copy(
                     displayedName = displayedName ?: current.displayedName,
                     displayedAvatarUrl = displayedAvatarUrl ?: current.displayedAvatarUrl,
                 )
+            entriesByNotificationKey[update.notificationKey] = refreshedEntry
+            claimIfPending(update.notificationKey, refreshedEntry)
         }
-    }
+
+    fun claimPendingRefreshes(): List<RefreshCandidate> =
+        synchronized(lock) {
+            entriesByNotificationKey.mapNotNull { (notificationKey, entry) ->
+                claimIfPending(notificationKey, entry)
+            }
+        }
 
     fun release(notificationKey: String) {
         synchronized(lock) {
@@ -109,5 +134,26 @@ internal class GroupInviteNotificationIdentityRefreshStore(
             entriesByNotificationKey.remove(notificationKey)
             refreshesInFlight.remove(notificationKey)
         }
+    }
+
+    private fun claimIfPending(
+        notificationKey: String,
+        entry: Entry,
+    ): RefreshCandidate? {
+        if (
+            notificationKey in refreshesInFlight ||
+            (
+                entry.desiredName == entry.displayedName &&
+                    entry.desiredAvatarUrl == entry.displayedAvatarUrl
+            )
+        ) {
+            return null
+        }
+        refreshesInFlight += notificationKey
+        return RefreshCandidate(
+            update = entry.update,
+            resolvedName = entry.desiredName,
+            resolvedAvatarUrl = entry.desiredAvatarUrl,
+        )
     }
 }

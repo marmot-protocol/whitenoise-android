@@ -3963,6 +3963,7 @@ class WhiteNoiseAppState private constructor(
         if (!appLockCredentialAvailable) {
             appLockScreenVisible = false
             appUnlockError = null
+            resumePendingInviteNotificationIdentityRefreshes()
         }
     }
 
@@ -3981,6 +3982,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLockScreenVisible = false
             appUnlockError = null
+            resumePendingInviteNotificationIdentityRefreshes()
         }
     }
 
@@ -4003,6 +4005,7 @@ class WhiteNoiseAppState private constructor(
         AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
         appLockScreenVisible = false
         appUnlockError = null
+        resumePendingInviteNotificationIdentityRefreshes()
         dismissVisibleConversationNotifications()
     }
 
@@ -4063,6 +4066,7 @@ class WhiteNoiseAppState private constructor(
                 requestAppUnlock()
             } else {
                 appLockScreenVisible = false
+                resumePendingInviteNotificationIdentityRefreshes()
             }
         }
     }
@@ -7058,26 +7062,58 @@ class WhiteNoiseAppState private constructor(
                 resolvedName = presentation.displayName,
                 resolvedAvatarUrl = presentation.avatarUrl,
             )
-        candidates.forEach { update ->
-            profileScope.launch {
+        candidates.forEach(::launchInviteNotificationIdentityRefresh)
+    }
+
+    private fun resumePendingInviteNotificationIdentityRefreshes() {
+        inviteNotificationIdentityRefreshStore
+            .claimPendingRefreshes()
+            .forEach(::launchInviteNotificationIdentityRefresh)
+    }
+
+    private fun launchInviteNotificationIdentityRefresh(initialCandidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate) {
+        val update = initialCandidate.update
+        profileScope.launch {
+            var candidate: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = initialCandidate
+            while (candidate != null) {
+                val currentCandidate = candidate
+                var followUp: GroupInviteNotificationIdentityRefreshStore.RefreshCandidate? = null
+                candidate = null
                 inviteNotificationIdentityRefreshStore.runClaimedRefresh(update.notificationKey) {
+                    if (appLockScreenVisible) {
+                        inviteNotificationIdentityRefreshStore.release(update.notificationKey)
+                        // Unlock can race between the visibility check and the
+                        // release above. Re-check after releasing so either this
+                        // coroutine or the unlock hook reclaims the deferred work.
+                        if (!appLockScreenVisible) {
+                            resumePendingInviteNotificationIdentityRefreshes()
+                        }
+                        return@runClaimedRefresh
+                    }
                     if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
                         return@runClaimedRefresh
                     }
+                    val presentation =
+                        ProfilePresentation(
+                            displayName = currentCandidate.resolvedName,
+                            avatarUrl = currentCandidate.resolvedAvatarUrl,
+                        )
                     val (posted, displayedPresentation) = refreshActiveInviteNotificationIdentity(update, presentation)
                     if (posted) {
-                        inviteNotificationIdentityRefreshStore.markRefreshed(
-                            update = update,
-                            displayedName = displayedPresentation.displayName,
-                            displayedAvatarUrl = displayedPresentation.avatarUrl,
-                        )
+                        followUp =
+                            inviteNotificationIdentityRefreshStore.markRefreshed(
+                                update = update,
+                                displayedName = displayedPresentation.displayName,
+                                displayedAvatarUrl = displayedPresentation.avatarUrl,
+                            )
                     } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
                     } else {
                         inviteNotificationIdentityRefreshStore.release(update.notificationKey)
                     }
                 }
+                candidate = followUp
             }
         }
     }
