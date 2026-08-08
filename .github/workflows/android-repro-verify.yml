@@ -36,11 +36,11 @@ jobs:
       - name: Shell tests (repro-verify)
         run: ./scripts/test-repro-verify.sh
 
-      - name: Set up JDK 21.0.7+6
+      - name: Set up JDK 21.0.7+6.0.LTS
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
-          java-version: '21.0.7+6'
+          java-version: '21.0.7+6.0.LTS'
           verify-signature: true
 
       - name: Set up Gradle

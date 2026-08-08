@@ -38,7 +38,7 @@ artifact retention); it is not a durable release distribution asset.
   This repo only pins whatever `.so` bytes are committed.
 - **Staging / dev flavors**, other ABIs, Play distribution, or PR preview APKs.
 - **Hermetic cross-toolchain reproducibility.** The workflow pins Ubuntu 24.04 and
-  exact Temurin **21.0.7+6** as `JAVA_HOME`. The verifier runs Gradle with
+  exact Temurin **21.0.7+6.0.LTS** as `JAVA_HOME`. The verifier runs Gradle with
   `--no-daemon`, restricts toolchain discovery in an isolated `GRADLE_USER_HOME`
   (`org.gradle.java.installations.paths` plus auto-detect/auto-download disabled),
   and records each Gradle build JVM’s actual home, vendor, version, and runtime
@@ -63,7 +63,7 @@ artifact retention); it is not a durable release distribution asset.
 
 Check out the tag and reproduce the environment recorded in the workflow's
 `repro-build-environment.txt` artifact. CI uses Ubuntu 24.04, exact Temurin
-21.0.7+6 as `JAVA_HOME`, records each build’s actual JVM properties in the
+21.0.7+6.0.LTS as `JAVA_HOME`, records each build’s actual JVM properties in the
 toolchain report, and lists the apksigner path used for unsigned checks; the report
 also lists installed Android SDK package revisions and wrapper checksums. The script
 currently requires Linux with Bash and GNU coreutils/findutils. Then run:
