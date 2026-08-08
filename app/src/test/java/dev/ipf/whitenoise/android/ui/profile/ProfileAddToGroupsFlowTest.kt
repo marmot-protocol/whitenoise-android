@@ -3,14 +3,17 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -126,30 +129,65 @@ class ProfileAddToGroupsFlowTest {
     }
 
     @Test
+    fun addToGroupsPickerReadyStateScreenshot() {
+        val appState = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface {
+                    ProfileAddToGroupsContent(
+                        appState = appState,
+                        targetName = "Alice",
+                        state =
+                            ProfileGroupPickerState(
+                                groups = listOf(groupItem("friends", "Friends"), groupItem("work", "Work")),
+                                pendingGroupIds = emptySet(),
+                                loadState = ProfileGroupPickerLoadState.READY,
+                            ),
+                        busy = false,
+                        onClose = {},
+                        onRetry = {},
+                        onAdd = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Friends").performClick()
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/profile_add_to_groups_ready_dark.png")
+    }
+
+    @Test
     fun makeAdminPickerReturnsTheSelectedSharedGroup() {
         val appState = testAppState()
         val group = groupItem("friends", "Friends")
         var promotedGroupId: String? = null
         composeRule.setContent {
-            WhiteNoiseTheme {
-                ProfileMakeAdminContent(
-                    appState = appState,
-                    targetName = "Alice",
-                    state =
-                        ProfileGroupPickerState(
-                            groups = listOf(group),
-                            pendingGroupIds = emptySet(),
-                            loadState = ProfileGroupPickerLoadState.READY,
-                        ),
-                    busy = false,
-                    onClose = {},
-                    onRetry = {},
-                    onPromote = { promotedGroupId = it.group.groupIdHex },
-                )
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface {
+                    ProfileMakeAdminContent(
+                        appState = appState,
+                        targetName = "Alice",
+                        state =
+                            ProfileGroupPickerState(
+                                groups = listOf(group),
+                                pendingGroupIds = emptySet(),
+                                loadState = ProfileGroupPickerLoadState.READY,
+                            ),
+                        busy = false,
+                        onClose = {},
+                        onRetry = {},
+                        onPromote = { promotedGroupId = it.group.groupIdHex },
+                    )
+                }
             }
         }
 
         composeRule.onNodeWithText("Friends").performClick()
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/profile_make_admin_ready_dark.png")
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).performClick()
         composeRule.runOnIdle { assertEquals("friends", promotedGroupId) }
     }
