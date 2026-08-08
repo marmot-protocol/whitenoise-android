@@ -904,6 +904,26 @@ private data class ProfilePresentation(
     }
 }
 
+internal data class PostedGroupInviteIdentity(
+    val update: NotificationUpdateFfi,
+    val displayedName: String?,
+)
+
+internal fun postedGroupInviteIdentity(
+    update: NotificationUpdateFfi,
+    posted: Boolean,
+    redactContent: Boolean,
+    displayedName: String?,
+): PostedGroupInviteIdentity? =
+    if (posted && update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+        PostedGroupInviteIdentity(
+            update = update,
+            displayedName = displayedName.takeUnless { redactContent },
+        )
+    } else {
+        null
+    }
+
 internal data class NotificationAvatarPreWarmTarget(
     val senderAccountIdHex: String?,
     val senderAvatarUrl: String?,
@@ -7009,12 +7029,15 @@ class WhiteNoiseAppState private constructor(
                             shouldPostNotification(update, engineMuted)
                     },
                 )
-            if (posted && !redactNotificationContent && update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
-                val displayedName = senderNameOverride ?: notificationDisplayNameHint(update.sender.displayName)
+            postedGroupInviteIdentity(
+                update = update,
+                posted = posted,
+                redactContent = redactNotificationContent,
+                displayedName = senderNameOverride ?: notificationDisplayNameHint(update.sender.displayName),
+            )?.let { identity ->
                 inviteNotificationIdentityRefreshStore.rememberPosted(
-                    update = update,
-                    displayedName = displayedName,
-                    displayedAvatarUrl = senderAvatarUrl,
+                    update = identity.update,
+                    displayedName = identity.displayedName,
                 )
                 synchronized(profilePresentationLock) {
                     profilePresentations[update.sender.accountIdHex]
@@ -7102,7 +7125,6 @@ class WhiteNoiseAppState private constructor(
             inviteNotificationIdentityRefreshStore.refreshCandidates(
                 senderAccountIdHex = senderAccountIdHex,
                 resolvedName = presentation.displayName,
-                resolvedAvatarUrl = presentation.avatarUrl,
             )
         candidates.forEach(::launchInviteNotificationIdentityRefresh)
     }
@@ -7136,18 +7158,16 @@ class WhiteNoiseAppState private constructor(
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
                         return@runClaimedRefresh
                     }
-                    val presentation =
-                        ProfilePresentation(
-                            displayName = currentCandidate.resolvedName,
-                            avatarUrl = currentCandidate.resolvedAvatarUrl,
+                    val (posted, displayedName) =
+                        refreshActiveInviteNotificationIdentity(
+                            update = update,
+                            resolvedProfileName = currentCandidate.resolvedName,
                         )
-                    val (posted, displayedPresentation) = refreshActiveInviteNotificationIdentity(update, presentation)
                     if (posted) {
                         followUp =
                             inviteNotificationIdentityRefreshStore.markRefreshed(
                                 update = update,
-                                displayedName = displayedPresentation.displayName,
-                                displayedAvatarUrl = displayedPresentation.avatarUrl,
+                                displayedName = displayedName,
                             )
                     } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
@@ -7162,33 +7182,25 @@ class WhiteNoiseAppState private constructor(
 
     private suspend fun refreshActiveInviteNotificationIdentity(
         update: NotificationUpdateFfi,
-        presentation: ProfilePresentation,
-    ): Pair<Boolean, ProfilePresentation> {
+        resolvedProfileName: String?,
+    ): Pair<Boolean, String?> {
         val skipEnrichmentForLock = appLockScreenVisible
         val resolvedName =
             if (skipEnrichmentForLock) {
                 null
             } else {
                 notificationSenderName(update)
-                    ?: presentation.displayName
+                    ?: resolvedProfileName
                     ?: notificationDisplayNameHint(update.sender.displayName)
             }
-        val resolvedAvatarUrl =
-            if (skipEnrichmentForLock) {
-                null
-            } else {
-                bestEffortNotificationAvatarLookup { notificationSenderAvatarUrl(update) }
-                    ?: presentation.avatarUrl
-            }
-        // A lock can arrive during either suspending lookup above. Re-check after
+        // A lock can arrive during the suspending lookup above. Re-check after
         // enrichment so the silent update cannot reveal identity behind the lock.
         val redactContent = skipEnrichmentForLock || appLockScreenVisible
-        val displayedPresentation =
-            if (redactContent) ProfilePresentation(null, null) else ProfilePresentation(resolvedName, resolvedAvatarUrl)
+        val displayedName = resolvedName.takeUnless { redactContent }
         val posted =
             localNotificationPresenter.show(
                 update = update,
-                senderNameOverride = displayedPresentation.displayName,
+                senderNameOverride = displayedName,
                 recipientAccountSubtext =
                     if (redactContent) {
                         null
@@ -7207,7 +7219,7 @@ class WhiteNoiseAppState private constructor(
                         localNotificationPresenter.isGroupInviteNotificationActive(update)
                 },
             )
-        return posted to displayedPresentation
+        return posted to displayedName
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
