@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.net.Uri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -170,5 +171,17 @@ class ImageEditorModelTest {
         assertTrue(isOnlyMediaUriReferenceAt(listOf(edited, other), index = 0, expected = edited))
         assertFalse(isOnlyMediaUriReferenceAt(listOf(edited, edited), index = 0, expected = edited))
         assertFalse(isOnlyMediaUriReferenceAt(listOf(other), index = 0, expected = edited))
+    }
+
+    @Test
+    fun repeatedAccessibilityActionsProduceDistinctAnnouncements() {
+        val first = nextEditorAnnouncement("Undo", current = "")
+        val second = nextEditorAnnouncement("Undo", current = first)
+        val third = nextEditorAnnouncement("Undo", current = second)
+
+        assertNotEquals(first, second)
+        assertNotEquals(second, third)
+        assertTrue(first.startsWith("Undo"))
+        assertTrue(second.startsWith("Undo"))
     }
 }

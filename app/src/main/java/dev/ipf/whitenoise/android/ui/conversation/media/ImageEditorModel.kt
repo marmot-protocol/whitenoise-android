@@ -309,6 +309,11 @@ internal fun isOnlyMediaUriReferenceAt(
     expected: Uri,
 ): Boolean = current.getOrNull(index) == expected && current.count { it == expected } == 1
 
+internal fun nextEditorAnnouncement(
+    label: String,
+    current: String,
+): String = if (current == label) "$label\u2060" else label
+
 private fun NormalizedPoint.normalized(clamp: Boolean = true): NormalizedPoint =
     NormalizedPoint(
         x = normalizeCoordinate(if (clamp) x.coerceIn(0f, 1f) else x),

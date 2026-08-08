@@ -77,6 +77,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -127,6 +128,17 @@ internal suspend fun <T : Any> createSerializedOwnedResource(
         )
     }
 
+internal suspend fun <T : Any> releaseSerializedOwnedResource(
+    mutex: Mutex,
+    resource: T,
+    workContext: CoroutineContext = Dispatchers.Default,
+    cleanup: (T) -> Unit,
+) {
+    withContext(NonCancellable + workContext) {
+        mutex.withLock { cleanup(resource) }
+    }
+}
+
 private enum class ImageEditorTool { Crop, Draw }
 
 private enum class CropCorner { TopLeft, TopRight, BottomLeft, BottomRight }
@@ -168,11 +180,20 @@ internal fun ImageEditorScreen(
                 },
                 cleanup = Bitmap::recycle,
             )
-        decodeState = decoded?.let(EditorDecodeState::Ready) ?: EditorDecodeState.Failed
-    }
-    DisposableEffect(decodeState) {
-        val bitmap = (decodeState as? EditorDecodeState.Ready)?.bitmap
-        onDispose { bitmap?.recycle() }
+        if (decoded == null) {
+            decodeState = EditorDecodeState.Failed
+            return@LaunchedEffect
+        }
+        decodeState = EditorDecodeState.Ready(decoded)
+        try {
+            awaitCancellation()
+        } finally {
+            releaseSerializedOwnedResource(
+                mutex = renderMutex,
+                resource = decoded,
+                cleanup = Bitmap::recycle,
+            )
+        }
     }
 
     Dialog(
@@ -181,10 +202,7 @@ internal fun ImageEditorScreen(
     ) {
         when (val decoded = decodeState) {
             EditorDecodeState.Loading -> EditorLoadingContent()
-            EditorDecodeState.Failed -> {
-                LaunchedEffect(uri) { onFailure() }
-                EditorFailureContent(onDismiss)
-            }
+            EditorDecodeState.Failed -> EditorFailureContent(onDismiss)
             is EditorDecodeState.Ready ->
                 ImageEditorContent(
                     source = decoded.bitmap,
@@ -405,7 +423,7 @@ internal fun ImageEditorContent(
                     enabled = enabled && history.canUndo,
                 ) {
                     history = history.undo()
-                    announcement = undoLabel
+                    announcement = nextEditorAnnouncement(undoLabel, announcement)
                 }
                 EditorActionButton(
                     icon = { Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null) },
@@ -413,7 +431,7 @@ internal fun ImageEditorContent(
                     enabled = enabled && history.canRedo,
                 ) {
                     history = history.redo()
-                    announcement = redoLabel
+                    announcement = nextEditorAnnouncement(redoLabel, announcement)
                 }
                 EditorActionButton(
                     icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
@@ -422,7 +440,7 @@ internal fun ImageEditorContent(
                 ) {
                     history = history.reset()
                     selectedAspect = ImageCropAspect.Free
-                    announcement = resetLabel
+                    announcement = nextEditorAnnouncement(resetLabel, announcement)
                 }
             }
 

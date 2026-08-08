@@ -3629,9 +3629,14 @@ class WhiteNoiseAppState private constructor(
                         appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
                     }
                 runCatchingCancellable {
-                    java.io
-                        .File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.IMAGE_EDITOR)
-                        .deleteRecursively()
+                    val directory =
+                        java.io.File(
+                            appContext.cacheDir,
+                            dev.ipf.whitenoise.android.media.MediaCacheDirs.IMAGE_EDITOR,
+                        )
+                    check(!directory.exists() || directory.deleteRecursively()) {
+                        "image editor media wipe incomplete"
+                    }
                 }.onFailure {
                     appStateDebug { "image editor media wipe failed: ${it.readableMessage()}" }
                 }

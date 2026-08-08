@@ -887,7 +887,7 @@
     <string name="image_editor_draw">Disegna</string>
     <string name="image_editor_rotate_left">Ruota a sinistra</string>
     <string name="image_editor_rotate_right">Ruota a destra</string>
-    <string name="image_editor_undo">Annulla</string>
+    <string name="image_editor_undo">Annulla l’ultima azione</string>
     <string name="image_editor_redo">Ripeti</string>
     <string name="image_editor_reset">Reimposta modifiche</string>
 

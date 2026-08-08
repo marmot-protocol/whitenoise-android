@@ -364,7 +364,8 @@ internal fun MediaPreviewContent(
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
-    val loadedPreviewMetadata = rememberPreviewMetadata(items)
+    val loadedPreviewMetadata =
+        rememberPreviewMetadata(if (previewMetadataOverride == null) items else emptyList())
     val previewMetadata = previewMetadataOverride ?: loadedPreviewMetadata
     LaunchedEffect(items.size) {
         currentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
@@ -533,12 +534,14 @@ private fun HeroMediaPreview(
     enabled: Boolean,
     onEdit: () -> Unit,
 ) {
+    val editLabel = stringResource(R.string.image_editor_edit)
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .clickable(
                     enabled = enabled && metadata?.canEdit == true,
+                    onClickLabel = editLabel,
                     onClick = onEdit,
                 ),
         contentAlignment = Alignment.Center,
