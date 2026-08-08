@@ -412,20 +412,21 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 hasReplyPreview = replyPreviewPresent,
                 hasMedia = hasMedia,
             )
+        val lastLineWidth =
+            lastLineLayout?.let { layout ->
+                if (layout.lineCount > 0) {
+                    ceil(layout.getLineRight(layout.lineCount - 1)).toInt()
+                } else {
+                    null
+                }
+            }
         if (collapsible) {
             BubbleCollapsibleFooterLayout(
                 maxBodyHeight = maxBodyHeightDp,
                 readMore = readMoreFooter,
                 footer = inlineFooter,
                 modifier = bodyModifier,
-                lastLineWidth =
-                    lastLineLayout?.let { layout ->
-                        if (layout.lineCount > 0) {
-                            ceil(layout.getLineRight(layout.lineCount - 1)).toInt()
-                        } else {
-                            null
-                        }
-                    },
+                lastLineWidth = lastLineWidth,
             ) {
                 selectableMessageBody()
             }
@@ -433,14 +434,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             BubbleFooterLayout(
                 footer = inlineFooter,
                 modifier = bodyModifier,
-                lastLineWidth =
-                    lastLineLayout?.let { layout ->
-                        if (layout.lineCount > 0) {
-                            ceil(layout.getLineRight(layout.lineCount - 1)).toInt()
-                        } else {
-                            null
-                        }
-                    },
+                lastLineWidth = lastLineWidth,
             ) {
                 selectableMessageBody()
             }

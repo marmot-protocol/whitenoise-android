@@ -36,7 +36,7 @@ class GodComposableDecompositionCoverageTest {
     @Test
     fun conversationUiTreeLivesInNamedRestartScopes() {
         val screenSource = source("conversation/ConversationScreen.kt").readText()
-        val screenBody = screenSource
+        val screenBody = screenSource.functionBody("ConversationScreen")
 
         val componentFiles =
             mapOf(
@@ -51,9 +51,9 @@ class GodComposableDecompositionCoverageTest {
                 source(path).readText().contains("internal fun $component("),
             )
         }
-        assertFalse("ConversationScreen must not own TopAppBar rendering", "TopAppBar(" in screenBody)
-        assertFalse("ConversationScreen must not own composer rendering", "ComposerBar(" in screenBody)
-        assertFalse("ConversationScreen must not own message bubble rendering", "MessageBubble(" in screenBody)
+        assertFalse("ConversationScreen must not own TopAppBar rendering", "TopAppBar(" in screenSource)
+        assertFalse("ConversationScreen must not own composer rendering", "ComposerBar(" in screenSource)
+        assertFalse("ConversationScreen must not own message bubble rendering", "MessageBubble(" in screenSource)
     }
 
     @Test
@@ -63,11 +63,11 @@ class GodComposableDecompositionCoverageTest {
 
         assertTrue("MessageBubble must use the extracted media holder", "rememberBubbleMedia(" in bubbleBody)
         assertTrue("The extracted holder must be immutable", "@Immutable" in mediaHolder)
+        val partitioningResultNames =
+            listOf("val indexedMedia =", "val images =", "val audio =", "val videos =", "val files =")
         assertFalse(
-            "MessageBubble must not partition every media class in its own composition scope",
-            "MediaReferenceSupport.isImageMedia(ref)" in bubbleBody ||
-                "MediaReferenceSupport.isAudioMedia(ref)" in bubbleBody ||
-                "MediaReferenceSupport.isVideoMedia(ref)" in bubbleBody,
+            "MessageBubble must not own media partitioning result lists",
+            partitioningResultNames.any(bubbleBody::contains),
         )
     }
 

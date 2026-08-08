@@ -1208,6 +1208,25 @@ internal fun MessageBubble(
                         )
                     }
                 }
+                val onPlainTextLayout: (TextLayoutResult) -> Unit = {
+                    plainTextLayoutTracker.layoutResult = it
+                    reportPlainTextLayoutIfReady()
+                }
+                val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
+                    if (textSelectionMode) {
+                        CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
+                            SelectionContainer(state = messageTextSelectionState) { content() }
+                        }
+                    } else {
+                        content()
+                    }
+                }
+                val onEditedClick: (() -> Unit)? =
+                    if (editState != null && !textSelectionMode) {
+                        { editHistoryOpen = true }
+                    } else {
+                        null
+                    }
                 if (hasMedia) {
                     // Signal and Telegram treat media plus caption as one message
                     // surface. The media owns no internal corners or border when
@@ -1263,19 +1282,8 @@ internal fun MessageBubble(
                                     markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
-                                    onPlainTextLayout = {
-                                        plainTextLayoutTracker.layoutResult = it
-                                        reportPlainTextLayoutIfReady()
-                                    },
-                                    selectionWrapper = { content ->
-                                        if (textSelectionMode) {
-                                            CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                                                SelectionContainer(state = messageTextSelectionState) { content() }
-                                            }
-                                        } else {
-                                            content()
-                                        }
-                                    },
+                                    onPlainTextLayout = onPlainTextLayout,
+                                    selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
@@ -1284,12 +1292,7 @@ internal fun MessageBubble(
                                     showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                                     showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                                     editedLabel = editedLabel,
-                                    onEditedClick =
-                                        if (editState != null && !textSelectionMode) {
-                                            { editHistoryOpen = true }
-                                        } else {
-                                            null
-                                        },
+                                    onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
@@ -1337,19 +1340,8 @@ internal fun MessageBubble(
                                     markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
-                                    onPlainTextLayout = {
-                                        plainTextLayoutTracker.layoutResult = it
-                                        reportPlainTextLayoutIfReady()
-                                    },
-                                    selectionWrapper = { content ->
-                                        if (textSelectionMode) {
-                                            CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                                                SelectionContainer(state = messageTextSelectionState) { content() }
-                                            }
-                                        } else {
-                                            content()
-                                        }
-                                    },
+                                    onPlainTextLayout = onPlainTextLayout,
+                                    selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
                                     replyPreviewPresent = replyPreview != null,
                                     hasMedia = hasMedia,
@@ -1358,12 +1350,7 @@ internal fun MessageBubble(
                                     showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                                     showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                                     editedLabel = editedLabel,
-                                    onEditedClick =
-                                        if (editState != null && !textSelectionMode) {
-                                            { editHistoryOpen = true }
-                                        } else {
-                                            null
-                                        },
+                                    onEditedClick = onEditedClick,
                                     footerOnVisualMedia = footerOnVisualMedia,
                                     footerOnPendingVisual = footerOnPendingVisual,
                                     invalidationWarning = invalidationWarning,
@@ -1411,19 +1398,8 @@ internal fun MessageBubble(
                             markdownLinkLayoutReporter = markdownLinkLayoutReporter,
                             onCopyMarkdownLink = ::copyMarkdownLink,
                             plainTextSelectionModifier = plainTextSelectionModifier,
-                            onPlainTextLayout = {
-                                plainTextLayoutTracker.layoutResult = it
-                                reportPlainTextLayoutIfReady()
-                            },
-                            selectionWrapper = { content ->
-                                if (textSelectionMode) {
-                                    CompositionLocalProvider(LocalClipboard provides textSelectionClipboard) {
-                                        SelectionContainer(state = messageTextSelectionState) { content() }
-                                    }
-                                } else {
-                                    content()
-                                }
-                            },
+                            onPlainTextLayout = onPlainTextLayout,
+                            selectionWrapper = selectionWrapper,
                             collapsible = collapsible,
                             replyPreviewPresent = replyPreview != null,
                             hasMedia = hasMedia,
@@ -1432,12 +1408,7 @@ internal fun MessageBubble(
                             showStatus = shouldShowMessageStatus(mine, deleted, invalidationPresentation),
                             showRetention = !deleted && retentionIndicatorVisible(record.retentionSeconds),
                             editedLabel = editedLabel,
-                            onEditedClick =
-                                if (editState != null && !textSelectionMode) {
-                                    { editHistoryOpen = true }
-                                } else {
-                                    null
-                                },
+                            onEditedClick = onEditedClick,
                             footerOnVisualMedia = footerOnVisualMedia,
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
