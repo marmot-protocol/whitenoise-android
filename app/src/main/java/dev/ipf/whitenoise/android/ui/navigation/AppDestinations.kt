@@ -20,6 +20,7 @@ internal enum class SettingsDetail {
     KeyPackages,
     Notifications,
     DevicePrivacy,
+    AiAgents,
     Donate,
     TextToSpeech,
     ChatFolders,

@@ -24,6 +24,7 @@ class SettingsDetailNavigationTest {
     fun topLevelDetailsReturnToHome() {
         listOf(
             SettingsDetail.AccountKeys,
+            SettingsDetail.AiAgents,
             SettingsDetail.DevicePrivacy,
             SettingsDetail.Relays,
             SettingsDetail.Notifications,
