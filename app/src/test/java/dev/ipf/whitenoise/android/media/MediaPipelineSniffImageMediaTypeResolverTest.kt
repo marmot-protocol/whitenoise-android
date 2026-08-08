@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +16,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -60,6 +62,34 @@ class MediaPipelineSniffImageMediaTypeResolverTest {
         }
 
         assertEquals("image/jpeg", MediaPipeline.sniffImageMediaType(context.contentResolver, uri))
+    }
+
+    @Test
+    fun decodeSampledFromUri_returnsNullWhenProviderStreamFailsDuringRead() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/broken.jpg")
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) {
+            object : InputStream() {
+                override fun read(): Int = throw UnsupportedOperationException("provider stream failed")
+            }
+        }
+
+        assertNull(MediaPipeline.decodeSampledFromUri(context.contentResolver, uri))
+    }
+
+    @Test
+    fun isAnimatedImageSource_returnsFalseWhenProviderStreamFailsDuringRead() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/broken.gif")
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) {
+            object : InputStream() {
+                override fun read(): Int = throw UnsupportedOperationException("provider stream failed")
+            }
+        }
+
+        assertFalse(MediaPipeline.isAnimatedImageSource(context.contentResolver, uri))
     }
 
     private class GhostProvider : ContentProvider() {

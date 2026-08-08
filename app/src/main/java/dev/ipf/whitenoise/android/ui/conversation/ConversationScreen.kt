@@ -149,9 +149,12 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
+import dev.ipf.whitenoise.android.ui.conversation.media.deleteOwnedEditorUri
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
+import dev.ipf.whitenoise.android.ui.conversation.media.isOnlyMediaUriReferenceAt
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.replaceMediaUriIfCurrent
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
@@ -3011,6 +3014,7 @@ internal fun ConversationScreen(
             chatTitle = controller.title(groupTitleCopy),
             initialCaption = seededDraftText,
             onDismiss = {
+                imageUris.forEach { deleteOwnedEditorUri(context, it) }
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
             },
@@ -3020,6 +3024,7 @@ internal fun ConversationScreen(
                     documentUris,
                     caption,
                     onAccepted = {
+                        imageUris.forEach { deleteOwnedEditorUri(context, it) }
                         pendingMediaUris = emptyList()
                         pendingDocumentUris = emptyList()
                         if (composerTextState.valueState.value.text == seededDraftText) {
@@ -3043,10 +3048,14 @@ internal fun ConversationScreen(
                 )
             },
             onRemoveAt = { index ->
+                val removed = pendingMediaUris.getOrNull(index)
+                val deleteRemoved =
+                    removed != null && isOnlyMediaUriReferenceAt(pendingMediaUris, index, removed)
                 pendingMediaUris =
                     pendingMediaUris.toMutableList().apply {
                         if (index in indices) removeAt(index)
                     }
+                if (deleteRemoved) deleteOwnedEditorUri(context, removed)
             },
             onRemoveDocumentAt = { index ->
                 pendingDocumentUris =
@@ -3060,6 +3069,15 @@ internal fun ConversationScreen(
                 )
             },
             onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
+            onReplaceMediaAt = { index, expected, replacement ->
+                val updated = replaceMediaUriIfCurrent(pendingMediaUris, index, expected, replacement)
+                if (updated != null) {
+                    pendingMediaUris = updated
+                    true
+                } else {
+                    false
+                }
+            },
         )
     }
 }

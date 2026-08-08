@@ -881,6 +881,30 @@
     <string name="group_system_you_avatar_changed">Vous avez changé l\'avatar du groupe</string>
     <string name="media_attachment_add_more">Ajouter plus</string>
     <string name="media_attachment_remove">Retirer la pièce jointe</string>
+    <string name="image_editor_edit">Modifier la photo</string>
+    <string name="image_editor_title">Modifier la photo</string>
+    <string name="image_editor_crop">Recadrer</string>
+    <string name="image_editor_draw">Dessiner</string>
+    <string name="image_editor_rotate_left">Pivoter à gauche</string>
+    <string name="image_editor_rotate_right">Pivoter à droite</string>
+    <string name="image_editor_undo">Annuler</string>
+    <string name="image_editor_redo">Rétablir</string>
+    <string name="image_editor_reset">Réinitialiser les modifications</string>
+
+    <string name="image_editor_eraser">Gomme</string>
+    <string name="image_editor_width">Épaisseur du trait</string>
+    <string name="image_editor_aspect_free">Libre</string>
+
+    <string name="image_editor_color_red">Stylo rouge</string>
+    <string name="image_editor_color_yellow">Stylo jaune</string>
+    <string name="image_editor_color_green">Stylo vert</string>
+    <string name="image_editor_color_blue">Stylo bleu</string>
+    <string name="image_editor_color_white">Stylo blanc</string>
+    <string name="image_editor_unsupported">Cette pièce jointe ne peut pas être modifiée. Elle sera envoyée sans modification.</string>
+    <string name="image_editor_decode_failed">Impossible d’ouvrir cette photo pour la modifier.</string>
+    <string name="image_editor_save_failed">Impossible d’enregistrer la photo modifiée.</string>
+    <string name="image_editor_crop_hint">Faites glisser un coin pour recadrer</string>
+    <string name="image_editor_draw_hint">Dessinez sur la photo</string>
     <string name="voice_message_record">Maintenir pour enregistrer</string>
     <string name="voice_message_recording">Enregistrement…</string>
     <string name="voice_message_release_to_send">Relâcher pour envoyer · glisser pour annuler</string>

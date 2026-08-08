@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalPreviewMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -24,8 +27,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
 /**
  * Behavioral coverage for the staged-media preview: badge numbering follows
@@ -40,6 +46,15 @@ class MediaPreviewContentTest {
     val composeRule = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
+    private val previewPng: ByteArray by lazy {
+        val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        bitmap.setPixel(0, 0, Color.WHITE)
+        ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+            bitmap.recycle()
+            output.toByteArray()
+        }
+    }
 
     private fun string(
         resId: Int,
@@ -51,7 +66,14 @@ class MediaPreviewContentTest {
     private fun renderPreview(
         initialMedia: List<Uri>,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
+        metadata: Map<Uri, LocalPreviewMetadata>? = null,
+        onEditMediaAt: (Int, Uri) -> Unit = { _, _ -> },
     ) {
+        initialMedia.forEach { uri ->
+            shadowOf(app.contentResolver).registerInputStreamSupplier(uri) {
+                ByteArrayInputStream(previewPng)
+            }
+        }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 var media by remember { mutableStateOf(initialMedia) }
@@ -67,6 +89,8 @@ class MediaPreviewContentTest {
                     onRemoveDocumentAt = {},
                     onAddPhotos = {},
                     onAddDocuments = {},
+                    previewMetadataOverride = metadata,
+                    onEditMediaAt = onEditMediaAt,
                 )
             }
         }
@@ -136,5 +160,50 @@ class MediaPreviewContentTest {
     fun addTileIsAvailableForGrowingTheSelection() {
         renderPreview(listOf(uri(1)))
         composeRule.onNodeWithContentDescription(string(R.string.media_attachment_add_more)).assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingAStaticImagePreviewOpensItsEditor() {
+        val image = uri(1)
+        var edited: Pair<Int, Uri>? = null
+        renderPreview(
+            initialMedia = listOf(image),
+            metadata =
+                mapOf(
+                    image to
+                        LocalPreviewMetadata(
+                            isVideo = false,
+                            displayName = null,
+                            canEdit = true,
+                            isUnsupportedImage = false,
+                        ),
+                ),
+            onEditMediaAt = { index, uri -> edited = index to uri },
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.image_editor_edit)).performClick()
+
+        composeRule.runOnIdle { assertEquals(0 to image, edited) }
+    }
+
+    @Test
+    fun animatedOrUnsupportedImagesClearlyOfferSendUnchanged() {
+        val image = uri(1)
+        renderPreview(
+            initialMedia = listOf(image),
+            metadata =
+                mapOf(
+                    image to
+                        LocalPreviewMetadata(
+                            isVideo = false,
+                            displayName = null,
+                            canEdit = false,
+                            isUnsupportedImage = true,
+                        ),
+                ),
+        )
+
+        composeRule.onNodeWithText(string(R.string.image_editor_unsupported)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.image_editor_edit)).assertDoesNotExist()
     }
 }

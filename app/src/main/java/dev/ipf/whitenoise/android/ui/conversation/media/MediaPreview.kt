@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -75,12 +77,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 private const val PREVIEW_STRIP_MAX_EDGE_PX = 256
 
-private data class LocalPreviewMetadata(
+internal data class LocalPreviewMetadata(
     val isVideo: Boolean,
     val displayName: String?,
+    val canEdit: Boolean,
+    val isUnsupportedImage: Boolean,
 )
 
 /** Resolve provider-backed MIME types and names once, off the composition thread. */
@@ -96,15 +101,39 @@ private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android
                 withContext(Dispatchers.IO) {
                     items.associate { item ->
                         val mime = safeGetType(context.contentResolver, item.uri)
+                        val sniffedMime =
+                            if (mime.isBlank() || mime.equals("application/octet-stream", ignoreCase = true)) {
+                                MediaPipeline.sniffImageMediaType(context.contentResolver, item.uri)
+                            } else {
+                                null
+                            }
+                        val effectiveMime = sniffedMime ?: mime
+                        val isVideo = effectiveMime.startsWith("video/", ignoreCase = true)
+                        val isImage = effectiveMime.startsWith("image/", ignoreCase = true)
+                        // ImageDecoder does not expose a cheap animated-AVIF probe;
+                        // keep all AVIFs on the explicit send-unchanged path rather
+                        // than accidentally discarding frames.
+                        val editability =
+                            imageEditability(
+                                mime = effectiveMime,
+                                isAnimated =
+                                    isImage &&
+                                        MediaPipeline.isAnimatedImageSource(
+                                            context.contentResolver,
+                                            item.uri,
+                                        ),
+                            )
                         item.uri to
                             LocalPreviewMetadata(
-                                isVideo = mime.startsWith("video/", ignoreCase = true),
+                                isVideo = isVideo,
                                 displayName =
                                     if (item is StagedPreviewItem.Document) {
                                         queryDisplayName(context.contentResolver, item.uri)
                                     } else {
                                         null
                                     },
+                                canEdit = item is StagedPreviewItem.Media && editability.canEdit,
+                                isUnsupportedImage = item is StagedPreviewItem.Media && editability.isUnsupportedImage,
                             )
                     }
                 }
@@ -223,6 +252,7 @@ internal fun previewIndexAfterRemoval(
         else -> currentIndex.coerceIn(0, remainingCount - 1)
     }
 
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun MediaPreviewScreen(
     uris: List<android.net.Uri>,
@@ -234,8 +264,14 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    onReplaceMediaAt: (Int, android.net.Uri, android.net.Uri) -> Boolean = { _, _, _ -> false },
     initialCaption: String = "",
 ) {
+    val context = LocalContext.current
+    val mediaRevisionToken = rememberSaveable(uris) { UUID.randomUUID().toString() }
+    var editingIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var editingUriText by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingRevisionToken by rememberSaveable { mutableStateOf<String?>(null) }
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -255,6 +291,52 @@ internal fun MediaPreviewScreen(
             onRemoveDocumentAt = onRemoveDocumentAt,
             onAddPhotos = onAddPhotos,
             onAddDocuments = onAddDocuments,
+            onEditMediaAt = { index, uri ->
+                editingIndex = index
+                editingUriText = uri.toString()
+                editingRevisionToken = mediaRevisionToken
+            },
+        )
+    }
+    val editingUri = editingUriText?.let(android.net.Uri::parse)
+    if (editingIndex >= 0 && editingUri != null) {
+        ImageEditorScreen(
+            uri = editingUri,
+            onDismiss = {
+                editingIndex = -1
+                editingUriText = null
+                editingRevisionToken = null
+            },
+            onSaved = { replacement ->
+                val currentRevision =
+                    replaceMediaUriIfCurrent(
+                        current = uris,
+                        index = editingIndex,
+                        expected = editingUri,
+                        replacement = replacement,
+                        expectedRevision = editingRevisionToken,
+                        currentRevision = mediaRevisionToken,
+                    ) != null
+                val accepted =
+                    currentRevision &&
+                        runCatching { onReplaceMediaAt(editingIndex, editingUri, replacement) }
+                            .getOrDefault(false)
+                if (accepted) {
+                    if (isOnlyMediaUriReferenceAt(uris, editingIndex, editingUri)) {
+                        deleteOwnedEditorUri(context, editingUri)
+                    }
+                } else {
+                    deleteOwnedEditorUri(context, replacement)
+                }
+                editingIndex = -1
+                editingUriText = null
+                editingRevisionToken = null
+            },
+            onFailure = {
+                android.widget.Toast
+                    .makeText(context, R.string.image_editor_save_failed, android.widget.Toast.LENGTH_SHORT)
+                    .show()
+            },
         )
     }
 }
@@ -271,6 +353,8 @@ internal fun MediaPreviewContent(
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
     initialCaption: String = "",
+    onEditMediaAt: (Int, android.net.Uri) -> Unit = { _, _ -> },
+    previewMetadataOverride: Map<android.net.Uri, LocalPreviewMetadata>? = null,
 ) {
     val items = remember(mediaUris, documentUris) { stagedPreviewItems(mediaUris, documentUris) }
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -280,7 +364,8 @@ internal fun MediaPreviewContent(
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
-    val previewMetadata = rememberPreviewMetadata(items)
+    val loadedPreviewMetadata = rememberPreviewMetadata(items)
+    val previewMetadata = previewMetadataOverride ?: loadedPreviewMetadata
     LaunchedEffect(items.size) {
         currentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
@@ -341,7 +426,13 @@ internal fun MediaPreviewContent(
             contentAlignment = Alignment.Center,
         ) {
             when (val item = items.getOrNull(currentIndex)) {
-                is StagedPreviewItem.Media -> HeroMediaPreview(item.uri, previewMetadata[item.uri])
+                is StagedPreviewItem.Media ->
+                    HeroMediaPreview(
+                        uri = item.uri,
+                        metadata = previewMetadata[item.uri],
+                        enabled = !sending,
+                        onEdit = { onEditMediaAt(currentIndex, item.uri) },
+                    )
                 is StagedPreviewItem.Document -> HeroDocumentPreview(item.uri, previewMetadata[item.uri])
                 null -> Unit
             }
@@ -435,11 +526,23 @@ private fun previewCaptionFieldColors() =
     )
 
 @Composable
+@Suppress("FunctionNaming", "LongMethod")
 private fun HeroMediaPreview(
     uri: android.net.Uri,
     metadata: LocalPreviewMetadata?,
+    enabled: Boolean,
+    onEdit: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .clickable(
+                    enabled = enabled && metadata?.canEdit == true,
+                    onClick = onEdit,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
         val bitmap =
             metadata?.let {
                 rememberLocalPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
@@ -468,6 +571,34 @@ private fun HeroMediaPreview(
                         Modifier
                             .padding(16.dp)
                             .size(40.dp),
+                )
+            }
+        }
+        if (metadata?.canEdit == true) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
+            ) {
+                IconButton(onClick = onEdit, enabled = enabled) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.image_editor_edit),
+                        tint = Color.White,
+                    )
+                }
+            }
+        } else if (metadata?.isUnsupportedImage == true) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.Black.copy(alpha = ScrimAlpha.AFFORDANCE),
+            ) {
+                Text(
+                    text = stringResource(R.string.image_editor_unsupported),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
                 )
             }
         }

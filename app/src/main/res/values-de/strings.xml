@@ -879,6 +879,30 @@
     <string name="group_system_you_avatar_changed">Du hast das Gruppenbild geändert</string>
     <string name="media_attachment_add_more">Mehr hinzufügen</string>
     <string name="media_attachment_remove">Anhang entfernen</string>
+    <string name="image_editor_edit">Foto bearbeiten</string>
+    <string name="image_editor_title">Foto bearbeiten</string>
+    <string name="image_editor_crop">Zuschneiden</string>
+    <string name="image_editor_draw">Zeichnen</string>
+    <string name="image_editor_rotate_left">Nach links drehen</string>
+    <string name="image_editor_rotate_right">Nach rechts drehen</string>
+    <string name="image_editor_undo">Rückgängig</string>
+    <string name="image_editor_redo">Wiederholen</string>
+    <string name="image_editor_reset">Änderungen zurücksetzen</string>
+
+    <string name="image_editor_eraser">Radierer</string>
+    <string name="image_editor_width">Strichstärke</string>
+    <string name="image_editor_aspect_free">Frei</string>
+
+    <string name="image_editor_color_red">Roter Stift</string>
+    <string name="image_editor_color_yellow">Gelber Stift</string>
+    <string name="image_editor_color_green">Grüner Stift</string>
+    <string name="image_editor_color_blue">Blauer Stift</string>
+    <string name="image_editor_color_white">Weißer Stift</string>
+    <string name="image_editor_unsupported">Dieser Anhang kann nicht bearbeitet werden. Er wird unverändert gesendet.</string>
+    <string name="image_editor_decode_failed">Dieses Foto konnte nicht zum Bearbeiten geöffnet werden.</string>
+    <string name="image_editor_save_failed">Das bearbeitete Foto konnte nicht gespeichert werden.</string>
+    <string name="image_editor_crop_hint">Zum Zuschneiden eine Ecke ziehen</string>
+    <string name="image_editor_draw_hint">Auf dem Foto zeichnen</string>
     <string name="voice_message_record">Halten zum Aufnehmen</string>
     <string name="voice_message_recording">Aufnahme läuft…</string>
     <string name="voice_message_release_to_send">Loslassen zum Senden · wegziehen zum Abbrechen</string>

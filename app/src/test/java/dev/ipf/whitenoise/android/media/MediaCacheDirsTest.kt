@@ -20,11 +20,20 @@ class MediaCacheDirsTest {
         assertEquals("voice_attachments", MediaCacheDirs.VOICE)
         assertEquals("video_attachments", MediaCacheDirs.VIDEO)
         assertEquals("shared_media", MediaCacheDirs.SHARED)
+        assertEquals("composer_paste", MediaCacheDirs.COMPOSER_PASTE)
+        assertEquals("image_editor", MediaCacheDirs.IMAGE_EDITOR)
     }
 
     @Test
     fun cacheDirNamesAreDistinctAndNonBlank() {
-        val names = listOf(MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO, MediaCacheDirs.SHARED)
+        val names =
+            listOf(
+                MediaCacheDirs.VOICE,
+                MediaCacheDirs.VIDEO,
+                MediaCacheDirs.SHARED,
+                MediaCacheDirs.COMPOSER_PASTE,
+                MediaCacheDirs.IMAGE_EDITOR,
+            )
         assertEquals("cache dir names must be distinct", names.size, names.toSet().size)
         names.forEach { assertTrue("cache dir name must be non-blank", it.isNotBlank()) }
     }
@@ -33,7 +42,13 @@ class MediaCacheDirsTest {
     fun cacheDirNamesContainNoPathSeparators() {
         // These are single-level subdirectory names under cacheDir; a '/' would
         // change the create/delete target path and could escape the cleanup root.
-        listOf(MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO, MediaCacheDirs.SHARED).forEach { name ->
+        listOf(
+            MediaCacheDirs.VOICE,
+            MediaCacheDirs.VIDEO,
+            MediaCacheDirs.SHARED,
+            MediaCacheDirs.COMPOSER_PASTE,
+            MediaCacheDirs.IMAGE_EDITOR,
+        ).forEach { name ->
             assertTrue("'$name' must not contain a path separator", !name.contains('/'))
             assertEquals("'$name' must be its own filename", name, java.io.File(name).name)
         }

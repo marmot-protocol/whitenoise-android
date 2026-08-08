@@ -879,6 +879,30 @@
     <string name="group_system_you_avatar_changed">Grup avatarını değiştirdiniz</string>
     <string name="media_attachment_add_more">Daha fazla ekle</string>
     <string name="media_attachment_remove">Eki kaldır</string>
+    <string name="image_editor_edit">Fotoğrafı düzenle</string>
+    <string name="image_editor_title">Fotoğrafı düzenle</string>
+    <string name="image_editor_crop">Kırp</string>
+    <string name="image_editor_draw">Çiz</string>
+    <string name="image_editor_rotate_left">Sola döndür</string>
+    <string name="image_editor_rotate_right">Sağa döndür</string>
+    <string name="image_editor_undo">Geri al</string>
+    <string name="image_editor_redo">Yinele</string>
+    <string name="image_editor_reset">Düzenlemeleri sıfırla</string>
+
+    <string name="image_editor_eraser">Silgi</string>
+    <string name="image_editor_width">Çizgi kalınlığı</string>
+    <string name="image_editor_aspect_free">Serbest</string>
+
+    <string name="image_editor_color_red">Kırmızı kalem</string>
+    <string name="image_editor_color_yellow">Sarı kalem</string>
+    <string name="image_editor_color_green">Yeşil kalem</string>
+    <string name="image_editor_color_blue">Mavi kalem</string>
+    <string name="image_editor_color_white">Beyaz kalem</string>
+    <string name="image_editor_unsupported">Bu ek düzenlenemez. Değiştirilmeden gönderilecek.</string>
+    <string name="image_editor_decode_failed">Bu fotoğraf düzenlemek için açılamadı.</string>
+    <string name="image_editor_save_failed">Düzenlenen fotoğraf kaydedilemedi.</string>
+    <string name="image_editor_crop_hint">Kırpmak için bir köşeyi sürükleyin</string>
+    <string name="image_editor_draw_hint">Fotoğrafın üzerine çizin</string>
     <string name="voice_message_record">Kaydetmek için basılı tutun</string>
     <string name="voice_message_recording">Kaydediliyor…</string>
     <string name="voice_message_release_to_send">Göndermek için bırakın · iptal için kaydırın</string>
