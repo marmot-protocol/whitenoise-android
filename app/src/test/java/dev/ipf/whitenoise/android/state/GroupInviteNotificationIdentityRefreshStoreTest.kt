@@ -16,8 +16,8 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         val store = GroupInviteNotificationIdentityRefreshStore()
         val aliceInvite = update("alice-invite", "Alice")
         val bobInvite = update("bob-invite", "Bob")
-        store.rememberPosted(aliceInvite, displayedName = null, displayedAvatarUrl = null)
-        store.rememberPosted(bobInvite, displayedName = null, displayedAvatarUrl = null)
+        store.rememberPosted(aliceInvite, displayedName = null)
+        store.rememberPosted(bobInvite, displayedName = null)
 
         assertEquals(
             listOf(aliceInvite),
@@ -25,7 +25,6 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
                 .refreshCandidates(
                     senderAccountIdHex = "alice",
                     resolvedName = "Alice",
-                    resolvedAvatarUrl = "https://example.com/alice.png",
                 ).map { it.update },
         )
         assertTrue(
@@ -33,21 +32,19 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
                 .refreshCandidates(
                     senderAccountIdHex = "ALICE",
                     resolvedName = "Alice",
-                    resolvedAvatarUrl = "https://example.com/alice.png",
                 ).isEmpty(),
         )
 
-        store.markRefreshed(
+        store.completeRefresh(
             aliceInvite,
             displayedName = "Alice",
-            displayedAvatarUrl = "https://example.com/alice.png",
+            contentRedacted = false,
         )
         assertTrue(
             store
                 .refreshCandidates(
                     senderAccountIdHex = "ALICE",
                     resolvedName = "Alice",
-                    resolvedAvatarUrl = "https://example.com/alice.png",
                 ).isEmpty(),
         )
     }
@@ -56,7 +53,7 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
     fun failedRefreshCanBeRetried() {
         val store = GroupInviteNotificationIdentityRefreshStore()
         val invite = update("alice-invite", "Alice")
-        store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+        store.rememberPosted(invite, displayedName = null)
 
         assertRefreshCandidate(store, invite)
         store.release(invite.notificationKey)
@@ -68,7 +65,7 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         runTest {
             val store = GroupInviteNotificationIdentityRefreshStore()
             val invite = update("alice-invite", "Alice")
-            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            store.rememberPosted(invite, displayedName = null)
             assertRefreshCandidate(store, invite)
 
             val failure =
@@ -87,7 +84,7 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         runTest {
             val store = GroupInviteNotificationIdentityRefreshStore()
             val invite = update("alice-invite", "Alice")
-            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            store.rememberPosted(invite, displayedName = null)
             assertRefreshCandidate(store, invite)
 
             val failure =
@@ -106,7 +103,7 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         runTest {
             val store = GroupInviteNotificationIdentityRefreshStore()
             val invite = update("alice-invite", "Alice")
-            store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+            store.rememberPosted(invite, displayedName = null)
             assertRefreshCandidate(store, invite)
 
             store.runClaimedRefresh(invite.notificationKey) {
@@ -117,86 +114,71 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         }
 
     @Test
-    fun nameOnlyRefreshPreservesExistingAvatar() {
-        val store = GroupInviteNotificationIdentityRefreshStore()
-        val invite = update("alice-invite", "Alice")
-        val avatarUrl = "https://example.com/alice.png"
-        store.rememberPosted(invite, displayedName = "npub1alice", displayedAvatarUrl = avatarUrl)
-        assertRefreshCandidate(store, invite)
-
-        store.markRefreshed(invite, displayedName = "Alice", displayedAvatarUrl = null)
-
-        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = avatarUrl).isEmpty())
-    }
-
-    @Test
-    fun avatarOnlyRefreshPreservesExistingName() {
-        val store = GroupInviteNotificationIdentityRefreshStore()
-        val invite = update("alice-invite", "Alice")
-        val avatarUrl = "https://example.com/alice.png"
-        store.rememberPosted(invite, displayedName = "Alice", displayedAvatarUrl = null)
-        assertEquals(
-            listOf(invite),
-            store
-                .refreshCandidates("Alice", resolvedName = null, resolvedAvatarUrl = avatarUrl)
-                .map { it.update },
-        )
-
-        store.markRefreshed(invite, displayedName = null, displayedAvatarUrl = avatarUrl)
-
-        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = avatarUrl).isEmpty())
-    }
-
-    @Test
     fun newerPresentationQueuedDuringRefreshRunsImmediatelyAfterOlderPost() {
         val store = GroupInviteNotificationIdentityRefreshStore()
         val invite = update("alice-invite", "Alice")
-        store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+        store.rememberPosted(invite, displayedName = null)
 
         val first =
             store
-                .refreshCandidates("Alice", resolvedName = "Alice v1", resolvedAvatarUrl = null)
+                .refreshCandidates("Alice", resolvedName = "Alice v1")
                 .single()
         assertEquals("Alice v1", first.resolvedName)
         assertTrue(
             store
-                .refreshCandidates("Alice", resolvedName = "Alice v2", resolvedAvatarUrl = null)
+                .refreshCandidates("Alice", resolvedName = "Alice v2")
                 .isEmpty(),
         )
 
         val followUp =
-            store.markRefreshed(
+            store.completeRefresh(
                 update = invite,
                 displayedName = "Alice v1",
-                displayedAvatarUrl = null,
+                contentRedacted = false,
             )
 
         assertEquals(invite, followUp?.update)
         assertEquals("Alice v2", followUp?.resolvedName)
         assertEquals(
             null,
-            store.markRefreshed(
+            store.completeRefresh(
                 update = invite,
                 displayedName = "Alice v2",
-                displayedAvatarUrl = null,
+                contentRedacted = false,
             ),
         )
     }
 
     @Test
-    fun deferredRefreshCanBeClaimedAfterUnlock() {
+    fun redactedInviteResolvedWhileLockedRefreshesAfterUnlock() {
         val store = GroupInviteNotificationIdentityRefreshStore()
         val invite = update("alice-invite", "Alice")
-        store.rememberPosted(invite, displayedName = null, displayedAvatarUrl = null)
+        store.rememberPosted(invite, displayedName = null)
         val candidate =
             store
-                .refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null)
+                .refreshCandidates("Alice", resolvedName = "Alice")
                 .single()
 
-        store.release(candidate.update.notificationKey)
+        assertEquals(
+            null,
+            store.completeRefresh(
+                update = invite,
+                displayedName = null,
+                contentRedacted = true,
+            ),
+        )
 
         assertEquals(listOf(candidate), store.claimPendingRefreshes())
         assertTrue(store.claimPendingRefreshes().isEmpty())
+        assertEquals(
+            null,
+            store.completeRefresh(
+                update = invite,
+                displayedName = "Alice",
+                contentRedacted = false,
+            ),
+        )
+        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice").isEmpty())
     }
 
     @Test
@@ -205,10 +187,9 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         store.rememberPosted(
             update("message", "Alice").copy(trigger = NotificationTriggerFfi.NEW_MESSAGE),
             displayedName = null,
-            displayedAvatarUrl = null,
         )
 
-        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null).isEmpty())
+        assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice").isEmpty())
     }
 
     private fun assertRefreshCandidate(
@@ -218,7 +199,7 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         assertEquals(
             listOf(invite),
             store
-                .refreshCandidates("Alice", resolvedName = "Alice", resolvedAvatarUrl = null)
+                .refreshCandidates("Alice", resolvedName = "Alice")
                 .map { it.update },
         )
     }
