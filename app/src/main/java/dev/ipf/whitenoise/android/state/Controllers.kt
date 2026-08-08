@@ -1246,6 +1246,7 @@ internal fun canAcceptTextSend(
     membersVerified: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
+    selfLeft: Boolean,
     unrecoverable: Boolean,
     disbanding: Boolean,
     disbanded: Boolean,
@@ -1255,8 +1256,10 @@ internal fun canAcceptTextSend(
         !unrecoverable &&
         !disbanding &&
         !disbanded &&
-        isSelfMember &&
-        (membersVerified || seededSelfMember)
+        (
+            (membersVerified && isSelfMember) ||
+                (!membersVerified && seededSelfMember && !selfLeft)
+        )
 
 /**
  * How many times a text/reply send retries the FFI publish before surfacing a
@@ -6405,6 +6408,7 @@ class ConversationController(
                 membersVerified = membersVerified,
                 isSelfMember = isSelfMember,
                 seededSelfMember = seededSelfMember,
+                selfLeft = selfMembership.selfLeft,
                 unrecoverable = group.unrecoverable,
                 disbanding = group.disbanding,
                 disbanded = group.disbanded,
@@ -6414,8 +6418,11 @@ class ConversationController(
             // visible composer can still reach this guard from a genuinely
             // unknown notification-open state; preserve the draft and surface
             // that the handoff has not started instead of dropping it silently.
-            if (accountRef != null && trimmed.isNotEmpty()) {
-                appState.present(R.string.toast_send_not_ready)
+            val sendHasContent = accountRef != null && trimmed.isNotEmpty()
+            val membershipUnknown = !membersVerified && !seededSelfMember && !selfMembership.selfLeft
+            val groupCanEventuallySend = !group.unrecoverable && !group.disbanding && !group.disbanded
+            if (sendHasContent && membershipUnknown && groupCanEventuallySend) {
+                appState.present(R.string.toast_send_membership_verifying)
             }
             return
         }

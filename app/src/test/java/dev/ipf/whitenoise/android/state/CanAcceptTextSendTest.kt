@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Regression coverage for issue #264: a short text message could be silently
+ * Regression coverage for issues #264 and #1843: a short text message could be silently
  * dropped — the input cleared but no optimistic bubble appeared and no error
  * was shown.
  *
@@ -21,11 +21,11 @@ import org.junit.Test
  */
 class CanAcceptTextSendTest {
     @Test
-    fun acceptsKnownSeededMemberWhileVerificationIsPending() {
+    fun acceptsKnownSeededMemberBeforeLiveRosterHydrates() {
         assertTrue(
             acceptsText(
                 membersVerified = false,
-                isSelfMember = true,
+                isSelfMember = false,
                 seededSelfMember = true,
             ),
         )
@@ -38,6 +38,18 @@ class CanAcceptTextSendTest {
                 membersVerified = true,
                 isSelfMember = false,
                 seededSelfMember = true,
+            ),
+        )
+    }
+
+    @Test
+    fun rejectsAfterLocalSelfLeaveDespitePositiveSeed() {
+        assertFalse(
+            acceptsText(
+                membersVerified = false,
+                isSelfMember = false,
+                seededSelfMember = true,
+                selfLeft = true,
             ),
         )
     }
@@ -98,6 +110,7 @@ class CanAcceptTextSendTest {
         membersVerified: Boolean = true,
         isSelfMember: Boolean = true,
         seededSelfMember: Boolean = false,
+        selfLeft: Boolean = false,
         unrecoverable: Boolean = false,
         disbanding: Boolean = false,
         disbanded: Boolean = false,
@@ -108,6 +121,7 @@ class CanAcceptTextSendTest {
             membersVerified = membersVerified,
             isSelfMember = isSelfMember,
             seededSelfMember = seededSelfMember,
+            selfLeft = selfLeft,
             unrecoverable = unrecoverable,
             disbanding = disbanding,
             disbanded = disbanded,
