@@ -535,7 +535,7 @@ internal fun ChatsScreen(
             query = trimmedQuery,
         )
     val chatListState = key(showArchived) { rememberLazyListState() }
-    var headReorderInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
+    var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
     val dragMaxScrollStepPx = with(density) { 18.dp.toPx() }
@@ -676,8 +676,15 @@ internal fun ChatsScreen(
         activeHeadId = activeHeadId,
         datasetKey = chatListDatasetKey,
         isActiveList = !showArchived,
-        onHeadReorderInProgressChange = { headReorderInProgress = it },
+        onHeadReorderInProgressChange = { headScrollCorrectionInProgress = it },
     )
+    val headReorderInProgress =
+        rememberChatListHeadReorderGate(
+            activeHeadId = activeHeadId,
+            datasetKey = chatListDatasetKey,
+            isActiveList = !showArchived,
+            scrollCorrectionInProgress = headScrollCorrectionInProgress,
+        )
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }

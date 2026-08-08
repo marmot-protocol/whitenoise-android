@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -379,6 +380,53 @@ class ChatListHeadReorderAnimationTest {
         }
     }
 
+    @Test
+    fun reorderedRowsAreNeverFirstComposedWithInteractionsEnabled() {
+        var itemIds by mutableStateOf(listOf("A", "B"))
+        val publishedCompositions = mutableListOf<Pair<List<String>, Boolean>>()
+
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                onRowsComposed = { ids, interactionsEnabled ->
+                    publishedCompositions += ids to interactionsEnabled
+                },
+            )
+        }
+        composeRule.waitForIdle()
+        publishedCompositions.clear()
+
+        composeRule.runOnUiThread { itemIds = listOf("B", "A") }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val firstReorderedComposition =
+                publishedCompositions.first { (ids, _) -> ids == listOf("B", "A") }
+            assertFalse(
+                "the first composition publishing reordered rows exposed input before effects ran",
+                firstReorderedComposition.second,
+            )
+        }
+
+        // Return to the original head before the first gate settles. Keying by
+        // the newly composed head must create another closed gate rather than
+        // mistaking the original id for an already-settled state.
+        publishedCompositions.clear()
+        composeRule.runOnUiThread { itemIds = listOf("A", "B") }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val firstReturningComposition =
+                publishedCompositions.first { (ids, _) -> ids == listOf("A", "B") }
+            assertFalse(firstReturningComposition.second)
+        }
+
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+        composeRule.runOnIdle {
+            assertTrue(publishedCompositions.last().second)
+        }
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -395,15 +443,27 @@ private fun ChatListHeadReorderMotionHarness(
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
     onOpen: (String) -> Unit = {},
+    onRowsComposed: (List<String>, Boolean) -> Unit = { _, _ -> },
 ) {
-    var interactionsEnabled by remember { mutableStateOf(true) }
+    var scrollCorrectionInProgress by remember { mutableStateOf(false) }
     ChatListActiveHeadScrollEffect(
         listState = listState,
         activeHeadId = itemIds.firstOrNull(),
         datasetKey = datasetKey,
         isActiveList = true,
-        onHeadReorderInProgressChange = { interactionsEnabled = !it },
+        onHeadReorderInProgressChange = { scrollCorrectionInProgress = it },
     )
+    val headReorderInProgress =
+        rememberChatListHeadReorderGate(
+            activeHeadId = itemIds.firstOrNull(),
+            datasetKey = datasetKey,
+            isActiveList = true,
+            scrollCorrectionInProgress = scrollCorrectionInProgress,
+        )
+    val interactionsEnabled = !headReorderInProgress
+    SideEffect {
+        onRowsComposed(itemIds, interactionsEnabled)
+    }
     LazyColumn(
         modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
         state = listState,

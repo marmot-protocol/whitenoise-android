@@ -6,8 +6,12 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
@@ -38,6 +42,43 @@ internal data class ChatListDatasetKey(
     val folderId: String?,
     val query: String,
 )
+
+/**
+ * Closes row input in the first composition that publishes a new active head.
+ *
+ * [ChatListActiveHeadScrollEffect] cannot provide that first-frame guarantee:
+ * effects start only after composition, when keyed rows may already be moving.
+ * A dataset replacement establishes a fresh baseline instead of treating its
+ * first head as a live promotion. Re-keying by [activeHeadId] creates a fresh
+ * gate even when rapid activity returns to an earlier head before settling.
+ */
+@Composable
+internal fun rememberChatListHeadReorderGate(
+    activeHeadId: String?,
+    datasetKey: ChatListDatasetKey,
+    isActiveList: Boolean,
+    scrollCorrectionInProgress: Boolean,
+): Boolean {
+    var datasetCompositionEstablished by
+        remember(datasetKey, isActiveList) { mutableStateOf(false) }
+    var synchronousGateInProgress by
+        remember(datasetKey, isActiveList, activeHeadId) {
+            mutableStateOf(
+                datasetCompositionEstablished &&
+                    isActiveList &&
+                    activeHeadId != null,
+            )
+        }
+
+    SideEffect { datasetCompositionEstablished = true }
+    LaunchedEffect(datasetKey, isActiveList, activeHeadId) {
+        if (!synchronousGateInProgress) return@LaunchedEffect
+        delay(CHAT_LIST_HEAD_INPUT_GATE_MILLIS)
+        synchronousGateInProgress = false
+    }
+
+    return synchronousGateInProgress || scrollCorrectionInProgress
+}
 
 /**
  * Active on-list head promotion: pairs [chatListRowMotion] with
