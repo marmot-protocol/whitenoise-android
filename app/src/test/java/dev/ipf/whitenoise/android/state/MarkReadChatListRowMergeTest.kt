@@ -114,12 +114,13 @@ class MarkReadChatListRowMergeTest {
     }
 
     @Test
-    fun preservesEqualTimestampHigherLastMessageWhileAdvancingReadPointer() {
+    fun clearsUnreadWhenReadPointerCoversEqualTimestampHigherLastMessage() {
         val current =
             row(
                 messageId = idB,
                 lastMessageAt = 100uL,
                 unreadCount = 1uL,
+                unreadMentionCount = 1uL,
                 lastReadTimelineAt = 50uL,
             )
         val incoming =
@@ -133,9 +134,69 @@ class MarkReadChatListRowMergeTest {
 
         val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
         assertEquals(idB, merged.lastMessage?.messageIdHex)
-        assertEquals(1uL, merged.unreadCount)
+        assertEquals(0uL, merged.unreadCount)
+        assertEquals(false, merged.hasUnread)
+        assertEquals(null, merged.firstUnreadMessageIdHex)
+        assertEquals(0uL, merged.unreadMentionCount)
+        assertEquals(false, merged.unreadMention)
         assertEquals(idB, merged.lastReadMessageIdHex)
         assertEquals(100uL, merged.lastReadTimelineAt)
+    }
+
+    @Test
+    fun clearsUnreadWhenReadPointerCoversNewerRetainedLastMessage() {
+        val current =
+            row(
+                messageId = "msg-new",
+                lastMessageAt = 200uL,
+                unreadCount = 2uL,
+                unreadMentionCount = 1uL,
+                lastReadTimelineAt = 100uL,
+            )
+        val incoming =
+            row(
+                messageId = "msg-old",
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = "msg-new",
+            )
+
+        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
+        assertEquals("msg-new", merged.lastMessage?.messageIdHex)
+        assertEquals(0uL, merged.unreadCount)
+        assertEquals(false, merged.hasUnread)
+        assertEquals(null, merged.firstUnreadMessageIdHex)
+        assertEquals(0uL, merged.unreadMentionCount)
+        assertEquals(false, merged.unreadMention)
+        assertEquals("msg-new", merged.lastReadMessageIdHex)
+        assertEquals(200uL, merged.lastReadTimelineAt)
+    }
+
+    @Test
+    fun preservesManualUnreadWhenClearingReadDerivedFields() {
+        val current =
+            row(
+                messageId = idB,
+                lastMessageAt = 100uL,
+                unreadCount = 1uL,
+                lastReadTimelineAt = 50uL,
+                manuallyMarkedUnread = true,
+            )
+        val incoming =
+            row(
+                messageId = idA,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+                manuallyMarkedUnread = true,
+            )
+
+        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
+        assertEquals(0uL, merged.unreadCount)
+        assertEquals(false, merged.hasUnread)
+        assertEquals(true, merged.manuallyMarkedUnread)
     }
 
     @Test
@@ -170,13 +231,15 @@ class MarkReadChatListRowMergeTest {
         messageId: String = "msg",
         lastMessageAt: ULong,
         unreadCount: ULong,
+        unreadMentionCount: ULong = 0uL,
         lastReadTimelineAt: ULong? = null,
         lastReadMessageIdHex: String? = null,
         includeLastMessage: Boolean = true,
+        manuallyMarkedUnread: Boolean = false,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
-        unreadMentionCount = 0uL,
-        unreadMention = false,
+        unreadMentionCount = unreadMentionCount,
+        unreadMention = unreadMentionCount > 0uL,
         groupIdHex = "group",
         archived = false,
         pendingConfirmation = false,
@@ -209,7 +272,7 @@ class MarkReadChatListRowMergeTest {
             },
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
-        firstUnreadMessageIdHex = messageId,
+        firstUnreadMessageIdHex = messageId.takeIf { unreadCount > 0uL },
         lastReadMessageIdHex = lastReadMessageIdHex,
         lastReadTimelineAt = lastReadTimelineAt,
         conversationCreatedAt = 0uL,
@@ -217,7 +280,7 @@ class MarkReadChatListRowMergeTest {
         updatedAt = lastMessageAt,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
-        manuallyMarkedUnread = false,
+        manuallyMarkedUnread = manuallyMarkedUnread,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,
         mutedUntilMs = null,
