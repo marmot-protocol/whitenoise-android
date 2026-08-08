@@ -79,16 +79,18 @@ internal class GroupInviteNotificationIdentityRefreshStore(
         }
     }
 
-    fun markRefreshed(
+    fun completeRefresh(
         update: NotificationUpdateFfi,
         displayedName: String?,
+        contentRedacted: Boolean,
     ): RefreshCandidate? =
         synchronized(lock) {
             refreshesInFlight.remove(update.notificationKey)
             val current = entriesByNotificationKey[update.notificationKey] ?: return@synchronized null
+            if (contentRedacted) return@synchronized null
             val refreshedEntry =
                 current.copy(
-                    displayedName = displayedName ?: current.displayedName,
+                    displayedName = displayedName,
                 )
             entriesByNotificationKey[update.notificationKey] = refreshedEntry
             claimIfPending(update.notificationKey, refreshedEntry)

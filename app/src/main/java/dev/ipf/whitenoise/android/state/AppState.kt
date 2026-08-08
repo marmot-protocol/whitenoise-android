@@ -904,6 +904,12 @@ private data class ProfilePresentation(
     }
 }
 
+private data class InviteNotificationIdentityRefreshResult(
+    val posted: Boolean,
+    val displayedName: String?,
+    val contentRedacted: Boolean,
+)
+
 internal data class PostedGroupInviteIdentity(
     val update: NotificationUpdateFfi,
     val displayedName: String?,
@@ -7158,17 +7164,22 @@ class WhiteNoiseAppState private constructor(
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
                         return@runClaimedRefresh
                     }
-                    val (posted, displayedName) =
+                    val refreshResult =
                         refreshActiveInviteNotificationIdentity(
                             update = update,
                             resolvedProfileName = currentCandidate.resolvedName,
                         )
-                    if (posted) {
+                    if (refreshResult.posted) {
                         followUp =
-                            inviteNotificationIdentityRefreshStore.markRefreshed(
+                            inviteNotificationIdentityRefreshStore.completeRefresh(
                                 update = update,
-                                displayedName = displayedName,
+                                displayedName = refreshResult.displayedName,
+                                contentRedacted = refreshResult.contentRedacted,
                             )
+                        if (refreshResult.contentRedacted && !appLockScreenVisible) {
+                            // Unlock can race the release in completeRefresh().
+                            resumePendingInviteNotificationIdentityRefreshes()
+                        }
                     } else if (!localNotificationPresenter.isGroupInviteNotificationActive(update)) {
                         inviteNotificationIdentityRefreshStore.forget(update.notificationKey)
                     } else {
@@ -7183,7 +7194,7 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshActiveInviteNotificationIdentity(
         update: NotificationUpdateFfi,
         resolvedProfileName: String?,
-    ): Pair<Boolean, String?> {
+    ): InviteNotificationIdentityRefreshResult {
         val skipEnrichmentForLock = appLockScreenVisible
         val resolvedName =
             if (skipEnrichmentForLock) {
@@ -7219,7 +7230,11 @@ class WhiteNoiseAppState private constructor(
                         localNotificationPresenter.isGroupInviteNotificationActive(update)
                 },
             )
-        return posted to displayedName
+        return InviteNotificationIdentityRefreshResult(
+            posted = posted,
+            displayedName = displayedName,
+            contentRedacted = redactContent,
+        )
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {

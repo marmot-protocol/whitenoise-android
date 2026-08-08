@@ -35,9 +35,10 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
                 ).isEmpty(),
         )
 
-        store.markRefreshed(
+        store.completeRefresh(
             aliceInvite,
             displayedName = "Alice",
+            contentRedacted = false,
         )
         assertTrue(
             store
@@ -130,18 +131,20 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         )
 
         val followUp =
-            store.markRefreshed(
+            store.completeRefresh(
                 update = invite,
                 displayedName = "Alice v1",
+                contentRedacted = false,
             )
 
         assertEquals(invite, followUp?.update)
         assertEquals("Alice v2", followUp?.resolvedName)
         assertEquals(
             null,
-            store.markRefreshed(
+            store.completeRefresh(
                 update = invite,
                 displayedName = "Alice v2",
+                contentRedacted = false,
             ),
         )
     }
@@ -156,11 +159,25 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
                 .refreshCandidates("Alice", resolvedName = "Alice")
                 .single()
 
-        store.release(candidate.update.notificationKey)
+        assertEquals(
+            null,
+            store.completeRefresh(
+                update = invite,
+                displayedName = null,
+                contentRedacted = true,
+            ),
+        )
 
         assertEquals(listOf(candidate), store.claimPendingRefreshes())
         assertTrue(store.claimPendingRefreshes().isEmpty())
-        assertEquals(null, store.markRefreshed(invite, displayedName = "Alice"))
+        assertEquals(
+            null,
+            store.completeRefresh(
+                update = invite,
+                displayedName = "Alice",
+                contentRedacted = false,
+            ),
+        )
         assertTrue(store.refreshCandidates("Alice", resolvedName = "Alice").isEmpty())
     }
 
