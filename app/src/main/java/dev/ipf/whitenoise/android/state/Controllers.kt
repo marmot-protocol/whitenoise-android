@@ -5257,6 +5257,25 @@ internal fun groupWithPublicAvatar(
         imageHashHex = if (avatarUrl != null && encryptedImageCleared) null else group.imageHashHex,
     )
 
+internal data class ConversationIdentityProjection(
+    val otherMemberAccount: String?,
+    val memberCount: Int,
+)
+
+internal fun conversationIdentityProjection(
+    members: List<AppGroupMemberRecordFfi>,
+    activeAccountIdHex: String?,
+    acceptedInvitePeerAccount: String?,
+): ConversationIdentityProjection {
+    val memberCount = GroupProjector.uniqueMemberCount(members)
+    val rosterPeer = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
+    val continuityPeer = acceptedInvitePeerAccount?.takeIf(String::isNotBlank)
+    return ConversationIdentityProjection(
+        otherMemberAccount = rosterPeer ?: continuityPeer,
+        memberCount = if (rosterPeer == null && continuityPeer != null) maxOf(memberCount, 2) else memberCount,
+    )
+}
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -5267,6 +5286,8 @@ class ConversationController(
 ) {
     var group by mutableStateOf(initialGroup)
         private set
+
+    private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -5569,16 +5590,20 @@ class ConversationController(
         get() = title()
 
     fun title(copy: dev.ipf.whitenoise.android.core.GroupTitleCopy = dev.ipf.whitenoise.android.core.GroupTitleCopy.Default): String {
-        val me = conversationAccountIdHex
-        val other = GroupProjector.otherMemberAccount(members, me)
+        val identity =
+            conversationIdentityProjection(
+                members = members,
+                activeAccountIdHex = conversationAccountIdHex,
+                acceptedInvitePeerAccount = acceptedInvitePeerAccount,
+            )
         return GroupProjector.displayTitle(
             group = group,
-            otherMemberAccount = other,
-            memberCount = memberCount,
+            otherMemberAccount = identity.otherMemberAccount,
+            memberCount = identity.memberCount,
             memberTitle = { appState.chatMemberTitle(it) },
             copy = copy,
             conversationKind = latestChatListRow?.conversationKind,
-            soleSelfMember = GroupProjector.isSelfSoleMember(members, me),
+            soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
         )
     }
 
@@ -5597,9 +5622,13 @@ class ConversationController(
      */
     val avatarAccount: String?
         get() {
-            val me = conversationAccountIdHex
-            val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.avatarAccount(group, other, memberCount)
+            val identity =
+                conversationIdentityProjection(
+                    members = members,
+                    activeAccountIdHex = conversationAccountIdHex,
+                    acceptedInvitePeerAccount = acceptedInvitePeerAccount,
+                )
+            return GroupProjector.avatarAccount(group, identity.otherMemberAccount, identity.memberCount)
         }
 
     /**
@@ -7843,6 +7872,7 @@ class ConversationController(
     suspend fun acceptInvite(notify: Boolean = true): Boolean =
         withMutationLockResult(false) {
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val invitePeerAccount = inviteAccount
             val acceptedGroup =
                 runCatching { appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) } }
                     .getOrElse {
@@ -7854,6 +7884,7 @@ class ConversationController(
                         )
                         return@withMutationLockResult false
                     }
+            acceptedInvitePeerAccount = invitePeerAccount
             group = acceptedGroup
             appState.applyLocalGroupUpdate(group)
             appState.dismissConversationNotifications(account, group.groupIdHex)
@@ -9989,6 +10020,7 @@ class ConversationController(
                 GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
             }
         members = updatedMembers
+        acceptedInvitePeerAccount = null
         membersLoaded = true
         membersVerified = true
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
@@ -10052,6 +10084,7 @@ class ConversationController(
         // otherwise the full roster (self included) would restore the member
         // count and re-enable the composer right after a leave (issue #787).
         members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
+        acceptedInvitePeerAccount = null
         membersLoaded = true
         membersVerified = true
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)

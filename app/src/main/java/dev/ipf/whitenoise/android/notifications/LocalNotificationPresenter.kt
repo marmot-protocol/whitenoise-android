@@ -25,6 +25,7 @@ import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
@@ -270,6 +271,7 @@ class LocalNotificationPresenter(
         directShareEligible: Boolean = false,
         conversationAvatarUrl: String? = null,
         senderAvatarUrl: String? = null,
+        silentUpdate: Boolean = false,
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
@@ -365,9 +367,9 @@ class LocalNotificationPresenter(
                     .setPriority(decision.importance.toCompatPriority())
                     .setShowWhen(true)
                     .setAutoCancel(true)
-                    .setOnlyAlertOnce(false)
+                    .setOnlyAlertOnce(silentUpdate)
                     .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                    .setSilent(false)
+                    .setSilent(silentUpdate)
             // Name the recipient identity in the header when multi-account (#836).
             if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
@@ -649,6 +651,23 @@ class LocalNotificationPresenter(
         } catch (_: Throwable) {
             null
         }
+
+    internal fun isGroupInviteNotificationActive(update: NotificationUpdateFfi): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val active =
+            manager?.let {
+                activeNotification(it, update.notificationKey, LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
+            }
+        val extras = active?.notification?.extras
+        return update.trigger == NotificationTriggerFfi.GROUP_INVITE &&
+            extras != null &&
+            shouldDismissInvite(
+                extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+                extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+                accountRef = update.accountRef,
+                groupIdHex = update.groupIdHex,
+            )
+    }
 
     private fun ChannelImportance.toCompatPriority(): Int =
         when (this) {
