@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -9,9 +10,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -328,6 +331,102 @@ class ChatListHeadReorderAnimationTest {
         assertEquals(0f, rowTop("C"), 0.5f)
     }
 
+    @Test
+    fun rapidHeadReordersNeverDispatchATapToACrossingRow() {
+        var itemIds by mutableStateOf(listOf("A", "B"))
+        val openedIds = mutableListOf<String>()
+
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                onOpen = openedIds::add,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+
+        repeat(100) { iteration ->
+            val targetHead = if (iteration % 2 == 0) "B" else "A"
+            composeRule.runOnUiThread {
+                itemIds = if (targetHead == "A") listOf("A", "B") else listOf("B", "A")
+            }
+            composeRule.runOnIdle { }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.runOnIdle { }
+
+            // The target head is visibly crossing the previous row. A tap in
+            // this window may be ignored, but must never open either stale
+            // layout target.
+            composeRule.onNodeWithTag(chatListHeadReorderRowTag(targetHead)).performTouchInput {
+                down(center)
+                up()
+            }
+            composeRule.runOnIdle {
+                assertEquals("a crossing-row tap opened a chat at iteration $iteration", iteration, openedIds.size)
+            }
+
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+            composeRule.runOnIdle { }
+            composeRule.onNodeWithTag(chatListHeadReorderRowTag(targetHead)).performTouchInput {
+                down(center)
+                up()
+            }
+            composeRule.runOnIdle {
+                assertEquals(targetHead, openedIds.last())
+                assertEquals(iteration + 1, openedIds.size)
+            }
+        }
+    }
+
+    @Test
+    fun reorderedRowsAreNeverFirstComposedWithInteractionsEnabled() {
+        var itemIds by mutableStateOf(listOf("A", "B"))
+        val publishedCompositions = mutableListOf<Pair<List<String>, Boolean>>()
+
+        composeRule.setContent {
+            ChatListHeadReorderMotionHarness(
+                itemIds = itemIds,
+                listState = rememberLazyListState(),
+                rowHeight = rowHeight,
+                onRowsComposed = { ids, interactionsEnabled ->
+                    publishedCompositions += ids to interactionsEnabled
+                },
+            )
+        }
+        composeRule.waitForIdle()
+        publishedCompositions.clear()
+
+        composeRule.runOnUiThread { itemIds = listOf("B", "A") }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val firstReorderedComposition =
+                publishedCompositions.first { (ids, _) -> ids == listOf("B", "A") }
+            assertFalse(
+                "the first composition publishing reordered rows exposed input before effects ran",
+                firstReorderedComposition.second,
+            )
+        }
+
+        // Return to the original head before the first gate settles. Keying by
+        // the newly composed head must create another closed gate rather than
+        // mistaking the original id for an already-settled state.
+        publishedCompositions.clear()
+        composeRule.runOnUiThread { itemIds = listOf("A", "B") }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val firstReturningComposition =
+                publishedCompositions.first { (ids, _) -> ids == listOf("A", "B") }
+            assertFalse(firstReturningComposition.second)
+        }
+
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+        composeRule.runOnIdle {
+            assertTrue(publishedCompositions.last().second)
+        }
+    }
+
     private fun rowTop(id: String): Float =
         composeRule
             .onNodeWithTag(chatListHeadReorderRowTag(id))
@@ -343,13 +442,28 @@ private fun ChatListHeadReorderMotionHarness(
     rowHeight: Dp,
     datasetKey: ChatListDatasetKey = ChatListDatasetKey(false, null, ""),
     contentRevision: Int = 0,
+    onOpen: (String) -> Unit = {},
+    onRowsComposed: (List<String>, Boolean) -> Unit = { _, _ -> },
 ) {
+    var scrollCorrectionInProgress by remember { mutableStateOf(false) }
     ChatListActiveHeadScrollEffect(
         listState = listState,
         activeHeadId = itemIds.firstOrNull(),
         datasetKey = datasetKey,
         isActiveList = true,
+        onHeadReorderInProgressChange = { scrollCorrectionInProgress = it },
     )
+    val headReorderInProgress =
+        rememberChatListHeadReorderGate(
+            activeHeadId = itemIds.firstOrNull(),
+            datasetKey = datasetKey,
+            isActiveList = true,
+            scrollCorrectionInProgress = scrollCorrectionInProgress,
+        )
+    val interactionsEnabled = !headReorderInProgress
+    SideEffect {
+        onRowsComposed(itemIds, interactionsEnabled)
+    }
     LazyColumn(
         modifier = Modifier.testTag(CHAT_LIST_HEAD_REORDER_LIST_TAG),
         state = listState,
@@ -361,6 +475,7 @@ private fun ChatListHeadReorderMotionHarness(
                         Modifier
                             .fillMaxWidth()
                             .height(rowHeight)
+                            .clickable(enabled = interactionsEnabled) { onOpen(id) }
                             .testTag(chatListHeadReorderRowTag(id)),
                 ) {
                     Text("$id-$contentRevision")
