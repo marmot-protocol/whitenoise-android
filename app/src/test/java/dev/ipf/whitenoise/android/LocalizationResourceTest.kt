@@ -260,11 +260,28 @@ class LocalizationResourceTest {
             }
 
         assertTrue(
-            "Agent connector prompts must link the MDK connector guide, include %1\$s, " +
-                "and avoid install commands or operational mechanics. Offenders:\n" +
+            "Agent connector prompts must link the immutable MDK connector guide once, " +
+                "include one %1\$s placeholder, require explicit approval, and avoid " +
+                "execution directives or operational mechanics. Offenders:\n" +
                 offenders.joinToString("\n"),
             offenders.isEmpty(),
         )
+    }
+
+    @Test
+    fun agentConnectorPromptGuardRejectsMutableUnattendedSetup() {
+        val unsafePrompt =
+            "APPROVAL_REQUIRED: Follow https://github.com/marmot-protocol/mdk/blob/master/" +
+                "crates/agent-connector/README.md and install and configure the connector " +
+                "non-interactively for %1\$s. Verify the connector is running."
+
+        val violations = agentConnectorPromptViolations(unsafePrompt)
+
+        assertTrue(violations.contains("missing immutable docs URL"))
+        assertTrue(violations.contains("mutable docs URL"))
+        assertTrue(violations.contains("unattended setup"))
+        assertTrue(violations.contains("direct install/configure directive"))
+        assertTrue(violations.contains("connector run/verification directive"))
     }
 
     @Test
@@ -533,11 +550,17 @@ class LocalizationResourceTest {
 
     private fun agentConnectorPromptViolations(prompt: String): List<String> {
         val violations = mutableListOf<String>()
-        if (!prompt.contains(AGENT_CONNECTOR_DOCS_URL)) {
-            violations += "missing canonical docs URL"
+        if (prompt.windowed(AGENT_CONNECTOR_DOCS_URL.length).count { it == AGENT_CONNECTOR_DOCS_URL } != 1) {
+            violations += "missing immutable docs URL"
         }
-        if (!prompt.contains("%1\$s")) {
-            violations += "missing %1\$s placeholder"
+        if (prompt.windowed(AGENT_CONNECTOR_NPUB_PLACEHOLDER.length).count {
+                it == AGENT_CONNECTOR_NPUB_PLACEHOLDER
+            } != 1
+        ) {
+            violations += "missing single %1\$s placeholder"
+        }
+        if (!prompt.startsWith(AGENT_CONNECTOR_APPROVAL_GATE)) {
+            violations += "missing approval gate"
         }
         agentConnectorForbiddenPatterns.forEach { (label, pattern) ->
             if (pattern.containsMatchIn(prompt)) {
@@ -548,11 +571,45 @@ class LocalizationResourceTest {
     }
 
     private companion object {
+        const val AGENT_CONNECTOR_APPROVAL_GATE = "APPROVAL_REQUIRED:"
+        const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
         const val AGENT_CONNECTOR_DOCS_URL =
-            "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
+            "https://github.com/marmot-protocol/mdk/blob/" +
+                "e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md"
 
         val agentConnectorForbiddenPatterns =
             listOf(
+                "mutable docs URL" to
+                    Regex(
+                        """github\.com/marmot-protocol/mdk/(?:blob|tree)/(?:master|main|refs/heads/)""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "unattended setup" to
+                    Regex(
+                        """non[- ]?interactiv|nicht\s+interaktiv|sin\s+interacci[oó]n|""" +
+                            """sans\s+interaction|senza\s+interazione|sem\s+intera[cç][aã]o|""" +
+                            """etkile[sş]imsiz|без\s+взаимодейств|非交[互動动]方式""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "direct install/configure directive" to
+                    Regex(
+                        """install\s+and\s+configure|installa\s+y\s+configura|""" +
+                            """installez\s+et\s+configurez|installa\s+e\s+configura|""" +
+                            """instale\s+e\s+configure|installiere\s+und\s+konfiguriere|""" +
+                            """kurun\s+ve\s+yapılandırın|установите\s+и\s+настройте|""" +
+                            """安裝並設定|安装并配置""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "connector run/verification directive" to
+                    Regex(
+                        """verify\s+the\s+connector\s+is\s+running|""" +
+                            """verifica\s+que\s+el\s+conector|vérifiez\s+que\s+le\s+connecteur|""" +
+                            """verifica\s+che\s+il\s+connettore|verifique\s+se\s+o\s+conector|""" +
+                            """prüfe,?\s+dass\s+der\s+konnektor|bağlayıcının\s+çalıştığını\s+doğrulayın|""" +
+                            """убедитесь,?\s+что\s+коннектор\s+работает|""" +
+                            """確認連接器正在執行|确认连接器正在运行""",
+                        RegexOption.IGNORE_CASE,
+                    ),
                 "curl" to Regex("""\bcurl\b""", RegexOption.IGNORE_CASE),
                 "pipe-to-bash" to Regex("""\|\s*bash"""),
                 "--yes" to Regex("""--yes\b"""),

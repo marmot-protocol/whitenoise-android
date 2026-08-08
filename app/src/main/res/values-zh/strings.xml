@@ -1290,13 +1290,13 @@
     <string name="agent_connector_hide_prompt_cd">隐藏 %1$s 设置提示</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的终端代理</string>
-    <string name="agent_connector_hermes_prompt">将此 Hermes 安装连接到 White Noise（Marmot）。请遵循官方 Hermes 连接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 按照其中的说明以非交互方式安装并配置连接器，并将我的 npub 加入允许列表：%1$s。完成后，请确认连接器正在运行，并仅回复你的代理 npub——不要其他内容。</string>
+    <string name="agent_connector_hermes_prompt">APPROVAL_REQUIRED: 请帮助我将此 Hermes 安装连接到 White Noise（Marmot）。阅读经过审查的连接器指南 https://github.com/marmot-protocol/mdk/blob/e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md，并使用我的公开 npub 制定连接计划：%1$s。列出每个建议执行的命令和系统更改，说明风险，并等待我的明确批准。在我批准之前，不得执行命令或更改系统。我批准且连接成功后，请回复你的代理 npub。</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">自托管个人 AI 助手</string>
-    <string name="agent_connector_openclaw_prompt">将此 OpenClaw 实例连接到 White Noise（Marmot）。请遵循官方 OpenClaw 连接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 按照其中的说明以非交互方式安装并配置连接器，并将我的 npub 加入允许列表：%1$s。完成后，请确认连接器正在运行，并仅回复你的代理 npub——不要其他内容。</string>
+    <string name="agent_connector_openclaw_prompt">APPROVAL_REQUIRED: 请帮助我将此 OpenClaw 实例连接到 White Noise（Marmot）。阅读经过审查的连接器指南 https://github.com/marmot-protocol/mdk/blob/e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md，并使用我的公开 npub 制定连接计划：%1$s。列出每个建议执行的命令和系统更改，说明风险，并等待我的明确批准。在我批准之前，不得执行命令或更改系统。我批准且连接成功后，请回复你的代理 npub。</string>
     <string name="agent_connector_opencode_name">OpenCode</string>
     <string name="agent_connector_opencode_subtitle">开源编程代理</string>
-    <string name="agent_connector_opencode_prompt">将此 OpenCode harness 连接到 White Noise（Marmot）。请遵循官方 OpenCode 连接器指南 https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md — 按照其中的说明以非交互方式安装并配置连接器，并将我的 npub 加入允许列表：%1$s。完成后，请确认连接器正在运行，并仅回复你的代理 npub——不要其他内容。</string>
+    <string name="agent_connector_opencode_prompt">APPROVAL_REQUIRED: 请帮助我将此 OpenCode harness 连接到 White Noise（Marmot）。阅读经过审查的连接器指南 https://github.com/marmot-protocol/mdk/blob/e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md，并使用我的公开 npub 制定连接计划：%1$s。列出每个建议执行的命令和系统更改，说明风险，并等待我的明确批准。在我批准之前，不得执行命令或更改系统。我批准且连接成功后，请回复你的代理 npub。</string>
     <string name="account_and_keys">账号与密钥</string>
     <string name="account_keys_settings_subtitle">npub · 备份 · 退出登录</string>
     <string name="composer">输入框</string>
