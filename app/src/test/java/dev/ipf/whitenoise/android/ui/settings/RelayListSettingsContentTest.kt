@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,6 +113,25 @@ class RelayListSettingsContentTest {
         composeRule.onNodeWithContentDescription(app.getString(R.string.add_relay)).performClick()
 
         composeRule.onAllNodesWithText(pendingUrl).assertCountEquals(0)
+    }
+
+    @Test
+    fun accountSwitchClearsPendingRelayUrl() {
+        val pendingUrl = "wss://account-a.example.com"
+        var activeAccountRef by mutableStateOf("account-a")
+        lateinit var editorState: RelayEditorState
+
+        composeRule.setContent {
+            editorState = rememberRelayState(activeAccountRef)
+            Text(editorState.pendingUrl)
+        }
+        composeRule.runOnIdle { editorState.pendingUrl = pendingUrl }
+        composeRule.onNodeWithText(pendingUrl).assertIsDisplayed()
+
+        composeRule.runOnIdle { activeAccountRef = "account-b" }
+
+        composeRule.onAllNodesWithText(pendingUrl).assertCountEquals(0)
+        composeRule.runOnIdle { assertEquals("", editorState.pendingUrl) }
     }
 
     private fun render(

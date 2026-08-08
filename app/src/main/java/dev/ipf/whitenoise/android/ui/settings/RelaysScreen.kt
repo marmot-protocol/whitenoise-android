@@ -54,17 +54,17 @@ internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
-    var pendingUrl by remember { mutableStateOf("") }
-    var lists by remember(appState.activeAccountRef) { mutableStateOf<AccountRelayListsFfi?>(null) }
+    val activeAccountRef = appState.activeAccountRef
+    val editorState = rememberRelayState(activeAccountRef)
+    var lists by remember(activeAccountRef) { mutableStateOf<AccountRelayListsFfi?>(null) }
     var selectedKind by remember { mutableStateOf(RelayListKind.Nip65) }
-    var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun reloadLists() {
         lists = appState.accountRelayLists()
     }
 
-    LaunchedEffect(appState.activeAccountRef) {
+    LaunchedEffect(activeAccountRef) {
         reloadLists()
     }
 
@@ -97,13 +97,13 @@ internal fun RelaysScreen(
                                 lists = lists,
                                 selectedKind = selectedKind,
                                 onSelectKind = { selectedKind = it },
-                                pendingUrl = pendingUrl,
-                                onPendingUrlChange = { pendingUrl = it },
-                                saving = saving,
-                                canEdit = appState.activeAccountRef != null,
+                                pendingUrl = editorState.pendingUrl,
+                                onPendingUrlChange = { editorState.pendingUrl = it },
+                                saving = editorState.saving,
+                                canEdit = activeAccountRef != null,
                                 onUpdateRelays = { kind, relays, onSuccess ->
-                                    val accountAtStart = appState.activeAccountRef
-                                    saving = true
+                                    val accountAtStart = activeAccountRef
+                                    editorState.saving = true
                                     appState.launchMutation {
                                         try {
                                             val updated = appState.setAccountRelays(kind, relays)
@@ -112,7 +112,7 @@ internal fun RelaysScreen(
                                                 onSuccess()
                                             }
                                         } finally {
-                                            saving = false
+                                            editorState.saving = false
                                         }
                                     }
                                 },
@@ -124,6 +124,14 @@ internal fun RelaysScreen(
         }
     }
 }
+
+internal class RelayEditorState {
+    var pendingUrl by mutableStateOf("")
+    var saving by mutableStateOf(false)
+}
+
+@Composable
+internal fun rememberRelayState(accountRef: String?): RelayEditorState = remember(accountRef) { RelayEditorState() }
 
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
