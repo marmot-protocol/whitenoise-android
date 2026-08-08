@@ -30,6 +30,7 @@ internal fun CopyableValueRow(
     value: String,
     clipboard: androidx.compose.ui.platform.ClipboardManager,
     displayValue: String = value,
+    modifier: Modifier = Modifier,
 ) {
     val copyLabel = stringResource(R.string.copy)
     // Identifier rows (npub, group id, public key) keep the value and trailing
@@ -37,7 +38,7 @@ internal fun CopyableValueRow(
     // but it must never wrap a stray character onto a second row (#799). Callers
     // may provide a pre-shortened displayValue when they need middle ellipsis.
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(
                 onClickLabel = copyLabel,

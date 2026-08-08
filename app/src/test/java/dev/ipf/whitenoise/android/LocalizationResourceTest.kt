@@ -221,6 +221,110 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun agentConnectorPromptsAreEvergreenAcrossAllLocales() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+
+        val promptKeys =
+            listOf(
+                "agent_connector_hermes_prompt",
+                "agent_connector_openclaw_prompt",
+                "agent_connector_opencode_prompt",
+            )
+
+        val resourceFiles =
+            buildList {
+                add(File(resDir, "values/strings.xml"))
+                resDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isDirectory && it.name.startsWith("values-") }
+                    .map { File(it, "strings.xml") }
+                    .filter { it.exists() }
+                    .forEach { add(it) }
+            }
+
+        val offenders =
+            resourceFiles.flatMap { file ->
+                val strings = stringValues(file)
+                promptKeys.mapNotNull { key ->
+                    val value = strings[key] ?: return@mapNotNull "${file.path}: missing $key"
+                    val violations = agentConnectorPromptViolations(value)
+                    if (violations.isEmpty()) {
+                        null
+                    } else {
+                        "${file.path}: $key (${violations.joinToString(", ")})"
+                    }
+                }
+            }
+
+        assertTrue(
+            "Agent connector prompts must link the immutable MDK connector guide once, " +
+                "include one %1\$s placeholder, require explicit approval, and avoid " +
+                "execution directives or operational mechanics. Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
+    fun agentConnectorPromptGuardRejectsMutableUnattendedSetup() {
+        val unsafePrompt =
+            "APPROVAL_REQUIRED: Follow https://github.com/marmot-protocol/mdk/blob/master/" +
+                "crates/agent-connector/README.md and install and configure the connector " +
+                "non-interactively for %1\$s. Verify the connector is running."
+
+        val violations = agentConnectorPromptViolations(unsafePrompt)
+
+        assertTrue(violations.contains("missing immutable docs URL"))
+        assertTrue(violations.contains("mutable docs URL"))
+        assertTrue(violations.contains("unattended setup"))
+        assertTrue(violations.contains("direct install/configure directive"))
+        assertTrue(violations.contains("connector run/verification directive"))
+    }
+
+    @Test
+    fun agentConnectorProductNamesAreIdenticalAcrossAllLocales() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+        val expectedNames =
+            mapOf(
+                "agent_connector_hermes_name" to "Hermes",
+                "agent_connector_openclaw_name" to "OpenClaw",
+                "agent_connector_opencode_name" to "OpenCode",
+            )
+
+        val resourceFiles =
+            buildList {
+                add(File(resDir, "values/strings.xml"))
+                resDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isDirectory && it.name.startsWith("values-") }
+                    .map { File(it, "strings.xml") }
+                    .filter { it.exists() }
+                    .forEach { add(it) }
+            }
+
+        val offenders =
+            resourceFiles.flatMap { file ->
+                val strings = stringValues(file)
+                expectedNames.mapNotNull { (key, expected) ->
+                    val actual = strings[key]
+                    if (actual == expected) null else "${file.path}: $key=\"$actual\""
+                }
+            }
+
+        assertTrue(
+            "Agent connector product names must remain untranslated. Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
     fun relayListLabelsDescribeUserVisibleBehavior() {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
@@ -444,7 +548,82 @@ class LocalizationResourceTest {
         }
     }
 
+    private fun agentConnectorPromptViolations(prompt: String): List<String> {
+        val violations = mutableListOf<String>()
+        if (prompt.windowed(AGENT_CONNECTOR_DOCS_URL.length).count { it == AGENT_CONNECTOR_DOCS_URL } != 1) {
+            violations += "missing immutable docs URL"
+        }
+        if (prompt.windowed(AGENT_CONNECTOR_NPUB_PLACEHOLDER.length).count {
+                it == AGENT_CONNECTOR_NPUB_PLACEHOLDER
+            } != 1
+        ) {
+            violations += "missing single %1\$s placeholder"
+        }
+        if (!prompt.startsWith(AGENT_CONNECTOR_APPROVAL_GATE)) {
+            violations += "missing approval gate"
+        }
+        agentConnectorForbiddenPatterns.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(prompt)) {
+                violations += label
+            }
+        }
+        return violations
+    }
+
     private companion object {
+        const val AGENT_CONNECTOR_APPROVAL_GATE = "APPROVAL_REQUIRED:"
+        const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
+        const val AGENT_CONNECTOR_DOCS_URL =
+            "https://github.com/marmot-protocol/mdk/blob/" +
+                "e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md"
+
+        val agentConnectorForbiddenPatterns =
+            listOf(
+                "mutable docs URL" to
+                    Regex(
+                        """github\.com/marmot-protocol/mdk/(?:blob|tree)/(?:master|main|refs/heads/)""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "unattended setup" to
+                    Regex(
+                        """non[- ]?interactiv|nicht\s+interaktiv|sin\s+interacci[oó]n|""" +
+                            """sans\s+interaction|senza\s+interazione|sem\s+intera[cç][aã]o|""" +
+                            """etkile[sş]imsiz|без\s+взаимодейств|非交[互動动]方式""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "direct install/configure directive" to
+                    Regex(
+                        """install\s+and\s+configure|installa\s+y\s+configura|""" +
+                            """installez\s+et\s+configurez|installa\s+e\s+configura|""" +
+                            """instale\s+e\s+configure|installiere\s+und\s+konfiguriere|""" +
+                            """kurun\s+ve\s+yapılandırın|установите\s+и\s+настройте|""" +
+                            """安裝並設定|安装并配置""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "connector run/verification directive" to
+                    Regex(
+                        """verify\s+the\s+connector\s+is\s+running|""" +
+                            """verifica\s+que\s+el\s+conector|vérifiez\s+que\s+le\s+connecteur|""" +
+                            """verifica\s+che\s+il\s+connettore|verifique\s+se\s+o\s+conector|""" +
+                            """prüfe,?\s+dass\s+der\s+konnektor|bağlayıcının\s+çalıştığını\s+doğrulayın|""" +
+                            """убедитесь,?\s+что\s+коннектор\s+работает|""" +
+                            """確認連接器正在執行|确认连接器正在运行""",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                "curl" to Regex("""\bcurl\b""", RegexOption.IGNORE_CASE),
+                "pipe-to-bash" to Regex("""\|\s*bash"""),
+                "--yes" to Regex("""--yes\b"""),
+                "--allow-welcomer" to Regex("""--allow-welcomer\b"""),
+                "release download URL" to
+                    Regex("""mdk/releases/download""", RegexOption.IGNORE_CASE),
+                "shell script" to Regex("""\.sh\b"""),
+                "connector executable or service name" to
+                    Regex("""\bwn-(?:agent|opencode)(?:-[a-z0-9-]+)?\b""", RegexOption.IGNORE_CASE),
+                "gateway run" to Regex("""gateway\s+run""", RegexOption.IGNORE_CASE),
+                "bootstrap.json" to Regex("""bootstrap\.json"""),
+                "home path" to Regex("""~\/"""),
+            )
+
         // Matches raw NIP specification identifiers in user-visible copy:
         // "NIP-05", "NIP_44", "NIP 65", "NIP - 65", "NIP65", etc., plus the
         // deprecated "NIP-EE" naming. Case-insensitive. The leading `\b` plus
@@ -474,6 +653,9 @@ class LocalizationResourceTest {
                 // Brand/protocol names kept identical across every locale.
                 "donate_method_bitcoin",
                 "donate_method_lightning",
+                "agent_connector_hermes_name",
+                "agent_connector_openclaw_name",
+                "agent_connector_opencode_name",
                 "edit_history_original",
                 "edit_history_version_label",
                 "generic_message",
