@@ -398,7 +398,10 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
-        private fun isFar(targetIndex: Int): Boolean = abs(targetIndex - writer.firstVisibleItemIndex) > MAX_ANIMATED_SCROLL_ITEMS
+        private fun isFar(targetIndex: Int): Boolean {
+            val indexDistance = abs(targetIndex - writer.firstVisibleItemIndex)
+            return indexDistance > MAX_ANIMATED_SCROLL_ITEMS
+        }
 
         private suspend fun ensureCurrent() {
             currentCoroutineContext().ensureActive()
