@@ -35,8 +35,11 @@ class StartupBenchmark {
             compilationMode = compilationMode,
             startupMode = StartupMode.COLD,
             iterations = 10,
-            setupBlock = { pressHome() },
-            measureBlock = { journeys.run { launchToChatList() } },
+            setupBlock = {
+                journeys.run { resumeToChatList() }
+                pressHome()
+            },
+            measureBlock = { journeys.run { launchForStartupMeasurement() } },
         )
     }
 }

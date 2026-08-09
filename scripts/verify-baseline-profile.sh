@@ -2,6 +2,7 @@
 set -euo pipefail
 
 apk_path="${1:?usage: bash scripts/verify-baseline-profile.sh <apk-path>}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -14,6 +15,8 @@ if [[ ! -f "$apk_path" ]]; then
   echo "APK not found: $apk_path" >&2
   exit 1
 fi
+
+bash "$script_dir/verify-generated-profiles.sh" "$script_dir/../app/src/main/generated/baselineProfiles"
 
 require_command rg
 if command -v apkanalyzer >/dev/null 2>&1; then

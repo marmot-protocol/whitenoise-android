@@ -32,6 +32,15 @@ adb_cmd() {
   "$adb_bin" "${adb_args[@]}" "$@"
 }
 
+# adb joins arguments following `shell` into a command string interpreted by
+# the device shell. Quote every dynamic value so spaces stay intact and shell
+# metacharacters remain data rather than becoming commands.
+quote_device_shell_arg() {
+  local escaped
+  escaped="$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+  printf "'%s'" "$escaped"
+}
+
 if ! adb_cmd shell pm path "$target_package" >/dev/null 2>&1; then
   echo "The authenticated dev app is not installed: $target_package" >&2
   echo "Install :app:installDevZapstoreDebug and prepare the fixture first." >&2
@@ -58,7 +67,7 @@ resolve_apk() {
   local module_dir="$1"
   local application_id="$2"
   local variant_name="$3"
-  local apk_root metadata output_file candidate
+  local apk_root metadata output_file candidate newest_candidate=""
 
   # AGP writes regular assembly outputs under outputs/apk. Device-targeted
   # builds created with android.injected.build.abi may instead use
@@ -85,12 +94,17 @@ resolve_apk() {
         ' "$metadata"
       )" || continue
       candidate="$(dirname "$metadata")/$output_file"
-      if [[ -f "$candidate" ]]; then
-        printf '%s\n' "$candidate"
-        return 0
+      if [[ -f "$candidate" ]] &&
+        { [[ -z "$newest_candidate" ]] || [[ "$candidate" -nt "$newest_candidate" ]]; }; then
+        newest_candidate="$candidate"
       fi
     done < <(find "$apk_root" -type f -name output-metadata.json -print | sort)
   done
+
+  if [[ -n "$newest_candidate" ]]; then
+    printf '%s\n' "$newest_candidate"
+    return 0
+  fi
 
   echo "Could not resolve $application_id ($variant_name) from AGP output metadata." >&2
   return 1
@@ -136,18 +150,47 @@ adb_cmd install -r -d -t "$test_apk"
 adb_cmd shell rm -rf "$device_output"
 adb_cmd shell mkdir -p "$device_output"
 
+# Exercise the first launch after the in-place APK swap before Macrobenchmark
+# starts resetting compilation. This catches a broken fixture early and keeps
+# one-time package initialization out of the first measured iteration.
+main_activity="$target_package/dev.ipf.whitenoise.android.MainActivity"
+preflight_output="$(adb_cmd shell am start -W -n "$main_activity")"
+if ! rg -q '^Status: ok\r?$' <<<"$preflight_output"; then
+  echo "Benchmark target preflight launch failed:" >&2
+  echo "$preflight_output" >&2
+  exit 1
+fi
+
+preflight_dump="$device_output/preflight.xml"
+preflight_ready=false
+for _ in {1..15}; do
+  if adb_cmd shell uiautomator dump "$preflight_dump" >/dev/null 2>&1 &&
+    adb_cmd exec-out cat "$preflight_dump" | rg -q 'resource-id="performance.new_message"'; then
+    preflight_ready=true
+    break
+  fi
+  sleep 2
+done
+adb_cmd shell rm -f "$preflight_dump"
+if [[ "$preflight_ready" != true ]]; then
+  echo "Benchmark target did not reach the authenticated chat list during preflight." >&2
+  exit 1
+fi
+adb_cmd shell am force-stop "$target_package"
+
 default_benchmark_classes="dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupNoCompilation,\
 dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupBaselineProfile,\
 dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupMembersNoCompilation,\
 dev.ipf.whitenoise.android.benchmark.GroupFlowsBenchmark#openGroupMembersBaselineProfile"
 benchmark_classes="${BENCHMARK_CLASS_FILTER:-$default_benchmark_classes}"
 
-adb_cmd shell am instrument -w -r \
-  -e class "$benchmark_classes" \
-  -e groupName "$group_name" \
-  -e androidx.benchmark.output.enable true \
-  -e additionalTestOutputDir "$device_output" \
-  "$runner" | tee "$result_file"
+instrument_command="am instrument -w -r \
+-e class $(quote_device_shell_arg "$benchmark_classes") \
+-e groupName $(quote_device_shell_arg "$group_name") \
+-e androidx.benchmark.output.enable true \
+-e additionalTestOutputDir $(quote_device_shell_arg "$device_output") \
+$(quote_device_shell_arg "$runner")"
+adb_cmd shell "$instrument_command" | tee "$result_file"
 
 if rg -q "FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed" "$result_file"; then
   echo "Instrumentation reported a failure." >&2

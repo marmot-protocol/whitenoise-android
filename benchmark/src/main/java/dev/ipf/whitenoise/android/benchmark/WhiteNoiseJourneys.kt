@@ -13,9 +13,34 @@ import androidx.test.uiautomator.textAsString
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
+    /** Initializes the real fixture before Macrobenchmark resets compilation and starts tracing. */
+    fun prepareAuthenticatedChatList() {
+        val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+        val launchOutput = device.executeShellCommand("am start -W -n $component")
+        check(launchOutput.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Benchmark target preflight launch failed: $launchOutput"
+        }
+        waitForTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)
+        check(device.pressHome()) { "Failed to return home after benchmark fixture preflight." }
+        device.waitForIdle()
+    }
+
     fun MacrobenchmarkScope.launchToChatList() {
         startActivityAndWait()
         waitForTag(PerformanceTags.NEW_MESSAGE, STARTUP_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
+    /**
+     * Launches the target for a startup measurement after [resumeToChatList]
+     * has already validated the fixture outside the measured trace.
+     *
+     * Macrobenchmark's cold-start wrapper force-stops the target between setup
+     * and measurement. Waiting for a test selector here would make that
+     * selector part of the measured journey and can outlive the startup metric.
+     */
+    fun MacrobenchmarkScope.launchForStartupMeasurement() {
+        startActivityAndWait()
         device.waitForIdle()
     }
 
@@ -157,7 +182,8 @@ internal class WhiteNoiseJourneys {
             .any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
 
     private fun AccessibilityNodeInfo.matchesPerformanceTag(tag: String): Boolean =
-        contentDescription?.toString() == tag ||
+        viewIdResourceName == tag ||
+            contentDescription?.toString() == tag ||
             extras.getCharSequence(COMPOSE_TEST_TAG_KEY)?.toString() == tag
 
     private companion object {

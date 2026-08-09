@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.testing
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import dev.ipf.whitenoise.android.BuildConfig
 
 /** Stable cross-process selectors for release-like Macrobenchmark journeys. */
@@ -20,3 +22,7 @@ internal fun Modifier.performanceTestTag(
     tag: String,
     enabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ): Modifier = if (enabled) testTag(tag) else this
+
+/** Makes descendant test tags visible to cross-process UiAutomator without replacing accessibility labels. */
+internal fun Modifier.exposePerformanceTestTags(enabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS): Modifier =
+    if (enabled) semantics { testTagsAsResourceId = true } else this
