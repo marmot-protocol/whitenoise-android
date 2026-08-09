@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -172,5 +174,31 @@ class ConversationForegroundPresentationTest {
             signals.trySend(Unit)
 
             assertEquals(settled, result.await())
+        }
+
+    @Test
+    fun foregroundWaitRemainsCancellableWhenGeometryNeverSettles() =
+        runTest {
+            val signals = Channel<Unit>(capacity = Channel.CONFLATED)
+            val animating =
+                ConversationForegroundSettleState(
+                    geometry = ConversationForegroundGeometry(520, 200, 296),
+                    imeTargetBottomPx = 300,
+                    bottomChromeMeasured = true,
+                )
+            val wait =
+                launch {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { animating },
+                        expectedImeVisible = true,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                    )
+                }
+            yield()
+
+            assertFalse(wait.isCompleted)
+            wait.cancelAndJoin()
+            assertTrue(wait.isCancelled)
         }
 }
