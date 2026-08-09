@@ -191,7 +191,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -2035,6 +2034,7 @@ internal fun ConversationScreen(
                 ConversationForegroundSettleState(
                     geometry = currentForegroundGeometryProvider(),
                     imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
+                    bottomChromeMeasured = bottomChromeHeightObserver.hasMeasurement,
                 )
             },
         )
@@ -2083,16 +2083,12 @@ internal fun ConversationScreen(
                 }
                 if (currentInitialTimelineAnchored && restoreToken != null) {
                     val resumedPresentation =
-                        withTimeoutOrNull(FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS) {
-                            foregroundPreDrawSignals
-                                .receiveAsFlow()
-                                .map { currentForegroundSettleStateProvider() }
-                                .first {
-                                    it.isSettled(
-                                        expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
-                                    )
-                                }
-                        } ?: currentForegroundSettleStateProvider()
+                        awaitConversationForegroundPresentation(
+                            preDrawSignals = foregroundPreDrawSignals,
+                            currentState = currentForegroundSettleStateProvider,
+                            expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
+                            expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                        )
                     scrollCoordinator.completeForegroundRestore(
                         token = restoreToken,
                         resumedGeometry = resumedPresentation.geometry,

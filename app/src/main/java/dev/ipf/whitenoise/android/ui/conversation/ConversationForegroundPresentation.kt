@@ -6,17 +6,49 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.withTimeoutOrNull
+
+private typealias ForegroundSettlePredicate = (ConversationForegroundSettleState) -> Boolean
 
 /** Layout and IME animation state required before the foreground frame can be exposed. */
 internal data class ConversationForegroundSettleState(
     val geometry: ConversationForegroundGeometry,
     val imeTargetBottomPx: Int,
+    val bottomChromeMeasured: Boolean,
 ) {
-    fun isSettled(expectedImeVisible: Boolean): Boolean =
+    fun isGeometrySettled(): Boolean =
         geometry.viewportHeightPx > 0 &&
-            geometry.bottomChromeHeightPx > 0 &&
-            geometry.imeBottomPx == imeTargetBottomPx &&
+            bottomChromeMeasured &&
+            geometry.imeBottomPx == imeTargetBottomPx
+
+    fun isSettled(expectedImeVisible: Boolean): Boolean =
+        isGeometrySettled() &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
+}
+
+/**
+ * Waits for the requested IME state, then relaxes only that request after the
+ * liveness timeout. Transient inset or unmeasured chrome geometry never passes.
+ */
+internal suspend fun awaitConversationForegroundPresentation(
+    preDrawSignals: ReceiveChannel<Unit>,
+    currentState: () -> ConversationForegroundSettleState,
+    expectedImeVisible: Boolean,
+    expectedVisibilityTimeoutMillis: Long,
+): ConversationForegroundSettleState {
+    suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
+        while (true) {
+            preDrawSignals.receive()
+            val state = currentState()
+            if (predicate(state)) return state
+        }
+    }
+
+    return withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+        awaitState { it.isSettled(expectedImeVisible) }
+    } ?: currentState().takeIf { it.isGeometrySettled() }
+        ?: awaitState { it.isGeometrySettled() }
 }
 
 /** Keeps Android on its task snapshot while the foreground transaction owns presentation. */

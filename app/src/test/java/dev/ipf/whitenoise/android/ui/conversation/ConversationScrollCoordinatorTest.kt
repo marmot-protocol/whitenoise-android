@@ -854,16 +854,18 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun conversationScreenUsesOneForegroundTransactionWithoutFrameDelayedRestore() {
         val screen = sourceFile("ConversationScreen.kt").readText()
+        val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
 
         assertTrue(screen.contains("scrollCoordinator.beginForegroundRestore("))
         assertTrue(screen.contains("scrollCoordinator.completeForegroundRestore("))
         assertTrue(screen.contains("scrollCoordinator.foregroundRestoreInProgress"))
         assertTrue(screen.contains("ConversationForegroundDrawGateEffect"))
         assertTrue(screen.contains("foregroundPreDrawSignals"))
-        assertTrue(screen.contains(".receiveAsFlow()"))
+        assertTrue(screen.contains("awaitConversationForegroundPresentation("))
         assertTrue(screen.contains("WindowInsets.imeAnimationTarget"))
-        assertTrue(screen.contains("it.isSettled("))
         assertTrue(screen.contains("expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus"))
+        assertTrue(presentation.contains("it.isSettled(expectedImeVisible)"))
+        assertTrue(presentation.contains("it.isGeometrySettled()"))
         assertFalse(screen.contains("RESUME_IME_SETTLE_MAX_FRAMES"))
         assertFalse(screen.contains("scrollCoordinator.restoreViewport("))
     }

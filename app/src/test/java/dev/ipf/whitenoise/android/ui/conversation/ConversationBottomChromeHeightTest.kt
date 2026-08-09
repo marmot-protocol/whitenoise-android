@@ -56,8 +56,12 @@ class ConversationBottomChromeHeightTest {
     fun latestMeasuredHeightIsAvailableToForegroundGeometryCapture() {
         val observer = ConversationBottomChromeHeightObserver()
 
+        assertFalse(observer.hasMeasurement)
         assertEquals(0, observer.currentHeightPx)
-        observer.onMeasured(96)
+        observer.onMeasured(0)
+        assertTrue(observer.hasMeasurement)
+        assertEquals(0, observer.currentHeightPx)
+        assertTrue(observer.onMeasured(96))
         assertEquals(96, observer.currentHeightPx)
     }
 
