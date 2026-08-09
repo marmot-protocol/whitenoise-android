@@ -256,7 +256,8 @@ internal fun BubbleCollapsibleFooterLayout(
         // the layout misses the overflow. Production derives maxBodyHeight from
         // this line limit, making the quotient the current scaled line height.
         val overflowProbePx =
-            (maxBodyHeightPx / MESSAGE_COLLAPSE_LINE_LIMIT).coerceAtLeast(1)
+            ((maxBodyHeightPx + MESSAGE_COLLAPSE_LINE_LIMIT - 1) / MESSAGE_COLLAPSE_LINE_LIMIT)
+                .coerceAtLeast(1)
         val probeHeight =
             (maxBodyHeightPx + overflowProbePx).coerceAtMost(constraints.maxHeight)
         val contentPlaceable =
