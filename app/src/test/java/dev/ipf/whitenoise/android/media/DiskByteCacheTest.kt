@@ -1014,6 +1014,30 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun successfulMutationsPublishCacheRevisionSignals() {
+        val mutations = AtomicInteger(0)
+        val cache =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 220,
+                onMutation = { mutations.incrementAndGet() },
+            )
+
+        cache.put("a", ByteArray(40))
+        cache.put("b", ByteArray(40))
+        cache.put("c", ByteArray(40)) // publishes the put and its LRU eviction
+        cache.remove("b")
+        cache.remove("missing")
+        cache.clear()
+
+        assertEquals(5, mutations.get())
+        assertFalse(cache.contains("a"))
+        assertFalse(cache.contains("b"))
+        assertFalse(cache.contains("c"))
+    }
+
+    @Test
     fun get_promotesToMRU_protectsFromEviction() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 220)
         cache.put("a", ByteArray(40))

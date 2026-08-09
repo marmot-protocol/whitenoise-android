@@ -7732,9 +7732,6 @@ class ConversationController(
             dispatcher = Dispatchers.Main.immediate,
             removeEntry = appState::removeMediaMemoryCacheEntry,
         )
-        withContext(Dispatchers.Main.immediate) {
-            evictedKeys.forEach { attachmentCacheAvailability.remove(it) }
-        }
         withContext(Dispatchers.IO) {
             loadedKeys.forEach { appState.diskMediaCache.remove(it) }
             // Plus any disk entry stamped with an expired ciphertext tag — the
@@ -7761,17 +7758,6 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
-    private val attachmentCacheAvailability = mutableStateMapOf<String, Boolean>()
-
-    /** Observable cache completion for bubbles sharing this controller. */
-    fun isAttachmentCachedForCompose(
-        messageIdHex: String,
-        attachmentIndex: Int,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return attachmentCacheAvailability[mediaCacheKey(account, messageIdHex, attachmentIndex)] == true
-    }
-
     /** Resolve a cold disk-index state without performing main-thread I/O. */
     suspend fun hasCachedAttachmentAfterHydration(
         messageIdHex: String,
@@ -7786,23 +7772,14 @@ class ConversationController(
                 withContext(Dispatchers.IO) {
                     appState.diskMediaCache.containsAfterHydration(cacheKey)
                 }
-        return withContext(Dispatchers.Main.immediate) {
-            // A sibling download may have completed while disk hydration was
-            // in progress. Re-check L1 and the observable publication so that
-            // an older miss can never overwrite that newer hit.
-            val cached =
-                diskHit ||
-                    appState.cachedMediaPlaintext(cacheKey) != null ||
-                    attachmentCacheAvailability[cacheKey] == true
-            if (cached) {
-                attachmentCacheAvailability[cacheKey] = true
-            } else {
-                // Misses are the default; do not retain one map entry for
-                // every attachment ever composed in a long conversation.
-                attachmentCacheAvailability.remove(cacheKey)
+        // Re-check L1 after the off-main hydration probe. A sibling download
+        // may have completed while hydration was in progress; unlike the old
+        // sticky Boolean publication, this cannot turn a later definitive miss
+        // into a permanent hit after normal LRU eviction.
+        return diskHit ||
+            withContext(Dispatchers.Main.immediate) {
+                appState.cachedMediaPlaintext(cacheKey) != null
             }
-            cached
-        }
     }
 
     /**
@@ -7818,7 +7795,6 @@ class ConversationController(
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         withContext(Dispatchers.Main.immediate) {
             appState.removeMediaMemoryCacheEntry(cacheKey)
-            attachmentCacheAvailability.remove(cacheKey)
         }
         withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
     }
@@ -7858,18 +7834,14 @@ class ConversationController(
         val account = conversationAccountRef ?: error("no active account")
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         // L1: in-memory LRU (hottest cache, instant return).
-        withContext(Dispatchers.Main.immediate) {
-            appState.cachedMediaPlaintext(cacheKey)?.also {
-                attachmentCacheAvailability[cacheKey] = true
-            }
-        }?.let { return it }
+        withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) }
+            ?.let { return it }
         // L2: disk LRU (survives process restart). Read off the main thread
         // since file I/O on big JPEGs can take 5-30ms.
         val onDisk = withContext(Dispatchers.IO) { appState.diskMediaCache.get(cacheKey) }
         if (onDisk != null) {
             withContext(Dispatchers.Main.immediate) {
                 appState.cacheMediaPlaintext(cacheKey, onDisk)
-                attachmentCacheAvailability[cacheKey] = true
             }
             return onDisk
         }
@@ -7914,7 +7886,6 @@ class ConversationController(
                 // tap-to-retry.
                 if (result.plaintext.isNotEmpty()) {
                     appState.cacheMediaPlaintext(cacheKey, result.plaintext)
-                    attachmentCacheAvailability[cacheKey] = true
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
                     // lifetime as the FFI fetch). Tag the entry with the

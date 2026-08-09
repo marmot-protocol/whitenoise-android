@@ -262,6 +262,10 @@ object MentionComposer {
      *
      * Returns null when the edit is not a contiguous deletion, or when no chip
      * is partially deleted (the caller then applies the IME edit verbatim).
+     * [includeAdjacentOwnedSeparator] additionally treats a delete beginning
+     * at a chip's trailing separator as touching that chip. Callers must only
+     * enable it for collapsed-caret IME edits: a ranged selection beginning at
+     * the same separator is ordinary prose deletion and must preserve the chip.
      *
      * Unlike [wholeChipBackspace] this handles deletions of any length (and a
      * selected-text-replaced-by-delete), because swipe-delete is not a clean
@@ -272,6 +276,7 @@ object MentionComposer {
     fun repairChipDeletion(
         oldText: String,
         newText: String,
+        includeAdjacentOwnedSeparator: Boolean = false,
     ): Insertion? {
         // Must be a net deletion: the new text is strictly shorter.
         if (newText.length >= oldText.length) return null
@@ -321,15 +326,17 @@ object MentionComposer {
         // the chip's right edge to the next burst commit without technically
         // overlapping it yet. Treat that owned separator + text as a hit on
         // the adjacent chip so no intermediate partial token can escape.
-        for (chip in chips) {
-            val chipEnd = chip.last + 1
-            val removesOwnedSeparatorAndText =
-                delStart == chipEnd &&
-                    delEnd > delStart + 1 &&
-                    oldText.getOrNull(delStart) == ' '
-            if (removesOwnedSeparatorAndText) {
-                touchedPartial = true
-                if (chip.first < widenedStart) widenedStart = chip.first
+        if (includeAdjacentOwnedSeparator) {
+            for (chip in chips) {
+                val chipEnd = chip.last + 1
+                val removesOwnedSeparatorAndText =
+                    delStart == chipEnd &&
+                        delEnd > delStart + 1 &&
+                        oldText.getOrNull(delStart) == ' '
+                if (removesOwnedSeparatorAndText) {
+                    touchedPartial = true
+                    if (chip.first < widenedStart) widenedStart = chip.first
+                }
             }
         }
         if (!touchedPartial) return null

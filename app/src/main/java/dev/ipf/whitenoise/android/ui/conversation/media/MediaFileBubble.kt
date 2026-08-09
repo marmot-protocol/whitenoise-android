@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,30 +90,25 @@ internal fun MediaFileBubble(
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     // Cached bytes (own send, or downloaded earlier) mean the chevron is
     // misleading — there's nothing to fetch. Probe on first composition,
-    // then flip after a successful in-bubble download. Outgoing sends are
-    // implicitly cached, so `mine` short-circuits to true.
+    // then re-probe whenever either cache tier mutates. The revision signal
+    // makes normal LRU eviction observable without retaining a sticky entry
+    // for every attachment ever composed. Outgoing sends are implicitly
+    // cached, so `mine` short-circuits to true.
     var cacheState by remember(pillKey) {
         mutableStateOf(if (mine) AttachmentCacheState.Cached else AttachmentCacheState.Resolving)
     }
-    val cachedElsewhere = controller.isAttachmentCachedForCompose(messageIdHex, attachmentIndex)
-    LaunchedEffect(cachedElsewhere, mine) {
-        cacheState =
-            when {
-                mine || cachedElsewhere -> AttachmentCacheState.Cached
-                cacheState == AttachmentCacheState.Cached -> AttachmentCacheState.Missing
-                else -> cacheState
-            }
-    }
-    LaunchedEffect(pillKey, mine) {
-        if (mine) return@LaunchedEffect
+    val cacheRevision by appState.mediaCacheRevision.collectAsState()
+    LaunchedEffect(pillKey, mine, cacheRevision) {
+        if (mine) {
+            cacheState = AttachmentCacheState.Cached
+            return@LaunchedEffect
+        }
         val isCached =
             runCatching {
                 controller.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
             }.onFailure(Throwable::rethrowIfCancellation)
                 .getOrDefault(false)
-        if (cacheState == AttachmentCacheState.Resolving) {
-            cacheState = if (isCached) AttachmentCacheState.Cached else AttachmentCacheState.Missing
-        }
+        cacheState = if (isCached) AttachmentCacheState.Cached else AttachmentCacheState.Missing
     }
     // Auto-download gate (#407): own sends are already cached; incoming
     // documents honor the Documents matrix row for the active connection.

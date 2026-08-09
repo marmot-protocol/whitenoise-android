@@ -239,6 +239,7 @@ internal fun repairComposerMentionEdit(
             ?: MentionComposer.repairChipDeletion(
                 oldText = oldValue.text,
                 newText = proposedValue.text,
+                includeAdjacentOwnedSeparator = oldValue.selection.collapsed,
             )
     val edited =
         repaired?.let { TextFieldValue(text = it.text, selection = TextRange(it.selection)) }

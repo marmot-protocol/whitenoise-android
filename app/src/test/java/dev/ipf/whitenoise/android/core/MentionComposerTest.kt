@@ -327,7 +327,12 @@ class MentionComposerTest {
         val deleteStart = "hey $chip".length
         val newText = oldText.removeRange(deleteStart, oldText.length)
 
-        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        val result =
+            MentionComposer.repairChipDeletion(
+                oldText,
+                newText,
+                includeAdjacentOwnedSeparator = true,
+            )
 
         assertEquals("hey ", result!!.text)
         assertEquals("hey ".length, result.selection)
@@ -342,7 +347,12 @@ class MentionComposerTest {
         val deleteEnd = deleteStart + 1 + 10
         val newText = oldText.removeRange(deleteStart, deleteEnd)
 
-        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        val result =
+            MentionComposer.repairChipDeletion(
+                oldText,
+                newText,
+                includeAdjacentOwnedSeparator = true,
+            )
 
         assertEquals(" tail", result!!.text)
         assertEquals(0, result.selection)
