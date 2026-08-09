@@ -1249,6 +1249,7 @@ class WhiteNoiseAppState private constructor(
     private val profileDisplayNameReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
+    private val marmotAccessObserver: (() -> Unit)?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1262,6 +1263,7 @@ class WhiteNoiseAppState private constructor(
             profileDisplayNameReader = null,
             profileRefreshRequest = null,
             identityLoginCalls = null,
+            marmotAccessObserver = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1277,6 +1279,7 @@ class WhiteNoiseAppState private constructor(
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
         identityLoginCalls: IdentityLoginCalls? = null,
+        marmotAccessObserver: (() -> Unit)? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1286,6 +1289,7 @@ class WhiteNoiseAppState private constructor(
         profileDisplayNameReader = profileDisplayNameReader,
         profileRefreshRequest = profileRefreshRequest,
         identityLoginCalls = identityLoginCalls,
+        marmotAccessObserver = marmotAccessObserver,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -2110,7 +2114,10 @@ class WhiteNoiseAppState private constructor(
         draftStore.set(account, groupIdHex, value)
     }
 
-    fun marmot(): Marmot = requireNotNull(client) { "Marmot is not initialized" }.marmot
+    fun marmot(): Marmot {
+        marmotAccessObserver?.invoke()
+        return requireNotNull(client) { "Marmot is not initialized" }.marmot
+    }
 
     /**
      * Launches a group/account mutation on a process-lifetime scope so it

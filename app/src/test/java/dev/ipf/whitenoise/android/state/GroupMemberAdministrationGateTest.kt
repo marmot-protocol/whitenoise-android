@@ -17,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -39,7 +40,8 @@ class GroupMemberAdministrationGateTest {
     @Test
     fun rosterLosingAuthorityWhileInviteWaitsForCommitLockSkipsRuntime() =
         runBlocking {
-            val appState = appState()
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
             val controller = readyController(appState)
             val tracker = rosterTracker(controller)
             assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
@@ -58,19 +60,24 @@ class GroupMemberAdministrationGateTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.inviteMembers(listOf("carol"))
                 }
+            // UNDISPATCHED runs through all synchronous preconditions. Remaining
+            // active here proves the operation reached the held commit lock.
+            assertTrue(invite.isActive)
 
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             releaseLock.complete(Unit)
 
             assertFalse(invite.await())
             holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
         }
 
     @Test
     fun rosterLosingAuthorityWhileRemoveWaitsForCommitLockSkipsRuntime() =
         runBlocking {
-            val appState = appState()
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
             val controller = readyController(appState)
             val tracker = rosterTracker(controller)
             val lockHeld = CompletableDeferred<Unit>()
@@ -82,18 +89,21 @@ class GroupMemberAdministrationGateTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.removeMember(member("bob"))
                 }
+            assertTrue(remove.isActive)
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             releaseLock.complete(Unit)
 
             assertFalse(remove.await())
             holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
         }
 
     @Test
     fun targetDisappearingWhilePromotionWaitsForCommitLockSkipsRuntime() =
         runBlocking {
-            val appState = appState()
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
             val controller = readyController(appState)
             val lockHeld = CompletableDeferred<Unit>()
             val releaseLock = CompletableDeferred<Unit>()
@@ -104,18 +114,21 @@ class GroupMemberAdministrationGateTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.setMemberAdmin(member("bob"), admin = true)
                 }
+            assertTrue(promote.isActive)
             replaceMembers(controller, listOf(member("alice", account = "alice", local = true)))
             releaseLock.complete(Unit)
 
             assertFalse(promote.await())
             holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
         }
 
     @Test
     fun rosterLosingAuthorityWhileDemotionWaitsForCommitLockSkipsRuntime() =
         runBlocking {
-            val appState = appState()
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
             val controller = readyController(appState, admins = listOf("alice", "bob"))
             val tracker = rosterTracker(controller)
             val lockHeld = CompletableDeferred<Unit>()
@@ -127,18 +140,21 @@ class GroupMemberAdministrationGateTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.setMemberAdmin(member("bob"), admin = false)
                 }
+            assertTrue(demote.isActive)
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             releaseLock.complete(Unit)
 
             assertFalse(demote.await())
             holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
         }
 
     @Test
     fun targetDisappearingWhileTransferWaitsForCommitLockSkipsBothCommits() =
         runBlocking {
-            val appState = appState()
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
             val controller = readyController(appState)
             val lockHeld = CompletableDeferred<Unit>()
             val releaseLock = CompletableDeferred<Unit>()
@@ -149,11 +165,13 @@ class GroupMemberAdministrationGateTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     controller.transferAdmin(member("bob"))
                 }
+            assertTrue(transfer.isActive)
             replaceMembers(controller, listOf(member("alice", account = "alice", local = true)))
             releaseLock.complete(Unit)
 
             assertFalse(transfer.await())
             holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
         }
 
@@ -204,7 +222,7 @@ class GroupMemberAdministrationGateTest {
         (field.get(controller) as MutableState<List<AppGroupMemberRecordFfi>>).value = members
     }
 
-    private fun appState() =
+    private fun appState(runtimeAccess: RuntimeAccessRecorder? = null) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
@@ -221,6 +239,7 @@ class GroupMemberAdministrationGateTest {
                     ),
                 ),
             activeAccountRef = "alice",
+            marmotAccessObserver = runtimeAccess?.let { it::record },
         )
 
     private fun group(admins: List<String> = listOf("alice")) =
@@ -277,6 +296,15 @@ class GroupMemberAdministrationGateTest {
         account = account,
         local = local,
     )
+}
+
+private class RuntimeAccessRecorder {
+    var callCount = 0
+        private set
+
+    fun record() {
+        callCount += 1
+    }
 }
 
 private class GroupMemberAdministrationDraftPersistence : DraftPersistence {
