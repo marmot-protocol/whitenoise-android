@@ -851,6 +851,24 @@ object MediaPipeline {
             } catch (_: SecurityException) {
                 return OriginalImageReadResult.Failed
             }
+        return prepareOriginalImageForUpload(
+            sourceBytes = sourceBytes,
+            sourceFileName = queryDisplayNameFromResolver(contentResolver, uri),
+        )
+    }
+
+    /**
+     * Byte-backed counterpart to [readOriginalImageForUpload]. Editor staging
+     * has already retained the provider bytes, so reopening and rendering the
+     * URI would both waste work and introduce generation loss. Keep the
+     * encoded pixels intact while applying the exact same metadata policy as
+     * a normal Original-quality send.
+     */
+    @Suppress("ReturnCount") // Each unsupported/unsafe container state must fail closed before attachment creation.
+    internal fun prepareOriginalImageForUpload(
+        sourceBytes: ByteArray,
+        sourceFileName: String?,
+    ): OriginalImageReadResult {
         val mediaType = originalImageMediaType(sourceBytes) ?: return OriginalImageReadResult.Unsupported
         // If the camera stored a raw landscape sensor buffer plus EXIF
         // Orientation=Rotate90/270, stripping APP1 would make "Original"
@@ -874,7 +892,7 @@ object MediaPipeline {
             OriginalImage(
                 bytes = stripped,
                 mediaType = mediaType,
-                fileName = queryDisplayNameFromResolver(contentResolver, uri) ?: defaultOriginalImageFileName(mediaType),
+                fileName = sourceFileName?.let(::safeDisplayName) ?: defaultOriginalImageFileName(mediaType),
                 dim = dim,
                 thumbhash = thumbhash,
             ),

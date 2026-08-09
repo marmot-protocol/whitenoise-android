@@ -6,10 +6,12 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -80,6 +82,32 @@ class PhotoDraftStagerTest {
             assertNull(fixture.gateway.current)
             assertNull(fixture.sources.bytes(first.photo.sourceLeaseId))
             assertNull(fixture.sessions.committed(ACCOUNT, GROUP, "stable-id", first.photo.attachmentDigest))
+        }
+
+    @Test
+    fun originalStagePreservesEncodedPixelsWithoutEditorRender() =
+        runTest {
+            var encodes = 0
+            val fixture = fixture(onEncode = { encodes += 1 })
+            val bytes = pngBytes()
+
+            val result =
+                fixture.stager.stageBytes(
+                    bytes,
+                    "picked.png",
+                    "stable-id",
+                    ACCOUNT,
+                    GROUP,
+                    MediaQuality.Original,
+                ) as PhotoDraftStageResult.Success
+
+            assertEquals(0, encodes)
+            assertArrayEquals(
+                MediaPipeline.stripOriginalImageMetadata(bytes),
+                result.photo.attachment.plaintext,
+            )
+            assertEquals("image/png", result.photo.attachment.mediaType)
+            assertEquals("80x60", result.photo.attachment.dim)
         }
 
     @Test

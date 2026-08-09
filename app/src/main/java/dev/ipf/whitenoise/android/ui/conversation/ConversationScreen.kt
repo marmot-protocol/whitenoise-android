@@ -228,6 +228,14 @@ private data class ActivePhotoEditor(
     val stateHolder: PhotoEditorStateHolder,
 )
 
+private data class ConversationMediaCleanupSnapshot(
+    val activeEditor: ActivePhotoEditor?,
+    val stagedPhotos: List<DraftBackedPhoto>,
+    val preparedPhotos: List<DraftPreparedPhoto>,
+    val accountRef: String?,
+    val groupIdHex: String,
+)
+
 private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 
 // Foreground catch-up normally materializes almost immediately. Keep the
@@ -1184,6 +1192,18 @@ internal fun ConversationScreen(
     var activePhotoEditor by remember(chat.id) { mutableStateOf<ActivePhotoEditor?>(null) }
     var requestedPhotoEditorSlotId by remember(chat.id) { mutableStateOf<String?>(null) }
     val mediaPreviewStateHolder = rememberSaveableStateHolder()
+    val currentMediaCleanupSnapshot =
+        key(chat.id) {
+            rememberUpdatedState(
+                ConversationMediaCleanupSnapshot(
+                    activeEditor = activePhotoEditor,
+                    stagedPhotos = draftBackedPhotos.values.toList(),
+                    preparedPhotos = draftPreparedPhotos.values.toList(),
+                    accountRef = controller.boundAccountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                ),
+            )
+        }
 
     fun releasePreparedPhoto(slotId: String) {
         val photo = draftBackedPhotos[slotId]
@@ -1593,10 +1613,11 @@ internal fun ConversationScreen(
     // accepts any MIME — the image picker can't surface PDFs, archives, etc.
     // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
     // same staging shelf as image picks; one Send dispatches both sides
-    // through one kind:9 album. Bytes pass through without recompression —
-    // including picked/forwarded audio files. The send-quality audio bitrate
-    // is intentionally scoped to recorded voice notes until this client grows
-    // a general audio transcode path.
+    // through one kind:9 album. Non-image bytes pass through without
+    // recompression, while detected images use the same metadata-safe policy
+    // as Photo Picker. The send-quality audio bitrate is intentionally scoped
+    // to recorded voice notes until this client grows a general audio
+    // transcode path.
     val documentPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
@@ -1615,19 +1636,20 @@ internal fun ConversationScreen(
     // (PDF viewer, etc.) may still be reading a granted FileProvider URI.
     // Those are reaped by the age-based `sweepStaleSharedMedia` janitor at
     // app start.
-    DisposableEffect(Unit) {
+    DisposableEffect(controller, chat.id) {
         onDispose {
-            activePhotoEditor?.previewBitmap?.recycle()
-            val stagedPhotos = draftBackedPhotos.values.toList()
-            val preparedPhotos = draftPreparedPhotos.values.toList()
-            val accountRef = controller.boundAccountRef
-            if (accountRef != null && (stagedPhotos.isNotEmpty() || preparedPhotos.isNotEmpty())) {
+            val cleanup = currentMediaCleanupSnapshot.value
+            cleanup.activeEditor?.previewBitmap?.recycle()
+            if (
+                cleanup.accountRef != null &&
+                (cleanup.stagedPhotos.isNotEmpty() || cleanup.preparedPhotos.isNotEmpty())
+            ) {
                 appState.launchMutation {
-                    stagedPhotos.forEach { photo ->
-                        photoDraftStager.remove(accountRef, controller.group.groupIdHex, photo)
+                    cleanup.stagedPhotos.forEach { photo ->
+                        photoDraftStager.remove(cleanup.accountRef, cleanup.groupIdHex, photo)
                     }
-                    preparedPhotos.forEach { photo ->
-                        photoDraftStager.removePrepared(accountRef, controller.group.groupIdHex, photo)
+                    cleanup.preparedPhotos.forEach { photo ->
+                        photoDraftStager.removePrepared(cleanup.accountRef, cleanup.groupIdHex, photo)
                     }
                 }
             }

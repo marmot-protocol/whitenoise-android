@@ -154,10 +154,9 @@ private class ConversationAttachmentReader(
         }
     }
 
-    // Read document-picker URIs as files. An image deliberately selected from
-    // Files stays byte-for-byte a file attachment; it is never silently routed
-    // through the photo scaler/editor. MIME comes from the content resolver and
-    // filename from `OpenableColumns.DISPLAY_NAME`.
+    // Read document-picker URIs as files. Static or animated images selected
+    // through Files follow the same metadata-safe image policy as Photo Picker
+    // selections. Non-image documents remain byte-for-byte file attachments.
     //
     // Two-layer size guard:
     //   1. Per-attachment ceiling: skip any single pick that already declares
@@ -205,7 +204,29 @@ private class ConversationAttachmentReader(
         val reportedMime = safeGetType(context.contentResolver, uri)
         val resolvedMime = reportedMime.takeIf { it.isNotBlank() } ?: "application/octet-stream"
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
-        readRawDocument(uri, resolvedMime, remainingBytes, bytesBudget, state)
+        val sniffedImageMime = MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
+        if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
+            readSanitizedImageDocument(uri, remainingBytes, state)
+        } else {
+            readRawDocument(uri, resolvedMime, remainingBytes, bytesBudget, state)
+        }
+    }
+
+    private fun readSanitizedImageDocument(
+        uri: android.net.Uri,
+        remainingBytes: Long,
+        state: DocumentReadAccumulator,
+    ) {
+        val outcome = readImageAttachment(uri, remainingBytes)
+        val attachment = outcome.attachment
+        when {
+            outcome.overflowed && remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES -> state.albumOverflowed = true
+            outcome.overflowed || attachment == null -> state.rejected = true
+            else -> {
+                state.totalBytes += attachment.plaintextBytes.size
+                state.attachments += attachment
+            }
+        }
     }
 
     private fun readRawDocument(
@@ -293,6 +314,11 @@ private class ConversationAttachmentReader(
         }
     }
 }
+
+internal fun isImageDocumentPick(
+    reportedMime: String,
+    sniffedImageMime: String?,
+): Boolean = reportedMime.startsWith("image/", ignoreCase = true) || sniffedImageMime != null
 
 /**
  * Media read/transform/send operations owned by a conversation.

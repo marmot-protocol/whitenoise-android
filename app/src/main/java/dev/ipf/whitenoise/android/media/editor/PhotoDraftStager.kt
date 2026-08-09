@@ -148,7 +148,8 @@ internal class PhotoDraftStager(
         )
     }
 
-    @Suppress("LongMethod") // One transaction owns source inspection, MDK commit, and lease cleanup.
+    // One transaction owns inspection, Original fallback, MDK commit, and lease cleanup.
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private suspend fun stageLease(
         leaseId: String,
         displayName: String,
@@ -172,21 +173,24 @@ internal class PhotoDraftStager(
                 return PhotoDraftStageResult.NotEditable(inspected.reason)
             }
             val sourceInfo = (inspected as PhotoEditorInspectResult.Success).source
-            val rendered = renderer.render(sourceBytes, PhotoEditRecipe.Original, quality)
-            if (rendered !is PhotoEditorRenderResult.Success) {
-                return PhotoDraftStageResult.SourceUnavailable
-            }
             val attachment =
-                MessageDraftAttachmentFfi(
-                    id = attachmentId,
-                    fileName = editedStageFileName(displayName, rendered.image.fileExtension),
-                    mediaType = rendered.image.mediaType,
-                    plaintext = rendered.image.bytes,
-                    dim = "${rendered.image.width}x${rendered.image.height}",
-                    thumbhash = rendered.image.thumbhash,
-                    durationSeconds = null,
-                    waveformSamples = emptyList(),
-                )
+                originalAttachment(sourceBytes, displayName, attachmentId, quality)
+                    ?: run {
+                        val rendered = renderer.render(sourceBytes, PhotoEditRecipe.Original, quality)
+                        if (rendered !is PhotoEditorRenderResult.Success) {
+                            return PhotoDraftStageResult.SourceUnavailable
+                        }
+                        MessageDraftAttachmentFfi(
+                            id = attachmentId,
+                            fileName = editedStageFileName(displayName, rendered.image.fileExtension),
+                            mediaType = rendered.image.mediaType,
+                            plaintext = rendered.image.bytes,
+                            dim = "${rendered.image.width}x${rendered.image.height}",
+                            thumbhash = rendered.image.thumbhash,
+                            durationSeconds = null,
+                            waveformSamples = emptyList(),
+                        )
+                    }
             val digest = attachment.editorDigest()
             val pending =
                 EditorAttachmentSession(
@@ -245,6 +249,29 @@ internal class PhotoDraftStager(
                 withContext(NonCancellable + ioDispatcher) { runCatching { sources.release(leaseId) } }
             }
         }
+    }
+
+    private fun originalAttachment(
+        sourceBytes: ByteArray,
+        displayName: String,
+        attachmentId: String,
+        quality: MediaQuality,
+    ): MessageDraftAttachmentFfi? {
+        if (!quality.preservesOriginalImageBytes) return null
+        val original =
+            MediaPipeline.prepareOriginalImageForUpload(sourceBytes, displayName)
+                as? MediaPipeline.OriginalImageReadResult.Success
+                ?: return null
+        return MessageDraftAttachmentFfi(
+            id = attachmentId,
+            fileName = original.image.fileName,
+            mediaType = original.image.mediaType,
+            plaintext = original.image.bytes,
+            dim = original.image.dim,
+            thumbhash = original.image.thumbhash,
+            durationSeconds = null,
+            waveformSamples = emptyList(),
+        )
     }
 
     suspend fun remove(
