@@ -1165,7 +1165,7 @@ internal fun GroupDetailsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                stringResource(R.string.members_count, controller.memberCount),
+                                stringResource(R.string.members_count, controller.presentedMemberCount),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),

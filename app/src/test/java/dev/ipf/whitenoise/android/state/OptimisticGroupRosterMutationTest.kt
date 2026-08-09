@@ -30,6 +30,7 @@ class OptimisticGroupRosterMutationTest {
                 }
 
             assertEquals(listOf("alice"), projectedGroupMembers(authoritative, tracker.current).map { it.memberIdHex })
+            assertEquals(1, projectedGroupMembers(authoritative, tracker.current).size)
 
             // MDK publishes a newer roster while the local commit is pending.
             // The overlay must apply to that roster rather than holding a stale
