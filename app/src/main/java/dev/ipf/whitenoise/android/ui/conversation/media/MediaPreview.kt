@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -40,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -193,8 +195,10 @@ internal sealed class StagedPreviewItem {
     abstract val uri: android.net.Uri
 
     data class Media(
-        override val uri: android.net.Uri,
-    ) : StagedPreviewItem()
+        val slot: PendingMediaSlot,
+    ) : StagedPreviewItem() {
+        override val uri: android.net.Uri = slot.uri
+    }
 
     data class Document(
         override val uri: android.net.Uri,
@@ -202,9 +206,9 @@ internal sealed class StagedPreviewItem {
 }
 
 internal fun stagedPreviewItems(
-    mediaUris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
-): List<StagedPreviewItem> = mediaUris.map { StagedPreviewItem.Media(it) } + documentUris.map { StagedPreviewItem.Document(it) }
+): List<StagedPreviewItem> = mediaSlots.map { StagedPreviewItem.Media(it) } + documentUris.map { StagedPreviewItem.Document(it) }
 
 /**
  * Where the preview cursor lands after removing [removedIndex] from a list
@@ -225,7 +229,7 @@ internal fun previewIndexAfterRemoval(
 
 @Composable
 internal fun MediaPreviewScreen(
-    uris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onDismiss: () -> Unit,
@@ -234,6 +238,11 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    onEditMediaAt: ((Int) -> Unit)? = null,
+    preparedPhotoLabels: Map<String, String> = emptyMap(),
+    preparingPhotoSlotIds: Set<String> = emptySet(),
+    nonEditableMediaSlotIds: Set<String> = emptySet(),
+    nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
 ) {
     Dialog(
@@ -245,7 +254,7 @@ internal fun MediaPreviewScreen(
             ),
     ) {
         MediaPreviewContent(
-            mediaUris = uris,
+            mediaSlots = mediaSlots,
             documentUris = documentUris,
             chatTitle = chatTitle,
             initialCaption = initialCaption,
@@ -255,13 +264,18 @@ internal fun MediaPreviewScreen(
             onRemoveDocumentAt = onRemoveDocumentAt,
             onAddPhotos = onAddPhotos,
             onAddDocuments = onAddDocuments,
+            onEditMediaAt = onEditMediaAt,
+            preparedPhotoLabels = preparedPhotoLabels,
+            preparingPhotoSlotIds = preparingPhotoSlotIds,
+            nonEditableMediaSlotIds = nonEditableMediaSlotIds,
+            nonEditableMediaDescriptions = nonEditableMediaDescriptions,
         )
     }
 }
 
 @Composable
 internal fun MediaPreviewContent(
-    mediaUris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onClose: () -> Unit,
@@ -270,9 +284,14 @@ internal fun MediaPreviewContent(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    onEditMediaAt: ((Int) -> Unit)? = null,
+    preparedPhotoLabels: Map<String, String> = emptyMap(),
+    preparingPhotoSlotIds: Set<String> = emptySet(),
+    nonEditableMediaSlotIds: Set<String> = emptySet(),
+    nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
 ) {
-    val items = remember(mediaUris, documentUris) { stagedPreviewItems(mediaUris, documentUris) }
+    val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
@@ -281,6 +300,8 @@ internal fun MediaPreviewContent(
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
     val previewMetadata = rememberPreviewMetadata(items)
+    val preparingAttachments =
+        items.any { item -> item is StagedPreviewItem.Media && item.slot.id in preparingPhotoSlotIds }
     LaunchedEffect(items.size) {
         currentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
@@ -291,7 +312,7 @@ internal fun MediaPreviewContent(
         currentIndex = previewIndexAfterRemoval(index, currentIndex, items.size - 1)
         when (item) {
             is StagedPreviewItem.Media -> onRemoveMediaAt(index)
-            is StagedPreviewItem.Document -> onRemoveDocumentAt(index - mediaUris.size)
+            is StagedPreviewItem.Document -> onRemoveDocumentAt(index - mediaSlots.size)
         }
     }
 
@@ -321,6 +342,39 @@ internal fun MediaPreviewContent(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val currentMedia = items.getOrNull(currentIndex) as? StagedPreviewItem.Media
+            val currentMetadata = currentMedia?.let { previewMetadata[it.uri] }
+            if (currentMedia != null && currentMetadata?.isVideo == false && onEditMediaAt != null) {
+                val preparing = currentMedia.slot.id in preparingPhotoSlotIds
+                val editable = currentMedia.slot.id !in nonEditableMediaSlotIds
+                val nonEditableDescription =
+                    nonEditableMediaDescriptions[currentMedia.slot.id]
+                        ?: stringResource(R.string.photo_editor_not_editable_animation)
+                TextButton(
+                    onClick = { onEditMediaAt(currentIndex) },
+                    enabled = !sending && !preparing && editable,
+                    modifier =
+                        Modifier.semantics {
+                            if (!editable) {
+                                contentDescription = nonEditableDescription
+                            }
+                        },
+                ) {
+                    if (preparing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White)
+                    }
+                    Text(
+                        text =
+                            preparedPhotoLabels[currentMedia.slot.id]?.let { quality ->
+                                stringResource(R.string.photo_editor_edit_with_quality, quality)
+                            } ?: stringResource(R.string.photo_editor_edit_action),
+                        color = Color.White,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
+            }
             IconButton(
                 onClick = { removeAt(currentIndex) },
                 enabled = items.isNotEmpty() && !sending,
@@ -360,7 +414,7 @@ internal fun MediaPreviewContent(
                     items,
                     key = { _, item ->
                         when (item) {
-                            is StagedPreviewItem.Media -> "image:${item.uri}"
+                            is StagedPreviewItem.Media -> "image:${item.slot.id}"
                             is StagedPreviewItem.Document -> "doc:${item.uri}"
                         }
                     },
@@ -397,7 +451,7 @@ internal fun MediaPreviewContent(
                 )
                 FloatingActionButton(
                     onClick = {
-                        if (!sending && items.isNotEmpty()) {
+                        if (!sending && !preparingAttachments && items.isNotEmpty()) {
                             sending = true
                             onSend(caption) { accepted ->
                                 if (!accepted) sending = false
@@ -406,7 +460,7 @@ internal fun MediaPreviewContent(
                     },
                     modifier =
                         Modifier.semantics {
-                            if (sending || items.isEmpty()) disabled()
+                            if (sending || preparingAttachments || items.isEmpty()) disabled()
                         },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,

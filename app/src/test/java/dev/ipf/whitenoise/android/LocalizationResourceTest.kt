@@ -14,15 +14,16 @@ class LocalizationResourceTest {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
                 .first { it.exists() }
-        val defaultKeys = resourceNames(File(resDir, "values/strings.xml"))
+        val defaultKeys = resourceNames(File(resDir, "values"))
 
         resDir
             .listFiles()
             .orEmpty()
-            .filter { it.isDirectory && it.name.startsWith("values-") }
-            .map { File(it, "strings.xml") }
-            .filter { it.exists() }
-            .forEach { localized ->
+            .filter {
+                it.isDirectory &&
+                    it.name.startsWith("values-") &&
+                    File(it, "strings.xml").exists()
+            }.forEach { localized ->
                 assertEquals(localized.path, defaultKeys, resourceNames(localized))
             }
     }
@@ -32,20 +33,21 @@ class LocalizationResourceTest {
         val resDir =
             listOf(File("src/main/res"), File("app/src/main/res"))
                 .first { it.exists() }
-        val englishFile = File(resDir, "values/strings.xml")
+        val englishDirectory = File(resDir, "values")
 
         resDir
             .listFiles()
             .orEmpty()
-            .filter { it.isDirectory && it.name.startsWith("values-") }
-            .map { File(it, "strings.xml") }
-            .filter { it.exists() }
-            .forEach { localized ->
+            .filter {
+                it.isDirectory &&
+                    it.name.startsWith("values-") &&
+                    File(it, "strings.xml").exists()
+            }.forEach { localized ->
                 val copiedKeys =
                     copiedEnglishResourceKeys(
-                        englishFile = englishFile,
-                        localizedFile = localized,
-                        localeDirName = requireNotNull(localized.parentFile).name,
+                        english = parseStringsResource(englishDirectory),
+                        localized = parseStringsResource(localized),
+                        localeDirName = localized.name,
                     )
 
                 assertTrue("${localized.path} copies English for $copiedKeys", copiedKeys.isEmpty())
@@ -382,7 +384,7 @@ class LocalizationResourceTest {
     }
 
     private fun resourceNames(file: File): ResourceNames {
-        val content = parseStringsFile(file)
+        val content = parseStringsResource(file)
         return ResourceNames(strings = content.strings.keys, plurals = content.plurals.keys)
     }
 
@@ -392,9 +394,18 @@ class LocalizationResourceTest {
         englishFile: File,
         localizedFile: File,
         localeDirName: String,
+    ): Set<String> =
+        copiedEnglishResourceKeys(
+            english = parseStringsResource(englishFile),
+            localized = parseStringsResource(localizedFile),
+            localeDirName = localeDirName,
+        )
+
+    private fun copiedEnglishResourceKeys(
+        english: StringsFileContent,
+        localized: StringsFileContent,
+        localeDirName: String,
     ): Set<String> {
-        val english = parseStringsFile(englishFile)
-        val localized = parseStringsFile(localizedFile)
         val localeExemptions = localeScopedAllowedKeys[localeDirName].orEmpty()
 
         val copiedStringKeys =
@@ -477,6 +488,20 @@ class LocalizationResourceTest {
             }
 
         return StringsFileContent(strings = strings, plurals = plurals)
+    }
+
+    private fun parseStringsResource(fileOrDirectory: File): StringsFileContent {
+        if (fileOrDirectory.isFile) return parseStringsFile(fileOrDirectory)
+        val contents =
+            fileOrDirectory
+                .listFiles { file -> file.isFile && file.extension == "xml" }
+                .orEmpty()
+                .sortedBy { it.name }
+                .map(::parseStringsFile)
+        return StringsFileContent(
+            strings = contents.flatMap { it.strings.entries }.associate { it.toPair() },
+            plurals = contents.flatMap { it.plurals.entries }.associate { it.toPair() },
+        )
     }
 
     private fun writeFixtureResDir(
@@ -640,6 +665,17 @@ class LocalizationResourceTest {
                 // Pure positional-format string ("current/total"); no
                 // translatable text, identical across every locale by design.
                 "conversation_search_match_count",
+                // Aspect ratios and dimension formats are locale-independent;
+                // Original/Standard are established photo-quality labels in
+                // several supported languages.
+                "photo_editor_crop_original",
+                "photo_editor_crop_square",
+                "photo_editor_crop_four_three",
+                "photo_editor_crop_three_four",
+                "photo_editor_crop_sixteen_nine",
+                "photo_editor_crop_nine_sixteen",
+                "photo_editor_quality_standard",
+                "photo_editor_effective_quality",
                 // Dialog confirm button; "OK" is shared verbatim across most locales.
                 "ok",
                 "admin",

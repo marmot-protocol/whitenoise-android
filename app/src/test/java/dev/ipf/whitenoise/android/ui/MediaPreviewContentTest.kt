@@ -18,14 +18,17 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.ByteArrayInputStream
 
 /**
  * Behavioral coverage for the staged-media preview: badge numbering follows
@@ -50,13 +53,24 @@ class MediaPreviewContentTest {
 
     private fun renderPreview(
         initialMedia: List<Uri>,
+        preparingMedia: Set<Uri> = emptySet(),
+        preparedLabels: Map<Uri, String> = emptyMap(),
+        onEditMediaAt: ((Int) -> Unit)? = null,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
     ) {
+        val initialSlots = initialMedia.mapIndexed { index, uri -> PendingMediaSlot("slot-$index", uri) }
+        val preparingSlotIds = initialSlots.filter { it.uri in preparingMedia }.mapTo(mutableSetOf()) { it.id }
+        val labelsBySlot = initialSlots.mapNotNull { slot -> preparedLabels[slot.uri]?.let { slot.id to it } }.toMap()
+        initialMedia.forEach { stagedUri ->
+            shadowOf(app.contentResolver).registerInputStreamSupplier(stagedUri) {
+                ByteArrayInputStream(ByteArray(1))
+            }
+        }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                var media by remember { mutableStateOf(initialMedia) }
+                var media by remember { mutableStateOf(initialSlots) }
                 MediaPreviewContent(
-                    mediaUris = media,
+                    mediaSlots = media,
                     documentUris = emptyList(),
                     chatTitle = "Test chat",
                     onClose = {},
@@ -67,6 +81,9 @@ class MediaPreviewContentTest {
                     onRemoveDocumentAt = {},
                     onAddPhotos = {},
                     onAddDocuments = {},
+                    preparingPhotoSlotIds = preparingSlotIds,
+                    preparedPhotoLabels = labelsBySlot,
+                    onEditMediaAt = onEditMediaAt,
                 )
             }
         }
@@ -130,6 +147,46 @@ class MediaPreviewContentTest {
         composeRule.runOnIdle { checkNotNull(onResult).invoke(false) }
         composeRule.waitForIdle()
         send.assertIsEnabled()
+    }
+
+    @Test
+    fun preparingPhotoDisablesSendUntilItsDraftArtifactIsReady() {
+        val staged = uri(1)
+        renderPreview(listOf(staged), preparingMedia = setOf(staged))
+
+        composeRule.onNodeWithContentDescription(string(R.string.send)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun editablePhotoShowsEditActionAndEffectiveAttachmentQuality() {
+        val staged = uri(1)
+        var editedIndex: Int? = null
+        val quality = "Standard · 2048 × 1536"
+        renderPreview(
+            initialMedia = listOf(staged),
+            preparedLabels = mapOf(staged to quality),
+            onEditMediaAt = { editedIndex = it },
+        )
+
+        composeRule
+            .onNodeWithText(string(R.string.photo_editor_edit_with_quality, quality))
+            .performClick()
+        assertEquals(0, editedIndex)
+    }
+
+    @Test
+    fun duplicateUriOccurrencesKeepIndependentPreviewPositions() {
+        val duplicate = uri(1)
+        var editedIndex: Int? = null
+        renderPreview(
+            initialMedia = listOf(duplicate, duplicate),
+            preparedLabels = mapOf(duplicate to "Standard"),
+            onEditMediaAt = { editedIndex = it },
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 2)).performClick()
+        composeRule.onNodeWithText(string(R.string.photo_editor_edit_with_quality, "Standard")).performClick()
+        assertEquals(1, editedIndex)
     }
 
     @Test

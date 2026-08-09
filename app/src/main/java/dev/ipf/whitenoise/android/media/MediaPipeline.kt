@@ -7,13 +7,20 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.graphics.PorterDuff
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.media.ExifInterface
 import android.net.Uri
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
 import java.nio.charset.StandardCharsets
+
+internal enum class ImageAnimationStatus {
+    STATIC,
+    ANIMATED,
+    INDETERMINATE,
+}
 
 /**
  * Local prep for outgoing image attachments. Two layers:
@@ -33,6 +40,8 @@ import java.nio.charset.StandardCharsets
  * 12MP source.
  */
 object MediaPipeline {
+    private const val MAX_JPEG_QUALITY = 100
+
     /** 1920px max edge mirrors `ImagePicker(maxWidth: 1920, maxHeight: 1920)`. */
     const val DEFAULT_MAX_EDGE_PX: Int = 1920
 
@@ -41,6 +50,42 @@ object MediaPipeline {
 
     /** MIME on the wire always matches the recompressed payload, not the source. */
     const val RECOMPRESSED_MIME: String = "image/jpeg"
+
+    const val EDITED_MAX_EDGE_PX: Int = 4096
+    const val EDITED_MAX_PIXELS: Long = 12_000_000L
+    const val EDITED_MAX_ENCODED_BYTES: Int = 32 * 1024 * 1024
+
+    enum class RenderedImageFormat(
+        val mediaType: String,
+        val fileExtension: String,
+    ) {
+        Jpeg("image/jpeg", "jpg"),
+        Png("image/png", "png"),
+    }
+
+    data class OutputPlan(
+        val maxEdgePx: Int,
+        val maxPixels: Long,
+        val format: RenderedImageFormat,
+        val jpegQuality: Int,
+        val maxEncodedBytes: Int = EDITED_MAX_ENCODED_BYTES,
+    ) {
+        init {
+            require(maxEdgePx > 0)
+            require(maxPixels > 0)
+            require(jpegQuality in 1..MAX_JPEG_QUALITY)
+            require(maxEncodedBytes > 0)
+        }
+    }
+
+    data class FinalizedImage(
+        val bytes: ByteArray,
+        val width: Int,
+        val height: Int,
+        val thumbhash: String?,
+        val mediaType: String,
+        val fileExtension: String,
+    )
 
     private const val MAX_SAFE_DISPLAY_NAME_CHARS = 120
     private const val MAX_SAFE_DISPLAY_EXTENSION_CHARS = 24
@@ -134,8 +179,14 @@ object MediaPipeline {
     /** Max longer-edge (px) for animated GIF/WebP decodes in chat attachments. */
     const val ANIMATED_IMAGE_MAX_EDGE_PX: Int = 1080
 
-    /** Header bytes read to sniff an animated source — GIF sig + WebP ANIM chunk sit near the start. */
+    /** Bounded prefix used to prove whether a picked image is static or animated. */
     private const val ANIMATED_SNIFF_MAX_BYTES: Int = 4096
+    private const val WEBP_ANIMATION_FLAG: Int = 0x02
+    private const val WEBP_FIRST_CHUNK_OFFSET: Int = 12
+    private const val WEBP_CHUNK_TYPE_BYTES: Int = 4
+    private const val WEBP_FIRST_CHUNK_PAYLOAD_OFFSET: Int = 20
+    private val ISO_BMFF_STATIC_IMAGE_BRANDS = setOf("avif", "mif1", "heic", "heix")
+    private val ISO_BMFF_IMAGE_SEQUENCE_BRANDS = setOf("avis", "msf1", "hevc", "hevx")
 
     /** Header bytes needed to recognize JPEG/PNG/WebP/GIF signatures. */
     private const val IMAGE_SIGNATURE_SNIFF_MAX_BYTES: Int = 12
@@ -259,35 +310,24 @@ object MediaPipeline {
         return scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation)
     }
 
-    /**
-     * True when [mediaType] / [bytes] identify an attachment that should use
-     * the animated [ImageDecoder] path (GIF always; WebP only when an ANIM
-     * chunk is present).
-     */
+    /** True only when [mediaType] / [bytes] positively identify animation. */
     fun isAnimatedImageAttachment(
         mediaType: String,
         bytes: ByteArray,
     ): Boolean {
         if (mediaType.equals("image/gif", ignoreCase = true)) return true
-        if (mediaType.equals("image/webp", ignoreCase = true) && hasWebpAnimChunk(bytes)) return true
-        if (mediaType.isBlank() || mediaType.equals("application/octet-stream", ignoreCase = true)) {
-            if (isGif(bytes)) return true
-            if (hasWebpAnimChunk(bytes)) return true
-        }
-        return false
+        return imageAnimationStatus(bytes) == ImageAnimationStatus.ANIMATED
     }
 
     /**
-     * Sniff the source header to decide whether [uri] is an animated image (GIF
-     * or animated WebP). Callers use this to keep animations off the static JPEG
-     * recompress path at any quality — a flatten would silently drop the motion.
-     * The GIF signature and the WebP `VP8X`/`ANIM` chunks live in the first few
-     * bytes, so a bounded header read is enough.
+     * Sniff a bounded source prefix. An unreadable, truncated, or unrecognized
+     * source stays indeterminate so callers can fail closed instead of silently
+     * flattening a possibly animated image.
      */
-    fun isAnimatedImageSource(
+    internal fun imageAnimationStatus(
         contentResolver: ContentResolver,
         uri: Uri,
-    ): Boolean {
+    ): ImageAnimationStatus {
         val header =
             try {
                 contentResolver.openInputStream(uri)?.use { stream ->
@@ -304,9 +344,101 @@ object MediaPipeline {
                 null
             } catch (_: SecurityException) {
                 null
-            } ?: return false
-        return isGif(header) || hasWebpAnimChunk(header)
+            } catch (_: RuntimeException) {
+                null
+            } ?: return ImageAnimationStatus.INDETERMINATE
+        return imageAnimationStatus(header)
     }
+
+    /** Preserve anything not positively proven static off the JPEG recompress path. */
+    fun shouldPreserveOriginalImageSource(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): Boolean = imageAnimationStatus(contentResolver, uri) != ImageAnimationStatus.STATIC
+
+    internal fun imageAnimationStatus(header: ByteArray): ImageAnimationStatus =
+        when {
+            isGif(header) -> ImageAnimationStatus.ANIMATED
+            isJpeg(header) -> ImageAnimationStatus.STATIC
+            isPng(header) -> pngAnimationStatus(header)
+            isIsoBmff(header) -> isoBmffAnimationStatus(header)
+            !isWebp(header) || header.size < WEBP_FIRST_CHUNK_PAYLOAD_OFFSET ->
+                ImageAnimationStatus.INDETERMINATE
+            else -> webpAnimationStatus(header)
+        }
+
+    @Suppress("ReturnCount") // Chunk sentinels make the bounded parser's terminal states explicit.
+    private fun pngAnimationStatus(header: ByteArray): ImageAnimationStatus {
+        var offset = PNG_SIGNATURE.size
+        while (offset + PNG_CHUNK_HEADER_BYTES <= header.size) {
+            val length = u32be(header, offset)
+            when (ascii(header, offset + PNG_CHUNK_TYPE_OFFSET, PNG_CHUNK_TYPE_BYTES)) {
+                "acTL" -> return ImageAnimationStatus.ANIMATED
+                "IDAT" -> return ImageAnimationStatus.STATIC
+            }
+            val chunkEnd = offset.toLong() + PNG_CHUNK_OVERHEAD + length
+            if (chunkEnd > header.size.toLong()) break
+            offset = chunkEnd.toInt()
+        }
+        return ImageAnimationStatus.INDETERMINATE
+    }
+
+    /** Classify only complete ISO BMFF `ftyp` boxes; unknown brands fail closed. */
+    private fun isoBmffAnimationStatus(header: ByteArray): ImageAnimationStatus {
+        val boxSize =
+            if (header.size >= ISO_BMFF_FILE_TYPE_MIN_BYTES) {
+                u32be(header, 0)
+            } else {
+                0L
+            }
+        if (boxSize < ISO_BMFF_FILE_TYPE_MIN_BYTES || boxSize > header.size.toLong()) {
+            return ImageAnimationStatus.INDETERMINATE
+        }
+
+        var hasStaticBrand =
+            ascii(header, ISO_BMFF_MAJOR_BRAND_OFFSET, ISO_BMFF_BRAND_BYTES) in ISO_BMFF_STATIC_IMAGE_BRANDS
+        var hasSequenceBrand =
+            ascii(header, ISO_BMFF_MAJOR_BRAND_OFFSET, ISO_BMFF_BRAND_BYTES) in ISO_BMFF_IMAGE_SEQUENCE_BRANDS
+        var offset = ISO_BMFF_COMPATIBLE_BRANDS_OFFSET
+        while (offset + ISO_BMFF_BRAND_BYTES <= boxSize.toInt()) {
+            val brand = ascii(header, offset, ISO_BMFF_BRAND_BYTES)
+            hasStaticBrand = hasStaticBrand || brand in ISO_BMFF_STATIC_IMAGE_BRANDS
+            hasSequenceBrand = hasSequenceBrand || brand in ISO_BMFF_IMAGE_SEQUENCE_BRANDS
+            offset += ISO_BMFF_BRAND_BYTES
+        }
+        return when {
+            hasSequenceBrand -> ImageAnimationStatus.ANIMATED
+            hasStaticBrand -> ImageAnimationStatus.STATIC
+            else -> ImageAnimationStatus.INDETERMINATE
+        }
+    }
+
+    private fun isIsoBmff(header: ByteArray): Boolean =
+        header.size >= ISO_BMFF_BOX_TYPE_OFFSET + ISO_BMFF_BRAND_BYTES &&
+            ascii(header, ISO_BMFF_BOX_TYPE_OFFSET, ISO_BMFF_BRAND_BYTES) == "ftyp"
+
+    private fun webpAnimationStatus(header: ByteArray): ImageAnimationStatus =
+        when (ascii(header, WEBP_FIRST_CHUNK_OFFSET, WEBP_CHUNK_TYPE_BYTES)) {
+            "VP8X" ->
+                if (
+                    header.size > WEBP_FIRST_CHUNK_PAYLOAD_OFFSET &&
+                    u8(header, WEBP_FIRST_CHUNK_PAYLOAD_OFFSET) and WEBP_ANIMATION_FLAG != 0
+                ) {
+                    ImageAnimationStatus.ANIMATED
+                } else if (header.size > WEBP_FIRST_CHUNK_PAYLOAD_OFFSET) {
+                    ImageAnimationStatus.STATIC
+                } else {
+                    ImageAnimationStatus.INDETERMINATE
+                }
+            "VP8 ", "VP8L" -> ImageAnimationStatus.STATIC
+            "ANIM" -> ImageAnimationStatus.ANIMATED
+            else ->
+                if (hasWebpAnimChunk(header)) {
+                    ImageAnimationStatus.ANIMATED
+                } else {
+                    ImageAnimationStatus.INDETERMINATE
+                }
+        }
 
     /**
      * True when a decoded static thumbnail cache hit can be trusted before the
@@ -618,7 +750,7 @@ object MediaPipeline {
         return buffer.toByteArray()
     }
 
-    private fun readExifOrientation(bytes: ByteArray): Int =
+    internal fun readExifOrientation(bytes: ByteArray): Int =
         try {
             bytes.inputStream().use { stream ->
                 normalizeExifOrientation(
@@ -844,42 +976,91 @@ object MediaPipeline {
     private fun finishDownscaledJpeg(
         scaled: Bitmap,
         quality: Int,
-    ): DownscaledJpeg? {
+    ): DownscaledJpeg? =
+        finalizeRenderedImage(
+            rendered = scaled,
+            plan =
+                OutputPlan(
+                    maxEdgePx = maxOf(scaled.width, scaled.height),
+                    maxPixels = scaled.width.toLong() * scaled.height,
+                    format = RenderedImageFormat.Jpeg,
+                    jpegQuality = quality.coerceIn(1, MAX_JPEG_QUALITY),
+                    maxEncodedBytes = Int.MAX_VALUE,
+                ),
+        )?.let { finalized ->
+            DownscaledJpeg(
+                bytes = finalized.bytes,
+                width = finalized.width,
+                height = finalized.height,
+                thumbhash = finalized.thumbhash,
+            )
+        }
+
+    /**
+     * Finalizes already-rendered pixels without consulting source metadata.
+     * This is the editor's sole lossy encode point. The function takes
+     * ownership of [rendered] and always recycles it.
+     */
+    @Suppress("CyclomaticComplexMethod") // All encode validation and cleanup stays in one ownership boundary.
+    internal fun finalizeRenderedImage(
+        rendered: Bitmap,
+        plan: OutputPlan,
+        onEncode: () -> Unit = {},
+    ): FinalizedImage? {
         var opaque: Bitmap? = null
         return try {
+            val pixels = rendered.width.toLong() * rendered.height.toLong()
+            if (maxOf(rendered.width, rendered.height) > plan.maxEdgePx || pixels > plan.maxPixels) {
+                return null
+            }
             opaque =
-                if (scaled.hasAlpha()) {
-                    if (scaled.isMutable) {
-                        Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
-                        scaled
-                    } else {
-                        Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
-                            Canvas(it).apply {
-                                drawColor(Color.WHITE)
-                                drawBitmap(scaled, 0f, 0f, null)
-                            }
-                        }
+                if (plan.format == RenderedImageFormat.Jpeg && rendered.hasAlpha()) {
+                    Bitmap.createBitmap(rendered.width, rendered.height, Bitmap.Config.ARGB_8888).also {
+                        it.eraseColor(Color.WHITE)
+                        Canvas(it).drawBitmap(rendered, 0f, 0f, null)
                     }
                 } else {
-                    scaled
+                    rendered
                 }
             val bitmap = opaque
             val thumbhash = runCatching { Thumbhash.encodeFromBitmap(bitmap) }.getOrNull()
-            ByteArrayOutputStream().use { output ->
-                if (bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
-                    DownscaledJpeg(
+            CappedImageOutputStream(plan.maxEncodedBytes).use { output ->
+                onEncode()
+                val format =
+                    when (plan.format) {
+                        RenderedImageFormat.Jpeg -> Bitmap.CompressFormat.JPEG
+                        RenderedImageFormat.Png -> Bitmap.CompressFormat.PNG
+                    }
+                val quality =
+                    if (plan.format == RenderedImageFormat.Png) {
+                        MAX_JPEG_QUALITY
+                    } else {
+                        plan.jpegQuality
+                    }
+                if (bitmap.compress(format, quality, output)) {
+                    FinalizedImage(
                         bytes = output.toByteArray(),
                         width = bitmap.width,
                         height = bitmap.height,
                         thumbhash = thumbhash,
+                        mediaType = plan.format.mediaType,
+                        fileExtension = plan.format.fileExtension,
                     )
                 } else {
                     null
                 }
             }
+        } catch (_: EncodedImageTooLargeException) {
+            null
+        } catch (_: IOException) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        } catch (_: RuntimeException) {
+            null
         } finally {
-            if (opaque !== null && opaque !== scaled) opaque.recycle()
-            scaled.recycle()
+            if (opaque !== null && opaque !== rendered) opaque.recycle()
+            rendered.recycle()
         }
     }
 
@@ -1151,7 +1332,15 @@ object MediaPipeline {
     }
 
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    private const val PNG_CHUNK_HEADER_BYTES = 8
     private const val PNG_CHUNK_OVERHEAD = 12
+    private const val PNG_CHUNK_TYPE_OFFSET = 4
+    private const val PNG_CHUNK_TYPE_BYTES = 4
+    private const val ISO_BMFF_BOX_TYPE_OFFSET = 4
+    private const val ISO_BMFF_MAJOR_BRAND_OFFSET = 8
+    private const val ISO_BMFF_COMPATIBLE_BRANDS_OFFSET = 16
+    private const val ISO_BMFF_BRAND_BYTES = 4
+    private const val ISO_BMFF_FILE_TYPE_MIN_BYTES = 16L
     private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
     private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024
@@ -1419,5 +1608,39 @@ object MediaPipeline {
         } finally {
             AttachmentPlaintextCache.unprotectPublicationFile(file)
         }
+    }
+}
+
+private class EncodedImageTooLargeException : IOException()
+
+private class CappedImageOutputStream(
+    private val maxBytes: Int,
+) : OutputStream() {
+    private val output = ByteArrayOutputStream(minOf(maxBytes, 256 * 1024))
+    private var written = 0
+
+    override fun write(value: Int) {
+        ensureCapacity(1)
+        output.write(value)
+        written += 1
+    }
+
+    override fun write(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        require(offset >= 0 && length >= 0 && offset <= bytes.size - length)
+        ensureCapacity(length)
+        output.write(bytes, offset, length)
+        written += length
+    }
+
+    fun toByteArray(): ByteArray = output.toByteArray()
+
+    override fun close() = output.close()
+
+    private fun ensureCapacity(additionalBytes: Int) {
+        if (additionalBytes > maxBytes - written) throw EncodedImageTooLargeException()
     }
 }
