@@ -67,6 +67,12 @@ class MainThreadConfinementCoverageTest {
         val eviction = source.functionSection("removeMediaMemoryCacheKeys")
         assertTrue("L1 eviction must dispatch before touching the caches", "withContext(dispatcher)" in eviction)
         assertTrue("both L1 tiers must be removed through one guarded boundary", "cacheKeys.forEach(removeEntry)" in eviction)
+
+        val expiredEviction = source.functionSection("evictExpiredMediaCaches")
+        assertTrue(
+            "expired attachment eviction must clear observable availability",
+            "attachmentCacheAvailability.remove" in expiredEviction,
+        )
     }
 
     @Test

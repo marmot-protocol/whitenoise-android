@@ -142,6 +142,8 @@ internal fun MessageActionMenu(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    if (!expanded) return
+
     val density = LocalDensity.current
     val actionKinds =
         remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, canForward, canSave) {
@@ -160,12 +162,14 @@ internal fun MessageActionMenu(
     val textMeasurer = rememberTextMeasurer()
     val actionTextStyle = MaterialTheme.typography.titleMedium
     val minimumActionCellWidth =
-        with(density) {
-            val widestLabelPx =
-                labeledActions.maxOf { (_, label) ->
-                    textMeasurer.measure(AnnotatedString(label), style = actionTextStyle, maxLines = 1).size.width
-                }
-            maxOf(136.dp, widestLabelPx.toDp() + 52.dp)
+        remember(labeledActions, actionTextStyle, density, textMeasurer) {
+            with(density) {
+                val widestLabelPx =
+                    labeledActions.maxOf { (_, label) ->
+                        textMeasurer.measure(AnnotatedString(label), style = actionTextStyle, maxLines = 1).size.width
+                    }
+                maxOf(136.dp, widestLabelPx.toDp() + 52.dp)
+            }
         }
     val actionRowHeight =
         with(density) {
@@ -174,7 +178,7 @@ internal fun MessageActionMenu(
     val reactionRowHeight =
         with(density) {
             maxOf(
-                36.dp,
+                48.dp,
                 MaterialTheme.typography.titleMedium.lineHeight
                     .toDp() + 8.dp,
             )

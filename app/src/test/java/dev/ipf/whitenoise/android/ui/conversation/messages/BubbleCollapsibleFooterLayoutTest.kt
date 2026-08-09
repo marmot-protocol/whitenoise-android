@@ -7,16 +7,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
@@ -89,38 +94,62 @@ class BubbleCollapsibleFooterLayoutTest {
 
     @Test
     fun bodyExactlyAtRaisedLineCapDoesNotCollapse() {
-        val cap = MESSAGE_COLLAPSE_LINE_LIMIT.dp
         composeRule.setContent {
             WhiteNoiseTheme {
-                BubbleCollapsibleFooterLayout(
-                    maxBodyHeight = cap,
-                    readMore = { Text("Read More", Modifier.testTag("read-more")) },
-                    footer = { Text("7:19 PM") },
-                ) {
-                    Spacer(Modifier.width(20.dp).height(cap))
+                val textStyle = MaterialTheme.typography.bodyLarge
+                val cap =
+                    with(LocalDensity.current) {
+                        (textStyle.lineHeight.toPx() * MESSAGE_COLLAPSE_LINE_LIMIT).toDp()
+                    }
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    BubbleCollapsibleFooterLayout(
+                        maxBodyHeight = cap,
+                        readMore = { Text("Read More", Modifier.testTag("read-more")) },
+                        footer = { Text("7:19 PM") },
+                    ) {
+                        Text(
+                            renderedLines(MESSAGE_COLLAPSE_LINE_LIMIT),
+                            style = textStyle,
+                            maxLines = MESSAGE_COLLAPSE_LINE_LIMIT + 1,
+                            modifier = Modifier.width(200.dp),
+                        )
+                    }
                 }
             }
         }
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("read-more").assertIsNotDisplayed()
     }
 
     @Test
     fun bodyJustPastRaisedLineCapCollapses() {
-        val cap = MESSAGE_COLLAPSE_LINE_LIMIT.dp
         composeRule.setContent {
             WhiteNoiseTheme {
-                BubbleCollapsibleFooterLayout(
-                    maxBodyHeight = cap,
-                    readMore = { Text("Read More", Modifier.testTag("read-more")) },
-                    footer = { Text("7:19 PM") },
-                ) {
-                    Spacer(Modifier.width(20.dp).height(cap + 1.dp))
+                val textStyle = MaterialTheme.typography.bodyLarge
+                val cap =
+                    with(LocalDensity.current) {
+                        (textStyle.lineHeight.toPx() * MESSAGE_COLLAPSE_LINE_LIMIT).toDp()
+                    }
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    BubbleCollapsibleFooterLayout(
+                        maxBodyHeight = cap,
+                        readMore = { Text("Read More", Modifier.testTag("read-more")) },
+                        footer = { Text("7:19 PM") },
+                    ) {
+                        Text(
+                            renderedLines(MESSAGE_COLLAPSE_LINE_LIMIT + 1),
+                            style = textStyle,
+                            maxLines = MESSAGE_COLLAPSE_LINE_LIMIT + 1,
+                            modifier = Modifier.width(200.dp),
+                        )
+                    }
                 }
             }
         }
+        composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag("read-more").assertIsDisplayed()
+        composeRule.onNodeWithTag("read-more").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -247,4 +276,6 @@ class BubbleCollapsibleFooterLayoutTest {
 
         assertEquals(Color.Black.toArgb(), footerGapPixel)
     }
+
+    private fun renderedLines(count: Int): String = List(count) { index -> "Line $index" }.joinToString("\n")
 }

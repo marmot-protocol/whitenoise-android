@@ -7726,11 +7726,15 @@ class ConversationController(
                     loadedMessageIds = loadedMessageIds,
                 )
             }
+        val evictedKeys = loadedKeys + staleKeys
         removeMediaMemoryCacheKeys(
-            cacheKeys = loadedKeys + staleKeys,
+            cacheKeys = evictedKeys,
             dispatcher = Dispatchers.Main.immediate,
             removeEntry = appState::removeMediaMemoryCacheEntry,
         )
+        withContext(Dispatchers.Main.immediate) {
+            evictedKeys.forEach { attachmentCacheAvailability.remove(it) }
+        }
         withContext(Dispatchers.IO) {
             loadedKeys.forEach { appState.diskMediaCache.remove(it) }
             // Plus any disk entry stamped with an expired ciphertext tag — the

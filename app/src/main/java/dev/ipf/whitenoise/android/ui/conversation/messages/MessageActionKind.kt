@@ -54,7 +54,7 @@ internal fun estimatedMessageActionMenuHeight(
     canReact: Boolean,
     canDelete: Boolean,
     actionRowHeight: Dp = 48.dp,
-    reactionRowHeight: Dp = 36.dp,
+    reactionRowHeight: Dp = 48.dp,
 ): Dp {
     val rows = (actionCount + columns - 1) / columns
     val actionHeight = actionRowHeight * rows + ((rows - 1).coerceAtLeast(0) * 2).dp

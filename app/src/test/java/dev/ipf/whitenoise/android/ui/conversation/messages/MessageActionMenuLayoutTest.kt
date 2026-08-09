@@ -5,6 +5,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -59,8 +60,8 @@ class MessageActionMenuLayoutTest {
     fun columnAndHeightEstimatesTrackGridRowsAndDeleteSection() {
         assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
-        assertEquals(382.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
-        assertEquals(582.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
+        assertEquals(394.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
+        assertEquals(594.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
     }
 
     @Test
@@ -122,10 +123,24 @@ class MessageActionMenuLayoutTest {
         )
     }
 
+    @Test
+    fun emojiPickerKeepsMinimumTouchTarget() {
+        renderMenu(fontScale = 1f, canReact = true)
+
+        val bounds =
+            composeRule
+                .onNodeWithContentDescription("Open emoji picker")
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(bounds.width >= 48f)
+        assertTrue(bounds.height >= 48f)
+    }
+
     private fun renderMenu(
         fontScale: Float,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         callbacks: MutableList<String> = mutableListOf(),
+        canReact: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -139,7 +154,7 @@ class MessageActionMenuLayoutTest {
                         anchorWindowYPx = 8f,
                         alignEnd = false,
                         canReply = true,
-                        canReact = false,
+                        canReact = canReact,
                         canDelete = true,
                         canEdit = true,
                         canForward = true,
@@ -148,7 +163,7 @@ class MessageActionMenuLayoutTest {
                         canSpeak = true,
                         canSelectText = true,
                         canSave = true,
-                        quickReactionEmojis = emptyList(),
+                        quickReactionEmojis = if (canReact) listOf("👍") else emptyList(),
                         onDismissRequest = {},
                         onReact = {},
                         onOpenEmojiPicker = {},

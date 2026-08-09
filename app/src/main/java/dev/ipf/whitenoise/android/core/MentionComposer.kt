@@ -321,18 +321,15 @@ object MentionComposer {
         // the chip's right edge to the next burst commit without technically
         // overlapping it yet. Treat that owned separator + text as a hit on
         // the adjacent chip so no intermediate partial token can escape.
-        if (!touchedPartial) {
-            for (chip in chips) {
-                val chipEnd = chip.last + 1
-                val removesOwnedSeparatorAndText =
-                    delStart == chipEnd &&
-                        delEnd > delStart + 1 &&
-                        oldText.getOrNull(delStart) == ' '
-                if (removesOwnedSeparatorAndText) {
-                    touchedPartial = true
-                    widenedStart = chip.first
-                    break
-                }
+        for (chip in chips) {
+            val chipEnd = chip.last + 1
+            val removesOwnedSeparatorAndText =
+                delStart == chipEnd &&
+                    delEnd > delStart + 1 &&
+                    oldText.getOrNull(delStart) == ' '
+            if (removesOwnedSeparatorAndText) {
+                touchedPartial = true
+                if (chip.first < widenedStart) widenedStart = chip.first
             }
         }
         if (!touchedPartial) return null

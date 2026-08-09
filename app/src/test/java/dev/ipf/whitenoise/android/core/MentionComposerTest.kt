@@ -334,6 +334,22 @@ class MentionComposerTest {
     }
 
     @Test
+    fun repairDeleteFromFirstChipSeparatorIntoSecondChipRemovesBothChips() {
+        val aliceChip = "@$aliceNpub"
+        val bobChip = "@$bobNpub"
+        val oldText = "$aliceChip $bobChip tail"
+        val deleteStart = aliceChip.length
+        val deleteEnd = deleteStart + 1 + 10
+        val newText = oldText.removeRange(deleteStart, deleteEnd)
+
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+
+        assertEquals(" tail", result!!.text)
+        assertEquals(0, result.selection)
+        assertTrue(MentionComposer.chipRanges(result.text).isEmpty())
+    }
+
+    @Test
     fun perCharacterSwipeBurstNeverPublishesAPartialChip() {
         val chip = "@$aliceNpub"
         var current = "hey $chip "
