@@ -316,6 +316,25 @@ object MentionComposer {
             if (chipStart < widenedStart) widenedStart = chipStart
             if (chipEnd > widenedEnd) widenedEnd = chipEnd
         }
+        // Some IMEs begin a word-granularity swipe by deleting the single
+        // separator inserted with the chip plus following text. That exposes
+        // the chip's right edge to the next burst commit without technically
+        // overlapping it yet. Treat that owned separator + text as a hit on
+        // the adjacent chip so no intermediate partial token can escape.
+        if (!touchedPartial) {
+            for (chip in chips) {
+                val chipEnd = chip.last + 1
+                val removesOwnedSeparatorAndText =
+                    delStart == chipEnd &&
+                        delEnd > delStart + 1 &&
+                        oldText.getOrNull(delStart) == ' '
+                if (removesOwnedSeparatorAndText) {
+                    touchedPartial = true
+                    widenedStart = chip.first
+                    break
+                }
+            }
+        }
         if (!touchedPartial) return null
 
         val before = oldText.substring(0, widenedStart)

@@ -1403,4 +1403,19 @@
     <string name="amoled_mode_subtitle">Использовать чисто черный фон</string>
     <string name="support">Поддержка</string>
     <string name="app_font">Шрифт приложения</string>
+    <string name="attachment_type_android_package">APK</string>
+    <string name="attachment_type_android_package_description">Пакет приложения Android</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_pdf_description">Документ PDF</string>
+    <string name="attachment_type_archive">Архив</string>
+    <string name="attachment_type_document">Документ</string>
+    <string name="attachment_type_spreadsheet">Таблица</string>
+    <string name="attachment_type_presentation">Презентация</string>
+    <string name="attachment_type_text">Текст</string>
+    <string name="attachment_type_code">Код</string>
+    <string name="attachment_type_code_description">Файл кода или данных</string>
+    <string name="attachment_type_audio">Аудио</string>
+    <string name="attachment_type_video">Видео</string>
+    <string name="attachment_type_image">Изображение</string>
+    <string name="attachment_type_file">Файл</string>
 </resources>

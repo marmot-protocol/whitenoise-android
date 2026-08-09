@@ -1737,7 +1737,7 @@ internal fun MessageBubble(
 
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
-internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 18
+internal const val MESSAGE_COLLAPSE_LINE_LIMIT = 52
 
 private val MessageBubbleOppositeGutter = 48.dp
 private val MessageBubbleSenderAvatarSlotWidth = 40.dp

@@ -150,6 +150,15 @@ internal class DiskByteCache(
         }
     }
 
+    /**
+     * Definitive off-main probe. Unlike [contains], this waits for cold-start
+     * hydration before reporting a miss, but still avoids decrypting the entry.
+     */
+    fun containsAfterHydration(key: String): Boolean {
+        ensureHydrated()
+        return contains(key)
+    }
+
     fun get(key: String): ByteArray? {
         val hashed = fileNameFor(key)
         // Look up (and LRU-promote) the entry under the lock, then read the

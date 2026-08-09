@@ -7757,6 +7757,50 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
+    private val attachmentCacheAvailability = mutableStateMapOf<String, Boolean>()
+
+    /** Observable cache completion for bubbles sharing this controller. */
+    fun isAttachmentCachedForCompose(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        return attachmentCacheAvailability[mediaCacheKey(account, messageIdHex, attachmentIndex)] == true
+    }
+
+    /** Resolve a cold disk-index state without performing main-thread I/O. */
+    suspend fun hasCachedAttachmentAfterHydration(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
+        val initialMemoryHit =
+            withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) != null }
+        val diskHit =
+            initialMemoryHit ||
+                withContext(Dispatchers.IO) {
+                    appState.diskMediaCache.containsAfterHydration(cacheKey)
+                }
+        return withContext(Dispatchers.Main.immediate) {
+            // A sibling download may have completed while disk hydration was
+            // in progress. Re-check L1 and the observable publication so that
+            // an older miss can never overwrite that newer hit.
+            val cached =
+                diskHit ||
+                    appState.cachedMediaPlaintext(cacheKey) != null ||
+                    attachmentCacheAvailability[cacheKey] == true
+            if (cached) {
+                attachmentCacheAvailability[cacheKey] = true
+            } else {
+                // Misses are the default; do not retain one map entry for
+                // every attachment ever composed in a long conversation.
+                attachmentCacheAvailability.remove(cacheKey)
+            }
+            cached
+        }
+    }
+
     /**
      * Drop decrypted bytes for one attachment after a decoder/playback failure.
      * A corrupt cached plaintext hit must fall back to the normal Download/Retry
@@ -7770,6 +7814,7 @@ class ConversationController(
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         withContext(Dispatchers.Main.immediate) {
             appState.removeMediaMemoryCacheEntry(cacheKey)
+            attachmentCacheAvailability.remove(cacheKey)
         }
         withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
     }
@@ -7810,7 +7855,9 @@ class ConversationController(
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         // L1: in-memory LRU (hottest cache, instant return).
         withContext(Dispatchers.Main.immediate) {
-            appState.cachedMediaPlaintext(cacheKey)
+            appState.cachedMediaPlaintext(cacheKey)?.also {
+                attachmentCacheAvailability[cacheKey] = true
+            }
         }?.let { return it }
         // L2: disk LRU (survives process restart). Read off the main thread
         // since file I/O on big JPEGs can take 5-30ms.
@@ -7818,6 +7865,7 @@ class ConversationController(
         if (onDisk != null) {
             withContext(Dispatchers.Main.immediate) {
                 appState.cacheMediaPlaintext(cacheKey, onDisk)
+                attachmentCacheAvailability[cacheKey] = true
             }
             return onDisk
         }
@@ -7862,6 +7910,7 @@ class ConversationController(
                 // tap-to-retry.
                 if (result.plaintext.isNotEmpty()) {
                     appState.cacheMediaPlaintext(cacheKey, result.plaintext)
+                    attachmentCacheAvailability[cacheKey] = true
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
                     // lifetime as the FFI fetch). Tag the entry with the

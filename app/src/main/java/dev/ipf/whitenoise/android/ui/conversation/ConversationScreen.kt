@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -947,22 +946,20 @@ internal fun ConversationScreen(
     // movement never emits these, so it cannot accidentally downgrade a tail
     // follower or overwrite a history anchor.
     LaunchedEffect(listState, scrollCoordinator) {
-        listState.interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is DragInteraction.Start -> scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                is DragInteraction.Stop,
-                is DragInteraction.Cancel,
-                -> {
-                    snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
-                    val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-                    val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(
-                        currentScrollAnchor(),
-                        isNearBottom(listState, liveRenderedSize, liveHasOlderHeader),
-                    )
-                }
-            }
-        }
+        listState.interactionSource.interactions.collectConversationDragInteractions(
+            onStarted = { scrollCoordinator.onUserGestureStarted(currentScrollAnchor()) },
+            awaitScrollSettled = {
+                snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
+            },
+            onSettled = {
+                val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+                val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+                scrollCoordinator.onUserGestureSettled(
+                    currentScrollAnchor(),
+                    isNearBottom(listState, liveRenderedSize, liveHasOlderHeader),
+                )
+            },
+        )
     }
     var readAnchorMessageId by
         rememberConversationReadAnchor(

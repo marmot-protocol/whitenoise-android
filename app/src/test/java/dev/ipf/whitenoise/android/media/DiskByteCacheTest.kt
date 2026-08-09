@@ -82,6 +82,16 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun definitiveContainsHydratesAColdIndexBeforeReporting() {
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("cached", byteArrayOf(1, 2, 3))
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+
+        assertFalse("the composition-safe peek remains non-blocking", reopened.contains("cached"))
+        assertTrue(reopened.containsAfterHydration("cached"))
+        assertFalse(reopened.containsAfterHydration("missing"))
+    }
+
+    @Test
     fun putThenGet_roundTripsThroughDisk() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         val payload = ByteArray(40) { it.toByte() }

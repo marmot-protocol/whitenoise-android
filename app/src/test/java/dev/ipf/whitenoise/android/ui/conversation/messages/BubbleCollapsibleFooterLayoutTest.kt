@@ -88,6 +88,42 @@ class BubbleCollapsibleFooterLayoutTest {
     }
 
     @Test
+    fun bodyExactlyAtRaisedLineCapDoesNotCollapse() {
+        val cap = MESSAGE_COLLAPSE_LINE_LIMIT.dp
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                BubbleCollapsibleFooterLayout(
+                    maxBodyHeight = cap,
+                    readMore = { Text("Read More", Modifier.testTag("read-more")) },
+                    footer = { Text("7:19 PM") },
+                ) {
+                    Spacer(Modifier.width(20.dp).height(cap))
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("read-more").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun bodyJustPastRaisedLineCapCollapses() {
+        val cap = MESSAGE_COLLAPSE_LINE_LIMIT.dp
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                BubbleCollapsibleFooterLayout(
+                    maxBodyHeight = cap,
+                    readMore = { Text("Read More", Modifier.testTag("read-more")) },
+                    footer = { Text("7:19 PM") },
+                ) {
+                    Spacer(Modifier.width(20.dp).height(cap + 1.dp))
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("read-more").assertIsDisplayed()
+    }
+
+    @Test
     fun collapsedHeightEqualsBodyCapPlusOneFooterRow() {
         var layoutHeight = 0
         var readMoreHeight = 0

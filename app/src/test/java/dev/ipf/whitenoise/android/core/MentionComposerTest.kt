@@ -321,6 +321,50 @@ class MentionComposerTest {
     }
 
     @Test
+    fun repairWordDeleteStartingAtOwnedTrailingSpaceRemovesWholeChip() {
+        val chip = "@$aliceNpub"
+        val oldText = "hey $chip following words"
+        val deleteStart = "hey $chip".length
+        val newText = oldText.removeRange(deleteStart, oldText.length)
+
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+
+        assertEquals("hey ", result!!.text)
+        assertEquals("hey ".length, result.selection)
+    }
+
+    @Test
+    fun perCharacterSwipeBurstNeverPublishesAPartialChip() {
+        val chip = "@$aliceNpub"
+        var current = "hey $chip "
+
+        repeat(3) {
+            val proposed = current.dropLast(1)
+            val repaired =
+                MentionComposer.wholeChipBackspace(current, current.length, proposed, proposed.length)
+                    ?: MentionComposer.repairChipDeletion(current, proposed)
+            current = repaired?.text ?: proposed
+            assertTrue(MentionComposer.chipRanges(current).all { range -> current.substring(range) == chip })
+        }
+
+        assertEquals("he", current)
+    }
+
+    @Test
+    fun selectionDeleteEndingAtChipRightEdgeSwallowsTheWholeChip() {
+        val chip = "@$aliceNpub"
+        val oldText = "before $chip after"
+        val chipEnd = "before $chip".length
+        val deleteStart = chipEnd - 8
+        val newText = oldText.removeRange(deleteStart, chipEnd)
+
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+
+        assertEquals("before  after", result!!.text)
+        assertEquals("before ".length, result.selection)
+    }
+
+    @Test
     fun repairDeleteSpanningChipAndAdjacentTextRemovesChipAndSpan() {
         val chip = "@$aliceNpub"
         val oldText = "hi $chip there"

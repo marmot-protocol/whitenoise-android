@@ -14,12 +14,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TextSnippet
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Slideshow
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,9 +56,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /**
  * Receive-side bubble for any attachment whose MIME isn't an image. Renders
@@ -76,14 +81,38 @@ internal fun MediaFileBubble(
     val pillKey = "$messageIdHex#$attachmentIndex"
     var inFlight by remember(pillKey) { mutableStateOf(false) }
     var failed by remember(pillKey) { mutableStateOf(false) }
+    val presentation =
+        remember(reference.mediaType, reference.fileName) {
+            resolveAttachmentPresentation(reference.mediaType, reference.fileName)
+        }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     // Cached bytes (own send, or downloaded earlier) mean the chevron is
     // misleading — there's nothing to fetch. Probe on first composition,
     // then flip after a successful in-bubble download. Outgoing sends are
     // implicitly cached, so `mine` short-circuits to true.
-    var cached by remember(pillKey) {
-        mutableStateOf(mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex))
+    var cacheState by remember(pillKey) {
+        mutableStateOf(if (mine) AttachmentCacheState.Cached else AttachmentCacheState.Resolving)
+    }
+    val cachedElsewhere = controller.isAttachmentCachedForCompose(messageIdHex, attachmentIndex)
+    LaunchedEffect(cachedElsewhere, mine) {
+        cacheState =
+            when {
+                mine || cachedElsewhere -> AttachmentCacheState.Cached
+                cacheState == AttachmentCacheState.Cached -> AttachmentCacheState.Missing
+                else -> cacheState
+            }
+    }
+    LaunchedEffect(pillKey, mine) {
+        if (mine) return@LaunchedEffect
+        val isCached =
+            runCatching {
+                controller.hasCachedAttachmentAfterHydration(messageIdHex, attachmentIndex)
+            }.onFailure(Throwable::rethrowIfCancellation)
+                .getOrDefault(false)
+        if (cacheState == AttachmentCacheState.Resolving) {
+            cacheState = if (isCached) AttachmentCacheState.Cached else AttachmentCacheState.Missing
+        }
     }
     // Auto-download gate (#407): own sends are already cached; incoming
     // documents honor the Documents matrix row for the active connection.
@@ -98,23 +127,18 @@ internal fun MediaFileBubble(
     // the attachment cache so the file is ready to open without a tap. We
     // only materialize (warm the L1/L2 cache); opening still happens on tap
     // via openAttachmentExternally below. Mirrors the audio/video bubbles.
-    LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
-        if (cached) return@LaunchedEffect
-        if (!startDownload) return@LaunchedEffect
-        // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
-        // controller's listMedia FFI lands the real epoch; the FFI download
-        // path errors with "missing encrypted media secret for epoch 0".
-        // Skip + retry once the projection rebinds the bubble with a real
-        // epoch. Own sends keep epoch 0 valid (retained bytes short-circuit).
-        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
+    LaunchedEffect(pillKey, reference.sourceEpoch, startDownload, cacheState) {
+        if (!shouldStartAttachmentDownload(cacheState, startDownload, reference.sourceEpoch, mine)) {
+            return@LaunchedEffect
+        }
         inFlight = true
         runCatching {
             controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
         }.onSuccess {
-            cached = true
+            cacheState = AttachmentCacheState.Cached
             failed = false
         }.onFailure {
-            if (it is kotlinx.coroutines.CancellationException) throw it
+            it.rethrowIfCancellation()
             failed = true
             Log.w("MediaFileBubble", "auto-download failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
         }
@@ -159,7 +183,7 @@ internal fun MediaFileBubble(
                                     val data =
                                         retained
                                             ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
-                                    cached = true
+                                    cacheState = AttachmentCacheState.Cached
                                     openAttachmentExternally(context, data, reference.fileName, reference.mediaType)
                                 }.onFailure {
                                     // Swipe-up / screen-dispose cancels this
@@ -168,7 +192,7 @@ internal fun MediaFileBubble(
                                     // rethrow so the launch dies quietly instead
                                     // of misreporting cancellation as a generic
                                     // "couldn't open file" toast.
-                                    if (it is kotlinx.coroutines.CancellationException) throw it
+                                    it.rethrowIfCancellation()
                                 }.getOrDefault(OpenAttachmentResult.Error)
                             when (outcome) {
                                 OpenAttachmentResult.Opened -> Unit
@@ -192,8 +216,8 @@ internal fun MediaFileBubble(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Icon(
-                imageVector = fileIconFor(reference.mediaType),
-                contentDescription = null,
+                imageVector = fileIconFor(presentation.iconCategory),
+                contentDescription = attachmentTypeDescription(presentation.iconCategory),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
@@ -205,7 +229,7 @@ internal fun MediaFileBubble(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    shortMediaTypeLabel(reference.mediaType),
+                    attachmentTypeLabel(presentation),
                     style = MaterialTheme.typography.labelSmall,
                     color =
                         if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -226,7 +250,7 @@ internal fun MediaFileBubble(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
                 )
-            } else if (!cached) {
+            } else if (cacheState == AttachmentCacheState.Missing) {
                 // Bytes aren't local yet — show the chevron so the user
                 // knows the tap will fetch. Once cached (own send, or after
                 // first tap-and-download) the chevron disappears: nothing
@@ -242,34 +266,66 @@ internal fun MediaFileBubble(
     }
 }
 
-/**
- * Compact uppercase label for the file-bubble's MIME line: `application/pdf`
- * becomes "PDF", `image/jpeg` becomes "JPG", `application/vnd.…` falls back
- * to the lowercase MIME so the bubble never goes blank.
- */
-internal fun shortMediaTypeLabel(mediaType: String): String {
-    val trimmed = mediaType.trim()
-    if (trimmed.isEmpty()) return ""
-    val tail = trimmed.substringAfterLast('/', missingDelimiterValue = trimmed)
-    return when (val canonical = tail.substringBefore('+').substringBefore(';').lowercase()) {
-        "jpeg" -> "JPG"
-        "vnd.openxmlformats-officedocument.wordprocessingml.document" -> "DOCX"
-        "vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "XLSX"
-        "vnd.openxmlformats-officedocument.presentationml.presentation" -> "PPTX"
-        "msword" -> "DOC"
-        "vnd.ms-excel" -> "XLS"
-        "vnd.ms-powerpoint" -> "PPT"
-        "" -> trimmed
-        else -> canonical.uppercase()
-    }
-}
+internal fun shouldStartAttachmentDownload(
+    cacheState: AttachmentCacheState,
+    policyAllowsDownload: Boolean,
+    sourceEpoch: ULong,
+    mine: Boolean,
+): Boolean =
+    cacheState == AttachmentCacheState.Missing &&
+        policyAllowsDownload &&
+        (mine || sourceEpoch != 0uL)
 
-internal fun fileIconFor(mediaType: String): androidx.compose.ui.graphics.vector.ImageVector =
-    when {
-        mediaType.startsWith("audio/", ignoreCase = true) -> Icons.Default.Audiotrack
-        mediaType.startsWith("video/", ignoreCase = true) -> Icons.Default.Movie
-        mediaType.startsWith("image/", ignoreCase = true) -> Icons.Default.Image
-        else -> Icons.Default.Description
+/** Localizes category fallbacks while stable format abbreviations stay concise. */
+@Composable
+internal fun attachmentTypeLabel(presentation: AttachmentPresentation): String =
+    presentation.formatLabel
+        ?: when (presentation.iconCategory) {
+            AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package)
+            AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf)
+            AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
+            AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
+            AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
+            AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
+            AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
+            AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code)
+            AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
+            AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
+            AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
+            AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
+        }
+
+@Composable
+internal fun attachmentTypeDescription(category: AttachmentIconCategory): String =
+    when (category) {
+        AttachmentIconCategory.AndroidPackage -> stringResource(R.string.attachment_type_android_package_description)
+        AttachmentIconCategory.Pdf -> stringResource(R.string.attachment_type_pdf_description)
+        AttachmentIconCategory.Archive -> stringResource(R.string.attachment_type_archive)
+        AttachmentIconCategory.Document -> stringResource(R.string.attachment_type_document)
+        AttachmentIconCategory.Spreadsheet -> stringResource(R.string.attachment_type_spreadsheet)
+        AttachmentIconCategory.Presentation -> stringResource(R.string.attachment_type_presentation)
+        AttachmentIconCategory.Text -> stringResource(R.string.attachment_type_text)
+        AttachmentIconCategory.Code -> stringResource(R.string.attachment_type_code_description)
+        AttachmentIconCategory.Audio -> stringResource(R.string.attachment_type_audio)
+        AttachmentIconCategory.Video -> stringResource(R.string.attachment_type_video)
+        AttachmentIconCategory.Image -> stringResource(R.string.attachment_type_image)
+        AttachmentIconCategory.Generic -> stringResource(R.string.attachment_type_file)
+    }
+
+internal fun fileIconFor(category: AttachmentIconCategory): ImageVector =
+    when (category) {
+        AttachmentIconCategory.AndroidPackage -> Icons.Default.Android
+        AttachmentIconCategory.Pdf -> Icons.Default.PictureAsPdf
+        AttachmentIconCategory.Archive -> Icons.Default.Archive
+        AttachmentIconCategory.Document -> Icons.Default.Description
+        AttachmentIconCategory.Spreadsheet -> Icons.Default.TableChart
+        AttachmentIconCategory.Presentation -> Icons.Default.Slideshow
+        AttachmentIconCategory.Text -> Icons.AutoMirrored.Filled.TextSnippet
+        AttachmentIconCategory.Code -> Icons.Default.Code
+        AttachmentIconCategory.Audio -> Icons.Default.Audiotrack
+        AttachmentIconCategory.Video -> Icons.Default.Movie
+        AttachmentIconCategory.Image -> Icons.Default.Image
+        AttachmentIconCategory.Generic -> Icons.Default.Description
     }
 
 private fun formatFileSize(bytes: Long): String {
@@ -293,6 +349,7 @@ internal fun PendingFilePill(
     onRetry: (() -> Unit)? = null,
     attachedToCaption: Boolean = false,
 ) {
+    val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = if (attachedToCaption) RectangleShape else RoundedCornerShape(12.dp),
@@ -314,8 +371,8 @@ internal fun PendingFilePill(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Icon(
-                imageVector = fileIconFor(mediaType),
-                contentDescription = null,
+                imageVector = fileIconFor(presentation.iconCategory),
+                contentDescription = attachmentTypeDescription(presentation.iconCategory),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )

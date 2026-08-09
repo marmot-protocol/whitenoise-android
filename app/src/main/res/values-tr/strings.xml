@@ -1349,4 +1349,19 @@
     <string name="amoled_mode_subtitle">Saf siyah bir arka plan kullan</string>
     <string name="support">Destek</string>
     <string name="app_font">Uygulama yazı tipi</string>
+    <string name="attachment_type_android_package">APK</string>
+    <string name="attachment_type_android_package_description">Android uygulama paketi</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_pdf_description">PDF belgesi</string>
+    <string name="attachment_type_archive">Arşiv</string>
+    <string name="attachment_type_document">Belge</string>
+    <string name="attachment_type_spreadsheet">Elektronik tablo</string>
+    <string name="attachment_type_presentation">Sunum</string>
+    <string name="attachment_type_text">Metin</string>
+    <string name="attachment_type_code">Kod</string>
+    <string name="attachment_type_code_description">Kod veya veri dosyası</string>
+    <string name="attachment_type_audio">Ses</string>
+    <string name="attachment_type_video">Video</string>
+    <string name="attachment_type_image">Görsel</string>
+    <string name="attachment_type_file">Dosya</string>
 </resources>

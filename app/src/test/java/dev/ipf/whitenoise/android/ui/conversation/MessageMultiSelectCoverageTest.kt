@@ -7,11 +7,13 @@ import java.io.File
 class MessageMultiSelectCoverageTest {
     @Test
     fun longPressMenuOffersSelectEntry() {
-        val source = source("messages/MessageActions.kt")
+        val menuSource = source("messages/MessageActions.kt")
+        val actionModelSource = source("messages/MessageActionKind.kt")
 
-        assertTrue(source.contains("canSelect: Boolean"))
-        assertTrue(source.contains("onSelect: () -> Unit"))
-        assertTrue(source.contains("R.string.select"))
+        assertTrue(menuSource.contains("canSelect: Boolean"))
+        assertTrue(menuSource.contains("onSelect: () -> Unit"))
+        assertTrue(actionModelSource.contains("if (canSelect) add(MessageActionKind.Select)"))
+        assertTrue(actionModelSource.contains("MessageActionKind.Select -> stringResource(R.string.select)"))
     }
 
     @Test

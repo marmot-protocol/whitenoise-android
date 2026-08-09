@@ -161,7 +161,9 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "first-frame height estimate for placement must remain in MessageActionMenu",
-            "estimatedPopupHeightPx" in body && "measuredPopupHeightPx" in body,
+            "estimatedOneColumnHeightPx" in body &&
+                "estimatedTwoColumnHeightPx" in body &&
+                "measuredPopupHeightPx" in body,
         )
         assertTrue(
             "reopening must discard a stale measured height from the previous menu variant",
