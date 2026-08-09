@@ -6,6 +6,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import dev.ipf.whitenoise.android.BuildConfig
 
+private val performanceTestSelectorsEnabled = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS
+
 /** Stable cross-process selectors for release-like Macrobenchmark journeys. */
 internal object PerformanceTestTags {
     const val NEW_MESSAGE = "performance.new_message"
@@ -24,5 +26,5 @@ internal fun Modifier.performanceTestTag(
 ): Modifier = if (enabled) testTag(tag) else this
 
 /** Makes descendant test tags visible to cross-process UiAutomator without replacing accessibility labels. */
-internal fun Modifier.exposePerformanceTestTags(enabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS): Modifier =
+internal fun Modifier.exposePerformanceTestTags(enabled: Boolean = performanceTestSelectorsEnabled): Modifier =
     if (enabled) semantics { testTagsAsResourceId = true } else this
