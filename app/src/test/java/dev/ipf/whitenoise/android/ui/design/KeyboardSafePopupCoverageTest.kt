@@ -163,11 +163,12 @@ class KeyboardSafePopupCoverageTest {
             "first-frame height estimate for placement must remain in MessageActionMenu",
             "estimatedOneColumnHeightPx" in body &&
                 "estimatedTwoColumnHeightPx" in body &&
-                "measuredPopupHeightPx" in body,
+                "MessageActionMenuPositionProvider(" in body,
         )
-        assertTrue(
-            "reopening must discard a stale measured height from the previous menu variant",
-            "remember(expanded) { mutableStateOf(0) }" in body,
+        val provider = positionSource().readText()
+        assertFalse(
+            "measured height must not reposition an already-painted action menu",
+            "popupContentSize.height" in provider || "measuredPopupHeightPx" in body,
         )
     }
 
@@ -202,6 +203,8 @@ class KeyboardSafePopupCoverageTest {
     private fun keyboardSafePopupSource(): File = sourceFile("ui/design/KeyboardSafePopup.kt")
 
     private fun messageActionsSource(): File = sourceFile("ui/conversation/messages/MessageActions.kt")
+
+    private fun positionSource(): File = sourceFile("ui/conversation/messages/MessageActionMenuPositionProvider.kt")
 
     private fun reactionsSource(): File = sourceFile("ui/conversation/reactions/Reactions.kt")
 

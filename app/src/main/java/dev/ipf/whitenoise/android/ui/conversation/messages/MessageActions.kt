@@ -67,7 +67,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -79,12 +78,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -110,7 +104,6 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 internal fun MessageActionMenu(
@@ -195,12 +188,10 @@ internal fun MessageActionMenu(
     // the menu top AT touchY on frame 1, then flip/clamp once the real tall
     // height arrives — a visible above-then-below jump (#389). Decide the side
     // deterministically from frame 1 by feeding a non-zero height into the
-    // provider: the real measured height once known, else a per-variant
-    // estimate derived from the menu's own layout so frame 1 already matches
-    // the height the side decision will settle on.
-    // Key to expanded so a previous menu variant's measured height cannot win
-    // over the new variant's estimate on the first frame after reopening.
-    var measuredPopupHeightPx by remember(expanded) { mutableStateOf(0) }
+    // provider a per-variant estimate derived from the same immutable action
+    // model as the rendered grid. Keep using that estimate after measurement:
+    // switching to the measured height can move an already-painted popup at a
+    // flip boundary when the window is IME-constrained (#1857).
     // First-frame fallback mirrors the measured responsive grid. Label widths
     // determine whether the estimate uses one or two columns, so large fonts
     // and long translations do not reintroduce the frame-two side flip.
@@ -235,7 +226,6 @@ internal fun MessageActionMenu(
             anchorWindowYPx,
             alignEnd,
             edgeInsetPx,
-            measuredPopupHeightPx,
             estimatedOneColumnHeightPx,
             estimatedTwoColumnHeightPx,
             minimumActionCellWidthPx,
@@ -243,53 +233,17 @@ internal fun MessageActionMenu(
             actionContentPaddingPx,
             actionColumnGapPx,
         ) {
-            object : PopupPositionProvider {
-                override fun calculatePosition(
-                    anchorBounds: IntRect,
-                    windowSize: IntSize,
-                    layoutDirection: LayoutDirection,
-                    popupContentSize: IntSize,
-                ): IntOffset {
-                    val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
-                    // Horizontal: hug the bubble side, clamped inside the window.
-                    val x =
-                        if (alignEnd) {
-                            windowSize.width - popupContentSize.width - edgeInsetPx
-                        } else {
-                            edgeInsetPx
-                        }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                    // Decide vertical placement against a non-zero height so the
-                    // chosen side is stable from the first frame. Once the popup
-                    // has any real measurement (content or onSizeChanged), use it
-                    // directly so the *settled* placement reflects the true menu
-                    // height; the per-variant estimate is consulted only on the
-                    // first frame before either is known (#517).
-                    val measuredHeight = maxOf(popupContentSize.height, measuredPopupHeightPx)
-                    val estimatedContentWidth =
-                        minOf(
-                            maximumActionContentWidthPx,
-                            (windowSize.width - actionContentPaddingPx).coerceAtLeast(0),
-                        )
-                    val estimatedHeight =
-                        if (estimatedContentWidth >= minimumActionCellWidthPx * 2 + actionColumnGapPx) {
-                            estimatedTwoColumnHeightPx
-                        } else {
-                            estimatedOneColumnHeightPx
-                        }
-                    val effectiveHeight =
-                        if (measuredHeight > 0) measuredHeight else estimatedHeight
-                    // Vertical: top at the touch y; flip upward if it would spill
-                    // past the bottom inset; if it still doesn't fit, clamp to top.
-                    val bottomLimit = windowSize.height - edgeInsetPx
-                    val y =
-                        when {
-                            touchY + effectiveHeight <= bottomLimit -> touchY
-                            effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
-                            else -> edgeInsetPx
-                        }.coerceIn(edgeInsetPx, (windowSize.height - effectiveHeight).coerceAtLeast(0))
-                    return IntOffset(x, y)
-                }
-            }
+            MessageActionMenuPositionProvider(
+                anchorWindowYPx = anchorWindowYPx,
+                alignEnd = alignEnd,
+                edgeInsetPx = edgeInsetPx,
+                estimatedOneColumnHeightPx = estimatedOneColumnHeightPx,
+                estimatedTwoColumnHeightPx = estimatedTwoColumnHeightPx,
+                minimumActionCellWidthPx = minimumActionCellWidthPx,
+                maximumActionContentWidthPx = maximumActionContentWidthPx,
+                actionContentPaddingPx = actionContentPaddingPx,
+                actionColumnGapPx = actionColumnGapPx,
+            )
         }
     KeyboardSafePopup(
         expanded = expanded,
@@ -308,7 +262,6 @@ internal fun MessageActionMenu(
             Surface(
                 modifier =
                     boundedHeightModifier
-                        .onSizeChanged { measuredPopupHeightPx = it.height }
                         .testTag(MESSAGE_ACTION_MENU_TEST_TAG),
                 shape = RoundedCornerShape(12.dp),
                 border = amoledSurfaceBorderStroke(),

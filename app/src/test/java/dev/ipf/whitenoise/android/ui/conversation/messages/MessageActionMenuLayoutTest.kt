@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -62,6 +64,104 @@ class MessageActionMenuLayoutTest {
         assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
         assertEquals(394.dp, estimatedMessageActionMenuHeight(9, 2, canReact = true, canDelete = true))
         assertEquals(594.dp, estimatedMessageActionMenuHeight(9, 1, canReact = true, canDelete = true))
+    }
+
+    @Test
+    fun receivedAttachmentPlacementIsStableAcrossInitialAndMeasuredCallbacksAtFlipBoundaries() {
+        listOf(true, false).forEach { canSave ->
+            // Exact incoming APK/file capabilities: the filename display copy
+            // is copyable, but the synthetic media fallback is not editable,
+            // selectable as text, speakable, or forwardable as a text message.
+            val actionKinds =
+                messageActionKinds(
+                    canReply = true,
+                    canEdit = false,
+                    canSelect = true,
+                    canSelectText = false,
+                    canCopyText = true,
+                    canSpeak = false,
+                    canForward = false,
+                    canSave = canSave,
+                )
+            assertEquals(
+                buildList {
+                    add(MessageActionKind.Reply)
+                    add(MessageActionKind.Select)
+                    add(MessageActionKind.CopyText)
+                    if (canSave) add(MessageActionKind.Save)
+                    add(MessageActionKind.Info)
+                },
+                actionKinds,
+            )
+            val actionCount = actionKinds.size
+            val twoColumnHeight = estimatedHeightPx(actionCount, 2, canReact = true, canDelete = false)
+            val belowBoundary = 780 - 8 - twoColumnHeight
+
+            listOf(belowBoundary, belowBoundary + 1).forEach { touchY ->
+                val provider = positionProvider(touchY = touchY, actionCount = actionCount)
+                val initial = provider.position(window = IntSize(360, 780), popup = IntSize.Zero)
+                val measured = provider.position(window = IntSize(360, 780), popup = IntSize(328, twoColumnHeight))
+
+                assertEquals("canSave=$canSave touchY=$touchY", initial.y, measured.y)
+                assertEquals(
+                    if (touchY == belowBoundary) touchY else touchY - twoColumnHeight,
+                    initial.y,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun placementSideAndYStayStableAcrossActionLayoutAndImeVariants() {
+        val actionCount = 5
+        val capabilities =
+            listOf(
+                false to false,
+                true to false,
+                false to true,
+                true to true,
+            )
+        val windows = listOf(IntSize(360, 780), IntSize(260, 780), IntSize(360, 320))
+
+        capabilities.forEach { (canReact, canDelete) ->
+            windows.forEach { window ->
+                listOf(false, true).forEach { largeFont ->
+                    val rowHeight = if (largeFont) 72 else 48
+                    val reactionHeight = if (largeFont) 64 else 48
+                    val minimumCellWidth = if (largeFont) 180 else 136
+                    val provider =
+                        positionProvider(
+                            touchY = window.height / 2,
+                            actionCount = actionCount,
+                            canReact = canReact,
+                            canDelete = canDelete,
+                            rowHeight = rowHeight,
+                            reactionHeight = reactionHeight,
+                            minimumCellWidth = minimumCellWidth,
+                        )
+                    val estimatedContentWidth = minOf(312, window.width - 16)
+                    val columns = if (estimatedContentWidth >= minimumCellWidth * 2 + 2) 2 else 1
+                    val estimatedHeight =
+                        estimatedHeightPx(
+                            actionCount,
+                            columns,
+                            canReact,
+                            canDelete,
+                            rowHeight,
+                            reactionHeight,
+                        )
+                    val measuredHeight = minOf(estimatedHeight, window.height - 16)
+                    val initial = provider.position(window, IntSize.Zero)
+                    val measured = provider.position(window, IntSize(minOf(328, window.width), measuredHeight))
+
+                    assertEquals(
+                        "react=$canReact delete=$canDelete window=$window largeFont=$largeFont",
+                        initial.y,
+                        measured.y,
+                    )
+                }
+            }
+        }
     }
 
     @Test
@@ -189,4 +289,48 @@ class MessageActionMenuLayoutTest {
             .onNodeWithText(label, substring = false)
             .fetchSemanticsNode()
             .boundsInRoot
+
+    private fun positionProvider(
+        touchY: Int,
+        actionCount: Int,
+        canReact: Boolean = true,
+        canDelete: Boolean = false,
+        rowHeight: Int = 48,
+        reactionHeight: Int = 48,
+        minimumCellWidth: Int = 136,
+    ) = MessageActionMenuPositionProvider(
+        anchorWindowYPx = touchY.toFloat(),
+        alignEnd = false,
+        edgeInsetPx = 8,
+        estimatedOneColumnHeightPx =
+            estimatedHeightPx(actionCount, 1, canReact, canDelete, rowHeight, reactionHeight),
+        estimatedTwoColumnHeightPx =
+            estimatedHeightPx(actionCount, 2, canReact, canDelete, rowHeight, reactionHeight),
+        minimumActionCellWidthPx = minimumCellWidth,
+        maximumActionContentWidthPx = 312,
+        actionContentPaddingPx = 16,
+        actionColumnGapPx = 2,
+    )
+
+    private fun MessageActionMenuPositionProvider.position(
+        window: IntSize,
+        popup: IntSize,
+    ) = calculatePosition(IntRect.Zero, window, LayoutDirection.Ltr, popup)
+
+    private fun estimatedHeightPx(
+        actionCount: Int,
+        columns: Int,
+        canReact: Boolean,
+        canDelete: Boolean,
+        rowHeight: Int = 48,
+        reactionHeight: Int = 48,
+    ): Int =
+        estimatedMessageActionMenuHeight(
+            actionCount = actionCount,
+            columns = columns,
+            canReact = canReact,
+            canDelete = canDelete,
+            actionRowHeight = rowHeight.dp,
+            reactionRowHeight = reactionHeight.dp,
+        ).value.toInt()
 }

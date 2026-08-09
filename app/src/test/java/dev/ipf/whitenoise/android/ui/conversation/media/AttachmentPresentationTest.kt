@@ -115,6 +115,15 @@ class AttachmentPresentationTest {
     }
 
     @Test
+    fun presentationNeverChangesTheMimeUsedForExternalOpen() {
+        val originalMime = "application/vnd.android.package-archive"
+
+        assertEquals("APK", resolveAttachmentPresentation(originalMime, "release.apk").formatLabel)
+        assertEquals(originalMime, attachmentOpenMime(originalMime))
+        assertEquals("application/octet-stream", attachmentOpenMime(""))
+    }
+
+    @Test
     fun unresolvedCacheStateNeverStartsAnAutomaticDownload() {
         assertFalse(shouldStartAttachmentDownload(AttachmentCacheState.Resolving, true, 12uL, mine = false))
         assertFalse(shouldStartAttachmentDownload(AttachmentCacheState.Cached, true, 12uL, mine = false))
