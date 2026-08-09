@@ -6,13 +6,12 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
-import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -25,6 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.zip.CRC32
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -85,11 +85,12 @@ class PhotoDraftStagerTest {
         }
 
     @Test
-    fun originalStagePreservesEncodedPixelsWithoutEditorRender() =
+    fun originalStageStripsMetadataWithoutEditorRenderOrPixelChanges() =
         runTest {
             var encodes = 0
             val fixture = fixture(onEncode = { encodes += 1 })
-            val bytes = pngBytes()
+            val bytes = pngBytesWithTextMetadata()
+            assertTrue(bytes.toString(Charsets.ISO_8859_1).contains(SENSITIVE_METADATA))
 
             val result =
                 fixture.stager.stageBytes(
@@ -102,9 +103,10 @@ class PhotoDraftStagerTest {
                 ) as PhotoDraftStageResult.Success
 
             assertEquals(0, encodes)
-            assertArrayEquals(
-                MediaPipeline.stripOriginalImageMetadata(bytes),
-                result.photo.attachment.plaintext,
+            assertFalse(
+                result.photo.attachment.plaintext
+                    .toString(Charsets.ISO_8859_1)
+                    .contains(SENSITIVE_METADATA),
             )
             assertEquals("image/png", result.photo.attachment.mediaType)
             assertEquals("80x60", result.photo.attachment.dim)
@@ -280,6 +282,44 @@ class PhotoDraftStagerTest {
         }
     }
 
+    private fun pngBytesWithTextMetadata(): ByteArray {
+        val png = pngBytes()
+        val iendStart = png.size - PNG_IEND_CHUNK_BYTES
+        val metadata = pngChunk("tEXt", "Comment\u0000$SENSITIVE_METADATA".encodeToByteArray())
+        return png.copyOfRange(0, iendStart) + metadata + png.copyOfRange(iendStart, png.size)
+    }
+
+    private fun pngChunk(
+        type: String,
+        payload: ByteArray,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        output.write(
+            byteArrayOf(
+                (payload.size ushr 24).toByte(),
+                (payload.size ushr 16).toByte(),
+                (payload.size ushr 8).toByte(),
+                payload.size.toByte(),
+            ),
+        )
+        val typeBytes = type.encodeToByteArray()
+        output.write(typeBytes)
+        output.write(payload)
+        val crc = CRC32()
+        crc.update(typeBytes)
+        crc.update(payload)
+        val crcValue = crc.value.toInt()
+        output.write(
+            byteArrayOf(
+                (crcValue ushr 24).toByte(),
+                (crcValue ushr 16).toByte(),
+                (crcValue ushr 8).toByte(),
+                crcValue.toByte(),
+            ),
+        )
+        return output.toByteArray()
+    }
+
     private data class Fixture(
         val sources: EditorSourceStore,
         val sessions: EditorSessionStore,
@@ -290,6 +330,8 @@ class PhotoDraftStagerTest {
     companion object {
         private const val ACCOUNT = "account"
         private const val GROUP = "group"
+        private const val PNG_IEND_CHUNK_BYTES = 12
+        private const val SENSITIVE_METADATA = "private gps metadata"
     }
 }
 

@@ -264,7 +264,9 @@ internal class MessageDraftRepository(
     suspend fun reconcileEditorState(sources: EditorSourceStore): Result<Int> =
         withContext(ioDispatcher) {
             try {
-                val sessionKeys = editorSessions.attachmentKeys()
+                val sessionKeys =
+                    editorSessions.attachmentKeys()
+                        ?: return@withContext Result.failure(editorSessionStoreUnavailable())
                 val committedDigests = linkedMapOf<Triple<String, String, String>, String>()
                 sessionKeys
                     .groupBy { it.first to it.second }
@@ -281,8 +283,13 @@ internal class MessageDraftRepository(
                                 ] = attachment.editorDigest()
                             }
                     }
-                editorSessions.reconcile(committedDigests)
-                Result.success(sources.reconcile(editorSessions.sourceLeaseReferenceCounts()))
+                if (editorSessions.reconcile(committedDigests) == null) {
+                    return@withContext Result.failure(editorSessionStoreUnavailable())
+                }
+                val sourceLeaseReferences =
+                    editorSessions.sourceLeaseReferenceCounts()
+                        ?: return@withContext Result.failure(editorSessionStoreUnavailable())
+                Result.success(sources.reconcile(sourceLeaseReferences))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (cause: Exception) {
@@ -426,6 +433,11 @@ internal class MessageDraftRepository(
         var users: Int = 0,
     )
 }
+
+private fun editorSessionStoreUnavailable() = IllegalStateException(EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE)
+
+private const val EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE =
+    "Encrypted editor sessions are temporarily unavailable"
 
 internal fun MessageDraftAttachmentFfi.editorDigest(): String =
     editorAttachmentDigest(

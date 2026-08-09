@@ -265,6 +265,29 @@ class MessageDraftRepositoryTest {
         }
 
     @Test
+    fun startupReconciliationKeepsSourcesWhenEncryptedSessionsCannotBeRead() =
+        runTest {
+            val payloads = RepositoryPayloads()
+            val sources =
+                EditorSourceStore(
+                    payloads = payloads,
+                    records = RepositorySessionStrings(),
+                    newId = { "lease" },
+                )
+            val lease = (sources.stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
+            val sessionRecords = RepositorySessionStrings(failReads = true)
+
+            val result =
+                repository(
+                    gateway = FakeDraftGateway(null),
+                    sessions = EditorSessionStore(sessionRecords),
+                ).reconcileEditorState(sources)
+
+            assertTrue(result.isFailure)
+            assertTrue(sources.bytes(lease.id) != null)
+        }
+
+    @Test
     fun draftReadRethrowsCancellation() =
         runTest {
             val gateway = FakeDraftGateway(null).apply { readFailure = CancellationException("cancelled") }
@@ -410,10 +433,12 @@ private class FakeDraftGateway(
     }
 }
 
-private class RepositorySessionStrings : EditorStringStore {
+private class RepositorySessionStrings(
+    var failReads: Boolean = false,
+) : EditorStringStore {
     private var values = linkedMapOf<String, String>()
 
-    override fun readAll(): Map<String, String> = values.toMap()
+    override fun readAll(): Map<String, String>? = if (failReads) null else values.toMap()
 
     override fun replaceAll(values: Map<String, String>): Boolean {
         this.values = LinkedHashMap(values)

@@ -6,7 +6,8 @@ import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import java.security.GeneralSecurityException
 
 internal interface EditorStringStore {
-    fun readAll(): Map<String, String>
+    /** Returns null when the encrypted store cannot currently be read. */
+    fun readAll(): Map<String, String>?
 
     fun replaceAll(values: Map<String, String>): Boolean
 
@@ -25,11 +26,11 @@ internal class KeystoreEditorStringStore(
             keyProvider = AndroidKeystoreSecretKeyProvider(keyAlias),
         )
 
-    override fun readAll(): Map<String, String> =
+    override fun readAll(): Map<String, String>? =
         try {
             secureStore.readAll()
         } catch (_: GeneralSecurityException) {
-            emptyMap()
+            null
         }
 
     override fun replaceAll(values: Map<String, String>): Boolean =

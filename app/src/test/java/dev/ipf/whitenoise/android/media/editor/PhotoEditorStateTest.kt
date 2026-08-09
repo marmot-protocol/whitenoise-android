@@ -170,10 +170,33 @@ class PhotoEditorStateTest {
             )
 
         assertEquals(PhotoEditorQualityTier.Hd, holder.state.qualityTier)
-        assertEquals(MediaQuality.High, holder.state.quality)
+        assertEquals(MediaQuality.Original, holder.state.quality)
+        assertFalse(holder.hasUnsavedChanges)
         holder.selectQualityTier(PhotoEditorQualityTier.Standard)
         assertEquals(MediaQuality.Standard, holder.state.quality)
         holder.selectQualityTier(PhotoEditorQualityTier.Hd)
+        assertEquals(MediaQuality.High, holder.state.quality)
+    }
+
+    @Test
+    fun originalQualityIsPreservedUntilAnEditAndRestoredByUndo() {
+        val holder =
+            PhotoEditorStateHolder(
+                initialRecipe = PhotoEditRecipe.Original,
+                initialQuality = MediaQuality.Original,
+                orientedSize = EditorPixelSize(400, 300),
+            )
+
+        holder.beginCropOperation()
+        holder.rotateClockwise()
+        holder.commitOperation()
+
+        assertEquals(MediaQuality.High, holder.state.quality)
+        assertTrue(holder.hasUnsavedChanges)
+        holder.undo()
+        assertEquals(MediaQuality.Original, holder.state.quality)
+        assertFalse(holder.hasUnsavedChanges)
+        holder.redo()
         assertEquals(MediaQuality.High, holder.state.quality)
     }
 

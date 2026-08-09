@@ -114,7 +114,10 @@ class EditorSessionStoreTest {
             )
 
         assertEquals(setOf("source-keep", "source-stale"), live)
-        assertEquals(setOf("source-keep", "source-stale"), store.sourceLeaseReferenceCounts().keys)
+        assertEquals(
+            setOf("source-keep", "source-stale"),
+            requireNotNull(store.sourceLeaseReferenceCounts()).keys,
+        )
     }
 
     @Test
@@ -130,6 +133,34 @@ class EditorSessionStoreTest {
 
         assertEquals(mapOf("retained-source" to 1), store.sourceLeaseReferenceCounts())
         assertEquals(setOf(Triple("retained", "group", "attachment")), store.attachmentKeys())
+    }
+
+    @Test
+    fun encryptedReadFailureAbortsMutationAndRetriesWithoutLosingSessions() {
+        val persistence = InMemorySessionStrings()
+        val seed = EditorSessionStore(persistence)
+        assertTrue(
+            seed.savePending(
+                session(accountRef = "removed", sourceLeaseId = "removed-source", digest = "a".repeat(64)),
+            ),
+        )
+        assertTrue(
+            seed.savePending(
+                session(accountRef = "retained", sourceLeaseId = "retained-source", digest = "b".repeat(64)),
+            ),
+        )
+        val persistedCount = persistence.values.size
+        persistence.failReads = true
+        val store = EditorSessionStore(persistence)
+
+        assertFalse(store.removeAccount("removed"))
+        assertNull(store.attachmentKeys())
+        assertNull(store.sourceLeaseReferenceCounts())
+        assertEquals(persistedCount, persistence.values.size)
+
+        persistence.failReads = false
+        assertTrue(store.removeAccount("removed"))
+        assertEquals(mapOf("retained-source" to 1), store.sourceLeaseReferenceCounts())
     }
 
     @Test
@@ -228,9 +259,10 @@ class EditorSessionStoreTest {
 
 private class InMemorySessionStrings : EditorStringStore {
     var values = linkedMapOf<String, String>()
+    var failReads = false
     var failWrites = false
 
-    override fun readAll(): Map<String, String> = values.toMap()
+    override fun readAll(): Map<String, String>? = if (failReads) null else values.toMap()
 
     override fun replaceAll(values: Map<String, String>): Boolean {
         if (failWrites) return false

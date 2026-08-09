@@ -3378,6 +3378,11 @@ internal fun ConversationScreen(
             },
             onSave = { recipe, quality ->
                 scope.launch {
+                    if (recipe == editor.photo.recipe && quality == editor.photo.quality) {
+                        editor.previewBitmap.recycle()
+                        activePhotoEditor = null
+                        return@launch
+                    }
                     val accountRef = controller.boundAccountRef
                     if (accountRef == null) {
                         editor.stateHolder.finishSaving(photoEditorSaveFailedMessage)

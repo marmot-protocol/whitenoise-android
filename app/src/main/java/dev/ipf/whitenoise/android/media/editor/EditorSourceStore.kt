@@ -116,7 +116,7 @@ internal class EditorSourceStore(
         if (bytes.size > maxSourceBytes) return EditorSourceStageResult.TooLarge
         val digest = sha256Hex(bytes)
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return EditorSourceStageResult.Unavailable
             leases.values
                 .firstOrNull { it.sha256Hex == digest && it.plaintextBytes == bytes.size && payloads.contains(it.id) }
                 ?.let { existing ->
@@ -150,19 +150,19 @@ internal class EditorSourceStore(
 
     fun bytes(leaseId: String): ByteArray? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             if (leaseId !in leases) null else payloads.get(leaseId)
         }
 
     fun lease(leaseId: String): EditorSourceLease? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             leases[leaseId]
         }
 
     fun retain(leaseId: String): EditorSourceLease? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             val current = leases[leaseId]?.takeIf { payloads.contains(leaseId) } ?: return null
             val retained = current.copy(references = current.references + 1)
             if (!persistLocked(leases + (leaseId to retained))) return null
@@ -172,7 +172,7 @@ internal class EditorSourceStore(
 
     fun release(leaseId: String): Boolean =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return false
             val current = leases[leaseId] ?: return false
             if (current.references > 1) {
                 val retained = current.copy(references = current.references - 1)
@@ -192,7 +192,7 @@ internal class EditorSourceStore(
     /** Reconciles both ownership and deduplicated reference counts after restart. */
     fun reconcile(liveLeaseReferences: Map<String, Int>): Int =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return 0
             val validReferences = liveLeaseReferences.filterValues { it > 0 }
             val stale = leases.keys - validReferences.keys
             val updated =
@@ -216,14 +216,15 @@ internal class EditorSourceStore(
         }
     }
 
-    private fun ensureLoadedLocked() {
-        if (loaded) return
+    private fun ensureLoadedLocked(): Boolean {
+        if (loaded) return true
+        val persisted = records.readAll() ?: return false
         leases =
-            records
-                .readAll()
+            persisted
                 .mapNotNull { (id, encoded) -> decodeLease(id, encoded)?.let { id to it } }
                 .toMap(LinkedHashMap())
         loaded = true
+        return true
     }
 
     private fun persistLocked(updated: Map<String, EditorSourceLease>): Boolean =

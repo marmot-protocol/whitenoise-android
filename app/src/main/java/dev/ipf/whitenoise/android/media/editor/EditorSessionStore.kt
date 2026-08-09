@@ -41,7 +41,7 @@ internal class EditorSessionStore(
         attachmentDigest: String,
     ): EditorAttachmentSession? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             sessions[key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Committed)]
                 ?.takeIf {
                     it.phase == EditorSessionPhase.Committed &&
@@ -61,7 +61,7 @@ internal class EditorSessionStore(
         committedDigest: String,
     ): EditorAttachmentSession? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             val pendingKey = key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Pending)
             val committedKey = key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Committed)
             val pending =
@@ -86,7 +86,7 @@ internal class EditorSessionStore(
         attachmentId: String,
     ): Boolean =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return false
             val key = key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Pending)
             val current = sessions[key]?.takeIf { it.phase == EditorSessionPhase.Pending } ?: return false
             removeLocked(key, current)
@@ -98,7 +98,7 @@ internal class EditorSessionStore(
         attachmentId: String,
     ): EditorAttachmentSession? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             val pendingKey = key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Pending)
             val committedKey = key(accountRef, groupIdHex, attachmentId, EditorSessionPhase.Committed)
             val current = sessions[committedKey] ?: sessions[pendingKey] ?: return null
@@ -108,9 +108,9 @@ internal class EditorSessionStore(
             current
         }
 
-    fun reconcile(committedDigestsByKey: Map<Triple<String, String, String>, String>): Set<String> =
+    fun reconcile(committedDigestsByKey: Map<Triple<String, String, String>, String>): Set<String>? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             val promotedOrKept = linkedMapOf<String, EditorAttachmentSession>()
             sessions.values
                 .groupBy { Triple(it.accountRef, it.groupIdHex, it.attachmentId) }
@@ -144,22 +144,22 @@ internal class EditorSessionStore(
             sessions.values.mapTo(linkedSetOf()) { it.sourceLeaseId }
         }
 
-    fun attachmentKeys(): Set<Triple<String, String, String>> =
+    fun attachmentKeys(): Set<Triple<String, String, String>>? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             sessions.values.mapTo(linkedSetOf()) { Triple(it.accountRef, it.groupIdHex, it.attachmentId) }
         }
 
-    fun sourceLeaseReferenceCounts(): Map<String, Int> =
+    fun sourceLeaseReferenceCounts(): Map<String, Int>? =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return null
             sessions.values.groupingBy { it.sourceLeaseId }.eachCount()
         }
 
     /** Removes only one account's sessions; safe to repeat after a completed account wipe. */
     fun removeAccount(accountRef: String): Boolean =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return false
             val updated = sessions.filterValues { it.accountRef != accountRef }
             if (updated.size == sessions.size) return true
             if (!persistLocked(updated)) return false
@@ -177,7 +177,7 @@ internal class EditorSessionStore(
 
     private fun put(session: EditorAttachmentSession): Boolean =
         synchronized(lock) {
-            ensureLoadedLocked()
+            if (!ensureLoadedLocked()) return false
             val encoded = encode(session)
             if (encoded.toByteArray(Charsets.UTF_8).size > maxSerializedBytes) return false
             val key = key(session.accountRef, session.groupIdHex, session.attachmentId, session.phase)
@@ -198,14 +198,15 @@ internal class EditorSessionStore(
         return true
     }
 
-    private fun ensureLoadedLocked() {
-        if (loaded) return
+    private fun ensureLoadedLocked(): Boolean {
+        if (loaded) return true
+        val persisted = persistence.readAll() ?: return false
         sessions =
-            persistence
-                .readAll()
+            persisted
                 .mapNotNull { (key, encoded) -> decode(encoded)?.let { key to it } }
                 .toMap(LinkedHashMap())
         loaded = true
+        return true
     }
 
     private fun persistLocked(updated: Map<String, EditorAttachmentSession>): Boolean =

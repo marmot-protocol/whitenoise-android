@@ -109,8 +109,9 @@ internal class PhotoEditorStateHolder(
     private val newStrokeId: () -> String = { UUID.randomUUID().toString() },
 ) {
     val initialRecipe: PhotoEditRecipe = initialRecipe
-    val initialQuality: MediaQuality = initialQuality.toEditorQuality()
+    val initialQuality: MediaQuality = initialQuality.toEditorInitialQuality()
     private var operationEntryHistory: PhotoEditHistory? = null
+    private var qualityWasExplicitlySelected = false
 
     var state by
         mutableStateOf(
@@ -143,6 +144,7 @@ internal class PhotoEditorStateHolder(
         state =
             state.copy(
                 history = committedHistory,
+                quality = qualityForRecipe(committedHistory.current, state.quality),
                 activeOperation = null,
                 activeTool = PhotoEditorTool.Draw,
                 cropPreset = PhotoCropPreset.Free,
@@ -157,6 +159,7 @@ internal class PhotoEditorStateHolder(
         state =
             state.copy(
                 history = entry ?: state.history,
+                quality = qualityForRecipe((entry ?: state.history).current, state.quality),
                 activeOperation = null,
                 activeTool = PhotoEditorTool.Draw,
                 cropPreset = PhotoCropPreset.Free,
@@ -200,9 +203,10 @@ internal class PhotoEditorStateHolder(
 
     fun selectQuality(quality: MediaQuality) {
         if (!state.isSaving && state.activeOperation == null) {
+            qualityWasExplicitlySelected = true
             state =
                 state.copy(
-                    quality = quality,
+                    quality = quality.toEditorSelectedQuality(),
                     errorMessage = null,
                     announcement = PhotoEditorAnnouncement.QualityChanged,
                 )
@@ -302,9 +306,11 @@ internal class PhotoEditorStateHolder(
 
     fun undo() {
         if (state.canUndo) {
+            val history = state.history.undo()
             state =
                 state.copy(
-                    history = state.history.undo(),
+                    history = history,
+                    quality = qualityForRecipe(history.current, state.quality),
                     cropPreset = PhotoCropPreset.Free,
                     announcement = PhotoEditorAnnouncement.Undo,
                 )
@@ -313,9 +319,11 @@ internal class PhotoEditorStateHolder(
 
     fun redo() {
         if (state.canRedo) {
+            val history = state.history.redo()
             state =
                 state.copy(
-                    history = state.history.redo(),
+                    history = history,
+                    quality = qualityForRecipe(history.current, state.quality),
                     cropPreset = PhotoCropPreset.Free,
                     announcement = PhotoEditorAnnouncement.Redo,
                 )
@@ -324,9 +332,11 @@ internal class PhotoEditorStateHolder(
 
     fun reset() {
         if (!state.isSaving && state.activeOperation == null) {
+            val history = state.history.reset()
             state =
                 state.copy(
-                    history = state.history.reset(),
+                    history = history,
+                    quality = qualityForRecipe(history.current, state.quality),
                     cropPreset = PhotoCropPreset.Original,
                     errorMessage = null,
                     lastLimit = null,
@@ -344,9 +354,28 @@ internal class PhotoEditorStateHolder(
     fun finishSaving(errorMessage: String? = null) {
         state = state.copy(isSaving = false, errorMessage = errorMessage)
     }
+
+    private fun qualityForRecipe(
+        recipe: PhotoEditRecipe,
+        currentQuality: MediaQuality,
+    ): MediaQuality =
+        if (!qualityWasExplicitlySelected && initialQuality == MediaQuality.Original) {
+            if (recipe == initialRecipe) MediaQuality.Original else MediaQuality.High
+        } else {
+            currentQuality
+        }
 }
 
-private fun MediaQuality.toEditorQuality(): MediaQuality =
+private fun MediaQuality.toEditorInitialQuality(): MediaQuality =
+    when (this) {
+        MediaQuality.Low,
+        MediaQuality.Standard,
+        -> MediaQuality.Standard
+        MediaQuality.High -> MediaQuality.High
+        MediaQuality.Original -> MediaQuality.Original
+    }
+
+private fun MediaQuality.toEditorSelectedQuality(): MediaQuality =
     when (this) {
         MediaQuality.Low,
         MediaQuality.Standard,

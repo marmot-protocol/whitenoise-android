@@ -89,6 +89,22 @@ class EditorSourceStoreTest {
     }
 
     @Test
+    fun encryptedRecordReadFailureNeverReleasesPayloadsAndCanRetry() {
+        val payloads = InMemoryPayloads()
+        val records = InMemoryStrings()
+        val lease = (store(payloads, records).stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
+        records.failReads = true
+        val reloaded = store(payloads, records)
+
+        assertEquals(0, reloaded.reconcile(emptyMap()))
+        assertTrue(payloads.values.containsKey(lease.id))
+        assertEquals(EditorSourceStageResult.Unavailable, reloaded.stageBytes(byteArrayOf(2)))
+
+        records.failReads = false
+        assertArrayEquals(byteArrayOf(1), reloaded.bytes(lease.id))
+    }
+
+    @Test
     fun reconciliationDeletesOnlyUnownedLeases() {
         val store = store()
         val keep = (store.stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
@@ -205,9 +221,10 @@ private class InMemoryPayloads : EditorEncryptedPayloadStore {
 
 private class InMemoryStrings : EditorStringStore {
     var values = linkedMapOf<String, String>()
+    var failReads = false
     var failWrites = false
 
-    override fun readAll(): Map<String, String> = values.toMap()
+    override fun readAll(): Map<String, String>? = if (failReads) null else values.toMap()
 
     override fun replaceAll(values: Map<String, String>): Boolean {
         if (failWrites) return false

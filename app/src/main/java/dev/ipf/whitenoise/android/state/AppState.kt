@@ -3855,7 +3855,7 @@ class WhiteNoiseAppState private constructor(
             clearHiddenMessagesForAccount(wipedRef)
             withContext(Dispatchers.IO) {
                 if (editorSessionStore.removeAccount(wipedRef)) {
-                    editorSourceStore.reconcile(editorSessionStore.sourceLeaseReferenceCounts())
+                    editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
                 }
             }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
