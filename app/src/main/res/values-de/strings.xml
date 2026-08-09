@@ -621,6 +621,7 @@
     <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>
     <string name="toast_member_removed">Mitglied entfernt</string>
     <string name="toast_couldnt_remove_member">Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.</string>
+    <string name="toast_group_roster_changed">Die Gruppenmitgliedschaft hat sich geändert. Prüfen Sie die Gruppe und versuchen Sie es erneut.</string>
     <string name="toast_keep_one_admin">Behalten Sie einen Administrator</string>
     <string name="toast_promote_before_removing_admin">Befördern Sie ein anderes Mitglied, bevor Sie diesen Administrator entfernen.</string>
     <string name="toast_admin_added">Administrator hinzugefügt</string>

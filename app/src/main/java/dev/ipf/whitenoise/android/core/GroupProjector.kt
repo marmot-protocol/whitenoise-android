@@ -275,25 +275,43 @@ object GroupProjector {
             .distinct()
             .count()
 
+    /** One display/action row per proven identity; blank identities remain distinct. */
+    fun identityDistinctMembers(members: List<AppGroupMemberRecordFfi>): List<AppGroupMemberRecordFfi> {
+        val identityIndexes = HashMap<String, Int>()
+        val distinct = ArrayList<AppGroupMemberRecordFfi>(members.size)
+        members.forEach { member ->
+            val identity =
+                member.memberIdHex
+                    .takeIf { it.isNotBlank() }
+                    ?.let { "member:${it.lowercase()}" }
+                    ?: member.account
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "account:${it.lowercase()}" }
+            val existingIndex = identity?.let(identityIndexes::get)
+            if (existingIndex == null) {
+                if (identity != null) identityIndexes[identity] = distinct.size
+                distinct += member
+            } else {
+                val existing = distinct[existingIndex]
+                distinct[existingIndex] =
+                    existing.copy(
+                        account = existing.account?.takeIf { it.isNotBlank() } ?: member.account,
+                        local = existing.local || member.local,
+                    )
+            }
+        }
+        return distinct
+    }
+
     /**
      * Number of distinct members, compared case-insensitively — the member
      * mirror of [uniqueAdminCount]. A roster snapshot can carry the same
-     * identity twice with hex-casing drift; a raw `members.size` then counts a
+     * identity in multiple MLS leaves; a raw `members.size` then counts a
      * 2-member DM as 3 and misclassifies it as a group (title, avatar, and
      * Start-DM routing all key off this count). Members with no id at all are
      * counted individually rather than collapsed.
      */
-    fun uniqueMemberCount(members: List<AppGroupMemberRecordFfi>): Int {
-        val identities = HashSet<String>()
-        var anonymous = 0
-        members.forEach { member ->
-            val id =
-                member.memberIdHex.takeIf { it.isNotBlank() }
-                    ?: member.account?.takeIf { it.isNotBlank() }
-            if (id == null) anonymous++ else identities.add(id.lowercase())
-        }
-        return identities.size + anonymous
-    }
+    fun uniqueMemberCount(members: List<AppGroupMemberRecordFfi>): Int = identityDistinctMembers(members).size
 
     /**
      * True iff [member] is the currently active account on this device.
