@@ -66,7 +66,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -189,9 +191,10 @@ internal fun MessageActionMenu(
     // height arrives — a visible above-then-below jump (#389). Decide the side
     // deterministically from frame 1 by feeding a non-zero height into the
     // provider a per-variant estimate derived from the same immutable action
-    // model as the rendered grid. Keep using that estimate after measurement:
-    // switching to the measured height can move an already-painted popup at a
-    // flip boundary when the window is IME-constrained (#1857).
+    // model as the rendered grid. The estimate keeps side selection stable,
+    // while the measured size supplies the final window-boundary clamp. Keep
+    // the content transparent until that first non-zero measurement so the
+    // clamped position is also the first position users see (#1857).
     // First-frame fallback mirrors the measured responsive grid. Label widths
     // determine whether the estimate uses one or two columns, so large fonts
     // and long translations do not reintroduce the frame-two side flip.
@@ -245,6 +248,7 @@ internal fun MessageActionMenu(
                 actionColumnGapPx = actionColumnGapPx,
             )
         }
+    var actionMenuMeasured by remember { mutableStateOf(false) }
     KeyboardSafePopup(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
@@ -262,7 +266,11 @@ internal fun MessageActionMenu(
             Surface(
                 modifier =
                     boundedHeightModifier
-                        .testTag(MESSAGE_ACTION_MENU_TEST_TAG),
+                        .onSizeChanged { size ->
+                            if (size.width > 0 && size.height > 0) actionMenuMeasured = true
+                        }.graphicsLayer(
+                            alpha = if (actionMenuMeasured) 1f else 0f,
+                        ).testTag(MESSAGE_ACTION_MENU_TEST_TAG),
                 shape = RoundedCornerShape(12.dp),
                 border = amoledSurfaceBorderStroke(),
                 tonalElevation = 3.dp,

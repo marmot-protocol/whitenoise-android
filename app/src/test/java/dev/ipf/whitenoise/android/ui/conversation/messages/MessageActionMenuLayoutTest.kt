@@ -165,7 +165,7 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun measuredHeightClampsPopupWithoutChangingEstimatedSideSelection() {
+    fun tallerMeasuredHeightClampsFirstVisiblePositionWithoutChangingSide() {
         val provider =
             MessageActionMenuPositionProvider(
                 anchorWindowYPx = 450f,

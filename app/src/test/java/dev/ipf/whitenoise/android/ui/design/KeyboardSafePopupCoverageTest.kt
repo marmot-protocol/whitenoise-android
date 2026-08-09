@@ -166,9 +166,15 @@ class KeyboardSafePopupCoverageTest {
                 "MessageActionMenuPositionProvider(" in body,
         )
         val provider = positionSource().readText()
-        assertFalse(
-            "measured height must not reposition an already-painted action menu",
-            "popupContentSize.height" in provider || "measuredPopupHeightPx" in body,
+        assertTrue(
+            "measured height must clamp the first visible position to the window",
+            "popupContentSize.height" in provider,
+        )
+        assertTrue(
+            "action menu content must stay transparent until its first stable measured position",
+            "var actionMenuMeasured" in body &&
+                ".onSizeChanged" in body &&
+                "alpha = if (actionMenuMeasured) 1f else 0f" in body,
         )
     }
 
