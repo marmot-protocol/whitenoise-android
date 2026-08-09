@@ -53,6 +53,15 @@ class ConversationBottomChromeHeightTest {
     }
 
     @Test
+    fun latestMeasuredHeightIsAvailableToForegroundGeometryCapture() {
+        val observer = ConversationBottomChromeHeightObserver()
+
+        assertEquals(0, observer.currentHeightPx)
+        observer.onMeasured(96)
+        assertEquals(96, observer.currentHeightPx)
+    }
+
+    @Test
     fun growingBottomChromeAndAppendingAtTailKeepsNewestRowFullyVisible() {
         val listState = LazyListState()
         val timelineSize = mutableStateOf(20)

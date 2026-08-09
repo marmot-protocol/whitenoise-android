@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 internal class ConversationBottomChromeHeightObserver {
-    private var measuredHeightPx: Int? = null
+    private var measured = false
+    var currentHeightPx: Int = 0
+        private set
 
     fun onMeasured(heightPx: Int): Boolean {
-        val previousHeightPx = measuredHeightPx
-        measuredHeightPx = heightPx
-        return previousHeightPx != null && previousHeightPx != heightPx
+        val changed = measured && currentHeightPx != heightPx
+        currentHeightPx = heightPx
+        measured = true
+        return changed
     }
 }

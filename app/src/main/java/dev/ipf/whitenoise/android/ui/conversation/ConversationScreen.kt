@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -182,12 +184,14 @@ import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -213,8 +217,6 @@ private data class ConversationSearchScrollAnchor(
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
-
-private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 
 // Foreground catch-up normally materializes almost immediately. Keep the
 // background-arrival listener bounded so a later, genuinely foreground
@@ -274,6 +276,10 @@ private fun LazyListScope.conversationLoadErrorItem(
         )
     }
 }
+
+// Liveness fallback only. Correctness waits for the IME target/inset settle signal,
+// never a guessed number of rendered frames.
+private const val FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS = 1_500L
 
 /** Whether adjacent timeline items participate in one visible message-bubble sender run. */
 internal fun conversationBubbleRowsShareSenderRun(
@@ -529,6 +535,7 @@ internal fun ConversationScreen(
                     },
             )
         }
+    val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
     val postInitialReanchorGate =
         remember(controller, listState) {
             ConversationPostInitialReanchorGate()
@@ -1123,6 +1130,9 @@ internal fun ConversationScreen(
     // triggers a recomposition. getBottom() reads the inset's snapshot state
     // inside the derived block. See #374.
     val imeInsets = WindowInsets.ime
+
+    @OptIn(ExperimentalLayoutApi::class)
+    val imeAnimationTargetInsets = WindowInsets.imeAnimationTarget
     val density = LocalDensity.current
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
@@ -1138,7 +1148,7 @@ internal fun ConversationScreen(
     val composerFocus = remember(chat.id) { FocusRequester() }
     var composerFocused by remember(chat.id) { mutableStateOf(false) }
     var imeTransitionBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
-    var pauseScrollBookmark by remember(chat.id) { mutableStateOf<ConversationScrollBookmark?>(null) }
+    var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
     // #589: used by the resume observer to clear focus and drop the keyboard
@@ -1962,6 +1972,7 @@ internal fun ConversationScreen(
             imeTransitionBookmark = null
             return@LaunchedEffect
         }
+        if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
         if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
         val snapshot = imeTransitionBookmark ?: scrollCoordinator.bookmark(currentScrollAnchor())
@@ -1977,23 +1988,17 @@ internal fun ConversationScreen(
             else -> Unit
         }
     }
-    // #589: app-switch resume handling. Two bugs surfaced when returning to a
-    // chat after backgrounding the app:
-    //
-    //   Case A (keyboard was OPEN on leave): restoring the pause-time viewport
-    //   bookmark before the keyboard inset re-applied could clip the tail or
-    //   shift a reader's mid-history position. The existing imeIsOpen chase
-    //   above does NOT re-fire here because imeIsOpen never transitions (it was
-    //   already true), so resume waits for the inset to settle before restoring
-    //   that bookmark — reusing the 24-frame chase idiom.
-    //
-    //   Case B (keyboard was CLOSED on leave): Android/Compose restores the
+    // #589/#1888: app-switch resume handling. Android/Compose can restore the
     //   BasicTextField focus and IME visibility on its own, popping a keyboard
     //   the user never asked for. We snapshot the composer focus on ON_PAUSE
     //   and, on ON_RESUME, gate restoration through the pure
     //   `shouldRestoreComposerFocusOnResume` predicate: restore focus only if
     //   it was held on pause (or an edit/reply session is active); otherwise
-    //   actively clear focus and hide the keyboard so it does not pop.
+    //   actively clear focus and hide the keyboard so it does not pop. Scroll,
+    //   inset, bottom-chrome, and timeline state are captured in the coordinator
+    //   at the same pause edge. Resume commits from the actual IME target/inset
+    //   settle signal: an unchanged presentation performs no list write, while a
+    //   real geometry or structure delta gets one correction instead of a frame chase.
     //
     // Keyed on controller so chat and same-group account/runtime switches both
     // rebind the observer; resolved through the existing Context.lifecycleOwner()
@@ -2004,6 +2009,39 @@ internal fun ConversationScreen(
         rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })
     val currentInitialTimelineAnchored by rememberUpdatedState(newValue = initialTimelineAnchored)
     val currentImeIsOpen by rememberUpdatedState(newValue = imeIsOpen)
+    val currentForegroundGeometryProvider by
+        rememberUpdatedState(
+            newValue = {
+                ConversationForegroundGeometry(
+                    viewportHeightPx = listState.layoutInfo.viewportSize.height,
+                    imeBottomPx = imeInsets.getBottom(density),
+                    bottomChromeHeightPx = bottomChromeHeightObserver.currentHeightPx,
+                )
+            },
+        )
+    val currentTimelineStructureProvider by
+        rememberUpdatedState(
+            newValue = {
+                val liveTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                ConversationTimelineStructure(
+                    rowKeys = liveTimeline.map { it.id to it.record.messageIdHex },
+                    olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0,
+                )
+            },
+        )
+    val currentForegroundSettleStateProvider by
+        rememberUpdatedState(
+            newValue = {
+                ConversationForegroundSettleState(
+                    geometry = currentForegroundGeometryProvider(),
+                    imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
+                )
+            },
+        )
+    ConversationForegroundDrawGateEffect(
+        isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
+        onBlockedPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
+    )
     ConversationComposerLifecycleEffect(
         observerKey = controller,
         lifecycleOwner = resumeLifecycleOwner,
@@ -2014,11 +2052,24 @@ internal fun ConversationScreen(
                 controller.replyingTo != null,
         onPause = {
             resumeScrollRestoreCoordinator.cancel()
-            pauseScrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider())
+            foregroundRestoreToken =
+                if (currentInitialTimelineAnchored) {
+                    scrollCoordinator.beginForegroundRestore(
+                        ConversationForegroundSnapshot(
+                            scrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider()),
+                            geometry = currentForegroundGeometryProvider(),
+                            timelineStructure = currentTimelineStructureProvider(),
+                        ),
+                    )
+                } else {
+                    scrollCoordinator.cancelForegroundRestore()
+                    null
+                }
         },
         onResume = { restoreFocus, clearFocus ->
-            val scrollSnapshot = pauseScrollBookmark
-            pauseScrollBookmark = null
+            foregroundPreDrawSignals.tryReceive()
+            val restoreToken = foregroundRestoreToken
+            foregroundRestoreToken = null
             resumeScrollRestoreCoordinator.launchResumeWork(scope) {
                 when {
                     restoreFocus -> {
@@ -2030,35 +2081,44 @@ internal fun ConversationScreen(
                         keyboardController?.hide()
                     }
                 }
-                if (currentInitialTimelineAnchored && scrollSnapshot != null) {
-                    var lastInset = -1
-                    var stableFrames = 0
-                    var settleFrame = 0
-                    while (settleFrame < RESUME_IME_SETTLE_MAX_FRAMES && stableFrames < 2) {
-                        withFrameNanos { }
-                        val current = imeInsets.getBottom(density)
-                        if (current == lastInset) {
-                            stableFrames++
-                        } else {
-                            stableFrames = 0
-                            lastInset = current
-                        }
-                        settleFrame++
-                    }
-                    scrollCoordinator.restoreViewport(
-                        snapshot = scrollSnapshot,
+                if (currentInitialTimelineAnchored && restoreToken != null) {
+                    val resumedPresentation =
+                        withTimeoutOrNull(FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS) {
+                            foregroundPreDrawSignals
+                                .receiveAsFlow()
+                                .map { currentForegroundSettleStateProvider() }
+                                .first {
+                                    it.isSettled(
+                                        expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
+                                    )
+                                }
+                        } ?: currentForegroundSettleStateProvider()
+                    scrollCoordinator.completeForegroundRestore(
+                        token = restoreToken,
+                        resumedGeometry = resumedPresentation.geometry,
+                        resumedTimelineStructure = currentTimelineStructureProvider(),
+                        resumedScrollAnchor = currentScrollAnchorProvider(),
                         resolveAnchorIndex = currentScrollAnchorResolver,
                         resolveTailIndex = { currentTailIndex },
                     )
+                } else {
+                    scrollCoordinator.cancelForegroundRestore()
                 }
             }
         },
-        onObserverDisposed = resumeScrollRestoreCoordinator::cancel,
+        onObserverDisposed = {
+            resumeScrollRestoreCoordinator.cancel()
+            scrollCoordinator.cancelForegroundRestore()
+            foregroundRestoreToken = null
+        },
     )
     LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
         snapshotFlow { listState.layoutInfo.viewportSize.height }.collect { viewportHeight ->
             val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
             if (!viewportChanged || !currentInitialTimelineAnchored || currentImeIsOpen) {
+                return@collect
+            }
+            if (scrollCoordinator.foregroundRestoreInProgress) {
                 return@collect
             }
             when (scrollCoordinator.mode) {
@@ -2709,7 +2769,10 @@ internal fun ConversationScreen(
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                 onBottomChromeMeasured = { heightPx, chromeBottomPx ->
-                    if (bottomChromeHeightObserver.onMeasured(heightPx)) {
+                    if (
+                        bottomChromeHeightObserver.onMeasured(heightPx) &&
+                        !scrollCoordinator.foregroundRestoreInProgress
+                    ) {
                         reanchorNewestAfterBottomInputChange(frameCount = 1)
                     }
                     snackbarBottomInset.value =
