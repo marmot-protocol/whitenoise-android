@@ -54,7 +54,6 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -148,7 +147,6 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -313,7 +311,6 @@ internal fun GroupDetailsScreen(
     // Scoped to the visible group; the controller mutation continues on appState
     // if the user switches conversations, but this sheet stops tracking it.
     var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
-    var pendingInvites by remember(controller.group.groupIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -531,14 +528,13 @@ internal fun GroupDetailsScreen(
         refreshPushDebugInfo()
     }
 
-    LaunchedEffect(controller.members.map { it.memberIdHex }, pendingInvites) {
-        val memberIds = controller.members.map { it.memberIdHex.lowercase() }.toSet()
-        val filtered =
-            pendingInvites.filter { invite ->
-                val accountIdHex = appState.accountIdHex(invite)?.lowercase()
-                accountIdHex == null || accountIdHex !in memberIds
-            }
-        if (filtered != pendingInvites) pendingInvites = filtered
+    // Close the picker only after the controller has accepted the invite and
+    // installed its optimistic row. This avoids dismissing a selection when a
+    // competing mutation won the controller's single-flight guard.
+    LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
+        if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
+            if (addMemberAutoOpened) onBack() else showAddMember = false
+        }
     }
 
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
@@ -683,7 +679,6 @@ internal fun GroupDetailsScreen(
                     action = GroupMutationAction.InviteMember,
                     mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
                     onSuccess = {
-                        pendingInvites = (pendingInvites + refs).distinct()
                         if (addMemberAutoOpened) onBack() else showAddMember = false
                     },
                 )
@@ -692,7 +687,8 @@ internal fun GroupDetailsScreen(
             confirmLabel = stringResource(R.string.add_member),
             busy = adding || controller.mutationInFlight,
             autoSelectResolvedIdentifier = true,
-            excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
+            excludeAccountIdHexes =
+                (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
         )
         return
     }
@@ -856,7 +852,7 @@ internal fun GroupDetailsScreen(
                     } else if (!rosterReady) {
                         stringResource(R.string.members)
                     } else {
-                        stringResource(R.string.group_details_subtitle, controller.memberCount)
+                        stringResource(R.string.group_details_subtitle, controller.presentedMemberCount)
                     },
                 description =
                     if (isDm) {
@@ -1169,7 +1165,7 @@ internal fun GroupDetailsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                stringResource(R.string.members_count, controller.memberCount),
+                                stringResource(R.string.members_count, controller.presentedMemberCount),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f).padding(start = Dimens.spaceLg, end = Dimens.spaceSm),
@@ -1218,22 +1214,25 @@ internal fun GroupDetailsScreen(
                         // Prefetch member profiles here so the title map below can stay a
                         // pure read (contactDisplayNameCached); the profile/nickname
                         // revision key recomposes the sort once names or local aliases land.
-                        LaunchedEffect(controller.members) {
-                            appState.requestProfiles(controller.members.map { it.memberIdHex })
+                        val presentedMembers = controller.presentedMembers
+                        LaunchedEffect(presentedMembers, controller.pendingInviteMemberRefs) {
+                            appState.requestProfiles(
+                                presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs,
+                            )
                         }
                         val memberTitlesByHex =
-                            remember(controller.members, appState.profileRevisionForCompose) {
-                                controller.members.associate {
+                            remember(presentedMembers, appState.profileRevisionForCompose) {
+                                presentedMembers.associate {
                                     it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
                                 }
                             }
                         val displayedMembers =
                             remember(
-                                controller.members,
+                                presentedMembers,
                                 activeAccountIdHex,
                                 memberTitlesByHex,
                             ) {
-                                controller.members.sortedWith(
+                                presentedMembers.sortedWith(
                                     compareBy(
                                         { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
                                         { !controller.isAdmin(it) },
@@ -1268,7 +1267,9 @@ internal fun GroupDetailsScreen(
                         // exposed (#444/#635 scope rules).
                         GroupMemberIdentityRows(visibleMembers) { _, member ->
                             val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
-                            val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
+                            val rowMutationPending =
+                                controller.isMemberMutationPending(member.memberIdHex) ||
+                                    activeMutation?.target == member.memberIdHex
                             val memberNpub = appState.npub(member.memberIdHex)
                             ContactRow(
                                 title = controller.memberDisplayName(member),
@@ -1288,21 +1289,10 @@ internal fun GroupDetailsScreen(
                                     },
                                 onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
                                 trailing = {
-                                    if (rowMutation != null) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    } else if (controller.isAdmin(member)) {
-                                        Surface(
-                                            shape = PillShape,
-                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        ) {
-                                            Text(
-                                                stringResource(R.string.admin),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
-                                            )
-                                        }
-                                    }
+                                    GroupMemberMutationStatus(
+                                        isAdmin = controller.isAdmin(member),
+                                        inProgress = rowMutationPending,
+                                    )
                                 },
                             )
                         }
@@ -1317,31 +1307,19 @@ internal fun GroupDetailsScreen(
                                 onClick = { membersExpanded = true },
                             )
                         }
-                        if (pendingInvites.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                            ) {
-                                pendingInvites.forEach { invite ->
-                                    // Pending invites stay non-actionable, but a tap
-                                    // copies the full invite key to the clipboard.
-                                    AssistChip(
-                                        onClick = {
-                                            clipboard.setText(AnnotatedString(invite))
-                                        },
-                                        label = {
-                                            Text(
-                                                stringResource(
-                                                    R.string.invite_pending,
-                                                    IdentityFormatter.short(invite),
-                                                ),
-                                            )
-                                        },
-                                        leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
-                                    )
-                                }
-                            }
+                        controller.pendingInviteMemberRefs.forEach { invite ->
+                            val inviteNpub = appState.npub(invite)
+                            PendingGroupInviteRow(
+                                title = appState.displayName(invite),
+                                subtitle =
+                                    stringResource(
+                                        R.string.invite_pending,
+                                        IdentityFormatter.short(inviteNpub),
+                                    ),
+                                avatarSeed = invite,
+                                avatarUrl = appState.avatarUrl(invite),
+                                onClick = { clipboard.setText(AnnotatedString(inviteNpub)) },
+                            )
                         }
                     }
                 }
