@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.runtime.MutableState
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
@@ -38,9 +40,8 @@ class GroupMemberAdministrationGateTest {
     fun rosterLosingAuthorityWhileInviteWaitsForCommitLockSkipsRuntime() =
         runBlocking {
             val appState = appState()
-            val controller = ConversationController(appState, group())
+            val controller = readyController(appState)
             val tracker = rosterTracker(controller)
-            tracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
             assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
 
             val lockHeld = CompletableDeferred<Unit>()
@@ -55,7 +56,7 @@ class GroupMemberAdministrationGateTest {
             lockHeld.await()
             val invite =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.inviteMembers(listOf("bob"))
+                    controller.inviteMembers(listOf("carol"))
                 }
 
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
@@ -66,10 +67,141 @@ class GroupMemberAdministrationGateTest {
             assertNull(controller.lastMutationError)
         }
 
+    @Test
+    fun rosterLosingAuthorityWhileRemoveWaitsForCommitLockSkipsRuntime() =
+        runBlocking {
+            val appState = appState()
+            val controller = readyController(appState)
+            val tracker = rosterTracker(controller)
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+
+            val remove =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.removeMember(member("bob"))
+                }
+            tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
+            releaseLock.complete(Unit)
+
+            assertFalse(remove.await())
+            holder.await()
+            assertNull(controller.lastMutationError)
+        }
+
+    @Test
+    fun targetDisappearingWhilePromotionWaitsForCommitLockSkipsRuntime() =
+        runBlocking {
+            val appState = appState()
+            val controller = readyController(appState)
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+
+            val promote =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setMemberAdmin(member("bob"), admin = true)
+                }
+            replaceMembers(controller, listOf(member("alice", account = "alice", local = true)))
+            releaseLock.complete(Unit)
+
+            assertFalse(promote.await())
+            holder.await()
+            assertNull(controller.lastMutationError)
+        }
+
+    @Test
+    fun rosterLosingAuthorityWhileDemotionWaitsForCommitLockSkipsRuntime() =
+        runBlocking {
+            val appState = appState()
+            val controller = readyController(appState, admins = listOf("alice", "bob"))
+            val tracker = rosterTracker(controller)
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+
+            val demote =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.setMemberAdmin(member("bob"), admin = false)
+                }
+            tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
+            releaseLock.complete(Unit)
+
+            assertFalse(demote.await())
+            holder.await()
+            assertNull(controller.lastMutationError)
+        }
+
+    @Test
+    fun targetDisappearingWhileTransferWaitsForCommitLockSkipsBothCommits() =
+        runBlocking {
+            val appState = appState()
+            val controller = readyController(appState)
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+
+            val transfer =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.transferAdmin(member("bob"))
+                }
+            replaceMembers(controller, listOf(member("alice", account = "alice", local = true)))
+            releaseLock.complete(Unit)
+
+            assertFalse(transfer.await())
+            holder.await()
+            assertNull(controller.lastMutationError)
+        }
+
     private fun rosterTracker(controller: ConversationController): GroupRosterLoadTracker {
         val field = ConversationController::class.java.getDeclaredField("memberRosterLoadTracker")
         field.isAccessible = true
         return field.get(controller) as GroupRosterLoadTracker
+    }
+
+    private fun readyController(
+        appState: WhiteNoiseAppState,
+        admins: List<String> = listOf("alice"),
+    ): ConversationController {
+        val controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group(admins),
+                initialMemberSnapshot =
+                    GroupMemberSnapshot(
+                        listOf(
+                            member("alice", account = "alice", local = true),
+                            member("bob"),
+                        ),
+                    ),
+            )
+        rosterTracker(controller).transition(GroupRosterRefreshEvent.SUCCEEDED)
+        return controller
+    }
+
+    private fun kotlinx.coroutines.CoroutineScope.holdGroupCommitLock(
+        appState: WhiteNoiseAppState,
+        lockHeld: CompletableDeferred<Unit>,
+        releaseLock: CompletableDeferred<Unit>,
+    ) = async {
+        appState.withGroupCommitLock("alice", "group") {
+            lockHeld.complete(Unit)
+            releaseLock.await()
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun replaceMembers(
+        controller: ConversationController,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        val field = ConversationController::class.java.getDeclaredField("members\$delegate")
+        field.isAccessible = true
+        (field.get(controller) as MutableState<List<AppGroupMemberRecordFfi>>).value = members
     }
 
     private fun appState() =
@@ -91,7 +223,7 @@ class GroupMemberAdministrationGateTest {
             activeAccountRef = "alice",
         )
 
-    private fun group() =
+    private fun group(admins: List<String> = listOf("alice")) =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = "group",
@@ -100,7 +232,7 @@ class GroupMemberAdministrationGateTest {
             endpoint = "endpoint",
             name = "Test Group",
             description = "",
-            admins = listOf("alice"),
+            admins = admins,
             relays = listOf("wss://relay.example"),
             nostrGroupIdHex = "nostr",
             avatarUrl = null,
@@ -135,6 +267,16 @@ class GroupMemberAdministrationGateTest {
             disbanded = false,
             disbandRequest = null,
         )
+
+    private fun member(
+        memberIdHex: String,
+        account: String? = null,
+        local: Boolean = false,
+    ) = AppGroupMemberRecordFfi(
+        memberIdHex = memberIdHex,
+        account = account,
+        local = local,
+    )
 }
 
 private class GroupMemberAdministrationDraftPersistence : DraftPersistence {

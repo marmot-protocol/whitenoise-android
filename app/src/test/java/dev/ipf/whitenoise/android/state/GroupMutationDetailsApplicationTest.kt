@@ -305,6 +305,25 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun detailedProjectionPreservesMixedNamespaceActionTargets() {
+        val applied =
+            applyAuthoritativeGroupDetails(
+                GroupDetailsFfi(
+                    mlsState = testMlsState(memberCount = 2u),
+                    group = group(admins = listOf("abc")),
+                    members =
+                        listOf(
+                            member("abc", account = null, isAdmin = true),
+                            member("", account = "ABC", isAdmin = false),
+                        ),
+                ),
+            )
+
+        assertEquals(listOf("abc", ""), applied.members.map { it.memberIdHex })
+        assertEquals(listOf(null, "ABC"), applied.members.map { it.account })
+    }
+
+    @Test
     fun memberSnapshotReadyToCache_rejectsEmptyRoster() {
         assertFalse(memberSnapshotReadyToCache(emptyList()))
     }

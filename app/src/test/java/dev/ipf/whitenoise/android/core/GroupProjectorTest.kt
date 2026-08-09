@@ -960,6 +960,21 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun identityDistinctMembersDoesNotConflateMemberAndAccountNamespaces() {
+        val memberIdentity = member("abc", account = null)
+        val accountIdentity = member("", account = "ABC")
+
+        assertEquals(
+            listOf(memberIdentity, accountIdentity),
+            GroupProjector.identityDistinctMembers(listOf(memberIdentity, accountIdentity)),
+        )
+        assertEquals(
+            listOf(accountIdentity, memberIdentity),
+            GroupProjector.identityDistinctMembers(listOf(accountIdentity, memberIdentity)),
+        )
+    }
+
+    @Test
     fun duplicatedRosterStillClassifiesAsImplicitDm() {
         // The exact drift uniqueAdminCount guards against: one identity listed
         // twice with different hex casing must not turn a DM into a group.

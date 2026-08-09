@@ -346,8 +346,7 @@ internal fun GroupDetailsScreen(
             null
         }
     val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
-    val canShowEditAction =
-        !isDm && !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
+    val canShowEditAction = !isDm && canEdit
     val dmSharedGroups =
         remember(dmPeerAccountIdHex, appState.chatListItems, controller.group.groupIdHex) {
             dmPeerAccountIdHex

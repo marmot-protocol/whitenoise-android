@@ -275,17 +275,21 @@ object GroupProjector {
             .distinct()
             .count()
 
-    /** One display/action row per identity; blank identities remain distinct. */
+    /** One display/action row per proven identity; blank identities remain distinct. */
     fun identityDistinctMembers(members: List<AppGroupMemberRecordFfi>): List<AppGroupMemberRecordFfi> {
         val identityIndexes = HashMap<String, Int>()
         val distinct = ArrayList<AppGroupMemberRecordFfi>(members.size)
         members.forEach { member ->
             val identity =
-                member.memberIdHex.takeIf { it.isNotBlank() }
-                    ?: member.account?.takeIf { it.isNotBlank() }
-            val existingIndex = identity?.lowercase()?.let(identityIndexes::get)
+                member.memberIdHex
+                    .takeIf { it.isNotBlank() }
+                    ?.let { "member:${it.lowercase()}" }
+                    ?: member.account
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { "account:${it.lowercase()}" }
+            val existingIndex = identity?.let(identityIndexes::get)
             if (existingIndex == null) {
-                if (identity != null) identityIndexes[identity.lowercase()] = distinct.size
+                if (identity != null) identityIndexes[identity] = distinct.size
                 distinct += member
             } else {
                 val existing = distinct[existingIndex]
