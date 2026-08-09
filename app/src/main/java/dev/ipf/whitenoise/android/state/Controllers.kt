@@ -2315,6 +2315,7 @@ data class ConversationControllerCopy(
     val streamFailedFormat: String = "Stream failed: %1\$s",
     val couldntAddMemberDuplicateFormat: String =
         "Couldn't add %1\$s. They're already a member, or their signing key conflicts with an existing member.",
+    val groupRosterChanged: String = "Group membership changed. Review the group and try again.",
 ) {
     fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
 
@@ -2427,13 +2428,15 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
     AppliedGroupDetails(
         group = details.group,
         members =
-            details.members.map {
-                AppGroupMemberRecordFfi(
-                    memberIdHex = it.memberIdHex,
-                    account = it.account,
-                    local = it.local,
-                )
-            },
+            GroupProjector.identityDistinctMembers(
+                details.members.map { member ->
+                    AppGroupMemberRecordFfi(
+                        memberIdHex = member.memberIdHex,
+                        account = member.account,
+                        local = member.local,
+                    )
+                },
+            ),
     )
 
 internal fun resolveAuthoritativeGroupRoster(
@@ -2457,7 +2460,7 @@ internal fun resolveAuthoritativeGroupRoster(
             !activeJoinedGroup -> null
             uniqueMemberCount == 0 -> GroupRosterInvariant.EMPTY_JOINED_ROSTER
             !containsLocalMember -> GroupRosterInvariant.LOCAL_MEMBER_MISSING
-            uniqueMemberCount.toLong() !=
+            details.members.size.toLong() !=
                 details.mlsState.memberCount.toLong() -> GroupRosterInvariant.MEMBER_COUNT_MISMATCH
             else -> null
         }
@@ -5552,6 +5555,13 @@ internal sealed interface OptimisticGroupRosterMutation {
     ) : OptimisticGroupRosterMutation
 }
 
+private enum class GroupAdministrationCommitOutcome {
+    COMMITTED,
+    ROSTER_CHANGED,
+    KEEP_ONE_ADMIN,
+    NO_CHANGE,
+}
+
 internal suspend fun canonicalGroupInviteRefs(
     memberRefs: List<String>,
     resolveAccountIdHex: suspend (String) -> String?,
@@ -8536,40 +8546,96 @@ class ConversationController(
         appState.present(title, AppText.Plain(message), copyable = true)
     }
 
+    private fun canAdministerMembersFromAuthoritativeRoster(): Boolean =
+        memberRosterState == GroupRosterLoadState.READY &&
+            !isDm &&
+            isSelfMember &&
+            isSelfAdmin &&
+            !group.pendingConfirmation &&
+            !group.disbanding &&
+            !group.disbanded
+
+    private fun authoritativeAdministrationTarget(targetMemberIdHex: String): AppGroupMemberRecordFfi? {
+        if (!canAdministerMembersFromAuthoritativeRoster() || targetMemberIdHex.isBlank()) return null
+        return members.singleOrNull { member ->
+            member.memberIdHex.equals(targetMemberIdHex, ignoreCase = true)
+        }
+    }
+
+    private fun presentRosterChanged(
+        @StringRes title: Int,
+    ) {
+        lastMutationError = copy.groupRosterChanged
+        appState.present(title, R.string.toast_group_roster_changed, copyable = true)
+    }
+
+    private suspend fun resolveCanonicalInviteRefs(memberRefs: List<String>): List<String>? =
+        try {
+            canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
+        } catch (throwable: Throwable) {
+            throwable.rethrowIfCancellation()
+            val message = mutationError(throwable)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
+            null
+        }
+
+    private fun presentAdminCommitOutcome(
+        outcome: GroupAdministrationCommitOutcome,
+        adminAdded: Boolean,
+    ): Boolean =
+        when (outcome) {
+            GroupAdministrationCommitOutcome.COMMITTED -> {
+                appState.present(if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed)
+                true
+            }
+            GroupAdministrationCommitOutcome.ROSTER_CHANGED -> {
+                presentRosterChanged(R.string.toast_couldnt_update_admin)
+                false
+            }
+            GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN -> {
+                appState.present(
+                    R.string.toast_keep_one_admin,
+                    R.string.toast_promote_before_removing_admin,
+                )
+                false
+            }
+            GroupAdministrationCommitOutcome.NO_CHANGE -> false
+        }
+
     suspend fun inviteMembers(
         memberRefs: List<String>,
         addAsAdmin: Boolean = false,
-    ): Boolean =
-        withMutationLockResult(false) {
+    ): Boolean {
+        return withMutationLockResult(false) {
             lastMutationError = null
+            if (!canAdministerMembersFromAuthoritativeRoster()) return@withMutationLockResult false
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val refs =
-                try {
-                    canonicalGroupInviteRefs(memberRefs) { ref ->
-                        appState.marmotIo { accountIdHex(ref) }
-                    }
-                } catch (throwable: Throwable) {
-                    throwable.rethrowIfCancellation()
-                    val message = mutationError(throwable)
-                    lastMutationError = message
-                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
-                    return@withMutationLockResult false
-                }
+            val refs = resolveCanonicalInviteRefs(memberRefs) ?: return@withMutationLockResult false
             if (refs.isEmpty()) return@withMutationLockResult false
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
                 var inviteSent = false
                 try {
                     val adminTargets = if (addAsAdmin) refs else emptyList()
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        val inviteResult =
-                            appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
-                        applyMutationDetails(account, inviteResult.details)
-                        inviteSent = true
-                        adminTargets.forEach { target ->
-                            val promoteResult =
-                                appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
-                            applyMutationDetails(account, promoteResult.details)
+                    val outcome =
+                        appState.withGroupCommitLock(account, group.groupIdHex) {
+                            if (!canAdministerMembersFromAuthoritativeRoster()) {
+                                return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                            }
+                            val inviteResult =
+                                appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
+                            applyMutationDetails(account, inviteResult.details)
+                            inviteSent = true
+                            adminTargets.forEach { target ->
+                                val promoteResult =
+                                    appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                                applyMutationDetails(account, promoteResult.details)
+                            }
+                            GroupAdministrationCommitOutcome.COMMITTED
                         }
+                    if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
+                        presentRosterChanged(R.string.toast_couldnt_add_members)
+                        return@track false
                     }
                     appState.present(R.string.toast_invite_sent)
                     true
@@ -8581,7 +8647,11 @@ class ConversationController(
                         // partial success and leave the row-level Admin switch as the
                         // retry path once the member appears in details.
                         lastMutationError = "Invite sent, but admin promotion failed: $message"
-                        appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message), copyable = true)
+                        appState.present(
+                            R.string.toast_invite_sent_but_couldnt_add_admin,
+                            AppText.Plain(message),
+                            copyable = true,
+                        )
                         true
                     } else if (isDuplicateSignatureKeyError(message)) {
                         // MLS rejected the add commit because the proposed member
@@ -8603,6 +8673,7 @@ class ConversationController(
                 }
             }
         }
+    }
 
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
@@ -8613,10 +8684,18 @@ class ConversationController(
             val target = member.memberIdHex
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Remove(target)) {
                 try {
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        val result =
-                            appState.marmotIo { removeMembersDetailed(account, group.groupIdHex, listOf(target)) }
-                        applyMutationDetails(account, result.details)
+                    val outcome =
+                        appState.withGroupCommitLock(account, group.groupIdHex) {
+                            authoritativeAdministrationTarget(target)
+                                ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                            val result =
+                                appState.marmotIo { removeMembersDetailed(account, group.groupIdHex, listOf(target)) }
+                            applyMutationDetails(account, result.details)
+                            GroupAdministrationCommitOutcome.COMMITTED
+                        }
+                    if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
+                        presentRosterChanged(R.string.toast_couldnt_remove_member)
+                        return@track false
                     }
                     appState.present(R.string.toast_member_removed)
                     true
@@ -8651,26 +8730,35 @@ class ConversationController(
             // group, so they require a Nostr pubkey hex — not a local-account
             // label. memberRef can return either; memberIdHex is always the hex.
             val target = member.memberIdHex
-            if (!admin && isAdmin(member) && group.admins.distinctBy { it.lowercase() }.size <= 1) {
+            if (!admin && isAdmin(member) && GroupProjector.revokeWouldDepleteAdmins(group, member, memberCount)) {
                 appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
                 return@withMutationLockResult false
             }
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.SetAdmin(target, admin)) {
                 runCatchingCancellable {
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        if (admin) {
-                            val result =
-                                appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
-                            applyMutationDetails(account, result.details)
-                            appState.present(R.string.toast_admin_added)
-                        } else {
-                            val result =
-                                appState.marmotIo { demoteAdminDetailed(account, group.groupIdHex, target) }
-                            applyMutationDetails(account, result.details)
-                            appState.present(R.string.toast_admin_removed)
+                    val outcome =
+                        appState.withGroupCommitLock(account, group.groupIdHex) {
+                            val currentMember =
+                                authoritativeAdministrationTarget(target)
+                                    ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                            if (GroupProjector.isAdmin(group, currentMember) == admin) {
+                                return@withGroupCommitLock GroupAdministrationCommitOutcome.NO_CHANGE
+                            }
+                            if (!admin && GroupProjector.revokeWouldDepleteAdmins(group, currentMember, memberCount)) {
+                                return@withGroupCommitLock GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN
+                            }
+                            if (admin) {
+                                val result =
+                                    appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                                applyMutationDetails(account, result.details)
+                            } else {
+                                val result =
+                                    appState.marmotIo { demoteAdminDetailed(account, group.groupIdHex, target) }
+                                applyMutationDetails(account, result.details)
+                            }
+                            GroupAdministrationCommitOutcome.COMMITTED
                         }
-                    }
-                    true
+                    presentAdminCommitOutcome(outcome, adminAdded = admin)
                 }.onFailure {
                     val message = mutationError(it)
                     lastMutationError = message
@@ -8800,12 +8888,19 @@ class ConversationController(
                 return@withMutationLockResult false
             }
             runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val result = appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
-                    applyMutationDetails(account, result.details)
-                }
-                appState.present(R.string.toast_admin_removed)
-                true
+                val outcome =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        if (!canAdministerMembersFromAuthoritativeRoster()) {
+                            return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
+                        }
+                        if (group.admins.distinctBy { it.lowercase() }.size <= 1) {
+                            return@withGroupCommitLock GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN
+                        }
+                        val result = appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                        applyMutationDetails(account, result.details)
+                        GroupAdministrationCommitOutcome.COMMITTED
+                    }
+                presentAdminCommitOutcome(outcome, adminAdded = false)
             }.onFailure {
                 val message = mutationError(it)
                 lastMutationError = message
@@ -8844,20 +8939,32 @@ class ConversationController(
             // a self-demote failure reports the partial state honestly.
             var grantedBeforeDemote = false
             runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val promoteResult =
-                        appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
-                    grantedBeforeDemote = true
-                    applyMutationDetails(account, promoteResult.details)
-                    // The grant has already landed on the MLS group. If the scope is
-                    // cancelled now, skipping the demote would strand both accounts as
-                    // admin without telling the caller (runCatchingCancellable propagates
-                    // cancellation past the partial-state branch). Run it to completion.
-                    withContext(NonCancellable) {
-                        val demoteResult =
-                            appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
-                        applyMutationDetails(account, demoteResult.details)
+                val transferCommitted =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        val currentMember =
+                            authoritativeAdministrationTarget(target)
+                                ?: return@withGroupCommitLock false
+                        if (!GroupProjector.canTransferAdminTo(group, currentMember, activeAccountIdHex)) {
+                            return@withGroupCommitLock false
+                        }
+                        val promoteResult =
+                            appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                        grantedBeforeDemote = true
+                        applyMutationDetails(account, promoteResult.details)
+                        // The grant has already landed on the MLS group. If the scope is
+                        // cancelled now, skipping the demote would strand both accounts as
+                        // admin without telling the caller (runCatchingCancellable propagates
+                        // cancellation past the partial-state branch). Run it to completion.
+                        withContext(NonCancellable) {
+                            val demoteResult =
+                                appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                            applyMutationDetails(account, demoteResult.details)
+                        }
+                        true
                     }
+                if (!transferCommitted) {
+                    appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin, copyable = true)
+                    return@runCatchingCancellable false
                 }
                 appState.present(R.string.toast_admin_transferred)
                 true
@@ -10528,7 +10635,7 @@ class ConversationController(
             "DMConversation",
             "joined roster invariant" +
                 " reason=${invariant.name.lowercase()}" +
-                " rows=${resolution.applied.members.size}" +
+                " rows=${details.members.size}" +
                 " unique=${resolution.uniqueMemberCount}" +
                 " mls=${resolution.mlsMemberCount}" +
                 " cached_unique=${cachedIds.size}" +

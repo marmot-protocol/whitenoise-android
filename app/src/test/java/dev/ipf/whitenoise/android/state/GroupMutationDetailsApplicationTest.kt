@@ -194,6 +194,28 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
+    fun validMultiDeviceRosterMatchesLeafCountWhileCollapsingDisplayRows() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                details =
+                    GroupDetailsFfi(
+                        mlsState = testMlsState(memberCount = 2u),
+                        group = group(admins = listOf("alice")),
+                        members =
+                            listOf(
+                                member("alice", account = "alice", local = true, isAdmin = true, isSelf = true),
+                                member("alice", account = "alice", local = false, isAdmin = true),
+                            ),
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertNull(resolution.invariant)
+        assertEquals(1, resolution.applied.members.size)
+        assertEquals(1, resolution.uniqueMemberCount)
+    }
+
+    @Test
     fun emptyRosterRemainsValidAfterLeavingTheGroup() {
         val resolution =
             resolveAuthoritativeGroupRoster(
@@ -260,7 +282,7 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
-    fun detailedProjectionPreservesAccountLocalAndDuplicateMemberRows() {
+    fun detailedProjectionCollapsesDuplicateIdentityRowsAndMergesLocalMetadata() {
         val applied =
             applyAuthoritativeGroupDetails(
                 GroupDetailsFfi(
@@ -276,11 +298,29 @@ class GroupMutationDetailsApplicationTest {
 
         assertEquals(
             listOf(
-                AppGroupMemberRecordFfi(memberIdHex = "alice", account = null, local = true),
-                AppGroupMemberRecordFfi(memberIdHex = "alice", account = "alice-local", local = false),
+                AppGroupMemberRecordFfi(memberIdHex = "alice", account = "alice-local", local = true),
             ),
             applied.members,
         )
+    }
+
+    @Test
+    fun detailedProjectionPreservesMixedNamespaceActionTargets() {
+        val applied =
+            applyAuthoritativeGroupDetails(
+                GroupDetailsFfi(
+                    mlsState = testMlsState(memberCount = 2u),
+                    group = group(admins = listOf("abc")),
+                    members =
+                        listOf(
+                            member("abc", account = null, isAdmin = true),
+                            member("", account = "ABC", isAdmin = false),
+                        ),
+                ),
+            )
+
+        assertEquals(listOf("abc", ""), applied.members.map { it.memberIdHex })
+        assertEquals(listOf(null, "ABC"), applied.members.map { it.account })
     }
 
     @Test

@@ -612,6 +612,7 @@
     <string name="toast_invites_sent_to_groups_partial">邀请已发送到部分群组；有些失败了</string>
     <string name="toast_member_removed">会员已删除</string>
     <string name="toast_couldnt_remove_member">移除成员失败。请重试。</string>
+    <string name="toast_group_roster_changed">群组成员已更改。请检查群组并重试。</string>
     <string name="toast_keep_one_admin">保留一名管理员</string>
     <string name="toast_promote_before_removing_admin">在删除该管理员之前晋升另一名成员。</string>
     <string name="toast_admin_added">管理员已添加</string>

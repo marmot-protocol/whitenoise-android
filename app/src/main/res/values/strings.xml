@@ -861,6 +861,7 @@
     <string name="toast_invites_sent_to_groups_partial">Invites sent to some groups; some failed</string>
     <string name="toast_member_removed">Member removed</string>
     <string name="toast_couldnt_remove_member">Couldn\'t remove member</string>
+    <string name="toast_group_roster_changed">Group membership changed. Review the group and try again.</string>
     <string name="toast_keep_one_admin">Keep one admin</string>
     <string name="toast_promote_before_removing_admin">Promote another member before removing this admin.</string>
     <string name="toast_admin_added">Admin added</string>
