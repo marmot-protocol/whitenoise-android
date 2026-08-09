@@ -489,11 +489,19 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun conversationScreenClearsOwnedHighlightsWhenNavigationIsCancelled() {
         val screen = sourceFile("ConversationScreen.kt").readText()
+        val highlightFunction =
+            screen
+                .substringAfter("suspend fun showTransientMessageHighlight(messageId: String)")
+                .substringBefore("fun navigateToReplyTarget")
 
-        assertTrue(screen.contains("suspend fun showTransientMessageHighlight(messageId: String)"))
         assertTrue(screen.contains("var transientHighlightOwner by remember(controller)"))
-        assertTrue(screen.contains("val owner = Any()"))
-        assertTrue(screen.contains("if (transientHighlightOwner === owner)"))
+        assertTrue(highlightFunction.contains("val owner = Any()"))
+        assertTrue(
+            highlightFunction.contains(
+                "try {\n            delay(1_500L)\n        } finally {",
+            ),
+        )
+        assertTrue(highlightFunction.contains("if (transientHighlightOwner === owner)"))
         assertEquals(5, Regex("showTransientMessageHighlight\\(").findAll(screen).count())
     }
 
