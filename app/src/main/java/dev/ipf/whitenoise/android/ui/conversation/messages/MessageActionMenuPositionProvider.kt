@@ -42,6 +42,7 @@ internal class MessageActionMenuPositionProvider(
             } else {
                 estimatedOneColumnHeightPx
             }
+        val boundaryHeight = popupContentSize.height.takeIf { it > 0 } ?: effectiveHeight
         val bottomLimit = windowSize.height - edgeInsetPx
         val y =
             when {
@@ -50,7 +51,7 @@ internal class MessageActionMenuPositionProvider(
                 else -> edgeInsetPx
             }.coerceIn(
                 edgeInsetPx,
-                (windowSize.height - effectiveHeight).coerceAtLeast(edgeInsetPx),
+                (windowSize.height - boundaryHeight).coerceAtLeast(edgeInsetPx),
             )
         return IntOffset(x, y)
     }

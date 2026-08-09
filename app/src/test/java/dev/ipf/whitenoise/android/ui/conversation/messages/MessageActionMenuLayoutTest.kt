@@ -165,6 +165,31 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
+    fun measuredHeightClampsPopupWithoutChangingEstimatedSideSelection() {
+        val provider =
+            MessageActionMenuPositionProvider(
+                anchorWindowYPx = 450f,
+                alignEnd = false,
+                edgeInsetPx = 8,
+                estimatedOneColumnHeightPx = 200,
+                estimatedTwoColumnHeightPx = 100,
+                minimumActionCellWidthPx = 136,
+                maximumActionContentWidthPx = 312,
+                actionContentPaddingPx = 16,
+                actionColumnGapPx = 2,
+            )
+        val window = IntSize(360, 500)
+
+        val initial = provider.position(window, IntSize.Zero)
+        val measured = provider.position(window, IntSize(328, 180))
+
+        assertEquals(350, initial.y)
+        assertEquals(320, measured.y)
+        assertTrue(measured.y < 450)
+        assertEquals(window.height, measured.y + 180)
+    }
+
+    @Test
     fun maximumMenuUsesRowMajorTwoColumnGridAndFullWidthDelete() {
         renderMenu(fontScale = 1f)
 
