@@ -97,12 +97,19 @@ internal class MessageDraftRepository(
     private val lockTableGuard = Any()
     private val lockTable = mutableMapOf<DraftKey, DraftLock>()
 
+    @Suppress("TooGenericExceptionCaught") // FFI gateway failures are returned; cancellation is rethrown first.
     suspend fun draft(
         accountRef: String,
         groupIdHex: String,
     ): Result<MessageDraftFfi?> =
         withContext(ioDispatcher) {
-            runCatching { gateway.read(accountRef, groupIdHex) }
+            try {
+                Result.success(gateway.read(accountRef, groupIdHex))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                Result.failure(cause)
+            }
         }
 
     suspend fun saveText(
@@ -253,9 +260,10 @@ internal class MessageDraftRepository(
      * bytes, then makes encrypted source ownership exactly match live sessions.
      * Any MDK read failure leaves both stores untouched and retries next start.
      */
+    @Suppress("TooGenericExceptionCaught") // Reconciliation is retryable for all non-cancellation gateway failures.
     suspend fun reconcileEditorState(sources: EditorSourceStore): Result<Int> =
         withContext(ioDispatcher) {
-            runCatching {
+            try {
                 val sessionKeys = editorSessions.attachmentKeys()
                 val committedDigests = linkedMapOf<Triple<String, String, String>, String>()
                 sessionKeys
@@ -274,7 +282,11 @@ internal class MessageDraftRepository(
                             }
                     }
                 editorSessions.reconcile(committedDigests)
-                sources.reconcile(editorSessions.sourceLeaseReferenceCounts())
+                Result.success(sources.reconcile(editorSessions.sourceLeaseReferenceCounts()))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (cause: Exception) {
+                Result.failure(cause)
             }
         }
 

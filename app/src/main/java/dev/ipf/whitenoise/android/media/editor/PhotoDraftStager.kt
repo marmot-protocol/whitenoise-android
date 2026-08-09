@@ -82,6 +82,7 @@ internal class PhotoDraftStager(
         accountRef: String,
         groupIdHex: String,
         quality: MediaQuality,
+        legacyOccurrenceIndex: Int? = null,
     ): PhotoDraftStageResult {
         val attachmentId = stagedPhotoAttachmentId(accountRef, groupIdHex, attachmentSlotId)
         findExisting(attachmentId, accountRef, groupIdHex)?.let { return it }
@@ -94,6 +95,21 @@ internal class PhotoDraftStager(
             } catch (_: Exception) {
                 return PhotoDraftStageResult.SourceUnavailable
             } as? EditorSourceStageResult.Success ?: return PhotoDraftStageResult.SourceUnavailable
+        if (legacyOccurrenceIndex != null) {
+            val restored =
+                findLegacyExisting(
+                    sourceLeaseId = staged.lease.id,
+                    occurrenceIndex = legacyOccurrenceIndex,
+                    accountRef = accountRef,
+                    groupIdHex = groupIdHex,
+                )
+            if (restored != null) {
+                withContext(NonCancellable + ioDispatcher) {
+                    runCatching { sources.release(staged.lease.id) }
+                }
+                return PhotoDraftStageResult.Success(restored)
+            }
+        }
         return stageLease(
             leaseId = staged.lease.id,
             displayName = queryDisplayName(uri),
@@ -245,7 +261,7 @@ internal class PhotoDraftStager(
             )
         if (result is MessageDraftMutationResult.Success) {
             val lease = result.previousEditorSession?.sourceLeaseId ?: photo.sourceLeaseId
-            withContext(ioDispatcher) { runCatching { sources.release(lease) } }
+            withContext(NonCancellable + ioDispatcher) { runCatching { sources.release(lease) } }
         }
     }
 
@@ -263,7 +279,7 @@ internal class PhotoDraftStager(
             )
         if (result is MessageDraftMutationResult.Success) {
             result.previousEditorSession?.sourceLeaseId?.let { lease ->
-                withContext(ioDispatcher) { runCatching { sources.release(lease) } }
+                withContext(NonCancellable + ioDispatcher) { runCatching { sources.release(lease) } }
             }
         }
     }
@@ -320,6 +336,39 @@ internal class PhotoDraftStager(
             )
     }
 
+    /**
+     * Old saved-state payloads retained only URI order, so their random slot ID
+     * cannot be reconstructed. Match the materialized source lease back to the
+     * persisted attachment/session at the same duplicate occurrence instead of
+     * appending a second draft attachment.
+     */
+    private suspend fun findLegacyExisting(
+        sourceLeaseId: String,
+        occurrenceIndex: Int,
+        accountRef: String,
+        groupIdHex: String,
+    ): DraftBackedPhoto? {
+        if (occurrenceIndex < 0) return null
+        val attachments =
+            drafts
+                .draft(accountRef, groupIdHex)
+                .getOrNull()
+                ?.mediaAttachments
+                .orEmpty()
+        var matchingOccurrence = 0
+        attachments.forEach { attachment ->
+            val digest = attachment.editorDigest()
+            val session = sessions.committed(accountRef, groupIdHex, attachment.id, digest)
+            if (session?.sourceLeaseId == sourceLeaseId) {
+                if (matchingOccurrence == occurrenceIndex) {
+                    return recover(attachment, accountRef, groupIdHex)
+                }
+                matchingOccurrence++
+            }
+        }
+        return null
+    }
+
     private fun queryDisplayName(uri: Uri): String =
         runCatching {
             contentResolver
@@ -351,7 +400,8 @@ private fun editedStageFileName(
     original: String,
     extension: String,
 ): String {
-    val dot = original.lastIndexOf('.')
-    val stem = (if (dot > 0) original.substring(0, dot) else original).take(96).ifBlank { "image" }
+    val safe = MediaPipeline.safeDisplayName(original)
+    val dot = safe.lastIndexOf('.')
+    val stem = (if (dot > 0) safe.substring(0, dot) else safe).take(96).ifBlank { "image" }
     return "$stem.$extension"
 }

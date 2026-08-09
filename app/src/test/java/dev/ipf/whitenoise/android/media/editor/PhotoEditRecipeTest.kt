@@ -100,6 +100,34 @@ class PhotoEditRecipeTest {
     }
 
     @Test
+    fun distanceCoalescingDoesNotReportAPointLimit() {
+        val mutation =
+            PhotoEditHistory(
+                limits = PhotoEditLimits(maxPointsPerStroke = 3, minimumPointDistance = 0.25f),
+            ).addStroke(
+                stroke(
+                    "coalesced",
+                    PhotoStrokeMode.Draw,
+                    listOf(
+                        NormalizedPoint(0f, 0f),
+                        NormalizedPoint(0.01f, 0.01f),
+                        NormalizedPoint(0.02f, 0.02f),
+                        NormalizedPoint(0.03f, 0.03f),
+                        NormalizedPoint(0.04f, 0.04f),
+                    ),
+                ),
+            )
+
+        assertEquals(null, mutation.reachedLimit)
+        assertEquals(
+            2,
+            mutation.history.current.strokes
+                .single()
+                .points.size,
+        )
+    }
+
+    @Test
     fun totalPointAndStrokeLimitsDoNotGrowState() {
         val limits =
             PhotoEditLimits(
@@ -125,10 +153,10 @@ class PhotoEditRecipeTest {
                 minimumSize = 0.1f,
             )
 
-        assertEquals(0.9f, crop.left)
-        assertEquals(0.9f, crop.top)
-        assertEquals(1f, crop.right)
-        assertEquals(1f, crop.bottom)
+        assertEquals(0.9f, crop.left, 0.0001f)
+        assertEquals(0.9f, crop.top, 0.0001f)
+        assertEquals(1f, crop.right, 0.0001f)
+        assertEquals(1f, crop.bottom, 0.0001f)
     }
 
     @Test

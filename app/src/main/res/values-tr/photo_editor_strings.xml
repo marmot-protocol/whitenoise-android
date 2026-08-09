@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">Çıktı kalitesi</string>
     <string name="photo_editor_quality_low">Düşük</string>
     <string name="photo_editor_quality_standard">Standart</string>
+    <string name="photo_editor_quality_standard_description">Daha hızlı, daha az veri kullanır</string>
+    <string name="photo_editor_quality_hd_description">Daha net, daha fazla veri kullanır</string>
     <string name="photo_editor_quality_high">Yüksek (HD)</string>
     <string name="photo_editor_quality_original">Orijinal (düzenlenmiş)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">Fotoğraf düzenlemeleri silinsin mi?</string>
     <string name="photo_editor_discard_message">Orijinal ekiniz değişmeden kalacak.</string>
     <string name="photo_editor_discard">Düzenlemeleri sil</string>
+    <string name="photo_editor_done">Bitti</string>
+    <string name="photo_editor_discard_operation_title">Bu işlem iptal edilsin mi?</string>
+    <string name="photo_editor_discard_operation_message">Bu araç açıldıktan sonra yapılan değişiklikler kaldırılacak.</string>
     <string name="photo_editor_limit_strokes">Çizim sınırına ulaşıldı. Devam etmek için geri alın veya sıfırlayın.</string>
     <string name="photo_editor_limit_points">Düzenlemeyi akıcı tutmak için bu çizgi sadeleştirildi.</string>
     <string name="photo_editor_save_failed">Düzenlenen fotoğraf kaydedilemedi. Önceki ek değiştirilmedi.</string>

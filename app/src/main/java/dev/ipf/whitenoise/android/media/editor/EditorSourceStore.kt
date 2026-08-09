@@ -99,9 +99,10 @@ internal class EditorSourceStore(
     ): EditorSourceStageResult {
         val bytes =
             try {
-                contentResolver.openInputStream(uri)?.use {
+                val stream = contentResolver.openInputStream(uri) ?: return EditorSourceStageResult.Unavailable
+                stream.use {
                     MediaPipeline.readBoundedBytes(it, maxSourceBytes)
-                } ?: return EditorSourceStageResult.Unavailable
+                } ?: return EditorSourceStageResult.TooLarge
             } catch (_: IOException) {
                 return EditorSourceStageResult.Unavailable
             } catch (_: SecurityException) {

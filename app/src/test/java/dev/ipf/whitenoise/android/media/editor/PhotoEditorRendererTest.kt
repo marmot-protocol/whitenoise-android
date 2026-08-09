@@ -61,7 +61,7 @@ class PhotoEditorRendererTest {
         )
         assertEquals(2048, maxOf(standard.geometry.outputSize.width, standard.geometry.outputSize.height))
         assertTrue(maxOf(high.geometry.outputSize.width, high.geometry.outputSize.height) > 2048)
-        assertTrue(high.effectiveLabel.startsWith("High (HD)"))
+        assertTrue(high.effectiveLabel.startsWith("HD"))
     }
 
     @Test

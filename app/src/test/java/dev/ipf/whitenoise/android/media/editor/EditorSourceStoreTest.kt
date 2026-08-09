@@ -1,14 +1,27 @@
 package dev.ipf.whitenoise.android.media.editor
 
+import android.app.Application
+import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowContentResolver
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.IOException
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class EditorSourceStoreTest {
     @Test
-    fun stageEncryptsPersistsAndReturnsSource() {
+    fun stagePersistsAndReturnsSource() {
         val payloads = InMemoryPayloads()
         val records = InMemoryStrings()
         val store = store(payloads, records)
@@ -98,15 +111,72 @@ class EditorSourceStoreTest {
         assertEquals(3, store.lease(lease.id)?.references)
     }
 
+    @Test
+    fun stageUriMapsMissingStreamToUnavailableWithoutPublishing() {
+        val payloads = InMemoryPayloads()
+        val store = store(payloads = payloads)
+        val resolver = ApplicationProvider.getApplicationContext<Application>().contentResolver
+        val uri = Uri.fromFile(File("/definitely-missing/editor-source/photo"))
+        ShadowContentResolver.reset()
+
+        assertEquals(EditorSourceStageResult.Unavailable, store.stageUri(resolver, uri))
+        assertTrue(payloads.values.isEmpty())
+    }
+
+    @Test
+    fun stageUriMapsBoundedReadOverflowToTooLargeWithoutPublishing() {
+        val payloads = InMemoryPayloads()
+        val store = store(payloads = payloads, maxSourceBytes = 3)
+        val resolver = ApplicationProvider.getApplicationContext<Application>().contentResolver
+        val uri = Uri.parse("content://editor-source/large")
+        ShadowContentResolver.reset()
+        shadowOf(resolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(byteArrayOf(1, 2, 3, 4)) }
+
+        assertEquals(EditorSourceStageResult.TooLarge, store.stageUri(resolver, uri))
+        assertTrue(payloads.values.isEmpty())
+    }
+
+    @Test
+    fun stageUriMapsIoAndSecurityFailuresToUnavailableWithoutPublishing() {
+        val payloads = InMemoryPayloads()
+        val store = store(payloads = payloads)
+        val resolver = ApplicationProvider.getApplicationContext<Application>().contentResolver
+        val ioUri = Uri.parse("content://editor-source/io")
+        val securityUri = Uri.parse("content://editor-source/security")
+        ShadowContentResolver.reset()
+        shadowOf(resolver).registerInputStreamSupplier(ioUri) { throw IOException("unreadable") }
+        shadowOf(resolver).registerInputStreamSupplier(securityUri) { throw SecurityException("denied") }
+
+        assertEquals(EditorSourceStageResult.Unavailable, store.stageUri(resolver, ioUri))
+        assertEquals(EditorSourceStageResult.Unavailable, store.stageUri(resolver, securityUri))
+        assertTrue(payloads.values.isEmpty())
+    }
+
+    @Test
+    fun generatedIdsRemainUniqueAfterAReleasedLease() {
+        val store = store()
+        val first = (store.stageBytes(byteArrayOf(1)) as EditorSourceStageResult.Success).lease
+        assertTrue(store.release(first.id))
+
+        val second = (store.stageBytes(byteArrayOf(2)) as EditorSourceStageResult.Success).lease
+
+        assertTrue(first.id != second.id)
+    }
+
     private fun store(
         payloads: InMemoryPayloads = InMemoryPayloads(),
         records: InMemoryStrings = InMemoryStrings(),
-    ) = EditorSourceStore(
-        payloads = payloads,
-        records = records,
-        nowMs = { 123L },
-        newId = { "lease-" + payloads.values.size },
-    )
+        maxSourceBytes: Int = 64 * 1024 * 1024,
+    ): EditorSourceStore {
+        var nextId = 0
+        return EditorSourceStore(
+            payloads = payloads,
+            records = records,
+            nowMs = { 123L },
+            newId = { "lease-${nextId++}" },
+            maxSourceBytes = maxSourceBytes,
+        )
+    }
 }
 
 private class InMemoryPayloads : EditorEncryptedPayloadStore {

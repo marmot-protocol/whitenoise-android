@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -263,6 +264,44 @@ class MessageDraftRepositoryTest {
             assertNull(sources.bytes(staleLease.id))
         }
 
+    @Test
+    fun draftReadRethrowsCancellation() =
+        runTest {
+            val gateway = FakeDraftGateway(null).apply { readFailure = CancellationException("cancelled") }
+
+            var propagated = false
+            try {
+                repository(gateway).draft(ACCOUNT, GROUP)
+            } catch (_: CancellationException) {
+                propagated = true
+            }
+
+            assertTrue(propagated)
+        }
+
+    @Test
+    fun editorReconciliationRethrowsCancellation() =
+        runTest {
+            val sessions = EditorSessionStore(RepositorySessionStrings())
+            val existing = attachment("target", byteArrayOf(1))
+            assertTrue(sessions.savePending(session(existing)))
+            val gateway = FakeDraftGateway(null).apply { readFailure = CancellationException("cancelled") }
+            val sources =
+                EditorSourceStore(
+                    payloads = RepositoryPayloads(),
+                    records = RepositorySessionStrings(),
+                )
+
+            var propagated = false
+            try {
+                repository(gateway, sessions).reconcileEditorState(sources)
+            } catch (_: CancellationException) {
+                propagated = true
+            }
+
+            assertTrue(propagated)
+        }
+
     private fun repository(
         gateway: FakeDraftGateway,
         sessions: EditorSessionStore = EditorSessionStore(RepositorySessionStrings()),
@@ -322,13 +361,17 @@ private class FakeDraftGateway(
     var current: MessageDraftFfi?,
 ) : MessageDraftGateway {
     var saveCalls = 0
+    var readFailure: Throwable? = null
     var throwBeforeNextSave = false
     var throwAfterNextSave = false
 
     override fun read(
         accountRef: String,
         groupIdHex: String,
-    ): MessageDraftFfi? = current
+    ): MessageDraftFfi? {
+        readFailure?.let { throw it }
+        return current
+    }
 
     override fun save(
         accountRef: String,

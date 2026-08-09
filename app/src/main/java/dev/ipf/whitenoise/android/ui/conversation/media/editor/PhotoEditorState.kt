@@ -24,6 +24,16 @@ internal enum class PhotoEditorTool {
     Erase,
 }
 
+internal enum class PhotoEditorOperation {
+    Crop,
+    Draw,
+}
+
+internal enum class PhotoEditorQualityTier {
+    Standard,
+    Hd,
+}
+
 internal enum class PhotoCropPreset(
     val outputAspectRatio: Float?,
 ) {
@@ -60,7 +70,8 @@ internal enum class PhotoEditorAnnouncement {
 internal data class PhotoEditorUiState(
     val history: PhotoEditHistory,
     val quality: MediaQuality,
-    val activeTool: PhotoEditorTool = PhotoEditorTool.Crop,
+    val activeOperation: PhotoEditorOperation? = null,
+    val activeTool: PhotoEditorTool = PhotoEditorTool.Draw,
     val cropPreset: PhotoCropPreset = PhotoCropPreset.Free,
     val drawColorArgb: Int = 0xFFFF3B30.toInt(),
     val strokeWidth: PhotoStrokeWidth = PhotoStrokeWidth.Medium,
@@ -77,6 +88,17 @@ internal data class PhotoEditorUiState(
 
     val canRedo: Boolean
         get() = history.canRedo && !isSaving
+
+    val qualityTier: PhotoEditorQualityTier
+        get() =
+            when (quality) {
+                MediaQuality.Low,
+                MediaQuality.Standard,
+                -> PhotoEditorQualityTier.Standard
+                MediaQuality.High,
+                MediaQuality.Original,
+                -> PhotoEditorQualityTier.Hd
+            }
 }
 
 @Suppress("TooManyFunctions") // Intent-style commands form one cohesive state-holder API.
@@ -87,13 +109,14 @@ internal class PhotoEditorStateHolder(
     private val newStrokeId: () -> String = { UUID.randomUUID().toString() },
 ) {
     val initialRecipe: PhotoEditRecipe = initialRecipe
-    val initialQuality: MediaQuality = initialQuality
+    val initialQuality: MediaQuality = initialQuality.toEditorQuality()
+    private var operationEntryHistory: PhotoEditHistory? = null
 
     var state by
         mutableStateOf(
             PhotoEditorUiState(
                 history = PhotoEditHistory(original = initialRecipe, current = initialRecipe),
-                quality = initialQuality,
+                quality = this.initialQuality,
             ),
         )
         private set
@@ -101,8 +124,71 @@ internal class PhotoEditorStateHolder(
     val hasUnsavedChanges: Boolean
         get() = state.recipe != initialRecipe || state.quality != initialQuality
 
+    val hasUncommittedOperationChanges: Boolean
+        get() = operationEntryHistory?.current?.let { it != state.recipe } == true
+
+    fun beginCropOperation() {
+        beginOperation(PhotoEditorOperation.Crop, PhotoEditorTool.Crop)
+    }
+
+    fun beginDrawOperation() {
+        beginOperation(PhotoEditorOperation.Draw, PhotoEditorTool.Draw)
+    }
+
+    fun commitOperation() {
+        if (state.isSaving || state.activeOperation == null) return
+        val entryHistory = operationEntryHistory ?: return
+        val committedHistory = entryHistory.applyRecipe(state.recipe)
+        operationEntryHistory = null
+        state =
+            state.copy(
+                history = committedHistory,
+                activeOperation = null,
+                activeTool = PhotoEditorTool.Draw,
+                cropPreset = PhotoCropPreset.Free,
+                errorMessage = null,
+            )
+    }
+
+    fun discardOperation() {
+        if (state.isSaving || state.activeOperation == null) return
+        val entry = operationEntryHistory
+        operationEntryHistory = null
+        state =
+            state.copy(
+                history = entry ?: state.history,
+                activeOperation = null,
+                activeTool = PhotoEditorTool.Draw,
+                cropPreset = PhotoCropPreset.Free,
+                errorMessage = null,
+                lastLimit = null,
+            )
+    }
+
+    private fun beginOperation(
+        operation: PhotoEditorOperation,
+        tool: PhotoEditorTool,
+    ) {
+        if (state.isSaving || state.activeOperation != null) return
+        operationEntryHistory = state.history
+        state =
+            state.copy(
+                history =
+                    PhotoEditHistory(
+                        original = state.recipe,
+                        current = state.recipe,
+                        limits = state.history.limits,
+                    ),
+                activeOperation = operation,
+                activeTool = tool,
+                errorMessage = null,
+                lastLimit = null,
+                announcement = PhotoEditorAnnouncement.ToolSelected,
+            )
+    }
+
     fun selectTool(tool: PhotoEditorTool) {
-        if (!state.isSaving) {
+        if (!state.isSaving && state.activeOperation == PhotoEditorOperation.Draw) {
             state =
                 state.copy(
                     activeTool = tool,
@@ -113,7 +199,7 @@ internal class PhotoEditorStateHolder(
     }
 
     fun selectQuality(quality: MediaQuality) {
-        if (!state.isSaving) {
+        if (!state.isSaving && state.activeOperation == null) {
             state =
                 state.copy(
                     quality = quality,
@@ -123,16 +209,29 @@ internal class PhotoEditorStateHolder(
         }
     }
 
+    fun selectQualityTier(tier: PhotoEditorQualityTier) {
+        selectQuality(
+            when (tier) {
+                PhotoEditorQualityTier.Standard -> MediaQuality.Standard
+                PhotoEditorQualityTier.Hd -> MediaQuality.High
+            },
+        )
+    }
+
     fun selectColor(colorArgb: Int) {
-        if (!state.isSaving) state = state.copy(drawColorArgb = colorArgb, errorMessage = null)
+        if (!state.isSaving && state.activeOperation == PhotoEditorOperation.Draw) {
+            state = state.copy(drawColorArgb = colorArgb, errorMessage = null)
+        }
     }
 
     fun selectStrokeWidth(width: PhotoStrokeWidth) {
-        if (!state.isSaving) state = state.copy(strokeWidth = width, errorMessage = null)
+        if (!state.isSaving && state.activeOperation == PhotoEditorOperation.Draw) {
+            state = state.copy(strokeWidth = width, errorMessage = null)
+        }
     }
 
     fun selectCropPreset(preset: PhotoCropPreset) {
-        if (state.isSaving) return
+        if (state.isSaving || state.activeOperation != PhotoEditorOperation.Crop) return
         val crop = cropForPreset(orientedSize, state.recipe.quarterTurnsClockwise, preset, state.recipe.crop)
         state =
             state.copy(
@@ -145,7 +244,7 @@ internal class PhotoEditorStateHolder(
     }
 
     fun commitFreeCrop(crop: NormalizedRect) {
-        if (!state.isSaving) {
+        if (!state.isSaving && state.activeOperation == PhotoEditorOperation.Crop) {
             state =
                 state.copy(
                     history = state.history.setCrop(crop),
@@ -158,7 +257,7 @@ internal class PhotoEditorStateHolder(
     }
 
     fun rotateClockwise() {
-        if (!state.isSaving) {
+        if (!state.isSaving && state.activeOperation == PhotoEditorOperation.Crop) {
             state =
                 state.copy(
                     history = state.history.rotateClockwise(),
@@ -171,7 +270,7 @@ internal class PhotoEditorStateHolder(
     }
 
     fun commitStroke(points: List<NormalizedPoint>) {
-        if (state.isSaving || points.isEmpty()) return
+        if (state.isSaving || state.activeOperation != PhotoEditorOperation.Draw || points.isEmpty()) return
         val mutation =
             state.history.addStroke(
                 PhotoEditStroke(
@@ -224,7 +323,7 @@ internal class PhotoEditorStateHolder(
     }
 
     fun reset() {
-        if (!state.isSaving) {
+        if (!state.isSaving && state.activeOperation == null) {
             state =
                 state.copy(
                     history = state.history.reset(),
@@ -237,13 +336,25 @@ internal class PhotoEditorStateHolder(
     }
 
     fun beginSaving() {
-        state = state.copy(isSaving = true, errorMessage = null, announcement = null)
+        if (state.activeOperation == null) {
+            state = state.copy(isSaving = true, errorMessage = null, announcement = null)
+        }
     }
 
     fun finishSaving(errorMessage: String? = null) {
         state = state.copy(isSaving = false, errorMessage = errorMessage)
     }
 }
+
+private fun MediaQuality.toEditorQuality(): MediaQuality =
+    when (this) {
+        MediaQuality.Low,
+        MediaQuality.Standard,
+        -> MediaQuality.Standard
+        MediaQuality.High,
+        MediaQuality.Original,
+        -> MediaQuality.High
+    }
 
 internal fun cropForPreset(
     orientedSize: EditorPixelSize,
@@ -281,4 +392,4 @@ internal fun minimumCropFraction(orientedSize: EditorPixelSize): Float =
     max(
         0.01f,
         32f / min(orientedSize.width, orientedSize.height).coerceAtLeast(1),
-    )
+    ).coerceAtMost(1f)

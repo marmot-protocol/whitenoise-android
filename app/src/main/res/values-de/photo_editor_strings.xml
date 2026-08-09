@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">Ausgabequalität</string>
     <string name="photo_editor_quality_low">Niedrig</string>
     <string name="photo_editor_quality_standard">Standard</string>
+    <string name="photo_editor_quality_standard_description">Schneller, verbraucht weniger Daten</string>
+    <string name="photo_editor_quality_hd_description">Schärfer, verbraucht mehr Daten</string>
     <string name="photo_editor_quality_high">Hoch (HD)</string>
     <string name="photo_editor_quality_original">Original (bearbeitet)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">Fotobearbeitungen verwerfen?</string>
     <string name="photo_editor_discard_message">Dein ursprünglicher Anhang bleibt unverändert.</string>
     <string name="photo_editor_discard">Bearbeitungen verwerfen</string>
+    <string name="photo_editor_done">Fertig</string>
+    <string name="photo_editor_discard_operation_title">Diesen Vorgang verwerfen?</string>
+    <string name="photo_editor_discard_operation_message">Änderungen seit dem Öffnen dieses Werkzeugs werden entfernt.</string>
     <string name="photo_editor_limit_strokes">Zeichenlimit erreicht. Mache einen Schritt rückgängig oder setze zurück.</string>
     <string name="photo_editor_limit_points">Dieser Strich wurde vereinfacht, damit die Bearbeitung flüssig bleibt.</string>
     <string name="photo_editor_save_failed">Das bearbeitete Foto konnte nicht gespeichert werden. Der vorherige Anhang bleibt unverändert.</string>

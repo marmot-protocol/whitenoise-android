@@ -50,7 +50,7 @@ internal data class NormalizedRect(
             second: NormalizedPoint,
             minimumSize: Float,
         ): NormalizedRect {
-            require(minimumSize.isFinite() && minimumSize in 0f..1f)
+            require(minimumSize.isFinite() && minimumSize > 0f && minimumSize <= 1f)
             val a = first.clamped()
             val b = second.clamped()
             var left = min(a.x, b.x)
@@ -60,12 +60,12 @@ internal data class NormalizedRect(
             if (right - left < minimumSize) {
                 val center = (left + right) / 2f
                 left = (center - minimumSize / 2f).coerceIn(0f, 1f - minimumSize)
-                right = left + minimumSize
+                right = (left + minimumSize).coerceAtMost(1f)
             }
             if (bottom - top < minimumSize) {
                 val center = (top + bottom) / 2f
                 top = (center - minimumSize / 2f).coerceIn(0f, 1f - minimumSize)
-                bottom = top + minimumSize
+                bottom = (top + minimumSize).coerceAtMost(1f)
             }
             return NormalizedRect(left, top, right, bottom)
         }
@@ -163,6 +163,8 @@ internal data class PhotoEditHistory(
 
     fun reset(): PhotoEditHistory = commit(original)
 
+    fun applyRecipe(recipe: PhotoEditRecipe): PhotoEditHistory = commit(recipe)
+
     fun addStroke(stroke: PhotoEditStroke): PhotoEditMutation {
         if (current.strokes.size >= limits.maxStrokes) {
             return PhotoEditMutation(this, PhotoEditLimit.StrokeCount)
@@ -177,11 +179,13 @@ internal data class PhotoEditHistory(
                 maxPoints = min(limits.maxPointsPerStroke, remainingPoints),
                 minimumDistance = limits.minimumPointDistance,
             )
+        val appliedPointCap = min(limits.maxPointsPerStroke, remainingPoints)
         val limit =
             when {
-                sanitized.size < stroke.points.size && remainingPoints < limits.maxPointsPerStroke ->
+                sanitized.size >= appliedPointCap && remainingPoints < limits.maxPointsPerStroke ->
                     PhotoEditLimit.TotalPoints
-                sanitized.size < stroke.points.size -> PhotoEditLimit.StrokePoints
+                sanitized.size >= appliedPointCap && stroke.points.size > appliedPointCap ->
+                    PhotoEditLimit.StrokePoints
                 else -> null
             }
         val nextStroke = stroke.copy(points = sanitized)

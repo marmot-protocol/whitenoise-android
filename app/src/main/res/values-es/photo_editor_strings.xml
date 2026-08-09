@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">Calidad de salida</string>
     <string name="photo_editor_quality_low">Baja</string>
     <string name="photo_editor_quality_standard">Estándar</string>
+    <string name="photo_editor_quality_standard_description">Más rápida, usa menos datos</string>
+    <string name="photo_editor_quality_hd_description">Más nítida, usa más datos</string>
     <string name="photo_editor_quality_high">Alta (HD)</string>
     <string name="photo_editor_quality_original">Original (editada)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">¿Descartar las ediciones?</string>
     <string name="photo_editor_discard_message">El archivo adjunto original no cambiará.</string>
     <string name="photo_editor_discard">Descartar ediciones</string>
+    <string name="photo_editor_done">Listo</string>
+    <string name="photo_editor_discard_operation_title">¿Descartar esta operación?</string>
+    <string name="photo_editor_discard_operation_message">Se eliminarán los cambios realizados desde que abriste esta herramienta.</string>
     <string name="photo_editor_limit_strokes">Se alcanzó el límite de dibujo. Deshaz o restablece para continuar.</string>
     <string name="photo_editor_limit_points">Este trazo se simplificó para mantener una edición fluida.</string>
     <string name="photo_editor_save_failed">No se pudo guardar la foto editada. El archivo adjunto anterior no ha cambiado.</string>

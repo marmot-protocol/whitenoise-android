@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -69,11 +70,11 @@ class PhotoEditorSemanticsTest {
     }
 
     @Test
-    fun toolsHistoryAndQualityExposeSelectedAndEnabledState() {
+    fun focusedToolsKeepHistoryAndQualityOffersOnlyStandardOrHd() {
         render()
 
-        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).assertIsSelected()
-        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).performClick().assertIsSelected()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).assertIsSelected()
         composeRule
             .onNodeWithContentDescription(
                 string(
@@ -97,6 +98,7 @@ class PhotoEditorSemanticsTest {
         }
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_undo)).assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_redo)).assertIsEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_done)).performClick()
 
         composeRule
             .onNodeWithContentDescription(
@@ -105,14 +107,22 @@ class PhotoEditorSemanticsTest {
                     string(R.string.photo_editor_quality_standard),
                 ),
             ).performClick()
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality_high)).performClick()
+        composeRule
+            .onNodeWithContentDescription(
+                string(
+                    R.string.photo_editor_announcement_quality,
+                    string(R.string.photo_editor_quality_hd),
+                ),
+            ).performClick()
         composeRule
             .onAllNodesWithContentDescription(
                 string(
                     R.string.photo_editor_announcement_quality,
-                    string(R.string.photo_editor_quality_high),
+                    string(R.string.photo_editor_quality_hd),
                 ),
             ).assertCountEquals(2)
+        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_high)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_original)).assertCountEquals(0)
         assertEquals(MediaQuality.High, holder.state.quality)
     }
 
@@ -120,6 +130,7 @@ class PhotoEditorSemanticsTest {
     fun cropPresetRotationAndResetAreReachableWithoutGestures() {
         render()
 
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).performClick()
         composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_crop_square))
             .performClick()
@@ -129,6 +140,12 @@ class PhotoEditorSemanticsTest {
             .onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise))
             .performClick()
         assertEquals(1, holder.state.recipe.quarterTurnsClockwise)
+        val cropped = holder.state.recipe
+
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_done)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).performClick()
+        assertEquals(cropped, holder.state.recipe)
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_done)).performClick()
 
         composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_reset))
@@ -145,10 +162,6 @@ class PhotoEditorSemanticsTest {
             .assertWidthIsAtLeast(48.dp)
             .assertHeightIsAtLeast(48.dp)
         composeRule
-            .onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise))
-            .assertWidthIsAtLeast(48.dp)
-            .assertHeightIsAtLeast(48.dp)
-        composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_crop))
             .assertHeightIsAtLeast(48.dp)
         composeRule
@@ -158,6 +171,11 @@ class PhotoEditorSemanticsTest {
                     string(R.string.photo_editor_quality_standard),
                 ),
             ).assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).performClick()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise))
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     @Test
@@ -165,7 +183,9 @@ class PhotoEditorSemanticsTest {
         var cancels = 0
         var saves = 0
         render(onCancel = { cancels += 1 }, onSave = { _, _ -> saves += 1 })
-        composeRule.runOnIdle { holder.rotateClockwise() }
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_done)).performClick()
 
         composeRule.onNodeWithContentDescription(string(R.string.cancel)).performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard_title)).assertIsDisplayed()
@@ -180,8 +200,10 @@ class PhotoEditorSemanticsTest {
         var saved: Pair<PhotoEditRecipe, MediaQuality>? = null
         render(onSave = { recipe, quality -> saved = recipe to quality })
         composeRule.runOnIdle {
+            holder.beginDrawOperation()
             holder.selectTool(PhotoEditorTool.Draw)
             holder.commitStroke(listOf(NormalizedPoint(0.5f, 0.5f)))
+            holder.commitOperation()
         }
 
         composeRule.onNodeWithContentDescription(string(R.string.save)).performClick()

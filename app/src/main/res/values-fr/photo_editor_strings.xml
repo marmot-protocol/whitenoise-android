@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">Qualité de sortie</string>
     <string name="photo_editor_quality_low">Faible</string>
     <string name="photo_editor_quality_standard">Standard</string>
+    <string name="photo_editor_quality_standard_description">Plus rapide, utilise moins de données</string>
+    <string name="photo_editor_quality_hd_description">Plus nette, utilise plus de données</string>
     <string name="photo_editor_quality_high">Élevée (HD)</string>
     <string name="photo_editor_quality_original">Originale (modifiée)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">Ignorer les modifications ?</string>
     <string name="photo_editor_discard_message">Votre pièce jointe d’origine restera inchangée.</string>
     <string name="photo_editor_discard">Ignorer les modifications</string>
+    <string name="photo_editor_done">Terminé</string>
+    <string name="photo_editor_discard_operation_title">Ignorer cette opération ?</string>
+    <string name="photo_editor_discard_operation_message">Les modifications apportées depuis l’ouverture de cet outil seront supprimées.</string>
     <string name="photo_editor_limit_strokes">Limite de dessin atteinte. Annulez ou réinitialisez pour continuer.</string>
     <string name="photo_editor_limit_points">Ce trait a été simplifié pour préserver la fluidité de l’édition.</string>
     <string name="photo_editor_save_failed">Impossible d’enregistrer la photo modifiée. La pièce jointe précédente est inchangée.</string>

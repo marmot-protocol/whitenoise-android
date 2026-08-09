@@ -1413,6 +1413,9 @@
     <string name="photo_editor_quality">Output quality</string>
     <string name="photo_editor_quality_low">Low</string>
     <string name="photo_editor_quality_standard">Standard</string>
+    <string name="photo_editor_quality_hd" translatable="false">HD</string>
+    <string name="photo_editor_quality_standard_description">Faster, uses less data</string>
+    <string name="photo_editor_quality_hd_description">Sharper, uses more data</string>
     <string name="photo_editor_quality_high">High (HD)</string>
     <string name="photo_editor_quality_original">Original (edited)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -1429,6 +1432,9 @@
     <string name="photo_editor_discard_title">Discard photo edits?</string>
     <string name="photo_editor_discard_message">Your original attachment will stay unchanged.</string>
     <string name="photo_editor_discard">Discard edits</string>
+    <string name="photo_editor_done">Done</string>
+    <string name="photo_editor_discard_operation_title">Discard this operation?</string>
+    <string name="photo_editor_discard_operation_message">Changes made since opening this tool will be removed.</string>
     <string name="photo_editor_limit_strokes">Drawing limit reached. Undo or reset to continue.</string>
     <string name="photo_editor_limit_points">This stroke was simplified to keep editing responsive.</string>
     <string name="photo_editor_save_failed">Couldn’t save the edited photo. The previous attachment is unchanged.</string>

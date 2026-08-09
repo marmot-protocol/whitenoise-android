@@ -831,7 +831,8 @@ object MediaPipeline {
      * Read an image for the "Original" quality level: preserve encoded pixel
      * bytes and strip identifying metadata without decoding/re-encoding. This
      * supports the containers whose metadata envelopes are safe to edit here
-     * (JPEG APP1/APP13/comment, PNG textual/eXIf chunks, WebP EXIF/XMP chunks).
+     * (JPEG APP1/APP13/comment, PNG textual/eXIf chunks, WebP EXIF/XMP/ICC
+     * chunks, and GIF comments/application metadata).
      * Unsupported containers return [OriginalImageReadResult.Unsupported] so the
      * caller can fall back to the JPEG privacy path instead of leaking metadata.
      */
@@ -885,11 +886,23 @@ object MediaPipeline {
             OriginalImageKind.Jpeg -> stripJpegMetadata(bytes)
             OriginalImageKind.Png -> stripPngMetadata(bytes)
             OriginalImageKind.Webp -> stripWebpMetadata(bytes)
-            // GIF carries no EXIF/GPS and re-encoding would drop the NETSCAPE
-            // loop block — pass the bytes through so the animation survives.
-            OriginalImageKind.Gif -> bytes
+            OriginalImageKind.Gif -> stripGifMetadata(bytes)
             null -> null
         }
+
+    /** Strips metadata only when the result remains a positively identified animation. */
+    @Suppress("ReturnCount") // Every guard fails closed before provider bytes can become an attachment.
+    internal fun sanitizeAnimatedImageMetadata(bytes: ByteArray): ByteArray? {
+        if (imageAnimationStatus(bytes) != ImageAnimationStatus.ANIMATED) return null
+        if (exifOrientationRequiresPixelTransform(readExifOrientation(bytes))) return null
+        val sanitized =
+            when (originalImageKind(bytes)) {
+                OriginalImageKind.Gif -> stripGifMetadata(bytes)
+                OriginalImageKind.Webp -> stripWebpMetadata(bytes)
+                else -> null
+            } ?: return null
+        return sanitized.takeIf { imageAnimationStatus(it) == ImageAnimationStatus.ANIMATED }
+    }
 
     /**
      * Decode the image at [uri], downscale so the longer edge ≤ [maxEdgePx],
@@ -1312,12 +1325,12 @@ object MediaPipeline {
             if (paddedEndLong > bytes.size.toLong()) return null
             val paddedEnd = paddedEndLong.toInt()
             when (chunkType) {
-                "EXIF", "XMP " -> Unit
+                "EXIF", "XMP ", "ICCP" -> Unit
                 "VP8X" -> {
                     val chunk = bytes.copyOfRange(pos, paddedEnd)
                     if (chunkSize > 0) {
-                        // Clear the EXIF and XMP presence bits after dropping those chunks.
-                        chunk[8] = (chunk[8].toInt() and 0xf3).toByte()
+                        // Clear ICC, EXIF, and XMP presence bits after dropping those chunks.
+                        chunk[8] = (chunk[8].toInt() and WEBP_FLAGS_WITHOUT_PRIVATE_METADATA).toByte()
                     }
                     out.write(chunk, 0, chunk.size)
                 }
@@ -1331,6 +1344,99 @@ object MediaPipeline {
         return result
     }
 
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
+    // GIF is a block stream. Preserve image data, graphics control, and only
+    // the two standard animation-loop application extensions; drop comments,
+    // plain text, XMP, ICC, and arbitrary application payloads.
+    private fun stripGifMetadata(bytes: ByteArray): ByteArray? {
+        if (!isGif(bytes) || bytes.size < GIF_FIXED_HEADER_BYTES) return null
+        val packed = u8(bytes, GIF_LOGICAL_SCREEN_PACKED_OFFSET)
+        val globalColorBytes =
+            if (packed and GIF_COLOR_TABLE_FLAG != 0) {
+                GIF_COLOR_ENTRY_BYTES * (1 shl ((packed and GIF_COLOR_TABLE_SIZE_MASK) + 1))
+            } else {
+                0
+            }
+        var position = GIF_FIXED_HEADER_BYTES + globalColorBytes
+        if (position > bytes.size) return null
+        val out = ByteArrayOutputStream(bytes.size)
+        out.write(bytes, 0, position)
+        var imageCount = 0
+        while (position < bytes.size) {
+            when (u8(bytes, position)) {
+                GIF_TRAILER -> {
+                    if (position != bytes.lastIndex || imageCount == 0) return null
+                    out.write(GIF_TRAILER)
+                    return out.toByteArray()
+                }
+                GIF_IMAGE_SEPARATOR -> {
+                    if (position + GIF_IMAGE_DESCRIPTOR_BYTES > bytes.size) return null
+                    val imagePacked = u8(bytes, position + GIF_IMAGE_PACKED_OFFSET)
+                    val localColorBytes =
+                        if (imagePacked and GIF_COLOR_TABLE_FLAG != 0) {
+                            GIF_COLOR_ENTRY_BYTES * (1 shl ((imagePacked and GIF_COLOR_TABLE_SIZE_MASK) + 1))
+                        } else {
+                            0
+                        }
+                    val imageDataStart = position + GIF_IMAGE_DESCRIPTOR_BYTES + localColorBytes
+                    if (imageDataStart >= bytes.size) return null
+                    val imageEnd = gifSubBlocksEnd(bytes, imageDataStart + 1) ?: return null
+                    out.write(bytes, position, imageEnd - position)
+                    position = imageEnd
+                    imageCount++
+                }
+                GIF_EXTENSION_INTRODUCER -> {
+                    if (position + 2 > bytes.size) return null
+                    val label = u8(bytes, position + 1)
+                    val extensionEnd = gifSubBlocksEnd(bytes, position + 2) ?: return null
+                    val keep =
+                        when (label) {
+                            GIF_GRAPHICS_CONTROL_LABEL -> true
+                            GIF_APPLICATION_LABEL -> isGifLoopApplicationExtension(bytes, position, extensionEnd)
+                            GIF_COMMENT_LABEL,
+                            GIF_PLAIN_TEXT_LABEL,
+                            -> false
+                            else -> return null
+                        }
+                    if (keep) out.write(bytes, position, extensionEnd - position)
+                    position = extensionEnd
+                }
+                else -> return null
+            }
+        }
+        return null
+    }
+
+    @Suppress("ReturnCount") // A malformed size must stop at the exact failing sub-block.
+    private fun gifSubBlocksEnd(
+        bytes: ByteArray,
+        start: Int,
+    ): Int? {
+        var position = start
+        while (position < bytes.size) {
+            val blockSize = u8(bytes, position)
+            position++
+            if (blockSize == 0) return position
+            if (position + blockSize > bytes.size) return null
+            position += blockSize
+        }
+        return null
+    }
+
+    @Suppress("ReturnCount") // Bounds guards avoid reading an untrusted extension identifier.
+    private fun isGifLoopApplicationExtension(
+        bytes: ByteArray,
+        start: Int,
+        end: Int,
+    ): Boolean {
+        val blockSizeOffset = start + 2
+        if (blockSizeOffset >= end || u8(bytes, blockSizeOffset) != GIF_APPLICATION_IDENTIFIER_BYTES) return false
+        val identifierStart = blockSizeOffset + 1
+        if (identifierStart + GIF_APPLICATION_IDENTIFIER_BYTES > end) return false
+        val identifier = ascii(bytes, identifierStart, GIF_APPLICATION_IDENTIFIER_BYTES)
+        return identifier == "NETSCAPE2.0" || identifier == "ANIMEXTS1.0"
+    }
+
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
     private const val PNG_CHUNK_HEADER_BYTES = 8
     private const val PNG_CHUNK_OVERHEAD = 12
@@ -1342,6 +1448,22 @@ object MediaPipeline {
     private const val ISO_BMFF_BRAND_BYTES = 4
     private const val ISO_BMFF_FILE_TYPE_MIN_BYTES = 16L
     private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
+    private const val GIF_FIXED_HEADER_BYTES = 13
+    private const val GIF_LOGICAL_SCREEN_PACKED_OFFSET = 10
+    private const val GIF_COLOR_TABLE_FLAG = 0x80
+    private const val GIF_COLOR_TABLE_SIZE_MASK = 0x07
+    private const val GIF_COLOR_ENTRY_BYTES = 3
+    private const val GIF_TRAILER = 0x3b
+    private const val GIF_IMAGE_SEPARATOR = 0x2c
+    private const val GIF_IMAGE_DESCRIPTOR_BYTES = 10
+    private const val GIF_IMAGE_PACKED_OFFSET = 9
+    private const val GIF_EXTENSION_INTRODUCER = 0x21
+    private const val GIF_GRAPHICS_CONTROL_LABEL = 0xf9
+    private const val GIF_APPLICATION_LABEL = 0xff
+    private const val GIF_COMMENT_LABEL = 0xfe
+    private const val GIF_PLAIN_TEXT_LABEL = 0x01
+    private const val GIF_APPLICATION_IDENTIFIER_BYTES = 11
+    private const val WEBP_FLAGS_WITHOUT_PRIVATE_METADATA = 0xd3
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
     private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024
     private const val EXIF_ORIENTATION_TAG = 0x0112

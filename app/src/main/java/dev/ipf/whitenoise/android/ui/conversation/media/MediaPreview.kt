@@ -362,7 +362,7 @@ internal fun MediaPreviewContent(
                 val editable = currentMedia.slot.id !in nonEditableMediaSlotIds
                 val nonEditableDescription =
                     nonEditableMediaDescriptions[currentMedia.slot.id]
-                        ?: stringResource(R.string.photo_editor_not_editable_animation)
+                        ?: stringResource(R.string.photo_editor_not_editable_source)
                 val editDescription =
                     preparedPhotoLabels[currentMedia.slot.id]?.let { quality ->
                         stringResource(R.string.photo_editor_edit_with_quality, quality)

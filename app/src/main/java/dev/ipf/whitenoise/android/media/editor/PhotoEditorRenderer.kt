@@ -14,6 +14,7 @@ import android.graphics.RectF
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaQuality
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -95,13 +96,20 @@ internal class PhotoEditorRenderer(
         withContext(renderDispatcher) {
             when (inspectNow(sourceBytes)) {
                 is PhotoEditorInspectResult.Failure -> null
-                is PhotoEditorInspectResult.Success ->
-                    MediaPipeline
-                        .decodeSampledBitmap(
+                is PhotoEditorInspectResult.Success -> {
+                    val preview =
+                        MediaPipeline.decodeSampledBitmap(
                             bytes = sourceBytes,
                             maxEdgePx = PREVIEW_MAX_EDGE_PX,
                             honorExifOrientation = true,
-                        )?.takeIf { it.width.toLong() * it.height <= PREVIEW_MAX_PIXELS }
+                        )
+                    if (preview != null && preview.width.toLong() * preview.height > PREVIEW_MAX_PIXELS) {
+                        preview.recycle()
+                        null
+                    } else {
+                        preview
+                    }
+                }
             }
         }
 
@@ -176,10 +184,12 @@ internal class PhotoEditorRenderer(
             }
         val profileName =
             when (quality) {
-                MediaQuality.Low -> "Low"
-                MediaQuality.Standard -> "Standard"
-                MediaQuality.High -> "High (HD)"
-                MediaQuality.Original -> "Original (edited)"
+                MediaQuality.Low,
+                MediaQuality.Standard,
+                -> "Standard"
+                MediaQuality.High,
+                MediaQuality.Original,
+                -> "HD"
             }
         return PhotoEditorOutputPlan(
             quality = quality,
@@ -268,6 +278,9 @@ internal class PhotoEditorRenderer(
             currentCoroutineContext().ensureActive()
             renderMarks(canvas, geometry)
             output
+        } catch (cancelled: CancellationException) {
+            output?.recycle()
+            throw cancelled
         } catch (_: OutOfMemoryError) {
             output?.recycle()
             null

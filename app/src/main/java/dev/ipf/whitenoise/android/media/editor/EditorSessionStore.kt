@@ -156,6 +156,17 @@ internal class EditorSessionStore(
             sessions.values.groupingBy { it.sourceLeaseId }.eachCount()
         }
 
+    /** Removes only one account's sessions; safe to repeat after a completed account wipe. */
+    fun removeAccount(accountRef: String): Boolean =
+        synchronized(lock) {
+            ensureLoadedLocked()
+            val updated = sessions.filterValues { it.accountRef != accountRef }
+            if (updated.size == sessions.size) return true
+            if (!persistLocked(updated)) return false
+            sessions = LinkedHashMap(updated)
+            true
+        }
+
     fun clear() {
         synchronized(lock) {
             sessions.clear()

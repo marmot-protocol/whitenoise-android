@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media.editor
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,10 +99,51 @@ class EditorSessionStoreTest {
     }
 
     @Test
-    fun oversizedRecipeFailsWithoutReplacingExistingRecord() {
+    fun reconcileKeepsPriorLeaseOwnershipWhenPersistenceFails() {
         val persistence = InMemorySessionStrings()
-        val store = EditorSessionStore(persistence, maxSerializedBytes = 300)
+        val store = EditorSessionStore(persistence)
+        val keep = session(attachmentId = "keep", sourceLeaseId = "source-keep", digest = "a".repeat(64))
+        val stale = session(attachmentId = "stale", sourceLeaseId = "source-stale", digest = "b".repeat(64))
+        assertTrue(store.savePending(keep))
+        assertTrue(store.savePending(stale))
+        persistence.failWrites = true
+
+        val live =
+            store.reconcile(
+                mapOf(Triple("account", "group", "keep") to keep.attachmentDigest),
+            )
+
+        assertEquals(setOf("source-keep", "source-stale"), live)
+        assertEquals(setOf("source-keep", "source-stale"), store.sourceLeaseReferenceCounts().keys)
+    }
+
+    @Test
+    fun removeAccountPurgesOnlyThatAccountsSessionsAndIsIdempotent() {
+        val store = EditorSessionStore(InMemorySessionStrings())
+        val removed = session(accountRef = "removed", sourceLeaseId = "removed-source", digest = "a".repeat(64))
+        val retained = session(accountRef = "retained", sourceLeaseId = "retained-source", digest = "b".repeat(64))
+        assertTrue(store.savePending(removed))
+        assertTrue(store.savePending(retained))
+
+        assertTrue(store.removeAccount("removed"))
+        assertTrue(store.removeAccount("removed"))
+
+        assertEquals(mapOf("retained-source" to 1), store.sourceLeaseReferenceCounts())
+        assertEquals(setOf(Triple("retained", "group", "attachment")), store.attachmentKeys())
+    }
+
+    @Test
+    fun oversizedRecipeFailsWithoutReplacingExistingRecord() {
         val original = session(digest = "a".repeat(64))
+        val measurement = InMemorySessionStrings()
+        assertTrue(EditorSessionStore(measurement, nowMs = { 1L }).savePending(original))
+        val baselineBytes =
+            measurement.values.values
+                .single()
+                .toByteArray(Charsets.UTF_8)
+                .size
+        val persistence = InMemorySessionStrings()
+        val store = EditorSessionStore(persistence, nowMs = { 1L }, maxSerializedBytes = baselineBytes)
         assertTrue(store.savePending(original))
         val huge =
             original.copy(
@@ -121,41 +163,58 @@ class EditorSessionStoreTest {
                     ),
             )
 
-        assertTrue(!store.savePending(huge))
+        assertFalse(store.savePending(huge))
         assertEquals(1, persistence.values.size)
     }
 
     @Test
     fun attachmentDigestChangesWhenAnyRelevantFieldChanges() {
-        val base =
-            editorAttachmentDigest(
-                attachmentId = "id",
-                fileName = "photo.jpg",
-                mediaType = "image/jpeg",
-                plaintext = byteArrayOf(1, 2),
-                dim = "10x20",
-                thumbhash = "hash",
-            )
-        val changed =
-            editorAttachmentDigest(
-                attachmentId = "id",
-                fileName = "photo.jpg",
-                mediaType = "image/jpeg",
-                plaintext = byteArrayOf(1, 3),
-                dim = "10x20",
-                thumbhash = "hash",
+        val base = digest()
+        val changes =
+            listOf(
+                digest(attachmentId = "other"),
+                digest(fileName = "other.jpg"),
+                digest(mediaType = "image/png"),
+                digest(plaintext = byteArrayOf(1, 3)),
+                digest(dim = "20x10"),
+                digest(thumbhash = "other-hash"),
+                digest(durationSeconds = 1.5),
+                digest(waveformSamples = listOf(0.1, 0.2)),
             )
 
-        assertTrue(base != changed)
+        assertTrue(changes.all { it != base })
+        assertEquals(changes.size, changes.toSet().size)
         assertEquals(64, base.length)
     }
 
+    private fun digest(
+        attachmentId: String = "id",
+        fileName: String = "photo.jpg",
+        mediaType: String = "image/jpeg",
+        plaintext: ByteArray = byteArrayOf(1, 2),
+        dim: String? = "10x20",
+        thumbhash: String? = "hash",
+        durationSeconds: Double? = null,
+        waveformSamples: List<Double> = emptyList(),
+    ): String =
+        editorAttachmentDigest(
+            attachmentId = attachmentId,
+            fileName = fileName,
+            mediaType = mediaType,
+            plaintext = plaintext,
+            dim = dim,
+            thumbhash = thumbhash,
+            durationSeconds = durationSeconds,
+            waveformSamples = waveformSamples,
+        )
+
     private fun session(
+        accountRef: String = "account",
         attachmentId: String = "attachment",
         sourceLeaseId: String = "source",
         digest: String,
     ) = EditorAttachmentSession(
-        accountRef = "account",
+        accountRef = accountRef,
         groupIdHex = "group",
         attachmentId = attachmentId,
         attachmentDigest = digest,
@@ -169,10 +228,12 @@ class EditorSessionStoreTest {
 
 private class InMemorySessionStrings : EditorStringStore {
     var values = linkedMapOf<String, String>()
+    var failWrites = false
 
     override fun readAll(): Map<String, String> = values.toMap()
 
     override fun replaceAll(values: Map<String, String>): Boolean {
+        if (failWrites) return false
         this.values = LinkedHashMap(values)
         return true
     }

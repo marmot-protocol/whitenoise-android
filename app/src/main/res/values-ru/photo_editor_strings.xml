@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">Качество результата</string>
     <string name="photo_editor_quality_low">Низкое</string>
     <string name="photo_editor_quality_standard">Стандартное</string>
+    <string name="photo_editor_quality_standard_description">Быстрее, расходует меньше данных</string>
+    <string name="photo_editor_quality_hd_description">Чётче, расходует больше данных</string>
     <string name="photo_editor_quality_high">Высокое (HD)</string>
     <string name="photo_editor_quality_original">Оригинал (изменённый)</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">Отменить изменения фото?</string>
     <string name="photo_editor_discard_message">Исходное вложение останется без изменений.</string>
     <string name="photo_editor_discard">Отменить изменения</string>
+    <string name="photo_editor_done">Готово</string>
+    <string name="photo_editor_discard_operation_title">Отменить эту операцию?</string>
+    <string name="photo_editor_discard_operation_message">Изменения, внесённые после открытия этого инструмента, будут удалены.</string>
     <string name="photo_editor_limit_strokes">Достигнут предел рисования. Отмените действие или сбросьте изменения.</string>
     <string name="photo_editor_limit_points">Этот штрих упрощён для плавной работы редактора.</string>
     <string name="photo_editor_save_failed">Не удалось сохранить изменённое фото. Предыдущее вложение не изменено.</string>

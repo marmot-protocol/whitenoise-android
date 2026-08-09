@@ -31,6 +31,8 @@
     <string name="photo_editor_quality">輸出品質</string>
     <string name="photo_editor_quality_low">低</string>
     <string name="photo_editor_quality_standard">標準</string>
+    <string name="photo_editor_quality_standard_description">傳送更快，使用較少數據</string>
+    <string name="photo_editor_quality_hd_description">畫面更清晰，使用更多數據</string>
     <string name="photo_editor_quality_high">高 (HD)</string>
     <string name="photo_editor_quality_original">原始（已編輯）</string>
     <string name="photo_editor_effective_quality">%1$s · %2$d × %3$d</string>
@@ -47,6 +49,9 @@
     <string name="photo_editor_discard_title">放棄照片編輯？</string>
     <string name="photo_editor_discard_message">原始附件將保持不變。</string>
     <string name="photo_editor_discard">放棄編輯</string>
+    <string name="photo_editor_done">完成</string>
+    <string name="photo_editor_discard_operation_title">捨棄此次操作？</string>
+    <string name="photo_editor_discard_operation_message">開啟此工具後所做的變更將被移除。</string>
     <string name="photo_editor_limit_strokes">已達繪製上限。請復原或重設後繼續。</string>
     <string name="photo_editor_limit_points">已簡化此筆畫以保持編輯流暢。</string>
     <string name="photo_editor_save_failed">無法儲存編輯後的照片。之前的附件未變更。</string>

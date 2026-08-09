@@ -95,7 +95,7 @@ private class ConversationAttachmentReader(
         }
     }
 
-    /** Preserve positively animated containers that have no safe metadata rewriter. */
+    /** Preserve animation only after a lossless metadata rewrite succeeds. */
     @Suppress("ReturnCount") // Provider and size failures must stop before allocating or flattening animation.
     private fun readRawAnimatedImageAttachment(
         uri: android.net.Uri,
@@ -109,12 +109,17 @@ private class ConversationAttachmentReader(
                     MediaPipeline.readBoundedBytes(stream, maxBytes)
                 }
             }.getOrNull() ?: return ImageAttachmentReadOutcome(null)
+        val sanitized = MediaPipeline.sanitizeAnimatedImageMetadata(bytes) ?: return ImageAttachmentReadOutcome(null)
+        val sanitizedMediaType = MediaPipeline.sniffImageMediaType(sanitized) ?: return ImageAttachmentReadOutcome(null)
         return ImageAttachmentReadOutcome(
             PendingAttachment(
-                plaintextBytes = bytes,
-                mediaType = mediaType,
-                fileName = queryDisplayName(context.contentResolver, uri) ?: "animated-image",
-                dim = null,
+                plaintextBytes = sanitized,
+                mediaType = sanitizedMediaType,
+                fileName =
+                    MediaPipeline.safeDisplayName(
+                        queryDisplayName(context.contentResolver, uri) ?: "animated-image",
+                    ),
+                dim = MediaPipeline.imageDimOrNull(sanitized),
             ),
         )
     }

@@ -2,7 +2,7 @@
 
 [GitHub issue #1866](https://github.com/marmot-protocol/whitenoise-android/issues/1866)
 
-- Status: Phase 1 approved; Phase 2 implementation in progress
+- Status: Phase 1 approved; Phase 2 implementation and UX revision in progress
 - White Noise baseline: 5b555b3a6ccddaaceb414d307faad80e4c76e20d (master)
 - MDK binding baseline: 64f13c4cb19e62f4be11cf6cf986ee9bfdb4d1e1
 - Research completed: 2026-08-09
@@ -23,7 +23,7 @@ These are architectural prerequisites, not minor editor details. Phase 2 should 
 
 Recommended product decisions:
 
-- Present the current four profiles where quality can be changed, labeling High as “High (HD)”. Standard and High (HD) are the required v1 paths; Low and Original remain visible and deterministic rather than being silently remapped.
+- Present exactly Standard and HD for edited photos. Low seeds Standard and Original seeds HD, and the actual render profile is normalized accordingly. “Original” remains truthful only on the unedited/raw path because any crop, rotation, or mark requires new pixels and a new encode.
 - Treat an edited Original image as a newly rendered image, not original bytes. Apply an explicit edited-output safety ceiling and show the effective dimensions.
 - Keep “send as file” separate. An image selected as a document remains raw and non-editable unless the user explicitly chooses “Convert to photo and edit.”
 - Disable editing for animations in v1. Offer raw image/file send; never silently flatten a first frame.
@@ -31,6 +31,16 @@ Recommended product decisions:
 - Use the existing Android graphics stack plus focused app-owned code. The surveyed dependencies do not satisfy the combined privacy, single-render, draft-atomicity, and coordinate requirements.
 
 This document was completed before production implementation began. The approved Phase 2 work now lives on the `issue/1866-photo-editor-research` branch.
+
+### 2026 UX revision: focused operations and a two-tier quality control
+
+The implementation was revised after a second pass over current Signal Android source and public WhatsApp behavior:
+
+- **Signal, verified at the pinned revision:** [ImageEditorToolbar.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/image/ImageEditorToolbar.kt) keeps a compact overview toolbar, then gives crop and drawing their own modes with explicit commit and discard actions. [ImageController.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/ImageController.kt) snapshots the operation on entry, restores it on cancel, and keeps one controller per media URI. [QualitySelectorSheetContent.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/QualitySelectorSheetContent.kt) exposes only Standard and High.
+- **WhatsApp, observed product behavior:** the top-bar HD badge opens a two-choice Standard/HD selector rather than exposing encoder vocabulary. Public walkthroughs document the same two-choice sheet ([9to5Google](https://9to5google.com/2023/08/17/whatsapp-hd-photos-android-ios/), [TechRadar](https://www.techradar.com/phones/this-whatsapp-setting-will-upgrade-your-photos-and-videos-heres-how-to-use-it)). Crop/rotate and mark/text actions use contextual editing surfaces rather than permanently placing every labeled control in the main approval view.
+- **Adopted interaction:** the overview contains icon-only Crop, Draw, and HD controls. Crop/Rotate and Draw/Erase are focused, transactional workspaces with X/Done and operation-local undo/redo. Done contributes one checkpoint to the photo's cumulative history; Cancel restores the operation-entry snapshot.
+- **Album continuity:** leaving the album preview for an operation must preserve the selected attachment index and caption. Returning after editing item 2 stays on item 2 and immediately displays its newly prepared bytes in both hero and thumbnail previews.
+- **Quality decision:** an edited photo has two actual render profiles, Standard (2048 px / JPEG 85) and HD (4096 px / JPEG 92). There is no “Original edited” option: it is a contradiction because editing necessarily creates a new representation. Unedited Original and raw file sending remain separate behaviors.
 
 ## Evidence language and method
 
@@ -211,25 +221,26 @@ Adopt the explicit file/photo choice. Do not adopt full-size decode or iterative
 ### Entry and attachment preview
 
 - Every editable static photo tile has an Edit action with an icon and text/semantic label.
-- The album preview header shows the selected attachment's effective profile. High is displayed as “High (HD)”; a safety cap displays the actual resulting maximum rather than only the label.
+- The album preview header shows Standard or HD plus the actual resulting dimensions.
 - A photo selected through “File” shows a file treatment and no Edit button. A secondary action, “Convert to photo and edit,” explains that conversion removes metadata and produces a rendered image.
 - Animated GIF/WebP, video, and non-image documents show no Edit action. The disabled explanation is reachable by accessibility services.
 - Editing one item never changes album order or the identity of another item.
 
 ### Editor layout
 
-- Top app bar: Cancel, concise filename/item position, and Save.
+- Overview top bar: Cancel, global undo/redo/reset, and Save.
 - Image stage: dark neutral surround, checkerboard only when alpha can be retained, bounded pan/zoom, conservative system-gesture exclusion over the stage only.
-- Primary tool row: Crop, Draw, Erase, Undo, Redo, Reset.
-- Crop panel: Free, Original, 1:1, 4:3, 3:4, 16:9, and 9:16; rotate-left 90°; reset crop.
-- Draw panel: labeled color swatches plus current color text, and discrete widths Small, Medium, Large, Extra large. Discrete widths are easier to reproduce, test, and announce than a continuous slider.
-- Erase panel: the same width choices. Erasing is stored as a vector command, not destructively applied to a bitmap.
-- Quality control: attachment-local selector showing Low, Standard, High (HD), and Original/Edited where supported. The global setting seeds a newly staged attachment but does not silently override an existing attachment.
+- Overview tool row: icon-only Crop, Draw, and HD badge controls with accessibility descriptions; no persistent text labels.
+- Crop/Rotate workspace: X, operation-local undo/redo, Done, Free, Original, 1:1, 4:3, 3:4, 16:9, 9:16, and clockwise quarter rotation.
+- Draw/Erase workspace: X, operation-local undo/redo, Done, icon toggles for brush/eraser, named color semantics, and discrete widths Small, Medium, Large, Extra large. Erasing is stored as a vector command, not destructively applied to a bitmap.
+- Quality control: the HD badge opens an attachment-local Standard/HD sheet. The selected card shows the effective dimensions.
 - Save shows cancellable progress. Editing gestures are disabled during final render; Cancel render returns to the unchanged committed draft.
 
 ### Interaction rules
 
-- Entering a tool starts from the committed editor-session snapshot.
+- Entering a tool starts from the current cumulative recipe, including every previously accepted crop, rotation, draw, or erase operation.
+- Done commits the focused operation as one checkpoint and returns to the overview. X restores the exact operation-entry recipe.
+- Undo/redo inside a focused operation cannot cross into previously accepted operations; overview undo/redo traverses those accepted checkpoints.
 - Back while there are unsaved edits asks whether to discard them. Back with no change is equivalent to Cancel.
 - Cancel discards the entire working recipe and does not call the draft save API.
 - Reset clears crop, quarter turns, and drawing commands to the original EXIF-oriented image. Reset is itself undoable.
@@ -430,25 +441,25 @@ The requested quality ordering maps exactly as follows:
 
 Thus profile dimensions are first applied when planning the final render, and profile JPEG quality is applied only at the single encode. Neither choice changes the edit recipe or causes an intermediate JPEG.
 
-### Standard, High/HD, Low, and Original
+### Standard and HD for edited photos
 
 Verified current profiles:
 
 | Profile | Current image ceiling | Current JPEG quality | Editor behavior |
 |---|---:|---:|---|
-| Low | 1024 px long edge | 70 | Supported but not part of the issue's required quality bar; render once using the same geometry. |
+| Low | 1024 px long edge | 70 | Global legacy preference seeds editor Standard; it is not exposed as a separate edited-photo choice. |
 | Standard | 2048 px long edge | 85 | Required v1 path. |
 | High (HD label) | 4096 px long edge | 92 | Required v1 HD path. |
-| Original | Byte-preserving when unedited and safely strippable | 100 fallback | Once edited, byte preservation is impossible; use the explicit edited safety plan below. |
+| Original | Byte-preserving when unedited and safely strippable | 100 fallback | Global preference seeds editor HD. Original remains available only when no pixel edit is performed. |
 
 Proposed application rules:
 
-- The profile is captured per draft attachment when staged and shown in preview/editor.
+- The normalized Standard/HD profile is captured per edited draft attachment and shown in preview/editor.
 - Changing the global preference affects newly staged attachments, not existing draft items.
 - Changing a profile in the editor updates only the OutputPlan preview. Save performs a fresh final render from source plus recipe.
 - Reopening an editor reads the committed profile from bounded attachment/session metadata.
 - Standard and High share crop/stroke geometry and metadata stripping. Their only differences are output dimensions and encoder parameters.
-- An unedited attachment may continue to use current Original lossless stripping. An edited Original is labeled “Original (edited, max 4096 px / 12 MP)” and rendered once. This avoids an unbounded full-source bitmap while making the effective cap honest.
+- An unedited attachment may continue to use current Original lossless stripping. Opening it in the editor normalizes the output to HD; no “Original edited” label or hidden Original encoder remains.
 - Never upscale. A 1200 px source remains at or below 1200 px under High.
 - Animated images continue through the unedited original path at every profile. Editing is unavailable unless a future explicit “extract still frame” feature is approved.
 
@@ -458,7 +469,7 @@ Alpha policy proposal:
 - Edited Original with alpha uses metadata-free PNG when the planned image is at most 4096 px, 12 MP, and 32 MiB encoded. Otherwise Save explains that the chosen result must be flattened or reduced and lets the user choose; it never silently changes representation.
 - Thumbhash is calculated after the same flatten/preserve decision.
 
-If product intends to replace the existing four-profile setting with a strict Standard/HD two-profile contract, that should be a separate, explicit migration decision. The editor must not invent that migration implicitly.
+The global media setting can retain its four existing values for non-editor sends. The editor intentionally has a smaller two-profile contract because only Standard and HD describe newly rendered photo output without implying byte preservation.
 
 ## Atomic MDK draft replacement
 
@@ -805,8 +816,8 @@ Every future effect must remain a bounded recipe command and flow through the sa
 Approval of this design should explicitly settle:
 
 1. **Draft prerequisite:** migrate Android text drafts to one MDK-backed MessageDraftRepository before editor UI work.
-2. **Quality naming:** retain Low, Standard, High, Original and label High as “High (HD),” rather than silently replacing the current model with two values.
-3. **Edited Original:** accept the visible 4096 px / 12 MP safety cap and PNG alpha policy.
+2. **Quality naming (settled):** expose exactly Standard and HD for edited photos; normalize Low to Standard and Original to HD.
+3. **Edited Original (settled):** do not expose it. Editing creates HD output under the existing 4096 px / 12 MP safety cap.
 4. **File semantics:** image MIME selected through Files remains a raw file; editing requires explicit conversion to a photo.
 5. **Source retention:** allow bounded, authenticated-encrypted private no-backup source copies for the lifetime of an editable draft so quality changes and reopen do not introduce generational loss.
 6. **Atomicity boundary:** require every Android MDK draft mutation to use the per-conversation coordinator; no MDK compare-and-swap API change.

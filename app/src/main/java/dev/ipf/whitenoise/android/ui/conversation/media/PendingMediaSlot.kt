@@ -108,6 +108,11 @@ private fun String.readLengthAt(start: Int): EncodedLength? {
 private fun legacySlotId(
     index: Int,
     uri: String,
-): String = UUID.nameUUIDFromBytes("$index\u0000$uri".toByteArray(StandardCharsets.UTF_8)).toString()
+): String =
+    LEGACY_SLOT_PREFIX +
+        UUID.nameUUIDFromBytes("$index\u0000$uri".toByteArray(StandardCharsets.UTF_8)).toString()
+
+internal fun PendingMediaSlot.isLegacyRestore(): Boolean = id.startsWith(LEGACY_SLOT_PREFIX)
 
 private const val SLOT_ENCODING_PREFIX = "media-slots-v1:"
+private const val LEGACY_SLOT_PREFIX = "legacy-media-slot:"

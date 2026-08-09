@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -195,6 +196,44 @@ class MediaPreviewContentTest {
             .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, "Standard"))
             .performClick()
         assertEquals(1, editedIndex)
+    }
+
+    @Test
+    fun editedPhotoReturnKeepsThePreviouslySelectedAlbumPosition() {
+        val slots = listOf(PendingMediaSlot("slot-0", uri(1)), PendingMediaSlot("slot-1", uri(2)))
+        slots.forEach { slot ->
+            shadowOf(app.contentResolver).registerInputStreamSupplier(slot.uri) {
+                ByteArrayInputStream(ByteArray(1))
+            }
+        }
+        var previewVisible by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                val stateHolder = rememberSaveableStateHolder()
+                if (previewVisible) {
+                    stateHolder.SaveableStateProvider("preview") {
+                        MediaPreviewContent(
+                            mediaSlots = slots,
+                            documentUris = emptyList(),
+                            chatTitle = "Test chat",
+                            onClose = {},
+                            onSend = { _, onResult -> onResult(true) },
+                            onRemoveMediaAt = {},
+                            onRemoveDocumentAt = {},
+                            onAddPhotos = {},
+                            onAddDocuments = {},
+                        )
+                    }
+                }
+            }
+        }
+        val secondBadge = string(R.string.media_preview_position_badge, 2)
+        composeRule.onNodeWithContentDescription(secondBadge).performClick().assertIsSelected()
+
+        composeRule.runOnIdle { previewVisible = false }
+        composeRule.runOnIdle { previewVisible = true }
+
+        composeRule.onNodeWithContentDescription(secondBadge).assertIsSelected()
     }
 
     @Test

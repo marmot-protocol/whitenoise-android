@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.editor
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
@@ -16,8 +17,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowContentResolver
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -76,6 +80,46 @@ class PhotoDraftStagerTest {
             assertNull(fixture.gateway.current)
             assertNull(fixture.sources.bytes(first.photo.sourceLeaseId))
             assertNull(fixture.sessions.committed(ACCOUNT, GROUP, "stable-id", first.photo.attachmentDigest))
+        }
+
+    @Test
+    fun legacyRestoreReusesPersistedAttachmentIdentityWithoutDuplicatingItsLease() =
+        runTest {
+            val fixture = fixture()
+            val bytes = pngBytes()
+            val initial =
+                fixture.stager.stageBytes(
+                    bytes,
+                    "picked.png",
+                    "stable-id",
+                    ACCOUNT,
+                    GROUP,
+                    MediaQuality.Standard,
+                ) as PhotoDraftStageResult.Success
+            val uri = Uri.parse("content://photo-editor/legacy")
+            ShadowContentResolver.reset()
+            shadowOf(app.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
+
+            val restored =
+                fixture.stager.stage(
+                    uri = uri,
+                    attachmentSlotId = "legacy-random-id",
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP,
+                    quality = MediaQuality.High,
+                    legacyOccurrenceIndex = 0,
+                )
+
+            assertTrue(restored is PhotoDraftStageResult.Success)
+            restored as PhotoDraftStageResult.Success
+            assertEquals("stable-id", restored.photo.attachment.id)
+            assertEquals(
+                listOf("stable-id"),
+                fixture.gateway.current
+                    ?.mediaAttachments
+                    ?.map { it.id },
+            )
+            assertEquals(1, fixture.sources.lease(initial.photo.sourceLeaseId)?.references)
         }
 
     @Test

@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -106,7 +107,9 @@ internal class PhotoEditorCommitter(
                 val draft = result.draft ?: return PhotoEditorCommitResult.MissingAttachment
                 val previousLease = result.previousEditorSession?.sourceLeaseId
                 if (!result.editorSessionRecoveryPending && previousLease != null && previousLease != sourceLeaseId) {
-                    withContext(sourceDispatcher) { sources.release(previousLease) }
+                    withContext(NonCancellable + sourceDispatcher) {
+                        runCatching { sources.release(previousLease) }
+                    }
                 }
                 PhotoEditorCommitResult.Success(
                     draft = draft,

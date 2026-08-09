@@ -46,6 +46,19 @@ class PendingMediaSlotTest {
     }
 
     @Test
+    fun legacyUriPayloadRestoresDeterministicMarkedOccurrenceIds() {
+        val duplicate = "content://test/photo"
+        val restored =
+            requireNotNull(
+                PendingMediaSlotListSaver.restore(encodeUriListTokens(listOf(duplicate, duplicate))),
+            )
+
+        assertEquals(listOf(Uri.parse(duplicate), Uri.parse(duplicate)), restored.map { it.uri })
+        assertNotEquals(restored[0].id, restored[1].id)
+        assertEquals(listOf(true, true), restored.map(PendingMediaSlot::isLegacyRestore))
+    }
+
+    @Test
     fun appendRespectsAlbumCapWithoutDroppingExistingSlots() {
         val existing = listOf(PendingMediaSlot("existing", Uri.parse("content://test/existing")))
         var nextId = 0

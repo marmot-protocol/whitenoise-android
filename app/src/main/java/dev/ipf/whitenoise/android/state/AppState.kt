@@ -3815,6 +3815,8 @@ class WhiteNoiseAppState private constructor(
      * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
      * outcome so the UI can surface partial failures.
      */
+    @Suppress("LongMethod", "ReturnCount")
+    // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
         clearInMemoryMediaCaches()
@@ -3851,6 +3853,11 @@ class WhiteNoiseAppState private constructor(
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             clearHiddenMessagesForAccount(wipedRef)
+            withContext(Dispatchers.IO) {
+                if (editorSessionStore.removeAccount(wipedRef)) {
+                    editorSourceStore.reconcile(editorSessionStore.sourceLeaseReferenceCounts())
+                }
+            }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
             accounts = refreshedAccounts
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
