@@ -311,6 +311,7 @@ class ConversationScrollCoordinatorTest {
 
             assertEquals(
                 listOf(
+                    ScrollWrite.Snap(30, 0),
                     ScrollWrite.Animate(40, 120),
                     ScrollWrite.Snap(27, 48),
                 ),
@@ -338,7 +339,13 @@ class ConversationScrollCoordinatorTest {
                 val jumped = coordinator.jumpToNewest(targetIndex = 88)
 
                 assertTrue(jumped)
-                assertEquals(listOf(ScrollWrite.Animate(88, 0)), writer.writes)
+                assertEquals(
+                    listOf(
+                        ScrollWrite.Snap(78, 0),
+                        ScrollWrite.Animate(88, 0),
+                    ),
+                    writer.writes,
+                )
                 assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
                 assertTrue(coordinator.isFollowingTail)
             }
@@ -409,7 +416,13 @@ class ConversationScrollCoordinatorTest {
             jump.join()
 
             assertFalse(followed)
-            assertEquals(listOf(ScrollWrite.Animate(20, 60)), writer.writes)
+            assertEquals(
+                listOf(
+                    ScrollWrite.Snap(10, 0),
+                    ScrollWrite.Animate(20, 60),
+                ),
+                writer.writes,
+            )
         }
 
     @Test
@@ -474,6 +487,37 @@ class ConversationScrollCoordinatorTest {
         }
 
     @Test
+    fun conversationScreenClearsOwnedHighlightsWhenNavigationIsCancelled() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+
+        assertTrue(screen.contains("suspend fun showTransientMessageHighlight(messageId: String)"))
+        assertTrue(screen.contains("var transientHighlightOwner by remember(controller)"))
+        assertTrue(screen.contains("val owner = Any()"))
+        assertTrue(screen.contains("if (transientHighlightOwner === owner)"))
+        assertEquals(5, Regex("showTransientMessageHighlight\\(").findAll(screen).count())
+    }
+
+    @Test
+    fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+
+        assertEquals(4, Regex("if \\(!centered\\)").findAll(screen).count())
+    }
+
+    @Test
+    fun conversationScreenReResolvesMessageBackedTargetsBeforeTheFinalAnimation() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+
+        assertTrue(
+            screen.contains(
+                """animateScrollToItem(targetIndex, animatedOffset) {
+                    currentTimelineListIndex(targetMessageId) ?: targetIndex
+                }""",
+            ),
+        )
+    }
+
+    @Test
     fun conversationScreenRoutesEveryLazyListWriteThroughTheCoordinator() {
         val screen = sourceFile("ConversationScreen.kt").readText()
         val coordinator = sourceFile("ConversationScrollCoordinator.kt").readText()
@@ -519,12 +563,14 @@ class ConversationScrollCoordinatorTest {
 
     private class RecordingScrollWriter : ConversationScrollWriter {
         val writes = mutableListOf<ScrollWrite>()
+        override var firstVisibleItemIndex = 0
 
         override suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int,
         ) {
             writes += ScrollWrite.Snap(index, scrollOffset)
+            firstVisibleItemIndex = index
         }
 
         override suspend fun animateScrollToItem(
@@ -532,6 +578,7 @@ class ConversationScrollCoordinatorTest {
             scrollOffset: Int,
         ) {
             writes += ScrollWrite.Animate(index, scrollOffset)
+            firstVisibleItemIndex = index
         }
     }
 }
