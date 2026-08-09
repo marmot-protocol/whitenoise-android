@@ -1112,6 +1112,16 @@ private fun ContactPrivateDetailsDialog(
     )
 }
 
+internal fun stableAdminActionTargetIsAdmin(
+    authoritativeAdmin: Boolean,
+    pendingAction: GroupMemberMenuAction?,
+): Boolean =
+    when (pendingAction) {
+        GroupMemberMenuAction.GrantAdmin -> false
+        GroupMemberMenuAction.RevokeAdmin -> true
+        else -> authoritativeAdmin
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -1469,11 +1479,19 @@ private fun ProfileSheetAdminActions(
     appState: WhiteNoiseAppState,
     targetHex: String,
 ) {
+    // Keep the initiated action stable until its coroutine completes. Detailed
+    // MDK state can land one frame before the local pending flag clears.
+    var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
+    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
     val targetMember =
-        remember(controller.members, targetHex) {
-            controller.members.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
+        remember(controller.presentedMembers, targetHex) {
+            controller.presentedMembers.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
         }
     val targetIsAdmin = targetMember?.let { controller.isAdmin(it) } == true
+    // Keep the action label stable while the optimistic badge changes. The row
+    // remains disabled until MDK reconciles, then switches to the inverse action.
+    val targetWasAuthoritativelyAdmin = targetMember?.let { controller.isAuthoritativeAdmin(it) } == true
+    val actionTargetIsAdmin = stableAdminActionTargetIsAdmin(targetWasAuthoritativelyAdmin, pendingAction)
     val targetIsSelf =
         targetMember?.let {
             GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
@@ -1484,15 +1502,13 @@ private fun ProfileSheetAdminActions(
             viewerIsAdmin = controller.isSelfAdmin,
             targetIsMember = targetMember != null,
             targetIsSelf = targetIsSelf,
-            targetIsAdmin = targetIsAdmin,
+            targetIsAdmin = actionTargetIsAdmin,
         )
     if (targetMember == null || actions.isEmpty()) return
 
     // The action-scoped local state both disables immediately and identifies the
     // row that owns progress. mutationInFlight only disables for work started
     // elsewhere; it must not assign that work to a row in this sheet.
-    var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
-    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
     val busy = pendingAction != null || controller.mutationInFlight
 
     fun runMutation(
