@@ -2,10 +2,29 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.profile.profileSheetAdminActions
+import dev.ipf.whitenoise.android.ui.profile.stableAdminActionTargetIsAdmin
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileSheetAdminActionsTest {
+    @Test
+    fun pendingAdminActionKeepsItsOriginalDirectionUntilCompletion() {
+        assertFalse(
+            stableAdminActionTargetIsAdmin(
+                authoritativeAdmin = true,
+                pendingAction = GroupMemberMenuAction.GrantAdmin,
+            ),
+        )
+        assertTrue(
+            stableAdminActionTargetIsAdmin(
+                authoritativeAdmin = false,
+                pendingAction = GroupMemberMenuAction.RevokeAdmin,
+            ),
+        )
+    }
+
     @Test
     fun adminViewerGetsGrantAndRemoveForOtherNonAdminMember() {
         assertEquals(
