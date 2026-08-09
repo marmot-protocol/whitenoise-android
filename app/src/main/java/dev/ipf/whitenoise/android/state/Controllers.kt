@@ -5552,6 +5552,24 @@ internal sealed interface OptimisticGroupRosterMutation {
     ) : OptimisticGroupRosterMutation
 }
 
+internal suspend fun canonicalGroupInviteRefs(
+    memberRefs: List<String>,
+    resolveAccountIdHex: suspend (String) -> String?,
+): List<String> {
+    val canonicalRefs = mutableListOf<String>()
+    val seenInputs = mutableSetOf<String>()
+    val seenAccountIds = mutableSetOf<String>()
+    memberRefs.forEach { rawRef ->
+        val memberRef = rawRef.trim()
+        if (memberRef.isEmpty() || !seenInputs.add(memberRef)) return@forEach
+        val accountIdHex =
+            resolveAccountIdHex(memberRef)
+                ?: throw IllegalArgumentException("Invalid member reference")
+        if (seenAccountIds.add(accountIdHex.lowercase())) canonicalRefs += accountIdHex
+    }
+    return canonicalRefs
+}
+
 internal fun projectedGroupMembers(
     authoritativeMembers: List<AppGroupMemberRecordFfi>,
     mutation: OptimisticGroupRosterMutation?,
@@ -8525,20 +8543,23 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val refs =
+                try {
+                    canonicalGroupInviteRefs(memberRefs) { ref ->
+                        appState.marmotIo { accountIdHex(ref) }
+                    }
+                } catch (throwable: Throwable) {
+                    throwable.rethrowIfCancellation()
+                    val message = mutationError(throwable)
+                    lastMutationError = message
+                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
+                    return@withMutationLockResult false
+                }
             if (refs.isEmpty()) return@withMutationLockResult false
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
                 var inviteSent = false
                 try {
-                    val adminTargets =
-                        if (addAsAdmin) {
-                            refs.map { ref ->
-                                appState.marmotIo { accountIdHex(ref) }
-                                    ?: throw IllegalArgumentException("Invalid member reference")
-                            }
-                        } else {
-                            emptyList()
-                        }
+                    val adminTargets = if (addAsAdmin) refs else emptyList()
                     appState.withGroupCommitLock(account, group.groupIdHex) {
                         val inviteResult =
                             appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }

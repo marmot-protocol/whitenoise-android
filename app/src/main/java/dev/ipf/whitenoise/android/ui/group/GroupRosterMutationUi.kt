@@ -58,12 +58,14 @@ internal fun PendingGroupInviteRow(
     subtitle: String,
     avatarSeed: String,
     avatarUrl: String?,
+    onClick: () -> Unit,
 ) {
     ContactRow(
         title = title,
         subtitle = subtitle,
         avatarSeed = avatarSeed,
         avatarUrl = avatarUrl,
+        onClick = onClick,
         trailing = {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         },

@@ -105,6 +105,31 @@ class OptimisticGroupRosterMutationTest {
             assertEquals(emptyList<String>(), pendingGroupInviteRefs(emptyList(), tracker.current))
         }
 
+    @Test
+    fun inviteReferencesAreCanonicalizedOnceAndDeduplicatedBeforeProjection() =
+        runBlocking {
+            val resolutions = mutableListOf<String>()
+            val canonicalRefs =
+                canonicalGroupInviteRefs(listOf(" npub-bob ", "bob-label", "npub-carol", "npub-carol")) { ref ->
+                    resolutions += ref
+                    when (ref) {
+                        "npub-bob", "bob-label" -> "BOB"
+                        "npub-carol" -> "carol"
+                        else -> null
+                    }
+                }
+
+            assertEquals(listOf("npub-bob", "bob-label", "npub-carol"), resolutions)
+            assertEquals(listOf("BOB", "carol"), canonicalRefs)
+            assertEquals(
+                listOf("carol"),
+                pendingGroupInviteRefs(
+                    authoritativeMembers = listOf(member("bob")),
+                    mutation = OptimisticGroupRosterMutation.Invite(canonicalRefs),
+                ),
+            )
+        }
+
     private fun member(id: String) =
         AppGroupMemberRecordFfi(
             memberIdHex = id,

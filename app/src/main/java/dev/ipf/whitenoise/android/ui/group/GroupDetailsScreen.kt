@@ -1308,15 +1308,17 @@ internal fun GroupDetailsScreen(
                             )
                         }
                         controller.pendingInviteMemberRefs.forEach { invite ->
+                            val inviteNpub = appState.npub(invite)
                             PendingGroupInviteRow(
                                 title = appState.displayName(invite),
                                 subtitle =
                                     stringResource(
                                         R.string.invite_pending,
-                                        IdentityFormatter.short(appState.npub(invite)),
+                                        IdentityFormatter.short(inviteNpub),
                                     ),
                                 avatarSeed = invite,
                                 avatarUrl = appState.avatarUrl(invite),
+                                onClick = { clipboard.setText(AnnotatedString(inviteNpub)) },
                             )
                         }
                     }

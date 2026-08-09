@@ -7,12 +7,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMutationStatus
 import dev.ipf.whitenoise.android.ui.group.PendingGroupInviteRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,6 +42,7 @@ class GroupRosterMutationScreenshotTest {
                             subtitle = "Invite pending: npub1ada…4x7q",
                             avatarSeed = "ada",
                             avatarUrl = null,
+                            onClick = {},
                         )
                         ContactRow(
                             title = "Grace Hopper",
@@ -66,6 +70,26 @@ class GroupRosterMutationScreenshotTest {
         composeRule
             .onNodeWithTag(TAG)
             .captureRoboImage("src/test/snapshots/group_roster_mutations_dark.png")
+    }
+
+    @Test
+    fun pendingInviteRowPreservesCopyAction() {
+        var copyCount = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                PendingGroupInviteRow(
+                    title = "Ada Lovelace",
+                    subtitle = "Invite pending: npub1ada…4x7q",
+                    avatarSeed = "ada",
+                    avatarUrl = null,
+                    onClick = { copyCount += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Ada Lovelace").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, copyCount) }
     }
 
     private companion object {
