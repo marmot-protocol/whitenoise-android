@@ -17,38 +17,45 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +65,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -70,6 +79,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -86,7 +96,6 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlin.math.hypot
-import kotlin.math.max
 import kotlin.math.min
 
 @Composable
@@ -128,6 +137,7 @@ internal fun PhotoEditorScreen(
 ) {
     val state = stateHolder.state
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showQualitySheet by remember { mutableStateOf(false) }
 
     fun requestCancel() {
         if (state.isSaving) return
@@ -138,9 +148,13 @@ internal fun PhotoEditorScreen(
     Surface(modifier = modifier.fillMaxSize(), color = Color.Black) {
         Column(Modifier.fillMaxSize()) {
             PhotoEditorTopBar(
-                title = stringResource(R.string.photo_editor_title),
                 saving = state.isSaving,
                 onCancel = ::requestCancel,
+                canUndo = state.canUndo,
+                onUndo = stateHolder::undo,
+                canRedo = state.canRedo,
+                onRedo = stateHolder::redo,
+                onReset = stateHolder::reset,
                 onSave = {
                     stateHolder.beginSaving()
                     onSave(state.recipe, state.quality)
@@ -157,21 +171,29 @@ internal fun PhotoEditorScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .heightIn(min = 160.dp)
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
             )
             PhotoEditorControls(
                 state = state,
-                outputPlan = outputPlan,
                 stateHolder = stateHolder,
+                onOpenQuality = { showQualitySheet = true },
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                        .navigationBarsPadding()
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp),
+                        .navigationBarsPadding(),
             )
         }
+    }
+    if (showQualitySheet) {
+        PhotoQualitySheet(
+            selectedQuality = state.quality,
+            selectedOutputPlan = outputPlan,
+            onSelect = { quality ->
+                stateHolder.selectQuality(quality)
+                showQualitySheet = false
+            },
+            onDismiss = { showQualitySheet = false },
+        )
     }
     if (showDiscardDialog) {
         AlertDialog(
@@ -196,10 +218,15 @@ internal fun PhotoEditorScreen(
 }
 
 @Composable
+@Suppress("LongMethod") // The compact top bar keeps all icon actions and saving state in one accessibility group.
 private fun PhotoEditorTopBar(
-    title: String,
     saving: Boolean,
     onCancel: () -> Unit,
+    canUndo: Boolean,
+    onUndo: () -> Unit,
+    canRedo: Boolean,
+    onRedo: () -> Unit,
+    onReset: () -> Unit,
     onSave: () -> Unit,
 ) {
     Row(
@@ -210,142 +237,124 @@ private fun PhotoEditorTopBar(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onCancel, enabled = !saving) { Text(stringResource(R.string.cancel)) }
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        TextButton(onClick = onSave, enabled = !saving) {
-            if (saving) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text(stringResource(R.string.save))
+        EditorIconButton(
+            description = stringResource(R.string.cancel),
+            enabled = !saving,
+            onClick = onCancel,
+        ) {
+            Icon(Icons.Default.Close, contentDescription = null)
+        }
+        Spacer(Modifier.weight(1f))
+        EditorIconButton(
+            description = stringResource(R.string.photo_editor_undo),
+            enabled = canUndo,
+            onClick = onUndo,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
+        }
+        EditorIconButton(
+            description = stringResource(R.string.photo_editor_redo),
+            enabled = canRedo,
+            onClick = onRedo,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null)
+        }
+        EditorIconButton(
+            description = stringResource(R.string.photo_editor_reset),
+            enabled = !saving,
+            onClick = onReset,
+        ) {
+            Icon(Icons.Default.RestartAlt, contentDescription = null)
+        }
+        Surface(
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = if (saving) Color.White.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primary,
+            contentColor = if (saving) Color.White.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onPrimary,
+        ) {
+            val saveDescription = stringResource(R.string.save)
+            IconButton(
+                onClick = onSave,
+                enabled = !saving,
+                modifier = Modifier.semantics { contentDescription = saveDescription },
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                }
             }
         }
     }
 }
 
 @Composable
-@Suppress("LongMethod") // A single scrollable control surface preserves focus and selection semantics.
 private fun PhotoEditorControls(
     state: PhotoEditorUiState,
-    outputPlan: PhotoEditorOutputPlan?,
     stateHolder: PhotoEditorStateHolder,
+    onOpenQuality: () -> Unit,
     modifier: Modifier,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        modifier = modifier,
+        color = Color(0xFF111315),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ToolChip(
-                selected = state.activeTool == PhotoEditorTool.Crop,
-                label = stringResource(R.string.photo_editor_crop),
-                enabled = !state.isSaving,
-                onClick = { stateHolder.selectTool(PhotoEditorTool.Crop) },
-            )
-            ToolChip(
-                selected = state.activeTool == PhotoEditorTool.Draw,
-                label = stringResource(R.string.photo_editor_draw),
-                enabled = !state.isSaving,
-                onClick = { stateHolder.selectTool(PhotoEditorTool.Draw) },
-            )
-            ToolChip(
-                selected = state.activeTool == PhotoEditorTool.Erase,
-                label = stringResource(R.string.photo_editor_erase),
-                enabled = !state.isSaving,
-                onClick = { stateHolder.selectTool(PhotoEditorTool.Erase) },
-            )
-            EditorActionButton(
-                label = stringResource(R.string.photo_editor_undo),
-                enabled = state.canUndo,
-                onClick = stateHolder::undo,
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
+                when (state.activeTool) {
+                    PhotoEditorTool.Crop -> CropControls(state, stateHolder)
+                    PhotoEditorTool.Draw -> DrawControls(state, stateHolder, showColors = true)
+                    PhotoEditorTool.Erase -> DrawControls(state, stateHolder, showColors = false)
+                }
             }
-            EditorActionButton(
-                label = stringResource(R.string.photo_editor_redo),
-                enabled = state.canRedo,
-                onClick = stateHolder::redo,
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableGroup(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null)
-            }
-            EditorActionButton(
-                label = stringResource(R.string.photo_editor_reset),
-                enabled = !state.isSaving,
-                onClick = stateHolder::reset,
-            ) {
-                Icon(Icons.Default.RestartAlt, contentDescription = null)
-            }
-        }
-        when (state.activeTool) {
-            PhotoEditorTool.Crop -> CropControls(state, stateHolder)
-            PhotoEditorTool.Draw -> DrawControls(state, stateHolder, showColors = true)
-            PhotoEditorTool.Erase -> DrawControls(state, stateHolder, showColors = false)
-        }
-        Text(
-            text = stringResource(R.string.photo_editor_quality),
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MediaQuality.entries.forEach { quality ->
-                val label = qualityLabel(quality)
-                FilterChip(
-                    selected = state.quality == quality,
-                    onClick = { stateHolder.selectQuality(quality) },
+                EditorToolButton(
+                    selected = state.activeTool == PhotoEditorTool.Crop,
+                    description = stringResource(R.string.photo_editor_crop),
                     enabled = !state.isSaving,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                    label = { Text(label) },
-                    leadingIcon =
-                        if (state.quality == quality) {
-                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        } else {
-                            null
-                        },
+                    onClick = { stateHolder.selectTool(PhotoEditorTool.Crop) },
+                ) {
+                    Icon(Icons.Default.Crop, contentDescription = null)
+                }
+                EditorToolButton(
+                    selected = state.activeTool == PhotoEditorTool.Draw,
+                    description = stringResource(R.string.photo_editor_draw),
+                    enabled = !state.isSaving,
+                    onClick = { stateHolder.selectTool(PhotoEditorTool.Draw) },
+                ) {
+                    Icon(Icons.Default.Brush, contentDescription = null)
+                }
+                EditorToolButton(
+                    selected = state.activeTool == PhotoEditorTool.Erase,
+                    description = stringResource(R.string.photo_editor_erase),
+                    enabled = !state.isSaving,
+                    onClick = { stateHolder.selectTool(PhotoEditorTool.Erase) },
+                ) {
+                    EraserIcon()
+                }
+                QualityButton(
+                    quality = state.quality,
+                    enabled = !state.isSaving,
+                    onClick = onOpenQuality,
                 )
             }
-        }
-        outputPlan?.let {
-            val effectiveQuality =
-                stringResource(
-                    R.string.photo_editor_effective_quality,
-                    qualityLabel(it.quality),
-                    it.geometry.outputSize.width,
-                    it.geometry.outputSize.height,
-                )
-            Text(
-                text = effectiveQuality,
-                color = Color.White.copy(alpha = 0.8f),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-        }
-        val status = state.errorMessage ?: limitMessage(state.lastLimit)
-        if (status != null) {
-            Text(
-                text = status,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-            )
-        } else if (state.isSaving) {
-            Text(
-                text = stringResource(R.string.photo_editor_saving),
-                color = Color.White,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-        } else {
-            announcementMessage(state)?.let { announcement ->
-                Text(
-                    text = announcement,
-                    color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
+            EditorStatus(state)
         }
     }
 }
@@ -358,27 +367,20 @@ private fun CropControls(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EditorActionButton(
-            label = stringResource(R.string.photo_editor_rotate_clockwise),
+        EditorIconButton(
+            description = stringResource(R.string.photo_editor_rotate_clockwise),
             enabled = !state.isSaving,
             onClick = stateHolder::rotateClockwise,
         ) { Icon(Icons.Default.RotateRight, contentDescription = null) }
         PhotoCropPreset.entries.forEach { preset ->
-            FilterChip(
+            CropPresetButton(
+                preset = preset,
                 selected = state.cropPreset == preset,
-                onClick = { stateHolder.selectCropPreset(preset) },
                 enabled = !state.isSaving,
-                modifier = Modifier.heightIn(min = 48.dp),
-                label = { Text(cropPresetLabel(preset)) },
-                leadingIcon =
-                    if (state.cropPreset == preset) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
+                onClick = { stateHolder.selectCropPreset(preset) },
             )
         }
     }
@@ -390,100 +392,440 @@ private fun DrawControls(
     stateHolder: PhotoEditorStateHolder,
     showColors: Boolean,
 ) {
-    if (showColors) {
-        Text(stringResource(R.string.photo_editor_color), color = Color.White, style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (showColors) {
             editorColors().forEach { color ->
                 val selected = state.drawColorArgb == color.argb
-                Box(
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .selectable(
-                                selected = selected,
-                                enabled = !state.isSaving,
-                                role = Role.RadioButton,
-                                onClick = { stateHolder.selectColor(color.argb) },
-                            ).semantics {
-                                this.selected = selected
-                                contentDescription =
-                                    if (selected) {
-                                        color.selectedDescription
-                                    } else {
-                                        color.name
-                                    }
-                            }.border(
-                                width = if (selected) 3.dp else 1.dp,
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.5f),
-                                shape = CircleShape,
-                            ).padding(6.dp)
-                            .background(Color(color.argb), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) Icon(Icons.Default.Check, contentDescription = null, tint = contrastingColor(color.argb))
-                }
+                ColorButton(
+                    color = color,
+                    selected = selected,
+                    enabled = !state.isSaving,
+                    onClick = { stateHolder.selectColor(color.argb) },
+                )
             }
+            Spacer(Modifier.width(4.dp))
+            VerticalDivider(
+                modifier = Modifier.width(1.dp).height(28.dp),
+                color = Color.White.copy(alpha = 0.16f),
+            )
+            Spacer(Modifier.width(4.dp))
         }
-    }
-    Text(stringResource(R.string.photo_editor_width), color = Color.White, style = MaterialTheme.typography.labelLarge)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PhotoStrokeWidth.entries.forEach { width ->
-            FilterChip(
+            StrokeWidthButton(
+                width = width,
                 selected = state.strokeWidth == width,
-                onClick = { stateHolder.selectStrokeWidth(width) },
                 enabled = !state.isSaving,
-                modifier = Modifier.heightIn(min = 48.dp),
-                label = { Text(strokeWidthLabel(width)) },
-                leadingIcon =
-                    if (state.strokeWidth == width) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
+                onClick = { stateHolder.selectStrokeWidth(width) },
             )
         }
     }
 }
 
 @Composable
-private fun ToolChip(
+private fun EditorToolButton(
     selected: Boolean,
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.heightIn(min = 48.dp),
-        label = { Text(label) },
-        leadingIcon = {
-            Icon(
-                if (label == stringResource(R.string.photo_editor_crop)) Icons.Default.Crop else Icons.Default.Edit,
-                contentDescription = null,
-            )
-        },
-    )
-}
-
-@Composable
-private fun EditorActionButton(
-    label: String,
+    description: String,
     enabled: Boolean,
     onClick: () -> Unit,
     icon: @Composable () -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .size(48.dp)
-                    .semantics { contentDescription = label },
-        ) { icon() }
-        Text(label, color = if (enabled) Color.White else Color.White.copy(alpha = 0.45f), style = MaterialTheme.typography.labelSmall)
+    val contentColor =
+        when {
+            !enabled -> Color.White.copy(alpha = 0.35f)
+            selected -> MaterialTheme.colorScheme.primary
+            else -> Color.White.copy(alpha = 0.82f)
+        }
+    Surface(
+        modifier =
+            Modifier
+                .size(48.dp)
+                .selectable(
+                    selected = selected,
+                    enabled = enabled,
+                    role = Role.RadioButton,
+                    onClick = onClick,
+                ).semantics {
+                    contentDescription = description
+                    this.selected = selected
+                },
+        shape = CircleShape,
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent,
+        contentColor = contentColor,
+    ) {
+        Box(contentAlignment = Alignment.Center) { icon() }
+    }
+}
+
+@Composable
+private fun EraserIcon() {
+    val tint = LocalContentColor.current
+    Canvas(Modifier.size(24.dp)) {
+        rotate(-40f, pivot = center) {
+            val left = size.width * 0.18f
+            val top = size.height * 0.32f
+            val width = size.width * 0.64f
+            val height = size.height * 0.36f
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(left, top),
+                size =
+                    androidx.compose.ui.geometry
+                        .Size(width, height),
+                cornerRadius =
+                    androidx.compose.ui.geometry
+                        .CornerRadius(2.dp.toPx()),
+                style = Stroke(width = 2.dp.toPx()),
+            )
+            drawLine(
+                color = tint,
+                start = Offset(left + width * 0.58f, top),
+                end = Offset(left + width * 0.58f, top + height),
+                strokeWidth = 2.dp.toPx(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorIconButton(
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(48.dp).semantics { contentDescription = description },
+    ) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape,
+            color = Color.White.copy(alpha = if (enabled) 0.08f else 0.03f),
+            contentColor = Color.White.copy(alpha = if (enabled) 0.82f else 0.32f),
+        ) {
+            Box(contentAlignment = Alignment.Center) { icon() }
+        }
+    }
+}
+
+@Composable
+private fun EditorStatus(state: PhotoEditorUiState) {
+    val status = state.errorMessage ?: limitMessage(state.lastLimit)
+    when {
+        status != null ->
+            Text(
+                text = status,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 8.dp).semantics { liveRegion = LiveRegionMode.Assertive },
+            )
+        state.isSaving ->
+            Text(
+                text = stringResource(R.string.photo_editor_saving),
+                color = Color.White.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        else ->
+            announcementMessage(state)?.let { announcement ->
+                Box(
+                    Modifier
+                        .size(1.dp)
+                        .semantics {
+                            contentDescription = announcement
+                            liveRegion = LiveRegionMode.Polite
+                        },
+                )
+            }
+    }
+}
+
+@Composable
+private fun QualityButton(
+    quality: MediaQuality,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val qualityName = qualityLabel(quality)
+    val description = stringResource(R.string.photo_editor_announcement_quality, qualityName)
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(48.dp).semantics { contentDescription = description },
+    ) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = CircleShape,
+            color = Color.White.copy(alpha = if (enabled) 0.08f else 0.03f),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                QualityBadgeIcon(
+                    quality = quality,
+                    tint = Color.White.copy(alpha = if (enabled) 0.9f else 0.35f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualityBadgeIcon(
+    quality: MediaQuality,
+    tint: Color,
+) {
+    Box(
+        modifier = Modifier.size(width = 28.dp, height = 22.dp).border(1.5.dp, tint, RoundedCornerShape(5.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "HD",
+            color = tint,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        if (quality == MediaQuality.Low || quality == MediaQuality.Standard) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawLine(
+                    color = tint,
+                    start = Offset(size.width * 0.18f, size.height * 0.85f),
+                    end = Offset(size.width * 0.82f, size.height * 0.15f),
+                    strokeWidth = 1.8.dp.toPx(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CropPresetButton(
+    preset: PhotoCropPreset,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val description = cropPresetLabel(preset)
+    val tint =
+        when {
+            !enabled -> Color.White.copy(alpha = 0.3f)
+            selected -> MaterialTheme.colorScheme.primary
+            else -> Color.White.copy(alpha = 0.78f)
+        }
+    Surface(
+        modifier =
+            Modifier
+                .size(48.dp)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .semantics {
+                    contentDescription = description
+                    this.selected = selected
+                },
+        shape = CircleShape,
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CropPresetGlyph(preset = preset, tint = tint)
+        }
+    }
+}
+
+@Composable
+private fun CropPresetGlyph(
+    preset: PhotoCropPreset,
+    tint: Color,
+) {
+    Canvas(Modifier.size(28.dp)) {
+        val strokeWidth = 1.8.dp.toPx()
+        if (preset == PhotoCropPreset.Free) {
+            val inset = size.minDimension * 0.18f
+            val arm = size.minDimension * 0.25f
+            listOf(
+                Offset(inset, inset) to Offset(inset + arm, inset),
+                Offset(inset, inset) to Offset(inset, inset + arm),
+                Offset(size.width - inset, inset) to Offset(size.width - inset - arm, inset),
+                Offset(size.width - inset, inset) to Offset(size.width - inset, inset + arm),
+                Offset(inset, size.height - inset) to Offset(inset + arm, size.height - inset),
+                Offset(inset, size.height - inset) to Offset(inset, size.height - inset - arm),
+                Offset(size.width - inset, size.height - inset) to Offset(size.width - inset - arm, size.height - inset),
+                Offset(size.width - inset, size.height - inset) to Offset(size.width - inset, size.height - inset - arm),
+            ).forEach { (start, end) -> drawLine(tint, start, end, strokeWidth = strokeWidth) }
+        } else {
+            val ratio = preset.outputAspectRatio ?: (4f / 3f)
+            val maxWidth = size.width * 0.78f
+            val maxHeight = size.height * 0.7f
+            val width = min(maxWidth, maxHeight * ratio)
+            val height = min(maxHeight, maxWidth / ratio)
+            val topLeft = Offset((size.width - width) / 2f, (size.height - height) / 2f)
+            drawRect(
+                color = tint,
+                topLeft = topLeft,
+                size =
+                    androidx.compose.ui.geometry
+                        .Size(width, height),
+                style = Stroke(width = strokeWidth),
+            )
+            if (preset == PhotoCropPreset.Original) {
+                drawCircle(
+                    color = tint,
+                    radius = 1.7.dp.toPx(),
+                    center = Offset(topLeft.x + width - 4.dp.toPx(), topLeft.y + 4.dp.toPx()),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColorButton(
+    color: EditorColor,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .semantics {
+                    this.selected = selected
+                    contentDescription = if (selected) color.selectedDescription else color.name
+                }.padding(6.dp)
+                .border(
+                    width = if (selected) 2.5.dp else 1.dp,
+                    color = if (selected) Color.White else Color.White.copy(alpha = 0.35f),
+                    shape = CircleShape,
+                ).padding(4.dp)
+                .background(Color(color.argb), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = contrastingColor(color.argb),
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StrokeWidthButton(
+    width: PhotoStrokeWidth,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val description = strokeWidthLabel(width)
+    val tint =
+        when {
+            !enabled -> Color.White.copy(alpha = 0.3f)
+            selected -> MaterialTheme.colorScheme.primary
+            else -> Color.White.copy(alpha = 0.78f)
+        }
+    Surface(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .semantics {
+                    contentDescription = description
+                    this.selected = selected
+                },
+        shape = CircleShape,
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+    ) {
+        Canvas(Modifier.padding(10.dp)) {
+            val lineWidth =
+                when (width) {
+                    PhotoStrokeWidth.Small -> 1.5.dp
+                    PhotoStrokeWidth.Medium -> 3.dp
+                    PhotoStrokeWidth.Large -> 5.dp
+                    PhotoStrokeWidth.ExtraLarge -> 7.dp
+                }.toPx()
+            drawLine(
+                color = tint,
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = lineWidth,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("LongMethod") // Each quality row stays adjacent so selection styling and dimensions remain consistent.
+private fun PhotoQualitySheet(
+    selectedQuality: MediaQuality,
+    selectedOutputPlan: PhotoEditorOutputPlan?,
+    onSelect: (MediaQuality) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF17191B),
+        contentColor = Color.White,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.photo_editor_quality),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            MediaQuality.entries.forEach { quality ->
+                val selected = quality == selectedQuality
+                Surface(
+                    onClick = { onSelect(quality) },
+                    color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                            .semantics { this.selected = selected },
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        QualityBadgeIcon(
+                            quality = quality,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(qualityLabel(quality), style = MaterialTheme.typography.bodyLarge)
+                            if (selected && selectedOutputPlan != null) {
+                                Text(
+                                    text =
+                                        "${selectedOutputPlan.geometry.outputSize.width} × " +
+                                            "${selectedOutputPlan.geometry.outputSize.height}",
+                                    color = Color.White.copy(alpha = 0.62f),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        if (selected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

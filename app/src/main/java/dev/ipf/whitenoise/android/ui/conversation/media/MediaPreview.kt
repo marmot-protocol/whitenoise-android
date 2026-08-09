@@ -41,7 +41,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -114,21 +113,32 @@ private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android
     return metadata
 }
 
-/** Decode a size-appropriate preview bitmap for a local content Uri, off-thread. */
+internal data class PreparedPhotoPreview(
+    val revision: String,
+    val bytes: ByteArray,
+)
+
+/** Decode the prepared send artifact when available, otherwise the original local Uri. */
 @Composable
-private fun rememberLocalPreviewBitmap(
+private fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
+    prepared: PreparedPhotoPreview? = null,
 ): ImageBitmap? {
     val context = LocalContext.current
-    var bitmap by remember(uri, isVideo, maxEdgePx) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(uri, isVideo, maxEdgePx) {
+    var bitmap by
+        remember(uri, isVideo, maxEdgePx, prepared?.revision) {
+            mutableStateOf<android.graphics.Bitmap?>(null)
+        }
+    LaunchedEffect(uri, isVideo, maxEdgePx, prepared?.revision) {
         var decoded: android.graphics.Bitmap? = null
         try {
             withContext(Dispatchers.IO) {
                 decoded =
-                    if (isVideo) {
+                    if (prepared != null) {
+                        MediaPipeline.decodeSampledBitmap(prepared.bytes, maxEdgePx)
+                    } else if (isVideo) {
                         // Video URI: extract the first frame as the staging thumbnail
                         // instead of trying to decode the bytes as JPEG (which spins
                         // forever on a video and leaves the sheet stuck). Scaled to
@@ -240,6 +250,7 @@ internal fun MediaPreviewScreen(
     onAddDocuments: () -> Unit,
     onEditMediaAt: ((Int) -> Unit)? = null,
     preparedPhotoLabels: Map<String, String> = emptyMap(),
+    preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparingPhotoSlotIds: Set<String> = emptySet(),
     nonEditableMediaSlotIds: Set<String> = emptySet(),
     nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
@@ -266,6 +277,7 @@ internal fun MediaPreviewScreen(
             onAddDocuments = onAddDocuments,
             onEditMediaAt = onEditMediaAt,
             preparedPhotoLabels = preparedPhotoLabels,
+            preparedPhotoPreviews = preparedPhotoPreviews,
             preparingPhotoSlotIds = preparingPhotoSlotIds,
             nonEditableMediaSlotIds = nonEditableMediaSlotIds,
             nonEditableMediaDescriptions = nonEditableMediaDescriptions,
@@ -286,6 +298,7 @@ internal fun MediaPreviewContent(
     onAddDocuments: () -> Unit,
     onEditMediaAt: ((Int) -> Unit)? = null,
     preparedPhotoLabels: Map<String, String> = emptyMap(),
+    preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparingPhotoSlotIds: Set<String> = emptySet(),
     nonEditableMediaSlotIds: Set<String> = emptySet(),
     nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
@@ -350,14 +363,21 @@ internal fun MediaPreviewContent(
                 val nonEditableDescription =
                     nonEditableMediaDescriptions[currentMedia.slot.id]
                         ?: stringResource(R.string.photo_editor_not_editable_animation)
-                TextButton(
+                val editDescription =
+                    preparedPhotoLabels[currentMedia.slot.id]?.let { quality ->
+                        stringResource(R.string.photo_editor_edit_with_quality, quality)
+                    } ?: stringResource(R.string.photo_editor_edit_action)
+                IconButton(
                     onClick = { onEditMediaAt(currentIndex) },
                     enabled = !sending && !preparing && editable,
                     modifier =
                         Modifier.semantics {
-                            if (!editable) {
-                                contentDescription = nonEditableDescription
-                            }
+                            contentDescription =
+                                if (!editable) {
+                                    nonEditableDescription
+                                } else {
+                                    editDescription
+                                }
                         },
                 ) {
                     if (preparing) {
@@ -365,14 +385,6 @@ internal fun MediaPreviewContent(
                     } else {
                         Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White)
                     }
-                    Text(
-                        text =
-                            preparedPhotoLabels[currentMedia.slot.id]?.let { quality ->
-                                stringResource(R.string.photo_editor_edit_with_quality, quality)
-                            } ?: stringResource(R.string.photo_editor_edit_action),
-                        color = Color.White,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
                 }
             }
             IconButton(
@@ -395,7 +407,12 @@ internal fun MediaPreviewContent(
             contentAlignment = Alignment.Center,
         ) {
             when (val item = items.getOrNull(currentIndex)) {
-                is StagedPreviewItem.Media -> HeroMediaPreview(item.uri, previewMetadata[item.uri])
+                is StagedPreviewItem.Media ->
+                    HeroMediaPreview(
+                        uri = item.uri,
+                        metadata = previewMetadata[item.uri],
+                        prepared = preparedPhotoPreviews[item.slot.id],
+                    )
                 is StagedPreviewItem.Document -> HeroDocumentPreview(item.uri, previewMetadata[item.uri])
                 null -> Unit
             }
@@ -422,6 +439,7 @@ internal fun MediaPreviewContent(
                     PreviewStripThumb(
                         item = item,
                         metadata = previewMetadata[item.uri],
+                        prepared = (item as? StagedPreviewItem.Media)?.let { preparedPhotoPreviews[it.slot.id] },
                         position = index + 1,
                         selected = index == currentIndex,
                         enabled = !sending,
@@ -492,16 +510,17 @@ private fun previewCaptionFieldColors() =
 private fun HeroMediaPreview(
     uri: android.net.Uri,
     metadata: LocalPreviewMetadata?,
+    prepared: PreparedPhotoPreview?,
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val bitmap =
             metadata?.let {
-                rememberLocalPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                rememberMediaPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
             }
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = null,
+                contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -560,6 +579,7 @@ private fun HeroDocumentPreview(
 private fun PreviewStripThumb(
     item: StagedPreviewItem,
     metadata: LocalPreviewMetadata?,
+    prepared: PreparedPhotoPreview?,
     position: Int,
     selected: Boolean,
     enabled: Boolean,
@@ -584,12 +604,12 @@ private fun PreviewStripThumb(
             is StagedPreviewItem.Media -> {
                 val bitmap =
                     metadata?.let {
-                        rememberLocalPreviewBitmap(item.uri, it.isVideo, PREVIEW_STRIP_MAX_EDGE_PX)
+                        rememberMediaPreviewBitmap(item.uri, it.isVideo, PREVIEW_STRIP_MAX_EDGE_PX, prepared)
                     }
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap,
-                        contentDescription = null,
+                        contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )

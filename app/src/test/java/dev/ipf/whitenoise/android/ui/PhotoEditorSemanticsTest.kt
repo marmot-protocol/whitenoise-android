@@ -4,18 +4,18 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -72,8 +72,8 @@ class PhotoEditorSemanticsTest {
     fun toolsHistoryAndQualityExposeSelectedAndEnabledState() {
         render()
 
-        composeRule.onNodeWithText(string(R.string.photo_editor_crop)).assertIsSelected()
-        composeRule.onNodeWithText(string(R.string.photo_editor_draw)).performClick().assertIsSelected()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).assertIsSelected()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).performClick().assertIsSelected()
         composeRule
             .onNodeWithContentDescription(
                 string(
@@ -99,18 +99,20 @@ class PhotoEditorSemanticsTest {
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_redo)).assertIsEnabled()
 
         composeRule
-            .onNodeWithText(string(R.string.photo_editor_quality_high))
-            .performScrollTo()
-            .performClick()
-            .assertIsSelected()
-        composeRule.onNodeWithText(string(R.string.photo_editor_quality_standard)).assertIsNotSelected()
+            .onNodeWithContentDescription(
+                string(
+                    R.string.photo_editor_announcement_quality,
+                    string(R.string.photo_editor_quality_standard),
+                ),
+            ).performClick()
+        composeRule.onNodeWithText(string(R.string.photo_editor_quality_high)).performClick()
         composeRule
-            .onNodeWithText(
+            .onAllNodesWithContentDescription(
                 string(
                     R.string.photo_editor_announcement_quality,
                     string(R.string.photo_editor_quality_high),
                 ),
-            ).assertExists()
+            ).assertCountEquals(2)
         assertEquals(MediaQuality.High, holder.state.quality)
     }
 
@@ -119,8 +121,7 @@ class PhotoEditorSemanticsTest {
         render()
 
         composeRule
-            .onNodeWithText(string(R.string.photo_editor_crop_square))
-            .performScrollTo()
+            .onNodeWithContentDescription(string(R.string.photo_editor_crop_square))
             .performClick()
         assertTrue(holder.state.recipe.crop != PhotoEditRecipe.Original.crop)
 
@@ -131,7 +132,6 @@ class PhotoEditorSemanticsTest {
 
         composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_reset))
-            .performScrollTo()
             .performClick()
         assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
     }
@@ -149,12 +149,15 @@ class PhotoEditorSemanticsTest {
             .assertWidthIsAtLeast(48.dp)
             .assertHeightIsAtLeast(48.dp)
         composeRule
-            .onNodeWithText(string(R.string.photo_editor_crop))
+            .onNodeWithContentDescription(string(R.string.photo_editor_crop))
             .assertHeightIsAtLeast(48.dp)
         composeRule
-            .onNodeWithText(string(R.string.photo_editor_quality_standard))
-            .performScrollTo()
-            .assertHeightIsAtLeast(48.dp)
+            .onNodeWithContentDescription(
+                string(
+                    R.string.photo_editor_announcement_quality,
+                    string(R.string.photo_editor_quality_standard),
+                ),
+            ).assertHeightIsAtLeast(48.dp)
     }
 
     @Test
@@ -164,7 +167,7 @@ class PhotoEditorSemanticsTest {
         render(onCancel = { cancels += 1 }, onSave = { _, _ -> saves += 1 })
         composeRule.runOnIdle { holder.rotateClockwise() }
 
-        composeRule.onNodeWithText(string(R.string.cancel)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.cancel)).performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard_title)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard)).performClick()
 
@@ -181,14 +184,13 @@ class PhotoEditorSemanticsTest {
             holder.commitStroke(listOf(NormalizedPoint(0.5f, 0.5f)))
         }
 
-        composeRule.onNodeWithText(string(R.string.save)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.save)).performClick()
 
         assertEquals(holder.state.recipe, saved?.first)
         assertEquals(MediaQuality.Standard, saved?.second)
         assertTrue(holder.state.isSaving)
         composeRule
             .onNodeWithText(string(R.string.photo_editor_saving))
-            .performScrollTo()
             .assertIsDisplayed()
     }
 
@@ -196,10 +198,10 @@ class PhotoEditorSemanticsTest {
     fun largeTextKeepsPrimaryActionsAndToolEscapeVisible() {
         render(fontScale = 2f)
 
-        composeRule.onNodeWithText(string(R.string.cancel)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.save)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.photo_editor_crop)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.photo_editor_draw)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.cancel)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.save)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_crop)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).assertIsDisplayed()
     }
 
     @Test
@@ -211,8 +213,8 @@ class PhotoEditorSemanticsTest {
             holder.finishSaving(failure)
         }
 
-        composeRule.onNodeWithText(failure).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled()
+        composeRule.onNodeWithText(failure).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.save)).assertIsEnabled()
     }
 
     private fun render(

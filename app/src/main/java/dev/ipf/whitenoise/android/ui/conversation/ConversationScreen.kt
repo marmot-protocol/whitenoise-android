@@ -157,6 +157,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
@@ -3227,6 +3228,19 @@ internal fun ConversationScreen(
                         stringResource(R.string.photo_editor_prepared_output, dimensions)
                     } ?: stringResource(R.string.photo_editor_prepared)
                 }
+        val preparedPhotoPreviews =
+            draftBackedPhotos.mapValues { (_, photo) ->
+                PreparedPhotoPreview(
+                    revision = photo.attachmentDigest,
+                    bytes = photo.attachment.plaintext,
+                )
+            } +
+                draftPreparedPhotos.mapValues { (_, photo) ->
+                    PreparedPhotoPreview(
+                        revision = photo.attachmentDigest,
+                        bytes = photo.attachment.plaintext,
+                    )
+                }
         // The typed composer draft seeds the caption, and an accepted send
         // consumes it exactly like a text send would — guarded so text typed
         // after staging is never wiped. Dismissing leaves the draft alone.
@@ -3294,6 +3308,7 @@ internal fun ConversationScreen(
             onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
             onEditMediaAt = { index -> pendingMediaSlots.getOrNull(index)?.let(::openPhotoEditor) },
             preparedPhotoLabels = preparedPhotoLabels,
+            preparedPhotoPreviews = preparedPhotoPreviews,
             preparingPhotoSlotIds = preparingPhotoSlotIds,
             nonEditableMediaSlotIds = nonEditablePhotoDescriptions.keys,
             nonEditableMediaDescriptions = nonEditablePhotoDescriptions,

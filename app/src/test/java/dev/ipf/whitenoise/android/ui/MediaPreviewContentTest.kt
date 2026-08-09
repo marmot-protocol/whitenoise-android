@@ -1,16 +1,20 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,6 +23,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -29,6 +34,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
 /**
  * Behavioral coverage for the staged-media preview: badge numbering follows
@@ -169,7 +175,7 @@ class MediaPreviewContentTest {
         )
 
         composeRule
-            .onNodeWithText(string(R.string.photo_editor_edit_with_quality, quality))
+            .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, quality))
             .performClick()
         assertEquals(0, editedIndex)
     }
@@ -185,13 +191,73 @@ class MediaPreviewContentTest {
         )
 
         composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 2)).performClick()
-        composeRule.onNodeWithText(string(R.string.photo_editor_edit_with_quality, "Standard")).performClick()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, "Standard"))
+            .performClick()
         assertEquals(1, editedIndex)
+    }
+
+    @Test
+    fun preparedArtifactReplacesHeroAndThumbnailForTheSameStableSlot() {
+        val staged = uri(1)
+        val slot = PendingMediaSlot("stable-slot", staged)
+        val original = imageBytes(Color.BLUE)
+        val edited = imageBytes(Color.RED)
+        shadowOf(app.contentResolver).registerInputStreamSupplier(staged) {
+            ByteArrayInputStream(original)
+        }
+        var prepared by mutableStateOf<Map<String, PreparedPhotoPreview>>(emptyMap())
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                MediaPreviewContent(
+                    mediaSlots = listOf(slot),
+                    documentUris = emptyList(),
+                    chatTitle = "Test chat",
+                    onClose = {},
+                    onSend = { _, onResult -> onResult(true) },
+                    onRemoveMediaAt = {},
+                    onRemoveDocumentAt = {},
+                    onAddPhotos = {},
+                    onAddDocuments = {},
+                    preparedPhotoPreviews = prepared,
+                )
+            }
+        }
+
+        val preparedDescription = string(R.string.photo_editor_prepared)
+        composeRule
+            .onAllNodesWithContentDescription(preparedDescription, useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.runOnIdle {
+            prepared = mapOf(slot.id to PreparedPhotoPreview(revision = "edited", bytes = edited))
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodesWithContentDescription(preparedDescription, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size == 2
+        }
+        composeRule
+            .onAllNodesWithContentDescription(preparedDescription, useUnmergedTree = true)
+            .assertCountEquals(2)
     }
 
     @Test
     fun addTileIsAvailableForGrowingTheSelection() {
         renderPreview(listOf(uri(1)))
         composeRule.onNodeWithContentDescription(string(R.string.media_attachment_add_more)).assertIsDisplayed()
+    }
+
+    private fun imageBytes(color: Int): ByteArray {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        return try {
+            bitmap.eraseColor(color)
+            ByteArrayOutputStream().use { output ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                output.toByteArray()
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 }

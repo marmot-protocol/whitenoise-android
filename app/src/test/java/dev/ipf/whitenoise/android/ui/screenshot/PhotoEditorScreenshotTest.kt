@@ -5,10 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -64,7 +63,7 @@ class PhotoEditorScreenshotTest {
                     )
                 }
             }
-            composeRule.onNodeWithText("1:1").performScrollTo().performClick()
+            composeRule.onNodeWithContentDescription("1:1").performClick()
             composeRule.waitForIdle()
 
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_square_crop.png")
