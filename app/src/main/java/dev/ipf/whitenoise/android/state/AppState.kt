@@ -6081,6 +6081,11 @@ class WhiteNoiseAppState private constructor(
         return runCatchingCancellable { marmotIo { accountIdHex(reference) } }.getOrNull()
     }
 
+    internal suspend fun resolveAccountIdHex(reference: String): String? {
+        accountIdHexResolver?.invoke(reference)?.let { return it }
+        return marmotIo { accountIdHex(reference) }
+    }
+
     // Pure profile-record read for Compose remember blocks. The caller owns prefetching.
     internal fun userProfileCached(accountIdHex: String): UserProfileMetadataFfi? {
         profileRevision

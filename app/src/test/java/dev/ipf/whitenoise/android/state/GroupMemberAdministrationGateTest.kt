@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -27,10 +28,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class GroupMemberAdministrationGateTest {
     @Test
-    fun loadingRosterRejectsInviteBeforeCallingRuntime() =
+    fun loadingRosterRejectsInviteAndClearsStaleMutationErrorBeforeCallingRuntime() =
         runBlocking {
             val controller = ConversationController(appState(), group())
             assertEquals(GroupRosterLoadState.LOADING, controller.memberRosterState)
+            replaceLastMutationError(controller, "Previous unrelated failure")
 
             assertFalse(controller.inviteMembers(listOf("bob")))
 
@@ -70,7 +72,7 @@ class GroupMemberAdministrationGateTest {
             assertFalse(invite.await())
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
-            assertNull(controller.lastMutationError)
+            assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_add_members)
         }
 
     @Test
@@ -96,7 +98,7 @@ class GroupMemberAdministrationGateTest {
             assertFalse(remove.await())
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
-            assertNull(controller.lastMutationError)
+            assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_remove_member)
         }
 
     @Test
@@ -121,7 +123,7 @@ class GroupMemberAdministrationGateTest {
             assertFalse(promote.await())
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
-            assertNull(controller.lastMutationError)
+            assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_update_admin)
         }
 
     @Test
@@ -147,7 +149,39 @@ class GroupMemberAdministrationGateTest {
             assertFalse(demote.await())
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
+            assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_update_admin)
+        }
+
+    @Test
+    fun becomingSoleAdminWhileSelfDemotionWaitsForCommitLockShowsRetryOutsideLock() =
+        runBlocking {
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
+            val controller = readyController(appState, admins = listOf("alice", "bob"))
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+
+            val demote =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.stepDownAsAdmin()
+                }
+            assertTrue(demote.isActive)
+            replaceGroup(controller, controller.group.copy(admins = listOf("alice")))
+            releaseLock.complete(Unit)
+
+            assertFalse(demote.await())
+            holder.await()
+            assertEquals(0, runtimeAccess.callCount)
             assertNull(controller.lastMutationError)
+            assertEquals(
+                ToastMessage(
+                    title = AppText.Resource(R.string.toast_keep_one_admin),
+                    detail = AppText.Resource(R.string.toast_promote_before_removing_admin),
+                ),
+                appState.toast,
+            )
         }
 
     @Test
@@ -179,6 +213,22 @@ class GroupMemberAdministrationGateTest {
         val field = ConversationController::class.java.getDeclaredField("memberRosterLoadTracker")
         field.isAccessible = true
         return field.get(controller) as GroupRosterLoadTracker
+    }
+
+    private fun assertRosterChangedFailure(
+        appState: WhiteNoiseAppState,
+        controller: ConversationController,
+        title: Int,
+    ) {
+        assertEquals(ConversationControllerCopy().groupRosterChanged, controller.lastMutationError)
+        assertEquals(
+            ToastMessage(
+                title = AppText.Resource(title),
+                detail = AppText.Resource(R.string.toast_group_roster_changed),
+                copyable = true,
+            ),
+            appState.toast,
+        )
     }
 
     private fun readyController(
@@ -222,11 +272,31 @@ class GroupMemberAdministrationGateTest {
         (field.get(controller) as MutableState<List<AppGroupMemberRecordFfi>>).value = members
     }
 
+    @Suppress("UNCHECKED_CAST")
+    private fun replaceGroup(
+        controller: ConversationController,
+        group: AppGroupRecordFfi,
+    ) {
+        val field = ConversationController::class.java.getDeclaredField("group\$delegate")
+        field.isAccessible = true
+        (field.get(controller) as MutableState<AppGroupRecordFfi>).value = group
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun replaceLastMutationError(
+        controller: ConversationController,
+        error: String,
+    ) {
+        val field = ConversationController::class.java.getDeclaredField("lastMutationError\$delegate")
+        field.isAccessible = true
+        (field.get(controller) as MutableState<String?>).value = error
+    }
+
     private fun appState(runtimeAccess: RuntimeAccessRecorder? = null) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
-            accountIdHexResolver = { null },
+            accountIdHexResolver = { it },
             accounts =
                 listOf(
                     AccountSummaryFfi(

@@ -108,6 +108,7 @@ internal fun rememberConversationControllerCopy(): ConversationControllerCopy =
         waitingForStream = stringResource(R.string.waiting_for_stream),
         streamFailedFormat = stringResource(R.string.stream_failed_format),
         couldntAddMemberDuplicateFormat = stringResource(R.string.toast_couldnt_add_member_duplicate_detail),
+        groupRosterChanged = stringResource(R.string.toast_group_roster_changed),
     )
 
 @Composable
