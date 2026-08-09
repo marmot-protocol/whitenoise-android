@@ -359,6 +359,7 @@ internal fun ImageEditorContent(
                     bitmap = bitmap.asImageBitmap(),
                     tool = tool,
                     crop = cropDraft,
+                    committedCrop = history.current.crop,
                     activePoints = activePoints,
                     penColor = penColor,
                     eraser = eraser,
@@ -629,6 +630,7 @@ private fun ImageEditorCanvas(
     bitmap: ImageBitmap,
     tool: ImageEditorTool,
     crop: NormalizedRect,
+    committedCrop: NormalizedRect,
     activePoints: List<NormalizedPoint>,
     penColor: Color,
     eraser: Boolean,
@@ -643,6 +645,7 @@ private fun ImageEditorCanvas(
             if (tool == ImageEditorTool.Crop) R.string.image_editor_crop_hint else R.string.image_editor_draw_hint,
         )
     val latestCrop by rememberUpdatedState(crop)
+    val latestCommittedCrop by rememberUpdatedState(committedCrop)
     Canvas(
         modifier =
             Modifier
@@ -704,7 +707,9 @@ private fun ImageEditorCanvas(
                         },
                         onDragEnd = {
                             if (tool == ImageEditorTool.Crop) {
-                                onCropCommitted(gestureCrop)
+                                if (activeCorner != null && gestureCrop != latestCommittedCrop) {
+                                    onCropCommitted(gestureCrop)
+                                }
                             } else if (gesturePoints.isNotEmpty()) {
                                 onStrokeCommitted(gesturePoints)
                             }
@@ -712,7 +717,11 @@ private fun ImageEditorCanvas(
                             activeCorner = null
                         },
                         onDragCancel = {
-                            onActivePointsChanged(emptyList())
+                            if (tool == ImageEditorTool.Crop) {
+                                onCropChanged(latestCommittedCrop)
+                            } else {
+                                onActivePointsChanged(emptyList())
+                            }
                             gesturePoints = emptyList()
                             activeCorner = null
                         },

@@ -146,6 +146,8 @@ object MediaPipeline {
     private const val WEBP_FIRST_CHUNK_OFFSET: Int = 12
     private const val WEBP_CHUNK_TYPE_BYTES: Int = 4
     private const val WEBP_FIRST_CHUNK_PAYLOAD_OFFSET: Int = 20
+    private val ISO_BMFF_STATIC_IMAGE_BRANDS = setOf("avif", "mif1", "heic", "heix")
+    private val ISO_BMFF_IMAGE_SEQUENCE_BRANDS = setOf("avis", "msf1", "hevc", "hevx")
 
     /** Header bytes needed to recognize JPEG/PNG/WebP/GIF signatures. */
     private const val IMAGE_SIGNATURE_SNIFF_MAX_BYTES: Int = 12
@@ -321,11 +323,72 @@ object MediaPipeline {
     private fun imageAnimationStatus(header: ByteArray): ImageAnimationStatus =
         when {
             isGif(header) -> ImageAnimationStatus.ANIMATED
-            isJpeg(header) || isPng(header) -> ImageAnimationStatus.STATIC
-            !isWebp(header) || header.size < WEBP_FIRST_CHUNK_PAYLOAD_OFFSET ->
-                ImageAnimationStatus.INDETERMINATE
+            isJpeg(header) -> ImageAnimationStatus.STATIC
+            isPng(header) -> pngAnimationStatus(header)
+            isIsoBmff(header) -> isoBmffAnimationStatus(header)
+            !isWebp(header) || header.size < WEBP_FIRST_CHUNK_PAYLOAD_OFFSET -> ImageAnimationStatus.INDETERMINATE
             else -> webpAnimationStatus(header)
         }
+
+    private fun pngAnimationStatus(header: ByteArray): ImageAnimationStatus {
+        var offset = PNG_SIGNATURE.size
+        var status = ImageAnimationStatus.INDETERMINATE
+        while (offset + PNG_CHUNK_HEADER_BYTES <= header.size) {
+            val length = u32be(header, offset)
+            when (ascii(header, offset + PNG_CHUNK_TYPE_OFFSET, PNG_CHUNK_TYPE_BYTES)) {
+                "acTL" -> {
+                    status = ImageAnimationStatus.ANIMATED
+                    break
+                }
+                "IDAT" -> {
+                    status = ImageAnimationStatus.STATIC
+                    break
+                }
+            }
+            val chunkEnd = offset.toLong() + PNG_CHUNK_OVERHEAD + length
+            if (chunkEnd > header.size.toLong()) break
+            offset = chunkEnd.toInt()
+        }
+        return status
+    }
+
+    /**
+     * AVIF and HEIF use ISO BMFF brands to distinguish still-image files from
+     * image sequences. Recognize only a complete `ftyp` box; a truncated or
+     * unknown brand remains indeterminate so the send path cannot flatten it.
+     */
+    private fun isoBmffAnimationStatus(header: ByteArray): ImageAnimationStatus {
+        val boxSize =
+            if (header.size >= ISO_BMFF_FILE_TYPE_MIN_BYTES) {
+                u32be(header, 0)
+            } else {
+                0L
+            }
+        if (boxSize < ISO_BMFF_FILE_TYPE_MIN_BYTES || boxSize > header.size.toLong()) {
+            return ImageAnimationStatus.INDETERMINATE
+        }
+
+        var hasStaticBrand =
+            ascii(header, ISO_BMFF_MAJOR_BRAND_OFFSET, ISO_BMFF_BRAND_BYTES) in ISO_BMFF_STATIC_IMAGE_BRANDS
+        var hasSequenceBrand =
+            ascii(header, ISO_BMFF_MAJOR_BRAND_OFFSET, ISO_BMFF_BRAND_BYTES) in ISO_BMFF_IMAGE_SEQUENCE_BRANDS
+        var offset = ISO_BMFF_COMPATIBLE_BRANDS_OFFSET
+        while (offset + ISO_BMFF_BRAND_BYTES <= boxSize.toInt()) {
+            val brand = ascii(header, offset, ISO_BMFF_BRAND_BYTES)
+            hasStaticBrand = hasStaticBrand || brand in ISO_BMFF_STATIC_IMAGE_BRANDS
+            hasSequenceBrand = hasSequenceBrand || brand in ISO_BMFF_IMAGE_SEQUENCE_BRANDS
+            offset += ISO_BMFF_BRAND_BYTES
+        }
+        return when {
+            hasSequenceBrand -> ImageAnimationStatus.ANIMATED
+            hasStaticBrand -> ImageAnimationStatus.STATIC
+            else -> ImageAnimationStatus.INDETERMINATE
+        }
+    }
+
+    private fun isIsoBmff(header: ByteArray): Boolean =
+        header.size >= ISO_BMFF_BOX_TYPE_OFFSET + ISO_BMFF_BRAND_BYTES &&
+            ascii(header, ISO_BMFF_BOX_TYPE_OFFSET, ISO_BMFF_BRAND_BYTES) == "ftyp"
 
     private fun webpAnimationStatus(header: ByteArray): ImageAnimationStatus =
         when (ascii(header, WEBP_FIRST_CHUNK_OFFSET, WEBP_CHUNK_TYPE_BYTES)) {
@@ -1198,7 +1261,15 @@ object MediaPipeline {
     }
 
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    private const val PNG_CHUNK_HEADER_BYTES = 8
     private const val PNG_CHUNK_OVERHEAD = 12
+    private const val PNG_CHUNK_TYPE_OFFSET = 4
+    private const val PNG_CHUNK_TYPE_BYTES = 4
+    private const val ISO_BMFF_BOX_TYPE_OFFSET = 4
+    private const val ISO_BMFF_MAJOR_BRAND_OFFSET = 8
+    private const val ISO_BMFF_COMPATIBLE_BRANDS_OFFSET = 16
+    private const val ISO_BMFF_BRAND_BYTES = 4
+    private const val ISO_BMFF_FILE_TYPE_MIN_BYTES = 16L
     private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
     private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024

@@ -898,8 +898,8 @@
     <string name="image_editor_color_green">Yeşil kalem</string>
     <string name="image_editor_color_blue">Mavi kalem</string>
     <string name="image_editor_color_white">Beyaz kalem</string>
-    <string name="image_editor_unsupported">Bu ek düzenlenemez. Değiştirilmeden gönderilecek.</string>
-    <string name="image_editor_decode_failed">Bu fotoğraf düzenlemek için açılamadı.</string>
+    <string name="image_editor_unsupported">Bu görsel düzenlenemez. Değiştirilmeden gönderilecek.</string>
+    <string name="image_editor_decode_failed">Bu fotoğraf düzenlenemedi.</string>
     <string name="image_editor_save_failed">Düzenlenen fotoğraf kaydedilemedi.</string>
     <string name="image_editor_crop_hint">Kırpmak için bir köşeyi sürükleyin</string>
     <string name="image_editor_draw_hint">Fotoğrafın üzerine çizin</string>

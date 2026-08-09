@@ -71,8 +71,13 @@ class ImageEditorStorageTest {
     fun startupSweepDeletesPartialAndStaleArtifactsButKeepsRecentCompletedDrafts() {
         val directory = File(root, MediaCacheDirs.IMAGE_EDITOR).apply { mkdirs() }
         val now = 10_000L
-        val partial =
-            File(directory, "render.tmp").apply {
+        val stalePartial =
+            File(directory, "stale-render.tmp").apply {
+                writeBytes(byteArrayOf(1))
+                setLastModified(1_000L)
+            }
+        val freshPartial =
+            File(directory, "fresh-render.tmp").apply {
                 writeBytes(byteArrayOf(1))
                 setLastModified(now)
             }
@@ -89,7 +94,8 @@ class ImageEditorStorageTest {
 
         sweepStaleImageEditorFiles(root, maxAgeMillis = 5_000L, nowMillis = now)
 
-        assertFalse(partial.exists())
+        assertFalse(stalePartial.exists())
+        assertTrue(freshPartial.exists())
         assertFalse(stale.exists())
         assertTrue(recent.exists())
     }
@@ -97,12 +103,23 @@ class ImageEditorStorageTest {
     @Test
     fun startupPartialSweepLeavesCompletedDraftsForStateRestoration() {
         val directory = File(root, MediaCacheDirs.IMAGE_EDITOR).apply { mkdirs() }
-        val partial = File(directory, "render.tmp").apply { writeBytes(byteArrayOf(1)) }
+        val now = 10_000L
+        val stalePartial =
+            File(directory, "stale-render.tmp").apply {
+                writeBytes(byteArrayOf(1))
+                setLastModified(1_000L)
+            }
+        val freshPartial =
+            File(directory, "fresh-render.tmp").apply {
+                writeBytes(byteArrayOf(1))
+                setLastModified(now)
+            }
         val completed = File(directory, "restored.png").apply { writeBytes(byteArrayOf(1)) }
 
-        sweepIncompleteImageEditorFiles(root)
+        sweepIncompleteImageEditorFiles(root, maxAgeMillis = 5_000L, nowMillis = now)
 
-        assertFalse(partial.exists())
+        assertFalse(stalePartial.exists())
+        assertTrue(freshPartial.exists())
         assertTrue(completed.exists())
     }
 

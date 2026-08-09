@@ -21,6 +21,7 @@ import org.robolectric.shadows.ShadowContentResolver
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -154,6 +155,90 @@ class MediaPipelineSniffImageMediaTypeResolverTest {
         )
     }
 
+    @Test
+    fun apngAnimationControlChunkIsDetectedBeforeImageData() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/animated.png")
+        val png =
+            PNG_SIGNATURE +
+                pngChunk("IHDR", ByteArray(13)) +
+                pngChunk("acTL", ByteArray(8)) +
+                pngChunk("IDAT", byteArrayOf(1))
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(png) }
+
+        assertEquals(
+            ImageAnimationStatus.ANIMATED,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, uri),
+        )
+    }
+
+    @Test
+    fun pngPrefixWithoutAnimationControlOrImageDataIsIndeterminate() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/truncated.png")
+        val png = PNG_SIGNATURE + pngChunk("iCCP", ByteArray(5_000))
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(png) }
+
+        assertEquals(
+            ImageAnimationStatus.INDETERMINATE,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, uri),
+        )
+    }
+
+    @Test
+    fun staticPngIsProvenByImageDataHeaderWithoutReadingTheWholeChunk() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/static.png")
+        val png = PNG_SIGNATURE + pngChunk("IHDR", ByteArray(13)) + pngChunk("IDAT", ByteArray(5_000))
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(png) }
+
+        assertEquals(
+            ImageAnimationStatus.STATIC,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, uri),
+        )
+    }
+
+    @Test
+    fun staticAvifBrandIsClassifiedWithoutFlatteningImageSequences() {
+        val context = RuntimeEnvironment.getApplication()
+        val staticUri = Uri.parse("content://$AUTHORITY/static.avif")
+        val animatedUri = Uri.parse("content://$AUTHORITY/animated.avif")
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(staticUri) {
+            ByteArrayInputStream(isoBmffFileTypeBox("avif", "mif1"))
+        }
+        shadowOf(context.contentResolver).registerInputStreamSupplier(animatedUri) {
+            ByteArrayInputStream(isoBmffFileTypeBox("avis", "avif"))
+        }
+
+        assertEquals(
+            ImageAnimationStatus.STATIC,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, staticUri),
+        )
+        assertEquals(
+            ImageAnimationStatus.ANIMATED,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, animatedUri),
+        )
+    }
+
+    @Test
+    fun staticHeicBrandIsClassifiedForTheJpegPrivacyFallback() {
+        val context = RuntimeEnvironment.getApplication()
+        val uri = Uri.parse("content://$AUTHORITY/static.heic")
+        ShadowContentResolver.registerProviderInternal(AUTHORITY, GhostProvider())
+        shadowOf(context.contentResolver).registerInputStreamSupplier(uri) {
+            ByteArrayInputStream(isoBmffFileTypeBox("heic", "mif1"))
+        }
+
+        assertEquals(
+            ImageAnimationStatus.STATIC,
+            MediaPipeline.imageAnimationStatus(context.contentResolver, uri),
+        )
+    }
+
     private fun webpChunk(
         fourCc: String,
         payload: ByteArray,
@@ -170,6 +255,34 @@ class MediaPipelineSniffImageMediaTypeResolverTest {
             ((value ushr 16) and 0xff).toByte(),
             ((value ushr 24) and 0xff).toByte(),
         )
+
+    private fun pngChunk(
+        type: String,
+        data: ByteArray,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        output.write(ByteBuffer.allocate(Int.SIZE_BYTES).putInt(data.size).array())
+        output.write(type.toByteArray(Charsets.US_ASCII))
+        output.write(data)
+        output.write(ByteArray(Int.SIZE_BYTES))
+        return output.toByteArray()
+    }
+
+    private fun isoBmffFileTypeBox(
+        majorBrand: String,
+        vararg compatibleBrands: String,
+    ): ByteArray {
+        val size = 16 + compatibleBrands.size * 4
+        return ByteBuffer
+            .allocate(size)
+            .putInt(size)
+            .put("ftyp".toByteArray(Charsets.US_ASCII))
+            .put(majorBrand.toByteArray(Charsets.US_ASCII))
+            .putInt(0)
+            .apply {
+                compatibleBrands.forEach { brand -> put(brand.toByteArray(Charsets.US_ASCII)) }
+            }.array()
+    }
 
     private class GhostProvider : ContentProvider() {
         override fun onCreate(): Boolean = true
@@ -205,5 +318,7 @@ class MediaPipelineSniffImageMediaTypeResolverTest {
 
     private companion object {
         const val AUTHORITY = "dev.ipf.whitenoise.android.media.sniff-image-test"
+        val PNG_SIGNATURE =
+            byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
     }
 }

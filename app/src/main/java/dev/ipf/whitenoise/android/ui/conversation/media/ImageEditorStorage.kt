@@ -136,17 +136,24 @@ internal fun sweepStaleImageEditorFiles(
     val cutoff = nowMillis - maxAgeMillis.coerceAtLeast(0L)
     directory.listFiles().orEmpty().forEach { entry ->
         val partial = entry.name.endsWith(".tmp")
-        val stale = entry.name !in protectedFileNames && entry.lastModified() < cutoff
-        if (entry.isFile && (partial || stale)) runCatching { entry.delete() }
+        val protected = entry.name in protectedFileNames
+        val stale = entry.lastModified() < cutoff
+        if (!entry.isFile || !stale) return@forEach
+        if (partial || !protected) runCatching { entry.delete() }
     }
 }
 
-internal fun sweepIncompleteImageEditorFiles(cacheRoot: File) {
+internal fun sweepIncompleteImageEditorFiles(
+    cacheRoot: File,
+    maxAgeMillis: Long = IMAGE_EDITOR_ORPHAN_MAX_AGE_MS,
+    nowMillis: Long = System.currentTimeMillis(),
+) {
     val directory = File(cacheRoot, MediaCacheDirs.IMAGE_EDITOR)
+    val cutoff = nowMillis - maxAgeMillis.coerceAtLeast(0L)
     directory
         .listFiles()
         .orEmpty()
-        .filter { entry -> entry.isFile && entry.name.endsWith(".tmp") }
+        .filter { entry -> entry.isFile && entry.name.endsWith(".tmp") && entry.lastModified() < cutoff }
         .forEach { entry -> runCatching { entry.delete() } }
 }
 

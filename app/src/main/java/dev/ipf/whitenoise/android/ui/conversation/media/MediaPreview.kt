@@ -272,6 +272,11 @@ internal fun MediaPreviewScreen(
     initialCaption: String = "",
 ) {
     val context = LocalContext.current
+    val showSaveFailure = {
+        android.widget.Toast
+            .makeText(context, R.string.image_editor_save_failed, android.widget.Toast.LENGTH_SHORT)
+            .show()
+    }
     val mediaRevisionToken = rememberSaveable(uris) { UUID.randomUUID().toString() }
     var editingIndex by rememberSaveable { mutableIntStateOf(-1) }
     var editingUriText by rememberSaveable { mutableStateOf<String?>(null) }
@@ -331,15 +336,14 @@ internal fun MediaPreviewScreen(
                     }
                 } else {
                     deleteOwnedEditorUri(context, replacement)
+                    showSaveFailure()
                 }
                 editingIndex = -1
                 editingUriText = null
                 editingRevisionToken = null
             },
             onFailure = {
-                android.widget.Toast
-                    .makeText(context, R.string.image_editor_save_failed, android.widget.Toast.LENGTH_SHORT)
-                    .show()
+                showSaveFailure()
             },
         )
     }

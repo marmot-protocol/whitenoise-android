@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -113,6 +115,46 @@ class ImageEditorContentTest {
         composeRule
             .onNode(SemanticsMatcher.expectValue(ImageEditorGestureExclusionKey, true))
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun missingCropHandlesDoesNotCreateUndoHistory() {
+        render()
+        composeRule.onNodeWithContentDescription(string(R.string.image_editor_crop)).performClick()
+
+        composeRule
+            .onNode(SemanticsMatcher.expectValue(ImageEditorGestureExclusionKey, true))
+            .performTouchInput {
+                down(center)
+                moveBy(Offset(20f, 20f))
+                up()
+            }
+
+        composeRule.onNodeWithContentDescription(string(R.string.image_editor_undo)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun cancellingCropDragRestoresTheCommittedCropDraft() {
+        var saved: ImageEditState? = null
+        render(onSave = { saved = it })
+        composeRule.onNodeWithContentDescription(string(R.string.image_editor_crop)).performClick()
+        val canvas = composeRule.onNode(SemanticsMatcher.expectValue(ImageEditorGestureExclusionKey, true))
+
+        canvas.performTouchInput {
+            val imageTop = (height - width / 2f) / 2f
+            down(Offset(1f, imageTop + 1f))
+            moveTo(center)
+            cancel()
+        }
+        composeRule.waitForIdle()
+        canvas.performTouchInput {
+            down(center)
+            moveBy(Offset(20f, 20f))
+            up()
+        }
+        composeRule.onNodeWithText(string(R.string.save)).performClick()
+
+        composeRule.runOnIdle { assertEquals(ImageEditState(), saved) }
     }
 
     private fun render(

@@ -51,7 +51,9 @@ private class ConversationAttachmentReader(
         val quality = appState.mediaQuality
         // Animated images cannot survive JPEG recompression. Preserve their
         // original bytes at every quality setting rather than flattening them.
-        // An indeterminate provider/header probe also fails closed.
+        // An indeterminate provider/header probe also fails closed: providers
+        // can fail this bounded read and then decode successfully, so falling
+        // back to JPEG here could flatten animation that was never ruled out.
         val animationStatus = MediaPipeline.imageAnimationStatus(context.contentResolver, uri)
         val requiresOriginalBytes = animationStatus != ImageAnimationStatus.STATIC
         val original =
