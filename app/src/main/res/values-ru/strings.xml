@@ -1380,7 +1380,7 @@
     <string name="agent_connector_openclaw_subtitle">Личный ИИ-ассистент на своём сервере</string>
     <string name="agent_connector_openclaw_prompt">Это запрос на установку для подключения этого экземпляра OpenClaw к White Noise через Marmot. Прочитайте актуальное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения установите и проверьте коннектор, а затем ответьте npub вашего агента.</string>
     <string name="agent_connector_opencode_name">OpenCode</string>
-    <string name="agent_connector_opencode_subtitle">Агент для кода с открытым исходным кодом</string>
+    <string name="agent_connector_opencode_subtitle">Агент программирования с открытым исходным кодом</string>
     <string name="agent_connector_opencode_prompt">Это запрос на установку для подключения этой конфигурации OpenCode к White Noise через Marmot. Прочитайте актуальное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения установите и проверьте коннектор, а затем ответьте npub вашего агента.</string>
     <string name="account_and_keys">Аккаунт и ключи</string>
     <string name="account_keys_settings_subtitle">npub · резервная копия · выход</string>

@@ -1328,7 +1328,7 @@
     <string name="agent_connector_openclaw_subtitle">Asistente de IA personal autoalojado</string>
     <string name="agent_connector_openclaw_prompt">Esta es una instrucción de instalación para conectar esta instancia de OpenClaw a White Noise mediante Marmot. Lee la guía más reciente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, instala y verifica el conector y, después, responde con la npub de tu agente.</string>
     <string name="agent_connector_opencode_name">OpenCode</string>
-    <string name="agent_connector_opencode_subtitle">Agente de código de código abierto</string>
+    <string name="agent_connector_opencode_subtitle">Agente de programación de código abierto</string>
     <string name="agent_connector_opencode_prompt">Esta es una instrucción de instalación para conectar esta configuración de OpenCode a White Noise mediante Marmot. Lee la guía más reciente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, instala y verifica el conector y, después, responde con la npub de tu agente.</string>
     <string name="account_and_keys">Cuenta y claves</string>
     <string name="account_keys_settings_subtitle">npub · copia de seguridad · cerrar sesión</string>
