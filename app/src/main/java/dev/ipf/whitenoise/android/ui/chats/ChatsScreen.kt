@@ -353,7 +353,7 @@ internal fun ChatsScreen(
                 // and cancels the prior attempt as the user keeps typing.
                 delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
                 val hex = Nip05Resolver.resolve(id.identifier)
-                val npub = hex?.let { appState.npub(it) }
+                val npub = presentableIdentifierNpub(hex, appState::npubForDisplay)
                 identifierResolution =
                     if (npub != null) {
                         IdentifierResolution.Resolved(npub)
@@ -1183,6 +1183,14 @@ private sealed interface IdentifierResolution {
         val arg: String? = null,
     ) : IdentifierResolution
 }
+
+internal fun presentableIdentifierNpub(
+    resolvedAccountIdHex: String?,
+    npubForDisplay: (String) -> String,
+): String? =
+    resolvedAccountIdHex
+        ?.let(npubForDisplay)
+        ?.takeIf { it.startsWith("npub1") }
 
 /**
  * Inline chat-list search result for a pasted Nostr identifier (#344). Renders

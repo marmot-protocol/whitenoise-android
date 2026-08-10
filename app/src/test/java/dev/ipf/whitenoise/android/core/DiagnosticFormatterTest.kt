@@ -13,6 +13,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagnosticFormatterTest {
+    private val legacyShortHexIdentity =
+        DiagnosticIdentityPresentation(
+            accountLabel = { label, _ -> label },
+            publicIdentity = IdentityFormatter::short,
+        )
+
     @Test
     fun describesMessagesAndGroupUpdates() {
         val message =
@@ -67,10 +73,13 @@ class DiagnosticFormatterTest {
 
         assertEquals(
             "[alice] msg from 01234567...cdef kind=9 len=5",
-            DiagnosticFormatter.describe(message),
+            DiagnosticFormatter.describe(message, legacyShortHexIdentity),
         )
-        assertEquals("[alice] group state fedcba98...3210", DiagnosticFormatter.describe(group))
-        assertEquals("[alice] projection aaaabbbb...dddd (0 messages)", DiagnosticFormatter.describe(projection))
+        assertEquals("[alice] group state fedcba98...3210", DiagnosticFormatter.describe(group, legacyShortHexIdentity))
+        assertEquals(
+            "[alice] projection aaaabbbb...dddd (0 messages)",
+            DiagnosticFormatter.describe(projection, legacyShortHexIdentity),
+        )
     }
 
     @Test
@@ -86,7 +95,7 @@ class DiagnosticFormatterTest {
                         "token=abc123 https://user:pass@example.test $secretHex $longHex " +
                         "while syncing a verbose diagnostics payload that should be truncated",
             )
-        val described = DiagnosticFormatter.describe(event)
+        val described = DiagnosticFormatter.describe(event, legacyShortHexIdentity)
 
         assertTrue(described.startsWith("[alice] error: failed [redacted] token=[redacted] https://[redacted]@example.test"))
         assertTrue(described.endsWith("…"))

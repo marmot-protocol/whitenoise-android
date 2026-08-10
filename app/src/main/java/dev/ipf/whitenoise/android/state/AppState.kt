@@ -1310,6 +1310,31 @@ internal fun npubPresentation(
         .orEmpty()
 }
 
+/**
+ * Fail-closed npub for visible/copy profile and message surfaces. Keeps an
+ * already-canonical [reference] when it is not the raw account hex; otherwise
+ * derives through [npubForDisplay] from [resolvedAccountIdHex].
+ */
+internal fun presentationNpubFromReference(
+    reference: String,
+    resolvedAccountIdHex: String?,
+    npubForDisplay: (String) -> String,
+): String {
+    if (
+        reference.startsWith("npub1", ignoreCase = true) &&
+        resolvedAccountIdHex?.equals(reference, ignoreCase = true) != true
+    ) {
+        return reference
+    }
+    return resolvedAccountIdHex?.let(npubForDisplay).orEmpty()
+}
+
+internal fun operationalNpub(
+    accountIdHex: String,
+    cachedNpub: String?,
+    encode: (String) -> String?,
+): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
+
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 
 internal fun appStateScopeExceptionHandler(
@@ -6253,23 +6278,35 @@ class WhiteNoiseAppState private constructor(
         )
 
     fun shortNpub(accountIdHex: String): String {
-        val npub = npub(accountIdHex)
+        val npub = npubForDisplay(accountIdHex)
+        if (npub.isEmpty()) return ""
         return IdentityFormatter.short(npub, prefix = 10, suffix = 8)
     }
 
+    /** Returns a canonical npub for presentation, or empty rather than exposing raw hex. */
+    fun npubForDisplay(accountIdHex: String): String {
+        val cached = npubs.get(accountIdHex)
+        return npubPresentation(accountIdHex, cached) {
+            marmot().npub(accountIdHex)
+        }.also { resolved ->
+            if (resolved.isNotEmpty() && cached == null) {
+                npubs.put(accountIdHex, resolved)
+            }
+        }
+    }
+
+    /**
+     * Returns a non-empty operational identity reference. This intentionally
+     * falls back to [accountIdHex] when encoding fails; UI must use
+     * [npubForDisplay] or [shortNpub] instead.
+     */
     fun npub(accountIdHex: String): String {
         val cached = npubs.get(accountIdHex)
         val resolved =
-            npubPresentation(accountIdHex, cached) {
-                // npub is a pure hex→bech32 encoding of the pubkey — no storage read, so
-                // no DB-lock contention, and safe to resolve inline (unlike displayName /
-                // userProfile, which this change moves off the composition thread).
-                // Resolving here also keeps it independent of whether a published profile
-                // exists — an account with no profile metadata still gets a real npub.
+            operationalNpub(accountIdHex, cached) {
                 marmot().npub(accountIdHex)
             }
-        if (resolved.isEmpty()) return ""
-        if (cached == null) {
+        if (cached == null && resolved.startsWith("npub1")) {
             npubs.put(accountIdHex, resolved)
         }
         return resolved

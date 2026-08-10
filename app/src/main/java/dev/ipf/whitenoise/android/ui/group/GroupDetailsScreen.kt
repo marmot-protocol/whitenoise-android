@@ -1270,7 +1270,7 @@ internal fun GroupDetailsScreen(
                             val rowMutationPending =
                                 controller.isMemberMutationPending(member.memberIdHex) ||
                                     activeMutation?.target == member.memberIdHex
-                            val memberNpub = appState.npub(member.memberIdHex)
+                            val memberNpub = appState.npubForDisplay(member.memberIdHex)
                             ContactRow(
                                 title = controller.memberDisplayName(member),
                                 subtitle =
@@ -1282,7 +1282,7 @@ internal fun GroupDetailsScreen(
                                 avatarSeed = member.memberIdHex,
                                 avatarUrl = controller.memberAvatarUrl(member),
                                 onSubtitleClick =
-                                    if (isSelfRow) {
+                                    if (isSelfRow || memberNpub.isBlank()) {
                                         null
                                     } else {
                                         { clipboard.setText(AnnotatedString(memberNpub)) }
@@ -1308,7 +1308,7 @@ internal fun GroupDetailsScreen(
                             )
                         }
                         controller.pendingInviteMemberRefs.forEach { invite ->
-                            val inviteNpub = appState.npub(invite)
+                            val inviteNpub = appState.npubForDisplay(invite)
                             PendingGroupInviteRow(
                                 title = appState.displayName(invite),
                                 subtitle =
@@ -1318,7 +1318,12 @@ internal fun GroupDetailsScreen(
                                     ),
                                 avatarSeed = invite,
                                 avatarUrl = appState.avatarUrl(invite),
-                                onClick = { clipboard.setText(AnnotatedString(inviteNpub)) },
+                                onClick =
+                                    if (inviteNpub.isBlank()) {
+                                        {}
+                                    } else {
+                                        { clipboard.setText(AnnotatedString(inviteNpub)) }
+                                    },
                             )
                         }
                     }
@@ -2048,8 +2053,13 @@ private fun PushTokenDebugRows(
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.fillMaxWidth(),
     )
-    val memberNpub = appState.npub(token.memberIdHex)
-    if (memberNpub.isNotBlank()) {
+    val identityCopy =
+        pushDebugPublicIdentityCopy(
+            memberIdHex = token.memberIdHex,
+            serverPubkeyHex = token.serverPubkeyHex,
+            npubForDisplay = appState::npubForDisplay,
+        )
+    identityCopy.memberNpub?.let { memberNpub ->
         DiagnosticRow(
             stringResource(R.string.push_debug_member),
             IdentityFormatter.short(memberNpub),
@@ -2063,8 +2073,7 @@ private fun PushTokenDebugRows(
         IdentityFormatter.short(token.tokenFingerprint),
         copyValue = token.tokenFingerprint,
     )
-    val serverNpub = appState.npub(token.serverPubkeyHex)
-    if (serverNpub.isNotBlank()) {
+    identityCopy.serverNpub?.let { serverNpub ->
         DiagnosticRow(
             stringResource(R.string.push_debug_push_server_pubkey),
             IdentityFormatter.short(serverNpub),

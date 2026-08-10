@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.core.DiagnosticIdentityPresentation
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
@@ -176,6 +177,16 @@ internal fun DiagnosticsScreen(
         entries = (entries + DiagnosticLogEntry(text = text)).takeLast(500)
     }
 
+    val diagnosticIdentity =
+        remember(appState) {
+            DiagnosticIdentityPresentation(
+                accountLabel = { label, accountIdHex ->
+                    DiagnosticIdentityPresentation.accountLabel(label, accountIdHex, appState::shortNpub)
+                },
+                publicIdentity = appState::shortNpub,
+            )
+        }
+
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
         streaming = true
         val subscription = appState.marmotIo { subscribeEvents() }
@@ -185,7 +196,8 @@ internal fun DiagnosticsScreen(
                     withContext(Dispatchers.IO) {
                         subscription.next()
                     } ?: break
-                entries = (entries + DiagnosticLogEntry(text = DiagnosticFormatter.describe(event))).takeLast(500)
+                val described = DiagnosticFormatter.describe(event, diagnosticIdentity)
+                entries = (entries + DiagnosticLogEntry(text = described)).takeLast(500)
             }
         } catch (throwable: Throwable) {
             // A re-key (account/runtime change) cancels this effect; let that

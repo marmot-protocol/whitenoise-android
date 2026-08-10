@@ -107,6 +107,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -417,7 +418,20 @@ internal fun ProfileSheet(
             discovered = appState.pendingProfileMetadata,
             cachedAvatarUrl = hex?.let { appState.avatarUrl(it) },
         )
-    val title = profile.displayName ?: hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
+    val presentationNpub =
+        presentationNpubFromReference(
+            reference = npub,
+            resolvedAccountIdHex = hex,
+            npubForDisplay = appState::npubForDisplay,
+        )
+    val presentationNpubShort =
+        presentationNpub.takeIf { it.isNotBlank() }?.let {
+            IdentityFormatter.short(it, prefix = 12, suffix = 8)
+        }
+    val title =
+        profile.displayName
+            ?: hex?.let { appState.networkDisplayName(it) }
+            ?: presentationNpubShort.orEmpty()
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
@@ -612,24 +626,24 @@ internal fun ProfileSheet(
                         Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (compactMemberSheet) {
+                if (compactMemberSheet && presentationNpub.isNotBlank()) {
                     val copyLabel = stringResource(R.string.copy)
                     Row(
                         modifier =
                             Modifier
                                 .minimumInteractiveComponentSize()
-                                .semantics { contentDescription = npub }
+                                .semantics { contentDescription = presentationNpub }
                                 .clickable(
                                     onClickLabel = copyLabel,
                                     role = Role.Button,
                                 ) {
-                                    clipboard.setText(AnnotatedString(npub))
+                                    clipboard.setText(AnnotatedString(presentationNpub))
                                 }.padding(horizontal = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            IdentityFormatter.short(npub, prefix = 12, suffix = 8),
+                            presentationNpubShort.orEmpty(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
@@ -725,11 +739,14 @@ internal fun ProfileSheet(
                     Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    CopyableValueRow(
-                        label = "npub",
-                        value = npub,
-                        clipboard = clipboard,
-                    )
+                    if (presentationNpub.isNotBlank()) {
+                        CopyableValueRow(
+                            label = "npub",
+                            value = presentationNpub,
+                            clipboard = clipboard,
+                            displayValue = presentationNpubShort.orEmpty(),
+                        )
+                    }
                     SectionCard(title = stringResource(R.string.about)) {
                         Text(
                             about ?: stringResource(R.string.profile_no_bio),

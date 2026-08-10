@@ -38,7 +38,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -261,7 +260,7 @@ internal fun ContactPickerScreen(
                                 if (alreadyMember) {
                                     stringResource(R.string.add_member_already_in_group, candidate.displayName)
                                 } else {
-                                    IdentityFormatter.short(candidate.npub)
+                                    appState.shortNpub(resolvedAccountIdHex).takeIf { it.isNotBlank() }
                                 },
                             avatarSeed = resolvedAccountIdHex,
                             avatarUrl = appState.avatarUrl(resolvedAccountIdHex),
@@ -303,7 +302,7 @@ internal fun ContactPickerScreen(
                                 when {
                                     candidate.isFollowing -> stringResource(R.string.user_search_following)
                                     candidate.searchProfile != null -> stringResource(R.string.user_search_network)
-                                    else -> IdentityFormatter.short(candidate.npub)
+                                    else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
                                 },
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =

@@ -39,10 +39,13 @@ internal fun rememberConversationMentionPickerState(
                     // `local`. Marmot marks any identity present on this device
                     // as local; filtering all locals can empty the picker.
                     .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                    .map { member ->
+                    .mapNotNull { member ->
+                        val mentionNpub =
+                            appState.npubForDisplay(member.memberIdHex).takeIf { it.isNotBlank() }
+                                ?: return@mapNotNull null
                         MentionComposer.Candidate(
                             accountIdHex = member.memberIdHex,
-                            npub = appState.npub(member.memberIdHex),
+                            npub = mentionNpub,
                             displayName = appState.contactDisplayNameCached(member.memberIdHex),
                             nip05 = appState.userProfile(member.memberIdHex)?.nip05,
                             avatarUrl = appState.avatarUrl(member.memberIdHex),

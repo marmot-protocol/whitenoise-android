@@ -54,7 +54,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
@@ -485,7 +484,7 @@ internal fun NewGroupSetupScreen(
             items(members, key = { it.accountIdHex }) { member ->
                 ContactRow(
                     title = selectedMemberDisplayName(member, appState),
-                    subtitle = IdentityFormatter.short(member.npub),
+                    subtitle = appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = member.accountIdHex,
                     avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
                 )

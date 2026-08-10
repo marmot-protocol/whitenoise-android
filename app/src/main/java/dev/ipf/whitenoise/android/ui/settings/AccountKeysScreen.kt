@@ -243,7 +243,7 @@ internal fun AccountKeysScreen(
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         DiagnosticRow(stringResource(R.string.display_name), appState.displayName(active.accountIdHex))
-                        val npub = appState.npub(active.accountIdHex)
+                        val npub = appState.npubForDisplay(active.accountIdHex)
                         if (npub.isNotBlank()) {
                             CopyableValueRow(
                                 label = stringResource(R.string.public_key),

@@ -746,7 +746,10 @@ internal fun ProfileEditScreen(
                         },
                         onEditPicture = { showPictureSheet = true },
                         onCopyNpub = {
-                            clipboard.setText(AnnotatedString(appState.npub(active.accountIdHex)))
+                            val copyValue = appState.npubForDisplay(active.accountIdHex)
+                            if (copyValue.isNotBlank()) {
+                                clipboard.setText(AnnotatedString(copyValue))
+                            }
                         },
                     )
                 }
