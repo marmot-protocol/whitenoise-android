@@ -92,6 +92,10 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
+import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
+import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
+import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
+import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
@@ -1296,6 +1300,13 @@ class WhiteNoiseAppState private constructor(
 
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
+    internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
+    internal val messageDraftRepository: MessageDraftRepository =
+        MessageDraftRepository(
+            gateway = MarmotMessageDraftGateway(::marmot),
+            editorSessions = editorSessionStore,
+        )
 
     // Which of the two sequential signer round-trips the Amber sign-in is
     // waiting on (1 = identity request, 2 = identity proof), or null when
@@ -2927,6 +2938,11 @@ class WhiteNoiseAppState private constructor(
             startNotificationListener()
             refreshSecurityPrivacySettings()
             refreshAccounts()
+            // Resolve interrupted editor commits against MDK before any draft
+            // is reopened, and reclaim encrypted sources with no live session.
+            messageDraftRepository.reconcileEditorState(editorSourceStore).onFailure {
+                appStateDebug(it) { "photo editor reconciliation deferred: ${it.readableMessage()}" }
+            }
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
             }
@@ -3799,6 +3815,8 @@ class WhiteNoiseAppState private constructor(
      * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
      * outcome so the UI can surface partial failures.
      */
+    @Suppress("LongMethod", "ReturnCount")
+    // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
         clearInMemoryMediaCaches()
@@ -3835,6 +3853,15 @@ class WhiteNoiseAppState private constructor(
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             clearHiddenMessagesForAccount(wipedRef)
+            withContext(NonCancellable + Dispatchers.IO) {
+                runCatching {
+                    if (editorSessionStore.removeAccount(wipedRef)) {
+                        editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
+                    }
+                }.onFailure {
+                    appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
+                }
+            }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())
             accounts = refreshedAccounts
             releaseContactClearGuardForSignedInAccounts(refreshedAccounts)

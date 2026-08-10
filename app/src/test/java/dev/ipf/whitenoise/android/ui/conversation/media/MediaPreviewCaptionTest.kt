@@ -23,7 +23,7 @@ class MediaPreviewCaptionTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 MediaPreviewContent(
-                    mediaUris = listOf(Uri.parse("content://test/photo-1")),
+                    mediaSlots = listOf(PendingMediaSlot("slot-1", Uri.parse("content://test/photo-1"))),
                     documentUris = emptyList(),
                     chatTitle = "Chat",
                     onClose = {},
@@ -45,7 +45,7 @@ class MediaPreviewCaptionTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 MediaPreviewContent(
-                    mediaUris = listOf(Uri.parse("content://test/photo-1")),
+                    mediaSlots = listOf(PendingMediaSlot("slot-1", Uri.parse("content://test/photo-1"))),
                     documentUris = emptyList(),
                     chatTitle = "Chat",
                     onClose = {},

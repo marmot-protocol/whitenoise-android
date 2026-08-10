@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.net.Uri
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedPreviewItem
 import dev.ipf.whitenoise.android.ui.conversation.media.previewIndexAfterRemoval
 import dev.ipf.whitenoise.android.ui.conversation.media.stagedPreviewItems
@@ -20,17 +21,19 @@ import org.robolectric.annotation.Config
 class MediaPreviewLogicTest {
     private fun uri(n: Int): Uri = Uri.parse("content://test/$n")
 
+    private fun slot(n: Int): PendingMediaSlot = PendingMediaSlot("slot-$n", uri(n))
+
     @Test
     fun sendOrderIsMediaThenDocumentsInSelectionOrder() {
         val items =
             stagedPreviewItems(
-                mediaUris = listOf(uri(1), uri(2)),
+                mediaSlots = listOf(slot(1), slot(2)),
                 documentUris = listOf(uri(3)),
             )
         assertEquals(
             listOf<StagedPreviewItem>(
-                StagedPreviewItem.Media(uri(1)),
-                StagedPreviewItem.Media(uri(2)),
+                StagedPreviewItem.Media(slot(1)),
+                StagedPreviewItem.Media(slot(2)),
                 StagedPreviewItem.Document(uri(3)),
             ),
             items,
@@ -39,9 +42,9 @@ class MediaPreviewLogicTest {
 
     @Test
     fun deselectingAnItemRenumbersTheRemainingOnes() {
-        val before = stagedPreviewItems(listOf(uri(1), uri(2), uri(3)), emptyList())
+        val before = stagedPreviewItems(listOf(slot(1), slot(2), slot(3)), emptyList())
         assertEquals(uri(2), before[1].uri)
-        val after = stagedPreviewItems(listOf(uri(1), uri(3)), emptyList())
+        val after = stagedPreviewItems(listOf(slot(1), slot(3)), emptyList())
         // uri(3) held badge 3, and moves up to badge 2 once uri(2) is removed.
         assertEquals(uri(3), after[1].uri)
         assertEquals(2, after.size)

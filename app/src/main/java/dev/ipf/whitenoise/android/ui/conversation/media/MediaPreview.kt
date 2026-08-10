@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +71,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -112,21 +115,32 @@ private fun rememberPreviewMetadata(items: List<StagedPreviewItem>): Map<android
     return metadata
 }
 
-/** Decode a size-appropriate preview bitmap for a local content Uri, off-thread. */
+internal data class PreparedPhotoPreview(
+    val revision: String,
+    val bytes: ByteArray,
+)
+
+/** Decode the prepared send artifact when available, otherwise the original local Uri. */
 @Composable
-private fun rememberLocalPreviewBitmap(
+private fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
+    prepared: PreparedPhotoPreview? = null,
 ): ImageBitmap? {
     val context = LocalContext.current
-    var bitmap by remember(uri, isVideo, maxEdgePx) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(uri, isVideo, maxEdgePx) {
+    var bitmap by
+        remember(uri, isVideo, maxEdgePx, prepared?.revision) {
+            mutableStateOf<android.graphics.Bitmap?>(null)
+        }
+    LaunchedEffect(uri, isVideo, maxEdgePx, prepared?.revision) {
         var decoded: android.graphics.Bitmap? = null
         try {
             withContext(Dispatchers.IO) {
                 decoded =
-                    if (isVideo) {
+                    if (prepared != null) {
+                        MediaPipeline.decodeSampledBitmap(prepared.bytes, maxEdgePx)
+                    } else if (isVideo) {
                         // Video URI: extract the first frame as the staging thumbnail
                         // instead of trying to decode the bytes as JPEG (which spins
                         // forever on a video and leaves the sheet stuck). Scaled to
@@ -193,8 +207,10 @@ internal sealed class StagedPreviewItem {
     abstract val uri: android.net.Uri
 
     data class Media(
-        override val uri: android.net.Uri,
-    ) : StagedPreviewItem()
+        val slot: PendingMediaSlot,
+    ) : StagedPreviewItem() {
+        override val uri: android.net.Uri = slot.uri
+    }
 
     data class Document(
         override val uri: android.net.Uri,
@@ -202,9 +218,9 @@ internal sealed class StagedPreviewItem {
 }
 
 internal fun stagedPreviewItems(
-    mediaUris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
-): List<StagedPreviewItem> = mediaUris.map { StagedPreviewItem.Media(it) } + documentUris.map { StagedPreviewItem.Document(it) }
+): List<StagedPreviewItem> = mediaSlots.map { StagedPreviewItem.Media(it) } + documentUris.map { StagedPreviewItem.Document(it) }
 
 /**
  * Where the preview cursor lands after removing [removedIndex] from a list
@@ -225,7 +241,7 @@ internal fun previewIndexAfterRemoval(
 
 @Composable
 internal fun MediaPreviewScreen(
-    uris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onDismiss: () -> Unit,
@@ -234,6 +250,13 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    onEditMediaAt: ((Int) -> Unit)? = null,
+    onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
+    preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
+    preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
+    preparingPhotoSlotIds: Set<String> = emptySet(),
+    nonEditableMediaSlotIds: Set<String> = emptySet(),
+    nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
 ) {
     Dialog(
@@ -245,7 +268,7 @@ internal fun MediaPreviewScreen(
             ),
     ) {
         MediaPreviewContent(
-            mediaUris = uris,
+            mediaSlots = mediaSlots,
             documentUris = documentUris,
             chatTitle = chatTitle,
             initialCaption = initialCaption,
@@ -255,13 +278,20 @@ internal fun MediaPreviewScreen(
             onRemoveDocumentAt = onRemoveDocumentAt,
             onAddPhotos = onAddPhotos,
             onAddDocuments = onAddDocuments,
+            onEditMediaAt = onEditMediaAt,
+            onSelectMediaQuality = onSelectMediaQuality,
+            preparedPhotoPreviews = preparedPhotoPreviews,
+            preparedPhotoQualities = preparedPhotoQualities,
+            preparingPhotoSlotIds = preparingPhotoSlotIds,
+            nonEditableMediaSlotIds = nonEditableMediaSlotIds,
+            nonEditableMediaDescriptions = nonEditableMediaDescriptions,
         )
     }
 }
 
 @Composable
 internal fun MediaPreviewContent(
-    mediaUris: List<android.net.Uri>,
+    mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
     onClose: () -> Unit,
@@ -270,9 +300,16 @@ internal fun MediaPreviewContent(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
+    onEditMediaAt: ((Int) -> Unit)? = null,
+    onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
+    preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
+    preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
+    preparingPhotoSlotIds: Set<String> = emptySet(),
+    nonEditableMediaSlotIds: Set<String> = emptySet(),
+    nonEditableMediaDescriptions: Map<String, String> = emptyMap(),
     initialCaption: String = "",
 ) {
-    val items = remember(mediaUris, documentUris) { stagedPreviewItems(mediaUris, documentUris) }
+    val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
@@ -281,6 +318,8 @@ internal fun MediaPreviewContent(
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
     val previewMetadata = rememberPreviewMetadata(items)
+    val preparingAttachments =
+        items.any { item -> item is StagedPreviewItem.Media && item.slot.id in preparingPhotoSlotIds }
     LaunchedEffect(items.size) {
         currentIndex = currentIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     }
@@ -291,7 +330,7 @@ internal fun MediaPreviewContent(
         currentIndex = previewIndexAfterRemoval(index, currentIndex, items.size - 1)
         when (item) {
             is StagedPreviewItem.Media -> onRemoveMediaAt(index)
-            is StagedPreviewItem.Document -> onRemoveDocumentAt(index - mediaUris.size)
+            is StagedPreviewItem.Document -> onRemoveDocumentAt(index - mediaSlots.size)
         }
     }
 
@@ -321,6 +360,44 @@ internal fun MediaPreviewContent(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val currentMedia = items.getOrNull(currentIndex) as? StagedPreviewItem.Media
+            val currentMetadata = currentMedia?.let { previewMetadata[it.uri] }
+            val currentPreparing = currentMedia?.slot?.id in preparingPhotoSlotIds
+            val showQuality = currentMetadata?.isVideo == false && onSelectMediaQuality != null
+            if (currentMedia != null && showQuality) {
+                PhotoQualitySelector(
+                    slotId = currentMedia.slot.id,
+                    qualities = preparedPhotoQualities,
+                    enabled = !sending && !currentPreparing,
+                    onSelect = onSelectMediaQuality,
+                )
+            }
+            if (currentMedia != null && currentMetadata?.isVideo == false && onEditMediaAt != null) {
+                val editable = currentMedia.slot.id !in nonEditableMediaSlotIds
+                val nonEditableDescription =
+                    nonEditableMediaDescriptions[currentMedia.slot.id]
+                        ?: stringResource(R.string.photo_editor_not_editable_source)
+                val editDescription = stringResource(R.string.photo_editor_edit_action)
+                IconButton(
+                    onClick = { onEditMediaAt(currentIndex) },
+                    enabled = !sending && !currentPreparing && editable,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription =
+                                if (!editable) {
+                                    nonEditableDescription
+                                } else {
+                                    editDescription
+                                }
+                        },
+                ) {
+                    if (currentPreparing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White)
+                    }
+                }
+            }
             IconButton(
                 onClick = { removeAt(currentIndex) },
                 enabled = items.isNotEmpty() && !sending,
@@ -341,7 +418,12 @@ internal fun MediaPreviewContent(
             contentAlignment = Alignment.Center,
         ) {
             when (val item = items.getOrNull(currentIndex)) {
-                is StagedPreviewItem.Media -> HeroMediaPreview(item.uri, previewMetadata[item.uri])
+                is StagedPreviewItem.Media ->
+                    HeroMediaPreview(
+                        uri = item.uri,
+                        metadata = previewMetadata[item.uri],
+                        prepared = preparedPhotoPreviews[item.slot.id],
+                    )
                 is StagedPreviewItem.Document -> HeroDocumentPreview(item.uri, previewMetadata[item.uri])
                 null -> Unit
             }
@@ -360,7 +442,7 @@ internal fun MediaPreviewContent(
                     items,
                     key = { _, item ->
                         when (item) {
-                            is StagedPreviewItem.Media -> "image:${item.uri}"
+                            is StagedPreviewItem.Media -> "image:${item.slot.id}"
                             is StagedPreviewItem.Document -> "doc:${item.uri}"
                         }
                     },
@@ -368,6 +450,7 @@ internal fun MediaPreviewContent(
                     PreviewStripThumb(
                         item = item,
                         metadata = previewMetadata[item.uri],
+                        prepared = (item as? StagedPreviewItem.Media)?.let { preparedPhotoPreviews[it.slot.id] },
                         position = index + 1,
                         selected = index == currentIndex,
                         enabled = !sending,
@@ -397,7 +480,7 @@ internal fun MediaPreviewContent(
                 )
                 FloatingActionButton(
                     onClick = {
-                        if (!sending && items.isNotEmpty()) {
+                        if (!sending && !preparingAttachments && items.isNotEmpty()) {
                             sending = true
                             onSend(caption) { accepted ->
                                 if (!accepted) sending = false
@@ -406,7 +489,7 @@ internal fun MediaPreviewContent(
                     },
                     modifier =
                         Modifier.semantics {
-                            if (sending || items.isEmpty()) disabled()
+                            if (sending || preparingAttachments || items.isEmpty()) disabled()
                         },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -438,16 +521,17 @@ private fun previewCaptionFieldColors() =
 private fun HeroMediaPreview(
     uri: android.net.Uri,
     metadata: LocalPreviewMetadata?,
+    prepared: PreparedPhotoPreview?,
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val bitmap =
             metadata?.let {
-                rememberLocalPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                rememberMediaPreviewBitmap(uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
             }
         if (bitmap != null) {
             Image(
                 bitmap = bitmap,
-                contentDescription = null,
+                contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -506,6 +590,7 @@ private fun HeroDocumentPreview(
 private fun PreviewStripThumb(
     item: StagedPreviewItem,
     metadata: LocalPreviewMetadata?,
+    prepared: PreparedPhotoPreview?,
     position: Int,
     selected: Boolean,
     enabled: Boolean,
@@ -530,12 +615,12 @@ private fun PreviewStripThumb(
             is StagedPreviewItem.Media -> {
                 val bitmap =
                     metadata?.let {
-                        rememberLocalPreviewBitmap(item.uri, it.isVideo, PREVIEW_STRIP_MAX_EDGE_PX)
+                        rememberMediaPreviewBitmap(item.uri, it.isVideo, PREVIEW_STRIP_MAX_EDGE_PX, prepared)
                     }
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap,
-                        contentDescription = null,
+                        contentDescription = prepared?.let { stringResource(R.string.photo_editor_prepared) },
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )

@@ -57,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -104,11 +105,20 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
+import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
+import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
+import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
+import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitResult
+import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitter
+import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
+import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -146,12 +156,23 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationM
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableFileSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
+import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
+import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorDialog
+import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
+import dev.ipf.whitenoise.android.ui.conversation.media.isLegacyRestore
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.media.selectablePhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
@@ -169,12 +190,14 @@ import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -200,6 +223,21 @@ private data class ConversationSearchScrollAnchor(
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
+
+private data class ActivePhotoEditor(
+    val slot: PendingMediaSlot,
+    val photo: DraftBackedPhoto,
+    val previewBitmap: android.graphics.Bitmap,
+    val stateHolder: PhotoEditorStateHolder,
+)
+
+private data class ConversationMediaCleanupSnapshot(
+    val activeEditor: ActivePhotoEditor?,
+    val stagedPhotos: List<DraftBackedPhoto>,
+    val preparedPhotos: List<DraftPreparedPhoto>,
+    val accountRef: String?,
+    val groupIdHex: String,
+)
 
 private const val RESUME_IME_SETTLE_MAX_FRAMES = 24
 
@@ -1070,6 +1108,14 @@ internal fun ConversationScreen(
     }
 
     val context = LocalContext.current
+    val photoEditorNotEditableAnimationMessage =
+        stringResource(R.string.photo_editor_not_editable_animation)
+    val photoEditorNotEditableSourceMessage =
+        stringResource(R.string.photo_editor_not_editable_source)
+    val photoEditorSourceUnavailableMessage =
+        stringResource(R.string.photo_editor_source_unavailable)
+    val photoEditorSaveFailedMessage =
+        stringResource(R.string.photo_editor_save_failed)
     val mediaSender =
         rememberConversationMediaSender(
             appState = appState,
@@ -1117,23 +1163,254 @@ internal fun ConversationScreen(
     // shelf — ConversationScreen is reused when `selectedChat` changes in
     // place, and an unkeyed state would otherwise carry URIs from chat A into
     // chat B (where a Send would attach them to the wrong recipient).
-    var pendingMediaUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
-        mutableStateOf<List<android.net.Uri>>(emptyList())
+    var pendingMediaSlots by rememberSaveable(chat.id, stateSaver = PendingMediaSlotListSaver) {
+        mutableStateOf<List<PendingMediaSlot>>(emptyList())
     }
     var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
-    LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaUris.size, pendingDocumentUris.size) {
+    val photoRenderer = remember(appState) { PhotoEditorRenderer() }
+    val photoDraftStager =
+        remember(appState, context, photoRenderer) {
+            PhotoDraftStager(
+                contentResolver = context.contentResolver,
+                sources = appState.editorSourceStore,
+                sessions = appState.editorSessionStore,
+                renderer = photoRenderer,
+                drafts = appState.messageDraftRepository,
+            )
+        }
+    val photoCommitter =
+        remember(appState, photoRenderer) {
+            PhotoEditorCommitter(
+                sources = appState.editorSourceStore,
+                renderer = photoRenderer,
+                drafts = appState.messageDraftRepository,
+            )
+        }
+    var draftBackedPhotos by remember(chat.id) { mutableStateOf<Map<String, DraftBackedPhoto>>(emptyMap()) }
+    var draftPreparedPhotos by remember(chat.id) { mutableStateOf<Map<String, DraftPreparedPhoto>>(emptyMap()) }
+    var preparingPhotoSlotIds by remember(chat.id) { mutableStateOf<Set<String>>(emptySet()) }
+    var nonEditablePhotoDescriptions by remember(chat.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var activePhotoEditor by remember(chat.id) { mutableStateOf<ActivePhotoEditor?>(null) }
+    var requestedPhotoEditorSlotId by remember(chat.id) { mutableStateOf<String?>(null) }
+    val mediaPreviewStateHolder = rememberSaveableStateHolder()
+    val currentMediaCleanupSnapshot =
+        key(chat.id) {
+            rememberUpdatedState(
+                ConversationMediaCleanupSnapshot(
+                    activeEditor = activePhotoEditor,
+                    stagedPhotos = draftBackedPhotos.values.toList(),
+                    preparedPhotos = draftPreparedPhotos.values.toList(),
+                    accountRef = controller.boundAccountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                ),
+            )
+        }
+
+    fun releasePreparedPhoto(slotId: String) {
+        val photo = draftBackedPhotos[slotId]
+        val prepared = draftPreparedPhotos[slotId]
+        if (photo == null && prepared == null) return
+        draftBackedPhotos = draftBackedPhotos - slotId
+        draftPreparedPhotos = draftPreparedPhotos - slotId
+        nonEditablePhotoDescriptions = nonEditablePhotoDescriptions - slotId
+        val accountRef = controller.boundAccountRef ?: return
+        appState.launchMutation {
+            if (photo != null) {
+                photoDraftStager.remove(accountRef, controller.group.groupIdHex, photo)
+            } else if (prepared != null) {
+                photoDraftStager.removePrepared(accountRef, controller.group.groupIdHex, prepared)
+            }
+        }
+    }
+
+    @Suppress("LongMethod", "ReturnCount") // One slot-scoped coroutine owns stale-result and editor-open races.
+    suspend fun preparePhoto(slot: PendingMediaSlot) {
+        val slotId = slot.id
+        val uri = slot.uri
+        if (slotId in preparingPhotoSlotIds || slotId in nonEditablePhotoDescriptions) return
+        val accountRef = controller.boundAccountRef ?: return
+        preparingPhotoSlotIds = preparingPhotoSlotIds + slotId
+        try {
+            val existing = draftBackedPhotos[slotId]
+            if (existing == null) {
+                val mime = withContext(Dispatchers.IO) { safeGetType(context.contentResolver, uri) }
+                if (mime.startsWith("video/", ignoreCase = true)) {
+                    if (requestedPhotoEditorSlotId == slotId) requestedPhotoEditorSlotId = null
+                    return
+                }
+            }
+            val staged =
+                existing?.let { PhotoDraftStageResult.Success(it) }
+                    ?: photoDraftStager.stage(
+                        uri = uri,
+                        attachmentSlotId = slotId,
+                        accountRef = accountRef,
+                        groupIdHex = controller.group.groupIdHex,
+                        quality = appState.mediaQuality,
+                        legacyOccurrenceIndex =
+                            if (slot.isLegacyRestore()) {
+                                pendingMediaSlots
+                                    .takeWhile { it.id != slot.id }
+                                    .count { it.isLegacyRestore() && it.uri == slot.uri }
+                            } else {
+                                null
+                            },
+                    )
+            when (staged) {
+                is PhotoDraftStageResult.Success -> {
+                    val photo = staged.photo
+                    if (slot !in pendingMediaSlots) {
+                        photoDraftStager.remove(accountRef, controller.group.groupIdHex, photo)
+                        if (requestedPhotoEditorSlotId == slotId) requestedPhotoEditorSlotId = null
+                        return
+                    }
+                    draftPreparedPhotos = draftPreparedPhotos - slotId
+                    nonEditablePhotoDescriptions = nonEditablePhotoDescriptions - slotId
+                    draftBackedPhotos = draftBackedPhotos + (slotId to photo)
+                    if (requestedPhotoEditorSlotId == slotId) {
+                        requestedPhotoEditorSlotId = null
+                        val sourceBytes =
+                            withContext(Dispatchers.IO) {
+                                appState.editorSourceStore.bytes(photo.sourceLeaseId)
+                            }
+                        val preview = sourceBytes?.let { photoRenderer.decodePreview(it) }
+                        if (!currentCoroutineContext().isActive) {
+                            preview?.recycle()
+                            return
+                        } else if (preview == null) {
+                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                        } else {
+                            activePhotoEditor =
+                                ActivePhotoEditor(
+                                    slot = slot,
+                                    photo = photo,
+                                    previewBitmap = preview,
+                                    stateHolder =
+                                        PhotoEditorStateHolder(
+                                            initialRecipe = photo.recipe,
+                                            initialQuality = photo.quality,
+                                            orientedSize = photo.sourceInfo.orientedSize,
+                                        ),
+                                )
+                        }
+                    }
+                }
+                is PhotoDraftStageResult.NotEditable -> {
+                    val description =
+                        if (staged.reason ==
+                            dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure.Animated
+                        ) {
+                            photoEditorNotEditableAnimationMessage
+                        } else {
+                            photoEditorNotEditableSourceMessage
+                        }
+                    nonEditablePhotoDescriptions = nonEditablePhotoDescriptions + (slotId to description)
+                    if (requestedPhotoEditorSlotId == slotId) {
+                        requestedPhotoEditorSlotId = null
+                        appState.presentText(AppText.Plain(description), copyable = true)
+                    }
+                }
+                is PhotoDraftStageResult.PreparedOnly -> {
+                    draftPreparedPhotos = draftPreparedPhotos + (slotId to staged.photo)
+                    val description = photoEditorSourceUnavailableMessage
+                    nonEditablePhotoDescriptions = nonEditablePhotoDescriptions + (slotId to description)
+                    if (requestedPhotoEditorSlotId == slotId) {
+                        requestedPhotoEditorSlotId = null
+                        appState.presentText(AppText.Plain(description), copyable = true)
+                    }
+                }
+                PhotoDraftStageResult.DraftUnavailable,
+                PhotoDraftStageResult.SourceUnavailable,
+                -> {
+                    if (requestedPhotoEditorSlotId == slotId) {
+                        requestedPhotoEditorSlotId = null
+                        appState.presentText(
+                            AppText.Plain(photoEditorSourceUnavailableMessage),
+                            copyable = true,
+                        )
+                    }
+                }
+            }
+        } finally {
+            preparingPhotoSlotIds = preparingPhotoSlotIds - slotId
+        }
+    }
+
+    fun openPhotoEditor(slot: PendingMediaSlot) {
+        if (slot.id in nonEditablePhotoDescriptions) return
+        requestedPhotoEditorSlotId = slot.id
+        if (slot.id !in preparingPhotoSlotIds) scope.launch { preparePhoto(slot) }
+    }
+
+    fun selectPhotoQuality(
+        slot: PendingMediaSlot,
+        requestedQuality: MediaQuality,
+    ) {
+        val photo = draftBackedPhotos[slot.id]
+        if (photo == null || slot.id in preparingPhotoSlotIds) return
+        val quality = requestedQuality.selectablePhotoQuality()
+        val currentlyStandard = photo.quality == MediaQuality.Low || photo.quality == MediaQuality.Standard
+        val accountRef = controller.boundAccountRef
+        if (currentlyStandard == (quality == MediaQuality.Standard) || accountRef == null) return
+        preparingPhotoSlotIds = preparingPhotoSlotIds + slot.id
+        appState.launchMutation {
+            try {
+                val result =
+                    photoCommitter.commit(
+                        accountRef = accountRef,
+                        groupIdHex = controller.group.groupIdHex,
+                        currentAttachment = photo.attachment,
+                        expectedDigest = photo.attachmentDigest,
+                        sourceLeaseId = photo.sourceLeaseId,
+                        recipe = photo.recipe,
+                        quality = quality,
+                    )
+                if (result is PhotoEditorCommitResult.Success) {
+                    val updated =
+                        photo.copy(
+                            attachment = result.attachment,
+                            attachmentDigest = result.attachment.editorDigest(),
+                            quality = quality,
+                        )
+                    if (pendingMediaSlots.any { it.id == slot.id }) {
+                        draftBackedPhotos = draftBackedPhotos + (slot.id to updated)
+                    } else {
+                        photoDraftStager.remove(accountRef, controller.group.groupIdHex, updated)
+                    }
+                } else if (pendingMediaSlots.any { it.id == slot.id }) {
+                    appState.presentText(AppText.Plain(photoEditorSaveFailedMessage), copyable = true)
+                }
+            } finally {
+                preparingPhotoSlotIds = preparingPhotoSlotIds - slot.id
+            }
+        }
+    }
+
+    LaunchedEffect(pendingMediaSlots, controller.boundAccountRef) {
+        val trackedPhotoSlotIds =
+            draftBackedPhotos.keys +
+                draftPreparedPhotos.keys +
+                preparingPhotoSlotIds +
+                nonEditablePhotoDescriptions.keys
+        pendingMediaSlots.forEach { slot ->
+            if (slot.id !in trackedPhotoSlotIds) {
+                preparePhoto(slot)
+            }
+        }
+    }
+    LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaSlots.size, pendingDocumentUris.size) {
         val capped =
             appState.consumeInboundShareStreamsCapped(
                 groupIdHex = chat.group.groupIdHex,
-                existingMediaCount = pendingMediaUris.size,
+                existingMediaCount = pendingMediaSlots.size,
                 existingDocumentCount = pendingDocumentUris.size,
                 maxItems = MEDIA_PICKER_MAX_ITEMS,
             ) ?: return@LaunchedEffect
         val staged = capped.accepted
         if (staged.mediaUris.isNotEmpty()) {
-            pendingMediaUris = (pendingMediaUris + staged.mediaUris).distinct()
+            pendingMediaSlots = appendPendingMediaSlots(pendingMediaSlots, staged.mediaUris, MEDIA_PICKER_MAX_ITEMS)
         }
         if (staged.documentUris.isNotEmpty()) {
             pendingDocumentUris = (pendingDocumentUris + staged.documentUris).distinct()
@@ -1172,11 +1449,9 @@ internal fun ConversationScreen(
             if (uris.isEmpty()) return@rememberLauncherForActivityResult
             // Append rather than replace so a follow-up "Add more" tile-pick
             // grows the staging shelf instead of clobbering whatever the user
-            // already queued. Dedupe on Uri identity to keep a double-pick
-            // from doubling the row, and cap on MEDIA_PICKER_MAX_ITEMS so the
-            // shelf can't exceed what a fresh pick would have been allowed.
-            val merged = (pendingMediaUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
-            pendingMediaUris = merged
+            // already queued. Each occurrence gets its own stable slot identity
+            // so selecting the same URI twice still produces independent edits.
+            pendingMediaSlots = appendPendingMediaSlots(pendingMediaSlots, uris, MEDIA_PICKER_MAX_ITEMS)
         }
     val cameraLauncher =
         rememberLauncherForActivityResult(
@@ -1186,8 +1461,8 @@ internal fun ConversationScreen(
             if (success && captured != null) {
                 // Append to whatever's already queued so an in-progress staging
                 // shelf survives a camera capture.
-                val merged = (pendingMediaUris + captured).distinct().take(MEDIA_PICKER_MAX_ITEMS)
-                pendingMediaUris = merged
+                pendingMediaSlots =
+                    appendPendingMediaSlots(pendingMediaSlots, listOf(captured), MEDIA_PICKER_MAX_ITEMS)
             } else {
                 cameraOutputFile?.delete() // cancelled — don't leak the empty temp
             }
@@ -1385,10 +1660,11 @@ internal fun ConversationScreen(
     // accepts any MIME — the image picker can't surface PDFs, archives, etc.
     // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
     // same staging shelf as image picks; one Send dispatches both sides
-    // through one kind:9 album. Bytes pass through without recompression —
-    // including picked/forwarded audio files. The send-quality audio bitrate
-    // is intentionally scoped to recorded voice notes until this client grows
-    // a general audio transcode path.
+    // through one kind:9 album. Non-image bytes pass through without
+    // recompression, while detected images use the same metadata-safe policy
+    // as Photo Picker. The send-quality audio bitrate is intentionally scoped
+    // to recorded voice notes until this client grows a general audio
+    // transcode path.
     val documentPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
@@ -1407,8 +1683,23 @@ internal fun ConversationScreen(
     // (PDF viewer, etc.) may still be reading a granted FileProvider URI.
     // Those are reaped by the age-based `sweepStaleSharedMedia` janitor at
     // app start.
-    DisposableEffect(Unit) {
+    DisposableEffect(controller, chat.id) {
         onDispose {
+            val cleanup = currentMediaCleanupSnapshot.value
+            cleanup.activeEditor?.previewBitmap?.recycle()
+            if (
+                cleanup.accountRef != null &&
+                (cleanup.stagedPhotos.isNotEmpty() || cleanup.preparedPhotos.isNotEmpty())
+            ) {
+                appState.launchMutation {
+                    cleanup.stagedPhotos.forEach { photo ->
+                        photoDraftStager.remove(cleanup.accountRef, cleanup.groupIdHex, photo)
+                    }
+                    cleanup.preparedPhotos.forEach { photo ->
+                        photoDraftStager.removePrepared(cleanup.accountRef, cleanup.groupIdHex, photo)
+                    }
+                }
+            }
             clearMediaTempFiles(context)
             controller.clearRetainedUploads()
         }
@@ -2509,7 +2800,8 @@ internal fun ConversationScreen(
                     )
                 },
                 onPickRecentMedia = { uri ->
-                    pendingMediaUris = (pendingMediaUris + uri).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                    pendingMediaSlots =
+                        appendPendingMediaSlots(pendingMediaSlots, listOf(uri), MEDIA_PICKER_MAX_ITEMS)
                 },
                 onCaptureFromCamera = {
                     val granted =
@@ -2539,8 +2831,8 @@ internal fun ConversationScreen(
                 onShareUser = { shareUserPickerOpen = true },
                 onShareContact = { contactPickerLauncher.launch(Unit) },
                 onPasteImageUris = { uris ->
-                    val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
-                    val pasteCandidates = uris.distinct().take(openSlots)
+                    val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
+                    val pasteCandidates = uris.take(openSlots)
                     val localUris =
                         pasteCandidates.mapNotNull { uri ->
                             materializeReceiveContentImageUri(context, uri)
@@ -2549,10 +2841,8 @@ internal fun ConversationScreen(
                         appState.present(R.string.toast_couldnt_decode_image, copyable = true)
                     }
                     if (localUris.isNotEmpty()) {
-                        pendingMediaUris =
-                            (pendingMediaUris + localUris)
-                                .distinct()
-                                .take(MEDIA_PICKER_MAX_ITEMS)
+                        pendingMediaSlots =
+                            appendPendingMediaSlots(pendingMediaSlots, localUris, MEDIA_PICKER_MAX_ITEMS)
                     }
                 },
                 voiceRecordingController = voiceRecordingController,
@@ -2998,68 +3288,167 @@ internal fun ConversationScreen(
         )
     }
 
-    if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
-        val imageUris = pendingMediaUris
+    if ((pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) && activePhotoEditor == null) {
+        val imageSlots = pendingMediaSlots
         val documentUris = pendingDocumentUris
+        val preparedPhotoPreviews =
+            draftBackedPhotos.mapValues { (_, photo) ->
+                PreparedPhotoPreview(
+                    revision = photo.attachmentDigest,
+                    bytes = photo.attachment.plaintext,
+                )
+            } +
+                draftPreparedPhotos.mapValues { (_, photo) ->
+                    PreparedPhotoPreview(
+                        revision = photo.attachmentDigest,
+                        bytes = photo.attachment.plaintext,
+                    )
+                }
+        val preparedPhotoQualities =
+            draftBackedPhotos.mapValues { (_, photo) ->
+                fun dimensions(quality: MediaQuality): String? =
+                    photoRenderer.outputPlan(photo.sourceInfo, photo.recipe, quality)?.geometry?.outputSize?.let {
+                        "${it.width} × ${it.height}"
+                    }
+                PreparedPhotoQuality(
+                    selectedQuality = photo.quality,
+                    standardDimensions =
+                        dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
+                    hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
+                )
+            }
         // The typed composer draft seeds the caption, and an accepted send
         // consumes it exactly like a text send would — guarded so text typed
         // after staging is never wiped. Dismissing leaves the draft alone.
         val seededDraftText = composerTextState.valueState.value.text
-        MediaPreviewScreen(
-            uris = imageUris,
-            documentUris = documentUris,
-            chatTitle = controller.title(groupTitleCopy),
-            initialCaption = seededDraftText,
-            onDismiss = {
-                pendingMediaUris = emptyList()
-                pendingDocumentUris = emptyList()
-            },
-            onSend = { caption, onResult ->
-                mediaSender.sendStagedAttachments(
-                    imageUris,
-                    documentUris,
-                    caption,
-                    onAccepted = {
-                        pendingMediaUris = emptyList()
-                        pendingDocumentUris = emptyList()
-                        if (composerTextState.valueState.value.text == seededDraftText) {
-                            composerTextState.valueState.value = TextFieldValue("")
-                            appState.setDraft(controller.group.groupIdHex, TextFieldValue(""))
+        mediaPreviewStateHolder.SaveableStateProvider(chat.id) {
+            MediaPreviewScreen(
+                mediaSlots = imageSlots,
+                documentUris = documentUris,
+                chatTitle = controller.title(groupTitleCopy),
+                initialCaption = seededDraftText,
+                onDismiss = {
+                    (draftBackedPhotos.keys + draftPreparedPhotos.keys).forEach(::releasePreparedPhoto)
+                    pendingMediaSlots = emptyList()
+                    pendingDocumentUris = emptyList()
+                },
+                onSend = { caption, onResult ->
+                    mediaSender.sendStagedAttachments(
+                        imageSlots,
+                        documentUris,
+                        caption,
+                        preparedImageAttachments =
+                            draftBackedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() } +
+                                draftPreparedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() },
+                        onAccepted = {
+                            (draftBackedPhotos.keys + draftPreparedPhotos.keys).forEach(::releasePreparedPhoto)
+                            pendingMediaSlots = emptyList()
+                            pendingDocumentUris = emptyList()
+                            if (composerTextState.valueState.value.text == seededDraftText) {
+                                composerTextState.valueState.value = TextFieldValue("")
+                                appState.setDraft(controller.group.groupIdHex, TextFieldValue(""))
+                            }
+                            onResult(true)
+                        },
+                        onRejected = { onResult(false) },
+                        onAfterSend = {
+                            // Pull the user down to the just-seeded bubble.
+                            // `bottomTimelineIndex` reads from
+                            // [renderedTimeline.size] (the snapshot-backed
+                            // controller list) instead of
+                            // [LazyListState.layoutInfo.totalItemsCount], which
+                            // is stale until the next recompose — for a
+                            // multi-file send that staleness leaves the user
+                            // one-or-more rows above the new bubble.
+                            revealSentMessage(bottomTimelineIndex)
+                        },
+                    )
+                },
+                onRemoveAt = { index ->
+                    pendingMediaSlots.getOrNull(index)?.id?.let(::releasePreparedPhoto)
+                    pendingMediaSlots =
+                        pendingMediaSlots.toMutableList().apply {
+                            if (index in indices) removeAt(index)
                         }
-                        onResult(true)
-                    },
-                    onRejected = { onResult(false) },
-                    onAfterSend = {
-                        // Pull the user down to the just-seeded bubble.
-                        // `bottomTimelineIndex` reads from
-                        // [renderedTimeline.size] (the snapshot-backed
-                        // controller list) instead of
-                        // [LazyListState.layoutInfo.totalItemsCount], which
-                        // is stale until the next recompose — for a
-                        // multi-file send that staleness leaves the user
-                        // one-or-more rows above the new bubble.
-                        revealSentMessage(bottomTimelineIndex)
-                    },
-                )
+                },
+                onRemoveDocumentAt = { index ->
+                    pendingDocumentUris =
+                        pendingDocumentUris.toMutableList().apply {
+                            if (index in indices) removeAt(index)
+                        }
+                },
+                onAddPhotos = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                    )
+                },
+                onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
+                onEditMediaAt = { index -> pendingMediaSlots.getOrNull(index)?.let(::openPhotoEditor) },
+                onSelectMediaQuality = { slotId, quality ->
+                    pendingMediaSlots.firstOrNull { it.id == slotId }?.let { selectPhotoQuality(it, quality) }
+                },
+                preparedPhotoPreviews = preparedPhotoPreviews,
+                preparedPhotoQualities = preparedPhotoQualities,
+                preparingPhotoSlotIds = preparingPhotoSlotIds,
+                nonEditableMediaSlotIds = nonEditablePhotoDescriptions.keys,
+                nonEditableMediaDescriptions = nonEditablePhotoDescriptions,
+            )
+        }
+    }
+    activePhotoEditor?.let { editor ->
+        PhotoEditorDialog(
+            previewBitmap = editor.previewBitmap,
+            sourceInfo = editor.photo.sourceInfo,
+            stateHolder = editor.stateHolder,
+            onCancel = {
+                editor.previewBitmap.recycle()
+                activePhotoEditor = null
             },
-            onRemoveAt = { index ->
-                pendingMediaUris =
-                    pendingMediaUris.toMutableList().apply {
-                        if (index in indices) removeAt(index)
+            onSave = { recipe, quality ->
+                scope.launch {
+                    if (recipe == editor.photo.recipe && quality == editor.photo.quality) {
+                        editor.previewBitmap.recycle()
+                        activePhotoEditor = null
+                        return@launch
                     }
-            },
-            onRemoveDocumentAt = { index ->
-                pendingDocumentUris =
-                    pendingDocumentUris.toMutableList().apply {
-                        if (index in indices) removeAt(index)
+                    val accountRef = controller.boundAccountRef
+                    if (accountRef == null) {
+                        editor.stateHolder.finishSaving(photoEditorSaveFailedMessage)
+                        return@launch
                     }
+                    when (
+                        val result =
+                            photoCommitter.commit(
+                                accountRef = accountRef,
+                                groupIdHex = controller.group.groupIdHex,
+                                currentAttachment = editor.photo.attachment,
+                                expectedDigest = editor.photo.attachmentDigest,
+                                sourceLeaseId = editor.photo.sourceLeaseId,
+                                recipe = recipe,
+                                quality = quality,
+                            )
+                    ) {
+                        is PhotoEditorCommitResult.Success -> {
+                            draftBackedPhotos =
+                                draftBackedPhotos +
+                                (
+                                    editor.slot.id to
+                                        editor.photo.copy(
+                                            attachment = result.attachment,
+                                            attachmentDigest = result.attachment.editorDigest(),
+                                            recipe = recipe,
+                                            quality = quality,
+                                        )
+                                )
+                            editor.previewBitmap.recycle()
+                            activePhotoEditor = null
+                        }
+                        else -> {
+                            editor.stateHolder.finishSaving(photoEditorSaveFailedMessage)
+                        }
+                    }
+                }
             },
-            onAddPhotos = {
-                imagePickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                )
-            },
-            onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         )
     }
 }
