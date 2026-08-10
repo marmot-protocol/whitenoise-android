@@ -1,6 +1,12 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
-const { isUiFile, renderSection, replaceSection } = require('./update-pr-screenshots')
+const {
+  isUiFile,
+  isMissingVisualCoverage,
+  renderSection,
+  replaceSection,
+  run,
+} = require('./update-pr-screenshots')
 
 const pr = {
   base: { repo: { full_name: 'marmot/base' }, sha: 'base-sha' },
@@ -28,6 +34,58 @@ test('warns when UI code changes without a baseline update', () => {
     status: 'modified',
   }])
   assert.match(section, /UI-affecting files changed/)
+})
+
+test('requires a committed baseline for UI-affecting changes', () => {
+  assert.equal(isMissingVisualCoverage([{
+    filename: 'app/src/main/java/dev/ipf/whitenoise/android/ui/Screen.kt',
+    status: 'modified',
+  }]), true)
+  assert.equal(isMissingVisualCoverage([{
+    filename: 'app/src/main/java/dev/ipf/whitenoise/android/ui/Screen.kt',
+    status: 'modified',
+  }, {
+    filename: 'app/src/test/snapshots/screen.png',
+    status: 'modified',
+  }]), false)
+  assert.equal(isMissingVisualCoverage([{
+    filename: 'app/src/main/java/dev/ipf/whitenoise/android/core/Model.kt',
+    status: 'modified',
+  }]), false)
+})
+
+test('updates the description before failing a UI change with no baseline', async () => {
+  const updates = []
+  const failures = []
+  const github = {
+    paginate: async () => [{
+      filename: 'app/src/main/java/dev/ipf/whitenoise/android/ui/Screen.kt',
+      status: 'modified',
+    }],
+    rest: {
+      pulls: {
+        listFiles: () => {},
+        update: async request => updates.push(request),
+      },
+      issues: {},
+    },
+  }
+  const context = {
+    payload: { pull_request: { ...pr, number: 42, body: 'Summary' } },
+    repo: { owner: 'marmot', repo: 'base' },
+  }
+  const core = {
+    info: () => {},
+    warning: () => {},
+    setFailed: message => failures.push(message),
+  }
+
+  await run({ github, context, core })
+
+  assert.equal(updates.length, 1)
+  assert.match(updates[0].body, /UI-affecting files changed/)
+  assert.equal(failures.length, 1)
+  assert.match(failures[0], /committed Roborazzi screenshot baseline/)
 })
 
 test('replaces the generated section without changing surrounding text', () => {

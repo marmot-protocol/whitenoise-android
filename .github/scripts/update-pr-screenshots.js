@@ -18,6 +18,13 @@ function isUiFile(path) {
     path.startsWith(SNAPSHOT_PREFIX)
 }
 
+function isMissingVisualCoverage(files) {
+  const hasUiChanges = files.some(file => isUiFile(file.filename))
+  const hasSnapshotChanges = files.some(file =>
+    file.filename.startsWith(SNAPSHOT_PREFIX) && file.filename.endsWith('.png'))
+  return hasUiChanges && !hasSnapshotChanges
+}
+
 function renderSection(pr, files) {
   const snapshots = files
     .filter(file => file.filename.startsWith(SNAPSHOT_PREFIX) && file.filename.endsWith('.png'))
@@ -101,6 +108,13 @@ async function run({ github, context, core }) {
       await github.rest.issues.createComment(request)
     }
   }
+
+  if (isMissingVisualCoverage(files)) {
+    core.setFailed(
+      'UI-affecting files changed without a committed Roborazzi screenshot baseline. ' +
+      'Add or update a screenshot test and commit its generated PNG.',
+    )
+  }
 }
 
-module.exports = { isUiFile, renderSection, replaceSection, repoFileUrl, run }
+module.exports = { isUiFile, isMissingVisualCoverage, renderSection, replaceSection, repoFileUrl, run }
