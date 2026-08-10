@@ -1402,9 +1402,15 @@
     <string name="mute">Mute</string>
     <string name="mute_dialog_title">Mute message notifications</string>
     <string name="mute_dialog_description">Others won\'t see that you muted this chat.</string>
+    <string name="mute_duration_1_hour">1 hour</string>
     <string name="mute_duration_8_hours">8 hours</string>
-    <string name="mute_duration_1_week">1 week</string>
+    <string name="mute_duration_1_day">1 day</string>
+    <string name="mute_duration_7_days">7 days</string>
+    <string name="mute_duration_custom">Custom time…</string>
     <string name="mute_duration_always">Always</string>
+    <string name="mute_custom_time_title">Choose a time</string>
+    <string name="mute_custom_future_error">Choose a time in the future.</string>
+    <string name="mute_custom_selected">Muted until %1$s</string>
     <string name="notify_for">Notify for</string>
     <string name="ok">OK</string>
     <string name="support">Support</string>

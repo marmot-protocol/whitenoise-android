@@ -4675,6 +4675,16 @@ class WhiteNoiseAppState private constructor(
         syncEngineMute(accountRef, groupIdHex)
     }
 
+    /** Mute the chat until the exact future Unix epoch-millisecond [expiryMillis]. */
+    fun muteConversationUntil(
+        groupIdHex: String,
+        expiryMillis: Long,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.muteUntil(accountRef, groupIdHex, expiryMillis)
+        syncEngineMute(accountRef, groupIdHex)
+    }
+
     /**
      * Mirror the app-side mute decision into the engine's durable notification
      * settings, so the projected row (`muted`/`mutedUntilMs`) and any other

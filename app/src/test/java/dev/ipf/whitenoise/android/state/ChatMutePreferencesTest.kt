@@ -257,6 +257,20 @@ class ChatMutePreferencesTest {
     }
 
     @Test
+    fun muteUntilPersistsTheExactInstantAndOriginalRestoreMode() {
+        val prefs = ChatMutePreferences(context, now = { 1_000L })
+        prefs.setMode("a", "g", ChatNotifyMode.MENTIONS_ONLY)
+
+        prefs.muteUntil("a", "g", expiryMillis = 123_456L)
+
+        assertEquals(123_456L, prefs.muteExpiryMillis("a", "g"))
+        val reloaded = ChatMutePreferences(context, now = { 1_000L })
+        assertTrue(reloaded.isMuted("a", "g"))
+        assertEquals(123_456L, reloaded.muteExpiryMillis("a", "g"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, reloaded.restoreNotifyMode("a", "g"))
+    }
+
+    @Test
     fun permanentMuteHasNoExpiry() {
         val prefs = ChatMutePreferences(context, now = { 0L })
         prefs.muteFor("a", "g", durationMillis = 0L)

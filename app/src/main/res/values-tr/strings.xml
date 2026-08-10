@@ -1310,9 +1310,15 @@
     <string name="mute">Sessize al</string>
     <string name="mute_dialog_title">Bildirimleri sessize al</string>
     <string name="mute_dialog_description">Diğerleri bu sohbeti sessize aldığınızı görmez.</string>
+    <string name="mute_duration_1_hour">1 saat</string>
     <string name="mute_duration_8_hours">8 saat</string>
-    <string name="mute_duration_1_week">1 hafta</string>
+    <string name="mute_duration_1_day">1 gün</string>
+    <string name="mute_duration_7_days">7 gün</string>
+    <string name="mute_duration_custom">Özel zaman…</string>
     <string name="mute_duration_always">Her zaman</string>
+    <string name="mute_custom_time_title">Saat seç</string>
+    <string name="mute_custom_future_error">Gelecekte bir saat seçin.</string>
+    <string name="mute_custom_selected">%1$s tarihine kadar sessiz</string>
     <string name="notify_for">Bildirim</string>
     <string name="ok">Tamam</string>
     <string name="device_privacy">Cihaz gizliliği</string>

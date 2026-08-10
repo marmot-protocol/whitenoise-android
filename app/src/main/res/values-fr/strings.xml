@@ -1312,9 +1312,15 @@
     <string name="mute">Muet</string>
     <string name="mute_dialog_title">Couper les notifications</string>
     <string name="mute_dialog_description">Les autres ne verront pas que vous avez mis ce chat en sourdine.</string>
+    <string name="mute_duration_1_hour">1 heure</string>
     <string name="mute_duration_8_hours">8 heures</string>
-    <string name="mute_duration_1_week">1 semaine</string>
+    <string name="mute_duration_1_day">1 jour</string>
+    <string name="mute_duration_7_days">7 jours</string>
+    <string name="mute_duration_custom">Heure personnalisée…</string>
     <string name="mute_duration_always">Toujours</string>
+    <string name="mute_custom_time_title">Choisir une heure</string>
+    <string name="mute_custom_future_error">Choisissez une heure à venir.</string>
+    <string name="mute_custom_selected">En sourdine jusqu\'à %1$s</string>
     <string name="notify_for">Notifier</string>
     <string name="ok">OK</string>
     <string name="device_privacy">Confidentialité de l\'appareil</string>

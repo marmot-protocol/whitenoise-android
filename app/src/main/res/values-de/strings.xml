@@ -1310,9 +1310,15 @@
     <string name="mute">Stumm</string>
     <string name="mute_dialog_title">Nachrichten stummschalten</string>
     <string name="mute_dialog_description">Andere sehen nicht, dass du diesen Chat stummgeschaltet hast.</string>
+    <string name="mute_duration_1_hour">1 Stunde</string>
     <string name="mute_duration_8_hours">8 Stunden</string>
-    <string name="mute_duration_1_week">1 Woche</string>
+    <string name="mute_duration_1_day">1 Tag</string>
+    <string name="mute_duration_7_days">7 Tage</string>
+    <string name="mute_duration_custom">Benutzerdefinierte Zeit…</string>
     <string name="mute_duration_always">Immer</string>
+    <string name="mute_custom_time_title">Zeit auswählen</string>
+    <string name="mute_custom_future_error">Wähle eine zukünftige Zeit.</string>
+    <string name="mute_custom_selected">Stummgeschaltet bis %1$s</string>
     <string name="notify_for">Benachrichtigung für</string>
     <string name="ok">OK</string>
     <string name="device_privacy">Gerätedatenschutz</string>
