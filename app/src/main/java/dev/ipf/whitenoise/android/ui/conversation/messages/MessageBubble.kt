@@ -1443,7 +1443,6 @@ internal fun MessageBubble(
                     expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
-                    alignEnd = mine,
                     canReply = !readOnly,
                     canReact = !readOnly,
                     canDelete = deleteCapability.canDeleteAtAll,

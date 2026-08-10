@@ -168,7 +168,12 @@ class KeyboardSafePopupCoverageTest {
         val provider = positionSource().readText()
         assertTrue(
             "the estimated height must own both side choice and final clamp to prevent a measured-frame jump",
-            "windowSize.height - effectiveHeight - edgeInsetPx" in provider,
+            "verticalPosition(windowSize.height, effectiveHeight)" in provider &&
+                "windowHeight - popupHeight - edgeInsetPx" in provider,
+        )
+        assertTrue(
+            "message bounds must center the popup on the selected bubble rather than a screen edge",
+            "bounds.center.x - popupWidth / 2" in provider,
         )
         assertTrue(
             "rendered content must be clipped to the same deterministic height used for placement",

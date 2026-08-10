@@ -171,7 +171,6 @@ class MessageActionMenuLayoutTest {
             MessageActionMenuPositionProvider(
                 anchorBoundsInWindow = null,
                 anchorWindowYPx = 450f,
-                alignEnd = false,
                 edgeInsetPx = 8,
                 anchorGapPx = 8,
                 estimatedOneColumnHeightPx = 200,
@@ -191,55 +190,73 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun incomingMenuAlignsToBubbleStartAndFlipsAboveIt() {
+    fun reactionMenuCentersOnIncomingBubbleAndPrefersAboveIt() {
         val provider =
             positionProvider(
                 touchY = 450,
                 actionCount = 5,
-                anchorBounds = IntRect(40, 400, 180, 460),
+                anchorBounds = IntRect(160, 400, 340, 460),
             )
 
-        val position = provider.position(window = IntSize(500, 500), popup = IntSize(328, 180))
+        val position = provider.position(window = IntSize(500, 780), popup = IntSize(328, 180))
 
-        assertEquals(40, position.x)
+        assertEquals(86, position.x)
         assertEquals(163, position.y)
     }
 
     @Test
-    fun outgoingMenuAlignsItsEndToBubbleEnd() {
+    fun reactionMenuCentersOnOutgoingImageBubble() {
         val provider =
             positionProvider(
-                touchY = 220,
-                actionCount = 3,
-                alignEnd = true,
-                anchorBounds = IntRect(210, 180, 340, 230),
+                touchY = 520,
+                actionCount = 5,
+                anchorBounds = IntRect(240, 400, 480, 650),
             )
 
-        val position = provider.position(window = IntSize(360, 780), popup = IntSize(200, 180))
+        val position = provider.position(window = IntSize(720, 900), popup = IntSize(328, 180))
 
-        assertEquals(12, position.x)
-        assertEquals(238, position.y)
+        assertEquals(196, position.x)
+        assertEquals(163, position.y)
     }
 
     @Test
-    fun outgoingMenuUsesTheBubbleEndInRtl() {
+    fun centeredBubblePlacementIsDirectionIndependent() {
         val provider =
             positionProvider(
                 touchY = 220,
                 actionCount = 3,
-                alignEnd = true,
-                anchorBounds = IntRect(20, 180, 150, 230),
+                anchorBounds = IntRect(150, 300, 350, 360),
             )
 
-        val position =
+        val ltr =
+            provider.position(
+                window = IntSize(500, 780),
+                popup = IntSize(328, 180),
+            )
+        val rtl =
             provider.position(
                 window = IntSize(500, 780),
                 popup = IntSize(328, 180),
                 layoutDirection = LayoutDirection.Rtl,
             )
 
-        assertEquals(20, position.x)
-        assertEquals(238, position.y)
+        assertEquals(ltr, rtl)
+        assertEquals(86, rtl.x)
+    }
+
+    @Test
+    fun reactionMenuFallsBelowBubbleOnlyWhenAboveDoesNotFit() {
+        val provider =
+            positionProvider(
+                touchY = 120,
+                actionCount = 3,
+                anchorBounds = IntRect(80, 20, 320, 220),
+            )
+
+        val position = provider.position(window = IntSize(400, 780), popup = IntSize(328, 180))
+
+        assertEquals(36, position.x)
+        assertEquals(228, position.y)
     }
 
     @Test
@@ -371,7 +388,6 @@ class MessageActionMenuLayoutTest {
                         expanded = true,
                         anchorBoundsInWindow = null,
                         anchorWindowYPx = 8f,
-                        alignEnd = false,
                         canReply = true,
                         canReact = canReact,
                         canDelete = true,
@@ -412,7 +428,6 @@ class MessageActionMenuLayoutTest {
     private fun positionProvider(
         touchY: Int,
         actionCount: Int,
-        alignEnd: Boolean = false,
         anchorBounds: IntRect? = null,
         canReact: Boolean = true,
         canDelete: Boolean = false,
@@ -422,7 +437,6 @@ class MessageActionMenuLayoutTest {
     ) = MessageActionMenuPositionProvider(
         anchorBoundsInWindow = anchorBounds,
         anchorWindowYPx = touchY.toFloat(),
-        alignEnd = alignEnd,
         edgeInsetPx = 8,
         anchorGapPx = 8,
         estimatedOneColumnHeightPx =

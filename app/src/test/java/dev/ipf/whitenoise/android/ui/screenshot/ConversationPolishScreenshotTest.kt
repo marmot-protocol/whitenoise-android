@@ -94,7 +94,6 @@ class ConversationPolishScreenshotTest {
             expanded = true,
             anchorBoundsInWindow = null,
             anchorWindowYPx = 8f,
-            alignEnd = false,
             canReply = true,
             canReact = true,
             canDelete = true,

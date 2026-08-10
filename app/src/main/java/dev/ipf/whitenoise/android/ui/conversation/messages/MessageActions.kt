@@ -113,7 +113,6 @@ internal fun MessageActionMenu(
     expanded: Boolean,
     anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
-    alignEnd: Boolean,
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
@@ -177,9 +176,11 @@ internal fun MessageActionMenu(
             maxOf(48.dp, actionTextStyle.lineHeight.toDp() + 16.dp)
         }
     val reactionRowHeight = 48.dp
-    // Position from the frozen message bounds, not a screen corner. This keeps
-    // incoming/outgoing menus attached to the corresponding bubble edge while
-    // still falling back to the captured touch for oversized/off-screen rows.
+    // Position from the frozen message bounds, not a screen corner. Centering
+    // the reaction strip over the selected bubble gives images and text the
+    // same stable visual anchor instead of pinning the surface to an outer
+    // screen edge. The provider prefers above the bubble, then falls below
+    // only when the top space is insufficient.
     val edgeInsetPx = with(density) { 8.dp.roundToPx() }
     val anchorGapPx = with(density) { 8.dp.roundToPx() }
     // Compose runs calculatePosition on the FIRST layout pass with
@@ -226,7 +227,6 @@ internal fun MessageActionMenu(
         remember(
             anchorBoundsInWindow,
             anchorWindowYPx,
-            alignEnd,
             edgeInsetPx,
             anchorGapPx,
             estimatedOneColumnHeightPx,
@@ -239,7 +239,6 @@ internal fun MessageActionMenu(
             MessageActionMenuPositionProvider(
                 anchorBoundsInWindow = anchorBoundsInWindow,
                 anchorWindowYPx = anchorWindowYPx,
-                alignEnd = alignEnd,
                 edgeInsetPx = edgeInsetPx,
                 anchorGapPx = anchorGapPx,
                 estimatedOneColumnHeightPx = estimatedOneColumnHeightPx,

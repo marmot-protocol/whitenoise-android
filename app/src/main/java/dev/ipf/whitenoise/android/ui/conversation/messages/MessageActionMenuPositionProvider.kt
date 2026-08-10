@@ -10,7 +10,6 @@ import kotlin.math.roundToInt
 internal class MessageActionMenuPositionProvider(
     private val anchorBoundsInWindow: IntRect?,
     private val anchorWindowYPx: Float?,
-    private val alignEnd: Boolean,
     private val edgeInsetPx: Int,
     private val anchorGapPx: Int,
     private val estimatedOneColumnHeightPx: Int,
@@ -32,7 +31,7 @@ internal class MessageActionMenuPositionProvider(
         val estimatedPopupWidth = estimatedPopupWidth(windowSize.width)
         val estimatedContentWidth = (estimatedPopupWidth - actionContentPaddingPx).coerceAtLeast(0)
         val effectiveHeight = effectiveHeight(estimatedContentWidth)
-        val x = horizontalPosition(windowSize.width, estimatedPopupWidth, layoutDirection)
+        val x = horizontalPosition(windowSize.width, estimatedPopupWidth)
         val y = verticalPosition(windowSize.height, effectiveHeight)
         return IntOffset(x, y)
     }
@@ -53,17 +52,11 @@ internal class MessageActionMenuPositionProvider(
     private fun horizontalPosition(
         windowWidth: Int,
         popupWidth: Int,
-        layoutDirection: LayoutDirection,
     ): Int {
-        val alignRight = if (layoutDirection == LayoutDirection.Ltr) alignEnd else !alignEnd
         val desiredX =
             anchorBoundsInWindow?.let { bounds ->
-                if (alignRight) bounds.right - popupWidth else bounds.left
-            } ?: if (alignRight) {
-                windowWidth - popupWidth - edgeInsetPx
-            } else {
-                edgeInsetPx
-            }
+                bounds.center.x - popupWidth / 2
+            } ?: edgeInsetPx
         return desiredX.coerceIn(
             edgeInsetPx,
             (windowWidth - popupWidth - edgeInsetPx).coerceAtLeast(edgeInsetPx),
@@ -95,8 +88,8 @@ internal class MessageActionMenuPositionProvider(
         val below = bounds.bottom + anchorGapPx
         val above = bounds.top - anchorGapPx - popupHeight
         return when {
-            below + popupHeight <= bottomLimit -> below
             above >= edgeInsetPx -> above
+            below + popupHeight <= bottomLimit -> below
             else -> touchY - popupHeight / 2
         }
     }
