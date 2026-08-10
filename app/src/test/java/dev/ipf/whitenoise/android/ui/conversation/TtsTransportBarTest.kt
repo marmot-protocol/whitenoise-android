@@ -4,6 +4,10 @@ import android.app.Application
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -15,11 +19,15 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -31,6 +39,8 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.errorTts
 import dev.ipf.whitenoise.android.audio.tts.pausedTts
 import dev.ipf.whitenoise.android.audio.tts.speakingTts
+import dev.ipf.whitenoise.android.state.TtsRatePreferences
+import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,6 +50,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -118,6 +129,92 @@ class TtsTransportBarTest {
         composeRule.onNodeWithText(label(R.string.tts_bar_error)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(label(R.string.tts_bar_stop)).performClick()
         assertEquals(true, stopped)
+    }
+
+    @Test
+    fun rateButtonOpensPickerWithoutCyclingAndEveryPresetCanBeChosen() {
+        val selections = mutableListOf<Float?>()
+        renderBar(
+            state = speakingTts(1, 4, 1, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            onRateSelected = { selections += it },
+        )
+        val control = composeRule.onNodeWithContentDescription(rateControlDescription())
+
+        control.performClick()
+        composeRule.onNodeWithText(label(R.string.tts_settings_rate_system)).assertIsDisplayed()
+        assertTrue(selections.isEmpty())
+
+        composeRule
+            .onNode(hasText(label(R.string.tts_settings_rate_system)) and isSelectable())
+            .performClick()
+        TtsRatePreferences.PRESET_RATES.forEach { rate ->
+            control.performClick()
+            composeRule.onNode(hasText(ttsRateLabel(rate, Locale.US)) and isSelectable()).performClick()
+        }
+
+        assertEquals(listOf<Float?>(null) + TtsRatePreferences.PRESET_RATES, selections)
+    }
+
+    @Test
+    fun customRateEditorAppliesBoundariesAndOneDecimalNormalization() {
+        val selections = mutableListOf<Float?>()
+        renderBar(
+            state = speakingTts(1, 4, 1, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            onRateSelected = { selections += it },
+        )
+
+        listOf("0.1" to 0.1f, "10.0" to 10.0f, "1.26" to 1.3f).forEach { (input, expected) ->
+            openCustomRateEditor()
+            composeRule.onNode(hasSetTextAction()).performTextReplacement(input)
+            composeRule.onNodeWithText(label(R.string.tts_rate_apply)).performClick()
+            assertEquals(expected, selections.last())
+        }
+    }
+
+    @Test
+    fun customRateEditorBlocksInvalidInputWithAnInlineError() {
+        val selections = mutableListOf<Float?>()
+        renderBar(
+            state = speakingTts(1, 4, 1, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+            onRateSelected = { selections += it },
+        )
+
+        openCustomRateEditor()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("10.01")
+
+        composeRule.onNodeWithText(label(R.string.tts_rate_custom_error)).assertIsDisplayed()
+        composeRule.onNodeWithText(label(R.string.tts_rate_apply)).assertIsNotEnabled()
+        assertTrue(selections.isEmpty())
+    }
+
+    @Test
+    fun appliedCustomRateUpdatesTheVisibleControlImmediately() {
+        composeRule.setContent {
+            var rateOverride by remember { mutableStateOf<Float?>(1.0f) }
+            WhiteNoiseTheme(darkTheme = false) {
+                TtsTransportBarContent(
+                    state = speakingTts(1, 4, 1, 3, "Preview", sentenceIndex = 1, sentenceCount = 2),
+                    rateOverride = rateOverride,
+                    activeRate = rateOverride ?: 1.0f,
+                    onPause = {},
+                    onResume = {},
+                    onPreviousSentence = {},
+                    onNextSentence = {},
+                    onPreviousMessage = {},
+                    onNextMessage = {},
+                    onRateSelected = { rateOverride = it },
+                    onStop = {},
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+
+        openCustomRateEditor()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("1.25")
+        composeRule.onNodeWithText(label(R.string.tts_rate_apply)).performClick()
+
+        val description = app.getString(R.string.tts_bar_rate_control, ttsRateLabel(1.3f, Locale.US))
+        composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
     }
 
     @Test
@@ -200,6 +297,7 @@ class TtsTransportBarTest {
         onNextSentence: () -> Unit = {},
         onPreviousMessage: () -> Unit = {},
         onNextMessage: () -> Unit = {},
+        onRateSelected: (Float?) -> Unit = {},
         onStop: () -> Unit = {},
         historyEdge: TtsHistoryEdgeState? = null,
     ) {
@@ -208,14 +306,15 @@ class TtsTransportBarTest {
                 WithFontScale(fontScale) {
                     TtsTransportBarContent(
                         state = state,
-                        rateLabel = "1×",
+                        rateOverride = 1.0f,
+                        activeRate = 1.0f,
                         onPause = onPause,
                         onResume = onResume,
                         onPreviousSentence = onPreviousSentence,
                         onNextSentence = onNextSentence,
                         onPreviousMessage = onPreviousMessage,
                         onNextMessage = onNextMessage,
-                        onCycleRate = {},
+                        onRateSelected = onRateSelected,
                         onStop = onStop,
                         modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
                         historyEdge = historyEdge,
@@ -223,6 +322,16 @@ class TtsTransportBarTest {
                 }
             }
         }
+    }
+
+    private fun rateControlDescription(): String {
+        val rateLabel = ttsRateLabel(1.0f, Locale.US)
+        return app.getString(R.string.tts_bar_rate_control, rateLabel)
+    }
+
+    private fun openCustomRateEditor() {
+        composeRule.onNodeWithContentDescription(rateControlDescription()).performClick()
+        composeRule.onNode(hasText(label(R.string.tts_rate_custom)) and isSelectable()).performClick()
     }
 
     @Suppress("FunctionNaming")

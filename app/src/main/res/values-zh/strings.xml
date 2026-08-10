@@ -1265,6 +1265,10 @@
     <string name="tts_auto_read_title">朗读消息</string>
     <string name="tts_auto_read_subtitle">打开此聊天时朗读未读消息</string>
     <string name="tts_settings_rate_system">系统（跟随设备设置）</string>
+    <string name="tts_bar_rate_control">语速，当前为 %1$s</string>
+    <string name="tts_rate_custom">自定义</string>
+    <string name="tts_rate_custom_error">请输入 0.1× 到 10.0× 之间的语速。</string>
+    <string name="tts_rate_apply">应用</string>
     <string name="connectivity_offline">无网络连接 — 请开启 Wi-Fi 或移动数据</string>
     <string name="connectivity_connecting">连接中…</string>
     <string name="connectivity_connected">已连接</string>

@@ -10,38 +10,29 @@ import org.junit.Test
 
 class TtsTransportBarLogicTest {
     @Test
-    fun ratePillCyclesPresetsStartingFromDefaultWhenFollowingTheSystem() {
-        assertEquals(1.0f, nextTtsPresetRate(null))
-        assertEquals(1.25f, nextTtsPresetRate(1.0f))
-        assertEquals(2.5f, nextTtsPresetRate(2.0f))
-        assertEquals(3.0f, nextTtsPresetRate(2.5f))
-        assertEquals(0.5f, nextTtsPresetRate(3.0f))
-    }
-
-    @Test
     fun rateLabelsFormatWithTheActiveLocale() {
         val previous = java.util.Locale.getDefault()
         try {
-            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            java.util.Locale.setDefault(java.util.Locale.US)
             assertEquals(
                 "0,75\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(0.75f),
+                    .ttsRateLabel(0.75f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "1\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(1.0f),
+                    .ttsRateLabel(1.0f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "2,5\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(2.5f),
+                    .ttsRateLabel(2.5f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "3\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(3.0f),
+                    .ttsRateLabel(3.0f, java.util.Locale.GERMANY),
             )
         } finally {
             java.util.Locale.setDefault(previous)

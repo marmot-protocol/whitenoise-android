@@ -1288,6 +1288,10 @@
     <string name="tts_auto_read_title">Mesajları sesli oku</string>
     <string name="tts_auto_read_subtitle">Bu sohbet açıldığında okunmamış mesajları sesli oku</string>
     <string name="tts_settings_rate_system">Sistem (cihaz ayarını izle)</string>
+    <string name="tts_bar_rate_control">Konuşma hızı, geçerli değer %1$s</string>
+    <string name="tts_rate_custom">Özel</string>
+    <string name="tts_rate_custom_error">0,1× ile 10,0× arasında bir hız girin.</string>
+    <string name="tts_rate_apply">Uygula</string>
     <string name="connectivity_offline">İnternet yok — Wi-Fi veya mobil veriyi açın</string>
     <string name="connectivity_connecting">Bağlanıyor…</string>
     <string name="connectivity_connected">Bağlandı</string>
