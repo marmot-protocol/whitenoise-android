@@ -8,9 +8,11 @@ import androidx.compose.ui.window.PopupPositionProvider
 import kotlin.math.roundToInt
 
 internal class MessageActionMenuPositionProvider(
+    private val anchorBoundsInWindow: IntRect?,
     private val anchorWindowYPx: Float?,
     private val alignEnd: Boolean,
     private val edgeInsetPx: Int,
+    private val anchorGapPx: Int,
     private val estimatedOneColumnHeightPx: Int,
     private val estimatedTwoColumnHeightPx: Int,
     private val minimumActionCellWidthPx: Int,
@@ -24,35 +26,89 @@ internal class MessageActionMenuPositionProvider(
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
-        val x =
-            if (alignEnd) {
-                windowSize.width - popupContentSize.width - edgeInsetPx
-            } else {
-                edgeInsetPx
-            }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-        val estimatedContentWidth =
-            minOf(
-                maximumActionContentWidthPx,
-                (windowSize.width - actionContentPaddingPx).coerceAtLeast(0),
-            )
-        val effectiveHeight =
-            if (estimatedContentWidth >= minimumActionCellWidthPx * 2 + actionColumnGapPx) {
-                estimatedTwoColumnHeightPx
-            } else {
-                estimatedOneColumnHeightPx
-            }
-        val boundaryHeight = popupContentSize.height.takeIf { it > 0 } ?: effectiveHeight
-        val bottomLimit = windowSize.height - edgeInsetPx
-        val y =
-            when {
-                touchY + effectiveHeight <= bottomLimit -> touchY
-                effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
-                else -> edgeInsetPx
-            }.coerceIn(
-                edgeInsetPx,
-                (windowSize.height - boundaryHeight).coerceAtLeast(edgeInsetPx),
-            )
+        // The popup is constrained to the matching deterministic width/height
+        // in MessageActionMenu. Do not derive placement from its transient
+        // reported dimensions; first and measured callbacks must be identical.
+        val estimatedPopupWidth = estimatedPopupWidth(windowSize.width)
+        val estimatedContentWidth = (estimatedPopupWidth - actionContentPaddingPx).coerceAtLeast(0)
+        val effectiveHeight = effectiveHeight(estimatedContentWidth)
+        val x = horizontalPosition(windowSize.width, estimatedPopupWidth, layoutDirection)
+        val y = verticalPosition(windowSize.height, effectiveHeight)
         return IntOffset(x, y)
     }
+
+    private fun estimatedPopupWidth(windowWidth: Int): Int =
+        minOf(
+            maximumActionContentWidthPx + actionContentPaddingPx,
+            (windowWidth - edgeInsetPx * 2).coerceAtLeast(0),
+        )
+
+    private fun effectiveHeight(estimatedContentWidth: Int): Int =
+        if (estimatedContentWidth >= minimumActionCellWidthPx * 2 + actionColumnGapPx) {
+            estimatedTwoColumnHeightPx
+        } else {
+            estimatedOneColumnHeightPx
+        }
+
+    private fun horizontalPosition(
+        windowWidth: Int,
+        popupWidth: Int,
+        layoutDirection: LayoutDirection,
+    ): Int {
+        val alignRight = if (layoutDirection == LayoutDirection.Ltr) alignEnd else !alignEnd
+        val desiredX =
+            anchorBoundsInWindow?.let { bounds ->
+                if (alignRight) bounds.right - popupWidth else bounds.left
+            } ?: if (alignRight) {
+                windowWidth - popupWidth - edgeInsetPx
+            } else {
+                edgeInsetPx
+            }
+        return desiredX.coerceIn(
+            edgeInsetPx,
+            (windowWidth - popupWidth - edgeInsetPx).coerceAtLeast(edgeInsetPx),
+        )
+    }
+
+    private fun verticalPosition(
+        windowHeight: Int,
+        popupHeight: Int,
+    ): Int {
+        val touchY = anchorWindowYPx?.roundToInt() ?: anchorBoundsInWindow?.center?.y ?: (windowHeight / 2)
+        val bottomLimit = windowHeight - edgeInsetPx
+        val preferredY =
+            anchorBoundsInWindow?.let { bounds ->
+                bubbleRelativeY(bounds, popupHeight, touchY, bottomLimit)
+            } ?: touchRelativeY(popupHeight, touchY, bottomLimit)
+        return preferredY.coerceIn(
+            edgeInsetPx,
+            (windowHeight - popupHeight - edgeInsetPx).coerceAtLeast(edgeInsetPx),
+        )
+    }
+
+    private fun bubbleRelativeY(
+        bounds: IntRect,
+        popupHeight: Int,
+        touchY: Int,
+        bottomLimit: Int,
+    ): Int {
+        val below = bounds.bottom + anchorGapPx
+        val above = bounds.top - anchorGapPx - popupHeight
+        return when {
+            below + popupHeight <= bottomLimit -> below
+            above >= edgeInsetPx -> above
+            else -> touchY - popupHeight / 2
+        }
+    }
+
+    private fun touchRelativeY(
+        popupHeight: Int,
+        touchY: Int,
+        bottomLimit: Int,
+    ): Int =
+        when {
+            touchY + popupHeight <= bottomLimit -> touchY
+            popupHeight <= touchY - edgeInsetPx -> touchY - popupHeight
+            else -> edgeInsetPx
+        }
 }

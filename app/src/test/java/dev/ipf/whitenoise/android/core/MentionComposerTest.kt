@@ -339,6 +339,23 @@ class MentionComposerTest {
     }
 
     @Test
+    fun repairWhitespaceDeleteAfterChipLeavesChipIntact() {
+        val chip = "@$aliceNpub"
+        val oldText = "$chip   following"
+        val deleteStart = chip.length
+        val newText = oldText.removeRange(deleteStart, deleteStart + 2)
+
+        val result =
+            MentionComposer.repairChipDeletion(
+                oldText,
+                newText,
+                includeAdjacentOwnedSeparator = true,
+            )
+
+        assertNull(result)
+    }
+
+    @Test
     fun repairDeleteFromFirstChipSeparatorIntoSecondChipRemovesBothChips() {
         val aliceChip = "@$aliceNpub"
         val bobChip = "@$bobNpub"

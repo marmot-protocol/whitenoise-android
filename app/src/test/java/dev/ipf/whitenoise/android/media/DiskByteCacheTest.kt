@@ -1029,9 +1029,21 @@ class DiskByteCacheTest {
         cache.put("c", ByteArray(40)) // publishes the put and its LRU eviction
         cache.remove("b")
         cache.remove("missing")
+        cache.put(
+            "tagged",
+            ByteArray(8),
+            cache.capturePublicationToken(),
+            ciphertextTag = "ciphertext-tag",
+        )
+        val mutationsBeforeTagRemoval = mutations.get()
+        assertEquals(0, cache.removeByCiphertextTags(setOf("missing-tag")))
+        assertEquals(mutationsBeforeTagRemoval, mutations.get())
+        assertEquals(1, cache.removeByCiphertextTags(setOf("ciphertext-tag")))
+        assertEquals(mutationsBeforeTagRemoval + 1, mutations.get())
+        assertFalse(cache.contains("tagged"))
         cache.clear()
 
-        assertEquals(5, mutations.get())
+        assertEquals(7, mutations.get())
         assertFalse(cache.contains("a"))
         assertFalse(cache.contains("b"))
         assertFalse(cache.contains("c"))

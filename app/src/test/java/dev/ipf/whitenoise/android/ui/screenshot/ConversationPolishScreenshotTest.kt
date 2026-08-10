@@ -92,6 +92,7 @@ class ConversationPolishScreenshotTest {
     private fun MaximumActionMenu() {
         MessageActionMenu(
             expanded = true,
+            anchorBoundsInWindow = null,
             anchorWindowYPx = 8f,
             alignEnd = false,
             canReply = true,

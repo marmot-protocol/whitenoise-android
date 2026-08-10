@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.items
@@ -81,6 +80,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -111,6 +111,7 @@ import java.util.Locale
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
+    anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
     alignEnd: Boolean,
     canReply: Boolean,
@@ -176,12 +177,11 @@ internal fun MessageActionMenu(
             maxOf(48.dp, actionTextStyle.lineHeight.toDp() + 16.dp)
         }
     val reactionRowHeight = 48.dp
-    // Position the popup purely from the captured window touch y, independent of
-    // any anchor's layout position. DropdownMenu derived flip-above from the
-    // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
-    // could send the menu above the finger even with room below (#326). This
-    // provider clamps/flips against the window directly.
+    // Position from the frozen message bounds, not a screen corner. This keeps
+    // incoming/outgoing menus attached to the corresponding bubble edge while
+    // still falling back to the captured touch for oversized/off-screen rows.
     val edgeInsetPx = with(density) { 8.dp.roundToPx() }
+    val anchorGapPx = with(density) { 8.dp.roundToPx() }
     // Compose runs calculatePosition on the FIRST layout pass with
     // popupContentSize == (0,0) (content not yet measured). With height 0 the
     // "fits below" branch is always true, so a near-top message would place
@@ -189,10 +189,10 @@ internal fun MessageActionMenu(
     // height arrives — a visible above-then-below jump (#389). Decide the side
     // deterministically from frame 1 by feeding a non-zero height into the
     // provider a per-variant estimate derived from the same immutable action
-    // model as the rendered grid. The estimate keeps side selection stable,
-    // while the measured size supplies the final window-boundary clamp. Keep
-    // the content transparent until that first non-zero measurement so the
-    // clamped position is also the first position users see (#1857).
+    // model as the rendered grid. That same estimate caps the scrollable
+    // surface and owns the final boundary clamp, so measurement cannot move
+    // the popup on the following frame. Keep the content transparent until its
+    // first non-zero measurement so users only see the settled surface (#1857).
     // First-frame fallback mirrors the measured responsive grid. Label widths
     // determine whether the estimate uses one or two columns, so large fonts
     // and long translations do not reintroduce the frame-two side flip.
@@ -221,12 +221,14 @@ internal fun MessageActionMenu(
     val minimumActionCellWidthPx = with(density) { minimumActionCellWidth.roundToPx() }
     val maximumActionContentWidthPx = with(density) { 312.dp.roundToPx() }
     val actionContentPaddingPx = with(density) { 16.dp.roundToPx() }
-    val actionColumnGapPx = with(density) { 2.dp.roundToPx() }
+    val actionColumnGapPx = with(density) { messageActionColumnGap.roundToPx() }
     val positionProvider =
         remember(
+            anchorBoundsInWindow,
             anchorWindowYPx,
             alignEnd,
             edgeInsetPx,
+            anchorGapPx,
             estimatedOneColumnHeightPx,
             estimatedTwoColumnHeightPx,
             minimumActionCellWidthPx,
@@ -235,9 +237,11 @@ internal fun MessageActionMenu(
             actionColumnGapPx,
         ) {
             MessageActionMenuPositionProvider(
+                anchorBoundsInWindow = anchorBoundsInWindow,
                 anchorWindowYPx = anchorWindowYPx,
                 alignEnd = alignEnd,
                 edgeInsetPx = edgeInsetPx,
+                anchorGapPx = anchorGapPx,
                 estimatedOneColumnHeightPx = estimatedOneColumnHeightPx,
                 estimatedTwoColumnHeightPx = estimatedTwoColumnHeightPx,
                 minimumActionCellWidthPx = minimumActionCellWidthPx,
@@ -255,15 +259,25 @@ internal fun MessageActionMenu(
         // Surface restores the menu chrome (rounded shape + elevation) that
         // DropdownMenu provided.
         BoxWithConstraints {
+            val menuWidth = minOf(328.dp, (maxWidth - 16.dp).coerceAtLeast(48.dp))
+            val estimatedMenuHeight =
+                if (messageActionColumnCount((menuWidth - 16.dp).coerceAtLeast(0.dp), minimumActionCellWidth) == 2) {
+                    with(density) { estimatedTwoColumnHeightPx.toDp() }
+                } else {
+                    with(density) { estimatedOneColumnHeightPx.toDp() }
+                }
             val boundedHeightModifier =
                 if (constraints.hasBoundedHeight) {
-                    Modifier.heightIn(max = (maxHeight - 16.dp).coerceAtLeast(48.dp))
+                    Modifier.heightIn(
+                        max = minOf(estimatedMenuHeight, (maxHeight - 16.dp).coerceAtLeast(48.dp)),
+                    )
                 } else {
-                    Modifier
+                    Modifier.heightIn(max = estimatedMenuHeight)
                 }
             Surface(
                 modifier =
                     boundedHeightModifier
+                        .width(menuWidth)
                         .onSizeChanged { size ->
                             if (size.width > 0 && size.height > 0) actionMenuMeasured = true
                         }.graphicsLayer(
@@ -277,7 +291,6 @@ internal fun MessageActionMenu(
                 Column(
                     modifier =
                         Modifier
-                            .widthIn(max = 328.dp)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                             .padding(8.dp),
@@ -329,11 +342,11 @@ internal fun MessageActionMenu(
                     }
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                         val columns = messageActionColumnCount(maxWidth, minimumActionCellWidth)
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
                             labeledActions.chunked(columns).forEach { rowActions ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap),
                                 ) {
                                     rowActions.forEach { (kind, label) ->
                                         MessageActionButton(
@@ -346,7 +359,7 @@ internal fun MessageActionMenu(
                                                         modifier = Modifier.size(20.dp),
                                                     )
                                                 } else {
-                                                    messageActionIcon(kind)
+                                                    MessageActionIcon(kind)
                                                 }
                                             },
                                             onClick = {
@@ -382,7 +395,8 @@ internal fun MessageActionMenu(
 }
 
 @Composable
-private fun messageActionIcon(kind: MessageActionKind) {
+@Suppress("FunctionNaming")
+private fun MessageActionIcon(kind: MessageActionKind) {
     val icon =
         when (kind) {
             MessageActionKind.Reply -> Icons.AutoMirrored.Filled.Reply

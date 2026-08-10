@@ -103,7 +103,7 @@ class MessageActionMenuLayoutTest {
                 val initial = provider.position(window = IntSize(360, 780), popup = IntSize.Zero)
                 val measured = provider.position(window = IntSize(360, 780), popup = IntSize(328, twoColumnHeight))
 
-                assertEquals("canSave=$canSave touchY=$touchY", initial.y, measured.y)
+                assertEquals("canSave=$canSave touchY=$touchY", initial, measured)
                 assertEquals(
                     if (touchY == belowBoundary) touchY else touchY - twoColumnHeight,
                     initial.y,
@@ -157,8 +157,8 @@ class MessageActionMenuLayoutTest {
 
                     assertEquals(
                         "react=$canReact delete=$canDelete window=$window largeFont=$largeFont",
-                        initial.y,
-                        measured.y,
+                        initial,
+                        measured,
                     )
                 }
             }
@@ -166,12 +166,14 @@ class MessageActionMenuLayoutTest {
     }
 
     @Test
-    fun tallerMeasuredHeightClampsFirstVisiblePositionWithoutChangingSide() {
+    fun tallerReportedHeightDoesNotMoveTheClippedMenu() {
         val provider =
             MessageActionMenuPositionProvider(
+                anchorBoundsInWindow = null,
                 anchorWindowYPx = 450f,
                 alignEnd = false,
                 edgeInsetPx = 8,
+                anchorGapPx = 8,
                 estimatedOneColumnHeightPx = 200,
                 estimatedTwoColumnHeightPx = 100,
                 minimumActionCellWidthPx = 136,
@@ -185,9 +187,59 @@ class MessageActionMenuLayoutTest {
         val measured = provider.position(window, IntSize(328, 180))
 
         assertEquals(350, initial.y)
-        assertEquals(320, measured.y)
-        assertTrue(measured.y < 450)
-        assertEquals(window.height, measured.y + 180)
+        assertEquals(initial, measured)
+    }
+
+    @Test
+    fun incomingMenuAlignsToBubbleStartAndFlipsAboveIt() {
+        val provider =
+            positionProvider(
+                touchY = 450,
+                actionCount = 5,
+                anchorBounds = IntRect(40, 400, 180, 460),
+            )
+
+        val position = provider.position(window = IntSize(500, 500), popup = IntSize(328, 180))
+
+        assertEquals(40, position.x)
+        assertEquals(163, position.y)
+    }
+
+    @Test
+    fun outgoingMenuAlignsItsEndToBubbleEnd() {
+        val provider =
+            positionProvider(
+                touchY = 220,
+                actionCount = 3,
+                alignEnd = true,
+                anchorBounds = IntRect(210, 180, 340, 230),
+            )
+
+        val position = provider.position(window = IntSize(360, 780), popup = IntSize(200, 180))
+
+        assertEquals(12, position.x)
+        assertEquals(238, position.y)
+    }
+
+    @Test
+    fun outgoingMenuUsesTheBubbleEndInRtl() {
+        val provider =
+            positionProvider(
+                touchY = 220,
+                actionCount = 3,
+                alignEnd = true,
+                anchorBounds = IntRect(20, 180, 150, 230),
+            )
+
+        val position =
+            provider.position(
+                window = IntSize(500, 780),
+                popup = IntSize(328, 180),
+                layoutDirection = LayoutDirection.Rtl,
+            )
+
+        assertEquals(20, position.x)
+        assertEquals(238, position.y)
     }
 
     @Test
@@ -317,6 +369,7 @@ class MessageActionMenuLayoutTest {
                 ) {
                     MessageActionMenu(
                         expanded = true,
+                        anchorBoundsInWindow = null,
                         anchorWindowYPx = 8f,
                         alignEnd = false,
                         canReply = true,
@@ -359,15 +412,19 @@ class MessageActionMenuLayoutTest {
     private fun positionProvider(
         touchY: Int,
         actionCount: Int,
+        alignEnd: Boolean = false,
+        anchorBounds: IntRect? = null,
         canReact: Boolean = true,
         canDelete: Boolean = false,
         rowHeight: Int = 48,
         reactionHeight: Int = 48,
         minimumCellWidth: Int = 136,
     ) = MessageActionMenuPositionProvider(
+        anchorBoundsInWindow = anchorBounds,
         anchorWindowYPx = touchY.toFloat(),
-        alignEnd = false,
+        alignEnd = alignEnd,
         edgeInsetPx = 8,
+        anchorGapPx = 8,
         estimatedOneColumnHeightPx =
             estimatedHeightPx(actionCount, 1, canReact, canDelete, rowHeight, reactionHeight),
         estimatedTwoColumnHeightPx =
@@ -381,7 +438,8 @@ class MessageActionMenuLayoutTest {
     private fun MessageActionMenuPositionProvider.position(
         window: IntSize,
         popup: IntSize,
-    ) = calculatePosition(IntRect.Zero, window, LayoutDirection.Ltr, popup)
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) = calculatePosition(IntRect.Zero, window, layoutDirection, popup)
 
     private fun estimatedHeightPx(
         actionCount: Int,

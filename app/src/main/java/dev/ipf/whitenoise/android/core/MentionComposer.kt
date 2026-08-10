@@ -332,7 +332,8 @@ object MentionComposer {
                 val removesOwnedSeparatorAndText =
                     delStart == chipEnd &&
                         delEnd > delStart + 1 &&
-                        oldText.getOrNull(delStart) == ' '
+                        oldText.getOrNull(delStart) == ' ' &&
+                        oldText.substring(delStart + 1, delEnd).any { !it.isWhitespace() }
                 if (removesOwnedSeparatorAndText) {
                     touchedPartial = true
                     if (chip.first < widenedStart) widenedStart = chip.first

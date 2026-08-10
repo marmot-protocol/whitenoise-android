@@ -65,6 +65,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -368,11 +369,14 @@ internal fun MessageBubble(
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
     val context = LocalContext.current
-    // Window-space position of the long-press touch. The y component anchors
-    // the action popover; the full point seeds partial text selection (#1370).
+    // Freeze both the touch point and the selected message's window bounds when
+    // the menu opens. The point seeds partial text selection; the bounds keep
+    // the action surface visually attached to the bubble like Signal/Telegram.
     var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
+    var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
     val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
+    val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
@@ -797,6 +801,7 @@ internal fun MessageBubble(
                                         // selection seed at the finger (#326, #1370).
                                         longPressWindowPosition = windowPosition
                                         longPressWindowY = windowPosition.y
+                                        actionMenuAnchorBounds = messageBoundsInWindow[0]
                                         onActionMenuOpenChange(true)
                                     }
                                 },
@@ -835,6 +840,7 @@ internal fun MessageBubble(
                                     // anchor to the bubble top and seed the first word.
                                     longPressWindowPosition = null
                                     longPressWindowY = null
+                                    actionMenuAnchorBounds = messageBoundsInWindow[0]
                                     onActionMenuOpenChange(true)
                                     true
                                 }
@@ -885,7 +891,19 @@ internal fun MessageBubble(
                 Spacer(Modifier.width(8.dp))
             }
             Column(
-                modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
+                modifier =
+                    Modifier
+                        .widthIn(max = bubbleColumnMaxWidth)
+                        .onGloballyPositioned { coordinates ->
+                            val bounds = coordinates.boundsInWindow()
+                            messageBoundsInWindow[0] =
+                                IntRect(
+                                    left = bounds.left.roundToInt(),
+                                    top = bounds.top.roundToInt(),
+                                    right = bounds.right.roundToInt(),
+                                    bottom = bounds.bottom.roundToInt(),
+                                )
+                        },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 // Resolved before the content column so its presence can pick
@@ -1085,6 +1103,7 @@ internal fun MessageBubble(
                             if (!selectionMode && !textSelectionMode) {
                                 longPressWindowPosition = null
                                 longPressWindowY = null
+                                actionMenuAnchorBounds = messageBoundsInWindow[0]
                                 onActionMenuOpenChange(true)
                             }
                         }
@@ -1421,6 +1440,7 @@ internal fun MessageBubble(
                     // Never render the menu for a deleted message or while batch
                     // or partial text selection owns the row interaction.
                     expanded = isActionMenuOpen && !deleted && !selectionMode && !textSelectionMode,
+                    anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     alignEnd = mine,
                     canReply = !readOnly,

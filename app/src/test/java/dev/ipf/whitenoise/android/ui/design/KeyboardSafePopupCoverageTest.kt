@@ -167,8 +167,12 @@ class KeyboardSafePopupCoverageTest {
         )
         val provider = positionSource().readText()
         assertTrue(
-            "measured height must clamp the first visible position to the window",
-            "popupContentSize.height" in provider,
+            "the estimated height must own both side choice and final clamp to prevent a measured-frame jump",
+            "windowSize.height - effectiveHeight - edgeInsetPx" in provider,
+        )
+        assertTrue(
+            "rendered content must be clipped to the same deterministic height used for placement",
+            "minOf(estimatedMenuHeight" in body,
         )
         assertTrue(
             "action menu content must stay transparent until its first stable measured position",
