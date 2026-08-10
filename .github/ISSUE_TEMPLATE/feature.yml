@@ -1,0 +1,62 @@
+name: Feature request
+description: Propose a user-visible White Noise Android capability or improvement
+title: ""
+labels: []
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: Describe the user problem and who encounters it.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior and useful acceptance criteria without prescribing an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Conversations
+        - Media
+        - Notifications
+        - Groups
+        - Profiles & identity
+        - Search
+        - Accessibility
+        - Performance & reliability
+        - Security & privacy
+        - Settings
+        - Release & tooling
+        - Unsure
+    validations:
+      required: true
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Suggested urgency
+      description: Maintainers make the final P0–P3 assignment in the Android project.
+      options:
+        - P1 — important near-term product work
+        - P2 — normal planned work
+        - P3 — valuable but not time-sensitive
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and alternatives
+      description: Add related issues, prior art, constraints, or alternatives considered.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched open and closed issues for the same need.
+          required: true

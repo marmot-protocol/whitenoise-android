@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.media.MessageAttachmentSaveSummary
+import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageAttachmentSaveOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,6 +48,21 @@ class BatchAttachmentSaveSelectionTest {
 
         assertEquals(listOf("m1"), savedSnapshot.map { it.action.messageId })
         assertEquals(setOf("m2"), selected.keys)
+    }
+
+    @Test
+    fun batchSaveAggregatesPartialSuccessAcrossTwoMessages() {
+        val summary =
+            aggregateMessageAttachmentSaveSummaries(
+                listOf(
+                    MessageAttachmentSaveSummary(savedCount = 2, totalCount = 2),
+                    MessageAttachmentSaveSummary(savedCount = 0, totalCount = 1),
+                ),
+            )
+
+        assertEquals(2, summary.savedCount)
+        assertEquals(3, summary.totalCount)
+        assertEquals(MessageAttachmentSaveOutcome.Partial, summary.outcome)
     }
 
     private fun conversationScreenSource(): String =
