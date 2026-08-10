@@ -5869,6 +5869,8 @@ class ConversationController(
     }
 
     private val conversationAccountRef = appState.activeAccountRef
+    internal val boundAccountRef: String?
+        get() = conversationAccountRef
 
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()

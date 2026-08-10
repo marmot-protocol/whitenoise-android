@@ -223,16 +223,91 @@ class MediaPipelineTest {
     }
 
     @Test
-    fun originalGifStrip_passesAnimationBytesThroughUnchanged() {
-        // GIF is a recognized original kind and must survive the metadata-strip
-        // step byte-for-byte — a re-encode would flatten the animation and drop
-        // the NETSCAPE loop block.
-        val gif = "GIF89a".encodeToByteArray() + byteArrayOf(0x21, 0xff.toByte(), 0x0b, 0x00, 0x2c, 0x3b)
+    fun originalGifStripDropsCommentsWhileKeepingFramesAndLooping() {
+        val gif = animatedGifWithMetadata()
 
         val stripped = MediaPipeline.stripOriginalImageMetadata(gif)!!
 
-        assertTrue(MediaPipeline.isGif(gif))
-        assertTrue(gif.contentEquals(stripped))
+        assertTrue(MediaPipeline.isGif(stripped))
+        assertFalse(stripped.containsAscii("private comment"))
+        assertTrue(stripped.containsAscii("NETSCAPE2.0"))
+        assertEquals(2, stripped.count { it == 0x2c.toByte() })
+        assertEquals(ImageAnimationStatus.ANIMATED, MediaPipeline.imageAnimationStatus(stripped))
+    }
+
+    @Test
+    fun animatedImageSanitizerDropsGifAndWebpMetadataWithoutFlatteningAnimation() {
+        val gif = MediaPipeline.sanitizeAnimatedImageMetadata(animatedGifWithMetadata())!!
+        assertFalse(gif.containsAscii("private comment"))
+        assertTrue(gif.containsAscii("NETSCAPE2.0"))
+        assertEquals(2, gif.count { it == 0x2c.toByte() })
+
+        val (webp, firstFrame, secondFrame) = animatedWebpWithMetadata()
+
+        val sanitizedWebp = MediaPipeline.sanitizeAnimatedImageMetadata(webp)!!
+
+        assertFalse(sanitizedWebp.containsAscii("gps"))
+        assertFalse(sanitizedWebp.containsAscii("private xmp"))
+        assertFalse(sanitizedWebp.containsAscii("private profile"))
+        assertTrue(sanitizedWebp.containsAscii("ANIM"))
+        assertTrue(sanitizedWebp.containsSubsequence(firstFrame))
+        assertTrue(sanitizedWebp.containsSubsequence(secondFrame))
+        assertEquals(ImageAnimationStatus.ANIMATED, MediaPipeline.imageAnimationStatus(sanitizedWebp))
+    }
+
+    private fun animatedWebpWithMetadata(): Triple<ByteArray, ByteArray, ByteArray> {
+        val firstFrame =
+            animatedWebpFrame(
+                byteArrayOf(
+                    0x2f,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0x07,
+                    0x10,
+                    0xfd.toByte(),
+                    0x8f.toByte(),
+                    0xfe.toByte(),
+                    0x07,
+                    0x22,
+                    0xa2.toByte(),
+                    0xff.toByte(),
+                    0x01,
+                ),
+            )
+        val secondFrame =
+            animatedWebpFrame(
+                byteArrayOf(
+                    0x2f,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0x07,
+                    0x10,
+                    0xd1.toByte(),
+                    0xff.toByte(),
+                    0xfe.toByte(),
+                    0x07,
+                    0x22,
+                    0xa2.toByte(),
+                    0xff.toByte(),
+                    0x01,
+                ),
+            )
+        val vp8xPayload = byteArrayOf(0x2e, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val webpPayload =
+            "WEBP".encodeToByteArray() +
+                webpChunk("VP8X", vp8xPayload) +
+                webpChunk("EXIF", "gps".encodeToByteArray()) +
+                webpChunk("XMP ", "private xmp".encodeToByteArray()) +
+                webpChunk("ICCP", "private profile".encodeToByteArray()) +
+                webpChunk("ANIM", byteArrayOf(0, 0, 0, 0, 0, 0)) +
+                firstFrame +
+                secondFrame
+        val webp = "RIFF".encodeToByteArray() + u32le(webpPayload.size) + webpPayload
+        return Triple(webp, firstFrame, secondFrame)
     }
 
     @Test
@@ -279,13 +354,14 @@ class MediaPipelineTest {
 
     @Test
     fun originalWebpStrip_dropsExifAndXmpChunksAndClearsVp8xFlags() {
-        val vp8xPayload = byteArrayOf(0x0c, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val vp8xPayload = byteArrayOf(0x2c, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         val vp8Payload = byteArrayOf(1, 2, 3, 4)
         val webpPayload =
             "WEBP".encodeToByteArray() +
                 webpChunk("VP8X", vp8xPayload) +
                 webpChunk("EXIF", "gps".encodeToByteArray()) +
                 webpChunk("XMP ", "xmp".encodeToByteArray()) +
+                webpChunk("ICCP", "device profile".encodeToByteArray()) +
                 webpChunk("VP8 ", vp8Payload)
         val webp = "RIFF".encodeToByteArray() + u32le(webpPayload.size) + webpPayload
 
@@ -293,11 +369,12 @@ class MediaPipelineTest {
 
         assertFalse(stripped.containsAscii("gps"))
         assertFalse(stripped.containsAscii("xmp"))
+        assertFalse(stripped.containsAscii("device profile"))
         assertTrue(stripped.containsAscii("VP8 "))
         assertTrue(stripped.containsSubsequence(vp8Payload))
         val vp8xOffset = stripped.indexOfAscii("VP8X")
         assertTrue(vp8xOffset >= 0)
-        assertEquals(0, stripped[vp8xOffset + 8].toInt() and 0x0c)
+        assertEquals(0, stripped[vp8xOffset + 8].toInt() and 0x2c)
     }
 
     private fun jpegSegment(
@@ -408,6 +485,63 @@ class MediaPipelineTest {
         out.write(payload)
         if (payload.size % 2 == 1) out.write(0)
         return out.toByteArray()
+    }
+
+    private fun animatedWebpFrame(vp8lPayload: ByteArray): ByteArray {
+        // ANMF's 16-byte header describes a 1x1 frame at (0, 0), followed by
+        // a valid lossless 1x1 WebP frame bitstream.
+        val frameHeader = ByteArray(16)
+        val frameBitstream = webpChunk("VP8L", vp8lPayload)
+        return webpChunk("ANMF", frameHeader + frameBitstream)
+    }
+
+    private fun animatedGifWithMetadata(): ByteArray {
+        val headerAndScreen =
+            "GIF89a".encodeToByteArray() +
+                byteArrayOf(
+                    0x01,
+                    0x00,
+                    0x01,
+                    0x00,
+                    0x80.toByte(),
+                    0x00,
+                    0x00,
+                )
+        val globalColors = byteArrayOf(0, 0, 0, 0xff.toByte(), 0xff.toByte(), 0xff.toByte())
+        val loop =
+            byteArrayOf(0x21, 0xff.toByte(), 0x0b) +
+                "NETSCAPE2.0".encodeToByteArray() +
+                byteArrayOf(0x03, 0x01, 0x00, 0x00, 0x00)
+        val commentBytes = "private comment".encodeToByteArray()
+        val comment = byteArrayOf(0x21, 0xfe.toByte(), commentBytes.size.toByte()) + commentBytes + byteArrayOf(0)
+        val graphicsControl = byteArrayOf(0x21, 0xf9.toByte(), 0x04, 0, 1, 0, 0, 0)
+        val frame =
+            byteArrayOf(
+                0x2c,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                2,
+                0x4c,
+                0x01,
+                0,
+            )
+        return headerAndScreen +
+            globalColors +
+            loop +
+            comment +
+            graphicsControl +
+            frame +
+            graphicsControl +
+            frame +
+            byteArrayOf(0x3b)
     }
 
     private fun u32be(value: Int): ByteArray =

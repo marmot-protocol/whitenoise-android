@@ -5,12 +5,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.media.documentPickTreatAsImage
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
@@ -50,10 +51,11 @@ private class ConversationAttachmentReader(
         val quality = appState.mediaQuality
         // Animated images cannot survive JPEG recompression. Preserve their
         // original bytes at every quality setting rather than flattening them.
-        val animatedSource = MediaPipeline.isAnimatedImageSource(context.contentResolver, uri)
+        val animationStatus = MediaPipeline.imageAnimationStatus(context.contentResolver, uri)
+        val preserveOriginalSource = animationStatus != ImageAnimationStatus.STATIC
         val original =
-            if (quality.preservesOriginalImageBytes || animatedSource) {
-                readOriginalImageAttachment(uri, remainingBytes, animatedSource)
+            if (quality.preservesOriginalImageBytes || preserveOriginalSource) {
+                readOriginalImageAttachment(uri, remainingBytes, animationStatus)
             } else {
                 null
             }
@@ -63,8 +65,9 @@ private class ConversationAttachmentReader(
     private fun readOriginalImageAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
-        animatedSource: Boolean,
+        animationStatus: ImageAnimationStatus,
     ): ImageAttachmentReadOutcome? {
+        val mustPreserveSource = animationStatus != ImageAnimationStatus.STATIC
         val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         return when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
             is MediaPipeline.OriginalImageReadResult.Success ->
@@ -79,10 +82,46 @@ private class ConversationAttachmentReader(
                 )
             MediaPipeline.OriginalImageReadResult.TooLarge ->
                 ImageAttachmentReadOutcome(null, overflowed = true)
-            MediaPipeline.OriginalImageReadResult.Failed,
-            MediaPipeline.OriginalImageReadResult.Unsupported,
-            -> if (animatedSource) ImageAttachmentReadOutcome(null) else null
+            MediaPipeline.OriginalImageReadResult.Unsupported ->
+                if (animationStatus == ImageAnimationStatus.ANIMATED) {
+                    readRawAnimatedImageAttachment(uri, cap)
+                } else if (mustPreserveSource) {
+                    ImageAttachmentReadOutcome(null)
+                } else {
+                    null
+                }
+            MediaPipeline.OriginalImageReadResult.Failed ->
+                if (mustPreserveSource) ImageAttachmentReadOutcome(null) else null
         }
+    }
+
+    /** Preserve animation only after a lossless metadata rewrite succeeds. */
+    @Suppress("ReturnCount") // Provider and size failures must stop before allocating or flattening animation.
+    private fun readRawAnimatedImageAttachment(
+        uri: android.net.Uri,
+        maxBytes: Int,
+    ): ImageAttachmentReadOutcome {
+        val mediaType = safeGetType(context.contentResolver, uri)
+        if (!mediaType.startsWith("image/", ignoreCase = true)) return ImageAttachmentReadOutcome(null)
+        val bytes =
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    MediaPipeline.readBoundedBytes(stream, maxBytes)
+                }
+            }.getOrNull() ?: return ImageAttachmentReadOutcome(null)
+        val sanitized = MediaPipeline.sanitizeAnimatedImageMetadata(bytes) ?: return ImageAttachmentReadOutcome(null)
+        val sanitizedMediaType = MediaPipeline.sniffImageMediaType(sanitized) ?: return ImageAttachmentReadOutcome(null)
+        return ImageAttachmentReadOutcome(
+            PendingAttachment(
+                plaintextBytes = sanitized,
+                mediaType = sanitizedMediaType,
+                fileName =
+                    MediaPipeline.safeDisplayName(
+                        queryDisplayName(context.contentResolver, uri) ?: "animated-image",
+                    ),
+                dim = MediaPipeline.imageDimOrNull(sanitized),
+            ),
+        )
     }
 
     private fun readRecompressedImageAttachment(
@@ -115,11 +154,9 @@ private class ConversationAttachmentReader(
         }
     }
 
-    // Read picked document URIs into attachments. Non-image documents are kept
-    // as raw bytes; image/* picks from Files use the same media-quality and
-    // metadata-stripping path as visual image picks before joining the document
-    // send path. MIME comes from the content resolver; filename from
-    // `OpenableColumns.DISPLAY_NAME`.
+    // Read document-picker URIs as files. Static or animated images selected
+    // through Files follow the same metadata-safe image policy as Photo Picker
+    // selections. Non-image documents remain byte-for-byte file attachments.
     //
     // Two-layer size guard:
     //   1. Per-attachment ceiling: skip any single pick that already declares
@@ -167,32 +204,24 @@ private class ConversationAttachmentReader(
         val reportedMime = safeGetType(context.contentResolver, uri)
         val resolvedMime = reportedMime.takeIf { it.isNotBlank() } ?: "application/octet-stream"
         val remainingBytes = (bytesBudget - state.totalBytes).coerceAtLeast(0L)
-        val sniffedImageMime =
-            if (reportedMime.isBlank() || reportedMime.equals("application/octet-stream", ignoreCase = true)) {
-                MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
-            } else {
-                null
-            }
-        if (documentPickTreatAsImage(reportedMime, sniffedImageMime)) {
-            readImageDocument(uri, remainingBytes, bytesBudget, state)
+        val sniffedImageMime = MediaPipeline.sniffImageMediaType(context.contentResolver, uri)
+        if (isImageDocumentPick(resolvedMime, sniffedImageMime)) {
+            readSanitizedImageDocument(uri, remainingBytes, state)
         } else {
             readRawDocument(uri, resolvedMime, remainingBytes, bytesBudget, state)
         }
     }
 
-    private fun readImageDocument(
+    private fun readSanitizedImageDocument(
         uri: android.net.Uri,
         remainingBytes: Long,
-        bytesBudget: Long,
         state: DocumentReadAccumulator,
     ) {
-        val image = readImageAttachment(uri, remainingBytes)
-        val attachment = image.attachment
+        val outcome = readImageAttachment(uri, remainingBytes)
+        val attachment = outcome.attachment
         when {
-            image.overflowed -> state.albumOverflowed = true
-            attachment == null -> state.rejected = true
-            attachment.plaintextBytes.isEmpty() -> Unit
-            state.totalBytes + attachment.plaintextBytes.size > bytesBudget -> state.albumOverflowed = true
+            outcome.overflowed && remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES -> state.albumOverflowed = true
+            outcome.overflowed || attachment == null -> state.rejected = true
             else -> {
                 state.totalBytes += attachment.plaintextBytes.size
                 state.attachments += attachment
@@ -286,6 +315,11 @@ private class ConversationAttachmentReader(
     }
 }
 
+internal fun isImageDocumentPick(
+    reportedMime: String,
+    sniffedImageMime: String?,
+): Boolean = reportedMime.startsWith("image/", ignoreCase = true) || sniffedImageMime != null
+
 /**
  * Media read/transform/send operations owned by a conversation.
  *
@@ -364,21 +398,22 @@ internal class ConversationMediaSender(
     }
 
     fun sendStagedAttachments(
-        imageUris: List<android.net.Uri>,
+        imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
         caption: String,
+        preparedImageAttachments: Map<String, PendingAttachment> = emptyMap(),
         onAccepted: () -> Unit = {},
         onRejected: () -> Unit = {},
         onAfterSend: () -> Unit = {},
     ) {
-        if (imageUris.isEmpty() && documentUris.isEmpty()) {
+        if (imageSlots.isEmpty() && documentUris.isEmpty()) {
             onRejected()
             return
         }
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val prepared = prepareStagedAttachments(imageUris, documentUris)
-            if (!acceptPreparedAttachments(prepared, imageUris.size)) {
+            val prepared = prepareStagedAttachments(imageSlots, documentUris, preparedImageAttachments)
+            if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
                 onRejected()
                 return@launchMutation
             }
@@ -402,10 +437,11 @@ internal class ConversationMediaSender(
     }
 
     private suspend fun prepareStagedAttachments(
-        imageUris: List<android.net.Uri>,
+        imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
+        preparedImageAttachments: Map<String, PendingAttachment>,
     ): PreparedStagedAttachments {
-        val rawImages = attachmentReader.readPickedImages(imageUris)
+        val rawImages = readStagedImages(imageSlots, preparedImageAttachments)
         val images = limitAttachmentsToBudget(rawImages.attachments, MEDIA_ALBUM_MAX_TOTAL_BYTES)
         val documentBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - images.totalBytes).coerceAtLeast(0L)
         val documents =
@@ -415,8 +451,8 @@ internal class ConversationMediaSender(
                 attachmentReader.readPickedDocuments(documentUris, documentBudget)
             }
         val pickHasVideo =
-            imageUris.any {
-                safeGetType(context.contentResolver, it).startsWith("video/", ignoreCase = true)
+            imageSlots.any {
+                safeGetType(context.contentResolver, it.uri).startsWith("video/", ignoreCase = true)
             }
         return PreparedStagedAttachments(
             images = images.attachments,
@@ -425,6 +461,25 @@ internal class ConversationMediaSender(
             visualFailureToast =
                 if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image,
         )
+    }
+
+    private suspend fun readStagedImages(
+        imageSlots: List<PendingMediaSlot>,
+        preparedImageAttachments: Map<String, PendingAttachment>,
+    ): VisualReadOutcome {
+        val attachments = mutableListOf<PendingAttachment>()
+        var overflowed = false
+        imageSlots.forEach { slot ->
+            val prepared = preparedImageAttachments[slot.id]
+            if (prepared != null) {
+                attachments += prepared
+            } else {
+                val read = attachmentReader.readPickedImages(listOf(slot.uri))
+                attachments += read.attachments
+                overflowed = overflowed || read.albumOverflowed
+            }
+        }
+        return VisualReadOutcome(attachments, overflowed)
     }
 
     private fun limitAttachmentsToBudget(

@@ -1,10 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.conversation.media.coerceResolvedMime
-import dev.ipf.whitenoise.android.ui.conversation.media.documentPickTreatAsImage
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -53,29 +50,5 @@ class SafeGetTypeContractTest {
         // and degrades gracefully rather than the staging tile crashing.
         assertEquals("", coerceResolvedMime { "" })
         assertEquals(false, coerceResolvedMime { "" }.startsWith("video/", ignoreCase = true))
-    }
-
-    // ---- document pick image routing (issue #1553) -------------------------
-
-    @Test
-    fun documentPickTreatAsImage_trustsResolverImageMime() {
-        assertTrue(documentPickTreatAsImage("image/png", sniffedImageMime = null))
-    }
-
-    @Test
-    fun documentPickTreatAsImage_sniffsWhenOctetStreamAndHeaderIsImage() {
-        assertTrue(documentPickTreatAsImage("application/octet-stream", "image/jpeg"))
-        assertTrue(documentPickTreatAsImage("", "image/png"))
-    }
-
-    @Test
-    fun documentPickTreatAsImage_keepsGenericDocumentWhenSniffMisses() {
-        assertFalse(documentPickTreatAsImage("application/octet-stream", null))
-        assertFalse(documentPickTreatAsImage("", null))
-    }
-
-    @Test
-    fun documentPickTreatAsImage_doesNotOverrideExplicitNonImageMime() {
-        assertFalse(documentPickTreatAsImage("application/pdf", "image/jpeg"))
     }
 }
