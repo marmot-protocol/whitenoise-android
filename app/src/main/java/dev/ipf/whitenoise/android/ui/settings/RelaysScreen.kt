@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -34,16 +35,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayListKind
+import dev.ipf.whitenoise.android.state.RelayUrlValidationResult
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
+import dev.ipf.whitenoise.android.state.canRemoveRelay
+import dev.ipf.whitenoise.android.state.relayUrlValidationResult
 import dev.ipf.whitenoise.android.ui.common.SettingsGroup
 import kotlinx.coroutines.launch
 
@@ -99,20 +105,38 @@ internal fun RelaysScreen(
                                 onSelectKind = { selectedKind = it },
                                 pendingUrl = editorState.pendingUrl,
                                 onPendingUrlChange = { editorState.pendingUrl = it },
-                                saving = editorState.saving,
+                                mutation = editorState.mutation,
                                 canEdit = activeAccountRef != null,
-                                onUpdateRelays = { kind, relays, onSuccess ->
+                                onAddRelay = addRelay@{ kind, relay, onSuccess ->
+                                    if (editorState.mutation != null) return@addRelay
                                     val accountAtStart = activeAccountRef
-                                    editorState.saving = true
+                                    val mutation = RelayMutation.Adding(kind, relay)
+                                    editorState.mutation = mutation
                                     appState.launchMutation {
                                         try {
-                                            val updated = appState.setAccountRelays(kind, relays)
+                                            val updated = appState.addAccountRelay(accountAtStart, kind, relay)
                                             if (updated != null && appState.activeAccountRef == accountAtStart) {
                                                 lists = updated
                                                 onSuccess()
                                             }
                                         } finally {
-                                            editorState.saving = false
+                                            if (editorState.mutation == mutation) editorState.mutation = null
+                                        }
+                                    }
+                                },
+                                onRemoveRelay = removeRelay@{ kind, relay ->
+                                    if (editorState.mutation != null) return@removeRelay
+                                    val accountAtStart = activeAccountRef
+                                    val mutation = RelayMutation.Removing(kind, relay)
+                                    editorState.mutation = mutation
+                                    appState.launchMutation {
+                                        try {
+                                            val updated = appState.removeAccountRelay(accountAtStart, kind, relay)
+                                            if (updated != null && appState.activeAccountRef == accountAtStart) {
+                                                lists = updated
+                                            }
+                                        } finally {
+                                            if (editorState.mutation == mutation) editorState.mutation = null
                                         }
                                     }
                                 },
@@ -127,7 +151,21 @@ internal fun RelaysScreen(
 
 internal class RelayEditorState {
     var pendingUrl by mutableStateOf("")
-    var saving by mutableStateOf(false)
+    var mutation by mutableStateOf<RelayMutation?>(null)
+}
+
+internal sealed interface RelayMutation {
+    val kind: RelayListKind
+
+    data class Adding(
+        override val kind: RelayListKind,
+        val relay: String,
+    ) : RelayMutation
+
+    data class Removing(
+        override val kind: RelayListKind,
+        val relay: String,
+    ) : RelayMutation
 }
 
 @Composable
@@ -141,17 +179,22 @@ internal fun RelayListSettingsContent(
     onSelectKind: (RelayListKind) -> Unit,
     pendingUrl: String,
     onPendingUrlChange: (String) -> Unit,
-    saving: Boolean,
+    mutation: RelayMutation?,
     canEdit: Boolean,
-    onUpdateRelays: (RelayListKind, List<String>, onSuccess: () -> Unit) -> Unit,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+    onAddRelay: (RelayListKind, String, onSuccess: () -> Unit) -> Unit,
+    onRemoveRelay: (RelayListKind, String) -> Unit,
 ) {
     RelayListStatus(lists)
+
+    val busy = mutation != null
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         relayListKinds.forEach { option ->
             FilterChip(
                 selected = selectedKind == option,
                 onClick = { onSelectKind(option) },
+                enabled = !busy,
                 label = { Text(stringResource(option.labelRes)) },
             )
         }
@@ -164,26 +207,111 @@ internal fun RelayListSettingsContent(
     )
 
     val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
+    RelayRows(
+        currentRelays = currentRelays,
+        selectedKind = selectedKind,
+        mutation = mutation,
+        canEdit = canEdit,
+        busy = busy,
+        allowExternalRelayHosts = allowExternalRelayHosts,
+        onRemoveRelay = onRemoveRelay,
+    )
+    RelayAddEditor(
+        currentRelays = currentRelays,
+        selectedKind = selectedKind,
+        pendingUrl = pendingUrl,
+        onPendingUrlChange = onPendingUrlChange,
+        mutation = mutation,
+        canEdit = canEdit,
+        busy = busy,
+        allowExternalRelayHosts = allowExternalRelayHosts,
+        onAddRelay = onAddRelay,
+    )
+}
+
+@Composable
+@Suppress("FunctionNaming", "LongParameterList")
+private fun RelayRows(
+    currentRelays: List<String>,
+    selectedKind: RelayListKind,
+    mutation: RelayMutation?,
+    canEdit: Boolean,
+    busy: Boolean,
+    allowExternalRelayHosts: Boolean,
+    onRemoveRelay: (RelayListKind, String) -> Unit,
+) {
     if (currentRelays.isEmpty()) {
         Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    if (
+        currentRelays.any {
+            relayUrlValidationResult(it, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable
+        }
+    ) {
+        Text(
+            text = stringResource(R.string.unsupported_relays_cleanup_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
     currentRelays.forEach { relay ->
+        val removing = mutation == RelayMutation.Removing(selectedKind, relay)
+        val removingDescription = stringResource(R.string.remove_relay)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
             IconButton(
-                onClick = { onUpdateRelays(selectedKind, currentRelays - relay) {} },
-                enabled = canEdit && !saving && currentRelays.size > 1,
+                onClick = { onRemoveRelay(selectedKind, relay) },
+                enabled =
+                    canEdit &&
+                        !busy &&
+                        canRemoveRelay(currentRelays, relay, allowExternalRelayHosts),
             ) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
+                if (removing) {
+                    CircularProgressIndicator(
+                        modifier =
+                            Modifier
+                                .size(20.dp)
+                                .semantics { contentDescription = removingDescription },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
+                }
             }
         }
     }
+}
+
+@Composable
+@Suppress("FunctionNaming", "LongParameterList")
+private fun RelayAddEditor(
+    currentRelays: List<String>,
+    selectedKind: RelayListKind,
+    pendingUrl: String,
+    onPendingUrlChange: (String) -> Unit,
+    mutation: RelayMutation?,
+    canEdit: Boolean,
+    busy: Boolean,
+    allowExternalRelayHosts: Boolean,
+    onAddRelay: (RelayListKind, String, onSuccess: () -> Unit) -> Unit,
+) {
+    val trimmedPendingUrl = pendingUrl.trim()
+    val pendingValidation =
+        trimmedPendingUrl
+            .takeIf { it.isNotEmpty() }
+            ?.let { relayUrlValidationResult(it, allowExternalRelayHosts) }
+    val inputErrorRes = pendingRelayErrorRes(pendingValidation)
+    val adding = mutation is RelayMutation.Adding && mutation.kind == selectedKind
+    val addingDescription = stringResource(R.string.add_relay)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
             value = pendingUrl,
             onValueChange = onPendingUrlChange,
             label = { Text("wss://relay.example.com") },
             singleLine = true,
+            enabled = canEdit && !busy,
+            isError = inputErrorRes != null,
+            supportingText = inputErrorRes?.let { errorRes -> { Text(stringResource(errorRes)) } },
             modifier = Modifier.weight(1f),
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             keyboardOptions =
@@ -195,24 +323,40 @@ internal fun RelayListSettingsContent(
         )
         IconButton(
             onClick = {
-                val trimmed = pendingUrl.trim()
-                onUpdateRelays(selectedKind, currentRelays + trimmed) {
+                onAddRelay(selectedKind, trimmedPendingUrl) {
                     onPendingUrlChange("")
                 }
             },
             modifier = Modifier.size(48.dp),
             enabled =
-                pendingUrl.trim().let {
-                    !saving &&
-                        canEdit &&
-                        isAcceptableRelayUrl(it) &&
-                        !currentRelays.contains(it)
-                },
+                !busy &&
+                    canEdit &&
+                    pendingValidation == RelayUrlValidationResult.Acceptable &&
+                    !currentRelays.contains(trimmedPendingUrl),
         ) {
-            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
+            if (adding) {
+                CircularProgressIndicator(
+                    modifier =
+                        Modifier
+                            .size(20.dp)
+                            .semantics { contentDescription = addingDescription },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
+            }
         }
     }
 }
+
+private fun pendingRelayErrorRes(validation: RelayUrlValidationResult?): Int? =
+    when (validation) {
+        RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
+        RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
+        RelayUrlValidationResult.Acceptable,
+        null,
+        -> null
+    }
 
 private val relayListKinds =
     listOf(

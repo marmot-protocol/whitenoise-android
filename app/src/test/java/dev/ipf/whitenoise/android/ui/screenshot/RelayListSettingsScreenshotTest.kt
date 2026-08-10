@@ -69,9 +69,10 @@ class RelayListSettingsScreenshotTest {
                             onSelectKind = {},
                             pendingUrl = "",
                             onPendingUrlChange = {},
-                            saving = false,
+                            mutation = null,
                             canEdit = true,
-                            onUpdateRelays = { _, _, _ -> },
+                            onAddRelay = { _, _, _ -> },
+                            onRemoveRelay = { _, _ -> },
                         )
                     }
                 }
