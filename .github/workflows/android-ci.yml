@@ -38,7 +38,9 @@ jobs:
         run: node --test .github/scripts/update-pr-screenshots.test.js
 
       - name: Verify generated performance profiles
-        run: bash scripts/verify-generated-profiles.sh
+        run: |
+          bash .github/scripts/test-verify-generated-profiles.sh
+          bash scripts/verify-generated-profiles.sh
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
