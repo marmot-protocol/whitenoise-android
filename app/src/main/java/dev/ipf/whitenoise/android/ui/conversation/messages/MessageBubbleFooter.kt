@@ -251,7 +251,15 @@ internal fun BubbleCollapsibleFooterLayout(
         },
     ) { measurables, constraints ->
         val maxBodyHeightPx = maxBodyHeight.roundToPx()
-        val probeHeight = (maxBodyHeightPx + 1).coerceAtMost(constraints.maxHeight)
+        // Let text measure one complete line beyond the visible cap. A one-pixel
+        // probe cannot fit line 53, so Text reports only the 52 visible lines and
+        // the layout misses the overflow. Production derives maxBodyHeight from
+        // this line limit, making the quotient the current scaled line height.
+        val overflowProbePx =
+            ((maxBodyHeightPx + MESSAGE_COLLAPSE_LINE_LIMIT - 1) / MESSAGE_COLLAPSE_LINE_LIMIT)
+                .coerceAtLeast(1)
+        val probeHeight =
+            (maxBodyHeightPx + overflowProbePx).coerceAtMost(constraints.maxHeight)
         val contentPlaceable =
             measurables[0].measure(
                 constraints.copy(

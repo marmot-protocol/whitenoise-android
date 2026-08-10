@@ -1322,6 +1322,13 @@ class WhiteNoiseAppState private constructor(
      * controller) so re-opening a chat doesn't re-download media already
      * fetched this session. Bounded in bytes; see [dev.ipf.whitenoise.android.media.ByteSizeLruCache].
      */
+    private val mediaCacheRevisionState = MutableStateFlow(0L)
+    internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
+
+    private fun bumpMediaCacheRevision() {
+        mediaCacheRevisionState.update { it + 1L }
+    }
+
     private val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
@@ -1360,6 +1367,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         assertMainThread { "cacheMediaPlaintext" }
         mediaPlaintextCache.put(cacheKey, plaintext)
+        bumpMediaCacheRevision()
     }
 
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
@@ -1379,6 +1387,7 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)
         mediaThumbnailCache.remove(cacheKey)
+        bumpMediaCacheRevision()
     }
 
     /** Every key currently resident in either in-memory tier, for group-scoped eviction. */
@@ -1405,6 +1414,7 @@ class WhiteNoiseAppState private constructor(
             cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
+            onMutation = ::bumpMediaCacheRevision,
         )
 
     @Volatile
@@ -3570,6 +3580,7 @@ class WhiteNoiseAppState private constructor(
         assertMainThread { "clearInMemoryMediaCaches" }
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        bumpMediaCacheRevision()
         MediaInventory.clear()
         mediaUploadSessionEpoch.incrementAndGet()
         // Uploads run on the app-lifetime mutation scope so they can survive

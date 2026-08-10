@@ -161,11 +161,29 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "first-frame height estimate for placement must remain in MessageActionMenu",
-            "estimatedPopupHeightPx" in body && "measuredPopupHeightPx" in body,
+            "estimatedOneColumnHeightPx" in body &&
+                "estimatedTwoColumnHeightPx" in body &&
+                "MessageActionMenuPositionProvider(" in body,
+        )
+        val provider = positionSource().readText()
+        assertTrue(
+            "the estimated height must own both side choice and final clamp to prevent a measured-frame jump",
+            "verticalPosition(windowSize.height, effectiveHeight)" in provider &&
+                "windowHeight - popupHeight - edgeInsetPx" in provider,
         )
         assertTrue(
-            "reopening must discard a stale measured height from the previous menu variant",
-            "remember(expanded) { mutableStateOf(0) }" in body,
+            "message bounds must center the popup on the selected bubble rather than a screen edge",
+            "bounds.center.x - popupWidth / 2" in provider,
+        )
+        assertTrue(
+            "rendered content must be clipped to the same deterministic height used for placement",
+            "minOf(estimatedMenuHeight" in body,
+        )
+        assertTrue(
+            "action menu content must stay transparent until its first stable measured position",
+            "var actionMenuMeasured" in body &&
+                ".onSizeChanged" in body &&
+                "alpha = if (actionMenuMeasured) 1f else 0f" in body,
         )
     }
 
@@ -200,6 +218,8 @@ class KeyboardSafePopupCoverageTest {
     private fun keyboardSafePopupSource(): File = sourceFile("ui/design/KeyboardSafePopup.kt")
 
     private fun messageActionsSource(): File = sourceFile("ui/conversation/messages/MessageActions.kt")
+
+    private fun positionSource(): File = sourceFile("ui/conversation/messages/MessageActionMenuPositionProvider.kt")
 
     private fun reactionsSource(): File = sourceFile("ui/conversation/reactions/Reactions.kt")
 

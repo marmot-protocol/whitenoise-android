@@ -137,4 +137,36 @@ class ComposerEmojiInsertionTest {
         assertEquals("hello ", result.text)
         assertEquals("hello ".length, result.selection.start)
     }
+
+    @Test
+    fun selectedProseDeletionPreservesAdjacentMentionChip() {
+        val npub = "npub1" + "a".repeat(58)
+        val chipText = "hello @$npub"
+        val oldText = "$chipText following words"
+        val oldValue =
+            TextFieldValue(
+                text = oldText,
+                selection = TextRange(chipText.length, oldText.length),
+            )
+        val proposedValue = TextFieldValue(text = chipText, selection = TextRange(chipText.length))
+
+        val result = repairComposerMentionEdit(oldValue, proposedValue, clampMentionSelection = true)
+
+        assertEquals(chipText, result.text)
+        assertEquals(chipText.length, result.selection.start)
+    }
+
+    @Test
+    fun collapsedCaretImeWordDeleteConsumesOwnedSeparatorAndMention() {
+        val npub = "npub1" + "a".repeat(58)
+        val chipText = "hello @$npub"
+        val oldText = "$chipText following words"
+        val oldValue = TextFieldValue(text = oldText, selection = TextRange(chipText.length))
+        val proposedValue = TextFieldValue(text = chipText, selection = TextRange(chipText.length))
+
+        val result = repairComposerMentionEdit(oldValue, proposedValue, clampMentionSelection = true)
+
+        assertEquals("hello ", result.text)
+        assertEquals("hello ".length, result.selection.start)
+    }
 }

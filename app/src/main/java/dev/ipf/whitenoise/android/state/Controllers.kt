@@ -7738,8 +7738,9 @@ class ConversationController(
                     loadedMessageIds = loadedMessageIds,
                 )
             }
+        val evictedKeys = loadedKeys + staleKeys
         removeMediaMemoryCacheKeys(
-            cacheKeys = loadedKeys + staleKeys,
+            cacheKeys = evictedKeys,
             dispatcher = Dispatchers.Main.immediate,
             removeEntry = appState::removeMediaMemoryCacheEntry,
         )
@@ -7767,6 +7768,30 @@ class ConversationController(
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         if (appState.cachedMediaPlaintext(cacheKey) != null) return true
         return appState.diskMediaCache.contains(cacheKey)
+    }
+
+    /** Resolve a cold disk-index state without performing main-thread I/O. */
+    suspend fun hasCachedAttachmentAfterHydration(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
+        val initialMemoryHit =
+            withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) != null }
+        val diskHit =
+            initialMemoryHit ||
+                withContext(Dispatchers.IO) {
+                    appState.diskMediaCache.containsAfterHydration(cacheKey)
+                }
+        // Re-check L1 after the off-main hydration probe. A sibling download
+        // may have completed while hydration was in progress; unlike the old
+        // sticky Boolean publication, this cannot turn a later definitive miss
+        // into a permanent hit after normal LRU eviction.
+        return diskHit ||
+            withContext(Dispatchers.Main.immediate) {
+                appState.cachedMediaPlaintext(cacheKey) != null
+            }
     }
 
     /**
@@ -7821,9 +7846,8 @@ class ConversationController(
         val account = conversationAccountRef ?: error("no active account")
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         // L1: in-memory LRU (hottest cache, instant return).
-        withContext(Dispatchers.Main.immediate) {
-            appState.cachedMediaPlaintext(cacheKey)
-        }?.let { return it }
+        withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(cacheKey) }
+            ?.let { return it }
         // L2: disk LRU (survives process restart). Read off the main thread
         // since file I/O on big JPEGs can take 5-30ms.
         val onDisk = withContext(Dispatchers.IO) { appState.diskMediaCache.get(cacheKey) }

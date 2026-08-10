@@ -82,6 +82,16 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun definitiveContainsHydratesAColdIndexBeforeReporting() {
+        DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("cached", byteArrayOf(1, 2, 3))
+        val reopened = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+
+        assertFalse("the composition-safe peek remains non-blocking", reopened.contains("cached"))
+        assertTrue(reopened.containsAfterHydration("cached"))
+        assertFalse(reopened.containsAfterHydration("missing"))
+    }
+
+    @Test
     fun putThenGet_roundTripsThroughDisk() {
         val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
         val payload = ByteArray(40) { it.toByte() }
@@ -1001,6 +1011,42 @@ class DiskByteCacheTest {
         assertNotNull(cache.get("b"))
         assertNotNull(cache.get("c"))
         assertTrue(cache.residentBytes() <= 220)
+    }
+
+    @Test
+    fun successfulMutationsPublishCacheRevisionSignals() {
+        val mutations = AtomicInteger(0)
+        val cache =
+            DiskByteCache(
+                dir,
+                keyProvider = keyProvider,
+                maxBytes = 220,
+                onMutation = { mutations.incrementAndGet() },
+            )
+
+        cache.put("a", ByteArray(40))
+        cache.put("b", ByteArray(40))
+        cache.put("c", ByteArray(40)) // publishes the put and its LRU eviction
+        cache.remove("b")
+        cache.remove("missing")
+        cache.put(
+            "tagged",
+            ByteArray(8),
+            cache.capturePublicationToken(),
+            ciphertextTag = "ciphertext-tag",
+        )
+        val mutationsBeforeTagRemoval = mutations.get()
+        assertEquals(0, cache.removeByCiphertextTags(setOf("missing-tag")))
+        assertEquals(mutationsBeforeTagRemoval, mutations.get())
+        assertEquals(1, cache.removeByCiphertextTags(setOf("ciphertext-tag")))
+        assertEquals(mutationsBeforeTagRemoval + 1, mutations.get())
+        assertFalse(cache.contains("tagged"))
+        cache.clear()
+
+        assertEquals(7, mutations.get())
+        assertFalse(cache.contains("a"))
+        assertFalse(cache.contains("b"))
+        assertFalse(cache.contains("c"))
     }
 
     @Test

@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,13 +17,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
@@ -63,21 +66,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -103,13 +107,13 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 internal fun MessageActionMenu(
     expanded: Boolean,
+    anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
-    alignEnd: Boolean,
+    centerOverAnchor: Boolean = false,
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
@@ -135,97 +139,121 @@ internal fun MessageActionMenu(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    if (!expanded) return
+
     val density = LocalDensity.current
-    // Position the popup purely from the captured window touch y, independent of
-    // any anchor's layout position. DropdownMenu derived flip-above from the
-    // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
-    // could send the menu above the finger even with room below (#326). This
-    // provider clamps/flips against the window directly.
+    val actionKinds =
+        remember(canReply, canEdit, canSelect, canSelectText, canCopyText, canSpeak, canForward, canSave) {
+            messageActionKinds(
+                canReply = canReply,
+                canEdit = canEdit,
+                canSelect = canSelect,
+                canSelectText = canSelectText,
+                canCopyText = canCopyText,
+                canSpeak = canSpeak,
+                canForward = canForward,
+                canSave = canSave,
+            )
+        }
+    val labeledActions: List<Pair<MessageActionKind?, String>> =
+        buildList {
+            actionKinds.forEach { kind -> add(kind to messageActionLabel(kind)) }
+            if (canDelete) add(null to stringResource(R.string.delete))
+        }
+    val textMeasurer = rememberTextMeasurer()
+    val actionTextStyle = MaterialTheme.typography.titleMedium
+    val minimumActionCellWidth =
+        remember(labeledActions, actionTextStyle, density, textMeasurer) {
+            with(density) {
+                val widestLabelPx =
+                    labeledActions.maxOf { (_, label) ->
+                        textMeasurer.measure(AnnotatedString(label), style = actionTextStyle, maxLines = 1).size.width
+                    }
+                maxOf(136.dp, widestLabelPx.toDp() + 52.dp)
+            }
+        }
+    val actionRowHeight =
+        with(density) {
+            maxOf(48.dp, actionTextStyle.lineHeight.toDp() + 16.dp)
+        }
+    val reactionRowHeight = 48.dp
+    // Position from the frozen message bounds, not a screen corner. Centering
+    // the reaction strip over the selected bubble gives images and text the
+    // same stable visual anchor instead of pinning the surface to an outer
+    // screen edge. Media menus center over the visual card; text menus retain
+    // the familiar adjacent placement below the bubble (above only when the
+    // bottom space is insufficient).
     val edgeInsetPx = with(density) { 8.dp.roundToPx() }
+    val anchorGapPx = with(density) { 8.dp.roundToPx() }
     // Compose runs calculatePosition on the FIRST layout pass with
     // popupContentSize == (0,0) (content not yet measured). With height 0 the
     // "fits below" branch is always true, so a near-top message would place
     // the menu top AT touchY on frame 1, then flip/clamp once the real tall
     // height arrives — a visible above-then-below jump (#389). Decide the side
     // deterministically from frame 1 by feeding a non-zero height into the
-    // provider: the real measured height once known, else a per-variant
-    // estimate derived from the menu's own layout so frame 1 already matches
-    // the height the side decision will settle on.
-    // Key to expanded so a previous menu variant's measured height cannot win
-    // over the new variant's estimate on the first frame after reopening.
-    var measuredPopupHeightPx by remember(expanded) { mutableStateOf(0) }
-    // First-frame fallback only. A flat constant (the previous 240.dp) both
-    // overestimated short menus — flipping them above even when they fit
-    // below — and underestimated tall menus, so the measured height could
-    // still flip the side on frame 2 (the same jump #389 set out to remove,
-    // see #517). Instead, predict the height from the exact menu layout:
-    //   - one emoji/quick-reaction Row (36.dp)
-    //   - a HorizontalDivider (1.dp)
-    //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-    //       Info always; +Select text when canSelectText; +Copy when canCopyText;
-    //       +Reply when canReply; +Edit when canEdit;
-    //       +Forward when canForward; +Select when canSelect;
-    //       +Delete when canDelete (scope is chosen on the delete surface)
-    //   - the outer Column's 8.dp padding (top + bottom) and its two
-    //     spacedBy(8.dp) gaps between the three sections.
-    // Keep this in sync with the menu Column below if its layout changes.
-    val estimatedPopupHeightPx =
+    // provider a per-variant estimate derived from the same immutable action
+    // model as the rendered grid. That same estimate caps the scrollable
+    // surface and owns the final boundary clamp, so measurement cannot move
+    // the popup on the following frame. Keep the content transparent until its
+    // first non-zero measurement so users only see the settled surface (#1857).
+    // First-frame fallback mirrors the measured responsive grid. Label widths
+    // determine whether the estimate uses one or two columns, so large fonts
+    // and long translations do not reintroduce the frame-two side flip.
+    val estimatedOneColumnHeightPx =
         with(density) {
-            val actionButtonCount =
-                1 +
-                    (if (canSelectText) 1 else 0) +
-                    (if (canCopyText) 1 else 0) +
-                    (if (canSpeak) 1 else 0) +
-                    (if (canReply) 1 else 0) +
-                    (if (canEdit) 1 else 0) +
-                    (if (canForward) 1 else 0) +
-                    (if (canSelect) 1 else 0) +
-                    (if (canSave) 1 else 0) +
-                    (if (canDelete) 1 else 0)
-            val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
-            val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
-            val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
-            totalHeight.roundToPx()
+            estimatedMessageActionMenuHeight(
+                actionCount = actionKinds.size,
+                columns = 1,
+                canReact = canReact,
+                canDelete = canDelete,
+                actionRowHeight = actionRowHeight,
+                reactionRowHeight = reactionRowHeight,
+            ).roundToPx()
         }
+    val estimatedTwoColumnHeightPx =
+        with(density) {
+            estimatedMessageActionMenuHeight(
+                actionCount = actionKinds.size,
+                columns = 2,
+                canReact = canReact,
+                canDelete = canDelete,
+                actionRowHeight = actionRowHeight,
+                reactionRowHeight = reactionRowHeight,
+            ).roundToPx()
+        }
+    val minimumActionCellWidthPx = with(density) { minimumActionCellWidth.roundToPx() }
+    val maximumActionContentWidthPx = with(density) { 312.dp.roundToPx() }
+    val actionContentPaddingPx = with(density) { 16.dp.roundToPx() }
+    val actionColumnGapPx = with(density) { messageActionColumnGap.roundToPx() }
     val positionProvider =
-        remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, estimatedPopupHeightPx) {
-            object : PopupPositionProvider {
-                override fun calculatePosition(
-                    anchorBounds: IntRect,
-                    windowSize: IntSize,
-                    layoutDirection: LayoutDirection,
-                    popupContentSize: IntSize,
-                ): IntOffset {
-                    val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
-                    // Horizontal: hug the bubble side, clamped inside the window.
-                    val x =
-                        if (alignEnd) {
-                            windowSize.width - popupContentSize.width - edgeInsetPx
-                        } else {
-                            edgeInsetPx
-                        }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                    // Decide vertical placement against a non-zero height so the
-                    // chosen side is stable from the first frame. Once the popup
-                    // has any real measurement (content or onSizeChanged), use it
-                    // directly so the *settled* placement reflects the true menu
-                    // height; the per-variant estimate is consulted only on the
-                    // first frame before either is known (#517).
-                    val measuredHeight = maxOf(popupContentSize.height, measuredPopupHeightPx)
-                    val effectiveHeight =
-                        if (measuredHeight > 0) measuredHeight else estimatedPopupHeightPx
-                    // Vertical: top at the touch y; flip upward if it would spill
-                    // past the bottom inset; if it still doesn't fit, clamp to top.
-                    val bottomLimit = windowSize.height - edgeInsetPx
-                    val y =
-                        when {
-                            touchY + effectiveHeight <= bottomLimit -> touchY
-                            effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
-                            else -> edgeInsetPx
-                        }.coerceIn(edgeInsetPx, (windowSize.height - effectiveHeight).coerceAtLeast(0))
-                    return IntOffset(x, y)
-                }
-            }
+        remember(
+            anchorBoundsInWindow,
+            anchorWindowYPx,
+            centerOverAnchor,
+            edgeInsetPx,
+            anchorGapPx,
+            estimatedOneColumnHeightPx,
+            estimatedTwoColumnHeightPx,
+            minimumActionCellWidthPx,
+            maximumActionContentWidthPx,
+            actionContentPaddingPx,
+            actionColumnGapPx,
+        ) {
+            MessageActionMenuPositionProvider(
+                anchorBoundsInWindow = anchorBoundsInWindow,
+                anchorWindowYPx = anchorWindowYPx,
+                centerOverAnchor = centerOverAnchor,
+                edgeInsetPx = edgeInsetPx,
+                anchorGapPx = anchorGapPx,
+                estimatedOneColumnHeightPx = estimatedOneColumnHeightPx,
+                estimatedTwoColumnHeightPx = estimatedTwoColumnHeightPx,
+                minimumActionCellWidthPx = minimumActionCellWidthPx,
+                maximumActionContentWidthPx = maximumActionContentWidthPx,
+                actionContentPaddingPx = actionContentPaddingPx,
+                actionColumnGapPx = actionColumnGapPx,
+            )
         }
+    var actionMenuMeasured by remember { mutableStateOf(false) }
     KeyboardSafePopup(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
@@ -233,134 +261,158 @@ internal fun MessageActionMenu(
     ) {
         // Surface restores the menu chrome (rounded shape + elevation) that
         // DropdownMenu provided.
-        Surface(
-            modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
-            shape = RoundedCornerShape(12.dp),
-            border = amoledSurfaceBorderStroke(),
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (canReact) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        quickReactionEmojis.forEach { emoji ->
-                            EmojiActionButton(
-                                emoji = emoji,
-                                onClick = { onReact(emoji) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        IconButton(
-                            onClick = onOpenEmojiPicker,
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.EmojiEmotions,
-                                contentDescription = stringResource(R.string.open_emoji_picker),
-                            )
-                        }
-                    }
-                    AppDivider()
+        BoxWithConstraints {
+            val menuWidth = minOf(328.dp, (maxWidth - 16.dp).coerceAtLeast(48.dp))
+            val estimatedMenuHeight =
+                if (messageActionColumnCount((menuWidth - 16.dp).coerceAtLeast(0.dp), minimumActionCellWidth) == 2) {
+                    with(density) { estimatedTwoColumnHeightPx.toDp() }
+                } else {
+                    with(density) { estimatedOneColumnHeightPx.toDp() }
                 }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    if (canReply) {
-                        MessageActionButton(
-                            label = stringResource(R.string.reply),
-                            icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onReply,
-                        )
-                    }
-                    if (canEdit) {
-                        MessageActionButton(
-                            label = stringResource(R.string.edit),
-                            icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onEdit,
-                        )
-                    }
-                    if (canSelect) {
-                        MessageActionButton(
-                            label = stringResource(R.string.select),
-                            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onSelect,
-                        )
-                    }
-                    if (canSelectText) {
-                        MessageActionButton(
-                            label = stringResource(R.string.select_text),
-                            icon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onSelectText,
-                        )
-                    }
-                    if (canCopyText) {
-                        MessageActionButton(
-                            label = stringResource(R.string.copy_text),
-                            icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onCopyText,
-                        )
-                    }
-                    if (canSpeak) {
-                        MessageActionButton(
-                            label = stringResource(R.string.speak_aloud),
-                            icon = {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.VolumeUp,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            },
-                            onClick = onSpeak,
-                        )
-                    }
-                    if (canForward) {
-                        MessageActionButton(
-                            label = stringResource(R.string.forward),
-                            icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onForward,
-                        )
-                    }
-                    if (canSave) {
-                        MessageActionButton(
-                            label = stringResource(R.string.shared_media_save),
-                            icon = {
-                                Icon(
-                                    Icons.Default.Download,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            },
-                            onClick = onSave,
-                        )
-                    }
-                    MessageActionButton(
-                        label = stringResource(R.string.message_info),
-                        icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onInfo,
+            val boundedHeightModifier =
+                if (constraints.hasBoundedHeight) {
+                    Modifier.heightIn(
+                        max = minOf(estimatedMenuHeight, (maxHeight - 16.dp).coerceAtLeast(48.dp)),
                     )
-                    if (canDelete) {
-                        // One Delete entry regardless of role or ownership;
-                        // the delete surface it opens offers only the scopes
-                        // the capability model permits.
-                        MessageActionButton(
-                            label = stringResource(R.string.delete),
-                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onDelete,
-                            isDestructive = true,
-                        )
+                } else {
+                    Modifier.heightIn(max = estimatedMenuHeight)
+                }
+            Surface(
+                modifier =
+                    boundedHeightModifier
+                        .width(menuWidth)
+                        .onSizeChanged { size ->
+                            if (size.width > 0 && size.height > 0) actionMenuMeasured = true
+                        }.graphicsLayer(
+                            alpha = if (actionMenuMeasured) 1f else 0f,
+                        ).testTag(MESSAGE_ACTION_MENU_TEST_TAG),
+                shape = RoundedCornerShape(12.dp),
+                border = amoledSurfaceBorderStroke(),
+                tonalElevation = 3.dp,
+                shadowElevation = 6.dp,
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (canReact) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    quickReactionEmojis.forEach { emoji ->
+                                        EmojiActionButton(
+                                            emoji = emoji,
+                                            onClick = { onReact(emoji) },
+                                            modifier = Modifier.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = onOpenEmojiPicker,
+                                    modifier = Modifier.size(48.dp),
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(40.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = CircleShape,
+                                        border = amoledSurfaceBorderStroke(),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.EmojiEmotions,
+                                                contentDescription = stringResource(R.string.open_emoji_picker),
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            AppDivider()
+                        }
+                    }
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val columns = messageActionColumnCount(maxWidth, minimumActionCellWidth)
+                        Column(verticalArrangement = Arrangement.spacedBy(messageActionColumnGap)) {
+                            labeledActions.chunked(columns).forEach { rowActions ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(messageActionColumnGap),
+                                ) {
+                                    rowActions.forEach { (kind, label) ->
+                                        MessageActionButton(
+                                            label = label,
+                                            icon = {
+                                                if (kind == null) {
+                                                    Icon(
+                                                        Icons.Default.Delete,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                } else {
+                                                    MessageActionIcon(kind)
+                                                }
+                                            },
+                                            onClick = {
+                                                when (kind) {
+                                                    MessageActionKind.Reply -> onReply()
+                                                    MessageActionKind.Edit -> onEdit()
+                                                    MessageActionKind.Select -> onSelect()
+                                                    MessageActionKind.SelectText -> onSelectText()
+                                                    MessageActionKind.CopyText -> onCopyText()
+                                                    MessageActionKind.Speak -> onSpeak()
+                                                    MessageActionKind.Forward -> onForward()
+                                                    MessageActionKind.Save -> onSave()
+                                                    MessageActionKind.Info -> onInfo()
+                                                    null -> onDelete()
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            isDestructive = kind == null,
+                                            minimumHeight = actionRowHeight,
+                                        )
+                                    }
+                                    repeat(columns - rowActions.size) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun MessageActionIcon(kind: MessageActionKind) {
+    val icon =
+        when (kind) {
+            MessageActionKind.Reply -> Icons.AutoMirrored.Filled.Reply
+            MessageActionKind.Edit -> Icons.Default.Edit
+            MessageActionKind.Select -> Icons.Default.CheckCircle
+            MessageActionKind.SelectText -> Icons.Default.TextFields
+            MessageActionKind.CopyText -> Icons.Default.ContentCopy
+            MessageActionKind.Speak -> Icons.AutoMirrored.Filled.VolumeUp
+            MessageActionKind.Forward -> Icons.AutoMirrored.Filled.Forward
+            MessageActionKind.Save -> Icons.Default.Download
+            MessageActionKind.Info -> Icons.Default.Info
+        }
+    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
 }
 
 /**
@@ -669,14 +721,19 @@ private fun EmojiActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.height(36.dp).clip(CircleShape).clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = CircleShape,
-        border = amoledSurfaceBorderStroke(),
+    Box(
+        modifier = modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(emoji, style = MaterialTheme.typography.titleMedium)
+        Surface(
+            modifier = Modifier.size(40.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = CircleShape,
+            border = amoledSurfaceBorderStroke(),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(emoji, style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }
@@ -688,10 +745,11 @@ internal fun MessageActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isDestructive: Boolean = false,
+    minimumHeight: Dp = 48.dp,
 ) {
     TextButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = minimumHeight),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         colors =
             ButtonDefaults.textButtonColors(
@@ -713,7 +771,7 @@ internal fun MessageActionButton(
             Text(
                 label,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

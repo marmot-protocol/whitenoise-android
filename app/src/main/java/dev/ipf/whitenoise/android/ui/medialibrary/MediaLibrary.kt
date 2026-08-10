@@ -88,12 +88,14 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
+import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveAttachmentToMediaStore
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
-import dev.ipf.whitenoise.android.ui.conversation.media.shortMediaTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -890,6 +892,10 @@ private fun FileLibraryRow(
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
+    val presentation =
+        remember(row.reference.mediaType, row.reference.fileName) {
+            resolveAttachmentPresentation(row.reference.mediaType, row.reference.fileName)
+        }
 
     // The tap is the user-initiated download trigger — files never auto-fetch
     // in the library. Prefer retained bytes for own in-flight sends, mirroring
@@ -940,8 +946,8 @@ private fun FileLibraryRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = fileIconFor(row.reference.mediaType),
-            contentDescription = null,
+            imageVector = fileIconFor(presentation.iconCategory),
+            contentDescription = attachmentTypeDescription(presentation.iconCategory),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(32.dp),
         )
@@ -957,7 +963,7 @@ private fun FileLibraryRow(
             // until the bytes are fetched; the MIME label + sender + timestamp
             // give the row enough identity without forcing a download.
             Text(
-                "${shortMediaTypeLabel(row.reference.mediaType)} · ${appState.displayName(row.sender)}",
+                "${attachmentTypeLabel(presentation)} · ${appState.displayName(row.sender)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

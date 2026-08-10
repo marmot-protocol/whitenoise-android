@@ -76,6 +76,7 @@ internal class DiskByteCache(
     private val beforeOrphanTmpSweep: () -> Unit = {},
     private val afterOrphanTmpSweep: () -> Unit = {},
     private val beforeHydrationDestructiveDelete: () -> Unit = {},
+    private val onMutation: () -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -148,6 +149,15 @@ internal class DiskByteCache(
         return synchronized(this) {
             hydrated && index.containsKey(hashed)
         }
+    }
+
+    /**
+     * Definitive off-main probe. Unlike [contains], this waits for cold-start
+     * hydration before reporting a miss, but still avoids decrypting the entry.
+     */
+    fun containsAfterHydration(key: String): Boolean {
+        ensureHydrated()
+        return contains(key)
     }
 
     fun get(key: String): ByteArray? {
@@ -306,6 +316,7 @@ internal class DiskByteCache(
             evicted += evictedEntryFiles()
         }
         deleteStaleEntries(evicted)
+        onMutation()
     }
 
     fun put(
@@ -337,6 +348,7 @@ internal class DiskByteCache(
                 }
             }
         deleteStaleEntries(stale)
+        onMutation()
     }
 
     /**
@@ -378,6 +390,7 @@ internal class DiskByteCache(
                 removed
             }
         deleteStaleEntries(stale)
+        if (removed > 0) onMutation()
         return removed
     }
 
@@ -468,6 +481,7 @@ internal class DiskByteCache(
                             it.name.endsWith(TAG_SUFFIX)
                     )
             }?.forEach { runCatching { it.delete() } }
+        onMutation()
     }
 
     fun size(): Int {
