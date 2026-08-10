@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -15,12 +17,14 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -64,6 +68,32 @@ class NewGroupNameEmojiPickerTest {
         action.performClick()
 
         composeRule.onNodeWithContentDescription(string(R.string.emoji_search_hint)).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h640dp-mdpi")
+    fun compactViewportAndLargeFontKeepTheNameFieldAndEmojiActionVisible() {
+        renderScreen(fontScale = 2f)
+
+        val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val nameField = composeRule.onNode(hasSetTextAction())
+        val emojiAction = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
+
+        listOf(nameField, emojiAction).forEach { node ->
+            node.assertIsDisplayed()
+            val bounds = node.getUnclippedBoundsInRoot()
+            assertTrue(
+                "$bounds must sit fully inside $rootBounds",
+                bounds.left >= rootBounds.left &&
+                    bounds.right <= rootBounds.right &&
+                    bounds.top >= rootBounds.top &&
+                    bounds.bottom <= rootBounds.bottom,
+            )
+        }
+
+        val actionBounds = emojiAction.getUnclippedBoundsInRoot()
+        assertTrue("Emoji action width must be at least 48dp", actionBounds.right - actionBounds.left >= 48.dp)
+        assertTrue("Emoji action height must be at least 48dp", actionBounds.bottom - actionBounds.top >= 48.dp)
     }
 
     @Test
@@ -209,17 +239,23 @@ class NewGroupNameEmojiPickerTest {
         assertEquals(expected, actual)
     }
 
-    private fun renderScreen(initialRetryGroupIdHex: String? = null) {
+    private fun renderScreen(
+        initialRetryGroupIdHex: String? = null,
+        fontScale: Float = 1f,
+    ) {
         val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
-                NewGroupSetupScreen(
-                    appState = state,
-                    members = emptyList(),
-                    onBack = {},
-                    onOpenConversation = { _, _ -> },
-                    initialRetryGroupIdHex = initialRetryGroupIdHex,
-                )
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                    NewGroupSetupScreen(
+                        appState = state,
+                        members = emptyList(),
+                        onBack = {},
+                        onOpenConversation = { _, _ -> },
+                        initialRetryGroupIdHex = initialRetryGroupIdHex,
+                    )
+                }
             }
         }
     }

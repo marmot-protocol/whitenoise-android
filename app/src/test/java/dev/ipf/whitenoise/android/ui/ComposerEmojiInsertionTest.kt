@@ -40,6 +40,20 @@ class ComposerEmojiInsertionTest {
     }
 
     @Test
+    fun insertionMovesAStaleCaretPastAnExtendedGraphemeCluster() {
+        val family = "👨‍👩‍👧"
+
+        val result =
+            insertEmojiAtSelection(
+                TextFieldValue(text = "A${family}B", selection = TextRange(4)),
+                "👍",
+            )
+
+        assertEquals("A$family👍B", result.text)
+        assertEquals(TextRange("A$family👍".length), result.selection)
+    }
+
+    @Test
     fun insertionExpandsASelectionThatSplitsASurrogatePair() {
         val result =
             insertEmojiAtSelection(
