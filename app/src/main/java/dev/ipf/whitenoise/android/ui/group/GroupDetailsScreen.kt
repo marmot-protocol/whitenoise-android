@@ -513,7 +513,11 @@ internal fun GroupDetailsScreen(
                 }
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
-                appState.presentFailure(R.string.toast_couldnt_export_transcript, "CONVERSATION_TRANSCRIPT_SHARE", error)
+                appState.presentFailure(
+                    R.string.toast_couldnt_export_transcript,
+                    "CONVERSATION_TRANSCRIPT_SHARE",
+                    error,
+                )
             } finally {
                 transcriptExportInFlight = false
             }

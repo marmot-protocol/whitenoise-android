@@ -8379,7 +8379,11 @@ class ConversationController(
             }.getOrElse {
                 if (it is CancellationException) throw it
                 recordMutationFailure(
-                    if (demotedBeforeLeave) R.string.toast_demoted_but_couldnt_leave else R.string.toast_couldnt_leave_chat,
+                    if (demotedBeforeLeave) {
+                        R.string.toast_demoted_but_couldnt_leave
+                    } else {
+                        R.string.toast_couldnt_leave_chat
+                    },
                     if (demotedBeforeLeave) "GROUP_LEAVE_AFTER_DEMOTE" else "GROUP_LEAVE",
                     it,
                 )
@@ -8688,6 +8692,7 @@ class ConversationController(
             GroupAdministrationCommitOutcome.NO_CHANGE -> false
         }
 
+    @Suppress("LongMethod") // Invite and optional promotion form one optimistic roster transaction.
     suspend fun inviteMembers(
         memberRefs: List<String>,
         addAsAdmin: Boolean = false,
@@ -9047,7 +9052,11 @@ class ConversationController(
                 if (grantedBeforeDemote) {
                     // Target is now an admin but we couldn't step down. Tell the user
                     // so they can retry the step-down (or revoke the grant).
-                    recordMutationFailure(R.string.toast_granted_but_couldnt_step_down, "GROUP_ADMIN_TRANSFER_STEP_DOWN", it)
+                    recordMutationFailure(
+                        R.string.toast_granted_but_couldnt_step_down,
+                        "GROUP_ADMIN_TRANSFER_STEP_DOWN",
+                        it,
+                    )
                 } else {
                     recordMutationFailure(R.string.toast_couldnt_update_admin, "GROUP_ADMIN_TRANSFER", it)
                 }

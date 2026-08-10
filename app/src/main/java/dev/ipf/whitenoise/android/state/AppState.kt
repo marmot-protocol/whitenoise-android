@@ -2782,6 +2782,7 @@ class WhiteNoiseAppState private constructor(
      * timeline order. One target's batch holds the group commit lock for the
      * complete sequence so another mutation cannot interleave between messages.
      */
+    @Suppress("CyclomaticComplexMethod") // Fan-out accounting keeps partial-success reporting in one transaction.
     fun forwardTexts(
         targetGroupIds: List<String>,
         texts: List<String>,
@@ -2820,7 +2821,11 @@ class WhiteNoiseAppState private constructor(
                 completeTargets == targets.size ->
                     presentTransient(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(completeTargets)))
                 successfulSends == 0 ->
-                    presentFailure(R.string.toast_forward_batch_failed, "MESSAGE_FORWARD_BATCH", requireNotNull(firstFailure))
+                    presentFailure(
+                        R.string.toast_forward_batch_failed,
+                        "MESSAGE_FORWARD_BATCH",
+                        requireNotNull(firstFailure),
+                    )
                 else ->
                     presentFailure(
                         R.string.toast_forwarded_batch_partial,
@@ -2884,6 +2889,7 @@ class WhiteNoiseAppState private constructor(
      * every attempted group accepted the invite, so partial failures can keep the
      * picker open with the failed groups still selected for retry.
      */
+    @Suppress("LongMethod", "ReturnCount") // The fan-out and aggregate result share one failure accumulator.
     suspend fun inviteProfileToGroups(
         targetRef: String,
         targetGroupIds: List<String>,
@@ -5826,7 +5832,13 @@ class WhiteNoiseAppState private constructor(
             appStateDebug {
                 "local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"
             }
-            presentTransient(if (enabled) R.string.toast_local_notifications_enabled else R.string.toast_local_notifications_disabled)
+            presentTransient(
+                if (enabled) {
+                    R.string.toast_local_notifications_enabled
+                } else {
+                    R.string.toast_local_notifications_disabled
+                },
+            )
             true
         }.getOrElse {
             rethrowIfCancellation(it)
@@ -5870,7 +5882,13 @@ class WhiteNoiseAppState private constructor(
             present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
             return false
         }
-        presentTransient(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
+        presentTransient(
+            if (enabled) {
+                R.string.toast_background_connection_enabled
+            } else {
+                R.string.toast_background_connection_disabled
+            },
+        )
         return true
     }
 

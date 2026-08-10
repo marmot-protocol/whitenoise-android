@@ -1350,7 +1350,12 @@ internal fun ConversationScreen(
                                 throwable,
                                 AppText.Resource(R.string.voice_message_microphone_busy),
                             )
-                        else -> appState.presentFailure(R.string.voice_message_recording_failed, "VOICE_RECORDING", throwable)
+                        else ->
+                            appState.presentFailure(
+                                R.string.voice_message_recording_failed,
+                                "VOICE_RECORDING",
+                                throwable,
+                            )
                     }
                 },
                 // Honor the user's media-quality ceiling for voice notes.

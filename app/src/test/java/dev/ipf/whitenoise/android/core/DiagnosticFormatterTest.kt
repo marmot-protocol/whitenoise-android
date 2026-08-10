@@ -158,7 +158,11 @@ class DiagnosticFormatterTest {
     @Test
     fun errorReportUsesStableCodesWithoutExceptionMessages() {
         val secret = "a".repeat(64)
-        val failure = IllegalStateException("wrapper", java.io.IOException("https://user:pass@example.test token=abc $secret"))
+        val failure =
+            IllegalStateException(
+                "wrapper",
+                java.io.IOException("https://user:pass@example.test token=abc $secret"),
+            )
 
         val report =
             DiagnosticFormatter.errorReport(

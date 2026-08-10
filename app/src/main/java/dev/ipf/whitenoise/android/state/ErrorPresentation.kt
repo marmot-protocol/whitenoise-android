@@ -22,7 +22,9 @@ internal fun privacySafeErrorPresentation(
     throwable: Throwable,
     message: AppText = AppText.Resource(R.string.error_try_again),
     appVersion: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-    androidVersion: String = runCatching { "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})" }.getOrDefault("unknown"),
+    androidVersion: String =
+        runCatching { "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})" }
+            .getOrDefault("unknown"),
     occurredAtUtc: String = Instant.now().toString(),
 ): ErrorPresentation =
     ErrorPresentation(

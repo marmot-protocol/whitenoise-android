@@ -46,6 +46,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
+
 @Composable
 fun WhiteNoiseApp(
     appState: WhiteNoiseAppState,
@@ -125,7 +127,7 @@ fun WhiteNoiseApp(
     }
     LaunchedEffect(transientNotice) {
         transientNotice ?: return@LaunchedEffect
-        delay(2_000)
+        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
         appState.clearTransientNotice(transientNotice)
     }
     LaunchedEffect(inboundProfilePayload, appState.phase) {

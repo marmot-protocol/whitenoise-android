@@ -1,3 +1,8 @@
+@file:Suppress(
+    "FunctionNaming",
+    "MatchingDeclarationName",
+) // Compose recovery primitives intentionally share this file.
+
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
@@ -146,7 +151,11 @@ internal fun InlineErrorBanner(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(error.message.resolve(context), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                error.message.resolve(context),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
             }

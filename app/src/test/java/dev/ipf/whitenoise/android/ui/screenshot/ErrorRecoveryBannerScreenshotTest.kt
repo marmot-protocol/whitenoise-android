@@ -45,7 +45,10 @@ class ErrorRecoveryBannerScreenshotTest {
                         InlineErrorBanner(
                             error =
                                 ErrorPresentation(
-                                    message = AppText.Plain("Your loaded messages are still available, but they may be out of date."),
+                                    message =
+                                        AppText.Plain(
+                                            "Your loaded messages are still available, but they may be out of date.",
+                                        ),
                                     report = "operation=CONVERSATION_REFRESH\nerror=CONNECTIVITY",
                                 ),
                             onRetry = {},

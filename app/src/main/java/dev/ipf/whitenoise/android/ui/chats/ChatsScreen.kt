@@ -933,21 +933,25 @@ internal fun ChatsScreen(
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = { showNewChatFlow = true })
                     visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
-                        controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
-                            InlineErrorBanner(
-                                error = failure,
-                                onRetry = controller::retryLoad,
-                                modifier = Modifier.align(Alignment.TopCenter),
-                            )
-                        }
-                    visibleItems.isEmpty() ->
-                        Column(Modifier.fillMaxSize()) {
-                            controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
+                        controller.error
+                            ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                            ?.let { failure ->
                                 InlineErrorBanner(
                                     error = failure,
                                     onRetry = controller::retryLoad,
+                                    modifier = Modifier.align(Alignment.TopCenter),
                                 )
                             }
+                    visibleItems.isEmpty() ->
+                        Column(Modifier.fillMaxSize()) {
+                            controller.error
+                                ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                                ?.let { failure ->
+                                    InlineErrorBanner(
+                                        error = failure,
+                                        onRetry = controller::retryLoad,
+                                    )
+                                }
                             Box(Modifier.fillMaxWidth().weight(1f)) {
                                 ChatListNoResults(
                                     query = searchQuery.trim(),
@@ -968,14 +972,16 @@ internal fun ChatsScreen(
                             state = chatListState,
                             contentPadding = PaddingValues(bottom = snackbarContentInset.value),
                         ) {
-                            controller.error?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }?.let { failure ->
-                                item(key = "chat-list-load-error") {
-                                    InlineErrorBanner(
-                                        error = failure,
-                                        onRetry = controller::retryLoad,
-                                    )
+                            controller.error
+                                ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
+                                ?.let { failure ->
+                                    item(key = "chat-list-load-error") {
+                                        InlineErrorBanner(
+                                            error = failure,
+                                            onRetry = controller::retryLoad,
+                                        )
+                                    }
                                 }
-                            }
                             visibleItems.forEachIndexed { targetIndex, item ->
                                 if (targetIndex == pinnedBoundary) {
                                     this.item(

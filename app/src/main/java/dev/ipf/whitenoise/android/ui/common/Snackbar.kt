@@ -102,7 +102,12 @@ internal data class ToastSnackbarVisuals(
 ) : SnackbarVisuals {
     override val actionLabel: String? = null
     override val withDismissAction: Boolean = tier == NoticeTier.ActionableError
-    override val duration: SnackbarDuration = if (tier == NoticeTier.ActionableError) SnackbarDuration.Indefinite else SnackbarDuration.Short
+    override val duration: SnackbarDuration =
+        if (tier == NoticeTier.ActionableError) {
+            SnackbarDuration.Indefinite
+        } else {
+            SnackbarDuration.Short
+        }
 }
 
 /**

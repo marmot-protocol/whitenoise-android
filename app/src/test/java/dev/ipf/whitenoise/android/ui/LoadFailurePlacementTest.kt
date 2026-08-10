@@ -45,9 +45,12 @@ class LoadFailurePlacementTest {
 
     @Test
     fun terminalRetryRekeysBothSubscriptionLifecyclesAndPreservesChats() {
-        val sourceRoot =
-            listOf(File("src/main/java/dev/ipf/whitenoise/android"), File("app/src/main/java/dev/ipf/whitenoise/android"))
-                .first(File::isDirectory)
+        val sourceCandidates =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android"),
+                File("app/src/main/java/dev/ipf/whitenoise/android"),
+            )
+        val sourceRoot = sourceCandidates.first(File::isDirectory)
         val controllers = File(sourceRoot, "state/Controllers.kt").readText()
         val shell = File(sourceRoot, "ui/navigation/MainShell.kt").readText()
 

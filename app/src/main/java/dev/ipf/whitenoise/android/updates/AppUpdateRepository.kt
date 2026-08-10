@@ -36,6 +36,7 @@ class AppUpdateRepository(
         return last <= 0L || nowMillis - last >= CHECK_INTERVAL_MS
     }
 
+    @Suppress("TooGenericExceptionCaught") // Repository boundary records every non-cancellation fetch failure.
     suspend fun refresh(installedVersion: String = installedVersionName()): AppUpdateInfo =
         withContext(Dispatchers.IO) {
             try {

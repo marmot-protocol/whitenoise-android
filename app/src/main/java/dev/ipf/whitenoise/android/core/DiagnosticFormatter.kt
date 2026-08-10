@@ -85,7 +85,10 @@ object DiagnosticFormatter {
     private val NSEC_SECRET = Regex("(?i)nsec1[0-9a-z]+\\b")
     private val HEX_SECRET = Regex("\\b[0-9a-fA-F]{64,}\\b")
     private val SEPARATED_HEX_SECRET = Regex("(?i)\\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){15,}\\b")
-    private val UUID_IDENTIFIER = Regex("(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b")
+    private val UUID_IDENTIFIER =
+        Regex(
+            "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b",
+        )
 
     // No trailing \b after the padding: `=` is a non-word char, so a \b there
     // only matched when another word char followed, letting the engine backtrack
@@ -116,7 +119,12 @@ object DiagnosticFormatter {
                 .replace(BEARER_HEADER, "Authorization: Bearer $REDACTED")
         if (scrubbed.length <= MAX_ERROR_LEN) return scrubbed
         // Don't truncate mid surrogate pair — that would leave a lone surrogate.
-        val end = if (Character.isHighSurrogate(scrubbed[MAX_ERROR_LEN - 1])) MAX_ERROR_LEN - 1 else MAX_ERROR_LEN
+        val end =
+            if (Character.isHighSurrogate(scrubbed[MAX_ERROR_LEN - 1])) {
+                MAX_ERROR_LEN - 1
+            } else {
+                MAX_ERROR_LEN
+            }
         return scrubbed.take(end) + "…"
     }
 
@@ -146,6 +154,7 @@ object DiagnosticFormatter {
             append("utc=${redactError(context.occurredAtUtc)}")
         }.take(MAX_REPORT_LEN)
 
+    @Suppress("CyclomaticComplexMethod") // One ordered taxonomy prevents error-code precedence from drifting.
     internal fun errorCode(throwable: Throwable): String {
         val chain = causeChain(throwable)
         val names = chain.map { it.javaClass.simpleName.lowercase(Locale.ROOT) }
@@ -181,10 +190,13 @@ object DiagnosticFormatter {
             marmotError is MarmotKitException.EncryptionFailed ||
                 marmotError is MarmotKitException.ExternalSignerMismatch -> "CRYPTO_FAILURE"
             marmotError is MarmotKitException.Io -> "IO"
-            chain.any { it is SecurityException } || names.any { "permission" in it || "security" in it } -> "PERMISSION_DENIED"
+            chain.any { it is SecurityException } ||
+                names.any { "permission" in it || "security" in it } -> "PERMISSION_DENIED"
             names.any { "timeout" in it } -> "TIMEOUT"
-            chain.any { it is java.io.IOException } || names.any { "network" in it || "connect" in it || "relay" in it } -> "CONNECTIVITY"
-            chain.any { it is IllegalArgumentException } || names.any { "invalid" in it || "parse" in it } -> "INVALID_INPUT"
+            chain.any { it is java.io.IOException } ||
+                names.any { "network" in it || "connect" in it || "relay" in it } -> "CONNECTIVITY"
+            chain.any { it is IllegalArgumentException } ||
+                names.any { "invalid" in it || "parse" in it } -> "INVALID_INPUT"
             names.any { "notfound" in it || "missing" in it } -> "NOT_FOUND"
             names.any { "busy" in it || "conflict" in it || "locked" in it } -> "RESOURCE_BUSY"
             else -> "UNEXPECTED"

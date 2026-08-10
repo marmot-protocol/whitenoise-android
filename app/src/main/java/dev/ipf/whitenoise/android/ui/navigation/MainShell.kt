@@ -268,7 +268,12 @@ internal fun MainShell(
         }
     }
 
-    LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration, chatsController.retryGeneration) {
+    LaunchedEffect(
+        chatsController,
+        appState.activeAccountRef,
+        appState.runtimeGeneration,
+        chatsController.retryGeneration,
+    ) {
         chatsController.bind(
             accountRef = appState.activeAccountRef,
             preserveLoadedContent = chatsController.retryGeneration > 0L,

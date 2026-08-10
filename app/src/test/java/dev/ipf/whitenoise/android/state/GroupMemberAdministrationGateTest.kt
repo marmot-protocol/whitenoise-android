@@ -220,7 +220,10 @@ class GroupMemberAdministrationGateTest {
         controller: ConversationController,
         title: Int,
     ) {
-        assertEquals(AppText.Plain(ConversationControllerCopy().groupRosterChanged), controller.lastMutationError?.message)
+        assertEquals(
+            AppText.Plain(ConversationControllerCopy().groupRosterChanged),
+            controller.lastMutationError?.message,
+        )
         assertEquals(
             ToastMessage(
                 title = AppText.Resource(title),
