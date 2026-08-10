@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
@@ -38,6 +39,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -65,9 +68,12 @@ import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
+import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
@@ -75,6 +81,14 @@ import kotlinx.coroutines.CancellationException
 private fun WhiteNoiseAppState.abandonGroupCreateTiming(stage: String) {
     abandonChatCreateOpenTiming(stage)
 }
+
+internal fun submittedNewGroupName(value: TextFieldValue): String = value.text.trim()
+
+internal fun newGroupDetailsEditable(
+    retryGroupIdHex: String?,
+    busy: Boolean,
+    imagePreparing: Boolean,
+): Boolean = retryGroupIdHex == null && !busy && !imagePreparing
 
 private suspend fun applyNewGroupRetentionIfNeeded(
     appState: WhiteNoiseAppState,
@@ -197,10 +211,11 @@ internal fun NewGroupSetupScreen(
     onOpenConversation: (ChatListItem, Boolean) -> Unit,
     initialRetryGroupIdHex: String? = null,
 ) {
-    var groupName by rememberSaveable { mutableStateOf("") }
+    var groupName by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     var retentionSecs by rememberSaveable { mutableLongStateOf(0L) }
     var showRetentionPicker by remember { mutableStateOf(false) }
     var showImagePicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var imageDraft by remember { mutableStateOf<ImageUploadDraft?>(null) }
     var imagePreparing by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -208,6 +223,7 @@ internal fun NewGroupSetupScreen(
     var retryGroupIdHex by rememberSaveable { mutableStateOf(initialRetryGroupIdHex) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     val imagePreview = rememberImageUploadPreview(imageDraft)
 
     fun createGroupErrorMessage(throwable: Throwable): String = groupCreateFailureDetail(throwable, appState::chatMemberTitle).resolve(context)
@@ -217,10 +233,22 @@ internal fun NewGroupSetupScreen(
             directMessage = false,
             busy = busy || imagePreparing,
             pendingRecipient = "",
-            groupName = groupName,
+            groupName = groupName.text,
         )
     val setupUi = newGroupSetupUiState(retryGroupIdHex, canCreate, busy)
+
+    fun detailsEditableNow(): Boolean =
+        newGroupDetailsEditable(
+            retryGroupIdHex = retryGroupIdHex,
+            busy = busy,
+            imagePreparing = imagePreparing,
+        )
+    val detailsEditable = detailsEditableNow()
     val setupMessage = setupUi.statusResId?.let { stringResource(it) } ?: error
+
+    LaunchedEffect(detailsEditable) {
+        if (!detailsEditable) showEmojiPicker = false
+    }
 
     fun create(retryLoadGroupIdHex: String? = null) {
         // canCreate is a composition-time snapshot; the direct `busy` state
@@ -243,7 +271,7 @@ internal fun NewGroupSetupScreen(
                 runNewGroupCreateMutation(
                     appState = appState,
                     account = account,
-                    groupName = groupName.trim(),
+                    groupName = submittedNewGroupName(groupName),
                     recipients = recipients,
                     imageDraft = imageDraft,
                     retentionSecs = retentionSecs,
@@ -346,7 +374,7 @@ internal fun NewGroupSetupScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
                 ) {
-                    val trimmedName = groupName.trim()
+                    val trimmedName = submittedNewGroupName(groupName)
                     val editImageLabel =
                         stringResource(
                             if (imageDraft == null) {
@@ -419,7 +447,23 @@ internal fun NewGroupSetupScreen(
                         onValueChange = { groupName = it },
                         label = { Text(stringResource(R.string.group_name)) },
                         singleLine = true,
-                        enabled = setupUi.detailsEditable && !busy,
+                        enabled = detailsEditable,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    if (detailsEditableNow()) {
+                                        showEmojiPicker = true
+                                    }
+                                },
+                                enabled = detailsEditable,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.EmojiEmotions,
+                                    contentDescription = stringResource(R.string.open_emoji_picker),
+                                )
+                            }
+                        },
                         colors =
                             TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -509,8 +553,8 @@ internal fun NewGroupSetupScreen(
             initialUrl = imageDraft?.sourceUrl.orEmpty(),
             hasCurrentImage = imageDraft != null,
             header = stringResource(R.string.group_image_search_title),
-            title = groupName.trim(),
-            seed = groupName.trim(),
+            title = submittedNewGroupName(groupName),
+            seed = submittedNewGroupName(groupName),
             urlLabel = stringResource(R.string.group_avatar_url),
             applyInFlight = imagePreparing,
             onApply = { picked ->
@@ -527,6 +571,21 @@ internal fun NewGroupSetupScreen(
                 }
             },
             onDismiss = { if (!imagePreparing) showImagePicker = false },
+        )
+    }
+
+    if (showEmojiPicker && detailsEditable) {
+        EmojiPickerSheet(
+            onDismissRequest = { showEmojiPicker = false },
+            onEmojiPicked = { emoji ->
+                if (detailsEditableNow()) {
+                    groupName = insertEmojiAtSelection(groupName, emoji)
+                }
+            },
+            recentEmojis = recentEmojiRecentsOwner.recents,
+            onEmojiUsed = { emoji ->
+                if (detailsEditableNow()) recentEmojiRecentsOwner.onEmojiUsed(emoji)
+            },
         )
     }
 }

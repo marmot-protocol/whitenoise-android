@@ -3,16 +3,21 @@ package dev.ipf.whitenoise.android.ui
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.ui.conversation.composer.deleteComposerSelectionOrPreviousCodePoint
-import dev.ipf.whitenoise.android.ui.conversation.composer.insertComposerEmoji
+import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerMentionEdit
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class ComposerEmojiInsertionTest {
     @Test
     fun insertsEmojiAtCollapsedCaret() {
         val result =
-            insertComposerEmoji(
+            insertEmojiAtSelection(
                 TextFieldValue(text = "hello world", selection = TextRange(6)),
                 "🙂",
             )
@@ -25,7 +30,7 @@ class ComposerEmojiInsertionTest {
     @Test
     fun insertionMovesAStaleCaretPastASurrogatePair() {
         val result =
-            insertComposerEmoji(
+            insertEmojiAtSelection(
                 TextFieldValue(text = "🙂", selection = TextRange(1)),
                 "👍",
             )
@@ -37,7 +42,7 @@ class ComposerEmojiInsertionTest {
     @Test
     fun insertionExpandsASelectionThatSplitsASurrogatePair() {
         val result =
-            insertComposerEmoji(
+            insertEmojiAtSelection(
                 TextFieldValue(text = "🙂", selection = TextRange(0, 1)),
                 "👍",
             )
@@ -49,7 +54,7 @@ class ComposerEmojiInsertionTest {
     @Test
     fun replacesSelectedTextWithEmoji() {
         val result =
-            insertComposerEmoji(
+            insertEmojiAtSelection(
                 TextFieldValue(text = "hello world", selection = TextRange(6, 11)),
                 "🌍",
             )
@@ -62,7 +67,7 @@ class ComposerEmojiInsertionTest {
     @Test
     fun clampsStaleSelectionToTheTextBounds() {
         val result =
-            insertComposerEmoji(
+            insertEmojiAtSelection(
                 TextFieldValue(text = "hello", selection = TextRange(99)),
                 "👋",
             )

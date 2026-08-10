@@ -78,6 +78,8 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
+import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
+import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
@@ -180,7 +182,7 @@ internal fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
  * range and moving the caret just after the inserted glyph. Kept pure so the
  * cursor math is pinned by local unit tests instead of only by Compose wiring.
  */
-internal fun insertComposerEmoji(
+internal fun insertEmojiAtSelection(
     value: TextFieldValue,
     emoji: String,
 ): TextFieldValue {
@@ -190,11 +192,11 @@ internal fun insertComposerEmoji(
     val collapsed = rawStart == rawEnd
     val start =
         if (collapsed) {
-            text.codePointBoundaryAtOrAfter(rawStart)
+            text.graphemeBoundaryAtOrAfter(rawStart)
         } else {
-            text.codePointBoundaryAtOrBefore(rawStart)
+            text.graphemeBoundaryAtOrBefore(rawStart)
         }
-    val end = if (collapsed) start else text.codePointBoundaryAtOrAfter(rawEnd)
+    val end = if (collapsed) start else text.graphemeBoundaryAtOrAfter(rawEnd)
     val updatedText =
         buildString {
             append(text, 0, start)
@@ -1022,7 +1024,7 @@ internal fun ComposerBar(
                         recentEmojis = recentEmojis,
                         onEmojiUsed = onEmojiUsed,
                         onEmojiPicked = { emoji ->
-                            val updated = insertComposerEmoji(textFieldValue, emoji)
+                            val updated = insertEmojiAtSelection(textFieldValue, emoji)
                             applyComposerFieldValue(updated)
                         },
                         onBackspace = ::deleteFromComposer,
