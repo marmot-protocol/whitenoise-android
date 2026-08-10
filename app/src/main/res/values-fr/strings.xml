@@ -1352,4 +1352,19 @@
     <string name="amoled_mode_subtitle">Utiliser un fond noir pur</string>
     <string name="support">Assistance</string>
     <string name="app_font">Police de l\'application</string>
+    <string name="attachment_type_android_package">APK</string>
+    <string name="attachment_type_android_package_description">Paquet d\'application Android</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_pdf_description">Document PDF</string>
+    <string name="attachment_type_archive">Archive</string>
+    <string name="attachment_type_document">Document</string>
+    <string name="attachment_type_spreadsheet">Feuille de calcul</string>
+    <string name="attachment_type_presentation">Présentation</string>
+    <string name="attachment_type_text">Texte</string>
+    <string name="attachment_type_code">Code</string>
+    <string name="attachment_type_code_description">Fichier de code ou de données</string>
+    <string name="attachment_type_audio">Audio</string>
+    <string name="attachment_type_video">Vidéo</string>
+    <string name="attachment_type_image">Image</string>
+    <string name="attachment_type_file">Fichier</string>
 </resources>

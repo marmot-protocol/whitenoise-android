@@ -680,6 +680,10 @@ class LocalizationResourceTest {
                 "ok",
                 "admin",
                 "app_name",
+                // Standard file-format abbreviations are intentionally kept
+                // identical in every locale.
+                "attachment_type_android_package",
+                "attachment_type_pdf",
                 // In-app brand wordmark; the product name "White Noise" is kept
                 // identical across every locale.
                 "white_noise",
@@ -804,6 +808,11 @@ class LocalizationResourceTest {
                         "media_album",
                         "media_counted_format",
                         "chat_folder_name_label",
+                        // Standard German technical/file-type terms.
+                        "attachment_type_text",
+                        "attachment_type_code",
+                        "attachment_type_audio",
+                        "attachment_type_video",
                     ),
                 "values-es" to
                     setOf(
@@ -812,6 +821,8 @@ class LocalizationResourceTest {
                         "chat_folder_chat_count",
                         // The counted-preview format is punctuation-only here.
                         "media_counted_format",
+                        // "Audio" is the standard Spanish media-type term.
+                        "attachment_type_audio",
                     ),
                 "values-fr" to
                     setOf(
@@ -828,6 +839,12 @@ class LocalizationResourceTest {
                         // counted-preview format is punctuation-only here.
                         "media_album",
                         "media_counted_format",
+                        // Standard French file-type terms/loan words.
+                        "attachment_type_archive",
+                        "attachment_type_document",
+                        "attachment_type_code",
+                        "attachment_type_audio",
+                        "attachment_type_image",
                     ),
                 "values-it" to
                     setOf(
@@ -838,6 +855,10 @@ class LocalizationResourceTest {
                         // counted-preview format is punctuation-only here.
                         "media_album",
                         "media_counted_format",
+                        // Standard Italian file-type terms/loan words.
+                        "attachment_type_audio",
+                        "attachment_type_video",
+                        "attachment_type_file",
                     ),
                 "values-pt" to
                     setOf(
@@ -853,6 +874,8 @@ class LocalizationResourceTest {
                     setOf(
                         // The counted-preview format is punctuation-only here.
                         "media_counted_format",
+                        // "Video" is the standard Turkish media-type term.
+                        "attachment_type_video",
                     ),
             )
     }

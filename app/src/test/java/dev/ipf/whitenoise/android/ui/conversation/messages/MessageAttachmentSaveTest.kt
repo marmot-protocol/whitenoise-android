@@ -90,8 +90,8 @@ class MessageAttachmentSaveTest {
             WhiteNoiseTheme {
                 MessageActionMenu(
                     expanded = true,
+                    anchorBoundsInWindow = null,
                     anchorWindowYPx = 0f,
-                    alignEnd = false,
                     canReply = false,
                     canReact = false,
                     canDelete = false,

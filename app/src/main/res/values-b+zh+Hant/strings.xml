@@ -1327,4 +1327,19 @@
     <string name="amoled_mode_subtitle">使用純黑背景</string>
     <string name="support">支援</string>
     <string name="app_font">應用程式字型</string>
+    <string name="attachment_type_android_package">APK</string>
+    <string name="attachment_type_android_package_description">Android 應用程式安裝包</string>
+    <string name="attachment_type_pdf">PDF</string>
+    <string name="attachment_type_pdf_description">PDF 文件</string>
+    <string name="attachment_type_archive">壓縮檔</string>
+    <string name="attachment_type_document">文件</string>
+    <string name="attachment_type_spreadsheet">試算表</string>
+    <string name="attachment_type_presentation">簡報</string>
+    <string name="attachment_type_text">文字</string>
+    <string name="attachment_type_code">程式碼</string>
+    <string name="attachment_type_code_description">程式碼或資料檔案</string>
+    <string name="attachment_type_audio">音訊</string>
+    <string name="attachment_type_video">影片</string>
+    <string name="attachment_type_image">圖片</string>
+    <string name="attachment_type_file">檔案</string>
 </resources>

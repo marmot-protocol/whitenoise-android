@@ -116,7 +116,7 @@ internal suspend fun openAttachmentExternally(
                 fileProviderUri(context, file)
             }.getOrNull()
         } ?: return OpenAttachmentResult.Error
-    val mime = mediaType.ifBlank { "application/octet-stream" }
+    val mime = attachmentOpenMime(mediaType)
     val intent =
         android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
             setDataAndType(uri, mime)
@@ -135,6 +135,9 @@ internal suspend fun openAttachmentExternally(
         OpenAttachmentResult.Error
     }
 }
+
+/** Presentation classification must never rewrite the MIME used to open a file. */
+internal fun attachmentOpenMime(mediaType: String): String = mediaType.ifBlank { "application/octet-stream" }
 
 /**
  * Persist [bytes] to the device gallery (Pictures/White Noise). Returns success.

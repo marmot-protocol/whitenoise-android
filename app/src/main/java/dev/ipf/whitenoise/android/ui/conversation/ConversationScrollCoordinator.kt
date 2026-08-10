@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +12,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.supervisorScope
 import java.util.concurrent.CancellationException
 
@@ -376,6 +381,32 @@ internal suspend fun ConversationScrollCoordinator.jumpToNewest(targetIndex: Int
     ) {
         animateScrollToItem(targetIndex)
     }
+
+/**
+ * Processes a newer drag immediately, cancelling any older Stop/Cancel waiter
+ * that is still waiting for fling motion to finish.
+ */
+internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
+    onStarted: () -> Unit,
+    awaitScrollSettled: suspend () -> Unit,
+    onSettled: () -> Unit,
+) {
+    filter { interaction ->
+        interaction is DragInteraction.Start ||
+            interaction is DragInteraction.Stop ||
+            interaction is DragInteraction.Cancel
+    }.collectLatest { interaction ->
+        when (interaction) {
+            is DragInteraction.Start -> onStarted()
+            is DragInteraction.Stop,
+            is DragInteraction.Cancel,
+            -> {
+                awaitScrollSettled()
+                onSettled()
+            }
+        }
+    }
+}
 
 /**
  * Positions an initial target while the transcript is hidden, waits until both
