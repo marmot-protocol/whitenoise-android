@@ -34,3 +34,16 @@ If Android seems to need a cache for protocol data, stop and ask whether the dat
 - Do not run connected device tests that can wipe local app state unless the user asks for them.
 - Prefer `rg` for searching.
 - Before editing files, check the dirty worktree and preserve changes you did not make.
+
+## GitHub triage
+
+- The public White Noise Android project is
+  `https://github.com/orgs/marmot-protocol/projects/7`.
+- Use the authenticated `gh` CLI for repository and GitHub Project operations.
+  A GitHub MCP connector or plugin is not required. Start with `gh auth status`
+  and require `repo`, `project`, `read:org`, and `workflow` scopes.
+- A sandbox or isolated worktree must preserve access to the existing gh config
+  and network. Do not conclude that GitHub is unavailable merely because an MCP
+  tool is absent.
+- Read `.agents/issue-triage.md` before creating or materially editing an issue.
+  Run `python3 scripts/check_github_triage.py` after project changes.
