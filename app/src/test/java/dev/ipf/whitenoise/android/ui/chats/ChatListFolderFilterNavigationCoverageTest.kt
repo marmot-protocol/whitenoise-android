@@ -55,6 +55,61 @@ class ChatListFolderFilterNavigationCoverageTest {
     }
 
     @Test
+    fun conversationBackLeavesRememberedFolderFilterUnchanged() {
+        val conversationRoute =
+            mainShellSource().readText().requiredSection(
+                start = "ConversationScreen(",
+                end = "\n                )",
+            )
+        val onBack =
+            conversationRoute.requiredSection(
+                start = "onBack = {",
+                end = "\n                    },",
+            )
+
+        assertFalse(
+            "returning from a conversation must not alter the remembered folder filter",
+            "selectedChatListFolderId" in onBack,
+        )
+    }
+
+    @Test
+    fun zeroResultFolderRemainsSelectedAndRepresented() {
+        val folderChipState =
+            chatsScreenSource().readText().requiredSection(
+                start = "val folderChipModels =",
+                end = "\n\n    if (showNewChatFlow)",
+            )
+
+        assertTrue(
+            "the selected folder must remain represented even when it has no current matches",
+            "selectedFolderId = selectedFolderId" in folderChipState,
+        )
+        assertTrue(
+            "only deleting the configured folder may implicitly clear its selection",
+            "accountFolders.none { it.id == selectedFolderId }" in folderChipState,
+        )
+        assertFalse(
+            "chip visibility must not implicitly clear the selected folder",
+            "folderChipModels.none { it.folderId == selectedFolderId }" in folderChipState,
+        )
+    }
+
+    @Test
+    fun explicitAllActionClearsRememberedFolderFilter() {
+        val filterChips =
+            chatListTopBarSource().readText().requiredSection(
+                start = "internal fun ChatListFilterChips(",
+                end = "\n}\n\n@OptIn(ExperimentalFoundationApi::class)",
+            )
+
+        assertTrue(
+            "tapping All must explicitly clear the selected folder",
+            "onClick = { onSelect(null) }" in filterChips,
+        )
+    }
+
+    @Test
     fun accountSwitchClearsRememberedFolderFilter() {
         val accountResetBlock =
             mainShellSource().readText().requiredSection(
@@ -81,6 +136,13 @@ class ChatListFolderFilterNavigationCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
+
+    private fun chatListTopBarSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing ChatListTopBar.kt source file")
 
     private fun String.requiredSection(
         start: String,

@@ -709,15 +709,13 @@ internal fun ChatsScreen(
                     appState.activeAccountRef?.let { appState.chatFolderPreferences.folderRule(it, folderId) }
                 },
                 membershipOf = resolveFolderChatIds,
+                selectedFolderId = selectedFolderId,
             )
         }
-    // Clear the selection whenever its chip disappears — the last archived
-    // chat unarchived, the last unread read, a custom folder emptied. Keyed on
-    // the chip list itself (structural equality), so ANY membership change
-    // re-evaluates; the old archived/filter keys missed unread and custom
-    // folders emptying and stranded the list on an invisible filter.
-    LaunchedEffect(folderChipModels, selectedFolderId) {
-        if (selectedFolderId != null && folderChipModels.none { it.folderId == selectedFolderId }) {
+    // An empty selected folder remains visible and active until the user picks
+    // another chip. Clear only when the configured folder itself is deleted.
+    LaunchedEffect(accountFolders, selectedFolderId) {
+        if (selectedFolderId != null && accountFolders.none { it.id == selectedFolderId }) {
             onSelectFolder(null)
         }
     }

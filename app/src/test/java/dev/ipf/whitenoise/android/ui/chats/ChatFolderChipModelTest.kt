@@ -49,6 +49,20 @@ class ChatFolderChipModelTest {
     }
 
     @Test
+    fun selectedEmptyFolderRemainsVisible() {
+        val selected = ChatFolder("f1", "Work", "", order = 0, systemKind = null)
+
+        val chips =
+            chips(
+                folders = listOf(selected),
+                selectedFolderId = selected.id,
+            )
+
+        assertEquals(listOf(selected.id), chips.map { it.folderId })
+        assertEquals(0, chips.single().trailingCount)
+    }
+
+    @Test
     fun archivedChipCountsItsUnread() {
         val chips =
             chips(
@@ -110,6 +124,7 @@ class ChatFolderChipModelTest {
         archivedItems: List<ChatListItem> = emptyList(),
         rules: Map<String, ChatFolderRule> = defaultRules(),
         manual: Map<String, Set<String>> = emptyMap(),
+        selectedFolderId: String? = null,
     ) = chatFolderChipModels(
         folders = folders,
         activeItems = activeItems,
@@ -127,6 +142,7 @@ class ChatFolderChipModelTest {
                 displayTitle = { "" },
             )
         },
+        selectedFolderId = selectedFolderId,
     )
 
     private fun defaultRules(): Map<String, ChatFolderRule> =
