@@ -21,11 +21,13 @@ internal data class ChatFolderChipModel(
 
 /**
  * Derives the visible chip row from the folder store: the user's configured
- * order, and only folders that currently match ≥1 chat — the hide-when-empty
- * rule the Archived chip pioneered, applied to every folder. Membership,
- * source list, and the unread badge all come from each folder's own rule
- * (via [membershipOf], which must evaluate against the matching source), so
- * an edited default behaves exactly like a custom folder.
+ * order, and only non-selected folders that currently match ≥1 chat — the
+ * hide-when-empty rule the Archived chip pioneered, applied to every folder.
+ * The selected folder stays represented while empty so its filter remains
+ * visible and explicit. Membership, source list, and the unread badge all
+ * come from each folder's own rule (via [membershipOf], which must evaluate
+ * against the matching source), so an edited default behaves exactly like a
+ * custom folder.
  */
 internal fun chatFolderChipModels(
     folders: List<ChatFolder>,
@@ -34,6 +36,7 @@ internal fun chatFolderChipModels(
     activeAccountIdHex: String?,
     ruleOf: (folderId: String) -> ChatFolderRule?,
     membershipOf: (folderId: String) -> Set<String>,
+    selectedFolderId: String? = null,
 ): List<ChatFolderChipModel> =
     folders
         .sortedBy { it.order }
@@ -41,7 +44,7 @@ internal fun chatFolderChipModels(
             val source = if (ruleOf(folder.id)?.archivedOnly == true) archivedItems else activeItems
             val ids = membershipOf(folder.id)
             val members = source.filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
-            if (members.isEmpty()) {
+            if (members.isEmpty() && folder.id != selectedFolderId) {
                 null
             } else {
                 ChatFolderChipModel(

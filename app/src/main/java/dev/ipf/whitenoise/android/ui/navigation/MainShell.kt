@@ -230,6 +230,10 @@ internal fun MainShell(
     // ChatsScreen is foregrounded. Published back to the list only after
     // setChatListVisible(true) flushes pending recompute (issue #1313).
     var chatListReturnHeadSnap by remember { mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed) }
+    // Active chat-list folder filter (null = All). Owned here so opening a
+    // conversation does not dispose the selection when ChatsScreen leaves
+    // composition (issue #1897).
+    var selectedChatListFolderId by remember { mutableStateOf<String?>(null) }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -656,6 +660,7 @@ internal fun MainShell(
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            selectedChatListFolderId = null
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
@@ -785,6 +790,8 @@ internal fun MainShell(
                         ChatsScreen(
                             appState = appState,
                             controller = chatsController,
+                            selectedFolderId = selectedChatListFolderId,
+                            onSelectFolder = { selectedChatListFolderId = it },
                             conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
                             onConversationReturnHeadHandled = {
                                 chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)

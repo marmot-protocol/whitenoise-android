@@ -134,6 +134,9 @@ internal fun ChatsScreen(
     onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
         appState.presentProfile(npub)
     },
+    // Shell-owned so the filter survives conversation navigation (issue #1897).
+    selectedFolderId: String? = null,
+    onSelectFolder: (String?) -> Unit = {},
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
@@ -166,9 +169,6 @@ internal fun ChatsScreen(
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
-    // Folder-backed filtering: null = All. Every folder — seeded defaults
-    // included — filters by its effective membership (manual + rule matches).
-    var selectedFolderId by remember { mutableStateOf<String?>(null) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
     val accountFolders =
         remember(folderStoreState, appState.activeAccountRef) {
@@ -699,6 +699,7 @@ internal fun ChatsScreen(
             controller.items,
             controller.archivedItems,
             resolveFolderChatIds,
+            selectedFolderId,
         ) {
             chatFolderChipModels(
                 folders = accountFolders,
@@ -709,16 +710,14 @@ internal fun ChatsScreen(
                     appState.activeAccountRef?.let { appState.chatFolderPreferences.folderRule(it, folderId) }
                 },
                 membershipOf = resolveFolderChatIds,
+                selectedFolderId = selectedFolderId,
             )
         }
-    // Clear the selection whenever its chip disappears — the last archived
-    // chat unarchived, the last unread read, a custom folder emptied. Keyed on
-    // the chip list itself (structural equality), so ANY membership change
-    // re-evaluates; the old archived/filter keys missed unread and custom
-    // folders emptying and stranded the list on an invisible filter.
-    LaunchedEffect(folderChipModels, selectedFolderId) {
-        if (selectedFolderId != null && folderChipModels.none { it.folderId == selectedFolderId }) {
-            selectedFolderId = null
+    // An empty selected folder remains visible and active until the user picks
+    // another chip. Clear only when the configured folder itself is deleted.
+    LaunchedEffect(accountFolders, selectedFolderId) {
+        if (selectedFolderId != null && accountFolders.none { it.id == selectedFolderId }) {
+            onSelectFolder(null)
         }
     }
 
@@ -883,7 +882,7 @@ internal fun ChatsScreen(
                 ChatListFilterChips(
                     chips = folderChipModels,
                     selectedFolderId = selectedFolderId,
-                    onSelect = { selectedFolderId = it },
+                    onSelect = onSelectFolder,
                     onEditFolder = { folderHandoff.editingFolderId = it },
                 )
             }
