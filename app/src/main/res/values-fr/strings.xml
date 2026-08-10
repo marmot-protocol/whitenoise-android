@@ -1290,6 +1290,10 @@
     <string name="tts_auto_read_title">Lire les messages à voix haute</string>
     <string name="tts_auto_read_subtitle">Lire les messages non lus à l\'ouverture de cette discussion</string>
     <string name="tts_settings_rate_system">Système (suivre le réglage de l\'appareil)</string>
+    <string name="tts_bar_rate_control">Vitesse de lecture, actuellement %1$s</string>
+    <string name="tts_rate_custom">Personnalisée</string>
+    <string name="tts_rate_custom_error">Saisissez une vitesse comprise entre 0,1× et 10,0×.</string>
+    <string name="tts_rate_apply">Appliquer</string>
     <string name="connectivity_offline">Pas d\'internet — activez le Wi-Fi ou les données mobiles</string>
     <string name="connectivity_connecting">Connexion…</string>
     <string name="connectivity_connected">Connecté</string>

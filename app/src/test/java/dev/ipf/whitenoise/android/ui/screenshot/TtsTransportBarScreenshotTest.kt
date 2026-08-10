@@ -156,14 +156,15 @@ class TtsTransportBarScreenshotTest {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 TtsTransportBarContent(
                     state = state,
-                    rateLabel = "1×",
+                    rateOverride = 1.0f,
+                    activeRate = 1.0f,
                     onPause = {},
                     onResume = {},
                     onPreviousSentence = {},
                     onNextSentence = {},
                     onPreviousMessage = {},
                     onNextMessage = {},
-                    onCycleRate = {},
+                    onRateSelected = {},
                     onStop = {},
                     modifier = Modifier.width(360.dp).testTag(TAG),
                     historyEdge = historyEdge,

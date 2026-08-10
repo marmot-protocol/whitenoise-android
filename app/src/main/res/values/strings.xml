@@ -1365,6 +1365,10 @@
     <string name="tts_auto_read_title">Read messages aloud</string>
     <string name="tts_auto_read_subtitle">Read the unread backlog when this chat opens</string>
     <string name="tts_settings_rate_system">System (follow device setting)</string>
+    <string name="tts_bar_rate_control">Speech rate, current %1$s</string>
+    <string name="tts_rate_custom">Custom</string>
+    <string name="tts_rate_custom_error">Enter a rate from 0.1× to 10.0×.</string>
+    <string name="tts_rate_apply">Apply</string>
     <string name="connectivity_offline">No internet — turn on Wi-Fi or mobile data</string>
     <string name="connectivity_connecting">Connecting…</string>
     <string name="connectivity_connected">Connected</string>

@@ -10,15 +10,6 @@ import org.junit.Test
 
 class TtsTransportBarLogicTest {
     @Test
-    fun ratePillCyclesPresetsStartingFromDefaultWhenFollowingTheSystem() {
-        assertEquals(1.0f, nextTtsPresetRate(null))
-        assertEquals(1.25f, nextTtsPresetRate(1.0f))
-        assertEquals(2.5f, nextTtsPresetRate(2.0f))
-        assertEquals(3.0f, nextTtsPresetRate(2.5f))
-        assertEquals(0.5f, nextTtsPresetRate(3.0f))
-    }
-
-    @Test
     fun rateLabelsFormatWithTheActiveLocale() {
         val previous = java.util.Locale.getDefault()
         try {

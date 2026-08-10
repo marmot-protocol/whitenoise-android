@@ -58,6 +58,7 @@ internal fun TextToSpeechScreen(
     var pendingEnginePackage by remember { mutableStateOf<String?>(null) }
     var trustWarningOpen by remember { mutableStateOf(false) }
     var rateSheetOpen by remember { mutableStateOf(false) }
+    var customRateOpen by remember { mutableStateOf(false) }
     var engineSheetOpen by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -165,8 +166,26 @@ internal fun TextToSpeechScreen(
                         },
                     )
                 }
+                SelectableSettingsRow(
+                    title = stringResource(R.string.tts_rate_custom),
+                    selected = isTtsCustomRate(rateOverride),
+                    onClick = {
+                        rateSheetOpen = false
+                        customRateOpen = true
+                    },
+                )
             }
         }
+    }
+    if (customRateOpen) {
+        TtsCustomRateDialog(
+            initialRate = rateOverride ?: appState.ttsRatePreferences.resolvedRate(),
+            onDismiss = { customRateOpen = false },
+            onRateSelected = { rate ->
+                appState.setTtsRateOverride(rate)
+                customRateOpen = false
+            },
+        )
     }
     if (engineSheetOpen) {
         ModalBottomSheet(onDismissRequest = { engineSheetOpen = false }) {
