@@ -1,23 +1,20 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
-import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
-import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoCropPreset
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
+import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorTool
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -63,13 +60,12 @@ class PhotoEditorScreenshotTest {
                 }
             }
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_overview.png")
-            val app: Application = ApplicationProvider.getApplicationContext()
-            composeRule.onNodeWithContentDescription(app.getString(R.string.photo_editor_crop)).performClick()
-            composeRule.onNodeWithContentDescription(app.getString(R.string.photo_editor_crop_square)).performClick()
+            // Visual snapshots use settled state; synthetic clicks can leave runner-dependent press ripples.
+            composeRule.runOnIdle { holder.selectCropPreset(PhotoCropPreset.Square) }
             composeRule.waitForIdle()
 
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_square_crop.png")
-            composeRule.onNodeWithContentDescription(app.getString(R.string.photo_editor_draw)).performClick()
+            composeRule.runOnIdle { holder.selectTool(PhotoEditorTool.Draw) }
             composeRule.waitForIdle()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_cropped_draw.png")
         } finally {
