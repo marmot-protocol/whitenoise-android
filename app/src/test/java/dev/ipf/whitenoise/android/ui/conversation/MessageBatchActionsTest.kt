@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.state.MessageStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -311,6 +312,7 @@ class MessageBatchActionsTest {
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
                 ),
+            status = MessageStatus.Received,
             timelineOrder = timelineOrder,
         )
 }

@@ -43,7 +43,7 @@ class MessageAttachmentSaveTest {
 
     @Test
     fun videoSaveReusesTheMaterializedFile() {
-        val saveBody = saveAttachmentsBody()
+        val saveBody = saveMediaBody()
 
         assertTrue(
             "video saves must stream the materialized file instead of resolving another ByteArray",
@@ -130,5 +130,13 @@ class MessageAttachmentSaveTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
         ).first(File::exists).readText()
 
+    private fun messageAttachmentSaveSource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageAttachmentSave.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageAttachmentSave.kt"),
+        ).first(File::exists).readText()
+
     private fun saveAttachmentsBody(): String = messageBubbleSource().functionBody("saveAttachments")
+
+    private fun saveMediaBody(): String = messageAttachmentSaveSource().functionBody("saveMessageMediaAttachments")
 }

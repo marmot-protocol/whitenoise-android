@@ -70,6 +70,11 @@
         <item quantity="one">%1$d chat seleccionado</item>
         <item quantity="other">%1$d chats seleccionados</item>
     </plurals>
+    <plurals name="message_selected_count">
+        <item quantity="one">%1$d mensaje seleccionado</item>
+        <item quantity="other">%1$d mensajes seleccionados</item>
+    </plurals>
+    <string name="message_selection_action_delete">Eliminar mensajes seleccionados</string>
     <plurals name="chat_list_bulk_delete_confirm">
         <item quantity="one">¿Eliminar %1$d chat de este dispositivo?</item>
         <item quantity="other">¿Eliminar %1$d chats de este dispositivo?</item>

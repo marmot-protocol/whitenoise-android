@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -24,55 +23,35 @@ class MessageSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
+    private fun plural(
+        res: Int,
+        quantity: Int,
+        vararg args: Any,
+    ): String =
+        ApplicationProvider
+            .getApplicationContext<android.content.Context>()
+            .resources
+            .getQuantityString(res, quantity, *args)
+
     @Test
-    fun showsCountAndRoutesAvailableActions() {
+    fun showsCountAndCloseOnly() {
         var closes = 0
-        var copies = 0
-        var forwards = 0
-        var deletes = 0
         composeRule.setContent {
             WhiteNoiseTheme {
                 MessageSelectionBar(
                     count = 3,
-                    canCopy = true,
-                    canForward = true,
                     onClose = { closes++ },
-                    onCopy = { copies++ },
-                    onForward = { forwards++ },
-                    onDelete = { deletes++ },
                 )
             }
         }
 
         composeRule.onNodeWithText("3").assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(
+                plural(R.plurals.message_selected_count, 3, 3),
+            ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.copy)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.forward)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.delete)).performClick()
 
         assertEquals(1, closes)
-        assertEquals(1, copies)
-        assertEquals(1, forwards)
-        assertEquals(1, deletes)
-    }
-
-    @Test
-    fun disablesCopyAndForwardWhenSelectionHasNoEligibleText() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                MessageSelectionBar(
-                    count = 2,
-                    canCopy = false,
-                    canForward = false,
-                    onClose = {},
-                    onCopy = {},
-                    onForward = {},
-                    onDelete = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription(string(R.string.copy)).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription(string(R.string.forward)).assertIsNotEnabled()
     }
 }

@@ -49,10 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.MessageStatusLabels
-import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.formatExactTimestamp
 import dev.ipf.whitenoise.android.state.labelFor
 import dev.ipf.whitenoise.android.state.shortHex
@@ -237,14 +237,14 @@ internal fun MessageFullScreenView(
 
 @Composable
 internal fun MessageInfoSheet(
-    item: TimelineMessage,
+    record: AppMessageRecordFfi,
+    status: MessageStatus,
     mine: Boolean,
     senderDisplayName: String,
     senderNpub: String,
     onDismissRequest: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
-    val record = item.record
     val configuration = LocalConfiguration.current
     val locale =
         remember(configuration) {
@@ -259,12 +259,12 @@ internal fun MessageInfoSheet(
             failed = stringResource(R.string.message_status_failed),
             streaming = stringResource(R.string.message_status_streaming),
         )
-    val statusText = labelFor(item.status, statusLabels)
+    val statusText = labelFor(status, statusLabels)
     // Label derives from status, not `mine`, so an outgoing Failed bubble
     // doesn't read "Sent" while the Status row says "Failed". For outgoing
     // pending/failed the row reflects local composition time.
     val timestampLabel =
-        when (item.status) {
+        when (status) {
             MessageStatus.Sent -> stringResource(R.string.message_info_sent_at)
             MessageStatus.Received, MessageStatus.Streaming -> stringResource(R.string.message_info_received_at)
             MessageStatus.Pending, MessageStatus.Failed -> stringResource(R.string.message_info_created_at)
