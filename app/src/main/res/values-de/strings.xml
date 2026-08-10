@@ -1295,6 +1295,12 @@
     <string name="tts_bar_history_error">Weitere Nachrichten konnten nicht geladen werden. Zum Wiederholen erneut tippen.</string>
     <string name="tts_auto_read_title">Nachrichten vorlesen</string>
     <string name="tts_auto_read_subtitle">Ungelesene Nachrichten beim Öffnen dieses Chats vorlesen</string>
+    <string name="tts_auto_read_default_global_title">Nachrichten standardmäßig vorlesen</string>
+    <string name="tts_auto_read_default_global_subtitle">Ungelesene Nachrichten beim Öffnen eines Chats vorlesen, sofern der Chat dies nicht überschreibt</string>
+    <string name="tts_auto_read_use_default_off">Standard verwenden (Aus)</string>
+    <string name="tts_auto_read_use_default_on">Standard verwenden (Ein)</string>
+    <string name="tts_auto_read_override_on">Ein</string>
+    <string name="tts_auto_read_override_off">Aus</string>
     <string name="tts_settings_rate_system">System (Geräteeinstellung folgen)</string>
     <string name="tts_bar_rate_control">Sprechgeschwindigkeit, aktuell %1$s</string>
     <string name="tts_rate_custom">Benutzerdefiniert</string>

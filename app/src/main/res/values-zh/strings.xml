@@ -1271,6 +1271,12 @@
     <string name="tts_bar_history_error">无法加载更多消息。再次点按可重试。</string>
     <string name="tts_auto_read_title">朗读消息</string>
     <string name="tts_auto_read_subtitle">打开此聊天时朗读未读消息</string>
+    <string name="tts_auto_read_default_global_title">默认朗读消息</string>
+    <string name="tts_auto_read_default_global_subtitle">打开聊天时朗读未读消息（除非该聊天单独设置）</string>
+    <string name="tts_auto_read_use_default_off">使用默认（关）</string>
+    <string name="tts_auto_read_use_default_on">使用默认（开）</string>
+    <string name="tts_auto_read_override_on">开</string>
+    <string name="tts_auto_read_override_off">关</string>
     <string name="tts_settings_rate_system">系统（跟随设备设置）</string>
     <string name="tts_bar_rate_control">语速，当前为 %1$s</string>
     <string name="tts_rate_custom">自定义</string>

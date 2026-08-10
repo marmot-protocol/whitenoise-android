@@ -1630,15 +1630,48 @@ class WhiteNoiseAppState private constructor(
 
     fun isConversationAutoRead(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
-        return ttsAutoReadPreferences.isEnabled(accountRef, groupIdHex)
+        return conversationAutoReadFor(accountRef, groupIdHex)
     }
 
-    fun setConversationAutoRead(
+    internal fun conversationAutoReadFor(
+        accountRef: String,
         groupIdHex: String,
-        enabled: Boolean,
+    ): Boolean = ttsAutoReadPreferences.isConversationAutoRead(accountRef, groupIdHex)
+
+    fun setTtsAutoReadGlobalDefault(enabled: Boolean) {
+        ttsAutoReadPreferences.setGlobalDefaultEnabled(enabled)
+        reconcileOwnedTtsAutoReadSession()
+    }
+
+    fun setConversationAutoReadOverride(
+        groupIdHex: String,
+        override: TtsAutoReadOverride?,
     ) {
         val accountRef = activeAccountRef ?: return
-        ttsAutoReadPreferences.setEnabled(accountRef, groupIdHex, enabled)
+        if (override == null) {
+            ttsAutoReadPreferences.clearConversationOverride(accountRef, groupIdHex)
+        } else {
+            ttsAutoReadPreferences.setConversationOverride(accountRef, groupIdHex, override)
+        }
+        reconcileOwnedTtsAutoReadSession()
+    }
+
+    private fun reconcileOwnedTtsAutoReadSession() {
+        val sessionKey = ttsAutoReadSessionKey ?: return
+        val separator = sessionKey.indexOf('|')
+        if (separator <= 0 || separator == sessionKey.lastIndex) return
+        val accountRef = sessionKey.substring(0, separator)
+        val groupIdHex = sessionKey.substring(separator + 1)
+        if (!conversationAutoReadFor(accountRef, groupIdHex)) {
+            stopOwnedTtsAutoReadSession()
+        }
+    }
+
+    internal fun stopOwnedTtsAutoReadSession() {
+        if (ttsAutoReadSessionKey == null) return
+        ttsController.stop()
+        ttsAutoReadSessionKey = null
+        ttsHistorySession.onSessionCleared()
     }
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */

@@ -1297,6 +1297,12 @@
     <string name="tts_bar_history_error">Impossible de charger d\'autres messages. Touchez à nouveau pour réessayer.</string>
     <string name="tts_auto_read_title">Lire les messages à voix haute</string>
     <string name="tts_auto_read_subtitle">Lire les messages non lus à l\'ouverture de cette discussion</string>
+    <string name="tts_auto_read_default_global_title">Lire les messages à voix haute par défaut</string>
+    <string name="tts_auto_read_default_global_subtitle">Lire les messages non lus à l\'ouverture d\'une discussion, sauf si elle est configurée autrement</string>
+    <string name="tts_auto_read_use_default_off">Utiliser la valeur par défaut (Désactivé)</string>
+    <string name="tts_auto_read_use_default_on">Utiliser la valeur par défaut (Activé)</string>
+    <string name="tts_auto_read_override_on">Activé</string>
+    <string name="tts_auto_read_override_off">Désactivé</string>
     <string name="tts_settings_rate_system">Système (suivre le réglage de l\'appareil)</string>
     <string name="tts_bar_rate_control">Vitesse de lecture, actuellement %1$s</string>
     <string name="tts_rate_custom">Personnalisée</string>

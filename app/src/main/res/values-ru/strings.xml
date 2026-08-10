@@ -1351,6 +1351,12 @@
     <string name="tts_bar_history_error">Не удалось загрузить другие сообщения. Нажмите ещё раз, чтобы повторить.</string>
     <string name="tts_auto_read_title">Читать сообщения вслух</string>
     <string name="tts_auto_read_subtitle">Читать непрочитанные сообщения при открытии этого чата</string>
+    <string name="tts_auto_read_default_global_title">Читать сообщения вслух по умолчанию</string>
+    <string name="tts_auto_read_default_global_subtitle">Читать непрочитанные при открытии чата, если для чата не задано иное</string>
+    <string name="tts_auto_read_use_default_off">Использовать по умолчанию (Выкл.)</string>
+    <string name="tts_auto_read_use_default_on">Использовать по умолчанию (Вкл.)</string>
+    <string name="tts_auto_read_override_on">Вкл.</string>
+    <string name="tts_auto_read_override_off">Выкл.</string>
     <string name="tts_settings_rate_system">Системная (по настройке устройства)</string>
     <string name="tts_bar_rate_control">Скорость речи, текущая %1$s</string>
     <string name="tts_rate_custom">Настраиваемая</string>

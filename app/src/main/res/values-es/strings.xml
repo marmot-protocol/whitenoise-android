@@ -1297,6 +1297,12 @@
     <string name="tts_bar_history_error">No se pudieron cargar más mensajes. Toca de nuevo para reintentar.</string>
     <string name="tts_auto_read_title">Leer mensajes en voz alta</string>
     <string name="tts_auto_read_subtitle">Leer los mensajes no leídos al abrir este chat</string>
+    <string name="tts_auto_read_default_global_title">Leer mensajes en voz alta por defecto</string>
+    <string name="tts_auto_read_default_global_subtitle">Leer los mensajes no leídos al abrir un chat, salvo que el chat lo cambie</string>
+    <string name="tts_auto_read_use_default_off">Usar predeterminado (Desactivado)</string>
+    <string name="tts_auto_read_use_default_on">Usar predeterminado (Activado)</string>
+    <string name="tts_auto_read_override_on">Activado</string>
+    <string name="tts_auto_read_override_off">Desactivado</string>
     <string name="tts_settings_rate_system">Sistema (seguir el ajuste del dispositivo)</string>
     <string name="tts_bar_rate_control">Velocidad de voz, actual %1$s</string>
     <string name="tts_rate_custom">Personalizada</string>
