@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">已简化此笔画以保持编辑流畅。</string>
     <string name="photo_editor_save_failed">无法保存编辑后的照片。之前的附件未更改。</string>
     <string name="photo_editor_edit_action">编辑照片</string>
-    <string name="photo_editor_edit_with_quality">编辑 · %1$s</string>
     <string name="photo_editor_not_editable_animation">动画图片可以原样发送，但不能编辑。</string>
     <string name="photo_editor_not_editable_source">无法安全地编辑此图片。</string>
     <string name="photo_editor_source_unavailable">仍可发送已准备的照片，但原始编辑源不可用。</string>
     <string name="photo_editor_prepared">已准备的照片</string>
-    <string name="photo_editor_prepared_output">已准备的照片 · %1$s</string>
     <string name="photo_editor_send_as_file">已作为文件发送；无法使用照片编辑。</string>
 </resources>

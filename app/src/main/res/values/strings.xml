@@ -1440,11 +1440,9 @@
     <string name="photo_editor_limit_points">This stroke was simplified to keep editing responsive.</string>
     <string name="photo_editor_save_failed">Couldn’t save the edited photo. The previous attachment is unchanged.</string>
     <string name="photo_editor_edit_action">Edit photo</string>
-    <string name="photo_editor_edit_with_quality">Edit · %1$s</string>
     <string name="photo_editor_not_editable_animation">Animated images can be sent unchanged, but cannot be edited.</string>
     <string name="photo_editor_not_editable_source">This image cannot be edited safely.</string>
     <string name="photo_editor_source_unavailable">The prepared photo can still be sent, but its original editing source is unavailable.</string>
     <string name="photo_editor_prepared">Prepared photo</string>
-    <string name="photo_editor_prepared_output">Prepared photo · %1$s</string>
     <string name="photo_editor_send_as_file">Sent as a file; photo editing is unavailable.</string>
 </resources>

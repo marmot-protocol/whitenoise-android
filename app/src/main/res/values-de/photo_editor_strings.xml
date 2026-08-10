@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">Dieser Strich wurde vereinfacht, damit die Bearbeitung flüssig bleibt.</string>
     <string name="photo_editor_save_failed">Das bearbeitete Foto konnte nicht gespeichert werden. Der vorherige Anhang bleibt unverändert.</string>
     <string name="photo_editor_edit_action">Foto bearbeiten</string>
-    <string name="photo_editor_edit_with_quality">Bearbeiten · %1$s</string>
     <string name="photo_editor_not_editable_animation">Animierte Bilder können unverändert gesendet, aber nicht bearbeitet werden.</string>
     <string name="photo_editor_not_editable_source">Dieses Bild kann nicht sicher bearbeitet werden.</string>
     <string name="photo_editor_source_unavailable">Das vorbereitete Foto kann weiterhin gesendet werden, aber die ursprüngliche Bearbeitungsquelle ist nicht verfügbar.</string>
     <string name="photo_editor_prepared">Vorbereitetes Foto</string>
-    <string name="photo_editor_prepared_output">Vorbereitetes Foto · %1$s</string>
     <string name="photo_editor_send_as_file">Als Datei gesendet; Fotobearbeitung ist nicht verfügbar.</string>
 </resources>

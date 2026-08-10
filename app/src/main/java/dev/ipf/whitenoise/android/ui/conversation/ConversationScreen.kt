@@ -172,6 +172,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveConten
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.media.selectablePhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
@@ -1347,20 +1348,12 @@ internal fun ConversationScreen(
         slot: PendingMediaSlot,
         requestedQuality: MediaQuality,
     ) {
-        val photo = draftBackedPhotos[slot.id] ?: return
-        if (slot.id in preparingPhotoSlotIds) return
-        val quality =
-            when (requestedQuality) {
-                MediaQuality.Low,
-                MediaQuality.Standard,
-                -> MediaQuality.Standard
-                MediaQuality.High,
-                MediaQuality.Original,
-                -> MediaQuality.High
-            }
+        val photo = draftBackedPhotos[slot.id]
+        if (photo == null || slot.id in preparingPhotoSlotIds) return
+        val quality = requestedQuality.selectablePhotoQuality()
         val currentlyStandard = photo.quality == MediaQuality.Low || photo.quality == MediaQuality.Standard
-        if (currentlyStandard == (quality == MediaQuality.Standard)) return
-        val accountRef = controller.boundAccountRef ?: return
+        val accountRef = controller.boundAccountRef
+        if (currentlyStandard == (quality == MediaQuality.Standard) || accountRef == null) return
         preparingPhotoSlotIds = preparingPhotoSlotIds + slot.id
         appState.launchMutation {
             try {
@@ -3298,33 +3291,6 @@ internal fun ConversationScreen(
     if ((pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) && activePhotoEditor == null) {
         val imageSlots = pendingMediaSlots
         val documentUris = pendingDocumentUris
-        val preparedPhotoLabels =
-            draftBackedPhotos.mapValues { (_, photo) ->
-                photoRenderer.outputPlan(photo.sourceInfo, photo.recipe, photo.quality)?.let { plan ->
-                    val qualityLabel =
-                        stringResource(
-                            when (photo.quality) {
-                                MediaQuality.Low,
-                                MediaQuality.Standard,
-                                -> R.string.photo_editor_quality_standard
-                                MediaQuality.High,
-                                MediaQuality.Original,
-                                -> R.string.photo_editor_quality_hd
-                            },
-                        )
-                    stringResource(
-                        R.string.photo_editor_effective_quality,
-                        qualityLabel,
-                        plan.geometry.outputSize.width,
-                        plan.geometry.outputSize.height,
-                    )
-                } ?: photo.quality.preferenceValue
-            } +
-                draftPreparedPhotos.mapValues { (_, photo) ->
-                    photo.attachment.dim?.let { dimensions ->
-                        stringResource(R.string.photo_editor_prepared_output, dimensions)
-                    } ?: stringResource(R.string.photo_editor_prepared)
-                }
         val preparedPhotoPreviews =
             draftBackedPhotos.mapValues { (_, photo) ->
                 PreparedPhotoPreview(
@@ -3418,10 +3384,9 @@ internal fun ConversationScreen(
                 },
                 onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
                 onEditMediaAt = { index -> pendingMediaSlots.getOrNull(index)?.let(::openPhotoEditor) },
-                onSelectMediaQualityAt = { index, quality ->
-                    pendingMediaSlots.getOrNull(index)?.let { selectPhotoQuality(it, quality) }
+                onSelectMediaQuality = { slotId, quality ->
+                    pendingMediaSlots.firstOrNull { it.id == slotId }?.let { selectPhotoQuality(it, quality) }
                 },
-                preparedPhotoLabels = preparedPhotoLabels,
                 preparedPhotoPreviews = preparedPhotoPreviews,
                 preparedPhotoQualities = preparedPhotoQualities,
                 preparingPhotoSlotIds = preparingPhotoSlotIds,

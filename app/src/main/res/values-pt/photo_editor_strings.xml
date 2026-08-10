@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">Este traço foi simplificado para manter a edição fluida.</string>
     <string name="photo_editor_save_failed">Não foi possível guardar a fotografia editada. O anexo anterior permanece inalterado.</string>
     <string name="photo_editor_edit_action">Editar foto</string>
-    <string name="photo_editor_edit_with_quality">Editar · %1$s</string>
     <string name="photo_editor_not_editable_animation">As imagens animadas podem ser enviadas sem alterações, mas não podem ser editadas.</string>
     <string name="photo_editor_not_editable_source">Esta imagem não pode ser editada em segurança.</string>
     <string name="photo_editor_source_unavailable">A fotografia preparada ainda pode ser enviada, mas a fonte de edição original não está disponível.</string>
     <string name="photo_editor_prepared">Fotografia preparada</string>
-    <string name="photo_editor_prepared_output">Fotografia preparada · %1$s</string>
     <string name="photo_editor_send_as_file">Enviada como ficheiro; a edição de fotografias não está disponível.</string>
 </resources>

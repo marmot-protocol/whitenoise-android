@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -26,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -35,13 +32,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -65,14 +60,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -128,30 +119,6 @@ internal data class PreparedPhotoPreview(
     val revision: String,
     val bytes: ByteArray,
 )
-
-internal data class PreparedPhotoQuality(
-    val selectedQuality: MediaQuality,
-    val standardDimensions: String?,
-    val hdDimensions: String?,
-)
-
-/** Keep the selected tier truthful when Low or Original bytes are retained unchanged. */
-internal fun photoApprovalOutputQuality(
-    selectedQuality: MediaQuality,
-    optionQuality: MediaQuality,
-): MediaQuality =
-    if (selectedQuality.isStandardPhotoTier() == optionQuality.isStandardPhotoTier()) {
-        selectedQuality
-    } else {
-        optionQuality
-    }
-
-private fun MediaQuality.isStandardPhotoTier(): Boolean = this == MediaQuality.Low || this == MediaQuality.Standard
-
-private enum class PhotoSendQualityTier {
-    Standard,
-    Hd,
-}
 
 /** Decode the prepared send artifact when available, otherwise the original local Uri. */
 @Composable
@@ -284,8 +251,7 @@ internal fun MediaPreviewScreen(
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
     onEditMediaAt: ((Int) -> Unit)? = null,
-    onSelectMediaQualityAt: ((Int, MediaQuality) -> Unit)? = null,
-    preparedPhotoLabels: Map<String, String> = emptyMap(),
+    onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
     preparingPhotoSlotIds: Set<String> = emptySet(),
@@ -313,8 +279,7 @@ internal fun MediaPreviewScreen(
             onAddPhotos = onAddPhotos,
             onAddDocuments = onAddDocuments,
             onEditMediaAt = onEditMediaAt,
-            onSelectMediaQualityAt = onSelectMediaQualityAt,
-            preparedPhotoLabels = preparedPhotoLabels,
+            onSelectMediaQuality = onSelectMediaQuality,
             preparedPhotoPreviews = preparedPhotoPreviews,
             preparedPhotoQualities = preparedPhotoQualities,
             preparingPhotoSlotIds = preparingPhotoSlotIds,
@@ -336,8 +301,7 @@ internal fun MediaPreviewContent(
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
     onEditMediaAt: ((Int) -> Unit)? = null,
-    onSelectMediaQualityAt: ((Int, MediaQuality) -> Unit)? = null,
-    preparedPhotoLabels: Map<String, String> = emptyMap(),
+    onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
     preparingPhotoSlotIds: Set<String> = emptySet(),
@@ -350,7 +314,6 @@ internal fun MediaPreviewContent(
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
     var caption by rememberSaveable { mutableStateOf(initialCaption) }
-    var qualitySheetSlotId by rememberSaveable { mutableStateOf<String?>(null) }
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
     var sending by remember { mutableStateOf(false) }
@@ -400,17 +363,13 @@ internal fun MediaPreviewContent(
             val currentMedia = items.getOrNull(currentIndex) as? StagedPreviewItem.Media
             val currentMetadata = currentMedia?.let { previewMetadata[it.uri] }
             val currentPreparing = currentMedia?.slot?.id in preparingPhotoSlotIds
-            val currentQuality = currentMedia?.let { preparedPhotoQualities[it.slot.id] }
-            if (
-                currentMedia != null &&
-                currentMetadata?.isVideo == false &&
-                currentQuality != null &&
-                onSelectMediaQualityAt != null
-            ) {
-                PhotoQualityButton(
-                    quality = currentQuality,
+            val showQuality = currentMetadata?.isVideo == false && onSelectMediaQuality != null
+            if (currentMedia != null && showQuality) {
+                PhotoQualitySelector(
+                    slotId = currentMedia.slot.id,
+                    qualities = preparedPhotoQualities,
                     enabled = !sending && !currentPreparing,
-                    onClick = { qualitySheetSlotId = currentMedia.slot.id },
+                    onSelect = onSelectMediaQuality,
                 )
             }
             if (currentMedia != null && currentMetadata?.isVideo == false && onEditMediaAt != null) {
@@ -418,10 +377,7 @@ internal fun MediaPreviewContent(
                 val nonEditableDescription =
                     nonEditableMediaDescriptions[currentMedia.slot.id]
                         ?: stringResource(R.string.photo_editor_not_editable_source)
-                val editDescription =
-                    preparedPhotoLabels[currentMedia.slot.id]?.let { quality ->
-                        stringResource(R.string.photo_editor_edit_with_quality, quality)
-                    } ?: stringResource(R.string.photo_editor_edit_action)
+                val editDescription = stringResource(R.string.photo_editor_edit_action)
                 IconButton(
                     onClick = { onEditMediaAt(currentIndex) },
                     enabled = !sending && !currentPreparing && editable,
@@ -546,223 +502,7 @@ internal fun MediaPreviewContent(
             }
         }
     }
-    val qualityTargetId = qualitySheetSlotId
-    val qualityTarget = qualityTargetId?.let(preparedPhotoQualities::get)
-    val qualityTargetIndex = mediaSlots.indexOfFirst { it.id == qualityTargetId }
-    if (qualityTarget != null && qualityTargetIndex >= 0) {
-        PhotoSendQualitySheet(
-            quality = qualityTarget,
-            onSelect = { tier ->
-                qualitySheetSlotId = null
-                if (tier != qualityTarget.selectedQuality.sendQualityTier()) {
-                    onSelectMediaQualityAt?.invoke(qualityTargetIndex, tier.mediaQuality())
-                }
-            },
-            onDismiss = { qualitySheetSlotId = null },
-        )
-    }
 }
-
-@Composable
-private fun PhotoQualityButton(
-    quality: PreparedPhotoQuality,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val tier = quality.selectedQuality.sendQualityTier()
-    val label = qualityTierLabel(tier)
-    val description = stringResource(R.string.photo_editor_announcement_quality, label)
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier =
-            Modifier
-                .size(48.dp)
-                .semantics {
-                    contentDescription = description
-                },
-    ) {
-        PhotoQualityBadge(
-            tier = tier,
-            tint = Color.White.copy(alpha = if (enabled) 0.92f else 0.38f),
-        )
-    }
-}
-
-@Composable
-private fun PhotoQualityBadge(
-    tier: PhotoSendQualityTier,
-    tint: Color,
-) {
-    Box(
-        modifier =
-            Modifier
-                .size(width = 30.dp, height = 22.dp)
-                .border(1.5.dp, tint, RoundedCornerShape(5.dp))
-                .clearAndSetSemantics { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = stringResource(R.string.photo_editor_quality_hd),
-            color = tint,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        if (tier == PhotoSendQualityTier.Standard) {
-            Canvas(Modifier.fillMaxSize()) {
-                drawLine(
-                    color = tint,
-                    start =
-                        androidx.compose.ui.geometry
-                            .Offset(size.width * 0.16f, size.height * 0.86f),
-                    end =
-                        androidx.compose.ui.geometry
-                            .Offset(size.width * 0.84f, size.height * 0.14f),
-                    strokeWidth = 1.8.dp.toPx(),
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PhotoSendQualitySheet(
-    quality: PreparedPhotoQuality,
-    onSelect: (PhotoSendQualityTier) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val selectedTier = quality.selectedQuality.sendQualityTier()
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF17191B),
-        contentColor = Color.White,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.photo_editor_quality),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-            Text(
-                text = stringResource(R.string.photo_editor_quality_sheet_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.64f),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-            PhotoSendQualityTier.entries.forEach { tier ->
-                val selected = tier == selectedTier
-                val label = qualityTierLabel(tier)
-                val dimensions =
-                    when (tier) {
-                        PhotoSendQualityTier.Standard -> quality.standardDimensions
-                        PhotoSendQualityTier.Hd -> quality.hdDimensions
-                    }
-                Surface(
-                    onClick = { onSelect(tier) },
-                    color =
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                        } else {
-                            Color.White.copy(alpha = 0.045f)
-                        },
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 76.dp)
-                            .semantics {
-                                this.selected = selected
-                                role = Role.RadioButton
-                            },
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        PhotoQualityBadge(
-                            tier = tier,
-                            tint = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.82f),
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(label, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = qualityTierDescription(tier),
-                                color = Color.White.copy(alpha = 0.62f),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            dimensions?.let {
-                                Text(
-                                    text = it,
-                                    color = Color.White.copy(alpha = 0.5f),
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                        }
-                        if (selected) {
-                            Surface(
-                                modifier = Modifier.size(28.dp),
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(5.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun qualityTierLabel(tier: PhotoSendQualityTier): String =
-    stringResource(
-        when (tier) {
-            PhotoSendQualityTier.Standard -> R.string.photo_editor_quality_standard
-            PhotoSendQualityTier.Hd -> R.string.photo_editor_quality_hd
-        },
-    )
-
-@Composable
-private fun qualityTierDescription(tier: PhotoSendQualityTier): String =
-    stringResource(
-        when (tier) {
-            PhotoSendQualityTier.Standard -> R.string.photo_editor_quality_standard_description
-            PhotoSendQualityTier.Hd -> R.string.photo_editor_quality_hd_description
-        },
-    )
-
-private fun MediaQuality.sendQualityTier(): PhotoSendQualityTier =
-    when (this) {
-        MediaQuality.Low,
-        MediaQuality.Standard,
-        -> PhotoSendQualityTier.Standard
-        MediaQuality.High,
-        MediaQuality.Original,
-        -> PhotoSendQualityTier.Hd
-    }
-
-private fun PhotoSendQualityTier.mediaQuality(): MediaQuality =
-    when (this) {
-        PhotoSendQualityTier.Standard -> MediaQuality.Standard
-        PhotoSendQualityTier.Hd -> MediaQuality.High
-    }
 
 @Composable
 private fun previewCaptionFieldColors() =

@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.PhotoQualitySelector
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
@@ -62,18 +63,18 @@ class MediaPreviewContentTest {
 
     private fun uri(n: Int): Uri = Uri.parse("content://test/$n")
 
+    private fun qualityDescription(resId: Int) = string(R.string.photo_editor_announcement_quality, string(resId))
+
     private fun renderPreview(
         initialMedia: List<Uri>,
         preparingMedia: Set<Uri> = emptySet(),
-        preparedLabels: Map<Uri, String> = emptyMap(),
         preparedQualities: Map<Uri, PreparedPhotoQuality> = emptyMap(),
         onEditMediaAt: ((Int) -> Unit)? = null,
-        onSelectMediaQualityAt: ((Int, MediaQuality) -> Unit)? = null,
+        onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
     ) {
         val initialSlots = initialMedia.mapIndexed { index, uri -> PendingMediaSlot("slot-$index", uri) }
         val preparingSlotIds = initialSlots.filter { it.uri in preparingMedia }.mapTo(mutableSetOf()) { it.id }
-        val labelsBySlot = initialSlots.mapNotNull { slot -> preparedLabels[slot.uri]?.let { slot.id to it } }.toMap()
         val qualitiesBySlot =
             initialSlots.mapNotNull { slot -> preparedQualities[slot.uri]?.let { slot.id to it } }.toMap()
         initialMedia.forEach { stagedUri ->
@@ -97,10 +98,9 @@ class MediaPreviewContentTest {
                     onAddPhotos = {},
                     onAddDocuments = {},
                     preparingPhotoSlotIds = preparingSlotIds,
-                    preparedPhotoLabels = labelsBySlot,
                     preparedPhotoQualities = qualitiesBySlot,
                     onEditMediaAt = onEditMediaAt,
-                    onSelectMediaQualityAt = onSelectMediaQualityAt,
+                    onSelectMediaQuality = onSelectMediaQuality,
                 )
             }
         }
@@ -175,18 +175,16 @@ class MediaPreviewContentTest {
     }
 
     @Test
-    fun editablePhotoShowsEditActionAndEffectiveAttachmentQuality() {
+    fun editablePhotoShowsEditAction() {
         val staged = uri(1)
         var editedIndex: Int? = null
-        val quality = "Standard · 2048 × 1536"
         renderPreview(
             initialMedia = listOf(staged),
-            preparedLabels = mapOf(staged to quality),
             onEditMediaAt = { editedIndex = it },
         )
 
         composeRule
-            .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, quality))
+            .onNodeWithContentDescription(string(R.string.photo_editor_edit_action))
             .performClick()
         assertEquals(0, editedIndex)
     }
@@ -194,7 +192,7 @@ class MediaPreviewContentTest {
     @Test
     fun photoQualityIsChosenFromApprovalWithTwoClearOptions() {
         val staged = uri(1)
-        var selected: Pair<Int, MediaQuality>? = null
+        var selected: Pair<String, MediaQuality>? = null
         renderPreview(
             initialMedia = listOf(staged),
             preparedQualities =
@@ -206,14 +204,10 @@ class MediaPreviewContentTest {
                             hdDimensions = "4096 × 3072",
                         ),
                 ),
-            onSelectMediaQualityAt = { index, quality -> selected = index to quality },
+            onSelectMediaQuality = { slotId, quality -> selected = slotId to quality },
         )
 
-        val standardDescription =
-            string(
-                R.string.photo_editor_announcement_quality,
-                string(R.string.photo_editor_quality_standard),
-            )
+        val standardDescription = qualityDescription(R.string.photo_editor_quality_standard)
         composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_hd)).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(standardDescription).performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_quality)).assertIsDisplayed()
@@ -225,7 +219,37 @@ class MediaPreviewContentTest {
 
         composeRule.onNodeWithText(string(R.string.photo_editor_quality_hd)).performClick()
 
-        assertEquals(0 to MediaQuality.High, selected)
+        assertEquals("slot-0" to MediaQuality.High, selected)
+    }
+
+    @Test
+    fun photoQualitySelectionKeepsItsStableSlotWhenCurrentSlotChanges() {
+        val qualities =
+            mapOf(
+                "first" to PreparedPhotoQuality(MediaQuality.Standard, "first standard", "first HD"),
+                "second" to PreparedPhotoQuality(MediaQuality.Standard, "second standard", "second HD"),
+            )
+        var currentSlotId by mutableStateOf("first")
+        var selected: Pair<String, MediaQuality>? = null
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                PhotoQualitySelector(
+                    slotId = currentSlotId,
+                    qualities = qualities,
+                    enabled = true,
+                    onSelect = { slotId, quality -> selected = slotId to quality },
+                )
+            }
+        }
+
+        val standardDescription = qualityDescription(R.string.photo_editor_quality_standard)
+        composeRule.onNodeWithContentDescription(standardDescription).performClick()
+        composeRule.runOnIdle { currentSlotId = "second" }
+        composeRule.onNodeWithText("first HD").assertIsDisplayed()
+        composeRule.onNodeWithText("second HD").assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.photo_editor_quality_hd)).performClick()
+
+        assertEquals("first" to MediaQuality.High, selected)
     }
 
     @Test
@@ -254,13 +278,12 @@ class MediaPreviewContentTest {
         var editedIndex: Int? = null
         renderPreview(
             initialMedia = listOf(duplicate, duplicate),
-            preparedLabels = mapOf(duplicate to "Standard"),
             onEditMediaAt = { editedIndex = it },
         )
 
         composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 2)).performClick()
         composeRule
-            .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, "Standard"))
+            .onNodeWithContentDescription(string(R.string.photo_editor_edit_action))
             .performClick()
         assertEquals(1, editedIndex)
     }

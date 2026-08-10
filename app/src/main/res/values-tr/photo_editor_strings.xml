@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">Düzenlemeyi akıcı tutmak için bu çizgi sadeleştirildi.</string>
     <string name="photo_editor_save_failed">Düzenlenen fotoğraf kaydedilemedi. Önceki ek değiştirilmedi.</string>
     <string name="photo_editor_edit_action">Fotoğrafı düzenle</string>
-    <string name="photo_editor_edit_with_quality">Düzenle · %1$s</string>
     <string name="photo_editor_not_editable_animation">Animasyonlu görseller değiştirilmeden gönderilebilir ancak düzenlenemez.</string>
     <string name="photo_editor_not_editable_source">Bu görsel güvenli şekilde düzenlenemiyor.</string>
     <string name="photo_editor_source_unavailable">Hazırlanan fotoğraf gönderilebilir ancak orijinal düzenleme kaynağı kullanılamıyor.</string>
     <string name="photo_editor_prepared">Hazırlanan fotoğraf</string>
-    <string name="photo_editor_prepared_output">Hazırlanan fotoğraf · %1$s</string>
     <string name="photo_editor_send_as_file">Dosya olarak gönderildi; fotoğraf düzenleme kullanılamıyor.</string>
 </resources>

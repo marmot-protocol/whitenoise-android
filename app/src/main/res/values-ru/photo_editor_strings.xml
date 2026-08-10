@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">Этот штрих упрощён для плавной работы редактора.</string>
     <string name="photo_editor_save_failed">Не удалось сохранить изменённое фото. Предыдущее вложение не изменено.</string>
     <string name="photo_editor_edit_action">Редактировать фото</string>
-    <string name="photo_editor_edit_with_quality">Редактировать · %1$s</string>
     <string name="photo_editor_not_editable_animation">Анимированные изображения можно отправлять без изменений, но нельзя редактировать.</string>
     <string name="photo_editor_not_editable_source">Это изображение нельзя безопасно редактировать.</string>
     <string name="photo_editor_source_unavailable">Подготовленное фото всё ещё можно отправить, но исходник для редактирования недоступен.</string>
     <string name="photo_editor_prepared">Подготовленное фото</string>
-    <string name="photo_editor_prepared_output">Подготовленное фото · %1$s</string>
     <string name="photo_editor_send_as_file">Отправлено как файл; редактирование фото недоступно.</string>
 </resources>

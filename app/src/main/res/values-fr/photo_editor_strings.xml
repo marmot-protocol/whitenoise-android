@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">Ce trait a été simplifié pour préserver la fluidité de l’édition.</string>
     <string name="photo_editor_save_failed">Impossible d’enregistrer la photo modifiée. La pièce jointe précédente est inchangée.</string>
     <string name="photo_editor_edit_action">Modifier la photo</string>
-    <string name="photo_editor_edit_with_quality">Modifier · %1$s</string>
     <string name="photo_editor_not_editable_animation">Les images animées peuvent être envoyées sans modification, mais ne peuvent pas être modifiées.</string>
     <string name="photo_editor_not_editable_source">Cette image ne peut pas être modifiée en toute sécurité.</string>
     <string name="photo_editor_source_unavailable">La photo préparée peut toujours être envoyée, mais sa source de modification originale n’est pas disponible.</string>
     <string name="photo_editor_prepared">Photo préparée</string>
-    <string name="photo_editor_prepared_output">Photo préparée · %1$s</string>
     <string name="photo_editor_send_as_file">Envoyée comme fichier ; la modification de photo n’est pas disponible.</string>
 </resources>

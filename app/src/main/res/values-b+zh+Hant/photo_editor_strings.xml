@@ -57,11 +57,9 @@
     <string name="photo_editor_limit_points">已簡化此筆畫以保持編輯流暢。</string>
     <string name="photo_editor_save_failed">無法儲存編輯後的照片。之前的附件未變更。</string>
     <string name="photo_editor_edit_action">編輯照片</string>
-    <string name="photo_editor_edit_with_quality">編輯 · %1$s</string>
     <string name="photo_editor_not_editable_animation">動畫圖片可以原樣傳送，但不能編輯。</string>
     <string name="photo_editor_not_editable_source">無法安全地編輯此圖片。</string>
     <string name="photo_editor_source_unavailable">仍可傳送已準備的照片，但原始編輯來源無法使用。</string>
     <string name="photo_editor_prepared">已準備的照片</string>
-    <string name="photo_editor_prepared_output">已準備的照片 · %1$s</string>
     <string name="photo_editor_send_as_file">已作為檔案傳送；無法使用照片編輯。</string>
 </resources>
