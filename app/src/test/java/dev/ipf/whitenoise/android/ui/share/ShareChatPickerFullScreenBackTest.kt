@@ -41,9 +41,9 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Behavioral Back coverage for the inbound share recipient screen (issues #1721 and #1922).
- * Composes production [ShareChatPickerFullScreen], exercises
- * committed and predictive Back through production callback seams,
- * and verifies request clearing plus route isolation.
+ * Composes production [ShareChatPickerFullScreen] for modal committed-Back coverage. Predictive
+ * dispatcher tests compose [ShareChatPickerFullScreenContent] in the activity window because
+ * Robolectric cannot dispatch predictive events to a Compose dialog's separate dispatcher.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -156,7 +156,7 @@ class ShareChatPickerFullScreenBackTest {
 
     @Test
     fun canceledPredictiveBackRestoresScreenAndKeepsRequest() {
-        val tracker = mountSharePicker()
+        val tracker = mountSharePicker(modal = false)
 
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
         val initialWidth = screenTitleWidth()
@@ -185,7 +185,7 @@ class ShareChatPickerFullScreenBackTest {
 
     @Test
     fun committedPredictiveBackDismissesScreenOnceAndClearsRequest() {
-        val tracker = mountSharePicker()
+        val tracker = mountSharePicker(modal = false)
 
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
         val dispatcher = screenOnBackPressedDispatcher()
@@ -223,28 +223,41 @@ class ShareChatPickerFullScreenBackTest {
         assertFalse(committed)
     }
 
-    private fun mountSharePicker(): PickerTracker {
+    private fun mountSharePicker(modal: Boolean = true): PickerTracker {
         val tracker = PickerTracker()
         val appState = testAppState()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 BackHandler { tracker.routeBackCount++ }
                 if (tracker.showPicker) {
-                    ShareChatPickerFullScreen(
-                        appState = appState,
-                        payload = payload,
-                        onDismiss = {
-                            tracker.dismissCount++
-                            tracker.showPicker = false
-                        },
-                        onStage = { tracker.stageCount++ },
-                        overlayBackRegistrar =
-                            ShareChatPickerOverlayBackRegistrar { priority, callback ->
-                                tracker.overlayBackPriority = priority
-                                tracker.overlayBackCallback = callback
-                                { tracker.overlayBackCallback = null }
-                            },
-                    )
+                    val onDismiss = {
+                        tracker.dismissCount++
+                        tracker.showPicker = false
+                    }
+                    val onStage: (List<String>) -> Unit = { tracker.stageCount++ }
+                    val registrar =
+                        ShareChatPickerOverlayBackRegistrar { priority, callback ->
+                            tracker.overlayBackPriority = priority
+                            tracker.overlayBackCallback = callback
+                            { tracker.overlayBackCallback = null }
+                        }
+                    if (modal) {
+                        ShareChatPickerFullScreen(
+                            appState = appState,
+                            payload = payload,
+                            onDismiss = onDismiss,
+                            onStage = onStage,
+                            overlayBackRegistrar = registrar,
+                        )
+                    } else {
+                        ShareChatPickerFullScreenContent(
+                            appState = appState,
+                            payload = payload,
+                            onDismiss = onDismiss,
+                            onStage = onStage,
+                            overlayBackRegistrar = registrar,
+                        )
+                    }
                 }
             }
         }

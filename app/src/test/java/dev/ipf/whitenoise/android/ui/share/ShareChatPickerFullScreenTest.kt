@@ -3,9 +3,7 @@ package dev.ipf.whitenoise.android.ui.share
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -72,7 +70,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -108,19 +106,14 @@ class ShareChatPickerFullScreenTest {
         val request = ShareRequest(payload, shortcutId = null, requestId = "request-7")
         val restorationTester = StateRestorationTester(composeRule)
         restorationTester.setContent {
-            val activeRequest by rememberSaveable(stateSaver = NullableShareRequestSaver) {
-                mutableStateOf<ShareRequest?>(request)
-            }
             WhiteNoiseTheme(darkTheme = true) {
-                activeRequest?.let { restoredRequest ->
-                    ShareChatPickerFullScreen(
-                        appState = appState,
-                        requestId = restoredRequest.requestId,
-                        payload = restoredRequest.payload,
-                        onDismiss = {},
-                        onStage = { staged = it },
-                    )
-                }
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    requestId = request.requestId,
+                    payload = request.payload,
+                    onDismiss = {},
+                    onStage = { staged = it },
+                )
             }
         }
 
@@ -167,7 +160,7 @@ class ShareChatPickerFullScreenTest {
         val restorationTester = StateRestorationTester(composeRule)
         restorationTester.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     requestId = request.requestId,
                     payload = request.payload,
@@ -201,7 +194,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     requestId = requestId.value,
                     payload = payload,
@@ -227,7 +220,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     requestId = request.value.requestId,
                     payload = request.value.payload,
@@ -256,7 +249,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -287,7 +280,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     payload = payload,
                     onDismiss = { dismissCount++ },
@@ -315,7 +308,7 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
+                ShareChatPickerFullScreenContent(
                     appState = appState,
                     payload = payload,
                     onDismiss = {},
@@ -360,7 +353,7 @@ class ShareChatPickerFullScreenTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
                 WhiteNoiseTheme(darkTheme = true) {
-                    ShareChatPickerFullScreen(
+                    ShareChatPickerFullScreenContent(
                         appState = appState,
                         payload = payload,
                         onDismiss = {},

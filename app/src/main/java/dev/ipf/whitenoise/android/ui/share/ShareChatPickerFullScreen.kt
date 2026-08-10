@@ -40,8 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,18 +72,11 @@ import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
-internal fun runShareChatPickerDismissal(
-    clearFocus: () -> Unit,
-    hideKeyboard: () -> Unit,
-    dismiss: () -> Unit,
-) {
-    clearFocus()
-    hideKeyboard()
-    dismiss()
-}
+internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = "share_chat_picker_full_screen"
 
+/** Visible production surface, split from its modal window for deterministic screenshot capture. */
 @Composable
-internal fun ShareChatPickerFullScreen(
+internal fun ShareChatPickerFullScreenContent(
     appState: WhiteNoiseAppState,
     requestId: String = "",
     payload: SharePayload,
@@ -92,6 +88,7 @@ internal fun ShareChatPickerFullScreen(
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val shareToTitle = stringResource(R.string.share_to)
     var finishing by remember(requestId) { mutableStateOf(false) }
     val dismissPicker: () -> Unit = {
         if (!finishing) {
@@ -109,16 +106,16 @@ internal fun ShareChatPickerFullScreen(
         overlayBackRegistrar = overlayBackRegistrar,
     ) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier.fillMaxSize().testTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG).semantics {
+                    isTraversalGroup = true
+                    paneTitle = shareToTitle
+                },
             containerColor = amoledSheetContainerColor(),
             topBar = {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.share_to)) },
-                    navigationIcon = {
-                        IconButton(onClick = dismissPicker) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                        }
-                    },
+                    title = { Text(shareToTitle) },
+                    navigationIcon = { ShareChatPickerCloseButton(dismissPicker) },
                 )
             },
             bottomBar = {
@@ -137,14 +134,17 @@ internal fun ShareChatPickerFullScreen(
                 ShareChatPickerContent(
                     pickerState = pickerState,
                     presentedTargets = presentedTargets,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(padding)
-                            .consumeWindowInsets(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ShareChatPickerCloseButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
     }
 }
 
