@@ -1,0 +1,115 @@
+name: Android Release Runtime Verify
+
+# R8 can successfully package bytecode that ART later rejects. This required
+# This pre-merge check builds the real optimized release type, signs it with a disposable
+# CI-only key, and asks ART on an x86_64 emulator to verify every DEX class.
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: android-release-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify minified APK on ART
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Create disposable release signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_path="$RUNNER_TEMP/release-runtime-verifier.jks"
+          keytool -genkeypair \
+            -keystore "$keystore_path" \
+            -storepass android \
+            -alias release-runtime-verifier \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname "CN=White Noise Release Runtime CI"
+          {
+            printf 'WHITENOISE_PRODUCTION_KEYSTORE_PATH=%s\n' "$keystore_path"
+            printf 'WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD=android\n'
+            printf 'WHITENOISE_PRODUCTION_KEY_ALIAS=release-runtime-verifier\n'
+            printf 'WHITENOISE_PRODUCTION_KEY_PASSWORD=android\n'
+          } >> "$GITHUB_ENV"
+
+      - name: Build optimized x86_64 release APK
+        run: >-
+          ./gradlew :app:assembleProductionZapstoreRelease
+          -Pandroid.injected.build.abi=x86_64
+          -Pandroid.injected.testOnly=false
+          --no-daemon --stacktrace
+
+      - name: Locate release APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t matches < <(
+            for apk_dir in \
+              app/build/outputs/apk/productionZapstore/release \
+              app/build/intermediates/apk/productionZapstore/release; do
+              [[ -d "$apk_dir" ]] || continue
+              find "$apk_dir" -maxdepth 1 -type f -name '*x86_64*release*.apk'
+            done | sort
+          )
+          if [[ ${#matches[@]} -ne 1 ]]; then
+            printf 'Expected one x86_64 release APK, found %d\n' "${#matches[@]}" >&2
+            printf '%s\n' "${matches[@]}" >&2
+            exit 1
+          fi
+          printf 'path=%s\n' "${matches[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify release APK on ART
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./scripts/verify-release-runtime.sh '${{ steps.apk.outputs.path }}' dev.ipf.whitenoise.android
+
+      - name: Upload release verifier report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-release-runtime-report
+          path: app/build/reports/release-runtime-verify/
+          if-no-files-found: ignore
+          retention-days: 7
