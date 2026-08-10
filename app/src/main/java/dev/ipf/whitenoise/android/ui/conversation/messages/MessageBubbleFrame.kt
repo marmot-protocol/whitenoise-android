@@ -309,7 +309,14 @@ internal fun MessageBubbleSenderHeader(
 internal fun shouldFrameMessageBubbleSupplement(
     bodyText: String?,
     invalidationWarning: String?,
-): Boolean = bodyText != null || invalidationWarning != null
+    showSenderHeader: Boolean = false,
+): Boolean = bodyText != null || invalidationWarning != null || showSenderHeader
+
+internal fun messageBubbleSupplementContentColor(
+    supplementInsideBubble: Boolean,
+    bubbleContentColor: Color,
+    outsideContentColor: Color,
+): Color = if (supplementInsideBubble) bubbleContentColor else outsideContentColor
 
 private fun messageTargetHighlightModifier(
     highlighted: Boolean,

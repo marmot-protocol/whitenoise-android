@@ -53,6 +53,28 @@ class MessageBubbleAmoledStyleTest {
     }
 
     @Test
+    fun uncaptionedHeaderOnlyMediaUsesCustomBubbleContentColor() {
+        val customBubbleContentColor = Color.White
+        val outsideFooterColor = Color.Gray
+        val supplementInsideBubble =
+            shouldFrameMessageBubbleSupplement(
+                bodyText = null,
+                invalidationWarning = null,
+                showSenderHeader = true,
+            )
+
+        assertTrue(supplementInsideBubble)
+        assertEquals(
+            customBubbleContentColor,
+            messageBubbleSupplementContentColor(
+                supplementInsideBubble = supplementInsideBubble,
+                bubbleContentColor = customBubbleContentColor,
+                outsideContentColor = outsideFooterColor,
+            ),
+        )
+    }
+
+    @Test
     fun amoledBubbleChromeColorCodesSentAndReceivedMessages() {
         var sentBorder: BorderStroke? = null
         var receivedBorder: BorderStroke? = null

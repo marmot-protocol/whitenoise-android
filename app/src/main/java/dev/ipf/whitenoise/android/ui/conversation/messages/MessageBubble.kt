@@ -1085,13 +1085,21 @@ internal fun MessageBubble(
                         anyConfirmedMedia -> mediaCaption
                         else -> displayedBody
                     }
-                val bodyOrWarningInsideBubble =
-                    shouldFrameMessageBubbleSupplement(bodyTextToRender, invalidationWarning)
-                // Captions/plain bodies sit on the resolved bubble background and therefore use
-                // its paired WCAG-safe content color. Footer-only media rows are
-                // outside the bubble and retain the page's surface foreground.
+                val supplementInsideBubble =
+                    shouldFrameMessageBubbleSupplement(
+                        bodyText = bodyTextToRender,
+                        invalidationWarning = invalidationWarning,
+                        showSenderHeader = showSenderHeader,
+                    )
+                // Captions, warnings, and sender headers place the supplement on the resolved
+                // bubble background and therefore use its paired WCAG-safe content color.
+                // Footer-only media rows stay outside the bubble with the page foreground.
                 val timestampColor =
-                    if (bodyOrWarningInsideBubble) bubbleContentColor else colorScheme.onSurfaceVariant
+                    messageBubbleSupplementContentColor(
+                        supplementInsideBubble = supplementInsideBubble,
+                        bubbleContentColor = bubbleContentColor,
+                        outsideContentColor = colorScheme.onSurfaceVariant,
+                    )
                 LaunchedEffect(textSelectionMode, bodyTextToRender) {
                     if (textSelectionMode && bodyTextToRender.isNullOrBlank()) {
                         onTextSelectionModeChange(false)
@@ -1225,7 +1233,7 @@ internal fun MessageBubble(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         replyPreviewCard(false)
-                        if (bodyOrWarningInsideBubble || showSenderHeader) {
+                        if (supplementInsideBubble) {
                             MediaCaptionFrame(
                                 modifier = actionAnchorBoundsModifier,
                                 presentation = bubblePresentation,
