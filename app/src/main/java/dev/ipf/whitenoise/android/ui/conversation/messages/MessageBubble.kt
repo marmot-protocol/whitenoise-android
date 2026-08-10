@@ -1180,6 +1180,7 @@ internal fun MessageBubble(
                                         if (!deleted && !selectionMode && !textSelectionMode) {
                                             longPressWindowPosition = null
                                             longPressWindowY = null
+                                            actionMenuAnchorBounds = messageBoundsInWindow[0]
                                             onActionMenuOpenChange(true)
                                         }
                                     },
