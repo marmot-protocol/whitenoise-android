@@ -9,9 +9,7 @@ internal object WhiteNoiseUrls {
 
     const val PRIVACY_POLICY = "https://www.whitenoise.chat/privacy"
 
-    // Keep agent-consumed setup guidance immutable: copied prompts grant an
-    // external agent authority only after the user reviews and approves a plan.
+    // Follow the latest reviewed connector guidance without requiring an Android release.
     const val AGENT_CONNECTOR_DOCS =
-        "https://github.com/marmot-protocol/mdk/blob/" +
-            "e12f53666b5203f16cb4443af0440990493e23c7/crates/agent-connector/README.md"
+        "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
 }
