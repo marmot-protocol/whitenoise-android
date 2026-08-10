@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.share
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -22,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.Density
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -349,19 +352,21 @@ class ShareChatPickerFullScreenTest {
     }
 
     @Test
-    @Config(sdk = [36], qualifiers = "land")
-    fun landscapeKeepsSearchResultsAndPrimaryActionVisible() {
+    @Config(sdk = [36], qualifiers = "w780dp-h360dp-land-mdpi")
+    fun compactLandscapeAtLargeFontKeepsSearchResultsAndPrimaryActionVisible() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
         val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
 
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                ShareChatPickerFullScreen(
-                    appState = appState,
-                    payload = payload,
-                    onDismiss = {},
-                    onStage = {},
-                )
+            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    ShareChatPickerFullScreen(
+                        appState = appState,
+                        payload = payload,
+                        onDismiss = {},
+                        onStage = {},
+                    )
+                }
             }
         }
         composeRule.onNodeWithText("Alice").performClick()
