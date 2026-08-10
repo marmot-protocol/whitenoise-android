@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
+import dev.ipf.whitenoise.android.core.AgentActivityPresentation
+import dev.ipf.whitenoise.android.core.AgentActivityProjector
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -141,6 +143,33 @@ internal fun TimelineRow(
                             )
                             return@Column
                         }
+                    }
+                }
+                TimelineRowKind.AgentActivity -> {
+                    val projectedDeleted = item.projected?.deleted == true
+                    val optimisticallyDeleted =
+                        MessageProjector.isDeleted(
+                            item.record.messageIdHex,
+                            controller.deletedMessageIds,
+                        )
+                    val invalidated = item.projected?.invalidationStatus != null
+                    if (!projectedDeleted && !optimisticallyDeleted && !invalidated) {
+                        val fallbackText = androidx.compose.ui.res.stringResource(
+                            dev.ipf.whitenoise.android.R.string.notification_channel_agent_activity,
+                        )
+                        val activity =
+                            remember(item.record, fallbackText) {
+                                AgentActivityProjector.project(item.record, fallbackText)
+                            }
+                                ?: AgentActivityPresentation(fallbackText, status = null)
+                        AgentActivityTimelineRow(
+                            item = item,
+                            activity = activity,
+                            controller = controller,
+                            appState = appState,
+                            readOnly = controller.group.pendingConfirmation,
+                        )
+                        return@Column
                     }
                 }
                 TimelineRowKind.DebugRow -> {

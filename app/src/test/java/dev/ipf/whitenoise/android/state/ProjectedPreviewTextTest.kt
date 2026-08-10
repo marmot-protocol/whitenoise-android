@@ -140,6 +140,19 @@ class ProjectedPreviewTextTest {
     }
 
     @Test
+    fun agentActivityPreviewShowsCommentaryWithoutRawJsonOrExtraMetadata() {
+        val rawJson =
+            """{"status":"commentary","text":"Checking sources.","extra":{"internal":"hidden"}}"""
+        val item = item(preview = preview(plaintext = rawJson, kind = 1201uL))
+
+        val text = item.projectedPreviewText(copy)
+
+        assertEquals("Checking sources.", text)
+        assertFalse(text.contains("extra"))
+        assertFalse(text.contains("{"))
+    }
+
+    @Test
     fun blankBodyOnAGenericKindFallsBackToMessageCopy() {
         val item = item(preview = preview(plaintext = "   ", kind = 9uL))
 

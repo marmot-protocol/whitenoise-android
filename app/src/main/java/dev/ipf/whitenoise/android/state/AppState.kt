@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
@@ -71,6 +72,7 @@ import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
+import dev.ipf.whitenoise.android.core.AgentActivityProjector
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
@@ -7737,7 +7739,13 @@ class WhiteNoiseAppState private constructor(
             val systemText = if (skipEnrichmentForLock) null else notificationGroupSystemText(update, senderNameOverride)
             val previewTextOverride =
                 systemText?.body ?: if (!skipEnrichmentForLock && LocalNotificationFormatter.needsPreviewTextResolution(update)) {
-                    notificationPreviewText(update.previewText)
+                    val previewSource =
+                        if (update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY) {
+                            AgentActivityProjector.previewText(update.previewText)
+                        } else {
+                            update.previewText
+                        }
+                    notificationPreviewText(previewSource)
                 } else {
                     null
                 }

@@ -43,6 +43,7 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         nonCanonicalHistory = stringResource(R.string.message_noncanonical_history_warning),
         deliveryNotConfirmed = stringResource(R.string.delivery_not_confirmed),
         agentStreamStarted = stringResource(R.string.agent_stream_started),
+        agentActivity = stringResource(R.string.notification_channel_agent_activity),
         streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),
         mediaPhoto = stringResource(R.string.reply_media_photo),

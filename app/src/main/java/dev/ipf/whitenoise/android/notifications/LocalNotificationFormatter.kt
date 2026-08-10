@@ -247,8 +247,14 @@ object LocalNotificationFormatter {
         // A caption (or any resolved text) always wins; only a captionless
         // attachment falls through to the type-aware label, and a non-media
         // empty message to the generic body.
+        val rawPreview =
+            if (update.trafficClass == NotificationTrafficClassFfi.AGENT_ACTIVITY) {
+                null
+            } else {
+                clean(update.previewText)
+            }
         return clean(previewTextOverride)
-            ?: clean(update.previewText)
+            ?: rawPreview
             ?: mediaBody(context, mediaKind)
             ?: text(context, R.string.notification_new_message, "New message")
     }

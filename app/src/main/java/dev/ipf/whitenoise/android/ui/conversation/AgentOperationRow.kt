@@ -114,7 +114,7 @@ internal fun AgentOperationTimelineRow(
             },
     )
     if (deleteDialogOpen) {
-        AgentOperationDeleteDialog(
+        DedicatedMessageDeleteDialog(
             record = record,
             controller = controller,
             appState = appState,
@@ -127,7 +127,7 @@ internal fun AgentOperationTimelineRow(
 }
 
 @Composable
-private fun AgentOperationDeleteDialog(
+internal fun DedicatedMessageDeleteDialog(
     record: AppMessageRecordFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,

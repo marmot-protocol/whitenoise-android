@@ -42,13 +42,15 @@ data class MessageDebugStyle(
  * Which row a timeline record renders as. Group-system state-change rows
  * ([GroupSystem]) always render as their one-line summary — even in developer
  * mode the raw MLS dump is tucked behind a per-row tap, never the default
- * (#857). [AgentOperation] always renders as an expandable tool-call chip.
+ * (#857). [AgentActivity] renders intermediary commentary and
+ * [AgentOperation] renders an expandable tool-call chip.
  * [DebugRow] is reserved for the other non-user-visible signaling kinds
  * (reactions, deletes, agent-stream-start, unknown) when streaming debug is on;
  * [Bubble] is the ordinary chat bubble.
  */
 enum class TimelineRowKind {
     GroupSystem,
+    AgentActivity,
     AgentOperation,
     DebugRow,
     Bubble,
@@ -66,6 +68,7 @@ fun timelineRowKind(
 ): TimelineRowKind =
     when {
         MessageProjector.isGroupSystem(record) -> TimelineRowKind.GroupSystem
+        MessageProjector.isAgentActivity(record) -> TimelineRowKind.AgentActivity
         MessageProjector.isAgentOperation(record) -> TimelineRowKind.AgentOperation
         streamingDebugEnabled && !MessageDebugClassifier.debugStyle(record).isUserVisibleBubble ->
             TimelineRowKind.DebugRow
@@ -96,6 +99,7 @@ object MessageDebugClassifier {
             MessageProjector.isStreamFinal(record) -> MessageDebugCategory.UserVisible
             MessageProjector.isChatKind(record.kind) -> MessageDebugCategory.UserVisible
             MessageProjector.isStreamStart(record) -> MessageDebugCategory.StreamSignaling
+            MessageProjector.isAgentActivity(record) -> MessageDebugCategory.AgentChrome
             MessageProjector.isAgentOperation(record) -> MessageDebugCategory.AgentChrome
             MessageProjector.isGroupSystem(record) -> MessageDebugCategory.GroupSystem
             MessageProjector.isReaction(record) -> MessageDebugCategory.Control
@@ -109,6 +113,7 @@ object MessageDebugClassifier {
             MessageProjector.isStreamFinal(record) -> "agent-stream-final"
             MessageProjector.isChatKind(record.kind) -> "chat"
             MessageProjector.isStreamStart(record) -> "agent-stream-start"
+            MessageProjector.isAgentActivity(record) -> "agent-activity"
             MessageProjector.isAgentOperation(record) -> "agent-operation"
             MessageProjector.isGroupSystem(record) -> "group-system"
             MessageProjector.isReaction(record) -> "reaction"

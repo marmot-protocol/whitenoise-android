@@ -324,6 +324,7 @@ private fun timelineItemRendersAsConversationBubble(
             ) ||
                 AgentOperationProjector.project(item.record) == null
         TimelineRowKind.GroupSystem,
+        TimelineRowKind.AgentActivity,
         TimelineRowKind.DebugRow,
         -> false
     }
@@ -2685,6 +2686,7 @@ internal fun ConversationScreen(
                                 contentType = { _, item ->
                                     when {
                                         MessageProjector.isGroupSystem(item.record) -> "groupSystem"
+                                        MessageProjector.isAgentActivity(item.record) -> "agentActivity"
                                         MessageProjector.isAgentOperation(item.record) -> "agentOperation"
                                         else -> "message"
                                     }

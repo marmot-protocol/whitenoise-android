@@ -15,6 +15,11 @@ object ProfileSanitizer {
 
     fun displayName(raw: String?): String? = singleLine(raw, MAX_NAME_LENGTH)
 
+    internal fun compactSingleLine(
+        raw: String?,
+        maxLength: Int,
+    ): String? = singleLine(raw, maxLength.coerceAtLeast(0))
+
     fun about(raw: String?): String? = multiline(raw, MAX_ABOUT_LENGTH)
 
     fun messageBody(raw: String): String {

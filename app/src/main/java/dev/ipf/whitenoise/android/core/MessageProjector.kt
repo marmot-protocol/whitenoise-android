@@ -53,6 +53,7 @@ data class MessageTextCopy(
     val nonCanonicalHistory: String,
     val deliveryNotConfirmed: String,
     val agentStreamStarted: String,
+    val agentActivity: String = "Agent activity",
     val streamFinished: String,
     val mediaAttachment: String,
     val mediaPhoto: String = "Photo",
@@ -102,6 +103,7 @@ data class MessageTextCopy(
                 nonCanonicalHistory = "Not confirmed in the group's current history",
                 deliveryNotConfirmed = "Delivery not confirmed",
                 agentStreamStarted = "Agent stream started",
+                agentActivity = "Agent activity",
                 streamFinished = "Stream finished",
                 mediaAttachment = "Media attachment",
                 mediaPhoto = "Photo",
@@ -138,6 +140,7 @@ object MessageProjector {
     private val KindChat = 9uL
     private val KindEdit = 1009uL
     private val KindAgentStreamStart = 1200uL
+    private const val KindAgentActivity = 1201uL
     private const val KindAgentOperation = 1202uL
     private val KindGroupSystem = 1210uL
 
@@ -157,6 +160,7 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
+            isAgentActivity(message) -> AgentActivityProjector.project(message, copy.agentActivity)?.text.orEmpty()
             // Never the raw JSON: kind-1210 content must not render as a chat
             // body. The conversation row builds the name-resolved summary;
             // this name-free form covers reply previews and copy-text.
@@ -175,6 +179,8 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> copy.agentStreamStarted
+            isAgentActivity(message) ->
+                AgentActivityProjector.project(message, copy.agentActivity)?.text ?: copy.message
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
             isMedia(message) -> mediaBodyText(message, copy)
@@ -300,6 +306,7 @@ object MessageProjector {
     fun rendersRawBodyPreview(kind: ULong): Boolean =
         kind != KindEdit &&
             kind != KindAgentStreamStart &&
+            kind != KindAgentActivity &&
             !isGroupSystemKind(kind)
 
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
@@ -317,6 +324,10 @@ object MessageProjector {
     fun editTargetMessageId(message: AppMessageRecordFfi): String? = if (message.kind == KindEdit) tagValues(message, EventRefTag).firstOrNull() else null
 
     fun isStreamStart(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentStreamStart
+
+    fun isAgentActivity(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentActivity
+
+    fun isAgentActivityKind(kind: ULong): Boolean = kind == KindAgentActivity
 
     fun isAgentOperation(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentOperation
 

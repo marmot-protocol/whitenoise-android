@@ -187,6 +187,21 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun agentActivityNotificationNeverFallsBackToRawJson() {
+        val rawJson =
+            """{"status":"commentary","text":"Checking sources.","extra":{"internal":"hidden"}}"""
+        val update =
+            update(
+                trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                previewText = rawJson,
+                trafficClass = NotificationTrafficClassFfi.AGENT_ACTIVITY,
+            )
+
+        assertEquals("New message", content(update)?.body)
+        assertEquals("Checking sources.", content(update, previewTextOverride = "Checking sources.")?.body)
+    }
+
+    @Test
     fun mentionDismissalKeyMatchesThePostedMentionIdentity() {
         val mention =
             content(

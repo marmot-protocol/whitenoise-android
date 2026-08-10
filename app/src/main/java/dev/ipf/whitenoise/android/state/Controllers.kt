@@ -51,6 +51,7 @@ import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AgentActivityProjector
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
@@ -303,6 +304,8 @@ data class ChatListItem(
         return when {
             preview.deleted -> copy.deleted
             preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
+            MessageProjector.isAgentActivityKind(preview.kind) ->
+                AgentActivityProjector.previewText(preview.plaintext) ?: copy.message
             // Kind-1009 edits are an in-place mutation of an existing
             // message body; they must not bump the chat-list preview to
             // "edit content" nor reorder the conversation. The original
