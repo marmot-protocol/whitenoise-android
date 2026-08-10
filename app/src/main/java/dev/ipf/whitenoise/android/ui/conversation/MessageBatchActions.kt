@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 
 /** UI-ready projection of one selected, user-visible message in timeline order. */
 internal data class BatchMessageActionItem(
@@ -133,7 +134,7 @@ internal data class BatchSelectionActionAvailability(
 
 internal fun batchSelectionActionAvailability(
     items: List<BatchMessageActionItem>,
-    readOnly: Boolean,
+    composerGate: ComposerGate,
 ): BatchSelectionActionAvailability {
     if (items.isEmpty()) {
         return BatchSelectionActionAvailability(
@@ -151,7 +152,7 @@ internal fun batchSelectionActionAvailability(
         canCopy = items.all { !it.copyableText.isNullOrBlank() },
         canForward = forwardBodies.isNotEmpty(),
         canSave = items.all(BatchMessageActionItem::hasSaveableMedia),
-        canReply = single && !readOnly,
+        canReply = single && composerGate == ComposerGate.COMPOSER,
         canInfo = single,
         canDelete = true,
     )

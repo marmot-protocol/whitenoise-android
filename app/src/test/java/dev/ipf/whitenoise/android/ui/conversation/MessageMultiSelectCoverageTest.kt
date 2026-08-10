@@ -52,7 +52,7 @@ class MessageMultiSelectCoverageTest {
 
         assertTrue(
             source.contains(
-                "return remember(selections, appState.profileRevisionForCompose, readOnly) { " +
+                "return remember(selections, appState.profileRevisionForCompose, composerGate) { " +
                     "val actionItems = selections.map { selection -> " +
                     "selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId)) }",
             ),
@@ -69,7 +69,7 @@ class MessageMultiSelectCoverageTest {
         )
         assertTrue(
             source.contains(
-                "actionAvailability = batchSelectionActionAvailability(actionItems, readOnly)",
+                "actionAvailability = batchSelectionActionAvailability(actionItems, composerGate)",
             ),
         )
     }

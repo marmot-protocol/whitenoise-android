@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,7 +15,7 @@ class MessageBatchSelectionActionsTest {
                 item("m2", forwardable = null),
             )
 
-        val availability = batchSelectionActionAvailability(items, readOnly = false)
+        val availability = batchSelectionActionAvailability(items, composerGate = ComposerGate.COMPOSER)
 
         assertFalse(availability.canForward)
         assertTrue(availability.canDelete)
@@ -28,7 +29,7 @@ class MessageBatchSelectionActionsTest {
                 item("m2", copyable = null),
             )
 
-        val availability = batchSelectionActionAvailability(items, readOnly = false)
+        val availability = batchSelectionActionAvailability(items, composerGate = ComposerGate.COMPOSER)
 
         assertFalse(availability.canCopy)
     }
@@ -41,28 +42,38 @@ class MessageBatchSelectionActionsTest {
                 item("m2", saveable = false),
             )
 
-        val availability = batchSelectionActionAvailability(items, readOnly = false)
+        val availability = batchSelectionActionAvailability(items, composerGate = ComposerGate.COMPOSER)
 
         assertFalse(availability.canSave)
     }
 
     @Test
     fun replyAndInfoOnlyForSingleSelection() {
-        val single = batchSelectionActionAvailability(listOf(item("m1")), readOnly = false)
+        val single = batchSelectionActionAvailability(listOf(item("m1")), composerGate = ComposerGate.COMPOSER)
         assertTrue(single.canReply)
         assertTrue(single.canInfo)
 
-        val multi = batchSelectionActionAvailability(listOf(item("m1"), item("m2")), readOnly = false)
+        val multi =
+            batchSelectionActionAvailability(
+                listOf(item("m1"), item("m2")),
+                composerGate = ComposerGate.COMPOSER,
+            )
         assertFalse(multi.canReply)
         assertFalse(multi.canInfo)
     }
 
     @Test
-    fun replyDisabledInReadOnlyConversation() {
-        val availability = batchSelectionActionAvailability(listOf(item("m1")), readOnly = true)
+    fun replyDisabledUnlessComposerGateIsComposer() {
+        val items = listOf(item("m1"))
+        assertTrue(batchSelectionActionAvailability(items, composerGate = ComposerGate.COMPOSER).canReply)
 
-        assertFalse(availability.canReply)
-        assertTrue(availability.canInfo)
+        ComposerGate.entries
+            .filter { it != ComposerGate.COMPOSER }
+            .forEach { gate ->
+                val availability = batchSelectionActionAvailability(items, composerGate = gate)
+                assertFalse("reply must be disabled for $gate", availability.canReply)
+                assertTrue(availability.canInfo)
+            }
     }
 
     @Test

@@ -299,14 +299,14 @@ private fun rememberConversationBatchSelectionUiState(
     chatId: String,
     activeAccountRef: String?,
     runtimeGeneration: Int,
-    readOnly: Boolean,
+    composerGate: ComposerGate,
     appState: WhiteNoiseAppState,
 ): ConversationBatchSelectionUiState {
     val selections by
         remember(chatId, activeAccountRef, runtimeGeneration) {
             derivedStateOf { orderedBatchSelections(selectedMessages.values) }
         }
-    return remember(selections, appState.profileRevisionForCompose, readOnly) {
+    return remember(selections, appState.profileRevisionForCompose, composerGate) {
         val actionItems =
             selections.map { selection ->
                 selection.action.copy(senderDisplayName = appState.displayName(selection.action.senderId))
@@ -317,7 +317,7 @@ private fun rememberConversationBatchSelectionUiState(
             copyText = batchCopyText(actionItems),
             forwardBodies = batchForwardBodies(actionItems),
             deleteBreakdown = batchDeleteBreakdown(actionItems),
-            actionAvailability = batchSelectionActionAvailability(actionItems, readOnly),
+            actionAvailability = batchSelectionActionAvailability(actionItems, composerGate),
         )
     }
 }
@@ -963,14 +963,25 @@ internal fun ConversationScreen(
         if (selectionMode) clearTextSelection()
         if (!selectionMode) batchInfoSelection = null
     }
-    val selectionReadOnly = controller.group.pendingConfirmation
+    val composerGate =
+        conversationComposerGate(
+            pendingInvite = controller.group.pendingConfirmation,
+            membersVerified = controller.membersVerified,
+            isSelfMember = controller.isSelfMember,
+            seededSelfMember = controller.seededSelfMember,
+            seededMembershipKnown = controller.seededMembershipKnown,
+            assumeMemberUntilVerified = notificationOpenRequestId != 0L,
+            unrecoverable = controller.group.unrecoverable,
+            disbanding = controller.group.disbanding,
+            disbanded = controller.group.disbanded,
+        )
     val batchSelectionUi =
         rememberConversationBatchSelectionUiState(
             selectedMessages = selectedMessages,
             chatId = chat.id,
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
-            readOnly = selectionReadOnly,
+            composerGate = composerGate,
             appState = appState,
         )
     val renderedSize = renderedTimeline.size
@@ -2607,18 +2618,6 @@ internal fun ConversationScreen(
         return
     }
 
-    val composerGate =
-        conversationComposerGate(
-            pendingInvite = controller.group.pendingConfirmation,
-            membersVerified = controller.membersVerified,
-            isSelfMember = controller.isSelfMember,
-            seededSelfMember = controller.seededSelfMember,
-            seededMembershipKnown = controller.seededMembershipKnown,
-            assumeMemberUntilVerified = notificationOpenRequestId != 0L,
-            unrecoverable = controller.group.unrecoverable,
-            disbanding = controller.group.disbanding,
-            disbanded = controller.group.disbanded,
-        )
     var createOpenConversationTiming by remember(chat.id) {
         mutableStateOf(ChatCreateOpenConversationTimingState())
     }
@@ -2795,7 +2794,8 @@ internal fun ConversationScreen(
                 onSaveSelection = {
                     if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
                         batchAttachmentSaveInFlight = true
-                        val selections = batchSelectionUi.selections
+                        val selections = orderedBatchSelections(selectedMessages.values)
+                        selectedMessages.clear()
                         appState.launchMutation {
                             try {
                                 var savedCount = 0
@@ -2814,7 +2814,6 @@ internal fun ConversationScreen(
                                         )
                                 }
                                 appState.presentAttachmentSaveOutcome(context, savedCount, totalCount)
-                                selectedMessages.clear()
                             } finally {
                                 batchAttachmentSaveInFlight = false
                             }
