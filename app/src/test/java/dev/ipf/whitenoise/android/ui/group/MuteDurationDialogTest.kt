@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.text.format.DateUtils
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -11,7 +12,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +55,34 @@ class MuteDurationDialogTest {
 
         assertEquals(1_772_955_000_000L, springGap)
         assertEquals(1_793_511_000_000L, fallOverlap)
+    }
+
+    @Test
+    fun customDateSelectionRejectsDatesBeforeToday() {
+        val today = LocalDate.of(2026, 8, 10)
+        val yesterdayUtcMillis =
+            LocalDate
+                .of(2026, 8, 9)
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli()
+
+        assertFalse(isDateAllowed(yesterdayUtcMillis, today))
+    }
+
+    @Test
+    fun customDateSelectionAllowsTodayAndFutureDates() {
+        val today = LocalDate.of(2026, 8, 10)
+        val todayUtcMillis = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val tomorrowUtcMillis =
+            today
+                .plusDays(1)
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli()
+
+        assertTrue(isDateAllowed(todayUtcMillis, today))
+        assertTrue(isDateAllowed(tomorrowUtcMillis, today))
     }
 
     @Test
@@ -116,6 +147,7 @@ class MuteDurationDialogTest {
     fun customDateAndTimeReturnToConfirmationWithTheResolvedInstant() {
         var confirmed: MuteTarget? = null
         val customDateTime = LocalDateTime.of(2026, 8, 11, 18, 30)
+        val selectedDateTime = LocalDateTime.of(2026, 8, 12, 19, 30)
         render(
             nowMillis = { LocalDateTime.of(2026, 8, 10, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli() },
             zoneId = { ZoneOffset.UTC },
@@ -124,10 +156,12 @@ class MuteDurationDialogTest {
         )
 
         composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
+        composeRule.onNodeWithText("Wednesday, August 12, 2026").performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
+        composeRule.onNode(hasContentDescription("7 o'clock", substring = true)).performClick()
         composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
 
-        val expectedExpiry = customDateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
+        val expectedExpiry = selectedDateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
         val expectedPreview =
             context.getString(
                 R.string.mute_custom_selected,
@@ -142,6 +176,30 @@ class MuteDurationDialogTest {
         composeRule.runOnIdle {
             assertEquals(MuteTarget.At(expectedExpiry), confirmed)
         }
+    }
+
+    @Test
+    fun elapsedCustomTimeIsRejectedAtFinalConfirmation() {
+        var confirmed: MuteTarget? = null
+        val customDateTime = LocalDateTime.of(2026, 8, 10, 12, 1)
+        var now = LocalDateTime.of(2026, 8, 10, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        render(
+            nowMillis = { now },
+            zoneId = { ZoneOffset.UTC },
+            initialCustomDateTime = customDateTime,
+            onConfirm = { confirmed = it },
+        )
+
+        composeRule.onNodeWithText(context.getString(R.string.mute_duration_custom)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(MUTE_CUSTOM_DATE_CONFIRM_TAG).performClick()
+        composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_CONFIRM_TAG).performClick()
+
+        now = customDateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
+        composeRule.onNodeWithText(context.getString(R.string.ok)).performClick()
+
+        composeRule.runOnIdle { assertNull(confirmed) }
+        composeRule.onNodeWithText(context.getString(R.string.mute_custom_future_error)).assertExists()
+        composeRule.onNodeWithTag(MUTE_CUSTOM_TIME_PICKER_TAG).assertExists()
     }
 
     @Test

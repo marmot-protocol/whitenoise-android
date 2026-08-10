@@ -11,6 +11,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -87,6 +88,16 @@ internal fun customMuteExpiryMillis(
         .toInstant()
         .toEpochMilli()
 
+internal fun isDateAllowed(
+    utcTimeMillis: Long,
+    minimumDate: LocalDate,
+): Boolean = utcTimeMillis >= minimumDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+private fun isExpiredMuteTarget(
+    target: MuteTarget,
+    nowMillis: Long,
+): Boolean = target is MuteTarget.At && target.expiryMillis <= nowMillis
+
 private fun defaultCustomDateTime(
     nowMillis: Long,
     zoneId: ZoneId,
@@ -121,6 +132,7 @@ internal fun MuteDurationDialog(
     if (customStage == CustomMutePickerStage.DATE) {
         CustomMuteDateDialog(
             initialDate = customDate,
+            minimumDate = Instant.ofEpochMilli(nowMillis()).atZone(zoneId()).toLocalDate(),
             onDismiss = { customStage = null },
             onConfirm = { pickedDate ->
                 customDate = pickedDate
@@ -159,7 +171,14 @@ internal fun MuteDurationDialog(
             customStage = CustomMutePickerStage.DATE
         },
         onDismiss = onDismiss,
-        onConfirm = { onConfirm(selected) },
+        onConfirm = {
+            if (isExpiredMuteTarget(selected, nowMillis())) {
+                customValidationError = true
+                customStage = CustomMutePickerStage.TIME
+            } else {
+                onConfirm(selected)
+            }
+        },
     )
 }
 
@@ -234,12 +253,20 @@ private fun CustomMutePreview(expiryMillis: Long) {
 @Composable
 private fun CustomMuteDateDialog(
     initialDate: LocalDate,
+    minimumDate: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
 ) {
+    val selectableDates =
+        remember(minimumDate) {
+            object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean = isDateAllowed(utcTimeMillis, minimumDate)
+            }
+        }
     val dateState =
         rememberDatePickerState(
             initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = selectableDates,
         )
     DatePickerDialog(
         onDismissRequest = onDismiss,
