@@ -18,6 +18,15 @@ function isUiFile(path) {
     path.startsWith(SNAPSHOT_PREFIX)
 }
 
+function isMissingVisualCoverage(files) {
+  const hasUiChanges = files.some(file => isUiFile(file.filename))
+  const hasSnapshotChanges = files.some(file =>
+    file.filename.startsWith(SNAPSHOT_PREFIX) &&
+    file.filename.endsWith('.png') &&
+    file.status !== 'removed')
+  return hasUiChanges && !hasSnapshotChanges
+}
+
 function renderSection(pr, files) {
   const snapshots = files
     .filter(file => file.filename.startsWith(SNAPSHOT_PREFIX) && file.filename.endsWith('.png'))
@@ -30,7 +39,10 @@ function renderSection(pr, files) {
       ? 'No UI-affecting files were detected in this pull request.'
       : '⚠️ UI-affecting files changed, but no committed Roborazzi screenshots changed. Please add or update a screenshot test when the change is visual.')
   } else {
-    lines.push('Generated from the committed Roborazzi baselines in this pull request. This section updates automatically when new commits are pushed.', '')
+    lines.push(
+      `Generated from the committed Roborazzi baselines at head \`${pr.head.sha}\`. This section updates automatically when new commits are pushed.`,
+      '',
+    )
     for (const file of snapshots) {
       const title = escapeCell(file.filename.slice(SNAPSHOT_PREFIX.length))
       const before = repoFileUrl(pr.base.repo.full_name, pr.base.sha, file.previous_filename || file.filename)
@@ -63,7 +75,11 @@ function replaceSection(body, section) {
 }
 
 async function run({ github, context, core }) {
-  const pr = context.payload.pull_request
+  const { data: pr } = await github.rest.pulls.get({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: context.payload.pull_request.number,
+  })
   const files = await github.paginate(github.rest.pulls.listFiles, {
     owner: context.repo.owner,
     repo: context.repo.repo,
@@ -101,6 +117,13 @@ async function run({ github, context, core }) {
       await github.rest.issues.createComment(request)
     }
   }
+
+  if (isMissingVisualCoverage(files)) {
+    core.setFailed(
+      'UI-affecting files changed without a committed Roborazzi screenshot baseline. ' +
+      'Add or update a screenshot test and commit its generated PNG.',
+    )
+  }
 }
 
-module.exports = { isUiFile, renderSection, replaceSection, repoFileUrl, run }
+module.exports = { isUiFile, isMissingVisualCoverage, renderSection, replaceSection, repoFileUrl, run }
