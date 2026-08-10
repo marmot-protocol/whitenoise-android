@@ -228,6 +228,7 @@
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupActionRow</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupMutationErrorBanner</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupSwitchActionRow</ID>
+    <ID>FunctionNaming:DirectDetailsContactEditor.kt:@Composable internal fun DirectDetailsContactEditorRow</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushDeliveryDebugSection</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushTokenDebugRows</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
@@ -339,7 +340,7 @@
     <ID>FunctionNaming:ProfileEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ProfileEditScreen</ID>
     <ID>FunctionNaming:ProfilePublicWarning.kt:@Composable internal fun ProfilePublicWarning</ID>
     <ID>FunctionNaming:ProfileQrSheet.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ProfileQrSheet</ID>
-    <ID>FunctionNaming:ProfileSheet.kt:@Composable private fun ContactPrivateDetailsDialog</ID>
+    <ID>FunctionNaming:ProfileSheet.kt:@Composable internal fun ContactPrivateDetailsDialog</ID>
     <ID>FunctionNaming:ProfileSheet.kt:@Composable private fun ProfileSharedGroupRow</ID>
     <ID>FunctionNaming:ProfileSheet.kt:@Composable private fun ProfileSheetAdminActions</ID>
     <ID>FunctionNaming:ProfileSheet.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ProfileSheet</ID>

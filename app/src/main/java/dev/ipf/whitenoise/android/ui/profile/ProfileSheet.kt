@@ -1051,7 +1051,7 @@ internal const val PROFILE_ADD_TO_GROUPS_CONTENT_TAG = "profile-add-to-groups-co
 internal const val PROFILE_MAKE_ADMIN_CONTENT_TAG = "profile-make-admin-content"
 
 @Composable
-private fun ContactPrivateDetailsDialog(
+internal fun ContactPrivateDetailsDialog(
     profileName: String,
     initialNickname: String,
     initialNotes: String,
