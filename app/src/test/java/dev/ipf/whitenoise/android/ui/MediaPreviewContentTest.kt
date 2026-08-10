@@ -16,15 +16,19 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -62,12 +66,16 @@ class MediaPreviewContentTest {
         initialMedia: List<Uri>,
         preparingMedia: Set<Uri> = emptySet(),
         preparedLabels: Map<Uri, String> = emptyMap(),
+        preparedQualities: Map<Uri, PreparedPhotoQuality> = emptyMap(),
         onEditMediaAt: ((Int) -> Unit)? = null,
+        onSelectMediaQualityAt: ((Int, MediaQuality) -> Unit)? = null,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
     ) {
         val initialSlots = initialMedia.mapIndexed { index, uri -> PendingMediaSlot("slot-$index", uri) }
         val preparingSlotIds = initialSlots.filter { it.uri in preparingMedia }.mapTo(mutableSetOf()) { it.id }
         val labelsBySlot = initialSlots.mapNotNull { slot -> preparedLabels[slot.uri]?.let { slot.id to it } }.toMap()
+        val qualitiesBySlot =
+            initialSlots.mapNotNull { slot -> preparedQualities[slot.uri]?.let { slot.id to it } }.toMap()
         initialMedia.forEach { stagedUri ->
             shadowOf(app.contentResolver).registerInputStreamSupplier(stagedUri) {
                 ByteArrayInputStream(ByteArray(1))
@@ -90,7 +98,9 @@ class MediaPreviewContentTest {
                     onAddDocuments = {},
                     preparingPhotoSlotIds = preparingSlotIds,
                     preparedPhotoLabels = labelsBySlot,
+                    preparedPhotoQualities = qualitiesBySlot,
                     onEditMediaAt = onEditMediaAt,
+                    onSelectMediaQualityAt = onSelectMediaQualityAt,
                 )
             }
         }
@@ -179,6 +189,63 @@ class MediaPreviewContentTest {
             .onNodeWithContentDescription(string(R.string.photo_editor_edit_with_quality, quality))
             .performClick()
         assertEquals(0, editedIndex)
+    }
+
+    @Test
+    fun photoQualityIsChosenFromApprovalWithTwoClearOptions() {
+        val staged = uri(1)
+        var selected: Pair<Int, MediaQuality>? = null
+        renderPreview(
+            initialMedia = listOf(staged),
+            preparedQualities =
+                mapOf(
+                    staged to
+                        PreparedPhotoQuality(
+                            selectedQuality = MediaQuality.Standard,
+                            standardDimensions = "2048 × 1536",
+                            hdDimensions = "4096 × 3072",
+                        ),
+                ),
+            onSelectMediaQualityAt = { index, quality -> selected = index to quality },
+        )
+
+        val standardDescription =
+            string(
+                R.string.photo_editor_announcement_quality,
+                string(R.string.photo_editor_quality_standard),
+            )
+        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_hd)).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(standardDescription).performClick()
+        composeRule.onNodeWithText(string(R.string.photo_editor_quality)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.photo_editor_quality_standard)).assertIsSelected()
+        composeRule.onNodeWithText("2048 × 1536").assertIsDisplayed()
+        composeRule.onNodeWithText("4096 × 3072").assertIsDisplayed()
+        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_high)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(string(R.string.photo_editor_quality_original)).assertCountEquals(0)
+
+        composeRule.onNodeWithText(string(R.string.photo_editor_quality_hd)).performClick()
+
+        assertEquals(0 to MediaQuality.High, selected)
+    }
+
+    @Test
+    fun selectedLowAndOriginalTiersKeepTheirTruthfulOutputProfiles() {
+        assertEquals(
+            MediaQuality.Low,
+            photoApprovalOutputQuality(MediaQuality.Low, MediaQuality.Standard),
+        )
+        assertEquals(
+            MediaQuality.Original,
+            photoApprovalOutputQuality(MediaQuality.Original, MediaQuality.High),
+        )
+        assertEquals(
+            MediaQuality.Standard,
+            photoApprovalOutputQuality(MediaQuality.High, MediaQuality.Standard),
+        )
+        assertEquals(
+            MediaQuality.High,
+            photoApprovalOutputQuality(MediaQuality.Standard, MediaQuality.High),
+        )
     }
 
     @Test

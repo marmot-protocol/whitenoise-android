@@ -45,13 +45,11 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -79,7 +77,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -91,7 +88,6 @@ import dev.ipf.whitenoise.android.media.editor.NormalizedRect
 import dev.ipf.whitenoise.android.media.editor.PhotoEditGeometry
 import dev.ipf.whitenoise.android.media.editor.PhotoEditLimit
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
-import dev.ipf.whitenoise.android.media.editor.PhotoEditorOutputPlan
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -103,7 +99,6 @@ internal fun PhotoEditorDialog(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,
     stateHolder: PhotoEditorStateHolder,
-    outputPlan: PhotoEditorOutputPlan?,
     onCancel: () -> Unit,
     onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
 ) {
@@ -117,7 +112,6 @@ internal fun PhotoEditorDialog(
             previewBitmap = previewBitmap,
             sourceInfo = sourceInfo,
             stateHolder = stateHolder,
-            outputPlan = outputPlan,
             onCancel = onCancel,
             onSave = onSave,
         )
@@ -125,65 +119,39 @@ internal fun PhotoEditorDialog(
 }
 
 @Composable
-@Suppress("CyclomaticComplexMethod", "LongMethod")
-// Screen-level orchestration keeps save/back and focused-operation semantics alongside editor state.
+@Suppress("LongMethod") // Screen-level orchestration keeps save/back semantics alongside editor state.
 internal fun PhotoEditorScreen(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,
     stateHolder: PhotoEditorStateHolder,
-    outputPlan: PhotoEditorOutputPlan?,
     onCancel: () -> Unit,
     onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state = stateHolder.state
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var showOperationDiscardDialog by remember { mutableStateOf(false) }
-    var showQualitySheet by remember { mutableStateOf(false) }
 
-    fun requestEditorCancel() {
+    fun requestCancel() {
         if (state.isSaving) return
         if (stateHolder.hasUnsavedChanges) showDiscardDialog = true else onCancel()
     }
 
-    fun requestOperationCancel() {
-        if (state.isSaving) return
-        if (stateHolder.hasUncommittedOperationChanges) {
-            showOperationDiscardDialog = true
-        } else {
-            stateHolder.discardOperation()
-        }
-    }
-
-    BackHandler(enabled = true) {
-        if (state.activeOperation == null) requestEditorCancel() else requestOperationCancel()
-    }
+    BackHandler(enabled = true, onBack = ::requestCancel)
     Surface(modifier = modifier.fillMaxSize(), color = Color.Black) {
         Column(Modifier.fillMaxSize()) {
-            if (state.activeOperation == null) {
-                PhotoEditorTopBar(
-                    saving = state.isSaving,
-                    onCancel = ::requestEditorCancel,
-                    canUndo = state.canUndo,
-                    onUndo = stateHolder::undo,
-                    canRedo = state.canRedo,
-                    onRedo = stateHolder::redo,
-                    onReset = stateHolder::reset,
-                    onSave = {
-                        stateHolder.beginSaving()
-                        onSave(state.recipe, state.quality)
-                    },
-                )
-            } else {
-                PhotoEditorOperationTopBar(
-                    canUndo = state.canUndo,
-                    onUndo = stateHolder::undo,
-                    canRedo = state.canRedo,
-                    onRedo = stateHolder::redo,
-                    onCancel = ::requestOperationCancel,
-                    onDone = stateHolder::commitOperation,
-                )
-            }
+            PhotoEditorTopBar(
+                saving = state.isSaving,
+                onCancel = ::requestCancel,
+                canUndo = state.canUndo,
+                onUndo = stateHolder::undo,
+                canRedo = state.canRedo,
+                onRedo = stateHolder::redo,
+                onReset = stateHolder::reset,
+                onSave = {
+                    stateHolder.beginSaving()
+                    onSave(state.recipe, state.quality)
+                },
+            )
             PhotoEditorCanvas(
                 previewBitmap = previewBitmap,
                 sourceInfo = sourceInfo,
@@ -197,40 +165,12 @@ internal fun PhotoEditorScreen(
                         .heightIn(min = 160.dp)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
             )
-            when (state.activeOperation) {
-                null ->
-                    PhotoEditorOverviewControls(
-                        state = state,
-                        onCrop = stateHolder::beginCropOperation,
-                        onDraw = stateHolder::beginDrawOperation,
-                        onOpenQuality = { showQualitySheet = true },
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-                    )
-                PhotoEditorOperation.Crop ->
-                    PhotoEditorOperationPanel(
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-                    ) {
-                        CropControls(state, stateHolder)
-                    }
-                PhotoEditorOperation.Draw ->
-                    PhotoEditorDrawPanel(
-                        state = state,
-                        stateHolder = stateHolder,
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-                    )
-            }
+            PhotoEditorControls(
+                state = state,
+                stateHolder = stateHolder,
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+            )
         }
-    }
-    if (showQualitySheet) {
-        PhotoQualitySheet(
-            selectedTier = state.qualityTier,
-            selectedOutputPlan = outputPlan,
-            onSelect = { tier ->
-                stateHolder.selectQualityTier(tier)
-                showQualitySheet = false
-            },
-            onDismiss = { showQualitySheet = false },
-        )
     }
     if (showDiscardDialog) {
         AlertDialog(
@@ -247,26 +187,6 @@ internal fun PhotoEditorScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
-    if (showOperationDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { showOperationDiscardDialog = false },
-            title = { Text(stringResource(R.string.photo_editor_discard_operation_title)) },
-            text = { Text(stringResource(R.string.photo_editor_discard_operation_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showOperationDiscardDialog = false
-                        stateHolder.discardOperation()
-                    },
-                ) { Text(stringResource(R.string.photo_editor_discard)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showOperationDiscardDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -350,129 +270,7 @@ private fun PhotoEditorTopBar(
 }
 
 @Composable
-private fun PhotoEditorOperationTopBar(
-    canUndo: Boolean,
-    onUndo: () -> Unit,
-    canRedo: Boolean,
-    onRedo: () -> Unit,
-    onCancel: () -> Unit,
-    onDone: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EditorIconButton(
-            description = stringResource(R.string.cancel),
-            enabled = true,
-            onClick = onCancel,
-        ) {
-            Icon(Icons.Default.Close, contentDescription = null)
-        }
-        Spacer(Modifier.weight(1f))
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_undo),
-            enabled = canUndo,
-            onClick = onUndo,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
-        }
-        EditorIconButton(
-            description = stringResource(R.string.photo_editor_redo),
-            enabled = canRedo,
-            onClick = onRedo,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null)
-        }
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ) {
-            val doneDescription = stringResource(R.string.photo_editor_done)
-            IconButton(
-                onClick = onDone,
-                modifier = Modifier.semantics { contentDescription = doneDescription },
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhotoEditorOverviewControls(
-    state: PhotoEditorUiState,
-    onCrop: () -> Unit,
-    onDraw: () -> Unit,
-    onOpenQuality: () -> Unit,
-    modifier: Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        color = Color(0xFF111315),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EditorIconButton(
-                    description = stringResource(R.string.photo_editor_crop),
-                    enabled = !state.isSaving,
-                    onClick = onCrop,
-                ) {
-                    Icon(Icons.Default.Crop, contentDescription = null)
-                }
-                EditorIconButton(
-                    description = stringResource(R.string.photo_editor_draw),
-                    enabled = !state.isSaving,
-                    onClick = onDraw,
-                ) {
-                    Icon(Icons.Default.Brush, contentDescription = null)
-                }
-                QualityButton(
-                    tier = state.qualityTier,
-                    enabled = !state.isSaving,
-                    onClick = onOpenQuality,
-                )
-            }
-            EditorStatus(state)
-        }
-    }
-}
-
-@Composable
-private fun PhotoEditorOperationPanel(
-    modifier: Modifier,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        color = Color(0xFF111315),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun PhotoEditorDrawPanel(
+private fun PhotoEditorControls(
     state: PhotoEditorUiState,
     stateHolder: PhotoEditorStateHolder,
     modifier: Modifier,
@@ -490,11 +288,11 @@ private fun PhotoEditorDrawPanel(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                DrawControls(
-                    state = state,
-                    stateHolder = stateHolder,
-                    showColors = state.activeTool == PhotoEditorTool.Draw,
-                )
+                when (state.activeTool) {
+                    PhotoEditorTool.Crop -> CropControls(state, stateHolder)
+                    PhotoEditorTool.Draw -> DrawControls(state, stateHolder, showColors = true)
+                    PhotoEditorTool.Erase -> DrawControls(state, stateHolder, showColors = false)
+                }
             }
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
             Row(
@@ -502,6 +300,14 @@ private fun PhotoEditorDrawPanel(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                EditorToolButton(
+                    selected = state.activeTool == PhotoEditorTool.Crop,
+                    description = stringResource(R.string.photo_editor_crop),
+                    enabled = !state.isSaving,
+                    onClick = { stateHolder.selectTool(PhotoEditorTool.Crop) },
+                ) {
+                    Icon(Icons.Default.Crop, contentDescription = null)
+                }
                 EditorToolButton(
                     selected = state.activeTool == PhotoEditorTool.Draw,
                     description = stringResource(R.string.photo_editor_draw),
@@ -711,62 +517,6 @@ private fun EditorStatus(state: PhotoEditorUiState) {
 }
 
 @Composable
-private fun QualityButton(
-    tier: PhotoEditorQualityTier,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val qualityName = qualityTierLabel(tier)
-    val description = stringResource(R.string.photo_editor_announcement_quality, qualityName)
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(48.dp).semantics { contentDescription = description },
-    ) {
-        Surface(
-            modifier = Modifier.size(40.dp),
-            shape = CircleShape,
-            color = Color.White.copy(alpha = if (enabled) 0.08f else 0.03f),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                QualityBadgeIcon(
-                    tier = tier,
-                    tint = Color.White.copy(alpha = if (enabled) 0.9f else 0.35f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QualityBadgeIcon(
-    tier: PhotoEditorQualityTier,
-    tint: Color,
-) {
-    Box(
-        modifier = Modifier.size(width = 28.dp, height = 22.dp).border(1.5.dp, tint, RoundedCornerShape(5.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = stringResource(R.string.photo_editor_quality_hd),
-            color = tint,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        if (tier == PhotoEditorQualityTier.Standard) {
-            Canvas(Modifier.fillMaxSize()) {
-                drawLine(
-                    color = tint,
-                    start = Offset(size.width * 0.18f, size.height * 0.85f),
-                    end = Offset(size.width * 0.82f, size.height * 0.15f),
-                    strokeWidth = 1.8.dp.toPx(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun CropPresetButton(
     preset: PhotoCropPreset,
     selected: Boolean,
@@ -923,91 +673,6 @@ private fun StrokeWidthButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Suppress("LongMethod") // Each quality row stays adjacent so selection styling and dimensions remain consistent.
-private fun PhotoQualitySheet(
-    selectedTier: PhotoEditorQualityTier,
-    selectedOutputPlan: PhotoEditorOutputPlan?,
-    onSelect: (PhotoEditorQualityTier) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF17191B),
-        contentColor = Color.White,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.photo_editor_quality),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PhotoEditorQualityTier.entries.forEach { tier ->
-                    val selected = tier == selectedTier
-                    val tierLabel = qualityTierLabel(tier)
-                    val tierAnnouncement = stringResource(R.string.photo_editor_announcement_quality, tierLabel)
-                    val description =
-                        stringResource(
-                            when (tier) {
-                                PhotoEditorQualityTier.Standard -> R.string.photo_editor_quality_standard_description
-                                PhotoEditorQualityTier.Hd -> R.string.photo_editor_quality_hd_description
-                            },
-                        )
-                    Surface(
-                        onClick = { onSelect(tier) },
-                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .heightIn(min = 88.dp)
-                                .semantics {
-                                    contentDescription = tierAnnouncement
-                                    this.selected = selected
-                                },
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            QualityBadgeIcon(
-                                tier = tier,
-                                tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
-                            )
-                            Text(tierLabel, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = description,
-                                color = Color.White.copy(alpha = 0.62f),
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            )
-                            if (selected && selectedOutputPlan != null) {
-                                Text(
-                                    text =
-                                        "${selectedOutputPlan.geometry.outputSize.width} × " +
-                                            "${selectedOutputPlan.geometry.outputSize.height}",
-                                    color = Color.White.copy(alpha = 0.62f),
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 @Suppress("LongMethod") // Pointer input, crop handles, and transformed preview share one coordinate space.
 private fun PhotoEditorCanvas(
@@ -1028,10 +693,9 @@ private fun PhotoEditorCanvas(
     BoxWithConstraints(modifier.background(Color(0xFF161616), RoundedCornerShape(12.dp))) {
         val viewWidth = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val viewHeight = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
-        val cropOperation = state.activeOperation == PhotoEditorOperation.Crop
-        val drawOperation = state.activeOperation == PhotoEditorOperation.Draw
+        val cropMode = state.activeTool == PhotoEditorTool.Crop
         val displayRecipe =
-            if (cropOperation) {
+            if (cropMode) {
                 state.recipe.copy(crop = NormalizedRect.Full)
             } else {
                 state.recipe
@@ -1051,16 +715,16 @@ private fun PhotoEditorCanvas(
                 EditorViewTransform.fit(geometry.outputSize, viewWidth, viewHeight)
             }
         val pointerModifier =
-            if (state.isSaving || state.activeOperation == null) {
+            if (state.isSaving) {
                 Modifier
             } else {
-                Modifier.pointerInput(state.activeOperation, state.activeTool, geometry, viewTransform, state.recipe.crop) {
+                Modifier.pointerInput(state.activeTool, geometry, viewTransform, state.recipe.crop) {
                     val strokePoints = mutableListOf<NormalizedPoint>()
                     detectDragGestures(
                         onDragStart = { position ->
-                            if (cropOperation) {
+                            if (cropMode) {
                                 activeCropCorner = nearestCropCorner(position, state.recipe.crop, geometry, viewTransform, handleRadiusPx)
-                            } else if (drawOperation) {
+                            } else {
                                 strokePoints.clear()
                                 strokePoints += geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped()
                                 transientStroke = strokePoints.toList()
@@ -1069,11 +733,11 @@ private fun PhotoEditorCanvas(
                         onDrag = { change, _ ->
                             change.consume()
                             val point = geometry.viewToOriented(EditorPoint(change.position.x, change.position.y), viewTransform).clamped()
-                            if (cropOperation) {
+                            if (cropMode) {
                                 activeCropCorner?.let { corner ->
                                     transientCrop = movedCropCorner(state.recipe.crop, corner, point, minimumCropFraction(sourceInfo.orientedSize))
                                 }
-                            } else if (drawOperation) {
+                            } else {
                                 strokePoints += point
                                 transientStroke = strokePoints.toList()
                             }
@@ -1120,7 +784,7 @@ private fun PhotoEditorCanvas(
                 transientMode = if (state.activeTool == PhotoEditorTool.Erase) PhotoStrokeMode.Erase else PhotoStrokeMode.Draw,
                 transientColor = state.drawColorArgb,
                 transientWidth = state.strokeWidth.fraction,
-                cropMode = cropOperation,
+                cropMode = cropMode,
             )
         }
     }
@@ -1156,16 +820,25 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEditorPreview(
                 ),
             )
         }
+    val outputLeft = viewTransform.offsetX
+    val outputTop = viewTransform.offsetY
+    val outputRight = outputLeft + geometry.outputSize.width * viewTransform.scale
+    val outputBottom = outputTop + geometry.outputSize.height * viewTransform.scale
     drawIntoCanvas { canvas ->
-        canvas.nativeCanvas.drawBitmap(
+        val native = canvas.nativeCanvas
+        val checkpoint = native.save()
+        native.clipRect(outputLeft, outputTop, outputRight, outputBottom)
+        native.drawBitmap(
             previewBitmap,
             matrix,
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
         )
+        native.restoreToCount(checkpoint)
     }
     drawIntoCanvas { canvas ->
         val native = canvas.nativeCanvas
-        val checkpoint = native.saveLayer(0f, 0f, size.width, size.height, null)
+        val checkpoint = native.saveLayer(outputLeft, outputTop, outputRight, outputBottom, null)
+        native.clipRect(outputLeft, outputTop, outputRight, outputBottom)
         committedRecipe.strokes.forEach { stroke ->
             drawPreviewStroke(native, stroke.points, stroke.mode, stroke.colorArgb, stroke.widthFraction, geometry, viewTransform)
         }
@@ -1354,15 +1027,6 @@ private fun strokeWidthLabel(width: PhotoStrokeWidth): String =
     )
 
 @Composable
-private fun qualityTierLabel(tier: PhotoEditorQualityTier): String =
-    stringResource(
-        when (tier) {
-            PhotoEditorQualityTier.Standard -> R.string.photo_editor_quality_standard
-            PhotoEditorQualityTier.Hd -> R.string.photo_editor_quality_hd
-        },
-    )
-
-@Composable
 private fun toolLabel(tool: PhotoEditorTool): String =
     stringResource(
         when (tool) {
@@ -1385,8 +1049,6 @@ private fun announcementMessage(state: PhotoEditorUiState): String? =
         PhotoEditorAnnouncement.Undo -> stringResource(R.string.photo_editor_announcement_undo)
         PhotoEditorAnnouncement.Redo -> stringResource(R.string.photo_editor_announcement_redo)
         PhotoEditorAnnouncement.Reset -> stringResource(R.string.photo_editor_announcement_reset)
-        PhotoEditorAnnouncement.QualityChanged ->
-            stringResource(R.string.photo_editor_announcement_quality, qualityTierLabel(state.qualityTier))
         null -> null
     }
 

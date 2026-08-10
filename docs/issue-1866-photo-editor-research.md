@@ -32,15 +32,17 @@ Recommended product decisions:
 
 This document was completed before production implementation began. The approved Phase 2 work now lives on the `issue/1866-photo-editor-research` branch.
 
-### 2026 UX revision: focused operations and a two-tier quality control
+### 2026 UX revision: unified editing and approval-level quality control
 
 The implementation was revised after a second pass over current Signal Android source and public WhatsApp behavior:
 
 - **Signal, verified at the pinned revision:** [ImageEditorToolbar.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/image/ImageEditorToolbar.kt) keeps a compact overview toolbar, then gives crop and drawing their own modes with explicit commit and discard actions. [ImageController.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/ImageController.kt) snapshots the operation on entry, restores it on cancel, and keeps one controller per media URI. [QualitySelectorSheetContent.kt](https://github.com/signalapp/Signal-Android/blob/9b2c2ed66d854b7abb8ed1a29e976a516ab2ce67/feature/media-send/src/main/java/org/signal/mediasend/screens/edit/QualitySelectorSheetContent.kt) exposes only Standard and High.
 - **WhatsApp, observed product behavior:** the top-bar HD badge opens a two-choice Standard/HD selector rather than exposing encoder vocabulary. Public walkthroughs document the same two-choice sheet ([9to5Google](https://9to5google.com/2023/08/17/whatsapp-hd-photos-android-ios/), [TechRadar](https://www.techradar.com/phones/this-whatsapp-setting-will-upgrade-your-photos-and-videos-heres-how-to-use-it)). Crop/rotate and mark/text actions use contextual editing surfaces rather than permanently placing every labeled control in the main approval view.
-- **Adopted interaction:** the overview contains icon-only Crop, Draw, and HD controls. Crop/Rotate and Draw/Erase are focused, transactional workspaces with X/Done and operation-local undo/redo. Done contributes one checkpoint to the photo's cumulative history; Cancel restores the operation-entry snapshot.
+- **Adopted interaction after device testing:** editing stays in one stable, icon-only surface. Crop, Draw, and Erase switch the contextual controls beneath the image while sharing one bounded undo/redo history. This preserves visual continuity and avoids the layout jump that the separate operation workspaces introduced after cropping.
 - **Album continuity:** leaving the album preview for an operation must preserve the selected attachment index and caption. Returning after editing item 2 stays on item 2 and immediately displays its newly prepared bytes in both hero and thumbnail previews.
+- **Quality placement:** the HD badge belongs to the media approval screen, alongside Edit and Remove, because quality controls how the attachment is sent rather than how pixels are edited. It opens a two-choice Standard/HD sheet with selection state, concise data-use guidance, and effective dimensions for both choices.
 - **Quality decision:** an edited photo has two actual render profiles, Standard (2048 px / JPEG 85) and HD (4096 px / JPEG 92). There is no “Original edited” option: it is a contradiction because editing necessarily creates a new representation. Unedited Original and raw file sending remain separate behaviors.
+- **Crop continuity:** preview drawing is clipped to the exact transformed output rectangle. Switching from Crop to Draw or Erase therefore shows the accepted crop, never pixels outside it, while export continues to use the same source-space recipe.
 
 ## Evidence language and method
 
@@ -228,19 +230,18 @@ Adopt the explicit file/photo choice. Do not adopt full-size decode or iterative
 
 ### Editor layout
 
-- Overview top bar: Cancel, global undo/redo/reset, and Save.
+- Top bar: Cancel, global undo/redo/reset, and Save.
 - Image stage: dark neutral surround, checkerboard only when alpha can be retained, bounded pan/zoom, conservative system-gesture exclusion over the stage only.
-- Overview tool row: icon-only Crop, Draw, and HD badge controls with accessibility descriptions; no persistent text labels.
-- Crop/Rotate workspace: X, operation-local undo/redo, Done, Free, Original, 1:1, 4:3, 3:4, 16:9, 9:16, and clockwise quarter rotation.
-- Draw/Erase workspace: X, operation-local undo/redo, Done, icon toggles for brush/eraser, named color semantics, and discrete widths Small, Medium, Large, Extra large. Erasing is stored as a vector command, not destructively applied to a bitmap.
-- Quality control: the HD badge opens an attachment-local Standard/HD sheet. The selected card shows the effective dimensions.
+- Unified tool row: icon-only Crop, Draw, and Erase actions with accessibility descriptions; no persistent text labels.
+- Context controls: Crop exposes Free, Original, 1:1, 4:3, 3:4, 16:9, 9:16, and clockwise quarter rotation. Draw/Erase exposes named color semantics and discrete widths Small, Medium, Large, Extra large. Erasing is stored as a vector command, not destructively applied to a bitmap.
+- Media approval quality control: an HD badge in the preview top bar opens an attachment-local Standard/HD sheet. Both choices show their effective dimensions, and the selected row is communicated by color, checkmark, and accessibility selection state.
 - Save shows cancellable progress. Editing gestures are disabled during final render; Cancel render returns to the unchanged committed draft.
 
 ### Interaction rules
 
 - Entering a tool starts from the current cumulative recipe, including every previously accepted crop, rotation, draw, or erase operation.
-- Done commits the focused operation as one checkpoint and returns to the overview. X restores the exact operation-entry recipe.
-- Undo/redo inside a focused operation cannot cross into previously accepted operations; overview undo/redo traverses those accepted checkpoints.
+- Tool switches preserve every accepted crop and stroke; they do not create hidden commit or discard boundaries.
+- Undo/redo traverses the single chronological edit history across crop, rotation, drawing, and erasing.
 - Back while there are unsaved edits asks whether to discard them. Back with no change is equivalent to Cancel.
 - Cancel discards the entire working recipe and does not call the draft save API.
 - Reset clears crop, quarter turns, and drawing commands to the original EXIF-oriented image. Reset is itself undoable.

@@ -159,6 +159,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.NullableUriSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
+import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
@@ -169,6 +170,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.media.isLegacyRestore
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.BatchMessageDeleteDialog
@@ -1339,6 +1341,58 @@ internal fun ConversationScreen(
         if (slot.id in nonEditablePhotoDescriptions) return
         requestedPhotoEditorSlotId = slot.id
         if (slot.id !in preparingPhotoSlotIds) scope.launch { preparePhoto(slot) }
+    }
+
+    fun selectPhotoQuality(
+        slot: PendingMediaSlot,
+        requestedQuality: MediaQuality,
+    ) {
+        val photo = draftBackedPhotos[slot.id] ?: return
+        if (slot.id in preparingPhotoSlotIds) return
+        val quality =
+            when (requestedQuality) {
+                MediaQuality.Low,
+                MediaQuality.Standard,
+                -> MediaQuality.Standard
+                MediaQuality.High,
+                MediaQuality.Original,
+                -> MediaQuality.High
+            }
+        val currentlyStandard = photo.quality == MediaQuality.Low || photo.quality == MediaQuality.Standard
+        if (currentlyStandard == (quality == MediaQuality.Standard)) return
+        val accountRef = controller.boundAccountRef ?: return
+        preparingPhotoSlotIds = preparingPhotoSlotIds + slot.id
+        scope.launch {
+            try {
+                val result =
+                    photoCommitter.commit(
+                        accountRef = accountRef,
+                        groupIdHex = controller.group.groupIdHex,
+                        currentAttachment = photo.attachment,
+                        expectedDigest = photo.attachmentDigest,
+                        sourceLeaseId = photo.sourceLeaseId,
+                        recipe = photo.recipe,
+                        quality = quality,
+                    )
+                if (result is PhotoEditorCommitResult.Success) {
+                    val updated =
+                        photo.copy(
+                            attachment = result.attachment,
+                            attachmentDigest = result.attachment.editorDigest(),
+                            quality = quality,
+                        )
+                    if (pendingMediaSlots.any { it.id == slot.id }) {
+                        draftBackedPhotos = draftBackedPhotos + (slot.id to updated)
+                    } else {
+                        photoDraftStager.remove(accountRef, controller.group.groupIdHex, updated)
+                    }
+                } else if (pendingMediaSlots.any { it.id == slot.id }) {
+                    appState.presentText(AppText.Plain(photoEditorSaveFailedMessage), copyable = true)
+                }
+            } finally {
+                preparingPhotoSlotIds = preparingPhotoSlotIds - slot.id
+            }
+        }
     }
 
     LaunchedEffect(pendingMediaSlots, controller.boundAccountRef) {
@@ -3284,6 +3338,19 @@ internal fun ConversationScreen(
                         bytes = photo.attachment.plaintext,
                     )
                 }
+        val preparedPhotoQualities =
+            draftBackedPhotos.mapValues { (_, photo) ->
+                fun dimensions(quality: MediaQuality): String? =
+                    photoRenderer.outputPlan(photo.sourceInfo, photo.recipe, quality)?.geometry?.outputSize?.let {
+                        "${it.width} × ${it.height}"
+                    }
+                PreparedPhotoQuality(
+                    selectedQuality = photo.quality,
+                    standardDimensions =
+                        dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
+                    hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
+                )
+            }
         // The typed composer draft seeds the caption, and an accepted send
         // consumes it exactly like a text send would — guarded so text typed
         // after staging is never wiped. Dismissing leaves the draft alone.
@@ -3351,8 +3418,12 @@ internal fun ConversationScreen(
                 },
                 onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
                 onEditMediaAt = { index -> pendingMediaSlots.getOrNull(index)?.let(::openPhotoEditor) },
+                onSelectMediaQualityAt = { index, quality ->
+                    pendingMediaSlots.getOrNull(index)?.let { selectPhotoQuality(it, quality) }
+                },
                 preparedPhotoLabels = preparedPhotoLabels,
                 preparedPhotoPreviews = preparedPhotoPreviews,
+                preparedPhotoQualities = preparedPhotoQualities,
                 preparingPhotoSlotIds = preparingPhotoSlotIds,
                 nonEditableMediaSlotIds = nonEditablePhotoDescriptions.keys,
                 nonEditableMediaDescriptions = nonEditablePhotoDescriptions,
@@ -3360,18 +3431,10 @@ internal fun ConversationScreen(
         }
     }
     activePhotoEditor?.let { editor ->
-        val editorState = editor.stateHolder.state
-        val outputPlan =
-            photoRenderer.outputPlan(
-                source = editor.photo.sourceInfo,
-                recipe = editorState.recipe,
-                quality = editorState.quality,
-            )
         PhotoEditorDialog(
             previewBitmap = editor.previewBitmap,
             sourceInfo = editor.photo.sourceInfo,
             stateHolder = editor.stateHolder,
-            outputPlan = outputPlan,
             onCancel = {
                 editor.previewBitmap.recycle()
                 activePhotoEditor = null

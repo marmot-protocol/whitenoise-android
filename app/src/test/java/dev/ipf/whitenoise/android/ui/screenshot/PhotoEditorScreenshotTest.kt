@@ -14,7 +14,6 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
-import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorScreen
@@ -51,16 +50,13 @@ class PhotoEditorScreenshotTest {
                 initialQuality = MediaQuality.Standard,
                 orientedSize = source.orientedSize,
             )
-        val renderer = PhotoEditorRenderer()
         try {
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = true) {
-                    val state = holder.state
                     PhotoEditorScreen(
                         previewBitmap = bitmap,
                         sourceInfo = source,
                         stateHolder = holder,
-                        outputPlan = renderer.outputPlan(source, state.recipe, state.quality),
                         onCancel = {},
                         onSave = { _, _ -> },
                     )
@@ -73,6 +69,9 @@ class PhotoEditorScreenshotTest {
             composeRule.waitForIdle()
 
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_square_crop.png")
+            composeRule.onNodeWithContentDescription(app.getString(R.string.photo_editor_draw)).performClick()
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_cropped_draw.png")
         } finally {
             bitmap.recycle()
         }
