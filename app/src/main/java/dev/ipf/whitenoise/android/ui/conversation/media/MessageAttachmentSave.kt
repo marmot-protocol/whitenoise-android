@@ -10,26 +10,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageAttachmentSave
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal data class MessageAttachmentSaveSummary(
-    val savedCount: Int,
-    val totalCount: Int,
-) {
-    val outcome: MessageAttachmentSaveOutcome
-        get() = MessageAttachmentSaveOutcome.from(savedCount, totalCount)
-
-    companion object {
-        val Empty = MessageAttachmentSaveSummary(savedCount = 0, totalCount = 0)
-    }
-}
-
-internal fun aggregateMessageAttachmentSaveSummaries(summaries: Iterable<MessageAttachmentSaveSummary>): MessageAttachmentSaveSummary =
-    summaries.fold(MessageAttachmentSaveSummary.Empty) { aggregate, summary ->
-        MessageAttachmentSaveSummary(
-            savedCount = aggregate.savedCount + summary.savedCount,
-            totalCount = aggregate.totalCount + summary.totalCount,
-        )
-    }
-
 internal suspend fun saveMessageMediaAttachments(
     context: Context,
     controller: ConversationController,
