@@ -29,6 +29,7 @@
     <string name="photo_editor_width_large">粗</string>
     <string name="photo_editor_width_extra_large">特粗</string>
     <string name="photo_editor_quality">输出质量</string>
+    <string name="photo_editor_quality_sheet_description">选择这张照片的发送方式。</string>
     <string name="photo_editor_quality_low">低</string>
     <string name="photo_editor_quality_standard">标准</string>
     <string name="photo_editor_quality_standard_description">发送更快，使用更少流量</string>

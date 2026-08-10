@@ -29,6 +29,7 @@
     <string name="photo_editor_width_large">Grande</string>
     <string name="photo_editor_width_extra_large">Muy grande</string>
     <string name="photo_editor_quality">Calidad de salida</string>
+    <string name="photo_editor_quality_sheet_description">Elige cómo se enviará esta foto.</string>
     <string name="photo_editor_quality_low">Baja</string>
     <string name="photo_editor_quality_standard">Estándar</string>
     <string name="photo_editor_quality_standard_description">Más rápida, usa menos datos</string>

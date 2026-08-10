@@ -29,6 +29,7 @@
     <string name="photo_editor_width_large">Büyük</string>
     <string name="photo_editor_width_extra_large">Çok büyük</string>
     <string name="photo_editor_quality">Çıktı kalitesi</string>
+    <string name="photo_editor_quality_sheet_description">Bu fotoğrafın nasıl gönderileceğini seçin.</string>
     <string name="photo_editor_quality_low">Düşük</string>
     <string name="photo_editor_quality_standard">Standart</string>
     <string name="photo_editor_quality_standard_description">Daha hızlı, daha az veri kullanır</string>

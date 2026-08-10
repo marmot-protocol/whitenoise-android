@@ -29,6 +29,7 @@
     <string name="photo_editor_width_large">Большая</string>
     <string name="photo_editor_width_extra_large">Очень большая</string>
     <string name="photo_editor_quality">Качество результата</string>
+    <string name="photo_editor_quality_sheet_description">Выберите, как отправить это фото.</string>
     <string name="photo_editor_quality_low">Низкое</string>
     <string name="photo_editor_quality_standard">Стандартное</string>
     <string name="photo_editor_quality_standard_description">Быстрее, расходует меньше данных</string>
