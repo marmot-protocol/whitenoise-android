@@ -3853,9 +3853,13 @@ class WhiteNoiseAppState private constructor(
             clearContactPrivateDetailsForAccount(wipedRef)
             wipeDecryptedMediaFromDisk()
             clearHiddenMessagesForAccount(wipedRef)
-            withContext(Dispatchers.IO) {
-                if (editorSessionStore.removeAccount(wipedRef)) {
-                    editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
+            withContext(NonCancellable + Dispatchers.IO) {
+                runCatching {
+                    if (editorSessionStore.removeAccount(wipedRef)) {
+                        editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
+                    }
+                }.onFailure {
+                    appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
                 }
             }
             val refreshedAccounts = runCatchingCancellable { marmotIo { listAccounts() } }.getOrDefault(emptyList())

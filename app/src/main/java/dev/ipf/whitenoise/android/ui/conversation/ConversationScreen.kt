@@ -1362,7 +1362,7 @@ internal fun ConversationScreen(
         if (currentlyStandard == (quality == MediaQuality.Standard)) return
         val accountRef = controller.boundAccountRef ?: return
         preparingPhotoSlotIds = preparingPhotoSlotIds + slot.id
-        scope.launch {
+        appState.launchMutation {
             try {
                 val result =
                     photoCommitter.commit(
