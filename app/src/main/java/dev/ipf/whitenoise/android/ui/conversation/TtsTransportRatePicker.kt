@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -36,7 +37,8 @@ internal fun TtsTransportRatePicker(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var customEditorOpen by remember { mutableStateOf(false) }
-    val rateLabel = ttsRateLabel(activeRate)
+    val locale = LocalConfiguration.current.locales[0]
+    val rateLabel = ttsRateLabel(activeRate, locale)
     val controlDescription = stringResource(R.string.tts_bar_rate_control, rateLabel)
 
     Box {
@@ -61,6 +63,7 @@ internal fun TtsTransportRatePicker(
             TransportRateMenuContent(
                 rateOverride = rateOverride,
                 activeRate = activeRate,
+                locale = locale,
                 customEditorOpen = customEditorOpen,
                 onCustomEditorOpenChange = { customEditorOpen = it },
                 onRateSelected = { rate ->
@@ -78,6 +81,7 @@ internal fun TtsTransportRatePicker(
 private fun TransportRateMenuContent(
     rateOverride: Float?,
     activeRate: Float,
+    locale: java.util.Locale,
     customEditorOpen: Boolean,
     onCustomEditorOpenChange: (Boolean) -> Unit,
     onRateSelected: (Float?) -> Unit,
@@ -96,7 +100,7 @@ private fun TransportRateMenuContent(
         )
         TtsRatePreferences.PRESET_RATES.forEach { rate ->
             TransportRateMenuItem(
-                label = ttsRateLabel(rate),
+                label = ttsRateLabel(rate, locale),
                 selected = rateOverride == rate,
                 onClick = { onRateSelected(rate) },
             )

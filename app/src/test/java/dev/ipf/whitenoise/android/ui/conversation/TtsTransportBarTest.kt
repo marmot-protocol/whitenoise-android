@@ -50,6 +50,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -148,7 +149,7 @@ class TtsTransportBarTest {
             .performClick()
         TtsRatePreferences.PRESET_RATES.forEach { rate ->
             control.performClick()
-            composeRule.onNode(hasText(ttsRateLabel(rate)) and isSelectable()).performClick()
+            composeRule.onNode(hasText(ttsRateLabel(rate, Locale.US)) and isSelectable()).performClick()
         }
 
         assertEquals(listOf<Float?>(null) + TtsRatePreferences.PRESET_RATES, selections)
@@ -212,7 +213,7 @@ class TtsTransportBarTest {
         composeRule.onNode(hasSetTextAction()).performTextReplacement("1.25")
         composeRule.onNodeWithText(label(R.string.tts_rate_apply)).performClick()
 
-        val description = app.getString(R.string.tts_bar_rate_control, ttsRateLabel(1.3f))
+        val description = app.getString(R.string.tts_bar_rate_control, ttsRateLabel(1.3f, Locale.US))
         composeRule.onNodeWithContentDescription(description).assertIsDisplayed()
     }
 
@@ -323,7 +324,10 @@ class TtsTransportBarTest {
         }
     }
 
-    private fun rateControlDescription(): String = app.getString(R.string.tts_bar_rate_control, ttsRateLabel(1.0f))
+    private fun rateControlDescription(): String {
+        val rateLabel = ttsRateLabel(1.0f, Locale.US)
+        return app.getString(R.string.tts_bar_rate_control, rateLabel)
+    }
 
     private fun openCustomRateEditor() {
         composeRule.onNodeWithContentDescription(rateControlDescription()).performClick()

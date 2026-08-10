@@ -29,6 +29,14 @@ class TtsRateInputTest {
     }
 
     @Test
+    fun customRateInputRejectsGroupingAndWrongDecimalSeparators() {
+        assertNull(parseTtsRateInput("0,5", Locale.US))
+        assertNull(parseTtsRateInput("1,0", Locale.US))
+        assertNull(parseTtsRateInput("0.5", Locale.GERMANY))
+        assertNull(parseTtsRateInput("1.0", Locale.GERMANY))
+    }
+
+    @Test
     fun customRateInputFormattingUsesTheActiveLocalesDecimalSeparator() {
         assertEquals("1.3", ttsRateInputValue(1.26f, Locale.US))
         assertEquals("1,3", ttsRateInputValue(1.26f, Locale.GERMANY))

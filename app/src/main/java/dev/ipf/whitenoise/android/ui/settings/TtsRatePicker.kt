@@ -42,7 +42,12 @@ internal fun parseTtsRateInput(
     if (candidate.isEmpty()) return null
 
     val position = ParsePosition(0)
-    val value = NumberFormat.getNumberInstance(locale).parse(candidate, position)?.toDouble()
+    val value =
+        NumberFormat
+            .getNumberInstance(locale)
+            .apply { isGroupingUsed = false }
+            .parse(candidate, position)
+            ?.toDouble()
     val minimum = TtsRatePreferences.MIN_RATE.toString().toDouble()
     val maximum = TtsRatePreferences.MAX_RATE.toString().toDouble()
     return value
@@ -102,7 +107,7 @@ internal fun TtsCustomRateEditor(
     val locale = LocalConfiguration.current.locales[0]
     var input by remember(initialRate, locale) { mutableStateOf(ttsRateInputValue(initialRate, locale)) }
     val parsedRate = parseTtsRateInput(input, locale)
-    val invalid = input.isNotBlank() && parsedRate == null
+    val invalid = parsedRate == null
     val errorMessage = stringResource(R.string.tts_rate_custom_error)
     val applyRate: () -> Unit = {
         parsedRate?.let(onRateSelected)

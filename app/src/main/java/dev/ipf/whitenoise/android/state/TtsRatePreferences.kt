@@ -23,7 +23,12 @@ class TtsRatePreferences(
     val rateOverride: StateFlow<Float?> = _rateOverride.asStateFlow()
 
     fun setRateOverride(rate: Float?) {
-        val normalized = rate?.let(::normalizeRate) ?: if (rate == null) null else return
+        val normalized =
+            if (rate == null) {
+                null
+            } else {
+                normalizeRate(rate) ?: return
+            }
         if (normalized == _rateOverride.value) return
         _rateOverride.value = normalized
         val edit = preferences.edit()

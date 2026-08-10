@@ -13,26 +13,26 @@ class TtsTransportBarLogicTest {
     fun rateLabelsFormatWithTheActiveLocale() {
         val previous = java.util.Locale.getDefault()
         try {
-            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            java.util.Locale.setDefault(java.util.Locale.US)
             assertEquals(
                 "0,75\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(0.75f),
+                    .ttsRateLabel(0.75f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "1\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(1.0f),
+                    .ttsRateLabel(1.0f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "2,5\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(2.5f),
+                    .ttsRateLabel(2.5f, java.util.Locale.GERMANY),
             )
             assertEquals(
                 "3\u00d7",
                 dev.ipf.whitenoise.android.ui.settings
-                    .ttsRateLabel(3.0f),
+                    .ttsRateLabel(3.0f, java.util.Locale.GERMANY),
             )
         } finally {
             java.util.Locale.setDefault(previous)
