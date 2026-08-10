@@ -83,6 +83,111 @@ class RelayUrlsTest {
     }
 
     @Test
+    fun releaseDistinguishesUnsupportedExternalHostFromInvalidUrl() {
+        assertEquals(
+            RelayUrlValidationResult.UnsupportedHost,
+            relayUrlValidationResult("wss://relay.example", allowExternalRelayHosts = false),
+        )
+        assertEquals(
+            RelayUrlValidationResult.Invalid,
+            relayUrlValidationResult("https://relay.example", allowExternalRelayHosts = false),
+        )
+        assertEquals(
+            RelayUrlValidationResult.Acceptable,
+            relayUrlValidationResult("wss://relay.us.whitenoise.chat", allowExternalRelayHosts = false),
+        )
+    }
+
+    @Test
+    fun releaseAdditionCleansImportedExternalRelaysBeforePublishing() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = listOf("wss://relay.us.whitenoise.chat"),
+            ),
+            relayListAfterAddition(
+                currentRelays = listOf("wss://external.example"),
+                relayToAdd = "wss://relay.us.whitenoise.chat",
+                allowExternalRelayHosts = false,
+            ),
+        )
+        assertEquals(
+            null,
+            relayListAfterAddition(
+                currentRelays = listOf("wss://relay.us.whitenoise.chat"),
+                relayToAdd = "wss://external.example",
+                allowExternalRelayHosts = false,
+            ),
+        )
+    }
+
+    @Test
+    fun releaseRemovalCleansAllImportedExternalRelays() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = listOf("wss://relay.us.whitenoise.chat"),
+            ),
+            relayListAfterRemoval(
+                currentRelays =
+                    listOf(
+                        "wss://relay.us.whitenoise.chat",
+                        "wss://one.external.example",
+                        "wss://two.external.example",
+                    ),
+                relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = false,
+            ),
+        )
+    }
+
+    @Test
+    fun releaseRemovalFallsBackToWhiteNoiseRelaysWhenOnlyExternalRelaysRemain() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = MarmotClient.bootstrapRelays,
+            ),
+            relayListAfterRemoval(
+                currentRelays = listOf("wss://one.external.example", "wss://two.external.example"),
+                relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = false,
+            ),
+        )
+    }
+
+    @Test
+    fun debugRemovalKeepsOtherExternalRelays() {
+        assertEquals(
+            RelayListEditPlan(
+                relays = listOf("wss://two.external.example"),
+            ),
+            relayListAfterRemoval(
+                currentRelays = listOf("wss://one.external.example", "wss://two.external.example"),
+                relayToRemove = "wss://one.external.example",
+                allowExternalRelayHosts = true,
+            ),
+        )
+    }
+
+    @Test
+    fun releaseKeepsLastSupportedRelayButAllowsExternalCleanup() {
+        val relays = listOf("wss://relay.us.whitenoise.chat", "wss://external.example")
+
+        assertFalse(
+            canRemoveRelay(
+                currentRelays = relays,
+                relay = "wss://relay.us.whitenoise.chat",
+                allowExternalRelayHosts = false,
+            ),
+        )
+        assertTrue(
+            canRemoveRelay(
+                currentRelays = relays,
+                relay = "wss://external.example",
+                allowExternalRelayHosts = false,
+            ),
+        )
+    }
+
+    @Test
     fun relayUrlValidationRejectsPrivateAndLoopbackHosts() {
         // SSRF guard: relay URLs sourced from protocol messages must not point
         // the client at loopback or the local network. See issue #82.

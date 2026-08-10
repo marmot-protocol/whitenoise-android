@@ -491,6 +491,9 @@
     <string name="no_relays">Реле не настроены</string>
     <string name="remove_relay">Удалить реле</string>
     <string name="add_relay">Добавить Реле</string>
+    <string name="error_invalid_relay_url">Введите допустимый безопасный URL ретранслятора, начинающийся с wss://.</string>
+    <string name="error_external_relay_not_supported">В этой версии поддерживаются только ретрансляторы, управляемые White Noise.</string>
+    <string name="unsupported_relays_cleanup_notice">Внешние ретрансляторы, импортированные из другого приложения, не поддерживаются в этой версии. При изменении списка все неподдерживаемые ретрансляторы будут удалены.</string>
     <string name="nip_65">Куда я публикую</string>
     <string name="inbox">Откуда я получаю</string>
     <string name="relay_posting_help">Другие получают ваш ключ с этих реле, чтобы добавить вас в группы.</string>

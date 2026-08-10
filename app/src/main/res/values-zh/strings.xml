@@ -460,6 +460,9 @@
     <string name="no_relays">未配置中继器</string>
     <string name="remove_relay">移除中继器</string>
     <string name="add_relay">添加中继器</string>
+    <string name="error_invalid_relay_url">请输入以 wss:// 开头的有效安全中继 URL。</string>
+    <string name="error_external_relay_not_supported">此版本仅支持由 White Noise 管理的中继。</string>
+    <string name="unsupported_relays_cleanup_notice">此版本不支持从其他应用导入的外部中继。编辑此列表会移除所有不受支持的中继。</string>
     <string name="nip_65">我发布到哪里</string>
     <string name="inbox">我在哪里接收</string>
     <string name="relay_posting_help">其他人从这些中继获取你的密钥，以便将你加入群组。</string>

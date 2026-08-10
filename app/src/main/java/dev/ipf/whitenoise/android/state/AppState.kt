@@ -984,6 +984,22 @@ enum class RelayListKind {
     Inbox,
 }
 
+internal enum class RelayUrlValidationResult {
+    Acceptable,
+    UnsupportedHost,
+    Invalid,
+}
+
+internal data class RelayListEditPlan(
+    val relays: List<String>,
+)
+
+private enum class RelayPublishValidationError {
+    Invalid,
+    Blocked,
+    Unavailable,
+}
+
 internal fun normalizeRelayUrls(
     relays: Iterable<String>,
     allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
@@ -1009,7 +1025,66 @@ internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim
 internal fun isAcceptableRelayUrl(
     url: String,
     allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
-): Boolean = canonicalRelayUrl(url, allowExternalRelayHosts) != null
+): Boolean = relayUrlValidationResult(url, allowExternalRelayHosts) == RelayUrlValidationResult.Acceptable
+
+internal fun relayUrlValidationResult(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): RelayUrlValidationResult {
+    val canonical =
+        canonicalRelayUrl(url, allowExternalRelayHosts = true)
+            ?: return RelayUrlValidationResult.Invalid
+    return if (allowExternalRelayHosts || canonicalRelayUrl(canonical, allowExternalRelayHosts = false) != null) {
+        RelayUrlValidationResult.Acceptable
+    } else {
+        RelayUrlValidationResult.UnsupportedHost
+    }
+}
+
+internal fun relayListAfterAddition(
+    currentRelays: List<String>,
+    relayToAdd: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): RelayListEditPlan? {
+    if (relayUrlValidationResult(relayToAdd, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable) {
+        return null
+    }
+    return RelayListEditPlan(
+        relays = normalizeRelayUrls(currentRelays + relayToAdd, allowExternalRelayHosts),
+    )
+}
+
+internal fun relayListAfterRemoval(
+    currentRelays: List<String>,
+    relayToRemove: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+    fallbackRelays: List<String> = MarmotClient.bootstrapRelays,
+): RelayListEditPlan {
+    val target = relayToRemove.trim()
+    val remaining =
+        currentRelays
+            .map(String::trim)
+            .filter { it.isNotEmpty() && it != target }
+            .distinct()
+    val supported = normalizeRelayUrls(remaining, allowExternalRelayHosts)
+    return RelayListEditPlan(
+        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays, allowExternalRelayHosts) },
+    )
+}
+
+internal fun canRemoveRelay(
+    currentRelays: List<String>,
+    relay: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): Boolean {
+    if (relayUrlValidationResult(relay, allowExternalRelayHosts) != RelayUrlValidationResult.Acceptable) {
+        return true
+    }
+    return normalizeRelayUrls(
+        currentRelays.filterNot { it.trim() == relay.trim() },
+        allowExternalRelayHosts,
+    ).isNotEmpty()
+}
 
 internal enum class RelayResolveTimeCheckResult {
     Passed,
@@ -3913,58 +3988,102 @@ class WhiteNoiseAppState private constructor(
         }.getOrNull()
     }
 
-    suspend fun accountRelayLists(): AccountRelayListsFfi? {
-        val account = activeAccountRef ?: return null
-        return runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
+    suspend fun accountRelayLists(): AccountRelayListsFfi? = activeAccountRef?.let { loadAccountRelayLists(it) }
+
+    suspend fun addAccountRelay(
+        kind: RelayListKind,
+        relay: String,
+    ): AccountRelayListsFfi? {
+        val validationError =
+            when (relayUrlValidationResult(relay)) {
+                RelayUrlValidationResult.Acceptable -> null
+                RelayUrlValidationResult.UnsupportedHost -> R.string.error_external_relay_not_supported
+                RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
+            }
+        return if (validationError != null) {
+            present(R.string.toast_relay_update_failed, validationError)
+            null
+        } else {
+            val account = activeAccountRef
+            val current = account?.let { loadAccountRelayLists(it) }
+            val plan = current?.let { relayListAfterAddition(it.relaysFor(kind), relay) }
+            if (account != null && plan != null) publishAccountRelays(account, kind, plan) else null
+        }
     }
 
-    suspend fun setAccountRelays(
+    suspend fun removeAccountRelay(
         kind: RelayListKind,
-        relays: List<String>,
+        relay: String,
     ): AccountRelayListsFfi? {
-        val account = activeAccountRef ?: return null
-        val candidates = relays.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        if (candidates.any { !isAcceptableRelayUrl(it) }) {
-            present(R.string.toast_relay_update_failed, R.string.error_remove_invalid_relay_urls_first, copyable = true)
-            return null
+        val account = activeAccountRef
+        val current = account?.let { loadAccountRelayLists(it) }
+        return if (account != null && current != null) {
+            publishAccountRelays(account, kind, relayListAfterRemoval(current.relaysFor(kind), relay))
+        } else {
+            null
         }
-        val next = normalizeRelayUrls(candidates)
-        if (next.isEmpty()) {
-            present(R.string.toast_relay_list_empty)
-            return null
-        }
-        when (relayUrlsResolveTimeCheckResult(next)) {
-            RelayResolveTimeCheckResult.Passed -> Unit
-            RelayResolveTimeCheckResult.Blocked -> {
-                present(
-                    R.string.toast_relay_update_failed,
-                    R.string.error_remove_invalid_relay_urls_first,
-                    copyable = true,
-                )
-                return null
-            }
-            RelayResolveTimeCheckResult.Unavailable -> {
-                present(
-                    R.string.toast_relay_update_failed,
-                    AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
-                    copyable = true,
-                )
-                return null
-            }
-        }
-        return runCatchingCancellable {
-            marmotIo {
-                when (kind) {
-                    RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
-                    RelayListKind.Inbox -> setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
-                }
-            }
-        }.onSuccess {
-            present(R.string.toast_relay_list_updated)
-        }.onFailure {
-            present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()), copyable = true)
-        }.getOrNull()
     }
+
+    private suspend fun publishAccountRelays(
+        account: String,
+        kind: RelayListKind,
+        plan: RelayListEditPlan,
+    ): AccountRelayListsFfi? {
+        val next = plan.relays
+        val validationError = relayPublishValidationError(next)
+        return if (validationError != null) {
+            when (validationError) {
+                RelayPublishValidationError.Invalid ->
+                    present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url, copyable = true)
+                RelayPublishValidationError.Blocked ->
+                    present(
+                        R.string.toast_relay_update_failed,
+                        R.string.error_remove_invalid_relay_urls_first,
+                        copyable = true,
+                    )
+                RelayPublishValidationError.Unavailable ->
+                    present(
+                        R.string.toast_relay_update_failed,
+                        AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
+                        copyable = true,
+                    )
+            }
+            null
+        } else {
+            runCatchingCancellable {
+                marmotIo {
+                    when (kind) {
+                        RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
+                        RelayListKind.Inbox -> setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
+                    }
+                }
+            }.onSuccess {
+                present(R.string.toast_relay_list_updated)
+            }.onFailure {
+                present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()), copyable = true)
+            }.getOrNull()
+        }
+    }
+
+    private suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
+        runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
+
+    private suspend fun relayPublishValidationError(relays: List<String>): RelayPublishValidationError? =
+        when {
+            relays.isEmpty() || relays.any { !isAcceptableRelayUrl(it) } -> RelayPublishValidationError.Invalid
+            else ->
+                when (relayUrlsResolveTimeCheckResult(relays)) {
+                    RelayResolveTimeCheckResult.Passed -> null
+                    RelayResolveTimeCheckResult.Blocked -> RelayPublishValidationError.Blocked
+                    RelayResolveTimeCheckResult.Unavailable -> RelayPublishValidationError.Unavailable
+                }
+        }
+
+    private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
+        when (kind) {
+            RelayListKind.Nip65 -> nip65.relays
+            RelayListKind.Inbox -> inbox.relays
+        }
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
 
